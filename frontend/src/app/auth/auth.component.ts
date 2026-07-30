@@ -1,0 +1,118 @@
+import { Component, inject, ChangeDetectorRef, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { AuthService } from '../services/auth.service';
+import { LucideEye, LucideEyeOff } from '@lucide/angular';
+import { HotToastService } from '@ngneat/hot-toast';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-auth',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, LucideEye, LucideEyeOff],
+  templateUrl: './auth.component.html',
+  styleUrls: ['./auth.component.css']
+})
+export class AuthComponent {
+  currentView: 'login' | 'register' = 'login';
+  
+  private fb = inject(FormBuilder);
+  private authService = inject(AuthService);
+  private toast = inject(HotToastService);
+  private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
+
+  registerForm: FormGroup;
+  loginForm: FormGroup;
+
+  isSubmitting = signal(false);
+  apiError = '';
+  showPassword = false;
+
+  constructor() {
+    this.registerForm = this.fb.group({
+      firstName: ['', Validators.required],
+      lastName: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
+      companyName: ['', Validators.required],
+      phone: [''],
+      password: ['', [Validators.required, Validators.minLength(8)]],
+      terms: [false, Validators.requiredTrue]
+    });
+
+    this.loginForm = this.fb.group({
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', Validators.required]
+    });
+  }
+
+  toggleView() {
+    this.currentView = this.currentView === 'login' ? 'register' : 'login';
+    this.apiError = '';
+    this.showPassword = false;
+    this.registerForm.reset();
+    this.loginForm.reset();
+  }
+
+  togglePassword() {
+    this.showPassword = !this.showPassword;
+  }
+
+  onRegister() {
+    if (this.registerForm.invalid) {
+      this.registerForm.markAllAsTouched();
+      return;
+    }
+
+    this.isSubmitting.set(true);
+    this.apiError = '';
+
+    this.authService.signup(this.registerForm.value).subscribe({
+      next: (res) => {
+        this.isSubmitting.set(false);
+        this.toast.success('Registration successful! Please log in with your new credentials.');
+        this.toggleView();
+      },
+      error: (err) => {
+        this.isSubmitting.set(false);
+        this.toast.error(err.error?.message || 'Registration failed. Please try again.');
+      }
+    });
+  }
+
+  onLogin() {
+    if (this.loginForm.invalid) {
+      this.loginForm.markAllAsTouched();
+      return;
+    }
+
+    this.isSubmitting.set(true);
+    this.apiError = '';
+
+    this.authService.login(this.loginForm.value).subscribe({
+      next: (res) => {
+        this.toast.success('Login successful! Loading workspace...');
+        
+        // Fetch user to check onboarding status
+        this.authService.getMe().subscribe({
+          next: (user) => {
+            this.isSubmitting.set(false);
+            if (user.company?.onboardingCompleted) {
+              this.router.navigate(['/dashboard']);
+            } else {
+              this.router.navigate(['/onboarding']);
+            }
+          },
+          error: () => {
+            this.isSubmitting.set(false);
+            this.router.navigate(['/dashboard']); // Fallback
+          }
+        });
+      },
+      error: (err) => {
+        this.isSubmitting.set(false);
+        this.toast.error(err.error?.message || 'Invalid credentials.');
+      }
+    });
+  }
+}

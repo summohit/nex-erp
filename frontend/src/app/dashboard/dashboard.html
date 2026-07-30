@@ -1,0 +1,81 @@
+<div class="dashboard-container">
+  <div class="welcome-card" *ngIf="user()">
+    <h2>Welcome back, {{ user()?.employee?.firstName }}!</h2>
+    <p>Your dashboard is ready. Select an option from the sidebar to get started.</p>
+  </div>
+
+  <div class="dashboard-grid" *ngIf="user()">
+    <!-- ATTENDANCE WIDGET -->
+    <div class="widget-card attendance-widget">
+      <div class="widget-header">
+        <h3>Time Tracking</h3>
+        <svg lucideClock size="20" class="text-muted"></svg>
+      </div>
+      
+      <div class="attendance-content">
+        <div class="status-indicator">
+          <div class="pulse-ring" [class.active]="todayAttendance()?.clockIn && !todayAttendance()?.clockOut"></div>
+          <span class="status-text">
+            {{ (!todayAttendance()?.clockIn) ? 'Not Clocked In' : (!todayAttendance()?.clockOut ? 'Currently Clocked In' : 'Clocked Out for the day') }}
+          </span>
+        </div>
+        
+        <div class="time-logs" *ngIf="todayAttendance()?.clockIn">
+          <div class="log-item">
+            <span class="log-label">Clock In:</span>
+            <span class="log-time">{{ todayAttendance()?.clockIn | date:'shortTime' }}</span>
+          </div>
+          <div class="log-item" *ngIf="todayAttendance()?.clockOut">
+            <span class="log-label">Clock Out:</span>
+            <span class="log-time">{{ todayAttendance()?.clockOut | date:'shortTime' }}</span>
+          </div>
+        </div>
+
+        <button 
+          class="btn-primary full-width" 
+          [class.btn-danger]="todayAttendance()?.clockIn && !todayAttendance()?.clockOut"
+          [disabled]="todayAttendance()?.clockOut || isClocking()"
+          (click)="clockInOut()">
+          <span *ngIf="isClocking()" class="loader-text">Locating...</span>
+          <span *ngIf="!isClocking()">
+            {{ (!todayAttendance()?.clockIn) ? 'Clock In' : 'Clock Out' }}
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ONBOARDING WIDGET -->
+  <div class="onboarding-widget" *ngIf="user() && onboardingStatus() !== 'COMPLETED' && onboardingTasks().length > 0">
+    <div class="widget-header">
+      <div class="header-titles">
+        <h3>Welcome to the Team! 🎉</h3>
+        <p>Please complete your onboarding checklist to get fully set up.</p>
+      </div>
+      <div class="progress-indicator">
+        <div class="circular-progress" [style.--progress]="getProgressPercentage() + '%'">
+          <span>{{ getProgressPercentage() }}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="task-list">
+      <div class="task-item" *ngFor="let task of onboardingTasks()" [class.completed]="task.isCompleted" (click)="completeTask(task)">
+        <div class="task-icon">
+          <svg *ngIf="task.isCompleted" lucideCheckCircle2 class="text-success" size="20"></svg>
+          <svg *ngIf="!task.isCompleted" lucideCircle class="text-muted" size="20"></svg>
+        </div>
+        <div class="task-details">
+          <h4>{{ task.title }}</h4>
+          <p *ngIf="task.description">{{ task.description }}</p>
+        </div>
+        <div class="loading-spinner" *ngIf="isCompletingTask() === task.id"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="!user()">
+    <div class="loader-spinner"></div>
+    <p>Loading your dashboard...</p>
+  </div>
+</div>

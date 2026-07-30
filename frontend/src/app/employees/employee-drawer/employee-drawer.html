@@ -1,0 +1,125 @@
+<div class="drawer-overlay" [class.open]="isOpen" (click)="close()"></div>
+
+<div class="drawer-container" [class.open]="isOpen">
+  <div class="drawer-header">
+    <h2>{{ employeeData ? 'Edit Employee' : 'Add New Employee' }}</h2>
+    <button class="btn-close" (click)="close()">
+      <svg lucideX size="20"></svg>
+    </button>
+  </div>
+
+  <div class="drawer-body">
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="form-grid">
+        
+        <div class="form-group">
+          <label>First Name <span class="required">*</span></label>
+          <input type="text" class="form-control" formControlName="firstName" placeholder="John" [class.error]="form.get('firstName')?.invalid && form.get('firstName')?.touched">
+          <div class="error-text" *ngIf="form.get('firstName')?.invalid && form.get('firstName')?.touched">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            First Name is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Last Name <span class="required">*</span></label>
+          <input type="text" class="form-control" formControlName="lastName" placeholder="Doe" [class.error]="form.get('lastName')?.invalid && form.get('lastName')?.touched">
+          <div class="error-text" *ngIf="form.get('lastName')?.invalid && form.get('lastName')?.touched">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Last Name is required
+          </div>
+        </div>
+
+        <div class="form-group full-width">
+          <label>Email Address <span class="required">*</span></label>
+          <input type="email" class="form-control" formControlName="email" placeholder="john.doe@company.com" [class.error]="form.get('email')?.invalid && form.get('email')?.touched">
+          <small class="help-text" *ngIf="!employeeData">This will be used to log in. Default password is Welcome@123</small>
+          <div class="error-text" *ngIf="form.get('email')?.invalid && form.get('email')?.touched">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Valid Email is required
+          </div>
+        </div>
+
+        <div class="form-group full-width">
+          <label>Phone Number</label>
+          <input type="tel" class="form-control" formControlName="phone" placeholder="+1 (555) 000-0000">
+        </div>
+
+        <div class="form-group">
+          <label>Department <span class="required">*</span></label>
+          <select class="form-control" formControlName="departmentId" [class.error]="form.get('departmentId')?.invalid && form.get('departmentId')?.touched">
+            <option [ngValue]="null" disabled selected>Select Department</option>
+            <option *ngFor="let dept of departments" [ngValue]="dept.id">{{ dept.name }}</option>
+          </select>
+          <div class="error-text" *ngIf="form.get('departmentId')?.invalid && form.get('departmentId')?.touched">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Department is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Designation <span class="required">*</span></label>
+          <select class="form-control" formControlName="designationId" [class.error]="form.get('designationId')?.invalid && form.get('designationId')?.touched">
+            <option [ngValue]="null" disabled selected>Select Designation</option>
+            <option *ngFor="let des of filteredDesignations" [ngValue]="des.id">{{ des.name }}</option>
+          </select>
+          <div class="error-text" *ngIf="form.get('designationId')?.touched && form.get('designationId')?.errors?.['required']">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Designation is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Office Branch <span class="required">*</span></label>
+          <select class="form-control" formControlName="branchId" [class.is-invalid]="form.get('branchId')?.touched && form.get('branchId')?.invalid">
+            <option [ngValue]="null" disabled>Select branch</option>
+            <option *ngFor="let b of branches" [ngValue]="b.id">{{ b.name }}</option>
+          </select>
+          <div class="error-text" *ngIf="form.get('branchId')?.touched && form.get('branchId')?.errors?.['required']">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Office Branch is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Shift <span class="required">*</span></label>
+          <select class="form-control" formControlName="shiftId" [class.error]="form.get('shiftId')?.invalid && form.get('shiftId')?.touched">
+            <option [ngValue]="null">Select Shift</option>
+            <option *ngFor="let shift of shifts" [ngValue]="shift.id">{{ shift.name }} ({{shift.startTime}} - {{shift.endTime}})</option>
+          </select>
+          <div class="error-text" *ngIf="form.get('shiftId')?.invalid && form.get('shiftId')?.touched">
+            Shift is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Manager (Optional)</label>
+          <select class="form-control" formControlName="managerId">
+            <option [ngValue]="null">No Manager (Top Level)</option>
+            <option *ngFor="let e of employees" [ngValue]="e.id">{{ e.firstName }} {{ e.lastName }}</option>
+          </select>
+        </div>
+
+        <div class="form-group full-width">
+          <label>System Role <span class="required">*</span></label>
+          <select class="form-control" formControlName="role">
+            <option value="EMPLOYEE">Employee (Standard Access)</option>
+            <option value="HR">HR Manager</option>
+            <option value="FINANCE">Finance Manager</option>
+            <option value="SALES">Sales Representative</option>
+            <option value="ADMIN">Administrator</option>
+          </select>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <div class="drawer-footer">
+    <button class="btn-outline" (click)="close()" [disabled]="isSaving">Cancel</button>
+    <button class="btn-primary" (click)="save()" [disabled]="isSaving">
+      <span *ngIf="isSaving" class="spinner-small"></span>
+      {{ isSaving ? 'Saving...' : 'Save Employee' }}
+    </button>
+  </div>
+</div>

@@ -1,0 +1,499 @@
+<div class="attendance-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h2>Attendance & Leave</h2>
+      <p>Manage your time, view logs, and request leaves.</p>
+    </div>
+  </div>
+
+  <div class="tabs-wrapper">
+    <div class="tabs-nav">
+      <button 
+        [class.active]="activeTab() === 'attendance'" 
+        (click)="setTab('attendance')">
+        Attendance View
+      </button>
+        <button class="nav-tab" [class.active]="activeTab() === 'leaves'" (click)="setTab('leaves')">
+          My Leaves
+        </button>
+        <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'approvals'" (click)="setTab('approvals')">
+          Leave Approvals
+        </button>
+        <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'balances'" (click)="setTab('balances')">
+          Manage Balances
+        </button>
+        <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'shifts'" (click)="setTab('shifts')">
+          Shift Roster
+        </button>
+    </div>
+  </div>
+
+  <!-- ATTENDANCE VIEW TAB -->
+  <div class="tab-content" *ngIf="activeTab() === 'attendance'">
+    <div class="grid-2-col">
+      <!-- Attendance History Grid -->
+      <div class="widget-card logs-widget full-width-grid">
+        <div class="widget-header grid-header">
+          <div class="period-selectors">
+            <select [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event); onPeriodChange()" class="period-select">
+              <option *ngFor="let m of months; let i = index" [value]="i">{{ m }}</option>
+            </select>
+            <select [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event); onPeriodChange()" class="period-select">
+              <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+            </select>
+          </div>
+          
+          <div class="grid-actions">
+            <button class="btn btn-outline" (click)="exportToCsv()">
+              <!-- Export Icon -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export
+            </button>
+            <div class="view-toggle">
+              <button [class.active]="viewMode() === 'grid'" (click)="setViewMode('grid')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              </button>
+              <button [class.active]="viewMode() === 'list'" (click)="setViewMode('list')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Status Legend -->
+        <div class="status-legend" *ngIf="viewMode() === 'grid'">
+          <div class="legend-item">
+            <div class="legend-icon-wrapper bg-present"><svg lucideCheck class="status-present"></svg></div> Present
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon-wrapper bg-half-day"><svg lucideStarHalf class="status-half-day"></svg></div> Half Day
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon-wrapper bg-late"><svg lucideAlertCircle class="status-late"></svg></div> Late
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon-wrapper bg-absent"><svg lucideX class="status-absent"></svg></div> Absent
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon-wrapper bg-leave"><svg lucidePlane class="status-leave"></svg></div> On Leave
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon-wrapper bg-holiday"><svg lucideStar class="status-holiday"></svg></div> Holiday
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon-wrapper bg-day-off"><svg lucideCalendar class="status-day-off"></svg></div> Day Off
+          </div>
+        </div>
+        
+        <!-- Grid View -->
+        <div class="monthly-grid-container" *ngIf="viewMode() === 'grid'">
+          <div class="grid-scroll-area">
+            <div class="monthly-grid">
+              <div class="day-col" *ngFor="let day of monthlyGrid()" [class.is-weekend]="day.status === 'Day Off' || day.weekdayStr === 'Sat' || day.weekdayStr === 'Sun'">
+                <div class="day-header">
+                  <span class="day-num">{{ day.dayNumber }}</span>
+                  <span class="day-week">{{ day.weekdayStr }}</span>
+                </div>
+                <div class="day-cell" [class.is-empty]="day.isFuture"
+                     [ngClass]="{
+                       'bg-present': day.status === 'Present',
+                       'bg-half-day': day.status === 'Half Day',
+                       'bg-late': day.status === 'Late',
+                       'bg-absent': day.status === 'Absent',
+                       'bg-leave': day.status === 'On Leave',
+                       'bg-holiday': day.status === 'Holiday',
+                       'bg-day-off': day.status === 'Day Off'
+                     }">
+                  <ng-container *ngIf="!day.isFuture">
+                    <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
+                    <svg *ngIf="day.status === 'Half Day'" lucideStarHalf class="status-half-day status-icon"></svg>
+                    <svg *ngIf="day.status === 'Late'" lucideAlertCircle class="status-late status-icon"></svg>
+                    <svg *ngIf="day.status === 'Absent'" lucideX class="status-absent status-icon"></svg>
+                    <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
+                    <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
+                    <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
+                  </ng-container>
+                  <div class="custom-tooltip" *ngIf="day.tooltip">{{ day.tooltip }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Pinned Total -->
+          <div class="total-col">
+            <div class="day-header total-header">Total</div>
+            <div class="day-cell total-cell">
+              {{ totalPresent() }}/{{ totalWorkingDays() }}
+            </div>
+          </div>
+        </div>
+
+        <div class="empty-state" *ngIf="viewMode() === 'grid' && monthlyGrid().length === 0">
+          No data available for this month.
+        </div>
+
+        <!-- List View (Legacy) -->
+        <div class="table-container" *ngIf="viewMode() === 'list'">
+          <ag-grid-angular
+            class="ag-theme-quartz"
+            [theme]="'legacy'"
+            style="width: 100%; height: 400px;"
+            [rowData]="myHistory()"
+            [columnDefs]="attendanceColDefs"
+            [defaultColDef]="defaultColDef"
+            [gridOptions]="gridOptions">
+          </ag-grid-angular>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" *ngIf="activeTab() === 'leaves'">
+    <div class="grid-2-col">
+      <!-- Leave Balances -->
+      <div class="widget-card">
+        <div class="widget-header">
+          <h3>My Balances</h3>
+        </div>
+        
+        <div class="balances-grid">
+          <div class="balance-card" *ngFor="let balance of myBalances()">
+            <div class="balance-header">
+              <h4 class="balance-type">{{ balance.leaveType.name }}</h4>
+              <div class="balance-icon">
+                <svg lucideCalendar [size]="20"></svg>
+              </div>
+            </div>
+            <div class="balance-amount-wrapper">
+              <span class="balance-amount">{{ balance.allocated + balance.carriedOver - balance.used }}</span>
+              <span class="days-label">days left</span>
+            </div>
+            
+            <div class="balance-progress-container">
+              <div class="balance-progress-bar">
+                <div class="balance-progress-fill" [style.width.%]="math.max(0, math.min(((balance.allocated + balance.carriedOver - balance.used) / (balance.allocated + balance.carriedOver)) * 100, 100))"></div>
+              </div>
+              <div class="balance-stats">
+                <span>{{ balance.used }} used</span>
+                <span>{{ balance.allocated + balance.carriedOver }} total</span>
+              </div>
+            </div>
+          </div>
+          <div class="empty-state balances-empty" *ngIf="myBalances().length === 0">
+            <div class="empty-icon-wrapper">
+              <svg lucideCalendar [size]="32"></svg>
+            </div>
+            <h4>No Balances Assigned</h4>
+            <p class="text-muted">Your available leave balances will appear here.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leave Requests -->
+      <div class="widget-card">
+        <div class="widget-header">
+          <h3>Leave Requests</h3>
+          <button class="btn btn-primary" (click)="openRequestModal()" style="height: 38px; display: flex; align-items: center; gap: 8px; width: max-content;">
+            <svg lucideCalendar [size]="16"></svg>
+            Request Leave
+          </button>
+        </div>
+        
+        <div class="table-container mt-4">
+          <ag-grid-angular
+            class="ag-theme-quartz"
+            [theme]="'legacy'"
+            style="width: 100%; height: 300px;"
+            [rowData]="myRequests()"
+            [columnDefs]="leaveColDefs"
+            [defaultColDef]="defaultColDef"
+            [rowClassRules]="rowClassRules"
+            [gridOptions]="gridOptions"
+            (cellClicked)="onCellClicked($event)">
+          </ag-grid-angular>
+        </div>
+      </div>
+    </div>
+  </div> <!-- Close Container -->
+
+<!-- Request Leave Modal -->
+<div class="drawer-overlay" *ngIf="isRequestModalOpen()" (click)="closeRequestModal()">
+  <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 500px;">
+    <div class="drawer-header">
+      <h2>Request Leave</h2>
+      <button class="btn-icon" (click)="closeRequestModal()">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <div class="form-group mb-4">
+        <label>Leave Type <span style="color: #E14B42;">*</span></label>
+        <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#E14B42' : ''">
+          <option value="">Select Leave Type...</option>
+          <option *ngFor="let balance of myBalances()" [value]="balance.leaveType.id">
+            {{ balance.leaveType.name }} ({{ balance.allocated + balance.carriedOver - balance.used }} days available)
+          </option>
+        </select>
+        <div *ngIf="showFormErrors() && !requestForm.leaveTypeId" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Leave Type is required</div>
+      </div>
+
+      <div class="grid-2-col mb-4">
+        <div class="form-group">
+          <label>Start Date <span style="color: #E14B42;">*</span></label>
+          <input type="date" class="form-control" [(ngModel)]="requestForm.startDate" [style.border-color]="showFormErrors() && !requestForm.startDate ? '#E14B42' : ''">
+          <div *ngIf="showFormErrors() && !requestForm.startDate" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Start Date is required</div>
+        </div>
+        <div class="form-group">
+          <label>End Date <span style="color: #E14B42;">*</span></label>
+          <input type="date" class="form-control" [(ngModel)]="requestForm.endDate" [min]="requestForm.startDate" [style.border-color]="showFormErrors() && (!requestForm.endDate || requestForm.endDate < requestForm.startDate) ? '#E14B42' : ''">
+          <div *ngIf="showFormErrors() && !requestForm.endDate" style="color: #E14B42; font-size: 12px; margin-top: 4px;">End Date is required</div>
+          <div *ngIf="showFormErrors() && requestForm.endDate && requestForm.endDate < requestForm.startDate" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Must be >= Start Date</div>
+        </div>
+      </div>
+
+      <div class="form-group mb-4">
+        <label>Reason (Optional)</label>
+        <textarea class="form-control" [(ngModel)]="requestForm.reason" rows="3" placeholder="Additional details..."></textarea>
+      </div>
+
+      <div class="form-group mb-4">
+        <label>Attachment (Optional)</label>
+        <div class="file-drop-area" (click)="fileInput.click()" 
+             (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)"
+             [class.drag-over]="isDragOver()">
+          <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*,.pdf" style="display: none;" />
+          
+          <div class="drop-message" *ngIf="!selectedFile && !requestForm.attachmentUrl">
+            <svg lucideUploadCloud size="24"></svg>
+            <p>Drag & drop or click to upload</p>
+          </div>
+          
+          <div class="drop-message" *ngIf="selectedFile">
+            <svg lucideFile size="24"></svg>
+            <p>{{ selectedFile.name }}</p>
+          </div>
+
+          <div class="drop-message" *ngIf="!selectedFile && requestForm.attachmentUrl && editMode()">
+            <svg lucidePaperclip size="24"></svg>
+            <p>Current attachment uploaded</p>
+            <a [href]="requestForm.attachmentUrl" target="_blank" (click)="$event.stopPropagation()">View File</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+    <div class="drawer-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
+      <button class="btn btn-outline" (click)="closeRequestModal()" style="width: max-content;">Cancel</button>
+      <button class="btn btn-primary" (click)="submitLeaveRequest()" [disabled]="isSubmittingRequest()" style="width: max-content; display: flex; align-items: center; gap: 8px;">
+        <span *ngIf="isSubmittingRequest()" class="btn-spinner"></span>
+        {{ isSubmittingRequest() ? 'Submitting...' : 'Submit Request' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+  <!-- LEAVE APPROVALS (HR/Admin) TAB -->
+  <div class="tab-content" *ngIf="activeTab() === 'approvals' && isAdmin()">
+    <div class="widget-card">
+      <div class="widget-header">
+        <h3>Pending Leave Approvals</h3>
+      </div>
+      <div class="table-container mt-4">
+        <ag-grid-angular
+          class="ag-theme-quartz"
+          [theme]="'legacy'"
+          style="width: 100%; height: 500px;"
+          [rowData]="allRequests()"
+          [columnDefs]="hrRequestsColDefs"
+          [defaultColDef]="defaultColDef"
+          [rowClassRules]="rowClassRules"
+          [gridOptions]="gridOptions"
+          (cellClicked)="onCellClicked($event)">
+        </ag-grid-angular>
+      </div>
+    </div>
+  </div>
+
+  <!-- REJECT MODAL -->
+  <div class="drawer-overlay" *ngIf="isRejectModalOpen()" (click)="closeRejectModal()" style="display: flex; align-items: center; justify-content: center;">
+    <div class="widget-card" (click)="$event.stopPropagation()" style="width: 400px; max-width: 90vw; animation: fadeIn 0.2s;">
+      <div class="widget-header">
+        <h3>Reject Leave Request</h3>
+        <button class="btn-icon" (click)="closeRejectModal()">
+          <svg lucideX [size]="20"></svg>
+        </button>
+      </div>
+      <div class="form-group mb-4 mt-2">
+        <label>Reason for Rejection <span style="color: var(--text-error)">*</span></label>
+        <textarea class="form-control" [(ngModel)]="rejectReason" rows="3" placeholder="Explain why this request is being rejected..."></textarea>
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn btn-outline" (click)="closeRejectModal()" style="width: max-content;">Cancel</button>
+        <button class="btn btn-primary" (click)="submitRejectRequest()" style="width: max-content; background-color: var(--text-error);">Reject Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rejection Reason View Modal -->
+  <div class="drawer-overlay" *ngIf="isRejectionReasonModalOpen()" (click)="closeRejectionReasonModal()" style="display: flex; align-items: center; justify-content: center;">
+    <div class="widget-card" (click)="$event.stopPropagation()" style="width: 500px; max-width: 90vw; animation: fadeIn 0.2s;">
+      <div class="widget-header">
+        <h3>Rejection Reason</h3>
+        <button class="btn-icon" (click)="closeRejectionReasonModal()">
+          <svg lucideX size="20"></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px 0;">
+        <p style="font-size: 14px; color: #334155; line-height: 1.5; white-space: pre-wrap; background: #F8FAFC; padding: 12px; border-radius: 6px; border: 1px solid #E2E8F0;">{{ currentRejectionReason() }}</p>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end;">
+        <button class="btn btn-outline" (click)="closeRejectionReasonModal()" style="width: max-content;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANAGE BALANCES (HR/Admin) TAB -->
+  <div class="tab-content" *ngIf="activeTab() === 'balances' && isAdmin()">
+      
+      <!-- Assign Balances Form -->
+      <div class="widget-card">
+        <div class="widget-header">
+          <div>
+            <h3 style="margin: 0; margin-bottom: 4px;">Assign Leave Balance</h3>
+          </div>
+        </div>
+        
+        <div class="assign-form-container">
+          <div class="filter-group">
+            <label>Assignment Type</label>
+            <div style="display: flex; align-items: center; height: 38px;">
+              <input type="checkbox" [ngModel]="assignToAll()" (ngModelChange)="assignToAll.set($event)" id="assignAll" class="custom-checkbox" style="margin-right: 12px;">
+              <label for="assignAll" style="margin: 0; font-weight: 500; cursor: pointer;">All Employees</label>
+            </div>
+          </div>
+          
+          <div class="filter-group" *ngIf="!assignToAll()" style="flex: 1; min-width: 200px;">
+            <label>Employee</label>
+            <select class="form-control" [ngModel]="selectedEmployeeId()" (ngModelChange)="selectedEmployeeId.set($event)">
+              <option value="">Select Employee...</option>
+              <option *ngFor="let emp of employees()" [value]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
+            </select>
+          </div>
+
+          <div class="filter-group" style="flex: 1; min-width: 200px;">
+            <label>Leave Type</label>
+            <select class="form-control" [ngModel]="selectedLeaveTypeId()" (ngModelChange)="selectedLeaveTypeId.set($event); onLeaveTypeSelect()">
+              <option value="">Select Leave Type...</option>
+              <option *ngFor="let type of leaveTypes()" [value]="type.id">{{ type.name }}</option>
+            </select>
+          </div>
+
+          <div class="filter-group" style="width: 120px;">
+            <label>Allocated Days</label>
+            <input type="number" class="form-control" [ngModel]="allocatedDays()" (ngModelChange)="allocatedDays.set($event)">
+          </div>
+
+          <div class="filter-group" style="width: 100px;">
+            <label>Year</label>
+            <input type="number" class="form-control" [ngModel]="assignYear()" (ngModelChange)="assignYear.set($event)">
+          </div>
+
+          <div style="flex-shrink: 0;">
+            <button class="btn btn-primary" (click)="submitAssignBalance()" [disabled]="isAssigning()" style="height: 40px; padding: 0 20px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+              <svg lucideCheck [size]="18" *ngIf="!isAssigning()"></svg>
+              {{ isAssigning() ? 'Assigning...' : (assignToAll() ? 'Assign to All' : 'Assign Balance') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- All Balances Grid -->
+      <div class="widget-card mt-4">
+        <div class="widget-header">
+          <h3>Employee Leave Balances</h3>
+        </div>
+        
+        <div class="table-container mt-4">
+          <ag-grid-angular
+            class="ag-theme-quartz"
+            [theme]="'legacy'"
+            style="width: 100%; height: 500px;"
+            [rowData]="pivotedBalances()"
+            [columnDefs]="dynamicColDefs()"
+            [defaultColDef]="defaultColDef"
+            [gridOptions]="gridOptions">
+          </ag-grid-angular>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SHIFT ROSTER TAB -->
+  <div class="tab-content" *ngIf="activeTab() === 'shifts' && isAdmin()">
+    <div class="widget-card">
+      <div class="widget-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h3>Shift Roster</h3>
+        <button class="btn btn-primary" (click)="openCreateShift()" style="width: max-content; display: flex; align-items: center; gap: 8px;">
+          <svg lucideCalendar size="16"></svg> Create Shift
+        </button>
+      </div>
+
+      <!-- AG Grid Shift Table -->
+      <div style="width: 100%; height: 400px;">
+        <ag-grid-angular
+          class="ag-theme-quartz"
+          [theme]="'legacy'"
+          style="width: 100%; height: 100%;"
+          [rowData]="allShifts()"
+          [columnDefs]="shiftColDefs"
+          [defaultColDef]="shiftDefaultColDef"
+          [gridOptions]="shiftGridOptions"
+          [rowHeight]="50"
+          [headerHeight]="48">
+        </ag-grid-angular>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create/Edit Shift Drawer -->
+  <div class="drawer-overlay" *ngIf="isCreateShiftModalOpen()" (click)="closeShiftDrawer()">
+    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 500px;">
+      <div class="drawer-header">
+        <h2>{{ shiftEditMode() === 'create' ? 'Create New Shift' : 'Edit Shift' }}</h2>
+        <button class="btn-icon" (click)="closeShiftDrawer()">
+          <svg lucideX size="20"></svg>
+        </button>
+      </div>
+      <form (ngSubmit)="saveShift()" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+        <div class="drawer-body">
+          <div class="form-group mb-4">
+            <label>Shift Name</label>
+            <input type="text" class="form-control" name="name" [(ngModel)]="shiftForm.name" required placeholder="e.g. Morning Shift">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div class="form-group">
+              <label>Start Time</label>
+              <input type="time" class="form-control" name="startTime" [(ngModel)]="shiftForm.startTime" required>
+            </div>
+            <div class="form-group">
+              <label>End Time</label>
+              <input type="time" class="form-control" name="endTime" [(ngModel)]="shiftForm.endTime" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Buffer Time (Minutes)</label>
+            <input type="number" class="form-control" name="buffer" [(ngModel)]="shiftForm.bufferTimeMinutes" required min="0" placeholder="e.g. 15">
+            <small style="color: #64748B; margin-top: 4px; display: block;">Grace period before employee is considered Late.</small>
+          </div>
+        </div>
+        <div class="drawer-footer" style="display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn btn-outline" (click)="closeShiftDrawer()" style="width: max-content;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="width: max-content;">{{ shiftEditMode() === 'create' ? 'Create Shift' : 'Save Changes' }}</button>
+        </div>
+      </form>
+    </div>
+  </div>

@@ -1,0 +1,155 @@
+<!-- REGISTER VIEW -->
+<div *ngIf="currentView === 'register'" class="auth-split">
+  
+  <div class="auth-split-left">
+    <div class="brand-header mb-8">
+      <img src="/logo.png" class="brand-logo" alt="ces-work logo">
+    </div>
+
+    <div class="hero-image-container mb-8">
+      <div class="mock-browser">
+         <div class="mock-browser-header">
+            <div class="mock-dot red"></div>
+            <div class="mock-dot yellow"></div>
+            <div class="mock-dot green"></div>
+         </div>
+         <div class="mock-browser-body">
+            <div class="mock-card"></div>
+            <div class="mock-card"></div>
+            <div class="mock-card"></div>
+         </div>
+      </div>
+    </div>
+
+    <h2 class="fs-3xl mb-6">Sign up for a 14-day free trial</h2>
+    <ul class="feature-list">
+      <li>> 60% faster ticket resolution with AI agents</li>
+      <li>59% deflection in tickets with AI bots</li>
+      <li>< 3 month payback period</li>
+    </ul>
+  </div>
+
+  <div class="auth-split-right">
+    <div style="width: 100%; max-width: 480px; margin: 0 auto;">
+      <h2 class="fs-4xl fw-bold" style="letter-spacing: -0.5px; margin-bottom: 0.5rem;">
+        Try <span class="text-primary">ces-work</span> for free
+      </h2>
+      <p class="fs-md fw-medium mb-8">
+        No credit card required. No strings attached.
+      </p>
+
+      <form [formGroup]="registerForm" (ngSubmit)="onRegister()">
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>First name *</label>
+            <input type="text" formControlName="firstName" placeholder="Enter your first name" [class.error]="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched">
+            <div class="error-text" *ngIf="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched">First name is required</div>
+          </div>
+          <div class="form-group">
+            <label>Last name *</label>
+            <input type="text" formControlName="lastName" placeholder="Enter your last name" [class.error]="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched">
+            <div class="error-text" *ngIf="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched">Last name is required</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Work email *</label>
+          <input type="email" formControlName="email" placeholder="Enter your work email" [class.error]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+          <div class="error-text" *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">A valid email is required</div>
+        </div>
+
+        <div class="form-group">
+          <label>Company name *</label>
+          <input type="text" formControlName="companyName" placeholder="Enter your company" [class.error]="registerForm.get('companyName')?.invalid && registerForm.get('companyName')?.touched">
+          <div class="error-text" *ngIf="registerForm.get('companyName')?.invalid && registerForm.get('companyName')?.touched">Company name is required</div>
+        </div>
+
+        <div class="form-group">
+          <label>Phone number</label>
+          <input type="text" formControlName="phone" placeholder="Enter your phone number">
+        </div>
+
+        <!-- NEW PASSWORD FIELD -->
+        <div class="form-group relative">
+          <label>Password *</label>
+          <div class="password-wrapper">
+            <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="Create a secure password" [class.error]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+            <button type="button" class="password-toggle" (click)="togglePassword()">
+              <svg *ngIf="!showPassword" lucideEye size="20" strokeWidth="2" color="#64748b"></svg>
+              <svg *ngIf="showPassword" lucideEyeOff size="20" strokeWidth="2" color="#64748b"></svg>
+            </button>
+          </div>
+          <div class="error-text" *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">Password must be at least 8 characters</div>
+        </div>
+
+        <div class="checkbox-group mb-8">
+          <input type="checkbox" id="terms" formControlName="terms">
+          <label for="terms">By checking this box you agree to ces-work <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a> which govern the terms of this Free Trial.</label>
+        </div>
+        <div class="error-text mb-4" *ngIf="registerForm.get('terms')?.invalid && registerForm.get('terms')?.touched">You must accept the terms to continue</div>
+
+        <button type="submit" class="btn-primary mb-6" [disabled]="isSubmitting()">
+          <span *ngIf="!isSubmitting()">Try it free</span>
+          <span *ngIf="isSubmitting()" class="loader"></span>
+        </button>
+
+      </form>
+
+      <div class="text-center">
+        <span class="fs-sm text-muted">Already have an account? </span>
+        <a class="link" (click)="toggleView()">Log in here</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- LOGIN VIEW -->
+<div *ngIf="currentView === 'login'" class="auth-centered">
+  
+  <div class="brand-header mb-4 justify-center">
+    <img src="/logo.png" class="brand-logo" alt="ces-work logo">
+  </div>
+
+  <h2 class="fs-2xl mb-4">Sign into your ces-work account</h2>
+
+  <div class="login-card">
+    <form [formGroup]="loginForm" (ngSubmit)="onLogin()">
+      
+      <div class="form-group">
+        <label class="text-muted fw-medium">Email</label>
+        <input type="email" formControlName="email" [class.error]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched">
+        <div *ngIf="loginForm.get('email')?.invalid && loginForm.get('email')?.touched" class="error-text">Please enter a valid email</div>
+      </div>
+
+      <!-- NEW PASSWORD FIELD -->
+      <div class="form-group mb-6 relative">
+        <label class="text-muted fw-medium">Password</label>
+        <div class="password-wrapper">
+          <input [type]="showPassword ? 'text' : 'password'" formControlName="password" [class.error]="loginForm.get('password')?.invalid && loginForm.get('password')?.touched">
+          <button type="button" class="password-toggle" (click)="togglePassword()">
+            <svg *ngIf="!showPassword" lucideEye size="20" strokeWidth="2" color="#64748b"></svg>
+            <svg *ngIf="showPassword" lucideEyeOff size="20" strokeWidth="2" color="#64748b"></svg>
+          </button>
+        </div>
+        <div *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched" class="error-text">Please enter your password</div>
+      </div>
+
+      <button type="submit" class="btn-primary mb-4" [disabled]="isSubmitting()">
+        <span *ngIf="!isSubmitting()">Continue</span>
+        <span *ngIf="isSubmitting()" class="loader"></span>
+      </button>
+
+    </form>
+
+    <div class="text-center">
+      <span class="fs-sm">New user? </span>
+      <a class="link" (click)="toggleView()">Create an account</a>
+    </div>
+  </div>
+
+  <div class="text-center mt-4 text-muted" style="font-size: 0.75rem; max-width: 400px; line-height: 1.5;">
+    By clicking 'Continue', I accept the ces-work <a href="#" class="link">Terms of Service</a> and <a href="#" class="link">Privacy Notice</a>
+  </div>
+</div>

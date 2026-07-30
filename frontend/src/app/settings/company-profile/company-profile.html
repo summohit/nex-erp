@@ -1,0 +1,113 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Company Profile</h1>
+      <p>Manage your company's branding and global settings</p>
+    </div>
+    <button class="btn-primary" (click)="save()" [disabled]="isLoading() || isSaving()">
+      <svg *ngIf="!isSaving()" lucideSave size="18"></svg>
+      <span *ngIf="!isSaving()">Save Changes</span>
+      <span *ngIf="isSaving()" class="loader-text">Saving...</span>
+    </button>
+  </div>
+
+  <div *ngIf="isLoading()" class="loading-state">
+    <svg lucideLoader2 class="spinner" size="32"></svg>
+    <p>Loading profile...</p>
+  </div>
+
+  <div class="profile-content" *ngIf="!isLoading()">
+    <!-- Left Column: Settings -->
+    <div class="settings-card">
+      <div class="card-header">
+        <h2>General Information</h2>
+        <p>Update your company's core details and localization</p>
+      </div>
+      
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label>Company Name <span class="required">*</span></label>
+          <input type="text" class="form-control" [(ngModel)]="profile().name" placeholder="Acme Corp">
+        </div>
+
+        <div class="form-group full-width">
+          <label>Company Website</label>
+          <input type="text" class="form-control" [(ngModel)]="profile().domain" placeholder="https://example.com">
+        </div>
+
+        <div class="form-group">
+          <label>Industry</label>
+          <select class="form-control" [(ngModel)]="profile().industry">
+            <option [ngValue]="undefined" disabled selected>Select industry</option>
+            <option [ngValue]="null" disabled hidden>Select industry</option>
+            <option value="Technology">Technology</option>
+            <option value="Healthcare">Healthcare</option>
+            <option value="Finance">Finance</option>
+            <option value="Retail">Retail</option>
+            <option value="Manufacturing">Manufacturing</option>
+            <option value="Education">Education</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Company Size</label>
+          <select class="form-control" [(ngModel)]="profile().size">
+            <option [ngValue]="undefined" disabled selected>Select size</option>
+            <option [ngValue]="null" disabled hidden>Select size</option>
+            <option value="1-10">1-10 employees</option>
+            <option value="11-50">11-50 employees</option>
+            <option value="51-200">51-200 employees</option>
+            <option value="201-500">201-500 employees</option>
+            <option value="500+">500+ employees</option>
+          </select>
+        </div>
+
+        <div class="form-group full-width">
+          <label>Timezone</label>
+          <select class="form-control" [(ngModel)]="profile().timezone">
+            <option [ngValue]="undefined" disabled selected>Select timezone</option>
+            <option [ngValue]="null" disabled hidden>Select timezone</option>
+            <option value="UTC">UTC</option>
+            <option value="EST">Eastern Time (EST)</option>
+            <option value="PST">Pacific Time (PST)</option>
+            <option value="IST">India Standard Time (IST)</option>
+            <!-- Others -->
+            <option value="America/Chicago">Central Time (CT)</option>
+            <option value="America/Denver">Mountain Time (MT)</option>
+            <option value="Europe/London">London (GMT)</option>
+            <option value="Asia/Tokyo">Tokyo (JST)</option>
+            <option value="Australia/Sydney">Sydney (AEST)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Logo -->
+    <div class="branding-card">
+      <div class="card-header">
+        <h2>Company Logo</h2>
+        <p>This will be displayed in the sidebar and reports.</p>
+      </div>
+
+      <div class="logo-upload-container">
+        <div class="current-logo" *ngIf="profile().logoUrl">
+          <img [src]="profile().logoUrl" alt="Company Logo">
+        </div>
+        <div class="logo-placeholder" *ngIf="!profile().logoUrl">
+          <svg lucideBuilding2 size="48" color="#9ca3af"></svg>
+        </div>
+
+        <div class="upload-actions">
+          <input type="file" id="logoUpload" (change)="onFileSelected($event)" accept="image/png, image/jpeg, image/svg+xml" style="display: none;">
+          <button class="btn-outline" (click)="triggerFileInput()" [disabled]="isUploading()">
+            <svg *ngIf="!isUploading()" lucideUpload size="16"></svg>
+            <span *ngIf="!isUploading()">Upload new logo</span>
+            <span *ngIf="isUploading()">Uploading...</span>
+          </button>
+          <p class="help-text">JPG, PNG or SVG. Max size 2MB.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

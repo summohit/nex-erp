@@ -1,0 +1,276 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Onboarding Board</h1>
+      <p>Track new hire progress through their onboarding checklists.</p>
+    </div>
+    <div class="header-actions">
+      <div class="view-toggle">
+        <button [class.active]="viewMode() === 'KANBAN'" (click)="viewMode.set('KANBAN')" title="Kanban View">
+          <svg lucideLayoutGrid size="16"></svg>
+        </button>
+        <button [class.active]="viewMode() === 'TABLE'" (click)="viewMode.set('TABLE')" title="Table View">
+          <svg lucideTable size="16"></svg>
+        </button>
+      </div>
+      <button class="btn-primary" (click)="openTemplateModal()">
+        <svg lucideSettings size="16"></svg>
+        Manage Templates
+      </button>
+    </div>
+  </div>
+
+  <div class="kanban-board" cdkDropListGroup *ngIf="viewMode() === 'KANBAN'">
+    <!-- PENDING COLUMN -->
+    <div class="kanban-column">
+      <div class="column-header pending">
+        <div class="column-title">
+          <svg lucideListTodo size="16"></svg>
+          <h3>Not Started</h3>
+        </div>
+        <span class="count-badge">{{ boardData().pending.length }}</span>
+      </div>
+      
+      <div class="kanban-cards"
+           id="pendingList"
+           cdkDropList
+           [cdkDropListData]="boardData().pending"
+           (cdkDropListDropped)="drop($event)">
+           
+        <div class="empty-column-state" *ngIf="!boardData().pending.length">
+          Drop cards here
+        </div>
+
+        <div class="kanban-card" *ngFor="let emp of boardData().pending" cdkDrag (click)="openChecklist(emp)">
+          <div class="card-drag-handle" cdkDragHandle>
+            <svg lucideGripVertical size="16"></svg>
+          </div>
+          <div class="card-content-wrapper">
+            <div class="card-header">
+              <div class="avatar-chip">{{ getInitials(emp.firstName, emp.lastName) }}</div>
+              <div class="emp-info">
+                <h4>{{ emp.firstName }} {{ emp.lastName }}</h4>
+                <span class="designation">{{ emp.designation?.name || 'No Designation' }}</span>
+              </div>
+            </div>
+            <div class="card-progress">
+              <div class="progress-stats">
+                <span>0% Complete</span>
+                <span>0 / {{ emp.onboardingTasks?.length || 0 }}</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" [style.width]="'0%'"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IN PROGRESS COLUMN -->
+    <div class="kanban-column">
+      <div class="column-header in-progress">
+        <div class="column-title">
+          <svg lucideClock size="16"></svg>
+          <h3>In Progress</h3>
+        </div>
+        <span class="count-badge">{{ boardData().inProgress.length }}</span>
+      </div>
+      
+      <div class="kanban-cards"
+           id="inProgressList"
+           cdkDropList
+           [cdkDropListData]="boardData().inProgress"
+           (cdkDropListDropped)="drop($event)">
+           
+        <div class="empty-column-state" *ngIf="!boardData().inProgress.length">
+          Drop cards here
+        </div>
+
+        <div class="kanban-card" *ngFor="let emp of boardData().inProgress" cdkDrag (click)="openChecklist(emp)">
+          <div class="card-drag-handle" cdkDragHandle>
+            <svg lucideGripVertical size="16"></svg>
+          </div>
+          <div class="card-content-wrapper">
+            <div class="card-header">
+              <div class="avatar-chip in-progress-chip">{{ getInitials(emp.firstName, emp.lastName) }}</div>
+              <div class="emp-info">
+                <h4>{{ emp.firstName }} {{ emp.lastName }}</h4>
+                <span class="designation">{{ emp.designation?.name || 'No Designation' }}</span>
+              </div>
+            </div>
+            <div class="card-progress">
+              <div class="progress-stats">
+                <span>{{ getProgressPercentage(emp.onboardingTasks) }}% Complete</span>
+                <span>{{ getCompletedCount(emp.onboardingTasks) }} / {{ emp.onboardingTasks?.length }}</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill in-progress-fill" [style.width]="getProgressPercentage(emp.onboardingTasks) + '%'"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPLETED COLUMN -->
+    <div class="kanban-column">
+      <div class="column-header completed">
+        <div class="column-title">
+          <svg lucideCheckCircle2 size="16"></svg>
+          <h3>Completed</h3>
+        </div>
+        <span class="count-badge">{{ boardData().completed.length }}</span>
+      </div>
+      
+      <div class="kanban-cards"
+           id="completedList"
+           cdkDropList
+           [cdkDropListData]="boardData().completed"
+           (cdkDropListDropped)="drop($event)">
+           
+        <div class="empty-column-state" *ngIf="!boardData().completed.length">
+          Drop cards here
+        </div>
+
+        <div class="kanban-card" *ngFor="let emp of boardData().completed" cdkDrag (click)="openChecklist(emp)">
+          <div class="card-drag-handle" cdkDragHandle>
+            <svg lucideGripVertical size="16"></svg>
+          </div>
+          <div class="card-content-wrapper">
+            <div class="card-header">
+              <div class="avatar-chip completed-chip">{{ getInitials(emp.firstName, emp.lastName) }}</div>
+              <div class="emp-info">
+                <h4>{{ emp.firstName }} {{ emp.lastName }}</h4>
+                <span class="designation">{{ emp.designation?.name || 'No Designation' }}</span>
+              </div>
+            </div>
+            <div class="card-progress">
+              <div class="progress-stats">
+                <span class="text-success">100% Complete</span>
+                <span>{{ emp.onboardingTasks?.length }} / {{ emp.onboardingTasks?.length }}</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill completed-fill" [style.width]="'100%'"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table View -->
+  <div class="table-container" *ngIf="viewMode() === 'TABLE'">
+    <ag-grid-angular
+      style="width: 100%; height: 100%;"
+      class="ag-theme-quartz"
+      [rowData]="tableData()"
+      [columnDefs]="colDefs"
+      [defaultColDef]="defaultColDef"
+      [pagination]="true"
+      [paginationPageSize]="20"
+      [theme]="'legacy'">
+    </ag-grid-angular>
+  </div>
+</div>
+
+<!-- Template Manager Modal -->
+<div class="modal-overlay" *ngIf="isTemplateModalOpen()">
+  <div class="modal-content slide-in" style="max-width: 600px;">
+    <div class="modal-header">
+      <div class="header-titles">
+        <h2>Onboarding Checklist Templates</h2>
+        <p class="subtitle">These tasks are automatically assigned to all new hires.</p>
+      </div>
+      <button class="btn-icon close-btn" (click)="closeTemplateModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <!-- Add New Template -->
+      <div class="add-template-box">
+        <div class="form-group">
+          <label>Task Title</label>
+          <input type="text" class="form-control" [(ngModel)]="newTemplate.title" placeholder="e.g., Sign NDA">
+        </div>
+        <div class="form-group mt-2">
+          <label>Description (Optional)</label>
+          <input type="text" class="form-control" [(ngModel)]="newTemplate.description" placeholder="e.g., Please review and sign the attached NDA document.">
+        </div>
+        <button class="btn-black mt-3 w-100" (click)="addTemplate()" [disabled]="isSaving()">
+          {{ isSaving() ? 'Adding...' : 'Add to Default Checklist' }}
+        </button>
+      </div>
+
+      <!-- List Existing Templates -->
+      <div class="template-list mt-4">
+        <h4 class="list-title">Current Default Tasks ({{ templates().length }})</h4>
+        
+        <div class="empty-state" *ngIf="templates().length === 0">
+          No default tasks configured yet. Add some above!
+        </div>
+
+        <div class="template-item" *ngFor="let t of templates()">
+          <div class="template-info">
+            <p class="template-name">{{ t.title }}</p>
+            <p class="template-desc" *ngIf="t.description">{{ t.description }}</p>
+          </div>
+          <button class="btn-icon text-danger" (click)="deleteTemplate(t.id)" title="Remove">
+            <svg lucideX size="16"></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Employee Checklist Slide-over -->
+<div class="slide-over-overlay" *ngIf="isChecklistPanelOpen()" (click)="closeChecklist()">
+  <div class="slide-over-panel slide-in-right" (click)="$event.stopPropagation()">
+    <div class="slide-over-header">
+      <div class="emp-profile-header">
+        <div class="avatar-chip lg-chip">{{ getInitials(selectedEmployee().firstName, selectedEmployee().lastName) }}</div>
+        <div>
+          <h2>{{ selectedEmployee().firstName }} {{ selectedEmployee().lastName }}</h2>
+          <p class="designation">{{ selectedEmployee().designation?.name || 'No Designation' }}</p>
+        </div>
+      </div>
+      <button class="btn-icon close-btn" (click)="closeChecklist()">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+
+    <div class="slide-over-body">
+      <div class="progress-section">
+        <div class="progress-stats">
+          <span>{{ getProgressPercentage(selectedEmployee().onboardingTasks) }}% Complete</span>
+          <span>{{ getCompletedCount(selectedEmployee().onboardingTasks) }} / {{ selectedEmployee().onboardingTasks?.length || 0 }} Tasks</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill in-progress-fill" [style.width]="getProgressPercentage(selectedEmployee().onboardingTasks) + '%'"></div>
+        </div>
+      </div>
+
+      <div class="checklist-section">
+        <h3>Onboarding Checklist</h3>
+        
+        <div class="empty-state" *ngIf="!selectedEmployee().onboardingTasks?.length">
+          No tasks assigned to this employee.
+        </div>
+
+        <div class="checklist-item" *ngFor="let task of selectedEmployee().onboardingTasks" [class.completed]="task.isCompleted">
+          <label class="custom-checkbox">
+            <input type="checkbox" [checked]="task.isCompleted" (change)="toggleTask(task)">
+            <span class="checkmark"></span>
+          </label>
+          <div class="task-details">
+            <span class="task-title">{{ task.title }}</span>
+            <span class="task-desc" *ngIf="task.description">{{ task.description }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

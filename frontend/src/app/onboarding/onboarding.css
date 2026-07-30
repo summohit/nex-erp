@@ -1,0 +1,321 @@
+.onboarding-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top left, #f3f4f6, #ffffff);
+  padding: var(--space-xl);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative Orbs */
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 0;
+  opacity: 0.4;
+  animation: float 10s ease-in-out infinite alternate;
+}
+
+.orb-1 {
+  width: 400px;
+  height: 400px;
+  background: var(--color-primary);
+  top: -100px;
+  left: -100px;
+}
+
+.orb-2 {
+  width: 500px;
+  height: 500px;
+  background: #f43f5e; /* Rose color for nice contrast */
+  bottom: -150px;
+  right: -150px;
+  animation-delay: -5s;
+}
+
+@keyframes float {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(30px) scale(1.05); }
+}
+
+.wizard-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  width: 100%;
+  max-width: 600px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  position: relative;
+  z-index: 1;
+}
+
+.wizard-top-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-md) var(--space-lg) 0 var(--space-lg);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.wizard-header {
+  padding: 0 var(--space-lg) var(--space-lg) var(--space-lg);
+  text-align: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.btn-logout {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  color: var(--text-dark);
+  transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+  background: var(--color-danger);
+  color: white;
+  border-color: var(--color-danger);
+}
+
+.wizard-header h2 {
+  margin: 0 0 var(--space-xs) 0;
+  font-size: var(--fs-xl);
+  color: var(--text-dark);
+}
+
+.wizard-header p {
+  color: var(--text-muted);
+  margin: 0 0 var(--space-md) 0;
+  font-size: var(--fs-sm);
+}
+
+.progress-bar {
+  height: 6px;
+  background: var(--border-light);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+.wizard-body {
+  padding: var(--space-lg);
+  min-height: 250px;
+}
+
+.step-content h3 {
+  margin: 0 0 var(--space-md) 0;
+  font-size: var(--fs-lg);
+  color: var(--text-dark);
+}
+
+.form-group {
+  margin-bottom: var(--space-md);
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: var(--fw-medium);
+  color: var(--text-dark);
+  font-size: var(--fs-xs);
+}
+
+.form-group input[type="text"],
+.form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  background: var(--bg-main);
+  color: var(--text-dark);
+  transition: border-color 0.2s;
+}
+
+.drag-drop-zone {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  border: 2px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(0,0,0,0.02);
+  padding: var(--space-xl);
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.drag-drop-zone:hover {
+  border-color: var(--color-primary);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.drag-drop-zone.has-file {
+  border: 2px solid #10b981;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.file-input-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.drag-drop-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  pointer-events: none; /* Let clicks pass to the hidden input */
+}
+
+.upload-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.success-icon {
+  width: 32px;
+  height: 32px;
+  color: #10b981;
+  margin-bottom: var(--space-xs);
+}
+
+.upload-text {
+  font-weight: var(--fw-medium);
+  color: var(--text-dark);
+  font-size: var(--fs-sm);
+}
+
+.upload-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.text-success {
+  color: #10b981;
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-sm);
+}
+
+.mt-2 {
+  margin-top: var(--space-xs);
+}
+
+.img-preview-container {
+  width: auto;
+  max-width: 100%;
+  height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+
+.img-preview {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.avatar-preview .img-preview {
+  height: 80px;
+  width: 80px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* Spinner for uploading state */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-left-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--space-xs);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.wizard-footer {
+  padding: var(--space-lg);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-dark);
+  border: 1px solid var(--border-subtle);
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--border-light);
+}

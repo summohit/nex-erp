@@ -1,0 +1,265 @@
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.welcome-card {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  border: 1px solid #f3f4f6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+}
+
+.welcome-card h2 {
+  margin: 0 0 8px 0;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.welcome-card p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 15px;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: #6b7280;
+}
+
+.loader-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f3f4f6;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Onboarding Widget */
+.onboarding-widget {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 24px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+.widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.header-titles h3 {
+  margin: 0 0 4px 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.header-titles p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.circular-progress {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: conic-gradient(#10b981 var(--progress), #e5e7eb 0deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+  position: relative;
+}
+
+.circular-progress::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: white;
+}
+
+.circular-progress span {
+  position: relative;
+  z-index: 1;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.task-item:hover:not(.completed) {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.task-item.completed {
+  background: #f8fafc;
+  border-color: #f1f5f9;
+  opacity: 0.8;
+  cursor: default;
+}
+
+.task-icon {
+  margin-top: 2px;
+}
+
+.text-success { color: #10b981; }
+.text-muted { color: #9ca3af; }
+
+.task-details h4 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  transition: color 0.2s;
+}
+
+.task-item.completed .task-details h4 {
+  text-decoration: line-through;
+  color: #6b7280;
+}
+
+.task-details p {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: auto;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.widget-card {
+  background: white;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.attendance-widget .widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.attendance-widget h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-main);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  background: #f9fafb;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.pulse-ring {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.pulse-ring.active {
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
+.status-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.time-logs {
+  margin-bottom: 20px;
+}
+
+.log-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 14px;
+}
+
+.log-item:last-child {
+  border-bottom: none;
+}
+
+.log-label {
+  color: var(--text-muted);
+}
+
+.log-time {
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.full-width {
+  width: 100%;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  border: none;
+}
+.btn-danger:hover {
+  background: #dc2626;
+}

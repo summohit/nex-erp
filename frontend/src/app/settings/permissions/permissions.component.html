@@ -1,0 +1,133 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Roles & Permissions</h1>
+      <p>Configure what each role can access and map departments to default roles.</p>
+    </div>
+  </div>
+
+  <div class="tabs-container">
+    <button class="tab-btn" [class.active]="activeTab === 'departments'" (click)="setTab('departments')">
+      Department Mapping
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'matrix'" (click)="setTab('matrix')">
+      Permissions Matrix
+    </button>
+  </div>
+
+  <!-- TAB 1: Department Mapping -->
+  <div class="tab-content" *ngIf="activeTab === 'departments'">
+    <div class="content-header">
+      <h2>Department ➔ Role Mapping</h2>
+      <p>When a new employee is assigned to a department, they will automatically inherit its Default Role.</p>
+    </div>
+    
+    <div class="loading-state" *ngIf="isLoadingDepartments">
+      <div class="spinner"></div> Loading departments...
+    </div>
+
+    <div class="table-container" *ngIf="!isLoadingDepartments">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Department Name</th>
+            <th>Default Role</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let dept of departments">
+            <td><strong>{{ dept.name }}</strong></td>
+            <td>
+              <select 
+                class="form-control" 
+                [ngModel]="dept.defaultRole" 
+                (ngModelChange)="updateDepartmentRole(dept, $event)"
+                [disabled]="savingDeptId === dept.id">
+                <option *ngFor="let r of roles" [value]="r">{{ r }}</option>
+              </select>
+            </td>
+            <td>
+              <span class="badge" [class.badge-success]="dept.isActive" [class.badge-error]="!dept.isActive">
+                {{ dept.isActive ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="departments.length === 0">
+            <td colspan="3" class="text-center">No departments found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 2: Permissions Matrix -->
+  <div class="tab-content matrix-layout" *ngIf="activeTab === 'matrix'">
+    <!-- Left Sidebar: Role Selector -->
+    <div class="role-sidebar">
+      <div class="sidebar-title">System Roles</div>
+      <div class="role-list">
+        <button 
+          class="role-btn" 
+          *ngFor="let role of roles" 
+          [class.active]="role === selectedRole"
+          (click)="selectRole(role)">
+          <div class="role-icon">
+            <svg lucideShield size="16"></svg>
+          </div>
+          {{ role }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Content: Permissions Matrix -->
+    <div class="permissions-content">
+      <div class="content-header">
+        <h2>{{ selectedRole }} Permissions</h2>
+        <p>Manage which sidebar menus and sub-menus users with the <strong>{{ selectedRole }}</strong> role can access.</p>
+      </div>
+
+      <div class="loading-state" *ngIf="isLoadingMatrix">
+        <div class="spinner"></div> Loading permissions...
+      </div>
+
+      <div class="modules-list" *ngIf="!isLoadingMatrix">
+        <div class="module-card" *ngFor="let cat of sidebarModules">
+          
+          <!-- Category Header -->
+          <div class="module-header">
+            <div class="cat-title" (click)="toggleExpand(cat)">
+              <svg *ngIf="cat.isExpanded" lucideChevronDown size="20"></svg>
+              <svg *ngIf="!cat.isExpanded" lucideChevronRight size="20"></svg>
+              <h3>{{ cat.title }}</h3>
+            </div>
+            <label class="toggle-switch">
+              <input 
+                type="checkbox" 
+                [ngModel]="cat.enabled" 
+                (ngModelChange)="toggleCategory(cat, $event)">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Sub Items -->
+          <div class="action-list" *ngIf="cat.isExpanded">
+            <div class="action-item" *ngFor="let sub of cat.subItems">
+              <div class="action-info">
+                <span class="action-label">{{ sub.title }}</span>
+              </div>
+              <label class="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  [ngModel]="sub.enabled" 
+                  (ngModelChange)="toggleSubItem(sub, cat, $event)">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

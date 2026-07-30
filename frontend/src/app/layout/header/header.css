@@ -1,0 +1,23 @@
+:host {
+  position: fixed;
+  top: 0;
+  left: 260px; /* offset for sidebar */
+  right: 0;
+  z-index: 90;
+}
+
+.topbar {
+  height: 72px;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-xl);
+}
+
+.page-title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  margin: 0;
+}

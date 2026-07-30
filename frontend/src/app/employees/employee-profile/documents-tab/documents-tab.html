@@ -1,0 +1,86 @@
+<div class="documents-tab-container">
+  
+  <div class="header-actions">
+    <button class="btn-primary" (click)="openModal()">
+      <svg lucidePlus size="16"></svg>
+      Add Files
+    </button>
+  </div>
+
+  <div class="documents-grid">
+    <div class="document-card" *ngFor="let doc of employeeData?.documents">
+      <div class="doc-icon">
+        <!-- Display image if it's a data url of image type -->
+        <img *ngIf="doc.fileUrl.startsWith('data:image')" [src]="doc.fileUrl" class="doc-thumbnail" [alt]="doc.fileName">
+        <!-- Display video -->
+        <video *ngIf="doc.fileUrl.startsWith('data:video')" [src]="doc.fileUrl" class="doc-thumbnail" muted loop playsinline></video>
+        <!-- Otherwise show file icon -->
+        <svg *ngIf="!doc.fileUrl.startsWith('data:image') && !doc.fileUrl.startsWith('data:video')" lucideFileText size="32"></svg>
+      </div>
+      <div class="doc-info">
+        <h3>{{ doc.fileName }}</h3>
+        <p>{{ timeAgo(doc.createdAt) }}</p>
+      </div>
+      <div class="card-actions">
+        <button class="action-btn view-btn" (click)="viewDocument(doc.fileUrl)" title="View File">
+          <svg lucideEye size="14"></svg>
+        </button>
+        <button class="action-btn delete-btn" (click)="deleteDocument(doc.id)" title="Delete File">
+          <svg lucideTrash2 size="14"></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="empty-state" *ngIf="!employeeData?.documents?.length">
+      <div class="empty-state-icon">
+        <svg lucideFolderOpen size="48"></svg>
+      </div>
+      <h3>No Documents Found</h3>
+      <p>There are no personal documents uploaded for this employee yet.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Add File Modal -->
+<div class="modal-overlay" *ngIf="showModal" (click)="closeModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Add File</h2>
+      <button class="close-btn" (click)="closeModal()">✕</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="form-group">
+        <label>File name <span class="required">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="fileName">
+      </div>
+      
+      <div class="form-group">
+        <label>Upload File <span class="required">*</span> <span class="help-icon">?</span></label>
+        <div class="upload-area">
+          <input type="file" class="file-input" (change)="handleFileInput($event)" accept="image/*,video/*">
+          <div class="upload-content" *ngIf="!selectedFileUrl">
+            <svg lucideUploadCloud size="32" class="upload-icon"></svg>
+            <p>Choose a file</p>
+          </div>
+          <div class="upload-preview" *ngIf="selectedFileUrl">
+            <img *ngIf="selectedFileUrl.startsWith('data:image')" [src]="selectedFileUrl" class="preview-media">
+            <video *ngIf="selectedFileUrl.startsWith('data:video')" [src]="selectedFileUrl" class="preview-media" controls></video>
+            <svg *ngIf="!selectedFileUrl.startsWith('data:image') && !selectedFileUrl.startsWith('data:video')" lucideFileText size="32" class="upload-icon"></svg>
+            <div class="preview-overlay">
+              <p class="selected-file-name">{{ selectedFile?.name }}</p>
+              <p class="change-text">Click to change</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeModal()">Cancel</button>
+      <button class="btn-primary" [disabled]="uploading" (click)="submitDocument()">
+        {{ uploading ? 'Uploading...' : 'Submit' }}
+      </button>
+    </div>
+  </div>
+</div>

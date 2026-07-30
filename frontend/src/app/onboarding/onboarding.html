@@ -1,0 +1,164 @@
+<div class="onboarding-container">
+  <!-- Decorative Background Elements -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  
+  <div class="wizard-card">
+    <div class="wizard-top-actions">
+      <button class="btn-logout" (click)="logout()">Logout</button>
+    </div>
+    <div class="wizard-header">
+      <h2>Welcome to your Workspace</h2>
+      <p>Let's get your environment set up in a few quick steps.</p>
+      
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width]="(step() / 3) * 100 + '%'"></div>
+      </div>
+    </div>
+
+    <div class="wizard-body">
+      
+      <!-- Step 1: Company -->
+      <div class="step-content" *ngIf="step() === 1">
+        <h3>Step 1: Company Profile</h3>
+        <form [formGroup]="companyForm">
+          <div class="form-group">
+            <label>Workspace Logo (Optional)</label>
+            <div class="drag-drop-zone" [class.has-file]="companyForm.get('logoUrl')?.value">
+              <input type="file" class="file-input-hidden" (change)="onFileSelected($event, 'logoUrl', companyForm)" accept="image/*">
+              
+              <div class="drag-drop-content" *ngIf="!companyForm.get('logoUrl')?.value && !isUploading()">
+                <svg lucideUploadCloud class="upload-icon" size="32"></svg>
+                <span class="upload-text">Click or drag image to upload</span>
+                <span class="upload-hint">SVG, PNG, JPG or GIF (max. 800x400px)</span>
+              </div>
+              
+              <div class="drag-drop-content uploading" *ngIf="isUploading()">
+                <div class="spinner"></div>
+                <span class="upload-text">Uploading...</span>
+              </div>
+
+              <div class="drag-drop-content success" *ngIf="companyForm.get('logoUrl')?.value && !isUploading()">
+                <div class="img-preview-container">
+                  <img [src]="companyForm.get('logoUrl')?.value" alt="Uploaded Logo" class="img-preview" />
+                </div>
+                <span class="text-success mt-2">Logo Uploaded Successfully</span>
+                <span class="upload-hint">Click to change file</span>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Industry *</label>
+            <select formControlName="industry">
+              <option value="">Select Industry</option>
+              <option value="Technology">Technology</option>
+              <option value="Healthcare">Healthcare</option>
+              <option value="Finance">Finance</option>
+              <option value="Education">Education</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Company Size *</label>
+            <select formControlName="size">
+              <option value="">Select Size</option>
+              <option value="1-10">1-10 Employees</option>
+              <option value="11-50">11-50 Employees</option>
+              <option value="51-200">51-200 Employees</option>
+              <option value="200+">200+ Employees</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Primary Timezone *</label>
+            <select formControlName="timezone">
+              <option value="">Select Timezone</option>
+              <option value="UTC">UTC</option>
+              <option value="EST">Eastern Time</option>
+              <option value="PST">Pacific Time</option>
+              <option value="IST">India Standard Time</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <!-- Step 2: Personal -->
+      <div class="step-content" *ngIf="step() === 2">
+        <h3>Step 2: Personal Details</h3>
+        <form [formGroup]="personalForm">
+          <div class="form-group">
+            <label>Avatar Image (Optional)</label>
+            <div class="drag-drop-zone" [class.has-file]="personalForm.get('avatarUrl')?.value">
+              <input type="file" class="file-input-hidden" (change)="onFileSelected($event, 'avatarUrl', personalForm)" accept="image/*">
+              
+              <div class="drag-drop-content" *ngIf="!personalForm.get('avatarUrl')?.value && !isUploading()">
+                <svg lucideUploadCloud class="upload-icon" size="32"></svg>
+                <span class="upload-text">Click or drag image to upload</span>
+                <span class="upload-hint">SVG, PNG, JPG or GIF (max. 800x400px)</span>
+              </div>
+              
+              <div class="drag-drop-content uploading" *ngIf="isUploading()">
+                <div class="spinner"></div>
+                <span class="upload-text">Uploading...</span>
+              </div>
+
+              <div class="drag-drop-content success" *ngIf="personalForm.get('avatarUrl')?.value && !isUploading()">
+                <div class="img-preview-container avatar-preview">
+                  <img [src]="personalForm.get('avatarUrl')?.value" alt="Uploaded Avatar" class="img-preview" />
+                </div>
+                <span class="text-success mt-2">Avatar Uploaded Successfully</span>
+                <span class="upload-hint">Click to change file</span>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Department *</label>
+            <select formControlName="departmentId" [class.error]="personalForm.get('departmentId')?.invalid && personalForm.get('departmentId')?.touched">
+              <option [ngValue]="null" disabled>Select Department</option>
+              <option *ngFor="let dept of departments()" [ngValue]="dept.id">{{ dept.name }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Job Title / Position *</label>
+            <select formControlName="designationId" [class.error]="personalForm.get('designationId')?.invalid && personalForm.get('designationId')?.touched">
+              <option [ngValue]="null" disabled>Select Position</option>
+              <option *ngFor="let des of filteredDesignations" [ngValue]="des.id">{{ des.name }}</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <!-- Step 3: Preferences -->
+      <div class="step-content" *ngIf="step() === 3">
+        <h3>Step 3: Platform Preferences</h3>
+        <form [formGroup]="prefsForm">
+          <div class="form-group">
+            <label>Theme Preference</label>
+            <select formControlName="themePref">
+              <option value="system">System Default</option>
+              <option value="light">Light Mode</option>
+              <option value="dark">Dark Mode</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Currency Format</label>
+            <select formControlName="currency">
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="INR">INR (₹)</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn-secondary" *ngIf="step() > 1" (click)="prevStep()" [disabled]="isSubmitting() || isUploading()">Back</button>
+      <div class="spacer"></div>
+      <button class="btn-primary" *ngIf="step() < 3" (click)="nextStep()" [disabled]="isUploading()">Next Step</button>
+      <button class="btn-primary" *ngIf="step() === 3" (click)="finishOnboarding()" [disabled]="isSubmitting() || isUploading()">
+        {{ isSubmitting() ? 'Saving...' : 'Finish Setup' }}
+      </button>
+    </div>
+  </div>
+</div>

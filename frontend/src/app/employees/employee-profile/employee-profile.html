@@ -1,0 +1,51 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Profile Settings</h1>
+      <p>Manage your profile, emergency contacts, and personal documents.</p>
+    </div>
+  </div>
+
+  <div class="profile-layout" *ngIf="!isLoading()">
+    <!-- Tabs Navigation -->
+    <div class="tabs-container">
+      <div class="tabs">
+        <button class="tab-btn" [class.active]="activeTab() === 'profile'" (click)="setTab('profile')">
+          Profile
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'contacts'" (click)="setTab('contacts')">
+          Emergency Contacts
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'documents'" (click)="setTab('documents')" *ngIf="isOwner()">
+          Documents
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab Content Area -->
+    <div class="tab-content">
+      <app-profile-tab *ngIf="activeTab() === 'profile'" 
+        [employeeData]="employeeData()" 
+        [isOwner]="isOwner()"
+        (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
+      </app-profile-tab>
+
+      <app-emergency-contacts-tab *ngIf="activeTab() === 'contacts'" 
+        [employeeData]="employeeData()" 
+        [isOwner]="isOwner()"
+        (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
+      </app-emergency-contacts-tab>
+
+      <app-documents-tab *ngIf="activeTab() === 'documents' && isOwner()" 
+        [employeeData]="employeeData()" 
+        (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
+      </app-documents-tab>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading()">
+    <div class="spinner"></div>
+    <p>Loading profile...</p>
+  </div>
+</div>

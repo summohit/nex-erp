@@ -1,0 +1,19 @@
+.dashboard-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-alt);
+  padding-left: 260px; /* Offset for fixed sidebar */
+  padding-top: 72px;   /* Offset for fixed header */
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-area {
+  padding: var(--space-xl);
+  flex: 1;
+}

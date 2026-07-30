@@ -1,0 +1,199 @@
+<div class="profile-tab-container">
+  
+  <div class="form-section">
+    <!-- SECTION: PHOTO -->
+    <div class="field-section">
+      <div class="form-group profile-pic-group">
+        <label>Profile Picture <span class="help-icon" title="Upload a clear, front-facing photo">?</span></label>
+        <div class="profile-pic-upload" [class.has-image]="formData.avatarUrl">
+          <input type="file" (change)="handleAvatarUpload($event)" accept="image/*" [disabled]="!isOwner" class="file-input">
+          
+          <div class="avatar-preview">
+            <img [src]="formData.avatarUrl || 'assets/default-avatar.png'" alt="Avatar" *ngIf="formData.avatarUrl">
+            <div class="avatar-placeholder" *ngIf="!formData.avatarUrl">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="placeholder-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </div>
+          </div>
+
+          <div class="upload-hint" *ngIf="isOwner">
+            <div class="upload-icon-wrapper">
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <p><strong>Click to upload</strong> or drag and drop</p>
+            <span>SVG, PNG, JPG or GIF (max. 800x400px)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: PERSONAL -->
+    <div class="field-section">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Your Name</label>
+          <div class="compound-input name-inputs">
+            <select class="form-control salutation" [(ngModel)]="formData.salutation" [disabled]="!isOwner">
+              <option value="Mr">Mr</option>
+              <option value="Mrs">Mrs</option>
+              <option value="Ms">Ms</option>
+            </select>
+            <input type="text" class="form-control" [(ngModel)]="formData.firstName" [disabled]="!isOwner" placeholder="First Name">
+            <input type="text" class="form-control" [(ngModel)]="formData.lastName" [disabled]="!isOwner" placeholder="Last Name">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Your Email <span class="required">*</span></label>
+          <input type="email" class="form-control" [(ngModel)]="formData.email" disabled>
+        </div>
+
+        <div class="form-group" *ngIf="isOwner">
+          <label>Your Password</label>
+          <div class="compound-input password-input">
+            <input [type]="showPassword ? 'text' : 'password'" class="form-control" [(ngModel)]="formData.password" placeholder="Must have at least 8 characters">
+            <button type="button" class="icon-btn" (click)="togglePassword()">
+              <svg lucideEye size="16" *ngIf="!showPassword"></svg>
+              <svg lucideEyeOff size="16" *ngIf="showPassword"></svg>
+            </button>
+            <button type="button" class="icon-btn" (click)="generatePassword()" title="Generate Random Password">
+              <svg lucideShuffle size="16"></svg>
+            </button>
+          </div>
+          <small class="hint-text">Leave blank to keep the current password.</small>
+        </div>
+        <div class="form-group" *ngIf="!isOwner"></div> <!-- Spacer -->
+      </div>
+    </div>
+
+    <!-- SECTION: WORK DETAILS -->
+    <div class="field-section">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Department</label>
+          <input type="text" class="form-control" [value]="employeeData?.department?.name || 'Not Assigned'" disabled>
+        </div>
+        <div class="form-group">
+          <label>Designation</label>
+          <input type="text" class="form-control" [value]="employeeData?.designation?.name || 'Not Assigned'" disabled>
+        </div>
+        <div class="form-group">
+          <label>Branch</label>
+          <input type="text" class="form-control" [value]="employeeData?.branch?.name || 'Not Assigned'" disabled>
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <input type="text" class="form-control" [value]="employeeData?.user?.role || 'N/A'" disabled>
+        </div>
+        <div class="form-group">
+          <label>Reporting Manager</label>
+          <input type="text" class="form-control" [value]="employeeData?.manager ? (employeeData.manager.firstName + ' ' + employeeData.manager.lastName) : 'No Manager (Top Level)'" disabled>
+        </div>
+        <div class="form-group">
+          <label>Assigned Shift</label>
+          <input type="text" class="form-control" [value]="employeeData?.shift ? (employeeData.shift.name + ' (' + employeeData.shift.startTime + ' - ' + employeeData.shift.endTime + ')') : 'Not Assigned'" disabled>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: CONTACT & ADDITIONAL -->
+    <div class="field-section">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Country</label>
+          <select class="form-control" [(ngModel)]="formData.country" (ngModelChange)="onCountryChange()" [disabled]="!isOwner">
+            <option value="">Select Country</option>
+            <option *ngFor="let c of countries" [value]="c.isoCode">{{ c.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>State / Province</label>
+          <select class="form-control" [(ngModel)]="formData.state" (ngModelChange)="onStateChange()" [disabled]="!isOwner || !states.length">
+            <option value="">Select State</option>
+            <option *ngFor="let s of states" [value]="s.isoCode">{{ s.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>City</label>
+          <select class="form-control" [(ngModel)]="formData.city" [disabled]="!isOwner || !cities.length">
+            <option value="">Select City</option>
+            <option *ngFor="let c of cities" [value]="c.name">{{ c.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Mobile</label>
+          <div class="compound-input mobile-input">
+            <div class="country-code">
+              <span class="flag">🇮🇳</span> +91
+            </div>
+            <input type="text" class="form-control" [(ngModel)]="formData.phone" [disabled]="!isOwner">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Change Language</label>
+          <select class="form-control" [(ngModel)]="formData.language" [disabled]="!isOwner">
+            <option value="English">English</option>
+            <option value="Hindi">Hindi</option>
+            <option value="Spanish">Spanish</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Gender</label>
+          <select class="form-control" [(ngModel)]="formData.gender" [disabled]="!isOwner">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Date of Birth</label>
+          <input type="date" class="form-control" [(ngModel)]="formData.dateOfBirth" [disabled]="!isOwner">
+        </div>
+
+        <div class="form-group">
+          <label>Slack Member ID</label>
+          <div class="compound-input slack-input">
+            <span class="prefix">@</span>
+            <input type="text" class="form-control" [(ngModel)]="formData.slackId" [disabled]="!isOwner">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Marital Status</label>
+          <select class="form-control" [(ngModel)]="formData.maritalStatus" [disabled]="!isOwner">
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+          </select>
+        </div>
+
+        <div class="form-group full-width">
+          <label>Your Address</label>
+          <textarea class="form-control" rows="3" [(ngModel)]="formData.address" [disabled]="!isOwner"></textarea>
+        </div>
+
+        <div class="form-group full-width">
+          <label>About</label>
+          <textarea class="form-control" rows="4" [(ngModel)]="formData.about" [disabled]="!isOwner"></textarea>
+        </div>
+      </div>
+    </div>
+    
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" (click)="goBack()">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Go Back
+      </button>
+
+      <button class="btn-primary" (click)="saveProfile()" *ngIf="isOwner">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="css-i6dzq1"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        Save
+      </button>
+    </div>
+
+  </div>
+</div>
