@@ -21,6 +21,16 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-dark);
 }
 
+.page-container {
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  overflow-y: auto !important;
+  position: relative !important;
+}
+
 /* Global Unified Page Header Card */
 .page-header-card,
 .header-main-text,
