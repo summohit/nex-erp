@@ -1,0 +1,532 @@
+<div class="assets-page-container">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-title-group">
+      <h1 class="page-title">Assets & IT Management</h1>
+      <p class="page-subtitle">Manage company IT inventory, track device assignments, and process hardware requests.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" *ngIf="isAdmin()" (click)="openAssignDrawer()">
+        <svg lucideUserCheck size="16"></svg>
+        <span>Assign Asset</span>
+      </button>
+      <button class="btn btn-primary" *ngIf="isAdmin() && activeTab() === 'inventory'" (click)="openAddAssetDrawer()">
+        <svg lucidePlus size="16"></svg>
+        <span>Add New Asset</span>
+      </button>
+      <button class="btn btn-primary" *ngIf="!isAdmin() || activeTab() === 'requests'" (click)="openRequestDrawer()">
+        <svg lucidePlus size="16"></svg>
+        <span>Submit Request</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- KPI Summary Grid -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon-box bg-blue-tint">
+        <svg lucideLaptop size="22" class="text-blue"></svg>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">Total Assets</span>
+        <h3 class="kpi-value">{{ totalAssetsCount() }}</h3>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box bg-purple-tint">
+        <svg lucideUserCheck size="22" class="text-purple"></svg>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">Assigned</span>
+        <h3 class="kpi-value">{{ assignedAssetsCount() }}</h3>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box bg-green-tint">
+        <svg lucideCheckCircle size="22" class="text-green"></svg>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">Available Stock</span>
+        <h3 class="kpi-value">{{ availableAssetsCount() }}</h3>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box bg-amber-tint">
+        <svg lucideWrench size="22" class="text-amber"></svg>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">Under Repair</span>
+        <h3 class="kpi-value">{{ inRepairAssetsCount() }}</h3>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box bg-rose-tint">
+        <svg lucideClock size="22" class="text-rose"></svg>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">Pending Requests</span>
+        <h3 class="kpi-value">{{ pendingRequestsCount() }}</h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="nav-tabs">
+    <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
+      Asset Inventory
+    </button>
+    <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'assignments'" (click)="setTab('assignments')">
+      Assignments
+    </button>
+    <button class="nav-tab" [class.active]="activeTab() === 'requests'" (click)="setTab('requests')">
+      Hardware Requests
+      <span class="tab-badge" *ngIf="pendingRequestsCount() > 0">{{ pendingRequestsCount() }}</span>
+    </button>
+  </div>
+
+  <!-- Tab 1: Asset Inventory -->
+  <div class="tab-content" *ngIf="activeTab() === 'inventory'">
+    <div class="section-card">
+      <div class="table-toolbar mb-3">
+        <div class="search-box">
+          <svg lucideSearch size="16" class="search-icon"></svg>
+          <input type="text" placeholder="Search by asset tag, name, brand..." [(ngModel)]="searchQuery">
+        </div>
+      </div>
+
+      <ag-grid-angular
+        class="ag-theme-quartz assets-grid"
+        [theme]="'legacy'"
+        [rowData]="assets()"
+        [columnDefs]="inventoryColDefs"
+        [defaultColDef]="defaultColDef"
+        [pagination]="true"
+        [paginationPageSize]="paginationPageSize"
+        [paginationPageSizeSelector]="paginationPageSizeOptions"
+        [quickFilterText]="searchQuery()"
+        [rowHeight]="64">
+      </ag-grid-angular>
+    </div>
+  </div>
+
+  <!-- Tab 2: Assignments -->
+  <div class="tab-content" *ngIf="activeTab() === 'assignments'">
+    <div class="section-card">
+      <div class="table-toolbar mb-3">
+        <div class="search-box">
+          <svg lucideSearch size="16" class="search-icon"></svg>
+          <input type="text" placeholder="Search assignments..." [(ngModel)]="searchQuery">
+        </div>
+      </div>
+
+      <ag-grid-angular
+        class="ag-theme-quartz assets-grid"
+        [theme]="'legacy'"
+        [rowData]="assignments()"
+        [columnDefs]="assignmentsColDefs"
+        [defaultColDef]="defaultColDef"
+        [pagination]="true"
+        [paginationPageSize]="paginationPageSize"
+        [paginationPageSizeSelector]="paginationPageSizeOptions"
+        [quickFilterText]="searchQuery()"
+        [rowHeight]="64">
+      </ag-grid-angular>
+    </div>
+  </div>
+
+  <!-- Tab 3: Hardware Requests -->
+  <div class="tab-content" *ngIf="activeTab() === 'requests'">
+    <div class="section-card">
+      <div class="table-toolbar mb-3">
+        <div class="search-box">
+          <svg lucideSearch size="16" class="search-icon"></svg>
+          <input type="text" placeholder="Search requests..." [(ngModel)]="searchQuery">
+        </div>
+      </div>
+
+      <ag-grid-angular
+        class="ag-theme-quartz assets-grid"
+        [theme]="'legacy'"
+        [rowData]="requests()"
+        [columnDefs]="requestsColDefs"
+        [defaultColDef]="defaultColDef"
+        [pagination]="true"
+        [paginationPageSize]="paginationPageSize"
+        [paginationPageSizeSelector]="paginationPageSizeOptions"
+        [quickFilterText]="searchQuery()"
+        [rowHeight]="64">
+      </ag-grid-angular>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- DRAWER 1: ADD / EDIT ASSET -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isAssetDrawerOpen()" (click)="isAssetDrawerOpen.set(false)">
+  <div class="drawer-panel" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>{{ assetForm.id > 0 ? 'Edit Asset' : 'Add New Asset' }}</h3>
+      <button class="btn-close" (click)="isAssetDrawerOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="form-group">
+        <label class="form-label">Asset Name <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="assetForm.name" placeholder="e.g. MacBook Pro M3 Max 16-inch">
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Category</label>
+          <select class="form-control" [(ngModel)]="assetForm.category">
+            <option value="LAPTOP">Laptop</option>
+            <option value="DESKTOP">Desktop</option>
+            <option value="MONITOR">Monitor</option>
+            <option value="PERIPHERAL">Peripheral (Keyboard/Mouse)</option>
+            <option value="SOFTWARE">Software License</option>
+            <option value="MOBILE">Mobile / Tablet</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Status</label>
+          <select class="form-control" [(ngModel)]="assetForm.status">
+            <option value="AVAILABLE">Available</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="IN_REPAIR">In Repair</option>
+            <option value="RETIRED">Retired</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Brand</label>
+          <input type="text" class="form-control" [(ngModel)]="assetForm.brand" placeholder="Apple, Dell, Logitech">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Model</label>
+          <input type="text" class="form-control" [(ngModel)]="assetForm.model" placeholder="Model designation">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Serial Number</label>
+        <input type="text" class="form-control font-mono" [(ngModel)]="assetForm.serialNumber" placeholder="SN123456789">
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Purchase Date</label>
+          <input type="date" class="form-control" [(ngModel)]="assetForm.purchaseDate">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Cost (₹)</label>
+          <input type="number" class="form-control" [(ngModel)]="assetForm.cost" placeholder="0.00">
+        </div>
+      </div>
+
+      <!-- Multiple Images & Invoice Upload Section -->
+      <div class="form-group">
+        <label class="form-label">Asset Photos & Receipts</label>
+        <input type="file" #fileInput multiple (change)="onFileSelected($event)" accept="image/*" class="hidden-file-input">
+        
+        <div class="upload-dropzone" (click)="fileInput.click()">
+          <div class="upload-icon-circle">
+            <svg lucideUploadCloud size="22"></svg>
+          </div>
+          <div class="upload-text-content">
+            <span class="upload-title">Click to upload photos or invoices</span>
+            <span class="upload-subtitle">PNG, JPG, WEBP or PDF (Max 5MB each)</span>
+          </div>
+        </div>
+
+        <div class="image-previews-grid" *ngIf="assetForm.images.length > 0">
+          <div class="image-preview-card" *ngFor="let img of assetForm.images; let i = index">
+            <img [src]="img" alt="Asset Photo" class="preview-img">
+            <button type="button" class="btn-remove-img" (click)="removeImage(i); $event.stopPropagation()">
+              <svg lucideX size="14"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isAssetDrawerOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="saveAsset()">Save Asset</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- DRAWER 2: ASSIGN ASSET -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isAssignDrawerOpen()" (click)="isAssignDrawerOpen.set(false)">
+  <div class="drawer-panel" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>Assign Asset to Employee</h3>
+      <button class="btn-close" (click)="isAssignDrawerOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="form-group">
+        <label class="form-label">Select Available Asset <span class="text-danger">*</span></label>
+        <select class="form-control" [(ngModel)]="assignForm.assetId">
+          <option [ngValue]="0" disabled>-- Choose Asset --</option>
+          <option *ngFor="let a of availableAssets()" [ngValue]="a.id">
+            [{{ a.assetTag }}] {{ a.name }} ({{ a.brand || a.category }})
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Select Employee <span class="text-danger">*</span></label>
+        <select class="form-control" [(ngModel)]="assignForm.employeeId">
+          <option [ngValue]="0" disabled>-- Choose Employee --</option>
+          <option *ngFor="let emp of employees()" [ngValue]="emp.id">
+            {{ emp.firstName }} {{ emp.lastName }} ({{ emp.department?.name || 'Employee' }})
+          </option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Assignment Date</label>
+          <input type="date" class="form-control" [(ngModel)]="assignForm.assignedDate">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Condition on Issue</label>
+          <select class="form-control" [(ngModel)]="assignForm.conditionOnAssign">
+            <option value="BRAND_NEW">Brand New</option>
+            <option value="GOOD">Good</option>
+            <option value="FAIR">Fair</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes / Accessories Provided</label>
+        <textarea class="form-control" rows="3" [(ngModel)]="assignForm.notes" placeholder="Charger, bag, HDMI adapter included..."></textarea>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isAssignDrawerOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitAssign()">Assign Device</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 3: RETURN ASSET -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isReturnModalOpen()" (click)="isReturnModalOpen.set(false)">
+  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>Return Asset to Stock</h3>
+      <button class="btn-close" (click)="isReturnModalOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="form-group">
+        <label class="form-label">Return Date</label>
+        <input type="date" class="form-control" [(ngModel)]="returnForm.returnDate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Condition on Return</label>
+        <select class="form-control" [(ngModel)]="returnForm.conditionOnReturn">
+          <option value="GOOD">Good</option>
+          <option value="NEEDS_REPAIR">Damaged / Needs Repair</option>
+          <option value="FAIR">Fair</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Next Stock Status</label>
+        <select class="form-control" [(ngModel)]="returnForm.assetNextStatus">
+          <option value="AVAILABLE">Available for Reassign</option>
+          <option value="IN_REPAIR">Under Maintenance / Repair</option>
+          <option value="RETIRED">Retire Asset</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Return Inspection Notes</label>
+        <textarea class="form-control" rows="2" [(ngModel)]="returnForm.notes" placeholder="Condition details upon return..."></textarea>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isReturnModalOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitReturn()">Confirm Return</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- DRAWER 4: SUBMIT / EDIT HARDWARE REQUEST -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isRequestDrawerOpen()" (click)="isRequestDrawerOpen.set(false)">
+  <div class="drawer-panel" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>{{ editingRequestId() ? 'Edit Hardware Request' : 'Submit Hardware Request' }}</h3>
+      <button class="btn-close" (click)="isRequestDrawerOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Request Type</label>
+          <select class="form-control" [(ngModel)]="requestForm.requestType">
+            <option value="NEW_DEVICE">New Device</option>
+            <option value="REPLACEMENT">Replacement</option>
+            <option value="REPAIR">Repair / Maintenance</option>
+            <option value="PERIPHERAL">Accessory / Peripheral</option>
+          </select>
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Category</label>
+          <select class="form-control" [(ngModel)]="requestForm.category">
+            <option value="LAPTOP">Laptop</option>
+            <option value="DESKTOP">Desktop</option>
+            <option value="MONITOR">Monitor</option>
+            <option value="PERIPHERAL">Keyboard / Mouse / Headset</option>
+            <option value="MOBILE">Mobile / Tablet</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Urgency Level</label>
+        <select class="form-control" [(ngModel)]="requestForm.urgency">
+          <option value="LOW">Low - Within 2 Weeks</option>
+          <option value="MEDIUM">Medium - Within 3-5 Days</option>
+          <option value="HIGH">High - Urgent / Work Stopped</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Reason / Justification <span class="text-danger">*</span></label>
+        <textarea class="form-control" rows="3" [(ngModel)]="requestForm.reason" placeholder="Explain why you need this hardware or describe the issue with your current device..."></textarea>
+      </div>
+
+      <!-- Multiple Images & Attachment Upload Section -->
+      <div class="form-group">
+        <label class="form-label">Photos / Attachments</label>
+        <input type="file" #requestFileInput multiple (change)="onRequestFileSelected($event)" accept="image/*" class="hidden-file-input">
+        
+        <div class="upload-dropzone" (click)="requestFileInput.click()">
+          <div class="upload-icon-circle">
+            <svg lucideUploadCloud size="22"></svg>
+          </div>
+          <div class="upload-text-content">
+            <span class="upload-title">Click to upload photos or quotes</span>
+            <span class="upload-subtitle">PNG, JPG, WEBP (Max 5MB each)</span>
+          </div>
+        </div>
+
+        <div class="image-previews-grid" *ngIf="requestForm.images.length > 0">
+          <div class="image-preview-card" *ngFor="let img of requestForm.images; let i = index">
+            <img [src]="img" alt="Request Attachment" class="preview-img">
+            <button type="button" class="btn-remove-img" (click)="removeRequestImage(i); $event.stopPropagation()">
+              <svg lucideX size="14"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isRequestDrawerOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitRequest()">{{ editingRequestId() ? 'Update Request' : 'Submit Request' }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 5: FULFILL HARDWARE REQUEST -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isFulfillModalOpen()" (click)="isFulfillModalOpen.set(false)">
+  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>Fulfill & Assign Asset</h3>
+      <button class="btn-close" (click)="isFulfillModalOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <p class="text-sm text-secondary mb-3">Select an available asset from inventory to fulfill this hardware request. It will be assigned to the employee automatically.</p>
+      <div class="form-group">
+        <label class="form-label">Select Available Asset</label>
+        <select class="form-control" [(ngModel)]="fulfillForm.fulfilledAssetId">
+          <option [ngValue]="0" disabled>-- Choose Stock Asset --</option>
+          <option *ngFor="let a of availableAssets()" [ngValue]="a.id">
+            [{{ a.assetTag }}] {{ a.name }} ({{ a.brand || a.category }})
+          </option>
+        </select>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isFulfillModalOpen.set(false)">Cancel</button>
+      <button class="btn btn-success" (click)="updateRequestStatus(fulfillForm.requestId, 'FULFILLED', undefined, fulfillForm.fulfilledAssetId)">Confirm Fulfillment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- IMAGE LIGHTBOX / VIEWER MODAL -->
+<!-- ========================================== -->
+<div class="viewer-overlay" *ngIf="previewImages().length > 0" (click)="closeImageViewer()">
+  <div class="image-viewer-modal" (click)="$event.stopPropagation()">
+    <button class="btn-close-viewer" (click)="closeImageViewer()" title="Close Viewer">
+      <svg lucideX size="18"></svg>
+    </button>
+
+    <!-- Floating Prev Arrow -->
+    <button 
+      type="button" 
+      class="lightbox-nav-prev" 
+      (click)="prevImage()" 
+      *ngIf="previewImages().length > 1"
+      [disabled]="activeImageIndex() === 0"
+      title="Previous Image">
+      ‹
+    </button>
+
+    <div class="image-viewer-content">
+      <img [src]="previewImages()[activeImageIndex()]" alt="Asset Photo Full View" class="full-preview-img">
+    </div>
+
+    <!-- Floating Next Arrow -->
+    <button 
+      type="button" 
+      class="lightbox-nav-next" 
+      (click)="nextImage()" 
+      *ngIf="previewImages().length > 1"
+      [disabled]="activeImageIndex() === previewImages().length - 1"
+      title="Next Image">
+      ›
+    </button>
+
+    <div class="image-viewer-footer" *ngIf="previewImages().length > 1">
+      <span class="img-counter">{{ activeImageIndex() + 1 }} of {{ previewImages().length }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 6: REJECT HARDWARE REQUEST -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isRejectModalOpen()" (click)="isRejectModalOpen.set(false)">
+  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3 style="color: #DC2626;">Reject Hardware Request</h3>
+      <button class="btn-close" (click)="isRejectModalOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <p class="text-sm text-secondary mb-3">Please state the reason for declining this request. The employee will see this reason in their request history.</p>
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label mb-0">Rejection Reason <span class="text-danger">*</span></label>
+          <span style="font-size: 11px; color: #64748B; font-weight: 600;">{{ rejectForm.rejectionReason.length || 0 }}/100</span>
+        </div>
+        <textarea class="form-control" rows="3" maxlength="100" [(ngModel)]="rejectForm.rejectionReason" placeholder="E.g., Out of budget, Device currently unavailable, Incomplete justification..."></textarea>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isRejectModalOpen.set(false)">Cancel</button>
+      <button class="btn btn-danger" (click)="submitReject()">Confirm Rejection</button>
+    </div>
+  </div>
+</div>

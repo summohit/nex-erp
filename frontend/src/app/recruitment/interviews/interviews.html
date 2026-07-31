@@ -1,0 +1,120 @@
+<div class="page-container" style="padding: 24px;">
+  <div class="page-header-card">
+    <div class="header-title-group">
+      <h1>My Interviews</h1>
+      <p>Manage and review your assigned candidate interviews</p>
+    </div>
+  </div>
+
+  <div class="interviews-grid" *ngIf="!isLoading()">
+    <div class="interview-card" *ngFor="let interview of interviews()">
+      <div class="card-header">
+        <div class="card-badge" [class.completed]="interview.rating">
+          {{ interview.rating ? 'Completed' : 'Upcoming / Pending Review' }}
+        </div>
+        <div class="card-date">
+          <svg lucideCalendar size="14"></svg>
+          {{ interview.scheduledAt | date:'mediumDate' }}
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <div class="candidate-info">
+          <h3>{{ interview.application?.fullName }}</h3>
+          <p class="job-title">{{ interview.application?.job?.title }}</p>
+        </div>
+        
+        <div class="interview-details">
+          <div class="detail-item">
+            <svg lucideClock size="16"></svg>
+            <span>{{ interview.scheduledAt | date:'shortTime' }} ({{ interview.durationMins }} mins)</span>
+          </div>
+          <div class="detail-item" *ngIf="interview.locationUrl">
+            <svg lucideVideo size="16"></svg>
+            <a [href]="interview.locationUrl" target="_blank">Meeting Link</a>
+          </div>
+          <div class="detail-item">
+            <svg lucideFileText size="16"></svg>
+            <span>{{ interview.title }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="feedback-status" *ngIf="interview.rating">
+          <div class="stars-display">
+            <svg lucideStar size="14" [class.filled]="interview.rating >= 1"></svg>
+            <svg lucideStar size="14" [class.filled]="interview.rating >= 2"></svg>
+            <svg lucideStar size="14" [class.filled]="interview.rating >= 3"></svg>
+            <svg lucideStar size="14" [class.filled]="interview.rating >= 4"></svg>
+            <svg lucideStar size="14" [class.filled]="interview.rating >= 5"></svg>
+          </div>
+          <span class="feedback-badge">Feedback Submitted</span>
+        </div>
+        
+        <button class="btn-primary" (click)="openFeedbackModal(interview)">
+          <svg lucideMessageSquare size="16"></svg>
+          {{ interview.rating ? 'Edit Feedback' : 'Provide Feedback' }}
+        </button>
+      </div>
+    </div>
+    
+    <div class="empty-state" *ngIf="interviews().length === 0">
+      <div class="empty-icon">
+        <svg lucideCalendar size="48"></svg>
+      </div>
+      <h3>No Interviews Assigned</h3>
+      <p>You don't have any upcoming interviews scheduled.</p>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading()">
+    <div class="spinner"></div>
+    <p>Loading your interviews...</p>
+  </div>
+</div>
+
+<!-- Feedback Modal -->
+<div class="modal-overlay" *ngIf="isFeedbackModalOpen()" (click)="closeFeedbackModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Interview Feedback</h3>
+      <button class="close-btn" (click)="closeFeedbackModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="candidate-summary">
+        <div class="summary-row">
+          <span class="summary-label">Candidate:</span>
+          <span class="summary-value">{{ selectedInterview()?.application?.fullName }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Role:</span>
+          <span class="summary-value">{{ selectedInterview()?.application?.job?.title }}</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Overall Rating</label>
+        <div class="star-rating-input">
+          <button type="button" class="star-btn" [class.active]="feedbackRating() >= 1" (click)="setRating(1)"><svg lucideStar size="24"></svg></button>
+          <button type="button" class="star-btn" [class.active]="feedbackRating() >= 2" (click)="setRating(2)"><svg lucideStar size="24"></svg></button>
+          <button type="button" class="star-btn" [class.active]="feedbackRating() >= 3" (click)="setRating(3)"><svg lucideStar size="24"></svg></button>
+          <button type="button" class="star-btn" [class.active]="feedbackRating() >= 4" (click)="setRating(4)"><svg lucideStar size="24"></svg></button>
+          <button type="button" class="star-btn" [class.active]="feedbackRating() >= 5" (click)="setRating(5)"><svg lucideStar size="24"></svg></button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Feedback Notes</label>
+        <textarea class="form-control" rows="5" placeholder="Share your detailed feedback on the candidate's performance, strengths, and areas of improvement..." [ngModel]="feedbackNotes()" (ngModelChange)="feedbackNotes.set($event)"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeFeedbackModal()">Cancel</button>
+      <button class="btn-primary" (click)="submitFeedback()" [disabled]="isSubmittingFeedback()">
+        {{ isSubmittingFeedback() ? 'Saving...' : 'Submit Feedback' }}
+      </button>
+    </div>
+  </div>
+</div>

@@ -2,8 +2,10 @@
   <!-- Top Executive Header & KPI Metric Strip -->
   <div class="payroll-header-banner">
     <div class="header-main-text">
-      <h2>Payroll & Compensation</h2>
-      <p>Configure salary structures, process monthly payslips, and manage employee reimbursement claims.</p>
+      <div class="header-title-group">
+        <h2>Payroll & Compensation</h2>
+        <p>Configure salary structures, process monthly payslips, and manage employee reimbursement claims.</p>
+      </div>
     </div>
     
     <!-- Top Summary Metrics Grid -->
@@ -236,12 +238,12 @@
       </button>
     </div>
 
-    <!-- Admin View: All Company Claims (Grouped by Employee) -->
+    <!-- Admin View: All Company Claims -->
     <div class="widget-card mb-4" *ngIf="isAdmin()">
-      <div class="widget-header mb-4" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
+      <div class="widget-header mb-3" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
         <div>
-          <h4 style="margin-bottom: 2px;">All Company Claims (HR/Admin Approval)</h4>
-          <p class="subtitle" style="margin: 0; font-size: 13px; color: #64748B;">Grouped by Employee. Expand to view individual claims.</p>
+          <h4 style="margin-bottom: 2px;">All Company Expense Claims</h4>
+          <p class="subtitle" style="margin: 0; font-size: 13px; color: #64748B;">Filter, review and approve employee business reimbursement claims.</p>
         </div>
 
         <!-- Filter Controls: Month & Year -->
@@ -262,96 +264,20 @@
         </div>
       </div>
 
-      <div class="grouped-claims-container" *ngIf="groupedExpenseClaims().length > 0; else noGroupedExpenses">
-        <div *ngFor="let grp of groupedExpenseClaims()" class="employee-accordion-card mb-3">
-          <!-- Accordion Header -->
-          <div class="accordion-header" (click)="toggleEmployeeGroup(grp.employeeId)">
-            <div class="employee-info-group">
-              <button class="btn-icon chevron-btn" type="button">
-                <svg lucideChevronDown size="18" *ngIf="isEmployeeExpanded(grp.employeeId)"></svg>
-                <svg lucideChevronRight size="18" *ngIf="!isEmployeeExpanded(grp.employeeId)"></svg>
-              </button>
-              <div>
-                <span class="employee-name">{{ grp.employeeName }}</span>
-                <span class="badge badge-secondary" style="margin-left: 8px;">{{ grp.departmentName }}</span>
-              </div>
-            </div>
-            
-            <div class="accordion-summary">
-              <span class="badge badge-warning" *ngIf="grp.pendingCount > 0">{{ grp.pendingCount }} Pending</span>
-              <span class="badge badge-success" *ngIf="grp.approvedCount > 0">{{ grp.approvedCount }} Approved</span>
-              <span class="badge badge-danger" *ngIf="grp.rejectedCount > 0">{{ grp.rejectedCount }} Rejected</span>
-              <span class="claim-total-badge">Total: <strong>₹{{ grp.totalAmount.toLocaleString('en-IN') }}</strong> ({{ grp.claims.length }} {{ grp.claims.length === 1 ? 'claim' : 'claims' }})</span>
-            </div>
-          </div>
-
-          <!-- Accordion Body (Child Claims Table) -->
-          <div class="accordion-body" *ngIf="isEmployeeExpanded(grp.employeeId)">
-            <table class="custom-table nested-claims-table">
-              <thead>
-                <tr>
-                  <th>Title & Notes</th>
-                  <th>Category</th>
-                  <th>Submitted Date</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Processed By</th>
-                  <th>Remarks</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let c of grp.claims">
-                  <td>
-                    <span class="claim-title">{{ c.title }}</span>
-                    <small class="claim-desc" *ngIf="c.description">{{ c.description }}</small>
-                  </td>
-                  <td><span class="chip-category">{{ c.category }}</span></td>
-                  <td><small class="text-muted">{{ c.createdAt ? (c.createdAt | date:'mediumDate') : '-' }}</small></td>
-                  <td><strong class="claim-amount">₹{{ c.amount.toLocaleString('en-IN') }}</strong></td>
-                  <td>
-                    <span class="badge" [ngClass]="c.status === 'APPROVED' ? 'badge-success' : (c.status === 'REJECTED' ? 'badge-danger' : 'badge-warning')">
-                      {{ c.status }}
-                    </span>
-                  </td>
-                  <td>
-                    <span class="text-muted" *ngIf="c.approvedBy?.employee">
-                      {{ c.approvedBy?.employee?.firstName }} {{ c.approvedBy?.employee?.lastName }}
-                    </span>
-                    <span class="text-muted" *ngIf="!c.approvedBy?.employee">-</span>
-                  </td>
-                  <td><span class="text-muted">{{ c.rejectionReason || '-' }}</span></td>
-                  <td>
-                    <button class="btn-icon action-menu-trigger" [matMenuTriggerFor]="adminMenu" (click)="$event.stopPropagation()">
-                      <svg lucideMoreHorizontal size="16"></svg>
-                    </button>
-                    <mat-menu #adminMenu="matMenu" panelClass="custom-action-menu">
-                      <button mat-menu-item class="menu-item" *ngIf="c.receiptUrl" (click)="viewReceipt(c.receiptUrl)">
-                        <span class="menu-text">View Receipt</span>
-                      </button>
-                      <ng-container *ngIf="c.status === 'PENDING'">
-                        <button mat-menu-item class="menu-item text-success" (click)="updateExpenseStatus(c.id, 'APPROVED')">
-                          <span class="menu-text">Approve</span>
-                        </button>
-                        <button mat-menu-item class="menu-item text-danger" (click)="openRejectModal(c.id)">
-                          <span class="menu-text">Reject</span>
-                        </button>
-                      </ng-container>
-                    </mat-menu>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <!-- AG Grid for Admin Expense Claims -->
+      <div style="width: 100%; height: 500px;" class="mt-3 grid-wrapper">
+        <ag-grid-angular
+          class="ag-theme-quartz"
+          [theme]="'legacy'"
+          style="width: 100%; height: 100%;"
+          [rowData]="expenseClaims()"
+          [pinnedBottomRowData]="expensePinnedBottomRow()"
+          [columnDefs]="expenseColDefs"
+          [defaultColDef]="defaultColDef"
+          [rowHeight]="64"
+          [headerHeight]="48">
+        </ag-grid-angular>
       </div>
-
-      <ng-template #noGroupedExpenses>
-        <div class="empty-state">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
-          <p>No expense claims match the selected criteria.</p>
-        </div>
-      </ng-template>
     </div>
 
     <!-- Employee View: My Submitted Claims -->
@@ -359,56 +285,21 @@
       <div class="widget-header mb-3">
         <h4>My Submitted Claims</h4>
       </div>
-      <div class="table-responsive" *ngIf="myExpenseClaims().length > 0; else noExpenses">
-        <table class="custom-table">
-          <thead>
-            <tr>
-              <th>Title & Description</th>
-              <th>Category</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Processed By</th>
-              <th>Remarks</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let c of myExpenseClaims()">
-              <td>
-                <span class="claim-title">{{ c.title }}</span>
-                <small class="claim-desc">{{ c.description || 'No description provided' }}</small>
-              </td>
-              <td><span class="chip-category">{{ c.category }}</span></td>
-              <td><strong class="claim-amount">₹{{ c.amount.toLocaleString('en-IN') }}</strong></td>
-              <td>
-                <span class="badge" [ngClass]="c.status === 'APPROVED' ? 'badge-success' : (c.status === 'REJECTED' ? 'badge-danger' : 'badge-warning')">
-                  {{ c.status }}
-                </span>
-              </td>
-              <td>
-                <span class="text-muted" *ngIf="c.approvedBy?.employee">
-                  {{ c.approvedBy?.employee?.firstName }} {{ c.approvedBy?.employee?.lastName }}
-                </span>
-                <span class="text-muted" *ngIf="!c.approvedBy?.employee">-</span>
-              </td>
-              <td><span class="text-muted">{{ c.rejectionReason || '-' }}</span></td>
-              <td>
-                <button class="btn-icon action-menu-trigger" [matMenuTriggerFor]="myMenu" (click)="$event.stopPropagation()">
-                  <svg lucideMoreHorizontal size="16"></svg>
-                </button>
-                <mat-menu #myMenu="matMenu" panelClass="custom-action-menu">
-                  <button mat-menu-item class="menu-item" *ngIf="c.receiptUrl" (click)="viewReceipt(c.receiptUrl)">
-                    <span class="menu-text">View Receipt</span>
-                  </button>
-                  <button mat-menu-item class="menu-item text-danger" *ngIf="c.status === 'PENDING'" (click)="deleteMyExpense(c.id)">
-                    <span class="menu-text">Cancel Claim</span>
-                  </button>
-                </mat-menu>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      
+      <!-- AG Grid for Employee Expense Claims -->
+      <div style="width: 100%; height: 400px;" class="mt-3 grid-wrapper" *ngIf="myExpenseClaims().length > 0; else noExpenses">
+        <ag-grid-angular
+          class="ag-theme-quartz"
+          [theme]="'legacy'"
+          style="width: 100%; height: 100%;"
+          [rowData]="myExpenseClaims()"
+          [columnDefs]="expenseColDefs"
+          [defaultColDef]="defaultColDef"
+          [rowHeight]="64"
+          [headerHeight]="48">
+        </ag-grid-angular>
       </div>
+
       <ng-template #noExpenses>
         <div class="empty-state">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
@@ -701,17 +592,34 @@
             <label>Amount (₹) <span class="required">*</span></label>
             <input type="number" class="form-control" [(ngModel)]="expenseForm.amount" name="amount" required min="1">
           </div>
+          <div class="row mb-3" style="display: flex; gap: 12px;">
+            <div class="form-group" style="flex: 1;">
+              <label>Purchase Date <span class="required">*</span></label>
+              <input type="date" class="form-control" [(ngModel)]="expenseForm.purchaseDate" name="purchaseDate" required>
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label>Purchased From</label>
+              <input type="text" class="form-control" [(ngModel)]="expenseForm.purchasedFrom" name="purchasedFrom" placeholder="e.g. Acme Corp / Amazon">
+            </div>
+          </div>
           <div class="form-group mb-3">
-            <label>Upload Receipt (Image/PDF)</label>
-            <div class="file-upload-zone">
-              <input type="file" class="file-input" (change)="onFileSelected($event)" accept="image/*,.pdf" [disabled]="isUploading()">
-              <div class="file-upload-content" *ngIf="!selectedFile()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span>Click to browse or drag and drop</span>
+            <label class="form-label">Upload Receipts / Invoices (Images/PDFs)</label>
+            <div class="dropzone-area">
+              <input type="file" multiple class="dropzone-input" (change)="onExpenseFilesSelected($event)" accept="image/*,.pdf">
+              <div class="dropzone-placeholder">
+                <svg lucideUploadCloud size="28" class="dropzone-icon"></svg>
+                <span class="dropzone-title">Click or drag receipt files to upload</span>
+                <span class="dropzone-subtitle">Supports JPG, PNG, PDF up to 5MB each</span>
               </div>
-              <div class="file-upload-content" *ngIf="selectedFile()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                <span class="file-name">{{ selectedFile()?.name }}</span>
+            </div>
+
+            <!-- Preview Thumbnail Chips -->
+            <div class="multi-images-preview mt-2" *ngIf="expenseForm.receipts.length > 0">
+              <div *ngFor="let url of expenseForm.receipts; let i = index" class="image-preview-card">
+                <img [src]="url" alt="Receipt preview" class="preview-thumb" (click)="openImageViewer(expenseForm.receipts, i)">
+                <button type="button" class="btn-remove-thumb" (click)="removeExpenseReceipt(i)">
+                  <svg lucideX size="14"></svg>
+                </button>
               </div>
             </div>
           </div>
@@ -864,6 +772,47 @@
       <div class="drawer-footer">
         <button class="btn btn-outline" (click)="closePayslipDetail()">Close</button>
         <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- IMAGE LIGHTBOX / VIEWER MODAL -->
+  <!-- ========================================== -->
+  <div class="viewer-overlay" *ngIf="previewImages().length > 0" (click)="closeImageViewer()">
+    <div class="image-viewer-modal" (click)="$event.stopPropagation()">
+      <button class="btn-close-viewer" (click)="closeImageViewer()" title="Close Viewer">
+        <svg lucideX size="18"></svg>
+      </button>
+
+      <!-- Floating Prev Arrow -->
+      <button 
+        type="button" 
+        class="lightbox-nav-prev" 
+        (click)="prevImage()" 
+        *ngIf="previewImages().length > 1"
+        [disabled]="activeImageIndex() === 0"
+        title="Previous Image">
+        ‹
+      </button>
+
+      <div class="image-viewer-content">
+        <img [src]="previewImages()[activeImageIndex()]" alt="Receipt Photo Full View" class="full-preview-img">
+      </div>
+
+      <!-- Floating Next Arrow -->
+      <button 
+        type="button" 
+        class="lightbox-nav-next" 
+        (click)="nextImage()" 
+        *ngIf="previewImages().length > 1"
+        [disabled]="activeImageIndex() === previewImages().length - 1"
+        title="Next Image">
+        ›
+      </button>
+
+      <div class="image-viewer-footer" *ngIf="previewImages().length > 1">
+        <span class="img-counter">{{ activeImageIndex() + 1 }} of {{ previewImages().length }}</span>
       </div>
     </div>
   </div>

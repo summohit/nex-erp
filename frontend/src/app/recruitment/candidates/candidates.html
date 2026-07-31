@@ -1,0 +1,763 @@
+<div class="page-container" style="padding: 24px;">
+  <div class="page-header-card">
+    <div class="header-title-group">
+      <h1>Candidates (ATS)</h1>
+      <p>Manage and track job applications</p>
+    </div>
+    
+    <div class="header-actions">
+      <!-- Filter Dropdown -->
+      <div class="filter-group">
+        <label>Filter by Job:</label>
+        <select class="form-select" [(ngModel)]="selectedJobId" (change)="onFilterChange()">
+          <option [ngValue]="null">All Jobs</option>
+          <option *ngFor="let job of jobs()" [ngValue]="job.id">
+            {{job.title}} ({{job.department?.name}})
+          </option>
+        </select>
+      </div>
+
+      <button class="btn-secondary" (click)="exportCSV()">
+        <svg lucideFileText size="16"></svg> Export CSV
+      </button>
+
+      <button class="btn-primary" (click)="openAnalytics()">
+        <svg lucideSparkles size="16"></svg> Analytics
+      </button>
+
+      <div class="view-toggles">
+        <button [class.active]="viewMode() === 'KANBAN'" (click)="viewMode.set('KANBAN')" class="toggle-btn" title="Kanban View">
+          <svg lucideLayoutGrid size="18"></svg>
+        </button>
+        <button [class.active]="viewMode() === 'TABLE'" (click)="viewMode.set('TABLE')" class="toggle-btn" title="Table View">
+          <svg lucideTable size="18"></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI WIDGETS -->
+  <div class="kpi-row" *ngIf="viewMode() === 'KANBAN'">
+    <div class="kpi-card" (click)="scrollToColumn('new')">
+      <div class="kpi-icon icon-blue"><svg lucideInbox size="20"></svg></div>
+      <div class="kpi-details">
+        <div class="kpi-value text-blue">{{colNew().length}}</div>
+        <div class="kpi-title">New</div>
+      </div>
+    </div>
+    <div class="kpi-card" (click)="scrollToColumn('reviewing')">
+      <div class="kpi-icon icon-purple"><svg lucideEye size="20"></svg></div>
+      <div class="kpi-details">
+        <div class="kpi-value text-purple">{{colReviewing().length}}</div>
+        <div class="kpi-title">Reviewing</div>
+      </div>
+    </div>
+    <div class="kpi-card" (click)="scrollToColumn('shortlisted')">
+      <div class="kpi-icon icon-orange"><svg lucideStar size="20"></svg></div>
+      <div class="kpi-details">
+        <div class="kpi-value text-orange">{{colShortlisted().length}}</div>
+        <div class="kpi-title">Shortlisted</div>
+      </div>
+    </div>
+    <div class="kpi-card" (click)="scrollToColumn('interviewing')">
+      <div class="kpi-icon icon-amber"><svg lucideUsers size="20"></svg></div>
+      <div class="kpi-details">
+        <div class="kpi-value text-amber">{{colInterviewing().length}}</div>
+        <div class="kpi-title">Interviewing</div>
+      </div>
+    </div>
+    <div class="kpi-card" (click)="scrollToColumn('offered')">
+      <div class="kpi-icon icon-emerald"><svg lucideAward size="20"></svg></div>
+      <div class="kpi-details">
+        <div class="kpi-value text-emerald">{{colOffered().length}}</div>
+        <div class="kpi-title">Offered</div>
+      </div>
+    </div>
+    <div class="kpi-card" (click)="scrollToColumn('hired')">
+      <div class="kpi-icon icon-green"><svg lucideCheckCircle size="20"></svg></div>
+      <div class="kpi-details">
+        <div class="kpi-value text-green">{{colHired().length}}</div>
+        <div class="kpi-title">Hired</div>
+      </div>
+    </div>
+    <div class="kpi-card" (click)="scrollToColumn('rejected')">
+      <div class="kpi-icon icon-red"><svg lucideXCircle size="20"></svg></div>
+      <div class="kpi-details">
+        <div class="kpi-value text-red">{{colRejected().length}}</div>
+        <div class="kpi-title">Rejected</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KANBAN VIEW -->
+  <div class="kanban-board" *ngIf="viewMode() === 'KANBAN'" cdkDropListGroup #kanbanBoard>
+    
+    <!-- Column: NEW -->
+    <div class="kanban-col kanban-col-new" #colNewRef>
+      <div class="col-header">
+        <h3>New <span>{{colNew().length}}</span></h3>
+      </div>
+      <div class="col-body" cdkDropList [cdkDropListData]="colNew()" (cdkDropListDropped)="drop($event, 'NEW')">
+        <div class="kanban-card" *ngFor="let item of colNew()" cdkDrag (click)="openApplication(item)">
+          <div class="card-title">{{item.fullName}}</div>
+          <div class="card-meta">{{item.job?.title}}</div>
+          <div class="card-footer-row">
+            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
+              <svg lucideSparkles size="12"></svg>
+              <span>{{item.aiScore}}% Match</span>
+            </div>
+            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column: REVIEWING -->
+    <div class="kanban-col kanban-col-reviewing" #colReviewingRef>
+      <div class="col-header">
+        <h3>Reviewing <span>{{colReviewing().length}}</span></h3>
+      </div>
+      <div class="col-body" cdkDropList [cdkDropListData]="colReviewing()" (cdkDropListDropped)="drop($event, 'REVIEWING')">
+        <div class="kanban-card" *ngFor="let item of colReviewing()" cdkDrag (click)="openApplication(item)">
+          <div class="card-title">{{item.fullName}}</div>
+          <div class="card-meta">{{item.job?.title}}</div>
+          <div class="card-footer-row">
+            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
+              <svg lucideSparkles size="12"></svg>
+              <span>{{item.aiScore}}% Match</span>
+            </div>
+            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column: SHORTLISTED -->
+    <div class="kanban-col kanban-col-shortlisted" #colShortlistedRef>
+      <div class="col-header">
+        <h3>Shortlisted <span>{{colShortlisted().length}}</span></h3>
+      </div>
+      <div class="col-body" cdkDropList [cdkDropListData]="colShortlisted()" (cdkDropListDropped)="drop($event, 'SHORTLISTED')">
+        <div class="kanban-card" *ngFor="let item of colShortlisted()" cdkDrag (click)="openApplication(item)">
+          <div class="card-title">{{item.fullName}}</div>
+          <div class="card-meta">{{item.job?.title}}</div>
+          <div class="card-footer-row">
+            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
+              <svg lucideSparkles size="12"></svg>
+              <span>{{item.aiScore}}% Match</span>
+            </div>
+            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column: INTERVIEWING -->
+    <div class="kanban-col kanban-col-interviewing" #colInterviewingRef>
+      <div class="col-header">
+        <h3>Interviewing <span>{{colInterviewing().length}}</span></h3>
+      </div>
+      <div class="col-body" cdkDropList [cdkDropListData]="colInterviewing()" (cdkDropListDropped)="drop($event, 'INTERVIEWING')">
+        <div class="kanban-card" *ngFor="let item of colInterviewing()" cdkDrag (click)="openApplication(item)">
+          <div class="card-title">{{item.fullName}}</div>
+          <div class="card-meta">{{item.job?.title}}</div>
+          <div class="card-footer-row">
+            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
+              <svg lucideSparkles size="12"></svg>
+              <span>{{item.aiScore}}% Match</span>
+            </div>
+            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column: OFFERED -->
+    <div class="kanban-col kanban-col-offered" #colOfferedRef>
+      <div class="col-header">
+        <h3>Offered <span>{{colOffered().length}}</span></h3>
+      </div>
+      <div class="col-body" cdkDropList [cdkDropListData]="colOffered()" (cdkDropListDropped)="drop($event, 'OFFERED')">
+        <div class="kanban-card" *ngFor="let item of colOffered()" cdkDrag (click)="openApplication(item)">
+          <div class="card-title">{{item.fullName}}</div>
+          <div class="card-meta">{{item.job?.title}}</div>
+          <div class="card-footer-row">
+            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
+              <svg lucideSparkles size="12"></svg>
+              <span>{{item.aiScore}}% Match</span>
+            </div>
+            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column: HIRED -->
+    <div class="kanban-col kanban-col-hired" #colHiredRef>
+      <div class="col-header">
+        <h3>Hired <span>{{colHired().length}}</span></h3>
+      </div>
+      <div class="col-body" cdkDropList [cdkDropListData]="colHired()" (cdkDropListDropped)="drop($event, 'HIRED')">
+        <div class="kanban-card" *ngFor="let item of colHired()" cdkDrag (click)="openApplication(item)">
+          <div class="card-title">{{item.fullName}}</div>
+          <div class="card-meta">{{item.job?.title}}</div>
+          <div class="card-footer-row">
+            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
+              <svg lucideSparkles size="12"></svg>
+              <span>{{item.aiScore}}% Match</span>
+            </div>
+            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Column: REJECTED -->
+    <div class="kanban-col kanban-col-rejected" #colRejectedRef>
+      <div class="col-header">
+        <h3>Rejected <span>{{colRejected().length}}</span></h3>
+      </div>
+      <div class="col-body" cdkDropList [cdkDropListData]="colRejected()" (cdkDropListDropped)="drop($event, 'REJECTED')">
+        <div class="kanban-card" *ngFor="let item of colRejected()" cdkDrag (click)="openApplication(item)">
+          <div class="card-title">{{item.fullName}}</div>
+          <div class="card-meta">{{item.job?.title}}</div>
+          <div class="card-footer-row">
+            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
+              <svg lucideSparkles size="12"></svg>
+              <span>{{item.aiScore}}% Match</span>
+            </div>
+            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TABLE VIEW -->
+  <div class="table-container" *ngIf="viewMode() === 'TABLE'">
+    <ag-grid-angular
+      class="ag-theme-quartz"
+      [theme]="'legacy'"
+      [rowData]="applications()"
+      [columnDefs]="colDefs"
+      [defaultColDef]="defaultColDef"
+      [pagination]="true"
+      [paginationPageSize]="20"
+      [domLayout]="'autoHeight'"
+      style="width: 100%;">
+    </ag-grid-angular>
+  </div>
+</div>
+
+<!-- SIDE DRAWER FOR APPLICATION DETAILS -->
+<div class="drawer-overlay" *ngIf="selectedApp()" (click)="closeDrawer()"></div>
+<div class="drawer" [class.open]="selectedApp()">
+  <div class="drawer-header" *ngIf="selectedApp()">
+    <h2>Application Details</h2>
+    <button class="close-btn" (click)="closeDrawer()"><svg lucideX size="20"></svg></button>
+  </div>
+
+  <div class="drawer-content" *ngIf="selectedApp() as app">
+    
+    <div class="profile-section">
+      <div class="avatar">{{ getInitials(app.fullName) }}</div>
+      <div class="profile-info">
+        <h3>{{app.fullName}}</h3>
+        <p class="role-badge" [innerHtml]="renderStatusBadge(app.status)"></p>
+      </div>
+    </div>
+
+    <div class="drawer-tabs">
+      <button class="tab-btn" [class.active]="activeTab() === 'details'" (click)="activeTab.set('details')">
+        <svg lucideFileText size="16"></svg> Details
+      </button>
+      <button class="tab-btn" [class.active]="activeTab() === 'interviews'" (click)="activeTab.set('interviews')">
+        <svg lucideUsers size="16"></svg> Interviews
+      </button>
+    </div>
+
+    <!-- DETAILS TAB -->
+    <div class="tab-content" *ngIf="activeTab() === 'details'">
+      <div class="info-grid">
+        <div class="info-item">
+          <svg lucideBriefcase size="16" class="icon"></svg>
+          <div class="text">
+            <label>Applied For</label>
+            <span>{{app.job?.title}}</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <svg lucideBuilding size="16" class="icon"></svg>
+          <div class="text">
+            <label>Department</label>
+            <span>{{app.job?.department?.name || 'General'}}</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <svg lucideMail size="16" class="icon"></svg>
+          <div class="text">
+            <label>Email</label>
+            <a [href]="'mailto:' + app.email">{{app.email}}</a>
+          </div>
+        </div>
+        <div class="info-item">
+          <svg lucidePhone size="16" class="icon"></svg>
+          <div class="text">
+            <label>Phone</label>
+            <span>{{app.phone}}</span>
+          </div>
+        </div>
+        <div class="info-item" *ngIf="app.linkedinUrl">
+          <svg lucideLink size="16" class="icon"></svg>
+          <div class="text">
+            <label>LinkedIn</label>
+            <a [href]="app.linkedinUrl" target="_blank">Profile Link</a>
+          </div>
+        </div>
+        <div class="info-item" *ngIf="app.portfolioUrl">
+          <svg lucideGlobe size="16" class="icon"></svg>
+          <div class="text">
+            <label>Portfolio</label>
+            <a [href]="app.portfolioUrl" target="_blank">Website Link</a>
+          </div>
+        </div>
+        <div class="info-item">
+          <svg lucideClock size="16" class="icon"></svg>
+          <div class="text">
+            <label>Experience</label>
+            <span>{{app.experienceYears || 'Not specified'}}</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <svg lucideClock size="16" class="icon"></svg>
+          <div class="text">
+            <label>Notice Period</label>
+            <span>{{app.noticePeriod || 'Not specified'}}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Insights -->
+      <div class="ai-insights-container" *ngIf="parsedAiSummary() as aiData">
+        <div class="ai-header">
+          <div class="ai-title">
+            <div class="icon-container">
+              <svg lucideSparkles size="20"></svg>
+            </div>
+            <h4>AI Match Analysis</h4>
+          </div>
+          <div class="ai-score-large" [ngClass]="getScoreClass(aiData.score)">
+            <span class="score-value">{{aiData.score}}</span>
+            <span class="score-label">Fit</span>
+          </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="ai-progress-bar">
+          <div class="ai-progress-fill" [ngClass]="getScoreClass(aiData.score)" [style.width]="aiData.score + '%'"></div>
+        </div>
+
+        <div class="ai-analysis-details">
+          <div class="analysis-section" *ngIf="aiData.recommendation">
+            <h5>Hiring Recommendation</h5>
+            <span class="rec-badge" [ngClass]="getRecommendationClass(aiData.recommendation)">
+              {{aiData.recommendation.replace('_', ' ')}}
+            </span>
+          </div>
+
+          <div class="analysis-section" *ngIf="aiData.matchingSkills?.length > 0">
+            <h5>Matching Skills</h5>
+            <div class="skills-flex">
+              <span class="skill-badge match" *ngFor="let skill of aiData.matchingSkills">
+                <svg lucideCheckCircle size="12"></svg> {{skill}}
+              </span>
+            </div>
+          </div>
+
+          <div class="analysis-section" *ngIf="aiData.missingSkills?.length > 0">
+            <h5>Missing Skills</h5>
+            <div class="skills-flex">
+              <span class="skill-badge missing" *ngFor="let skill of aiData.missingSkills">
+                <svg lucideXCircle size="12"></svg> {{skill}}
+              </span>
+            </div>
+          </div>
+
+          <div class="analysis-section" *ngIf="aiData.strengths">
+            <h5>AI Assessment</h5>
+            <p class="ai-summary-text">{{aiData.strengths}}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screening Answers -->
+      <div class="section-block" *ngIf="parsedAnswers().length > 0">
+        <h4>Screening Questions</h4>
+        <div class="qa-item" *ngFor="let item of parsedAnswers()">
+          <p class="question">{{item.question}}</p>
+          <p class="answer">{{item.answer}}</p>
+        </div>
+      </div>
+
+      <!-- Resume Link -->
+      <div class="section-block" *ngIf="app.resumeUrl">
+        <h4>Resume / CV</h4>
+        <a [href]="app.resumeUrl" target="_blank" class="resume-link">
+          <svg lucideFileText size="20"></svg>
+          <span>View Resume PDF</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- INTERVIEWS TAB -->
+    <div class="tab-content" *ngIf="activeTab() === 'interviews'">
+      <div class="interviews-header">
+        <h4>Interview Schedule</h4>
+        <button class="btn-primary" (click)="showInterviewForm.set(true)" *ngIf="!showInterviewForm() && app.status !== 'HIRED' && app.status !== 'REJECTED' && app.status !== 'ONBOARDED'">
+          <svg lucideClock size="16"></svg> Schedule
+        </button>
+      </div>
+
+      <!-- Schedule Form -->
+      <div class="interview-form" *ngIf="showInterviewForm()">
+        <h5>{{ editInterviewMode() ? 'Edit Interview' : 'New Interview' }}</h5>
+        <div class="form-group">
+          <label>Title (e.g. Technical Round)</label>
+          <input type="text" class="form-control" [ngModel]="newInterview().title" (ngModelChange)="newInterview.update(v => ({...v, title: $event}))" placeholder="Technical Round 1">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date & Time</label>
+            <input type="datetime-local" class="form-control" [min]="minDate" [ngModel]="newInterview().scheduledAt" (ngModelChange)="newInterview.update(v => ({...v, scheduledAt: $event}))">
+          </div>
+          <div class="form-group">
+            <label>Duration (mins)</label>
+            <input type="number" class="form-control" [ngModel]="newInterview().durationMins" (ngModelChange)="newInterview.update(v => ({...v, durationMins: $event}))" value="30">
+          </div>
+        </div>
+        <div class="form-group" style="position: relative;">
+          <label>Interviewer</label>
+          <div class="custom-emp-dropdown-container">
+            <button type="button" class="emp-dropdown-trigger" (click)="toggleEmpDropdown()">
+              <div class="trigger-emp-info" *ngIf="selectedEmp(); else selectPlaceholder">
+                <img [src]="selectedEmp().avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="selectedEmp().avatarUrl">
+                <div class="emp-avatar-circle" *ngIf="!selectedEmp().avatarUrl">
+                  {{ selectedEmp().firstName ? selectedEmp().firstName.charAt(0) : '' }}{{ selectedEmp().lastName ? selectedEmp().lastName.charAt(0) : '' }}
+                </div>
+                <div class="emp-text-details">
+                  <span class="emp-name">{{ selectedEmp().firstName }} {{ selectedEmp().lastName }}</span>
+                  <span class="emp-subtext">{{ selectedEmp().department?.name || 'General' }} &bull; {{ selectedEmp().designation?.name || 'Staff' }}</span>
+                </div>
+              </div>
+              <ng-template #selectPlaceholder>
+                <span class="placeholder-text">Unassigned (Select an Employee)</span>
+              </ng-template>
+              <svg class="chevron-icon" [class.open]="isEmpDropdownOpen()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+
+            <!-- Dropdown Menu Box -->
+            <div class="emp-dropdown-menu" *ngIf="isEmpDropdownOpen()">
+              <div class="search-input-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input 
+                  type="text" 
+                  class="search-input" 
+                  placeholder="Search by name, department..." 
+                  [ngModel]="empSearchQuery()" 
+                  (ngModelChange)="empSearchQuery.set($event)"
+                  (click)="$event.stopPropagation()">
+              </div>
+
+              <div class="emp-options-list">
+                <div class="emp-option-item" (click)="selectEmpFromDropdown(null)">
+                  <div class="option-avatar-circle" style="background: #e2e8f0; color: #64748b;">--</div>
+                  <div class="option-text-details">
+                    <span class="option-name">Unassigned</span>
+                    <span class="option-dept">No interviewer selected</span>
+                  </div>
+                </div>
+                <div 
+                  class="emp-option-item" 
+                  *ngFor="let e of filteredEmployees()" 
+                  [class.selected]="e.id === newInterview().interviewerId"
+                  (click)="selectEmpFromDropdown(e.id)">
+                  <img [src]="e.avatarUrl" alt="Avatar" class="option-avatar-img" *ngIf="e.avatarUrl">
+                  <div class="option-avatar-circle" *ngIf="!e.avatarUrl">
+                    {{ e.firstName ? e.firstName.charAt(0) : '' }}{{ e.lastName ? e.lastName.charAt(0) : '' }}
+                  </div>
+                  <div class="option-text-details">
+                    <span class="option-name">{{ e.firstName }} {{ e.lastName }}</span>
+                    <span class="option-dept">{{ e.department?.name || 'General' }} &bull; {{ e.designation?.name || 'Staff' }}</span>
+                  </div>
+                  <svg class="check-icon" *ngIf="e.id === newInterview().interviewerId" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div class="no-results-item" *ngIf="filteredEmployees().length === 0">
+                  No employees found matching "{{ empSearchQuery() }}"
+                </div>
+              </div>
+            </div>
+
+            <!-- Click Backdrop Overlay -->
+            <div class="dropdown-backdrop" *ngIf="isEmpDropdownOpen()" (click)="closeEmpDropdown()"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Location / Meeting Link</label>
+          <input type="text" class="form-control" [ngModel]="newInterview().locationUrl" (ngModelChange)="newInterview.update(v => ({...v, locationUrl: $event}))" placeholder="Zoom/Meet Link">
+        </div>
+        <div class="form-actions">
+          <button class="btn-secondary" (click)="cancelInterviewForm()">Cancel</button>
+          <button class="btn-primary" (click)="submitInterview()">{{ editInterviewMode() ? 'Update Interview' : 'Save Interview' }}</button>
+        </div>
+      </div>
+
+      <!-- Interview List -->
+      <div class="interview-list">
+        <div class="empty-state" *ngIf="interviews().length === 0 && !showInterviewForm()">
+          No interviews scheduled.
+        </div>
+        
+        <div class="interview-card" *ngFor="let interview of interviews()">
+          <div class="interview-card-header">
+            <div class="i-title">{{interview.title}}</div>
+            <div class="i-header-actions">
+              <span class="i-status" [ngClass]="interview.status.toLowerCase()">{{interview.status}}</span>
+              <button class="btn-edit-small" *ngIf="interview.status === 'SCHEDULED'" (click)="editScheduledInterview(interview)">
+                Edit
+              </button>
+            </div>
+          </div>
+          <div class="i-details">
+            <div class="i-row">
+              <svg lucideClock size="14"></svg> {{interview.scheduledAt | date:'medium'}} ({{interview.durationMins}}m)
+            </div>
+            <div class="i-row" *ngIf="interview.interviewer">
+              <svg lucideUsers size="14"></svg> Interviewer: {{interview.interviewer.firstName}} {{interview.interviewer.lastName}}
+            </div>
+            <div class="i-row" *ngIf="interview.locationUrl">
+              <svg lucideLink size="14"></svg> <a [href]="interview.locationUrl" target="_blank">Meeting Link</a>
+            </div>
+          </div>
+          
+          <div class="i-feedback-actions" *ngIf="interview.status !== 'COMPLETED'">
+            <div class="form-group" style="margin-bottom: 0;">
+              <select class="form-select status-select-sm" [ngModel]="interview.status" (ngModelChange)="updateInterviewStatus(interview.id, $event, interview.rating, interview.feedback)">
+                <option value="SCHEDULED">Scheduled</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="feedback-review-card" *ngIf="interview.status === 'COMPLETED'">
+            <div class="rating-visual">
+              <svg viewBox="0 0 36 36" class="rating-donut">
+                <path class="rating-donut-bg"
+                  d="M18 2.0845
+                    a 15.9155 15.9155 0 0 1 0 31.831
+                    a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path class="rating-donut-value"
+                  [attr.stroke]="getRatingColor(interview.rating)"
+                  [attr.stroke-dasharray]="getRatingStrokeDasharray(interview.rating)"
+                  d="M18 2.0845
+                    a 15.9155 15.9155 0 0 1 0 31.831
+                    a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <text x="18" y="21.5" class="rating-donut-text" [attr.fill]="getRatingColor(interview.rating)">
+                  {{interview.rating}}<tspan font-size="6" fill="#94a3b8">/5</tspan>
+                </text>
+              </svg>
+            </div>
+            <div class="feedback-content">
+              <h4>Interviewer Feedback</h4>
+              <p class="feedback-notes" *ngIf="interview.feedback">"{{interview.feedback}}"</p>
+              <p class="feedback-notes empty" *ngIf="!interview.feedback">No additional notes provided.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer-footer" *ngIf="selectedApp() as app">
+    <div class="status-actions">
+      <select class="form-select status-select" [ngModel]="app.status" (ngModelChange)="updateDrawerStatus($event)">
+        <option value="NEW">New</option>
+        <option value="REVIEWING">Reviewing</option>
+        <option value="SHORTLISTED">Shortlisted</option>
+        <option value="INTERVIEWING">Interviewing</option>
+        <option value="OFFERED">Offered</option>
+        <option value="HIRED">Hired</option>
+        <option value="ONBOARDED">Onboarded</option>
+        <option value="REJECTED">Rejected</option>
+      </select>
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+      <button *ngIf="app.status === 'HIRED'" class="btn-primary" (click)="onboardCandidate()" style="display: flex; align-items: center; gap: 6px;">
+        <svg lucideBriefcase size="16"></svg> Onboard Candidate
+      </button>
+      
+      <button class="btn-danger-outline" (click)="deleteApplication()">
+        <svg lucideTrash2 size="16"></svg> Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Analytics Modal -->
+<div class="modal-overlay" *ngIf="showAnalytics()" (click)="closeAnalytics()">
+  <div class="modal-content analytics-modal" (click)="$event.stopPropagation()" *ngIf="analyticsData() as data">
+    <div class="modal-header analytics-header">
+      <div class="analytics-header-title">
+        <div class="analytics-header-icon">
+          <svg lucideSparkles size="20"></svg>
+        </div>
+        <div>
+          <h3>Recruitment Analytics & Insights</h3>
+          <p>Real-time candidate pipeline performance and AI fit metrics</p>
+        </div>
+      </div>
+      <button class="close-btn" (click)="closeAnalytics()"><svg lucideX size="18"></svg></button>
+    </div>
+    
+    <div class="modal-body analytics-body">
+      <!-- 3 Key Metric Cards -->
+      <div class="stats-cards-grid">
+        <div class="stat-card blue">
+          <div class="stat-icon bg-blue-light">
+            <svg lucideUsers size="20"></svg>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ data.totalApplications }}</div>
+            <div class="stat-label">Total Applications</div>
+          </div>
+        </div>
+
+        <div class="stat-card purple">
+          <div class="stat-icon bg-purple-light">
+            <svg lucideSparkles size="20"></svg>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">{{ data.averageScore }}%</div>
+            <div class="stat-label">Avg AI Match Score</div>
+          </div>
+          <span class="stat-tag" [class.high]="data.averageScore >= 75" [class.med]="data.averageScore >= 50 && data.averageScore < 75">
+            {{ data.averageScore >= 75 ? 'High Fit' : data.averageScore >= 50 ? 'Moderate Fit' : 'Low Fit' }}
+          </span>
+        </div>
+
+        <div class="stat-card green">
+          <div class="stat-icon bg-green-light">
+            <svg lucideAward size="20"></svg>
+          </div>
+          <div class="stat-info">
+            <div class="stat-value">
+              {{ data.totalApplications > 0 ? (Math.round(((data.pipeline.OFFERED + data.pipeline.HIRED) / data.totalApplications) * 100)) : 0 }}%
+            </div>
+            <div class="stat-label">Offer / Hired Rate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="analytics-charts-row">
+        <!-- SVG Donut Chart & Legend -->
+        <div class="chart-box donut-box">
+          <div class="chart-box-title">
+            <h4>Pipeline Distribution</h4>
+          </div>
+          <div class="donut-container">
+            <svg viewBox="0 0 100 100" class="donut-svg">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" stroke-width="12"/>
+              <circle 
+                *ngFor="let seg of getDonutSegments(data)" 
+                cx="50" cy="50" r="40" 
+                fill="none" 
+                stroke-width="12" 
+                [attr.stroke]="seg.color" 
+                [attr.stroke-dasharray]="seg.strokeDasharray" 
+                [attr.stroke-dashoffset]="seg.strokeDashoffset" 
+                transform="rotate(-90 50 50)"
+                class="donut-segment"/>
+            </svg>
+            <div class="donut-center-text">
+              <span class="center-num">{{ data.totalApplications }}</span>
+              <span class="center-lbl">Total</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Funnel Stage Progress Bars -->
+        <div class="chart-box funnel-box">
+          <div class="chart-box-title">
+            <h4>Stage Breakdown</h4>
+          </div>
+          <div class="funnel-bars-list">
+            <div class="funnel-item">
+              <div class="funnel-label-row">
+                <span class="stage-name"><span class="dot-indicator" style="background:#2563eb;"></span> New</span>
+                <span class="stage-count"><strong>{{ data.pipeline.NEW }}</strong> ({{ data.totalApplications > 0 ? Math.round((data.pipeline.NEW / data.totalApplications) * 100) : 0 }}%)</span>
+              </div>
+              <div class="funnel-bar-bg">
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #3b82f6, #2563eb);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.NEW / data.totalApplications * 100) : 0"></div>
+              </div>
+            </div>
+
+            <div class="funnel-item">
+              <div class="funnel-label-row">
+                <span class="stage-name"><span class="dot-indicator" style="background:#8b5cf6;"></span> Reviewing</span>
+                <span class="stage-count"><strong>{{ data.pipeline.REVIEWING }}</strong> ({{ data.totalApplications > 0 ? Math.round((data.pipeline.REVIEWING / data.totalApplications) * 100) : 0 }}%)</span>
+              </div>
+              <div class="funnel-bar-bg">
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #a78bfa, #8b5cf6);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.REVIEWING / data.totalApplications * 100) : 0"></div>
+              </div>
+            </div>
+
+            <div class="funnel-item">
+              <div class="funnel-label-row">
+                <span class="stage-name"><span class="dot-indicator" style="background:#ea580c;"></span> Shortlisted</span>
+                <span class="stage-count"><strong>{{ data.pipeline.SHORTLISTED }}</strong> ({{ data.totalApplications > 0 ? Math.round((data.pipeline.SHORTLISTED / data.totalApplications) * 100) : 0 }}%)</span>
+              </div>
+              <div class="funnel-bar-bg">
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #f97316, #ea580c);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.SHORTLISTED / data.totalApplications * 100) : 0"></div>
+              </div>
+            </div>
+
+            <div class="funnel-item">
+              <div class="funnel-label-row">
+                <span class="stage-name"><span class="dot-indicator" style="background:#d97706;"></span> Interviewing</span>
+                <span class="stage-count"><strong>{{ data.pipeline.INTERVIEWING }}</strong> ({{ data.totalApplications > 0 ? Math.round((data.pipeline.INTERVIEWING / data.totalApplications) * 100) : 0 }}%)</span>
+              </div>
+              <div class="funnel-bar-bg">
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #f59e0b, #d97706);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.INTERVIEWING / data.totalApplications * 100) : 0"></div>
+              </div>
+            </div>
+
+            <div class="funnel-item">
+              <div class="funnel-label-row">
+                <span class="stage-name"><span class="dot-indicator" style="background:#10b981;"></span> Offered / Hired</span>
+                <span class="stage-count"><strong>{{ data.pipeline.OFFERED + data.pipeline.HIRED }}</strong> ({{ data.totalApplications > 0 ? Math.round(((data.pipeline.OFFERED + data.pipeline.HIRED) / data.totalApplications) * 100) : 0 }}%)</span>
+              </div>
+              <div class="funnel-bar-bg">
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #34d399, #10b981);" [style.width.%]="data.totalApplications > 0 ? ((data.pipeline.OFFERED + data.pipeline.HIRED) / data.totalApplications * 100) : 0"></div>
+              </div>
+            </div>
+
+            <div class="funnel-item">
+              <div class="funnel-label-row">
+                <span class="stage-name"><span class="dot-indicator" style="background:#ef4444;"></span> Rejected</span>
+                <span class="stage-count"><strong>{{ data.pipeline.REJECTED }}</strong> ({{ data.totalApplications > 0 ? Math.round((data.pipeline.REJECTED / data.totalApplications) * 100) : 0 }}%)</span>
+              </div>
+              <div class="funnel-bar-bg">
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #f87171, #ef4444);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.REJECTED / data.totalApplications * 100) : 0"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

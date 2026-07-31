@@ -11,6 +11,7 @@ export interface ActionCellParams extends ICellRendererParams {
   onDelete?: (data: any) => void;
   onViewProfile?: (data: any) => void;
   onView?: (data: any) => void;
+  viewLabel?: string;
   onMarkPaid?: (data: any) => void;
   onFinalize?: (data: any) => void;
 }
@@ -20,14 +21,14 @@ export interface ActionCellParams extends ICellRendererParams {
   standalone: true,
   imports: [CommonModule, LucideMoreHorizontal, MatMenuModule],
   template: `
-    <div class="action-container" *ngIf="!params?.data?.isSummaryRow" (click)="$event.stopPropagation()">
+    <div class="action-container" *ngIf="!params.data?.isSummaryRow" (click)="$event.stopPropagation()">
       <button class="btn-icon" [matMenuTriggerFor]="menu">
         <svg lucideMoreHorizontal size="16"></svg>
       </button>
 
       <mat-menu #menu="matMenu" panelClass="custom-action-menu">
         <button mat-menu-item class="menu-item" (click)="view()" *ngIf="params.onView">
-          <span class="menu-text">View / Print Payslip</span>
+          <span class="menu-text">{{ params.viewLabel || 'View / Print Payslip' }}</span>
         </button>
         <button mat-menu-item class="menu-item" (click)="viewProfile()" *ngIf="params.onViewProfile">
           <span class="menu-text">View Profile</span>

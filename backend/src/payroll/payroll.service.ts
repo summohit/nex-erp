@@ -536,7 +536,7 @@ export class PayrollService {
 
   // ==================== 4. EXPENSE CLAIMS ====================
 
-  async createExpenseClaim(companyId: number, userId: number, data: { title: string; description?: string; amount: number; category?: string; receiptUrl?: string }) {
+  async createExpenseClaim(companyId: number, userId: number, data: { title: string; description?: string; amount: number; category?: string; receiptUrl?: string; purchaseDate?: string; purchasedFrom?: string }) {
     const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
     if (!employee) throw new NotFoundException('Employee not found');
 
@@ -549,6 +549,8 @@ export class PayrollService {
         amount: Number(data.amount),
         category: data.category || 'OTHER',
         receiptUrl: data.receiptUrl,
+        purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null,
+        purchasedFrom: data.purchasedFrom || null,
         status: 'PENDING'
       }
     });
@@ -603,11 +605,20 @@ export class PayrollService {
     });
   }
 
-  async deleteExpenseClaim(companyId: number, id: number, userId: number) {
+  async deleteExpenseClaim(companyId: number, id: number, userId: number, userRole?: string) {
     const claim = await this.prisma.expenseClaim.findFirst({
-      where: { id, companyId, employee: { userId }, status: 'PENDING' }
+      where: { id, companyId }
     });
-    if (!claim) throw new NotFoundException('Pending expense claim not found');
+    if (!claim) throw new NotFoundException('Expense claim not found');
+
+    const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
+    const isOwner = employee && claim.employeeId === employee.id;
+    const isPrivileged = userRole === 'SUPERADMIN' || userRole === 'ADMIN' || userRole === 'HR';
+
+    if (!isOwner && !isPrivileged) {
+      throw new BadRequestException('You do not have permission to delete this expense claim');
+    }
+
     return this.prisma.expenseClaim.delete({ where: { id } });
   }
 

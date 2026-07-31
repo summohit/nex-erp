@@ -70,6 +70,13 @@ export class PermissionsComponent implements OnInit {
       ]
     },
     {
+      id: 'appreciation', title: 'Appreciation & Awards', isExpanded: true, enabled: false,
+      subItems: [
+        { id: 'appreciation/list', title: 'Appreciations List', enabled: false },
+        { id: 'appreciation/types', title: 'Award Categories', enabled: false }
+      ]
+    },
+    {
       id: 'payroll', title: 'Payroll & Expenses', isExpanded: true, enabled: false,
       subItems: [
         { id: 'payroll/processing', title: 'Salary Processing', enabled: false },

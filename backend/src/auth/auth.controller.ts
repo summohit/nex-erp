@@ -30,4 +30,12 @@ export class AuthController {
   signIn(@Body() signInDto: Record<string, any>) {
     return this.authService.login(signInDto.email, signInDto.password);
   }
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh')
+  refresh(@Body() body: { refreshToken: string }) {
+    if (!body.refreshToken) {
+      throw new Error('Refresh token is required');
+    }
+    return this.authService.refreshToken(body.refreshToken);
+  }
 }

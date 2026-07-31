@@ -109,6 +109,7 @@ export class AuthService {
         ],
         'EMPLOYEE': [
           'employees', 'employees/directory', 'employees/org-chart', 'employees/documents',
+          'recruitment', 'recruitment/interviews',
           'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
           'payroll', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
           'assets', 'assets/requests'
@@ -133,9 +134,13 @@ export class AuthService {
 
       // 6. Generate JWT
       const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId };
-      const access_token = await this.jwtService.signAsync(payload);
+      const access_token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
+      const refresh_token = await this.jwtService.signAsync(payload, { 
+        expiresIn: '7d', 
+        secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh' 
+      });
 
-      return { company, access_token };
+      return { company, access_token, refresh_token };
     });
   }
 
@@ -147,8 +152,33 @@ export class AuthService {
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
     const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId };
-    return {
-      access_token: await this.jwtService.signAsync(payload),
-    };
+    
+    const access_token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
+    const refresh_token = await this.jwtService.signAsync(payload, { 
+      expiresIn: '7d', 
+      secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh' 
+    });
+
+    return { access_token, refresh_token };
+  }
+
+  async refreshToken(refreshToken: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh'
+      });
+
+      const newPayload = { sub: payload.sub, email: payload.email, role: payload.role, companyId: payload.companyId };
+      
+      const new_access_token = await this.jwtService.signAsync(newPayload, { expiresIn: '1h' });
+      const new_refresh_token = await this.jwtService.signAsync(newPayload, { 
+        expiresIn: '7d', 
+        secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh' 
+      });
+
+      return { access_token: new_access_token, refresh_token: new_refresh_token };
+    } catch (err) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 }

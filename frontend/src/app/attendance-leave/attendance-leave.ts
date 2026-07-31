@@ -24,7 +24,14 @@ import {
   LucideFileText,
   LucideUploadCloud,
   LucideFile,
-  LucidePaperclip
+  LucidePaperclip,
+  LucidePlus,
+  LucideTrash2,
+  LucideEdit,
+  LucideGrid,
+  LucideList,
+  LucideChevronLeft,
+  LucideChevronRight
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -57,7 +64,14 @@ export interface DayStatus {
     AgGridAngular,
     LucideUploadCloud,
     LucideFile,
-    LucidePaperclip
+    LucidePaperclip,
+    LucidePlus,
+    LucideTrash2,
+    LucideEdit,
+    LucideGrid,
+    LucideList,
+    LucideChevronLeft,
+    LucideChevronRight
   ],
   providers: [DatePipe],
   templateUrl: './attendance-leave.html',
@@ -248,53 +262,107 @@ export class AttendanceLeaveComponent implements OnInit {
     rowSelection: { mode: 'multiRow' as const, enableClickSelection: false }
   };
 
-  hrRequestsColDefs = [
+  hrRequestsColDefs: ColDef[] = [
     { 
+      field: 'employee',
       headerName: 'Employee', 
-      valueGetter: (params: any) => `${params.data.employee?.firstName} ${params.data.employee?.lastName}`,
-      flex: 1 
-    },
-    { 
-      field: 'leaveType.name', 
-      headerName: 'Type', 
-      flex: 1,
-      autoHeight: true,
+      minWidth: 200,
+      flex: 1.5,
+      pinned: 'left',
       cellRenderer: (params: any) => {
-        if (!params.value) return '';
-        const attachmentLink = params.data.attachmentUrl 
-          ? `<a href="${params.data.attachmentUrl}" target="_blank" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #f97316; text-decoration: underline; margin-top: 2px;">View Attachment <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg></a>`
-          : '';
-        return `<div style="display: flex; flex-direction: column; justify-content: center; padding: 6px 0; line-height: 1.2;">
-                  <span style="font-weight: 500;">${params.value}</span>
-                  ${attachmentLink}
-                </div>`;
+        const emp = params.data?.employee;
+        if (!emp) return 'N/A';
+        const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+        const dept = emp.department?.name || 'General';
+        const initial = (emp.firstName || 'E').charAt(0);
+        return `
+          <div class="cell-user-avatar-row">
+            <div class="avatar-circle-sm">${initial}</div>
+            <div class="cell-stacked">
+              <div class="cell-title-bold">${name}</div>
+              <div class="user-text-stack text-secondary">${dept}</div>
+            </div>
+          </div>
+        `;
       }
     },
     { 
-      headerName: 'Dates', 
-      valueGetter: (params: any) => `${this.datePipe.transform(params.data.startDate, 'MMM d, yyyy')} - ${this.datePipe.transform(params.data.endDate, 'MMM d, yyyy')}`,
-      flex: 1.5 
+      field: 'leaveType.name', 
+      headerName: 'Leave Type', 
+      flex: 1.2,
+      minWidth: 150,
+      cellRenderer: (params: any) => {
+        if (!params.value) return 'N/A';
+        const attachmentLink = params.data.attachmentUrl 
+          ? `<a href="${params.data.attachmentUrl}" target="_blank" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #2563EB; font-weight: 600; text-decoration: none; margin-top: 3px;">📎 Attachment</a>`
+          : '';
+        return `
+          <div class="cell-stacked">
+            <span class="cat-badge cat-laptop">${params.value}</span>
+            ${attachmentLink}
+          </div>
+        `;
+      }
+    },
+    { 
+      headerName: 'Dates & Duration', 
+      flex: 1.5,
+      minWidth: 180,
+      cellRenderer: (params: any) => {
+        if (!params.data?.startDate || !params.data?.endDate) return '-';
+        const start = this.datePipe.transform(params.data.startDate, 'MMM d, yyyy');
+        const end = this.datePipe.transform(params.data.endDate, 'MMM d, yyyy');
+        
+        const s = new Date(params.data.startDate);
+        const e = new Date(params.data.endDate);
+        const diffDays = Math.ceil(Math.abs(e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        
+        return `
+          <div class="cell-stacked">
+            <div class="cell-title-bold">${start} → ${end}</div>
+            <div class="user-text-stack text-secondary">${diffDays} day${diffDays > 1 ? 's' : ''} duration</div>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'reason',
+      headerName: 'Reason', 
+      flex: 1.5,
+      minWidth: 180,
+      cellRenderer: (params: any) => `<span style="font-size: 12px; color: #334155;">${params.value || 'No reason provided'}</span>`
     },
     { 
       headerName: 'Status', 
       field: 'status',
-      flex: 1,
-      autoHeight: true,
+      flex: 1.2,
+      minWidth: 140,
       cellRenderer: (params: any) => {
-        const statusClass = params.value ? params.value.toLowerCase() : '';
-        let badgeHtml = `<span class="status-badge ${statusClass}">${params.value}</span>`;
-        let reasonLink = params.value === 'REJECTED' && params.data.rejectionReason 
-          ? `<div class="view-reason-link" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #ef4444; text-decoration: underline; margin-top: 4px; cursor: pointer;">View Reason <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>` 
+        const s = params.value || 'PENDING';
+        let statusClass = 'status-pending';
+        if (s === 'APPROVED') statusClass = 'status-approved';
+        if (s === 'REJECTED') statusClass = 'status-rejected';
+        
+        const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason 
+          ? `<div class="view-reason-link" style="font-size: 10px; color: #DC2626; font-weight: 500; margin-top: 3px; cursor: pointer;">Reason: ${params.data.rejectionReason}</div>` 
           : '';
-        return `<div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 6px 0; line-height: 1.2;">
-                  ${badgeHtml}
-                  ${reasonLink}
-                </div>`;
+        return `
+          <div class="cell-stacked">
+            <span class="status-round ${statusClass}">
+              <span class="status-dot"></span>
+              ${s}
+            </span>
+            ${reasonHtml}
+          </div>
+        `;
       }
     },
     {
       headerName: 'Actions',
-      flex: 1.5,
+      width: 110,
+      pinned: 'right',
+      sortable: false,
+      filter: false,
       cellRenderer: LeaveActionCellRendererComponent,
       cellRendererParams: {
         onApprove: (data: any) => this.approveLeaveRequest(data.id),
@@ -348,6 +416,128 @@ export class AttendanceLeaveComponent implements OnInit {
   // Rejection Reason Modal
   isRejectionReasonModalOpen = signal<boolean>(false);
   currentRejectionReason = signal<string>('');
+
+  // Holiday Tab Signals & State
+  selectedHolidayYear = signal<number>(new Date().getFullYear());
+  holidayViewMode = signal<'cards' | 'calendar'>('cards');
+  holidayCalendarDate = signal(new Date());
+  isHolidayModalOpen = signal<boolean>(false);
+  isSavingHoliday = signal<boolean>(false);
+  holidayForm = {
+    id: 0,
+    name: '',
+    date: ''
+  };
+
+  filteredHolidays = computed(() => {
+    const year = Number(this.selectedHolidayYear());
+    const list = this.holidays()
+      .filter(h => new Date(h.date).getFullYear() === year)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const seen = new Set<string>();
+    return list.filter(h => {
+      const dStr = new Date(h.date).toISOString().split('T')[0];
+      const key = `${h.name.toLowerCase().trim()}_${dStr}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  });
+
+  upcomingHolidaysCount = computed(() => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return this.filteredHolidays().filter(h => new Date(h.date) >= today).length;
+  });
+
+  pastHolidaysCount = computed(() => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return this.filteredHolidays().filter(h => new Date(h.date) < today).length;
+  });
+
+  nextUpcomingHoliday = computed(() => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const upcoming = this.filteredHolidays().filter(h => new Date(h.date) >= today);
+    if (upcoming.length === 0) return null;
+    const next = upcoming[0];
+    const diffTime = new Date(next.date).getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return {
+      ...next,
+      daysLeft: diffDays
+    };
+  });
+
+  holidayCalendarDays = computed(() => {
+    const date = this.holidayCalendarDate();
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    
+    const days: any[] = [];
+    for (let i = 0; i < firstDay.getDay(); i++) {
+      days.push({ empty: true });
+    }
+    const allHolidays = this.holidays();
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      const cellDate = new Date(year, month, i);
+      cellDate.setHours(0,0,0,0);
+      const isWeekend = cellDate.getDay() === 0 || cellDate.getDay() === 6;
+      const isToday = cellDate.getTime() === today.getTime();
+
+      const isHoliday = allHolidays.find(h => {
+        const hd = new Date(h.date);
+        return hd.getFullYear() === year && hd.getMonth() === month && hd.getDate() === i;
+      });
+      days.push({
+        dayNumber: i,
+        holiday: isHoliday,
+        isWeekend,
+        isToday
+      });
+    }
+    return days;
+  });
+
+  holidayCurrentMonthName = computed(() => {
+    return this.holidayCalendarDate().toLocaleString('default', { month: 'long', year: 'numeric' });
+  });
+
+  todayFullDate = computed(() => {
+    return new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  });
+
+  isCurrentHolidayMonth = computed(() => {
+    const today = new Date();
+    const current = this.holidayCalendarDate();
+    return today.getFullYear() === current.getFullYear() && today.getMonth() === current.getMonth();
+  });
+
+  jumpToCurrentHolidayMonth() {
+    this.holidayCalendarDate.set(new Date());
+  }
+
+  prevHolidayMonth() {
+    const current = this.holidayCalendarDate();
+    this.holidayCalendarDate.set(new Date(current.getFullYear(), current.getMonth() - 1, 1));
+  }
+
+  nextHolidayMonth() {
+    const current = this.holidayCalendarDate();
+    this.holidayCalendarDate.set(new Date(current.getFullYear(), current.getMonth() + 1, 1));
+  }
 
   loadShifts() {
     this.shiftsService.getShifts().subscribe({
@@ -718,7 +908,7 @@ export class AttendanceLeaveComponent implements OnInit {
   // Grid / UI State
   viewMode = signal<'grid' | 'list'>('grid');
   months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  years = [2024, 2025, 2026, 2027, 2028]; // can dynamically generate
+  years = [2024, 2025, 2026, 2027, 2028];
   selectedMonth = signal<number>(new Date().getMonth());
   selectedYear = signal<number>(new Date().getFullYear());
 
@@ -730,6 +920,137 @@ export class AttendanceLeaveComponent implements OnInit {
     'row-approved': (params: any) => params.data && params.data.status === 'APPROVED',
     'row-rejected': (params: any) => params.data && params.data.status === 'REJECTED'
   };
+
+  // HR Target Employee Selection & Day Log Modal State
+  selectedAttendanceEmployeeId = signal<number | null>(null);
+  isEmpDropdownOpen = signal<boolean>(false);
+  empSearchQuery = signal<string>('');
+
+  isDayDetailsModalOpen = signal<boolean>(false);
+  selectedDayDetails = signal<any | null>(null);
+
+  toggleEmpDropdown() {
+    this.isEmpDropdownOpen.update(v => !v);
+  }
+
+  closeEmpDropdown() {
+    this.isEmpDropdownOpen.set(false);
+  }
+
+  selectedAttendanceEmployee = computed(() => {
+    const empId = this.selectedAttendanceEmployeeId();
+    if (!empId) return null;
+    return this.employees().find(e => e.id === empId) || null;
+  });
+
+  filteredAttendanceEmployees = computed(() => {
+    const q = this.empSearchQuery().toLowerCase().trim();
+    const list = this.employees() || [];
+    if (!q) return list;
+    return list.filter(e => {
+      const name = `${e.firstName} ${e.lastName}`.toLowerCase();
+      const dept = (e.department?.name || '').toLowerCase();
+      const desig = (e.designation?.name || '').toLowerCase();
+      return name.includes(q) || dept.includes(q) || desig.includes(q);
+    });
+  });
+
+  selectAttendanceEmp(empId: number | null) {
+    if (empId === null) {
+      this.selectedAttendanceEmployeeId.set(null);
+      this.attendanceService.getMyHistory().subscribe((res: any) => {
+        this.myHistory.set(res);
+        this.generateGrid();
+      });
+    } else {
+      this.selectedAttendanceEmployeeId.set(empId);
+      this.attendanceService.getEmployeeHistory(empId).subscribe((res: any) => {
+        this.myHistory.set(res);
+        this.generateGrid();
+      });
+    }
+    this.closeEmpDropdown();
+  }
+
+  openDayDetailsModal(day: DayStatus) { console.log("Clicked day:", day); 
+    if (day.isFuture) return;
+
+    const dateString = this.getLocalDateString(day.date);
+    const log = this.myHistory().find(l => this.getBackendDateString(l.date) === dateString);
+    const leave = this.myRequests().find(r => {
+      const s = this.getBackendDateString(r.startDate);
+      const e = this.getBackendDateString(r.endDate);
+      return r.status === 'APPROVED' && dateString >= s && dateString <= e;
+    });
+    const holiday = this.holidays().find(h => this.getBackendDateString(h.date) === dateString);
+
+    let targetEmpName = 'My Attendance Log';
+    let targetEmpDept = 'Employee Profile';
+    if (this.selectedAttendanceEmployeeId()) {
+      const emp = this.employees().find(e => e.id === this.selectedAttendanceEmployeeId());
+      if (emp) {
+        targetEmpName = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+        targetEmpDept = emp.department?.name || 'Department';
+      }
+    } else {
+      const currentUser = this.authService.currentUser();
+      if (currentUser) {
+        targetEmpName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email;
+        targetEmpDept = currentUser.role;
+      }
+    }
+
+    let clockIn12 = '-';
+    let clockOut12 = '-';
+    let durationStr = '-';
+    let clockInLat = null;
+    let clockInLng = null;
+    let clockOutLat = null;
+    let clockOutLng = null;
+
+    if (log) {
+      if (log.clockIn) {
+        const inDate = new Date(log.clockIn);
+        clockIn12 = inDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        clockInLat = log.clockInLat;
+        clockInLng = log.clockInLng;
+      }
+      if (log.clockOut) {
+        const outDate = new Date(log.clockOut);
+        clockOut12 = outDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        clockOutLat = log.clockOutLat;
+        clockOutLng = log.clockOutLng;
+      }
+      if (log.clockIn && log.clockOut) {
+        const diffMs = new Date(log.clockOut).getTime() - new Date(log.clockIn).getTime();
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        durationStr = `${hours} hrs ${mins} mins`;
+      }
+    }
+
+    this.selectedDayDetails.set({
+      day,
+      log,
+      leave,
+      holiday,
+      employeeName: targetEmpName,
+      employeeDept: targetEmpDept,
+      clockIn12,
+      clockOut12,
+      durationStr,
+      clockInLat,
+      clockInLng,
+      clockOutLat,
+      clockOutLng
+    });
+    this.isDayDetailsModalOpen.set(true);
+  }
+
+  closeDayDetailsModal() {
+    this.isDayDetailsModalOpen.set(false);
+    this.selectedDayDetails.set(null);
+  }
 
   currentTime = signal<Date>(new Date());
   private timerInterval: any;
@@ -793,6 +1114,51 @@ export class AttendanceLeaveComponent implements OnInit {
     this.generateGrid();
   }
 
+  prevMonth() {
+    let m = this.selectedMonth() - 1;
+    let y = this.selectedYear();
+    if (m < 0) {
+      m = 11;
+      y--;
+    }
+    this.selectedMonth.set(m);
+    this.selectedYear.set(y);
+    this.generateGrid();
+  }
+
+  nextMonth() {
+    let m = this.selectedMonth() + 1;
+    let y = this.selectedYear();
+    if (m > 11) {
+      m = 0;
+      y++;
+    }
+    this.selectedMonth.set(m);
+    this.selectedYear.set(y);
+    this.generateGrid();
+  }
+
+  jumpToCurrentMonth() {
+    const today = new Date();
+    this.selectedMonth.set(today.getMonth());
+    this.selectedYear.set(today.getFullYear());
+    this.generateGrid();
+  }
+
+  private getLocalDateString(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private getBackendDateString(dateStr: string | Date): string {
+    // If it's already a Date, just use it. If it's a string from backend, parse it.
+    // Backend returns '2026-07-30T00:00:00.000Z'
+    const d = new Date(dateStr);
+    return d.toISOString().split('T')[0];
+  }
+
   setViewMode(mode: 'grid' | 'list') {
     this.viewMode.set(mode);
   }
@@ -817,7 +1183,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = this.getLocalDateString(date);
       const isFuture = date > today;
       const dayOfWeek = date.getDay();
       const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
@@ -831,17 +1197,17 @@ export class AttendanceLeaveComponent implements OnInit {
         status = 'Empty';
       } else {
         // Find if holiday
-        const holiday = hols.find(h => new Date(h.date).toISOString().split('T')[0] === dateString);
+        const holiday = hols.find(h => this.getBackendDateString(h.date) === dateString);
         
         // Find if on leave
         const leave = reqs.find(r => {
-          const s = new Date(r.startDate).toISOString().split('T')[0];
-          const e = new Date(r.endDate).toISOString().split('T')[0];
+          const s = this.getBackendDateString(r.startDate);
+          const e = this.getBackendDateString(r.endDate);
           return dateString >= s && dateString <= e;
         });
 
         // Find attendance
-        const log = logs.find(l => new Date(l.date).toISOString().split('T')[0] === dateString);
+        const log = logs.find(l => this.getBackendDateString(l.date) === dateString);
 
         if (log && log.clockIn) {
           // Check for Late or Half day (simplistic logic)
@@ -870,9 +1236,9 @@ export class AttendanceLeaveComponent implements OnInit {
           else if (isLate) status = 'Late';
           else status = 'Present';
 
-          const inStr = clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const outStr = log.clockOut ? new Date(log.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
-          tooltip = `In: ${inStr} - Out: ${outStr}`;
+          const inStr = clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+          const outStr = log.clockOut ? new Date(log.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '...';
+          tooltip = `In: ${inStr} - Out: ${outStr} (Click for details)`;
           
           if (!isWeekend && !holiday) workingDaysCount++; // if they worked on weekend, does it increase working days? yes, they worked.
         } 
@@ -944,7 +1310,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
     let csv = 'Date,Day,Status,Notes\n';
     for (const d of grid) {
-      csv += `${d.date.toISOString().split('T')[0]},${d.weekdayStr},${d.status},"${d.tooltip || ''}"\n`;
+      csv += `${this.getLocalDateString(d.date)},${d.weekdayStr},${d.status},"${d.tooltip || ''}"\n`;
     }
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -965,6 +1331,82 @@ export class AttendanceLeaveComponent implements OnInit {
       this.loadShifts();
     }
     this.router.navigate(['/attendance', tab]);
+  }
+
+  getHolidayStatus(dateStr: string): { label: string; class: string } {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const hDate = new Date(dateStr);
+    hDate.setHours(0,0,0,0);
+
+    if (hDate.getTime() === today.getTime()) {
+      return { label: 'Today', class: 'status-today' };
+    } else if (hDate > today) {
+      return { label: 'Upcoming', class: 'status-upcoming' };
+    } else {
+      return { label: 'Past', class: 'status-past' };
+    }
+  }
+
+  openAddHolidayModal() {
+    this.holidayForm = { id: 0, name: '', date: '' };
+    this.isHolidayModalOpen.set(true);
+  }
+
+  openEditHolidayModal(h: Holiday) {
+    const dateFormatted = h.date ? new Date(h.date).toISOString().split('T')[0] : '';
+    this.holidayForm = { id: h.id, name: h.name, date: dateFormatted };
+    this.isHolidayModalOpen.set(true);
+  }
+
+  closeHolidayModal() {
+    this.isHolidayModalOpen.set(false);
+  }
+
+  saveHoliday() {
+    if (!this.holidayForm.name.trim() || !this.holidayForm.date) {
+      this.toast.error('Holiday name and date are required');
+      return;
+    }
+    this.isSavingHoliday.set(true);
+    if (this.holidayForm.id) {
+      this.masterDataService.updateHoliday(this.holidayForm.id, this.holidayForm).subscribe({
+        next: () => {
+          this.toast.success('Holiday updated successfully');
+          this.closeHolidayModal();
+          this.loadData();
+          this.isSavingHoliday.set(false);
+        },
+        error: () => {
+          this.toast.error('Failed to update holiday');
+          this.isSavingHoliday.set(false);
+        }
+      });
+    } else {
+      this.masterDataService.createHoliday(this.holidayForm).subscribe({
+        next: () => {
+          this.toast.success('Holiday added successfully');
+          this.closeHolidayModal();
+          this.loadData();
+          this.isSavingHoliday.set(false);
+        },
+        error: () => {
+          this.toast.error('Failed to add holiday');
+          this.isSavingHoliday.set(false);
+        }
+      });
+    }
+  }
+
+  deleteHoliday(id: number) {
+    if (!confirm('Are you sure you want to delete this holiday?')) return;
+    this.masterDataService.deleteHoliday(id).subscribe({
+      next: () => {
+        this.toast.success('Holiday deleted');
+        this.loadData();
+      },
+      error: () => this.toast.error('Failed to delete holiday')
+    });
   }
 
   onLeaveTypeSelect() {

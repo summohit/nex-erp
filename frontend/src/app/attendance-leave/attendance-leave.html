@@ -25,6 +25,9 @@
         <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'shifts'" (click)="setTab('shifts')">
           Shift Roster
         </button>
+        <button class="nav-tab" [class.active]="activeTab() === 'holidays'" (click)="setTab('holidays')">
+          Holidays
+        </button>
     </div>
   </div>
 
@@ -34,7 +37,82 @@
       <!-- Attendance History Grid -->
       <div class="widget-card logs-widget full-width-grid">
         <div class="widget-header grid-header">
-          <div class="period-selectors">
+          <div class="period-selectors" style="display: flex; align-items: center; gap: 8px;">
+            <!-- Searchable Custom Dropdown with User Avatar -->
+            <div class="custom-emp-dropdown-container" *ngIf="isAdmin()" style="margin-right: 4px;">
+              <button type="button" class="emp-dropdown-trigger" (click)="toggleEmpDropdown()">
+                <div class="trigger-emp-info" *ngIf="selectedAttendanceEmployee() as emp; else selectMyAttendance">
+                  <img [src]="emp.avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="emp.avatarUrl">
+                  <div class="emp-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
+                  </div>
+                  <div class="emp-text-details">
+                    <span class="emp-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                    <span class="emp-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }}</span>
+                  </div>
+                </div>
+                <ng-template #selectMyAttendance>
+                  <div class="trigger-emp-info">
+                    <div class="emp-avatar-circle" style="background: #2563EB;">ME</div>
+                    <div class="emp-text-details">
+                      <span class="emp-name">My Attendance</span>
+                      <span class="emp-subtext">Logged-in User Profile</span>
+                    </div>
+                  </div>
+                </ng-template>
+                <svg class="chevron-icon" [class.open]="isEmpDropdownOpen()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+
+              <div class="dropdown-backdrop" *ngIf="isEmpDropdownOpen()" (click)="closeEmpDropdown()"></div>
+
+              <div class="emp-dropdown-menu" *ngIf="isEmpDropdownOpen()">
+                <div class="search-input-wrapper">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input 
+                    type="text" 
+                    class="search-input" 
+                    placeholder="Search by name, department, designation..." 
+                    [ngModel]="empSearchQuery()" 
+                    (ngModelChange)="empSearchQuery.set($event)"
+                    (click)="$event.stopPropagation()">
+                </div>
+
+                <div class="emp-options-list">
+                  <div class="emp-option-item" [class.selected]="!selectedAttendanceEmployeeId()" (click)="selectAttendanceEmp(null)">
+                    <div class="option-avatar-circle" style="background: #2563EB;">ME</div>
+                    <div class="option-text-details">
+                      <span class="option-name">My Attendance</span>
+                      <span class="option-dept">Logged-in User Profile</span>
+                    </div>
+                    <svg *ngIf="!selectedAttendanceEmployeeId()" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+
+                  <div 
+                    class="emp-option-item" 
+                    *ngFor="let e of filteredAttendanceEmployees()" 
+                    [class.selected]="e.id === selectedAttendanceEmployeeId()"
+                    (click)="selectAttendanceEmp(e.id)">
+                    <img [src]="e.avatarUrl" alt="Avatar" class="option-avatar-img" *ngIf="e.avatarUrl">
+                    <div class="option-avatar-circle" *ngIf="!e.avatarUrl">
+                      {{ e.firstName ? e.firstName.charAt(0) : '' }}{{ e.lastName ? e.lastName.charAt(0) : '' }}
+                    </div>
+                    <div class="option-text-details">
+                      <span class="option-name">{{ e.firstName }} {{ e.lastName }}</span>
+                      <span class="option-dept">{{ e.department?.name || 'General' }} &bull; {{ e.designation?.name || 'Staff' }}</span>
+                    </div>
+                    <svg *ngIf="e.id === selectedAttendanceEmployeeId()" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+
+                  <div class="no-results-item" *ngIf="filteredAttendanceEmployees().length === 0">
+                    No employees found
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-outline" style="padding: 4px 10px; font-weight: bold;" (click)="prevMonth()" title="Previous Month">‹</button>
+            <button class="btn btn-outline" style="padding: 4px 12px; font-size: 12px; font-weight: 600;" (click)="jumpToCurrentMonth()">Today</button>
+            <button class="btn btn-outline" style="padding: 4px 10px; font-weight: bold;" (click)="nextMonth()" title="Next Month">›</button>
             <select [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event); onPeriodChange()" class="period-select">
               <option *ngFor="let m of months; let i = index" [value]="i">{{ m }}</option>
             </select>
@@ -95,6 +173,8 @@
                   <span class="day-week">{{ day.weekdayStr }}</span>
                 </div>
                 <div class="day-cell" [class.is-empty]="day.isFuture"
+                     (click)="openDayDetailsModal(day)"
+                     style="cursor: pointer;"
                      [ngClass]="{
                        'bg-present': day.status === 'Present',
                        'bg-half-day': day.status === 'Half Day',
@@ -113,7 +193,6 @@
                     <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                     <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
                   </ng-container>
-                  <div class="custom-tooltip" *ngIf="day.tooltip">{{ day.tooltip }}</div>
                 </div>
               </div>
             </div>
@@ -309,6 +388,8 @@
           [rowData]="allRequests()"
           [columnDefs]="hrRequestsColDefs"
           [defaultColDef]="defaultColDef"
+          [rowHeight]="64"
+          [headerHeight]="48"
           [rowClassRules]="rowClassRules"
           [gridOptions]="gridOptions"
           (cellClicked)="onCellClicked($event)">
@@ -459,6 +540,178 @@
     </div>
   </div>
 
+  <!-- HOLIDAYS TAB -->
+  <div class="tab-content" *ngIf="activeTab() === 'holidays'">
+    <!-- KPI Summary Row -->
+    <div class="kpi-grid mb-4">
+      <div class="kpi-card">
+        <div class="kpi-icon bg-blue">
+          <svg lucideCalendar size="20"></svg>
+        </div>
+        <div class="kpi-info">
+          <span class="kpi-title">Total Holidays ({{ selectedHolidayYear() }})</span>
+          <span class="kpi-value">{{ filteredHolidays().length }}</span>
+          <span class="kpi-subtext">Declared Company Holidays</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon bg-orange">
+          <svg lucideStar size="20"></svg>
+        </div>
+        <div class="kpi-info">
+          <span class="kpi-title">Next Upcoming Holiday</span>
+          <span class="kpi-value" style="font-size: 16px; margin-top: 4px;" *ngIf="nextUpcomingHoliday()">
+            {{ nextUpcomingHoliday()?.name }}
+          </span>
+          <span class="kpi-value" style="font-size: 16px; margin-top: 4px;" *ngIf="!nextUpcomingHoliday()">
+            None remaining
+          </span>
+          <span class="kpi-subtext" *ngIf="nextUpcomingHoliday()">
+            {{ nextUpcomingHoliday()?.date | date:'EEE, MMM d, yyyy' }} (In {{ nextUpcomingHoliday()?.daysLeft }} days)
+          </span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon bg-green">
+          <svg lucideCheck size="20"></svg>
+        </div>
+        <div class="kpi-info">
+          <span class="kpi-title">Past Holidays</span>
+          <span class="kpi-value">{{ pastHolidaysCount() }}</span>
+          <span class="kpi-subtext">Completed in {{ selectedHolidayYear() }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Card Container -->
+    <div class="widget-card">
+      <div class="widget-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #0F172A;">Company Holidays Directory</h3>
+          <p class="subtitle" style="margin: 4px 0 0 0; color: #64748B; font-size: 13px;">View official company holidays and non-working days.</p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <!-- View Toggle -->
+          <div class="view-toggle pill-toggle">
+            <button [class.active]="holidayViewMode() === 'cards'" (click)="holidayViewMode.set('cards')" title="Card Grid View">
+              <svg lucideGrid size="18"></svg>
+            </button>
+            <button [class.active]="holidayViewMode() === 'calendar'" (click)="holidayViewMode.set('calendar')" title="Monthly Calendar View">
+              <svg lucideList size="18"></svg>
+            </button>
+          </div>
+
+          <!-- Year Selector (Cards View) -->
+          <div *ngIf="holidayViewMode() === 'cards'" style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 13px; font-weight: 600; color: #475569;">Year:</label>
+            <select [ngModel]="selectedHolidayYear()" (ngModelChange)="selectedHolidayYear.set($event)" class="form-control" style="width: auto; padding: 6px 12px; font-size: 13px;">
+              <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+            </select>
+          </div>
+
+          <!-- Add Holiday Button (Admin only) -->
+          <button *ngIf="isAdmin()" class="btn btn-primary" (click)="openAddHolidayModal()" style="display: flex; align-items: center; gap: 6px; width: auto; font-size: 13px;">
+            <svg lucidePlus size="16"></svg>
+            Add Holiday
+          </button>
+        </div>
+      </div>
+
+      <!-- CARDS VIEW -->
+      <ng-container *ngIf="holidayViewMode() === 'cards'">
+        <!-- Empty State -->
+        <div *ngIf="filteredHolidays().length === 0" style="text-align: center; padding: 48px 24px; background: #F8FAFC; border-radius: 12px; border: 1px dashed #CBD5E1;">
+          <svg lucideCalendar size="48" style="color: #94A3B8; margin-bottom: 12px;"></svg>
+          <h4 style="margin: 0 0 4px 0; color: #1E293B; font-size: 16px; font-weight: 600;">No Holidays Found for {{ selectedHolidayYear() }}</h4>
+          <p style="margin: 0; color: #64748B; font-size: 13px;">No company holidays have been scheduled for this year yet.</p>
+        </div>
+
+        <!-- Holidays Grid Cards -->
+        <div class="holidays-grid" *ngIf="filteredHolidays().length > 0">
+          <div class="holiday-card" *ngFor="let h of filteredHolidays()" [class.is-past]="getHolidayStatus(h.date).class === 'status-past'" [class.is-today]="getHolidayStatus(h.date).class === 'status-today'">
+            <div class="holiday-date-badge">
+              <span class="badge-day">{{ h.date | date:'dd' }}</span>
+              <span class="badge-month">{{ h.date | date:'MMM' }}</span>
+            </div>
+
+            <div class="holiday-details">
+              <h4 class="holiday-name">{{ h.name }}</h4>
+              <span class="holiday-weekday">{{ h.date | date:'EEEE, yyyy' }}</span>
+            </div>
+
+            <div class="holiday-actions">
+              <span class="status-pill" [ngClass]="getHolidayStatus(h.date).class">
+                {{ getHolidayStatus(h.date).label }}
+              </span>
+              <div class="admin-buttons" *ngIf="isAdmin()">
+                <button class="icon-btn-sm" (click)="openEditHolidayModal(h)" title="Edit Holiday">
+                  <svg lucideEdit size="14"></svg>
+                </button>
+                <button class="icon-btn-sm danger" (click)="deleteHoliday(h.id)" title="Delete Holiday">
+                  <svg lucideTrash2 size="14"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- CALENDAR VIEW -->
+      <ng-container *ngIf="holidayViewMode() === 'calendar'">
+        <div class="calendar-container">
+          <div class="calendar-header">
+            <button class="cal-nav-btn" (click)="prevHolidayMonth()" title="Previous Month">
+              <svg lucideChevronLeft size="16"></svg>
+              <span>Previous</span>
+            </button>
+            
+            <div class="calendar-title-group">
+              <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <h3 class="month-heading">{{ holidayCurrentMonthName() }}</h3>
+                <button *ngIf="!isCurrentHolidayMonth()" class="jump-today-pill" (click)="jumpToCurrentHolidayMonth()" title="Jump to Current Month">
+                  Today
+                </button>
+              </div>
+              <span class="current-date-badge">Today: {{ todayFullDate() }}</span>
+            </div>
+
+            <button class="cal-nav-btn" (click)="nextHolidayMonth()" title="Next Month">
+              <span>Next</span>
+              <svg lucideChevronRight size="16"></svg>
+            </button>
+          </div>
+          <div class="calendar-grid">
+            <div class="weekday is-weekend">Sun</div>
+            <div class="weekday">Mon</div>
+            <div class="weekday">Tue</div>
+            <div class="weekday">Wed</div>
+            <div class="weekday">Thu</div>
+            <div class="weekday">Fri</div>
+            <div class="weekday is-weekend">Sat</div>
+            <div *ngFor="let day of holidayCalendarDays()" 
+                 class="calendar-cell" 
+                 [class.empty]="day.empty" 
+                 [class.is-holiday]="day.holiday"
+                 [class.is-weekend]="day.isWeekend"
+                 [class.is-today]="day.isToday">
+              <div *ngIf="!day.empty" class="cell-top-row">
+                <span *ngIf="day.isToday" class="today-tag">TODAY</span>
+                <span class="day-number">{{ day.dayNumber }}</span>
+              </div>
+              <div *ngIf="day.holiday" class="holiday-badge" [title]="day.holiday.name">
+                <svg lucideStar size="12" style="margin-right: 4px; display: inline-block; vertical-align: middle;"></svg>
+                <span>{{ day.holiday.name }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+
   <!-- Create/Edit Shift Drawer -->
   <div class="drawer-overlay" *ngIf="isCreateShiftModalOpen()" (click)="closeShiftDrawer()">
     <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 500px;">
@@ -497,3 +750,128 @@
       </form>
     </div>
   </div>
+
+  <!-- Add/Edit Holiday Modal -->
+  <div class="drawer-overlay" *ngIf="isHolidayModalOpen()" (click)="closeHolidayModal()">
+    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 450px;">
+      <div class="drawer-header">
+        <h2>{{ holidayForm.id ? 'Edit Holiday' : 'Add New Holiday' }}</h2>
+        <button class="btn-icon" (click)="closeHolidayModal()">
+          <svg lucideX size="20"></svg>
+        </button>
+      </div>
+      <form (ngSubmit)="saveHoliday()" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+        <div class="drawer-body">
+          <div class="form-group mb-4">
+            <label>Holiday Name</label>
+            <input type="text" class="form-control" name="hName" [(ngModel)]="holidayForm.name" required placeholder="e.g. Independence Day">
+          </div>
+          <div class="form-group mb-4">
+            <label>Date</label>
+            <input type="date" class="form-control" name="hDate" [(ngModel)]="holidayForm.date" required>
+          </div>
+        </div>
+        <div class="drawer-footer" style="display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn btn-outline" (click)="closeHolidayModal()" style="width: max-content;">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isSavingHoliday()" style="width: max-content;">
+            {{ holidayForm.id ? 'Save Changes' : 'Add Holiday' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- ========================================== -->
+  <!-- DETAILED ATTENDANCE LOG MODAL -->
+  <!-- ========================================== -->
+  <div class="viewer-overlay" *ngIf="isDayDetailsModalOpen() && selectedDayDetails()" (click)="closeDayDetailsModal()">
+    <div class="widget-card" (click)="$event.stopPropagation()" style="width: 520px; max-width: 92vw; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4);">
+      <div class="widget-header" style="border-bottom: 1px solid #E2E8F0; padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="avatar-circle-md" style="width: 44px; height: 44px; font-size: 18px; font-weight: bold; background: linear-gradient(135deg, #2563EB, #1D4ED8); color: #FFF; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+            {{ (selectedDayDetails()?.employeeName || 'E').charAt(0) }}
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">{{ selectedDayDetails()?.employeeName }}</h3>
+            <span style="font-size: 12px; color: #64748B;">{{ selectedDayDetails()?.employeeDept }}</span>
+          </div>
+        </div>
+        <button class="btn-icon" (click)="closeDayDetailsModal()" style="border: none; background: #F1F5F9; width: 32px; height: 32px; border-radius: 50%; cursor: pointer;">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 0;">
+        <!-- Date & Status Bar -->
+        <div style="display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; padding: 12px 16px; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px;">
+          <div>
+            <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; font-weight: 600; display: block;">Date</span>
+            <span style="font-size: 14px; font-weight: 700; color: #0F172A;">{{ selectedDayDetails()?.day?.date | date:'fullDate' }}</span>
+          </div>
+          <span class="status-round" [ngClass]="{
+            'status-approved': selectedDayDetails()?.day?.status === 'Present',
+            'status-pending': selectedDayDetails()?.day?.status === 'Late' || selectedDayDetails()?.day?.status === 'Half Day',
+            'status-rejected': selectedDayDetails()?.day?.status === 'Absent'
+          }">
+            <span class="status-dot"></span>
+            {{ selectedDayDetails()?.day?.status }}
+          </span>
+        </div>
+
+        <!-- Clock In & Clock Out Details -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <!-- Clock In -->
+          <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 14px;">
+            <div style="display: flex; align-items: center; gap: 6px; color: #1E40AF; font-size: 12px; font-weight: 700; margin-bottom: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              CLOCK IN
+            </div>
+            <div style="font-size: 16px; font-weight: 800; color: #1E293B; margin-bottom: 8px;">
+              {{ selectedDayDetails()?.clockIn12 }}
+            </div>
+            <div *ngIf="selectedDayDetails()?.clockInLat" style="font-size: 11px; color: #1E40AF; line-height: 1.5;">
+              <div><strong>Lat:</strong> {{ selectedDayDetails()?.clockInLat }}</div>
+              <div><strong>Lng:</strong> {{ selectedDayDetails()?.clockInLng }}</div>
+              <a [href]="'https://www.google.com/maps?q=' + selectedDayDetails()?.clockInLat + ',' + selectedDayDetails()?.clockInLng" target="_blank" style="display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: #2563EB; text-decoration: underline; margin-top: 4px;">
+                📍 View on Google Maps
+              </a>
+            </div>
+            <div *ngIf="!selectedDayDetails()?.clockInLat" style="font-size: 11px; color: #94A3B8;">
+              No GPS coordinates logged
+            </div>
+          </div>
+
+          <!-- Clock Out -->
+          <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 14px;">
+            <div style="display: flex; align-items: center; gap: 6px; color: #166534; font-size: 12px; font-weight: 700; margin-bottom: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              CLOCK OUT
+            </div>
+            <div style="font-size: 16px; font-weight: 800; color: #1E293B; margin-bottom: 8px;">
+              {{ selectedDayDetails()?.clockOut12 }}
+            </div>
+            <div *ngIf="selectedDayDetails()?.clockOutLat" style="font-size: 11px; color: #166534; line-height: 1.5;">
+              <div><strong>Lat:</strong> {{ selectedDayDetails()?.clockOutLat }}</div>
+              <div><strong>Lng:</strong> {{ selectedDayDetails()?.clockOutLng }}</div>
+              <a [href]="'https://www.google.com/maps?q=' + selectedDayDetails()?.clockOutLat + ',' + selectedDayDetails()?.clockOutLng" target="_blank" style="display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: #16A34A; text-decoration: underline; margin-top: 4px;">
+                📍 View on Google Maps
+              </a>
+            </div>
+            <div *ngIf="!selectedDayDetails()?.clockOutLat" style="font-size: 11px; color: #94A3B8;">
+              No GPS coordinates logged
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Duration -->
+        <div style="display: flex; align-items: center; justify-content: space-between; background: #FFFBEB; border: 1px solid #FDE68A; padding: 10px 14px; border-radius: 10px;">
+          <span style="font-size: 12px; font-weight: 600; color: #92400E;">⏱️ Total Duration Worked:</span>
+          <span style="font-size: 13px; font-weight: 800; color: #78350F;">{{ selectedDayDetails()?.durationStr }}</span>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 12px; border-top: 1px solid #E2E8F0; padding-top: 12px;">
+        <button class="btn btn-outline" (click)="closeDayDetailsModal()" style="width: max-content; padding: 6px 18px;">Close Log</button>
+      </div>
+    </div>
+  </div>
+

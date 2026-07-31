@@ -1,9 +1,22 @@
-<aside class="sidebar">
+<aside class="sidebar" [class.collapsed]="isCollapsed()">
   <div class="sidebar-header">
-    <div class="logo-container">
-      <img [src]="user()?.company?.logoUrl || '/logo.png'" alt="Company Logo" class="logo">
+    <div class="logo-container" *ngIf="!isCollapsed()">
+      <img [src]="user()?.company?.logoUrl" 
+           *ngIf="user()?.company?.logoUrl && !logoFailed(); else defaultBrand" 
+           (error)="onLogoError()" 
+           alt="Company Logo" 
+           class="logo">
+      <ng-template #defaultBrand>
+        <div class="logo-badge-full">
+          <div class="logo-icon-badge">N</div>
+          <span class="logo-text">NEX<span class="logo-highlight">ERP</span></span>
+        </div>
+      </ng-template>
     </div>
-    <button class="btn-collapse"><svg lucideChevronRight size="16"></svg></button>
+    <button class="btn-collapse" (click)="toggleSidebar()" [attr.title]="isCollapsed() ? 'Expand Sidebar' : 'Collapse Sidebar'">
+      <svg lucideChevronRight size="16" *ngIf="isCollapsed()"></svg>
+      <svg lucideChevronLeft size="16" *ngIf="!isCollapsed()"></svg>
+    </button>
   </div>
   
   <div class="sidebar-scroll">
@@ -15,16 +28,17 @@
           <div class="nav-section" *ngIf="hasAccess(item.id)">
             <a href="#" 
                class="nav-item" 
-               [class.active]="item.id === 'overview' && !expandedMenu()"
+               [class.active]="isMainItemActive(item)"
                [class.expanded]="expandedMenu() === item.id"
                (click)="toggleMenu(item.id, $event, !!item.subItems)">
-              <div class="active-indicator" *ngIf="item.id === 'overview' && !expandedMenu()"></div>
+              <div class="active-indicator" *ngIf="isMainItemActive(item)"></div>
               <div class="nav-item-content">
                 <ng-container [ngSwitch]="item.icon">
                   <ng-container *ngSwitchCase="'lucideLayoutDashboard'"><svg lucideLayoutDashboard class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'lucideUsers'"><svg lucideUsers class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'lucideBriefcase'"><svg lucideBriefcase class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'lucideCalendarClock'"><svg lucideCalendarClock class="nav-icon" size="20"></svg></ng-container>
+                  <ng-container *ngSwitchCase="'lucideTrophy'"><svg lucideTrophy class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'lucideBanknote'"><svg lucideBanknote class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'lucideLaptop'"><svg lucideLaptop class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'lucideSettings'"><svg lucideSettings class="nav-icon" size="20"></svg></ng-container>

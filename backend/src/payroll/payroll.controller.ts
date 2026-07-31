@@ -117,6 +117,6 @@ export class PayrollController {
 
   @Delete('expenses/:id')
   deleteExpenseClaim(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.payrollService.deleteExpenseClaim(req.user.companyId, req.user.sub, id);
+    return this.payrollService.deleteExpenseClaim(req.user.companyId, id, req.user.sub, req.user.role);
   }
 }

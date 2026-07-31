@@ -1,0 +1,228 @@
+<div class="public-careers-page">
+  
+  <!-- Public Top Navigation Bar -->
+  <header class="public-nav">
+    <div class="nav-brand">
+      <img src="/logo.png" alt="Company Logo" class="brand-logo-img">
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-banner">
+    <div class="hero-content">
+      <span class="hero-pill">We are hiring!</span>
+      <h1>Build the Future of Enterprise Solutions</h1>
+      <p>Explore open roles across engineering, product, marketing, and operations. Join a passionate team driving digital transformation worldwide.</p>
+
+      <!-- Global Search Input -->
+      <div class="hero-search-box">
+        <svg lucideSearch size="20" class="search-icon"></svg>
+        <input 
+          type="text" 
+          placeholder="Search position, keyword, or location..." 
+          [(ngModel)]="searchText" 
+          (input)="applyFilters()">
+        <button class="btn-search" (click)="applyFilters()">Find Jobs</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Area -->
+  <main class="careers-body">
+    
+    <!-- Filter Pills Bar -->
+    <div class="filter-pills-bar">
+      <span class="filter-label"><svg lucideFilter size="14"></svg> Filter by Department:</span>
+      <button 
+        class="dept-pill" 
+        [class.active]="selectedDepartment() === 'All'" 
+        (click)="filterByDepartment('All')">
+        All Jobs ({{ jobs().length }})
+      </button>
+      <button 
+        *ngFor="let dept of departments()" 
+        class="dept-pill" 
+        [class.active]="selectedDepartment() === dept" 
+        (click)="filterByDepartment(dept)">
+        {{ dept }}
+      </button>
+    </div>
+
+    <!-- Jobs Grid -->
+    <div class="jobs-list-container">
+      <div class="jobs-count-header">
+        <h2>Showing {{ filteredJobs().length }} Open Positions</h2>
+      </div>
+
+      <div class="jobs-grid" *ngIf="filteredJobs().length > 0; else emptyState">
+        <div *ngFor="let job of filteredJobs()" class="public-job-card">
+          <div class="card-header">
+            <span class="dept-badge">{{ job.department }}</span>
+            <span class="type-badge">{{ job.type }}</span>
+          </div>
+
+          <h3 class="job-card-title">{{ job.title }}</h3>
+          
+          <div class="job-meta-row">
+            <span class="meta-item"><svg lucideMapPin size="14"></svg> {{ job.location }}</span>
+            <span class="meta-item" *ngIf="job.experienceYears"><svg lucideBriefcase size="14"></svg> {{ job.experienceYears }}</span>
+            <span class="meta-item"><svg lucideClock size="14"></svg> Posted {{ job.postedDate | date:'mediumDate' }}</span>
+          </div>
+
+          <p class="job-address" *ngIf="job.address">
+            <svg lucideBuilding size="13"></svg> {{ job.address }}
+          </p>
+
+          <div class="card-footer">
+            <button class="btn-apply-now" (click)="openJobApplication(job)">
+              View Details & Apply <svg lucideArrowRight size="16"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #emptyState>
+        <div class="empty-jobs-card">
+          <h3>No matching positions found</h3>
+          <p>Try clearing your search query or selecting another department.</p>
+        </div>
+      </ng-template>
+    </div>
+  </main>
+
+  <!-- Application Slide Drawer -->
+  <div class="drawer-overlay" [class.open]="isApplyDrawerOpen()" (click)="closeApplyDrawer()"></div>
+  <div class="drawer-container" [class.open]="isApplyDrawerOpen()">
+    
+    <ng-container *ngIf="selectedJob() as job">
+      <div class="drawer-header">
+        <div>
+          <h2>{{ job.title }}</h2>
+          <p class="drawer-sub">{{ job.department }} • {{ job.location }}</p>
+        </div>
+        <button class="btn-close" (click)="closeApplyDrawer()"><svg lucideX size="20"></svg></button>
+      </div>
+
+      <div class="drawer-body">
+        
+        <!-- SUCCESS STATE -->
+        <div class="success-banner" *ngIf="isSubmittedSuccess()">
+          <svg lucideCheckCircle size="48" class="text-green"></svg>
+          <h3>Application Submitted Successfully!</h3>
+          <p>Thank you for applying for the <strong>{{ job.title }}</strong> role. Our recruitment team will review your application and reach out via email/phone soon.</p>
+          <button class="btn-primary" (click)="closeApplyDrawer()">Explore Other Roles</button>
+        </div>
+
+        <!-- FORM STATE -->
+        <ng-container *ngIf="!isSubmittedSuccess()">
+          
+          <!-- Job Overview Section -->
+          <div class="job-details-box">
+            <h4>Job Overview</h4>
+            <div class="view-desc" [innerHTML]="job.descriptionHtml"></div>
+          </div>
+
+          <hr class="section-divider">
+
+          <!-- Candidate Application Form -->
+          <div class="candidate-form-section">
+            <h4>Apply for this Position</h4>
+
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label>Full Name <span class="required">*</span></label>
+                <input type="text" class="form-control" [class.input-error]="showValidationErrors() && !candidateForm.fullName" [(ngModel)]="candidateForm.fullName" placeholder="e.g. Sarah Jenkins">
+                <span class="error-text" *ngIf="showValidationErrors() && !candidateForm.fullName">Full Name is required</span>
+              </div>
+
+              <div class="form-group">
+                <label>Email Address <span class="required">*</span></label>
+                <input type="email" class="form-control" [class.input-error]="showValidationErrors() && !candidateForm.email" [(ngModel)]="candidateForm.email" placeholder="sarah@example.com">
+                <span class="error-text" *ngIf="showValidationErrors() && !candidateForm.email">Email Address is required</span>
+              </div>
+
+              <div class="form-group">
+                <label>Phone Number <span class="required">*</span></label>
+                <input type="tel" class="form-control" [class.input-error]="showValidationErrors() && !candidateForm.phone" [(ngModel)]="candidateForm.phone" placeholder="+1 (555) 019-2834">
+                <span class="error-text" *ngIf="showValidationErrors() && !candidateForm.phone">Phone Number is required</span>
+              </div>
+
+              <div class="form-group">
+                <label>Total Experience</label>
+                <select class="form-control" [(ngModel)]="candidateForm.experienceYears">
+                  <option value="0-1 Years">0-1 Years (Fresher)</option>
+                  <option value="1-3 Years">1-3 Years</option>
+                  <option value="3-5 Years">3-5 Years</option>
+                  <option value="5-8 Years">5-8 Years</option>
+                  <option value="8+ Years">8+ Years</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Notice Period</label>
+                <select class="form-control" [(ngModel)]="candidateForm.noticePeriod">
+                  <option value="Immediate">Immediate / Serving Notice</option>
+                  <option value="15 Days">15 Days</option>
+                  <option value="30 Days">30 Days</option>
+                  <option value="60+ Days">60+ Days</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>LinkedIn Profile URL</label>
+                <input type="url" class="form-control" [(ngModel)]="candidateForm.linkedinUrl" placeholder="https://linkedin.com/in/username">
+              </div>
+
+              <div class="form-group">
+                <label>Portfolio / GitHub URL</label>
+                <input type="url" class="form-control" [(ngModel)]="candidateForm.portfolioUrl" placeholder="https://github.com/username">
+              </div>
+            </div>
+
+            <!-- Resume / CV Upload Dropzone -->
+            <div class="upload-section">
+              <label class="upload-label">Upload CV / Resume <span class="required">*</span></label>
+              <div class="file-dropzone" [class.dropzone-error]="showValidationErrors() && !candidateForm.resumeUrl" (click)="!isUploading() && fileInput.click()">
+                <svg lucideLoader size="24" class="upload-icon spinner" *ngIf="isUploading()"></svg>
+                <svg lucideUpload size="24" class="upload-icon" *ngIf="!isUploading()"></svg>
+                <div class="upload-text">
+                  <span class="main-text" *ngIf="isUploading()">Uploading {{ uploadFileName() }}...</span>
+                  <span class="main-text" *ngIf="!isUploading()">{{ uploadFileName() ? uploadFileName() : 'Click to upload your Resume (PDF)' }}</span>
+                  <span class="sub-text" *ngIf="!isUploading()">Max file size: 10MB</span>
+                </div>
+                <input #fileInput type="file" (change)="onFileSelected($event)" accept=".pdf" style="display: none;">
+              </div>
+              <span class="error-text" *ngIf="showValidationErrors() && !candidateForm.resumeUrl">Resume is required</span>
+            </div>
+
+            <!-- Dynamic Screening Questions -->
+            <div class="screening-questions-box" *ngIf="job.screeningQuestions && job.screeningQuestions.length > 0">
+              <div class="sq-title-bar">
+                <svg lucideHelpCircle size="18" class="text-orange"></svg>
+                <h5>Screening Questions</h5>
+              </div>
+              <p class="sq-help">Please answer the questions below to complete your application.</p>
+
+              <div *ngFor="let q of job.screeningQuestions; let idx = index" class="sq-item">
+                <label>{{ idx + 1 }}. {{ q }}</label>
+                <textarea class="form-control sq-textarea" [(ngModel)]="answersMap[q]" placeholder="Type your answer here..."></textarea>
+              </div>
+            </div>
+
+          </div>
+
+        </ng-container>
+
+      </div>
+
+      <div class="drawer-footer" *ngIf="!isSubmittedSuccess()">
+        <button class="btn-outline" (click)="closeApplyDrawer()">Cancel</button>
+        <button class="btn-primary" (click)="submitApplication()" [disabled]="isSubmitting() || isUploading()">
+          {{ isSubmitting() ? 'Submitting...' : 'Submit Application' }}
+        </button>
+      </div>
+    </ng-container>
+
+  </div>
+
+</div>

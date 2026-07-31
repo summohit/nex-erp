@@ -28,6 +28,15 @@ export class AttendanceService {
 
     return this.prisma.attendance.findMany({
       where: { employeeId: employee.id },
+      include: { employee: { include: { department: true } } },
+      orderBy: { date: 'desc' }
+    });
+  }
+
+  async getEmployeeHistory(employeeId: number) {
+    return this.prisma.attendance.findMany({
+      where: { employeeId },
+      include: { employee: { include: { department: true } } },
       orderBy: { date: 'desc' }
     });
   }

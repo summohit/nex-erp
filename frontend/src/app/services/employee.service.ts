@@ -9,12 +9,13 @@ export interface Employee {
   lastName: string;
   email: string;
   phone?: string;
+  avatarUrl?: string;
   departmentId?: number;
   designationId?: number;
   role: string;
   department?: { name: string };
   designation?: { name: string };
-  user?: { email: string, role: string };
+  user?: { email: string, role: string, avatarUrl?: string };
   createdAt?: string;
 }
 

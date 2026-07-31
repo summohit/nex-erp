@@ -1,0 +1,269 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Job Postings</h1>
+      <p>Manage open positions, generate AI job descriptions, and set screening questions.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="openCreateModal()">
+        <svg lucidePlus size="16"></svg>
+        Create New Job
+      </button>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <div class="search-group">
+      <svg lucideSearch size="16" class="search-icon"></svg>
+      <input type="text" class="form-control pl-9" placeholder="Search jobs..." [(ngModel)]="searchText" (input)="onSearch()">
+    </div>
+    <div class="filter-group">
+      <select class="form-control" [(ngModel)]="filterStatus" (change)="applyFilters()">
+        <option value="">All Statuses</option>
+        <option value="Open">Open</option>
+        <option value="Draft">Draft</option>
+        <option value="Closed">Closed</option>
+      </select>
+      <select class="form-control" [(ngModel)]="filterDepartment" (change)="applyFilters()">
+        <option value="">All Departments</option>
+        <option *ngFor="let dept of departments()" [value]="dept.name">{{ dept.name }}</option>
+      </select>
+      <button class="btn-outline btn-clear" (click)="clearFilters()" *ngIf="searchText || filterStatus || filterDepartment">
+        <svg lucideX size="14"></svg> Clear
+      </button>
+    </div>
+  </div>
+
+  <div class="grid-container">
+    <ag-grid-angular
+      style="width: 100%; height: 100%;"
+      class="ag-theme-quartz"
+      [theme]="'legacy'"
+      [rowData]="jobs()"
+      [columnDefs]="colDefs"
+      [defaultColDef]="defaultColDef"
+      [gridOptions]="gridOptions"
+      (gridReady)="onGridReady($event)">
+    </ag-grid-angular>
+  </div>
+</div>
+
+<!-- Job Drawer (Create / Edit / View) -->
+<div class="drawer-overlay" [class.open]="isCreateModalOpen()" (click)="closeCreateModal()"></div>
+<div class="drawer-container" [class.open]="isCreateModalOpen()">
+  <div class="drawer-header">
+    <h2>
+      <ng-container [ngSwitch]="drawerMode()">
+        <span *ngSwitchCase="'create'">Create New Job</span>
+        <span *ngSwitchCase="'edit'">Edit Job Posting</span>
+        <span *ngSwitchCase="'view'">Job Overview</span>
+      </ng-container>
+    </h2>
+    <button class="btn-icon-sm" (click)="closeCreateModal()"><svg lucideX size="18"></svg></button>
+  </div>
+  
+  <!-- VIEW MODE -->
+  <ng-container *ngIf="drawerMode() === 'view' && selectedJob() as job">
+    <div class="drawer-body">
+      <div class="view-job-card">
+        <h3 class="view-title">{{ job.title }}</h3>
+        <p class="view-subtitle">{{ job.department }} • {{ job.location }}</p>
+
+        <div class="address-chip" *ngIf="job.address">
+          <svg lucideBuilding size="14"></svg>
+          <span>{{ job.address }}</span>
+        </div>
+        
+        <div class="view-stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">Status</span>
+            <span class="stat-val status-badge" [class.open]="job.status === 'Open'" [class.draft]="job.status === 'Draft'" [class.closed]="job.status === 'Closed'">{{ job.status }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Experience Required</span>
+            <span class="stat-val bold">{{ job.experienceYears || 'Not specified' }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Applicants</span>
+            <span class="stat-val bold">{{ job.applicants }} Candidates</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Employment Type</span>
+            <span class="stat-val">{{ job.type }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Posted Date</span>
+            <span class="stat-val">{{ job.postedDate | date:'mediumDate' }}</span>
+          </div>
+        </div>
+
+        <div class="view-desc-section">
+          <h4>Job Description & Requirements</h4>
+          <div class="desc-content ql-editor" [innerHTML]="job.descriptionHtml || '<p>No description provided.</p>'"></div>
+        </div>
+
+        <!-- Dedicated Screening Questions Card in View Mode -->
+        <div class="view-desc-section" *ngIf="job.screeningQuestions && job.screeningQuestions.length > 0">
+          <h4 class="questions-card-header">
+            <svg lucideHelpCircle size="16" class="text-orange"></svg>
+            Suggested Screening Questions ({{ job.screeningQuestions.length }})
+          </h4>
+          <ol class="questions-view-list">
+            <li *ngFor="let q of job.screeningQuestions">{{ q }}</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-footer">
+      <button class="btn-outline" (click)="closeCreateModal()">Close</button>
+      <button class="btn-primary" (click)="editJob(job)">
+        Edit Job Posting
+      </button>
+    </div>
+  </ng-container>
+
+  <!-- CREATE / EDIT MODE -->
+  <ng-container *ngIf="drawerMode() !== 'view'">
+    <div class="drawer-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Department</label>
+          <select class="form-control" [(ngModel)]="jobForm.departmentId" (change)="onDepartmentChange()">
+            <option value="">Select Department</option>
+            <option *ngFor="let dept of departments()" [value]="dept.id">{{ dept.name }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Designation (Job Role)</label>
+          <select class="form-control" [(ngModel)]="jobForm.designationId" [disabled]="!jobForm.departmentId">
+            <option value="">Select Designation</option>
+            <option *ngFor="let desig of filteredDesignations()" [value]="desig.id">{{ desig.name }}</option>
+          </select>
+        </div>
+        <div class="form-group full-width">
+          <label>Custom Job Title (Optional)</label>
+          <input type="text" class="form-control" [(ngModel)]="jobForm.title" placeholder="e.g. Senior Frontend Developer (React)">
+        </div>
+
+        <!-- Experience Required -->
+        <div class="form-group">
+          <label>Experience Required</label>
+          <select class="form-control" [(ngModel)]="jobForm.experienceYears">
+            <option value="0-1 Years">0-1 Years (Fresher / Entry)</option>
+            <option value="1-3 Years">1-3 Years (Junior)</option>
+            <option value="3-5 Years">3-5 Years (Mid-Level)</option>
+            <option value="5-8 Years">5-8 Years (Senior)</option>
+            <option value="8+ Years">8+ Years (Lead / Executive)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Employment Type</label>
+          <select class="form-control" [(ngModel)]="jobForm.type">
+            <option>Full-time</option>
+            <option>Part-time</option>
+            <option>Contract</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-control" [(ngModel)]="jobForm.status">
+            <option value="Draft">Draft</option>
+            <option value="Open">Open</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Office / Branch Location</label>
+          <select class="form-control" [(ngModel)]="jobForm.branchId" (change)="onBranchChange()">
+            <option value="">Select Office / Branch</option>
+            <option *ngFor="let branch of branches()" [value]="branch.id">{{ branch.name }} {{ branch.address ? '— ' + branch.address : '' }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>City / Location Type</label>
+          <input type="text" class="form-control" [(ngModel)]="jobForm.location" placeholder="e.g. Remote or New York, NY">
+        </div>
+
+        <!-- Full Office Address -->
+        <div class="form-group full-width">
+          <label>Full Office / Work Address</label>
+          <input type="text" class="form-control" [(ngModel)]="jobForm.address" placeholder="e.g. Building 4, Tech Park, Suite 300, New York, NY">
+        </div>
+      </div>
+      
+      <!-- AI Generator Bar -->
+      <div class="ai-generator-section">
+        <div class="ai-header">
+          <label>AI Description Generator</label>
+          <button class="btn-ai-sparkle" (click)="generateWithAI()" [disabled]="isGeneratingAI() || (!jobForm.title && !jobForm.aiPrompt && !jobForm.designationId)">
+            <svg lucideSparkles size="14"></svg>
+            {{ isGeneratingAI() ? 'Generating...' : 'Generate with Groq AI' }}
+          </button>
+        </div>
+        
+        <div class="ai-prompt-box">
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="jobForm.aiPrompt" placeholder="Optional: Give the AI instructions (e.g. 'Must know Angular and Node.js')">
+        </div>
+      </div>
+
+      <!-- Full Quill Rich Text Editor Container -->
+      <div class="editor-container">
+        <label class="editor-label">Job Description (Full Quill Rich Text Editor)</label>
+        
+        <div class="quill-editor-wrapper">
+          <div #quillContainer class="quill-box"></div>
+        </div>
+      </div>
+
+      <!-- Dedicated Screening Questions Section -->
+      <div class="screening-questions-section">
+        <div class="questions-header">
+          <div class="questions-title-group">
+            <svg lucideHelpCircle size="18" class="text-orange"></svg>
+            <h3>Suggested Screening Questions</h3>
+          </div>
+          <span class="badge-count">{{ screeningQuestions().length }} Questions</span>
+        </div>
+
+        <p class="section-help-text">These questions will be automatically assigned to interviewers for candidate screening.</p>
+
+        <!-- Question List -->
+        <div class="questions-list" *ngIf="screeningQuestions().length > 0">
+          <div *ngFor="let q of screeningQuestions(); let i = index" class="question-item">
+            <span class="q-num">{{ i + 1 }}.</span>
+            <span class="q-text">{{ q }}</span>
+            <button class="btn-icon-danger" (click)="removeScreeningQuestion(i)" title="Remove Question">
+              <svg lucideTrash2 size="14"></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Custom Question Input -->
+        <div class="add-question-bar">
+          <input 
+            type="text" 
+            class="form-control" 
+            placeholder="Add custom screening question..." 
+            [(ngModel)]="newQuestionInput" 
+            (keyup.enter)="addScreeningQuestion()">
+          <button class="btn-outline btn-add-q" (click)="addScreeningQuestion()">
+            <svg lucidePlus size="14"></svg> Add
+          </button>
+        </div>
+      </div>
+
+    </div>
+    
+    <div class="drawer-footer">
+      <button class="btn-outline" (click)="closeCreateModal()">Cancel</button>
+      <button class="btn-primary" (click)="saveJob()">
+        {{ drawerMode() === 'create' ? 'Save Job' : 'Update Job' }}
+      </button>
+    </div>
+  </ng-container>
+</div>

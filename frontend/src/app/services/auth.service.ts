@@ -24,6 +24,9 @@ export class AuthService {
         if (response?.access_token) {
           localStorage.setItem('access_token', response.access_token);
         }
+        if (response?.refresh_token) {
+          localStorage.setItem('refresh_token', response.refresh_token);
+        }
       })
     );
   }
@@ -33,6 +36,9 @@ export class AuthService {
       tap((response: any) => {
         if (response?.access_token) {
           localStorage.setItem('access_token', response.access_token);
+        }
+        if (response?.refresh_token) {
+          localStorage.setItem('refresh_token', response.refresh_token);
         }
       })
     );
@@ -56,5 +62,20 @@ export class AuthService {
 
   logout() {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+  }
+
+  refreshToken(): Observable<any> {
+    const refresh_token = localStorage.getItem('refresh_token');
+    return this.http.post(`${this.apiUrl}/refresh`, { refreshToken: refresh_token }).pipe(
+      tap((response: any) => {
+        if (response?.access_token) {
+          localStorage.setItem('access_token', response.access_token);
+        }
+        if (response?.refresh_token) {
+          localStorage.setItem('refresh_token', response.refresh_token);
+        }
+      })
+    );
   }
 }

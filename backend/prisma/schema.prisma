@@ -30,6 +30,13 @@ model Company {
   shifts              Shift[]
   salaryComponents    SalaryComponent[]
   expenseClaims       ExpenseClaim[]
+  awardTypes          AwardType[]
+  appreciations       Appreciation[]
+  assets              Asset[]
+  assetAssignments    AssetAssignment[]
+  hardwareRequests    HardwareRequest[]
+  jobs                Job[]
+  jobApplications     JobApplication[]
 }
 
 // Authentication & RBAC
@@ -45,6 +52,7 @@ model User {
   employee  Employee?
   approvedLeaveRequests LeaveRequest[]
   approvedExpenseClaims ExpenseClaim[] @relation("ExpenseApprover")
+  approvedHardwareRequests HardwareRequest[] @relation("HardwareApprover")
 }
 
 // Roles & Permissions
@@ -73,6 +81,7 @@ model Department {
   defaultRole  String        @default("EMPLOYEE")
   designations Designation[]
   employees    Employee[]
+  jobs         Job[]
 }
 
 model Designation {
@@ -87,6 +96,7 @@ model Designation {
   isActive        Boolean     @default(true)
   canEditProfiles Boolean     @default(false)
   employees       Employee[]
+  jobs            Job[]
 }
 
 // Core Employee Profile
@@ -138,11 +148,15 @@ model Employee {
   emergencyContacts EmergencyContact[]
   documents         EmployeeDocument[]
   leaveBalances     LeaveBalance[]
+  appreciations     Appreciation[]
   leaveRequests     LeaveRequest[]
   attendances       Attendance[]
   salaryStructures  SalaryStructure[]
   payslips          Payslip[]
   expenseClaims     ExpenseClaim[]
+  assetAssignments  AssetAssignment[]
+  hardwareRequests  HardwareRequest[]
+  interviews        Interview[]
 }
 
 model EmergencyContact {
@@ -203,6 +217,7 @@ model Branch {
   companyId   Int
   company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employees   Employee[]
+  jobs        Job[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -381,6 +396,164 @@ model ExpenseClaim {
   company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   month           Int?
   year            Int?
+  purchaseDate    DateTime?
+  purchasedFrom   String?
+  projectId       Int?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
+
+// Appreciation & Awards
+model AwardType {
+  id            Int            @id @default(autoincrement())
+  title         String
+  icon          String         @default("trophy") // trophy, ribbon, star, award, gift, thumbsup
+  color         String         @default("orange") // orange, purple, blue, green, red, yellow
+  status        Boolean        @default(true)
+  companyId     Int
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appreciations Appreciation[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Appreciation {
+  id          Int       @id @default(autoincrement())
+  awardTypeId Int
+  awardType   AwardType @relation(fields: [awardTypeId], references: [id], onDelete: Cascade)
+  employeeId  Int
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  givenDate   DateTime
+  summary     String    @db.Text
+  photoUrl    String?
+  companyId   Int
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Assets & IT Management
+model Asset {
+  id                Int               @id @default(autoincrement())
+  assetTag          String
+  name              String
+  category          String            @default("LAPTOP") // LAPTOP, DESKTOP, MONITOR, PERIPHERAL, SOFTWARE, MOBILE, OTHER
+  brand             String?
+  model             String?
+  serialNumber      String?
+  purchaseDate      DateTime?
+  cost              Float?
+  warrantyExpiry    DateTime?
+  images            String?           @db.Text
+  status            String            @default("AVAILABLE") // AVAILABLE, ASSIGNED, IN_REPAIR, RETIRED
+  companyId         Int
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignments       AssetAssignment[]
+  fulfilledRequests HardwareRequest[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model AssetAssignment {
+  id                Int       @id @default(autoincrement())
+  assetId           Int
+  asset             Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  employeeId        Int
+  employee          Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedDate      DateTime  @default(now())
+  returnDate        DateTime?
+  conditionOnAssign String?
+  conditionOnReturn String?
+  notes             String?   @db.Text
+  status            String    @default("ACTIVE") // ACTIVE, RETURNED
+  companyId         Int
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model HardwareRequest {
+  id               Int       @id @default(autoincrement())
+  employeeId       Int
+  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  requestType      String    @default("NEW_DEVICE") // NEW_DEVICE, REPLACEMENT, REPAIR, PERIPHERAL
+  category         String    @default("LAPTOP")
+  urgency          String    @default("MEDIUM") // LOW, MEDIUM, HIGH
+  reason           String    @db.Text
+  images           String?   @db.Text
+  status           String    @default("PENDING") // PENDING, APPROVED, FULFILLED, REJECTED
+  rejectionReason  String?
+  fulfilledAssetId Int?
+  fulfilledAsset   Asset?    @relation(fields: [fulfilledAssetId], references: [id], onDelete: SetNull)
+  approvedById     Int?
+  approvedBy       User?     @relation("HardwareApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  companyId        Int
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// Recruitment & ATS
+model Job {
+  id                 Int              @id @default(autoincrement())
+  title              String
+  departmentId       Int?
+  department         Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designationId      Int?
+  designation        Designation?     @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  branchId           Int?
+  branch             Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  experienceYears    String?
+  type               String           @default("Full-time")
+  status             String           @default("Draft") // Open, Draft, Closed
+  descriptionHtml    String?          @db.Text
+  screeningQuestions String?          @db.Text // Store as JSON string or comma-separated
+  companyId          Int
+  company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  postedDate         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  applications       JobApplication[]
+}
+
+model JobApplication {
+  id          Int      @id @default(autoincrement())
+  jobId       Int
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fullName    String
+  email       String
+  phone       String
+  resumeUrl       String?
+  linkedinUrl     String?
+  portfolioUrl    String?
+  experienceYears String?
+  noticePeriod    String?
+  status          String   @default("NEW") // NEW, REVIEWING, SHORTLISTED, REJECTED, HIRED, ONBOARDED
+  answers         String?  @db.Text // Store JSON string of answers
+  aiScore         Int?
+  aiSummary       String?  @db.Text
+  isAiScored      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  interviews      Interview[]
+}
+
+model Interview {
+  id            Int            @id @default(autoincrement())
+  applicationId Int
+  application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewerId Int?
+  interviewer   Employee?      @relation(fields: [interviewerId], references: [id], onDelete: SetNull)
+  title         String         // e.g. "Technical Round 1"
+  scheduledAt   DateTime
+  durationMins  Int            @default(30)
+  locationUrl   String?        // Google Meet / Zoom link
+  status        String         @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  rating        Int?           // Scorecard rating (1-5)
+  feedback      String?        @db.Text
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+

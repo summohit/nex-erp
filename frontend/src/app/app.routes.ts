@@ -8,6 +8,8 @@ import { OnboardingComponent } from './employees/onboarding/onboarding';
 
 export const routes: Routes = [
   { path: '', component: AuthComponent },
+  { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
+  { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { 
     path: '', 
     component: MainLayoutComponent, 
@@ -50,6 +52,40 @@ export const routes: Routes = [
       {
         path: 'payroll/:tab',
         loadComponent: () => import('./payroll/payroll').then(m => m.PayrollComponent)
+      },
+      {
+        path: 'appreciation',
+        loadComponent: () => import('./appreciation/appreciation').then(m => m.AppreciationComponent)
+      },
+      {
+        path: 'appreciation/:tab',
+        loadComponent: () => import('./appreciation/appreciation').then(m => m.AppreciationComponent)
+      },
+      {
+        path: 'assets',
+        redirectTo: 'assets/inventory',
+        pathMatch: 'full'
+      },
+      {
+        path: 'assets/:tab',
+        loadComponent: () => import('./assets/assets').then(m => m.AssetsComponent)
+      },
+      {
+        path: 'recruitment',
+        redirectTo: 'recruitment/jobs',
+        pathMatch: 'full'
+      },
+      {
+        path: 'recruitment/jobs',
+        loadComponent: () => import('./recruitment/job-postings/job-postings').then(m => m.JobPostingsComponent)
+      },
+      {
+        path: 'recruitment/candidates',
+        loadComponent: () => import('./recruitment/candidates/candidates').then(m => m.CandidatesComponent)
+      },
+      {
+        path: 'recruitment/interviews',
+        loadComponent: () => import('./recruitment/interviews/interviews').then(m => m.InterviewsComponent)
       }
     ]
   },

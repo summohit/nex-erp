@@ -15,7 +15,7 @@ export interface ExpenseActionCellParams extends ICellRendererParams {
   standalone: true,
   imports: [CommonModule, LucideMoreHorizontal, MatMenuModule],
   template: `
-    <div class="action-container" *ngIf="!params?.data?.isSummaryRow" (click)="$event.stopPropagation()">
+    <div class="action-container" *ngIf="!params.data?.isSummaryRow" (click)="$event.stopPropagation()">
       <button class="btn-icon" [matMenuTriggerFor]="menu">
         <svg lucideMoreHorizontal size="16"></svg>
       </button>

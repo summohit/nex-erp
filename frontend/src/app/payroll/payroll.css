@@ -7,12 +7,227 @@
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
 
+/* Multi-file dropzone & Lightbox Modal styles */
+.dropzone-area {
+  position: relative;
+  border: 2px dashed #CBD5E1;
+  border-radius: 12px;
+  background: #F8FAFC;
+  padding: 24px 16px;
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.dropzone-area:hover {
+  border-color: #2563EB;
+  background: #EFF6FF;
+}
+
+.dropzone-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.dropzone-icon {
+  color: #64748B;
+}
+
+.dropzone-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.dropzone-subtitle {
+  font-size: 11px;
+  color: #64748B;
+}
+
+.multi-images-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.image-preview-card {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.preview-thumb:hover {
+  transform: scale(1.05);
+}
+
+.btn-remove-thumb {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.75);
+  color: #FFF;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.btn-remove-thumb:hover {
+  background: #DC2626;
+}
+
+/* Lightbox Modal - Floating Card Modal */
+.viewer-overlay {
+  z-index: 9999 !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.image-viewer-modal {
+  position: relative;
+  max-width: 85vw;
+  max-height: 85vh;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.btn-close-viewer {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  background: #0F172A;
+  color: #FFFFFF;
+  border: 2px solid #FFFFFF;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.btn-close-viewer:hover {
+  background: #DC2626;
+  transform: scale(1.1);
+}
+
+.image-viewer-content {
+  max-width: 80vw;
+  max-height: 75vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #F8FAFC;
+}
+
+.full-preview-img {
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.image-viewer-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  background: #F1F5F9;
+  padding: 6px 16px;
+  border-radius: 9999px;
+}
+
+.btn-nav-img {
+  background: #FFFFFF;
+  color: #0F172A;
+  border: 1px solid #CBD5E1;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-nav-img:hover:not(:disabled) {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+}
+
+.btn-nav-img:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.img-counter {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* Header & Top KPI Banner */
 .payroll-header-banner {
   margin-bottom: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.header-main-text {
+  background: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid #E2E8F0;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.02);
 }
 
 .header-main-text h2 {
@@ -1433,6 +1648,7 @@
   background: #FFFFFF;
   overflow: hidden;
   transition: all 0.2s ease;
+  margin-bottom: 1rem;
 }
 
 .employee-accordion-card:hover {
@@ -1443,9 +1659,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 12px 11px;
   background: #F8FAFC;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   transition: background 0.2s ease;
 }

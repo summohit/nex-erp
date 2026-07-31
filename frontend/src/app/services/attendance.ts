@@ -42,6 +42,10 @@ export class AttendanceService {
     return this.http.get<AttendanceRecord[]>(`${this.apiUrl}/history/me`);
   }
 
+  getEmployeeHistory(employeeId: number): Observable<AttendanceRecord[]> {
+    return this.http.get<AttendanceRecord[]>(`${this.apiUrl}/employee/${employeeId}`);
+  }
+
   clockIn(lat?: number, lng?: number) {
     return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-in`, { lat, lng });
   }

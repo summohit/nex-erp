@@ -65,6 +65,8 @@ export interface ExpenseClaim {
   amount: number;
   category: string;
   receiptUrl?: string;
+  purchaseDate?: string;
+  purchasedFrom?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejectionReason?: string;
   createdAt: string;

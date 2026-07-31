@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -10,11 +10,14 @@ import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
 import { ActionCellRendererComponent } from '../shared/components/action-cell-renderer.component';
 import { ExpenseActionCellRendererComponent } from '../shared/components/expense-action-cell-renderer.component';
+import { UploadService } from '../services/upload.service';
 import { 
   LucideFilter, 
   LucideMoreHorizontal,
   LucideChevronDown,
-  LucideChevronRight
+  LucideChevronRight,
+  LucideUploadCloud,
+  LucideX
 } from '@lucide/angular';
 import { MatMenuModule } from '@angular/material/menu';
 
@@ -26,9 +29,8 @@ import { MatMenuModule } from '@angular/material/menu';
     FormsModule,
     AgGridModule,
     LucideFilter,
-    LucideMoreHorizontal,
-    LucideChevronDown,
-    LucideChevronRight,
+    LucideUploadCloud,
+    LucideX,
     MatMenuModule
   ],
   templateUrl: './payroll.html',
@@ -70,14 +72,20 @@ export class PayrollComponent implements OnInit {
   selectedEmployeeId = signal<number | null>(null);
   currentStructure = signal<SalaryStructureItem[]>([]);
 
+  private uploadService = inject(UploadService);
+
   // Drawer / Modal states
   isAdjustModalOpen = signal<boolean>(false);
   selectedPayslipToAdjust = signal<Payslip | null>(null);
   adjustForm = { lossOfPay: 0, totalEarnings: 0, totalDeductions: 0, expenseAmount: 0 };
 
   isExpenseModalOpen = signal<boolean>(false);
-  expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '' };
+  expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '', receipts: [] as string[], purchaseDate: '', purchasedFrom: '' };
   
+  // Image Lightbox Viewer states
+  previewImages = signal<string[]>([]);
+  activeImageIndex = signal<number>(0);
+
   // Rejection Modal
   isRejectModalOpen = signal(false);
   rejectingClaimId = signal<number | null>(null);
@@ -86,6 +94,55 @@ export class PayrollComponent implements OnInit {
   // File Upload
   selectedFile = signal<File | null>(null);
   isUploading = signal(false);
+
+  // Lightbox Navigation Methods
+  openImageViewer(images: string[], index = 0) {
+    if (!images || images.length === 0) return;
+    this.previewImages.set(images);
+    this.activeImageIndex.set(index);
+  }
+
+  closeImageViewer() {
+    this.previewImages.set([]);
+    this.activeImageIndex.set(0);
+  }
+
+  prevImage() {
+    if (this.activeImageIndex() > 0) {
+      this.activeImageIndex.update(i => i - 1);
+    }
+  }
+
+  nextImage() {
+    if (this.activeImageIndex() < this.previewImages().length - 1) {
+      this.activeImageIndex.update(i => i + 1);
+    }
+  }
+
+  onExpenseFilesSelected(event: any) {
+    const files: FileList = event.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        this.toast.error('File size should not exceed 5MB');
+        return;
+      }
+      this.uploadService.uploadFile(file).subscribe({
+        next: (res: any) => {
+          if (res?.url) {
+            this.expenseForm.receipts.push(res.url);
+            this.toast.success('Receipt uploaded');
+          }
+        },
+        error: () => this.toast.error('Failed to upload receipt')
+      });
+    });
+  }
+
+  removeExpenseReceipt(index: number) {
+    this.expenseForm.receipts.splice(index, 1);
+  }
 
   // Draft Generation States
   isPayslipModalOpen = signal(false);
@@ -288,32 +345,37 @@ export class PayrollComponent implements OnInit {
     {
       field: 'employee',
       headerName: 'Employee',
-      minWidth: 170,
-      flex: 1.5,
+      minWidth: 200,
+      flex: 1.6,
       pinned: 'left',
-      valueFormatter: (params: ValueFormatterParams) => {
+      cellRenderer: (params: any) => {
+        if (params.data?.isSummaryRow) return `<strong>${params.data.employee?.firstName || 'TOTAL'}</strong>`;
         const emp = params.data?.employee;
         if (!emp) return 'N/A';
-        return emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+        const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+        const dept = emp.department?.name || 'General';
+        const initial = (emp.firstName || 'E').charAt(0);
+        return `
+          <div class="cell-user-avatar-row">
+            <div class="avatar-circle-sm">${initial}</div>
+            <div class="cell-stacked">
+              <div class="cell-title-bold">${name}</div>
+              <div class="user-text-stack text-secondary">${dept}</div>
+            </div>
+          </div>
+        `;
       }
     },
-    {
-      field: 'employee.department.name',
-      headerName: 'Department',
-      minWidth: 150,
-      flex: 1.2,
-      valueFormatter: (params: ValueFormatterParams) => params.data?.isSummaryRow ? '' : (params.data?.employee?.department?.name || 'N/A')
-    },
-    { field: 'workingDays', headerName: 'Working Days', minWidth: 130, flex: 1, valueFormatter: (params) => params.data?.isSummaryRow ? '' : params.value },
-    { field: 'presentDays', headerName: 'Present', minWidth: 110, flex: 0.9, valueFormatter: (params) => params.data?.isSummaryRow ? '' : params.value },
+    { field: 'workingDays', headerName: 'Working Days', minWidth: 120, flex: 0.9, valueFormatter: (params) => params.data?.isSummaryRow ? '' : params.value },
+    { field: 'presentDays', headerName: 'Present', minWidth: 100, flex: 0.8, valueFormatter: (params) => params.data?.isSummaryRow ? '' : params.value },
     {
       field: 'absentDays',
       headerName: 'Absent',
-      minWidth: 110,
-      flex: 0.9,
+      minWidth: 100,
+      flex: 0.8,
       valueFormatter: (params) => params.data?.isSummaryRow ? '' : params.value,
       cellStyle: (params) => {
-        if (!params.data?.isSummaryRow && params.value > 0) return { color: '#EF4444', fontWeight: 'bold' };
+        if (!params.data?.isSummaryRow && params.value > 0) return { color: '#DC2626', fontWeight: 'bold' };
         return null;
       }
     },
@@ -327,10 +389,10 @@ export class PayrollComponent implements OnInit {
     {
       field: 'lossOfPay',
       headerName: 'LOP (Deducted)',
-      minWidth: 150,
-      flex: 1.2,
+      minWidth: 140,
+      flex: 1.1,
       cellStyle: (params) => {
-        if (!params.data?.isSummaryRow && params.value > 0) return { color: '#F59E0B', fontWeight: 'bold' };
+        if (!params.data?.isSummaryRow && params.value > 0) return { color: '#D97706', fontWeight: 'bold' };
         return null;
       },
       valueFormatter: (params: ValueFormatterParams) => `₹${(params.value || 0).toLocaleString('en-IN')}`
@@ -338,8 +400,8 @@ export class PayrollComponent implements OnInit {
     {
       field: 'expenseAmount',
       headerName: 'Expenses Reimbursed',
-      minWidth: 180,
-      flex: 1.4,
+      minWidth: 160,
+      flex: 1.3,
       valueFormatter: (params: ValueFormatterParams) => `₹${(params.value || 0).toLocaleString('en-IN')}`
     },
     {
@@ -347,27 +409,32 @@ export class PayrollComponent implements OnInit {
       headerName: 'Net Pay',
       minWidth: 130,
       flex: 1.1,
-      cellStyle: { fontWeight: 'bold', color: '#10B981' },
+      cellStyle: { fontWeight: 'bold', color: '#059669' },
       valueFormatter: (params: ValueFormatterParams) => `₹${(params.value || 0).toLocaleString('en-IN')}`
     },
     {
       field: 'status',
       headerName: 'Status',
-      minWidth: 120,
+      minWidth: 130,
       flex: 1,
       cellRenderer: (params: any) => {
         if (params.data?.isSummaryRow) return '';
-        const status = params.value;
-        let badgeClass = 'badge-secondary';
-        if (status === 'DRAFT') badgeClass = 'badge-warning';
-        if (status === 'FINALIZED') badgeClass = 'badge-info';
-        if (status === 'PAID') badgeClass = 'badge-success';
-        return `<span class="badge ${badgeClass}">${status}</span>`;
+        const status = params.value || 'DRAFT';
+        let statusClass = 'status-pending';
+        if (status === 'DRAFT') statusClass = 'status-draft';
+        if (status === 'FINALIZED') statusClass = 'status-approved';
+        if (status === 'PAID') statusClass = 'status-paid';
+        return `
+          <span class="status-round ${statusClass}">
+            <span class="status-dot"></span>
+            ${status}
+          </span>
+        `;
       }
     },
     {
       headerName: 'Actions',
-      minWidth: 150,
+      minWidth: 140,
       flex: 1,
       pinned: 'right',
       sortable: false,
@@ -388,38 +455,127 @@ export class PayrollComponent implements OnInit {
     {
       field: 'employee',
       headerName: 'Employee',
-      flex: 1.2,
+      minWidth: 200,
+      flex: 1.5,
       pinned: 'left',
-      valueFormatter: (params: ValueFormatterParams) => {
+      cellRenderer: (params: any) => {
+        if (params.data?.isSummaryRow) return `<strong>${params.data.employee?.firstName || 'TOTAL'}</strong>`;
         const emp = params.data?.employee;
         if (!emp) return 'N/A';
-        return emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+        const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+        const dept = emp.department?.name || 'General';
+        const initial = (emp.firstName || 'E').charAt(0);
+        return `
+          <div class="cell-user-avatar-row">
+            <div class="avatar-circle-sm">${initial}</div>
+            <div class="cell-stacked">
+              <div class="cell-title-bold">${name}</div>
+              <div class="user-text-stack text-secondary">${dept}</div>
+            </div>
+          </div>
+        `;
       }
     },
-    { field: 'title', headerName: 'Title', flex: 1.3, valueFormatter: (params) => params.data?.isSummaryRow ? params.value : params.value },
-    { field: 'category', headerName: 'Category', flex: 1 },
+    {
+      field: 'title',
+      headerName: 'Title & Category',
+      flex: 1.8,
+      minWidth: 200,
+      cellRenderer: (params: any) => {
+        if (params.data?.isSummaryRow) return `<strong>${params.value || ''}</strong>`;
+        const title = params.data?.title || 'Expense Claim';
+        const vendor = params.data?.purchasedFrom ? `Vendor: ${params.data.purchasedFrom}` : '';
+        const category = params.data?.category || 'OTHER';
+        return `
+          <div class="cell-stacked">
+            <div class="cell-title-bold">${title}</div>
+            <div class="cell-subtitle-row">
+              <span class="cat-badge cat-laptop">${category}</span>
+              <span>${vendor}</span>
+            </div>
+          </div>
+        `;
+      }
+    },
+    {
+      field: 'purchaseDate',
+      headerName: 'Purchase Date',
+      flex: 1.1,
+      minWidth: 130,
+      valueFormatter: (params: any) => {
+        if (!params.value) return '-';
+        return new Date(params.value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
+    },
     {
       field: 'amount',
       headerName: 'Amount',
-      flex: 1,
-      valueFormatter: (params: ValueFormatterParams) => `₹${(params.value || 0).toLocaleString('en-IN')}`
+      flex: 1.1,
+      minWidth: 120,
+      valueFormatter: (params: ValueFormatterParams) => `₹${(params.value || 0).toLocaleString('en-IN')}`,
+      cellStyle: { fontWeight: 'bold' }
+    },
+    {
+      field: 'receiptUrl',
+      headerName: 'Receipts',
+      flex: 1.1,
+      minWidth: 130,
+      cellRenderer: (params: any) => {
+        if (params.data?.isSummaryRow) return '';
+        let imgs: string[] = [];
+        if (params.value) {
+          try {
+            imgs = typeof params.value === 'string' && params.value.startsWith('[') ? JSON.parse(params.value) : [params.value];
+          } catch (e) { imgs = [params.value]; }
+        }
+        if (!imgs || imgs.length === 0 || !imgs[0]) return '<span style="color: #94A3B8; font-size: 12px;">No receipt</span>';
+        return `
+          <div class="cell-user-avatar-row" style="cursor: pointer;" title="Click to view receipt">
+            <img src="${imgs[0]}" style="width: 30px; height: 30px; border-radius: 6px; object-fit: cover; border: 1px solid #CBD5E1;" />
+            <span style="font-size: 11px; font-weight: 600; color: #2563EB;">${imgs.length} receipt(s)</span>
+          </div>
+        `;
+      },
+      onCellClicked: (params: any) => {
+        let imgs: string[] = [];
+        if (params.value) {
+          try {
+            imgs = typeof params.value === 'string' && params.value.startsWith('[') ? JSON.parse(params.value) : [params.value];
+          } catch (e) { imgs = [params.value]; }
+        }
+        if (imgs && imgs.length > 0 && imgs[0]) {
+          this.openImageViewer(imgs, 0);
+        }
+      }
     },
     {
       field: 'status',
       headerName: 'Status',
-      flex: 1,
+      flex: 1.2,
+      minWidth: 130,
       cellRenderer: (params: any) => {
         if (params.data?.isSummaryRow) return '';
-        const status = params.value;
-        let badgeClass = 'badge-warning';
-        if (status === 'APPROVED') badgeClass = 'badge-success';
-        if (status === 'REJECTED') badgeClass = 'badge-danger';
-        return `<span class="badge ${badgeClass}">${status}</span>`;
+        const s = params.value || 'PENDING';
+        let statusClass = 'status-pending';
+        if (s === 'APPROVED') statusClass = 'status-approved';
+        if (s === 'REJECTED') statusClass = 'status-rejected';
+        const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason 
+          ? `<div style="font-size: 10px; color: #DC2626; font-weight: 500; line-height: 1.2; margin-top: 3px;">Reason: ${params.data.rejectionReason}</div>`
+          : '';
+        return `
+          <div class="cell-stacked">
+            <span class="status-round ${statusClass}">
+              <span class="status-dot"></span>
+              ${s}
+            </span>
+            ${reasonHtml}
+          </div>
+        `;
       }
     },
     {
       headerName: 'Actions',
-      width: 140,
+      width: 110,
       pinned: 'right',
       sortable: false,
       filter: false,
@@ -705,7 +861,16 @@ export class PayrollComponent implements OnInit {
 
   // Expense Claims
   openExpenseModal() {
-    this.expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '' };
+    this.expenseForm = { 
+      title: '', 
+      description: '', 
+      amount: 0, 
+      category: 'OTHER', 
+      receiptUrl: '', 
+      receipts: [], 
+      purchaseDate: new Date().toISOString().split('T')[0], 
+      purchasedFrom: '' 
+    };
     this.selectedFile.set(null);
     this.isExpenseModalOpen.set(true);
   }
@@ -714,38 +879,23 @@ export class PayrollComponent implements OnInit {
     this.isExpenseModalOpen.set(false);
   }
 
-  onFileSelected(event: any) {
-    const file = event.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        this.toast.error('File size should not exceed 5MB');
-        return;
-      }
-      this.selectedFile.set(file);
-    }
-  }
-
   submitExpenseClaim() {
-    if (this.selectedFile()) {
-      this.isUploading.set(true);
-      this.payrollService.uploadFile(this.selectedFile()!).subscribe({
-        next: (res) => {
-          this.isUploading.set(false);
-          this.expenseForm.receiptUrl = res.url;
-          this.createExpenseClaimApi();
-        },
-        error: (err) => {
-          this.isUploading.set(false);
-          this.toast.error('Failed to upload receipt');
-        }
-      });
-    } else {
-      this.createExpenseClaimApi();
+    if (!this.expenseForm.title || !this.expenseForm.amount) {
+      this.toast.error('Please fill in title and amount');
+      return;
     }
-  }
 
-  private createExpenseClaimApi() {
-    this.payrollService.createExpenseClaim(this.expenseForm).subscribe({
+    const payload = {
+      title: this.expenseForm.title,
+      description: this.expenseForm.description,
+      amount: Number(this.expenseForm.amount),
+      category: this.expenseForm.category,
+      purchaseDate: this.expenseForm.purchaseDate,
+      purchasedFrom: this.expenseForm.purchasedFrom,
+      receiptUrl: this.expenseForm.receipts.length > 0 ? JSON.stringify(this.expenseForm.receipts) : ''
+    };
+
+    this.payrollService.createExpenseClaim(payload).subscribe({
       next: () => {
         this.toast.success('Expense claim submitted for approval');
         this.closeExpenseModal();
@@ -803,13 +953,16 @@ export class PayrollComponent implements OnInit {
   }
 
   deleteMyExpense(id: number) {
-    if (!confirm('Cancel this pending expense claim?')) return;
+    if (!confirm('Are you sure you want to delete this expense claim?')) return;
     this.payrollService.deleteExpenseClaim(id).subscribe({
       next: () => {
-        this.toast.success('Expense claim cancelled');
+        this.toast.success('Expense claim deleted');
         this.payrollService.getMyExpenseClaims().subscribe(res => this.myExpenseClaims.set(res));
+        if (this.isAdmin()) {
+          this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
+        }
       },
-      error: (err) => this.toast.error(err.error?.message || 'Failed to cancel claim')
+      error: (err) => this.toast.error(err.error?.message || 'Failed to delete claim')
     });
   }
 

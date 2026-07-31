@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { MasterDataService, Department, Designation, Branch } from '../../services/master-data.service';
 import { EmployeeService } from '../../services/employee.service';
 import { ShiftsService } from '../../services/shifts.service';
+import { AuthService } from '../../services/auth.service';
 import { Shift } from '../../services/attendance';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideX } from '@lucide/angular';
@@ -25,6 +26,7 @@ export class EmployeeDrawerComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
   private shiftsService = inject(ShiftsService);
+  private authService = inject(AuthService);
   private toast = inject(HotToastService);
 
   form: FormGroup;
@@ -71,6 +73,14 @@ export class EmployeeDrawerComponent implements OnInit {
 
   ngOnChanges() {
     if (this.isOpen) {
+      // Permission check: only SUPERADMIN and ADMIN can change roles
+      const currentUserRole = this.authService.currentUser()?.role;
+      if (currentUserRole !== 'SUPERADMIN' && currentUserRole !== 'ADMIN') {
+        this.form.get('role')?.disable();
+      } else {
+        this.form.get('role')?.enable();
+      }
+
       if (this.employeeData) {
         this.form.patchValue({
           firstName: this.employeeData.firstName,

@@ -14,8 +14,15 @@
 
   <div class="filter-card">
     <div class="filter-group search-group">
-      <svg lucideSearch size="16" class="search-icon"></svg>
-      <input type="text" placeholder="Search employees by name..." [(ngModel)]="searchText" (input)="onSearch()">
+      <button class="cmd-k-btn" (click)="openSearchModal()">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg lucideSearch size="16" class="search-icon"></svg>
+          <span style="color: #64748B;">Search employees...</span>
+        </div>
+        <div class="cmd-k-badge">
+          <span class="cmd-key">⌘</span><span class="cmd-key">K</span>
+        </div>
+      </button>
     </div>
     
     <div class="filter-group">
@@ -78,3 +85,35 @@
   (closeDrawer)="closeDrawer()"
   (saveSuccess)="onSaveSuccess()">
 </app-employee-drawer>
+
+<!-- Command-K Search Modal -->
+<div class="cmd-k-overlay" *ngIf="isSearchModalOpen()" (click)="closeSearchModal()">
+  <div class="cmd-k-modal" (click)="$event.stopPropagation()">
+    <div class="cmd-k-header">
+      <svg lucideSearch size="20" class="cmd-k-search-icon"></svg>
+      <input type="text" class="cmd-k-input" placeholder="Search employees by name, department, or role..." [ngModel]="modalSearchQuery()" (ngModelChange)="modalSearchQuery.set($event)" autofocus>
+      <button class="cmd-k-close" (click)="closeSearchModal()">Esc</button>
+    </div>
+    <div class="cmd-k-body">
+      <div class="cmd-k-empty" *ngIf="filteredModalEmployees().length === 0">
+        <div *ngIf="!modalSearchQuery()">Type to start searching...</div>
+        <div *ngIf="modalSearchQuery()">No employees found matching "{{ modalSearchQuery() }}"</div>
+      </div>
+      <div class="cmd-k-list" *ngIf="filteredModalEmployees().length > 0">
+        <div class="cmd-k-item" *ngFor="let emp of filteredModalEmployees()" (click)="selectModalEmployee(emp)">
+          <div class="cmd-k-avatar">
+            <img *ngIf="emp.avatarUrl || emp.user?.avatarUrl" [src]="emp.avatarUrl || emp.user?.avatarUrl" alt="Avatar">
+            <div *ngIf="!(emp.avatarUrl || emp.user?.avatarUrl)" class="cmd-k-avatar-circle">
+              {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
+            </div>
+          </div>
+          <div class="cmd-k-details">
+            <div class="cmd-k-name">{{ emp.firstName }} {{ emp.lastName }}</div>
+            <div class="cmd-k-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }}</div>
+          </div>
+          <svg lucideChevronRight size="16" class="cmd-k-arrow"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

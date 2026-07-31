@@ -13,9 +13,14 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { LeavesModule } from './leaves/leaves.module';
 import { PayrollModule } from './payroll/payroll.module';
+import { AppreciationModule } from './appreciation/appreciation.module';
+import { AssetsModule } from './assets/assets.module';
+import { AiModule } from './ai/ai.module';
+import { PublicJobsModule } from './public-jobs/public-jobs.module';
+import { RecruitmentModule } from './recruitment/recruitment.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule],
+  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule],
   controllers: [AppController],
   providers: [AppService],
 })

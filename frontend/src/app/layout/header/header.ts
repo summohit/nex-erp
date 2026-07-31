@@ -25,7 +25,7 @@ export class HeaderComponent implements OnInit {
 
   private updateTitle(url: string) {
     if (url.includes('/payroll')) {
-      this.pageTitle.set('Payroll & Expenses');
+      this.pageTitle.set('Payroll & Compensation');
     } else if (url.includes('/employees/directory')) {
       this.pageTitle.set('Employee Directory');
     } else if (url.includes('/employees/onboarding')) {
@@ -38,6 +38,8 @@ export class HeaderComponent implements OnInit {
       this.pageTitle.set('Master Data Management');
     } else if (url.includes('/settings/company')) {
       this.pageTitle.set('Company Profile');
+    } else if (url.includes('/appreciation')) {
+      this.pageTitle.set('Appreciation & Awards');
     } else if (url.includes('/settings/permissions')) {
       this.pageTitle.set('Roles & Permissions');
     } else {

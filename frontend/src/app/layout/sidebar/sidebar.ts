@@ -5,12 +5,12 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { PermissionsService, RolePermission } from '../../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideUser } from '@lucide/angular';
+import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy } from '@lucide/angular';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideUser],
+  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy],
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css']
 })
@@ -23,6 +23,12 @@ export class SidebarComponent implements OnInit {
   user = signal<any>(null);
   expandedMenu = signal<string | null>(null);
   allowedModules = signal<Set<string>>(new Set(['overview']));
+  isCollapsed = signal<boolean>(false);
+  logoFailed = signal<boolean>(false);
+
+  onLogoError() {
+    this.logoFailed.set(true);
+  }
 
   menuSections = [
     {
@@ -54,7 +60,8 @@ export class SidebarComponent implements OnInit {
           subItems: [
             { id: 'recruitment/jobs', title: 'Job Postings', route: '/recruitment/jobs' },
             { id: 'recruitment/candidates', title: 'Candidates (ATS)', route: '/recruitment/candidates' },
-            { id: 'recruitment/interviews', title: 'Interviews', route: '/recruitment/interviews' }
+            { id: 'recruitment/interviews', title: 'Interviews', route: '/recruitment/interviews' },
+            { id: 'recruitment/careers', title: 'Public Careers Page ↗', route: '/careers', external: true }
           ]
         },
         {
@@ -69,6 +76,12 @@ export class SidebarComponent implements OnInit {
             { id: 'attendance/shifts', title: 'Shift Roster', route: '/attendance/shifts' },
             { id: 'attendance/holidays', title: 'Holidays', route: '/attendance/holidays' }
           ]
+        },
+        {
+          id: 'appreciation',
+          title: 'Appreciation',
+          icon: 'lucideTrophy',
+          route: '/appreciation'
         },
         {
           id: 'payroll',
@@ -142,28 +155,88 @@ export class SidebarComponent implements OnInit {
 
     this.permissionsService.getAllPermissions(role).subscribe({
       next: (perms) => {
-        const allowed = new Set<string>(['overview']);
-        perms.forEach(p => {
-          if (p.action === 'VIEW') {
-            allowed.add(p.module);
+        const allowed = new Set<string>(['overview', 'employees/me/profile']);
+        
+        if (perms && perms.length > 0) {
+          perms.forEach(p => {
+            if (p.action === 'VIEW') {
+              allowed.add(p.module);
+            }
+          });
+        } else {
+          // Fallback defaults based on RBAC role
+          if (role === 'ADMIN' || role === 'HR' || role === 'FINANCE') {
+            allowed.add('assets');
+            allowed.add('assets/inventory');
+            allowed.add('assets/assignments');
+            allowed.add('assets/requests');
+          } else {
+            // Standard Employee / Other roles: Only Hardware Requests
+            allowed.add('assets');
+            allowed.add('assets/requests');
           }
+        }
+        
+        allowed.add('recruitment/careers');
+
+        // Auto-add parent module ID if any sub-item is allowed
+        this.menuSections.forEach(sec => {
+          sec.items.forEach(item => {
+            if (item.subItems && item.subItems.some((sub: any) => allowed.has(sub.id))) {
+              allowed.add(item.id);
+            }
+          });
         });
-        // We always allow 'My Profile' for all users, but we didn't give it an ID. Let's add it manually just in case
-        allowed.add('employees/me/profile');
+
         this.allowedModules.set(allowed);
       }
     });
   }
 
   hasAccess(moduleId: string): boolean {
+    const item = this.findMenuItem(moduleId);
+    if (item && item.subItems) {
+      return item.subItems.some((sub: any) => this.allowedModules().has(sub.id));
+    }
     return this.allowedModules().has(moduleId);
+  }
+
+  private findMenuItem(id: string): any {
+    for (const sec of this.menuSections) {
+      for (const item of sec.items) {
+        if (item.id === id) return item;
+      }
+    }
+    return null;
   }
 
   hasVisibleItems(section: any): boolean {
     return section.items.some((item: any) => this.hasAccess(item.id));
   }
 
+  isMainItemActive(item: any): boolean {
+    const currentUrl = this.router.url;
+    if (item.route && item.route !== '/') {
+      if (item.route === '/dashboard' && (currentUrl === '/dashboard' || currentUrl === '/')) {
+        return true;
+      }
+      if (item.route !== '/dashboard' && currentUrl.startsWith(item.route)) {
+        return true;
+      }
+    }
+    if (item.subItems) {
+      return item.subItems.some((sub: any) => currentUrl.includes(sub.route));
+    }
+    return false;
+  }
+
   ngOnInit() {
+    const savedState = localStorage.getItem('sidebar_collapsed');
+    if (savedState === 'true') {
+      this.isCollapsed.set(true);
+      document.body.classList.add('sidebar-collapsed');
+    }
+
     // Check initially
     this.checkExpandedMenu(this.router.url);
     
@@ -175,17 +248,35 @@ export class SidebarComponent implements OnInit {
     });
   }
 
+  toggleSidebar() {
+    const newState = !this.isCollapsed();
+    this.isCollapsed.set(newState);
+    localStorage.setItem('sidebar_collapsed', newState.toString());
+    
+    if (newState) {
+      document.body.classList.add('sidebar-collapsed');
+      this.expandedMenu.set(null); // Collapse any open menus when collapsing sidebar
+    } else {
+      document.body.classList.remove('sidebar-collapsed');
+    }
+  }
+
   private checkExpandedMenu(url: string) {
+    let activeFound = false;
     for (const section of this.menuSections) {
       for (const item of section.items) {
         if (item.subItems) {
           const hasActiveSubItem = item.subItems.some(sub => url.includes(sub.route));
           if (hasActiveSubItem) {
             this.expandedMenu.set(item.id);
+            activeFound = true;
             return;
           }
         }
       }
+    }
+    if (!activeFound) {
+      this.expandedMenu.set(null);
     }
   }
 
@@ -213,11 +304,25 @@ export class SidebarComponent implements OnInit {
 
   toggleMenu(menuId: string, event: Event, hasSubItems: boolean) {
     event.preventDefault();
+
+    // If sidebar is collapsed, auto-expand it so submenus and labels are accessible
+    if (this.isCollapsed()) {
+      this.isCollapsed.set(false);
+      localStorage.setItem('sidebar_collapsed', 'false');
+      document.body.classList.remove('sidebar-collapsed');
+    }
+
     if (!hasSubItems) {
-      if (menuId !== 'overview') {
-        this.comingSoon(event);
-      } else {
+      if (menuId === 'overview') {
         this.router.navigate(['/dashboard']);
+      } else if (menuId === 'appreciation') {
+        if (this.hasAccess('appreciation')) {
+          this.router.navigate(['/appreciation']);
+        } else {
+          this.toast.error('You do not have permission to access Appreciation.');
+        }
+      } else {
+        this.comingSoon(event);
       }
       return;
     }
@@ -231,8 +336,26 @@ export class SidebarComponent implements OnInit {
 
   handleSubMenuClick(subItem: any, event: Event) {
     event.preventDefault();
-    const allowedRoutes = ['/settings/master-data', '/settings/company', '/settings/permissions', '/employees/directory', '/employees/me/profile', '/employees/onboarding', '/payroll/processing', '/payroll/payslips', '/payroll/expenses', '/payroll/structure'];
-    if (allowedRoutes.includes(subItem.route) || subItem.route.startsWith('/employees/') || subItem.route.startsWith('/attendance/') || subItem.route.startsWith('/payroll/')) {
+    if (subItem.external || subItem.route === '/careers') {
+      let route = subItem.route;
+      if (subItem.route === '/careers') {
+        const currentUser = this.user();
+        if (currentUser && currentUser.companyId) {
+          const encrypted = btoa(currentUser.companyId);
+          route = `/careers/${encrypted}`;
+        }
+      }
+      window.open(route, '_blank');
+      return;
+    }
+    if (
+      subItem.route.startsWith('/assets') ||
+      subItem.route.startsWith('/employees/') ||
+      subItem.route.startsWith('/attendance/') ||
+      subItem.route.startsWith('/payroll/') ||
+      subItem.route.startsWith('/settings/') ||
+      subItem.route.startsWith('/recruitment/')
+    ) {
       this.router.navigate([subItem.route]);
     } else {
       this.comingSoon(event);

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request, Param } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -15,6 +15,11 @@ export class AttendanceController {
   @Get('history/me')
   getMyHistory(@Request() req) {
     return this.attendanceService.getMyHistory(req.user.sub);
+  }
+
+  @Get('employee/:employeeId')
+  getEmployeeHistory(@Param('employeeId') employeeId: string) {
+    return this.attendanceService.getEmployeeHistory(+employeeId);
   }
 
   @Post('clock-in')
