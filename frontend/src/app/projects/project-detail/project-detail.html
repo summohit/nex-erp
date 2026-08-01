@@ -70,17 +70,39 @@
                cdkDrag 
                (click)="openIssueDetails(issue)">
             
+            <!-- Card Cover Image Banner -->
+            <div class="card-cover-banner" *ngIf="issue.coverUrl">
+              <img [src]="issue.coverUrl" class="cover-img" [alt]="issue.title">
+            </div>
+
             <div class="card-content-wrapper">
+              <!-- Label Indicator Bars on Card -->
+              <div class="card-labels-indicators-row mb-1.5" *ngIf="issue.labels && issue.labels.length > 0">
+                <div class="card-label-indicator-bar" *ngFor="let il of issue.labels" [style.background-color]="il.label?.color || il.color" [title]="il.label?.name || il.name"></div>
+              </div>
+
               <div class="card-labels" *ngIf="issue.type && issue.type !== 'TASK'">
                 <span class="type-pill" [ngClass]="issue.type.toLowerCase()">{{ issue.type }}</span>
               </div>
 
               <div class="card-title">{{ issue.title }}</div>
 
-              <div class="card-footer-meta" *ngIf="issue.key || (issue.workStartedAt && !issue.workCompletedAt)">
-                <span class="card-key" *ngIf="issue.key">{{ issue.key }}</span>
-                <div class="card-timer" *ngIf="issue.workStartedAt && !issue.workCompletedAt">
-                  <svg lucideClock size="12"></svg>
+              <div class="card-footer-meta flex items-center justify-between" *ngIf="issue.key || (issue.workStartedAt && !issue.workCompletedAt) || (issue.members && issue.members.length > 0)">
+                <div class="flex items-center gap-1.5">
+                  <span class="card-key" *ngIf="issue.key">{{ issue.key }}</span>
+                  <div class="card-timer" *ngIf="issue.workStartedAt && !issue.workCompletedAt">
+                    <svg lucideClock size="12"></svg>
+                  </div>
+                </div>
+
+                <div class="card-member-avatars-row flex items-center -space-x-1" *ngIf="issue.members && issue.members.length > 0">
+                  <div class="card-member-avatar-tiny" 
+                       *ngFor="let m of issue.members" 
+                       [style.background-color]="getMemberColor(m)" 
+                       [title]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')">
+                    <img *ngIf="m.employee?.avatarUrl" [src]="m.employee?.avatarUrl" class="avatar-img" [alt]="m.employee?.firstName">
+                    <span *ngIf="!m.employee?.avatarUrl">{{ getMemberInitials(m) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -159,6 +181,7 @@
   <div class="trello-modal-header">
     <div class="modal-header-left">
       <button class="modal-status-btn" (click)="togglePopover('status')">
+        <span class="status-dot" [ngClass]="getStatusDotClass(issueForm.columnId)"></span>
         <span>{{ getColumnName(issueForm.columnId) }}</span>
         <svg lucideChevronDown size="14"></svg>
       </button>
@@ -170,17 +193,19 @@
           <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
         </div>
         <div class="popover-body">
-          <button class="popover-item" *ngFor="let col of columns()" (click)="issueForm.columnId = col.id; closePopover()">
-            <div class="item-text"><strong>{{ col.name }}</strong></div>
+          <button class="popover-item" *ngFor="let col of columns()" [class.selected]="issueForm.columnId === col.id" (click)="issueForm.columnId = col.id; closePopover()">
+            <span class="status-dot" [ngClass]="getStatusDotClass(col.id)"></span>
+            <div class="item-text" style="flex: 1;"><strong>{{ col.name }}</strong></div>
+            <svg *ngIf="issueForm.columnId === col.id" lucideCheck size="16" style="color: #0c66e4;"></svg>
           </button>
         </div>
       </div>
     </div>
     
     <div class="modal-header-right">
-      <button class="modal-icon-btn"><svg lucideImage size="18"></svg></button>
-      <button class="modal-icon-btn"><svg lucideMoreHorizontal size="18"></svg></button>
-      <button class="modal-icon-btn" (click)="closeDrawer()"><svg lucideX size="18"></svg></button>
+      <button class="modal-icon-btn" title="Image attachment"><svg lucideImage size="18"></svg></button>
+      <button class="modal-icon-btn" title="More options"><svg lucideMoreHorizontal size="18"></svg></button>
+      <button class="modal-icon-btn" (click)="closeDrawer()" title="Close"><svg lucideX size="18"></svg></button>
     </div>
   </div>
 
@@ -190,74 +215,258 @@
       
       <!-- Card Title Row -->
       <div class="modal-title-row">
-        <svg lucideCircle size="22" class="title-icon"></svg>
+        <button class="custom-title-checkbox" [class.completed]="issueForm.completed" (click)="issueForm.completed = !issueForm.completed" type="button" title="Toggle complete">
+          <span class="checkbox-inner">
+            <svg *ngIf="issueForm.completed" lucideCheck size="14"></svg>
+          </span>
+        </button>
         <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" placeholder="Card Title">
       </div>
 
       <!-- Action Buttons Row -->
       <div class="modal-action-buttons">
-        <!-- Add Button + Popover -->
-        <div class="popover-container">
-          <button class="modal-action-btn" (click)="togglePopover('add')">
-            <svg lucidePlus size="14"></svg>
-            <span>Add</span>
-          </button>
-          
-          <div class="trello-popover add-popover" *ngIf="activePopover() === 'add'">
-            <div class="popover-header">
-              <span>Add to card</span>
-              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
-            </div>
-            <div class="popover-body">
-              <button class="popover-item"><svg lucideTag size="14"></svg> <div class="item-text"><strong>Labels</strong><span>Organize, categorize, and prioritize</span></div></button>
-              <button class="popover-item"><svg lucideClock size="14"></svg> <div class="item-text"><strong>Dates</strong><span>Start dates, due dates, and reminders</span></div></button>
-              <button class="popover-item"><svg lucideCheckSquare size="14"></svg> <div class="item-text"><strong>Checklist</strong><span>Add subtasks</span></div></button>
-              <button class="popover-item"><svg lucideUsers size="14"></svg> <div class="item-text"><strong>Members</strong><span>Assign members</span></div></button>
-            </div>
-          </div>
-        </div>
+
 
         <!-- Labels -->
         <div class="popover-container">
           <button class="modal-action-btn" (click)="togglePopover('labels')">
-            <svg lucideTag size="14"></svg>
+            <svg lucideTag size="14" class="btn-icon-svg"></svg>
             <span>Labels</span>
           </button>
 
           <div class="trello-popover labels-popover" *ngIf="activePopover() === 'labels'">
-            <div class="popover-header">
-              <span>Labels</span>
-              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
-            </div>
-            <div class="popover-body p-3">
-              <input type="text" class="form-control mb-2" placeholder="Search labels...">
-              <div class="label-color green"></div>
-              <div class="label-color yellow"></div>
-              <div class="label-color orange"></div>
-              <div class="label-color red"></div>
-              <div class="label-color purple"></div>
-              <div class="label-color blue"></div>
-              <button class="btn btn-outline w-full mt-2">Create a new label</button>
-            </div>
+            <!-- Sub-view 1: LIST MODE -->
+            <ng-container *ngIf="labelPopoverMode() === 'list'">
+              <div class="popover-header">
+                <span>Labels</span>
+                <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
+              </div>
+              <div class="popover-body p-3">
+                <input type="text" class="label-search-input mb-3" [(ngModel)]="labelSearchQuery" placeholder="Search labels...">
+                
+                <div class="labels-list-subtitle">Labels</div>
+                
+                <div class="labels-list-container mb-3">
+                  <div class="label-row-item" *ngFor="let label of filteredLabels">
+                    <input type="checkbox" class="label-checkbox" [checked]="isLabelAttached(label.id)" (change)="toggleLabel(label)">
+                    <div class="label-color-bar" [style.background-color]="label.color" [style.color]="getLabelTextColor(label.color)" (click)="toggleLabel(label)">
+                      <span>{{ label.name }}</span>
+                    </div>
+                    <button class="label-edit-btn" (click)="openEditLabel(label, $event)" type="button" title="Edit label">
+                      <svg lucidePencil size="16"></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <button class="btn-create-label-outline w-full" (click)="openCreateLabel()">Create a new label</button>
+              </div>
+            </ng-container>
+
+            <!-- Sub-view 2: CREATE MODE -->
+            <ng-container *ngIf="labelPopoverMode() === 'create'">
+              <div class="popover-header flex items-center justify-between px-3 py-2 border-b">
+                <button class="btn-icon-tiny" (click)="labelPopoverMode.set('list')"><svg lucideChevronLeft size="16"></svg></button>
+                <span>Create label</span>
+                <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
+              </div>
+              <div class="popover-body p-3">
+                <div class="label-preview-box-container mb-3">
+                  <div class="label-preview-bar" [style.background-color]="labelForm.color">
+                    <span>{{ labelForm.title }}</span>
+                  </div>
+                </div>
+
+                <label class="checklist-popover-label">Title</label>
+                <input type="text" class="checklist-popover-input mb-3" [(ngModel)]="labelForm.title" placeholder="Label title">
+
+                <label class="checklist-popover-label">Select a color</label>
+                <div class="color-swatches-grid mb-3">
+                  <button type="button" class="color-swatch-item" *ngFor="let c of labelColorPalette" [style.background-color]="c.fill" [style.border]="c.border ? '1.5px solid ' + c.border : 'none'" (click)="labelForm.color = c.fill">
+                    <svg lucideCheck size="16" *ngIf="labelForm.color === c.fill" [style.color]="getLabelTextColor(c.fill)" class="swatch-check"></svg>
+                  </button>
+                </div>
+
+                <button class="btn-remove-color-outline w-full" (click)="removeLabelColor()" type="button">
+                  <svg lucideX size="14"></svg>
+                  <span>Remove color</span>
+                </button>
+
+                <div class="popover-divider"></div>
+
+                <div class="popover-footer-actions">
+                  <button class="btn-trello-create-compact" (click)="saveCreateLabel()" type="button">Create</button>
+                </div>
+              </div>
+            </ng-container>
+
+            <!-- Sub-view 3: EDIT MODE -->
+            <ng-container *ngIf="labelPopoverMode() === 'edit'">
+              <div class="popover-header flex items-center justify-between px-3 py-2 border-b">
+                <button class="btn-icon-tiny" (click)="labelPopoverMode.set('list')"><svg lucideChevronLeft size="16"></svg></button>
+                <span>Edit label</span>
+                <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
+              </div>
+              <div class="popover-body p-3">
+                <div class="label-preview-box-container mb-3">
+                  <div class="label-preview-bar" [style.background-color]="labelForm.color">
+                    <span>{{ labelForm.title }}</span>
+                  </div>
+                </div>
+
+                <label class="checklist-popover-label">Title</label>
+                <input type="text" class="checklist-popover-input mb-3" [(ngModel)]="labelForm.title" placeholder="Label title">
+
+                <label class="checklist-popover-label">Select a color</label>
+                <div class="color-swatches-grid mb-3">
+                  <button type="button" class="color-swatch-item" *ngFor="let c of labelColorPalette" [style.background-color]="c.fill" [style.border]="c.border ? '1.5px solid ' + c.border : 'none'" (click)="labelForm.color = c.fill">
+                    <svg lucideCheck size="16" *ngIf="labelForm.color === c.fill" [style.color]="getLabelTextColor(c.fill)" class="swatch-check"></svg>
+                  </button>
+                </div>
+
+                <button class="btn-remove-color-outline w-full" (click)="removeLabelColor()" type="button">
+                  <svg lucideX size="14"></svg>
+                  <span>Remove color</span>
+                </button>
+
+                <div class="popover-divider"></div>
+
+                <div class="popover-footer-actions flex justify-between items-center">
+                  <button class="btn-trello-create-compact" (click)="saveEditLabel()" type="button">Save</button>
+                  <button class="btn-trello-danger-compact" (click)="deleteProjectLabel()" type="button">Delete</button>
+                </div>
+              </div>
+            </ng-container>
           </div>
         </div>
 
         <!-- Dates -->
         <div class="popover-container">
           <button class="modal-action-btn" (click)="togglePopover('dates')">
-            <svg lucideClock size="14"></svg>
+            <svg lucideClock size="14" class="btn-icon-svg"></svg>
             <span>Dates</span>
           </button>
 
           <div class="trello-popover dates-popover" *ngIf="activePopover() === 'dates'">
             <div class="popover-header">
               <span>Dates</span>
-              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
+              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
             </div>
-            <div class="popover-body p-3 text-center">
-              <div class="font-bold mb-2">August 2026</div>
-              <div class="text-sm text-gray-500 mb-4">Calendar placeholder</div>
-              <button class="btn btn-primary w-full">Save</button>
+            
+            <div class="popover-body p-3">
+              <!-- Calendar Navigation Header -->
+              <div class="calendar-nav-header flex items-center justify-between mb-3">
+                <div class="nav-btn-group flex gap-1">
+                  <button class="btn-cal-nav" (click)="prevYear()" type="button" title="Previous Year"><svg lucideChevronsLeft size="14"></svg></button>
+                  <button class="btn-cal-nav" (click)="prevMonth()" type="button" title="Previous Month"><svg lucideChevronLeft size="14"></svg></button>
+                </div>
+                <div class="calendar-month-title">{{ calendarMonthYearTitle }}</div>
+                <div class="nav-btn-group flex gap-1">
+                  <button class="btn-cal-nav" (click)="nextMonth()" type="button" title="Next Month"><svg lucideChevronRight size="14"></svg></button>
+                  <button class="btn-cal-nav" (click)="nextYear()" type="button" title="Next Year"><svg lucideChevronsRight size="14"></svg></button>
+                </div>
+              </div>
+
+              <!-- Weekday Headers (Mon - Sun) -->
+              <div class="calendar-weekdays-row mb-2">
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+                <div>Sun</div>
+              </div>
+
+              <!-- Calendar Days Grid (7 columns) -->
+              <div class="calendar-days-grid mb-4">
+                <button type="button" 
+                        class="cal-day-cell" 
+                        *ngFor="let cell of calendarDaysGrid" 
+                        [class.muted]="!cell.isCurrentMonth"
+                        [class.today]="cell.isToday"
+                        [class.start-date]="cell.isStart"
+                        [class.due-date]="cell.isDue"
+                        [class.in-range]="cell.isInRange"
+                        (click)="selectCalendarDate(cell)">
+                  <span>{{ cell.dayNumber }}</span>
+                </button>
+              </div>
+
+              <!-- Start Date Section -->
+              <div class="dates-form-section mb-3">
+                <label class="dates-section-label mb-1">Start date</label>
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" class="label-checkbox" [(ngModel)]="datesForm.enableStartDate">
+                  <input type="text" class="label-search-input" style="width: 140px;" [(ngModel)]="datesForm.startDateStr" [disabled]="!datesForm.enableStartDate" placeholder="DD/MM/YYYY">
+                </div>
+              </div>
+
+              <!-- Due Date & Time Section -->
+              <div class="dates-form-section mb-3">
+                <label class="dates-section-label mb-1">Due date</label>
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" class="label-checkbox" [(ngModel)]="datesForm.enableDueDate">
+                  <input type="text" class="label-search-input" style="width: 140px;" [(ngModel)]="datesForm.dueDateStr" [disabled]="!datesForm.enableDueDate" placeholder="DD/MM/YYYY">
+                  
+                  <!-- Time Picker Input / Select -->
+                  <div class="relative flex-1">
+                    <button type="button" class="trello-select-btn" [disabled]="!datesForm.enableDueDate" (click)="showTimeDropdown.set(!showTimeDropdown())">
+                      <span>{{ datesForm.dueTimeStr }}</span>
+                      <svg lucideChevronDown size="14"></svg>
+                    </button>
+
+                    <!-- Scrollable Time Dropdown -->
+                    <div class="custom-select-dropdown time-dropdown" *ngIf="showTimeDropdown() && datesForm.enableDueDate">
+                      <div class="dropdown-item" *ngFor="let t of timeOptions" (click)="datesForm.dueTimeStr = t; showTimeDropdown.set(false)" [class.selected]="datesForm.dueTimeStr === t">
+                        {{ t }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recurring Section -->
+              <div class="dates-form-section mb-3">
+                <label class="dates-section-label mb-1">Recurring</label>
+                <div class="relative">
+                  <button type="button" class="trello-select-btn" (click)="showRecurringDropdown.set(!showRecurringDropdown())">
+                    <span>{{ datesForm.recurring }}</span>
+                    <svg lucideChevronDown size="14"></svg>
+                  </button>
+
+                  <div class="custom-select-dropdown" *ngIf="showRecurringDropdown()">
+                    <div class="dropdown-item" *ngFor="let opt of recurringOptions" (click)="datesForm.recurring = opt; showRecurringDropdown.set(false)" [class.selected]="datesForm.recurring === opt">
+                      {{ opt }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reminder Section -->
+              <div class="dates-form-section mb-3">
+                <label class="dates-section-label mb-1">Set due date reminder</label>
+                <div class="relative">
+                  <button type="button" class="trello-select-btn" (click)="showReminderDropdown.set(!showReminderDropdown())">
+                    <span>{{ datesForm.dueReminder || '1 Day before' }}</span>
+                    <svg lucideChevronDown size="14"></svg>
+                  </button>
+
+                  <div class="custom-select-dropdown" *ngIf="showReminderDropdown()">
+                    <div class="dropdown-item" *ngFor="let opt of reminderOptions" (click)="datesForm.dueReminder = opt; showReminderDropdown.set(false)" [class.selected]="datesForm.dueReminder === opt">
+                      {{ opt }}
+                    </div>
+                  </div>
+                </div>
+                <div class="dates-caption-text mt-1.5">
+                  Reminders will be sent to all members and watchers of this card.
+                </div>
+              </div>
+
+              <!-- Action Footer Buttons -->
+              <div class="dates-footer-actions flex flex-col gap-2 mt-4">
+                <button class="btn-dates-save" (click)="saveDates()" type="button">Save</button>
+                <button class="btn-dates-remove" (click)="removeDates()" type="button">Remove</button>
+              </div>
             </div>
           </div>
         </div>
@@ -265,41 +474,304 @@
         <!-- Checklist -->
         <div class="popover-container">
           <button class="modal-action-btn" (click)="togglePopover('checklist')">
-            <svg lucideCheckSquare size="14"></svg>
+            <svg lucideCheckSquare size="14" class="btn-icon-svg"></svg>
             <span>Checklist</span>
           </button>
 
           <div class="trello-popover checklist-popover" *ngIf="activePopover() === 'checklist'">
             <div class="popover-header">
               <span>Add checklist</span>
-              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
+              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
             </div>
-            <div class="popover-body p-3">
-              <label class="block text-sm font-bold mb-1">Title</label>
-              <input type="text" class="form-control mb-3" value="Checklist">
-              <button class="btn btn-primary w-full">Add</button>
+            <div class="popover-body">
+              <label class="checklist-popover-label">Title</label>
+              <input type="text" class="checklist-popover-input" [(ngModel)]="activeChecklistTitle" (keyup.enter)="addChecklist()" placeholder="Checklist">
+              
+              <button class="btn-generate-checklist-popover" (click)="generateChecklist()" [disabled]="isGeneratingChecklist()" type="button">
+                <svg lucideSparkles size="16" style="color: #44546f;"></svg> 
+                <span>{{ isGeneratingChecklist() ? 'Generating...' : 'Generate checklist' }}</span>
+              </button>
+              
+              <button class="btn-add-checklist-popover" (click)="addChecklist()" type="button">Add</button>
             </div>
           </div>
         </div>
 
-        <!-- Members -->
-        <button class="modal-action-btn">
-          <svg lucideUsers size="14"></svg>
-          <span>Members</span>
-        </button>
+        <!-- Members Popover -->
+        <div class="popover-container">
+          <button class="modal-action-btn" (click)="togglePopover('members')">
+            <svg lucideUsers size="14" class="btn-icon-svg"></svg>
+            <span>Members</span>
+          </button>
+
+          <div class="trello-popover members-popover" *ngIf="activePopover() === 'members'">
+            <div class="popover-header">
+              <span>Members</span>
+              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
+            </div>
+            
+            <div class="popover-body p-3">
+              <input type="text" class="label-search-input mb-3" [(ngModel)]="memberSearchQuery" placeholder="Search members...">
+
+              <div class="section-label-subtitle mb-2">Board members</div>
+              
+              <div class="members-popover-list">
+                <div class="member-popover-item" 
+                     *ngFor="let m of filteredMembers" 
+                     [class.selected]="isMemberAttached(m.id)"
+                     (click)="toggleCardMember(m)">
+                  <div class="member-popover-avatar" [style.background-color]="getMemberColor(m)">
+                    <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="avatar-img" [alt]="m.firstName">
+                    <span *ngIf="!m.avatarUrl">{{ getMemberInitials(m) }}</span>
+                  </div>
+                  <div class="member-popover-info">
+                    <div class="member-popover-name">{{ m.firstName }} {{ m.lastName }}</div>
+                    <div class="member-popover-email">{{ m.user?.email || m.designation?.name }}</div>
+                  </div>
+                  <svg lucideCheck size="16" *ngIf="isMemberAttached(m.id)" class="member-check-icon"></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attachment Popover -->
+        <div class="popover-container">
+          <button class="modal-action-btn" (click)="togglePopover('attachment')">
+            <svg lucidePaperclip size="14" class="btn-icon-svg"></svg>
+            <span>Attachment</span>
+          </button>
+
+          <div class="trello-popover attachment-popover" *ngIf="activePopover() === 'attachment'">
+            <div class="popover-header">
+              <span class="popover-title">Attach</span>
+              <button class="btn-icon-tiny btn-close-popover" (click)="closePopover()"><svg lucideX size="16"></svg></button>
+            </div>
+            
+            <div class="popover-body attachment-popover-body">
+              <!-- Section 1: Computer Upload -->
+              <div class="attach-section-title">Attach a file from your computer</div>
+              <div class="attach-section-desc">You can also drag and drop files to upload them.</div>
+              
+              <label class="btn-choose-file-trello" *ngIf="!isUploadingAttachment()">
+                <input type="file" (change)="onFileSelected($event)" style="display: none;">
+                <span>Choose a file</span>
+              </label>
+
+              <!-- Upload Progress Bar -->
+              <div class="upload-progress-box" *ngIf="isUploadingAttachment()">
+                <div class="upload-progress-label">
+                  <span>Uploading to ImageKit...</span>
+                  <span>{{ uploadProgress() }}%</span>
+                </div>
+                <div class="progress-bar-track">
+                  <div class="progress-bar-fill" [style.width.%]="uploadProgress()"></div>
+                </div>
+              </div>
+
+              <hr class="attach-divider">
+
+              <!-- Section 2: Link Upload -->
+              <div class="attach-section-title required-link-title">
+                <span>Search or paste a link</span>
+                <span class="asterisk">*</span>
+              </div>
+              <input type="text" class="trello-input-field link-url-input" [(ngModel)]="attachmentLinkUrl" placeholder="Find recent links or paste a new link">
+
+              <!-- Section 3: Display Text -->
+              <div class="attach-section-title">Display text (optional)</div>
+              <input type="text" class="trello-input-field link-name-input" [(ngModel)]="attachmentLinkName" placeholder="Text to display">
+              <div class="attach-input-hint">Give this link a title or description</div>
+
+              <!-- Footer Action Buttons -->
+              <div class="attach-footer-actions">
+                <button class="btn-trello-cancel-text" (click)="closePopover()" type="button">Cancel</button>
+                <button class="btn-trello-insert-primary" (click)="addLinkAttachment()" type="button">Insert</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attached Members, Labels & Due Date Row -->
+      <div class="modal-meta-attached-row flex flex-wrap gap-4 my-3" *ngIf="(selectedIssue()?.members && selectedIssue()?.members.length > 0) || (selectedIssue()?.labels && selectedIssue()?.labels.length > 0) || selectedIssue()?.dueDate || selectedIssue()?.startDate">
+        <!-- Members Section -->
+        <div class="modal-attached-members-section" *ngIf="selectedIssue()?.members && selectedIssue()?.members.length > 0">
+          <div class="section-label-subtitle">Members</div>
+          <div class="attached-members-flex-row flex items-center gap-1">
+            <div class="attached-member-avatar" 
+                 *ngFor="let m of getVisibleMembers(selectedIssue()?.members)" 
+                 [style.background-color]="getMemberColor(m)" 
+                 [title]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')"
+                 (click)="togglePopover('members')">
+              <img *ngIf="m.employee?.avatarUrl" [src]="m.employee?.avatarUrl" class="avatar-img" [alt]="m.employee?.firstName">
+              <span *ngIf="!m.employee?.avatarUrl">{{ getMemberInitials(m) }}</span>
+            </div>
+
+            <!-- Overflow Counter Badge -->
+            <div class="attached-member-overflow-badge" 
+                 *ngIf="getRemainingMembersCount(selectedIssue()?.members) > 0" 
+                 (click)="togglePopover('members')" 
+                 title="View all members">
+              +{{ getRemainingMembersCount(selectedIssue()?.members) }}
+            </div>
+
+            <button class="btn-add-member-pill" (click)="togglePopover('members')" type="button" title="Add members">
+              <svg lucidePlus size="16"></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Labels Section -->
+        <div class="modal-attached-labels-section" *ngIf="selectedIssue()?.labels && selectedIssue()?.labels.length > 0">
+          <div class="section-label-subtitle">Labels</div>
+          <div class="attached-labels-flex-row">
+            <div class="attached-label-pill" *ngFor="let il of selectedIssue()?.labels" [style.background-color]="il.label?.color || il.color" [style.color]="getLabelTextColor(il.label?.color || il.color)" (click)="togglePopover('labels')">
+              <span>{{ il.label?.name || il.name }}</span>
+            </div>
+            <button class="btn-add-label-pill" (click)="togglePopover('labels')" type="button" title="Add label">
+              <svg lucidePlus size="16"></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Due Date Section -->
+        <div class="modal-attached-duedate-section" *ngIf="selectedIssue()?.dueDate || selectedIssue()?.startDate">
+          <div class="section-label-subtitle">Due date</div>
+          <button class="attached-duedate-btn" (click)="togglePopover('dates')" type="button">
+            <span>{{ formatDisplayDueDate(selectedIssue()) }}</span>
+            <svg lucideRepeat size="14" *ngIf="selectedIssue()?.recurring && selectedIssue()?.recurring !== 'Never'" class="ml-1"></svg>
+            <svg lucideChevronDown size="14" class="ml-1"></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Description Section -->
-      <div class="modal-description-section">
+      <div class="modal-description-section mb-4">
         <div class="section-header">
           <svg lucideAlignLeft size="20" class="header-icon"></svg>
           <h3>Description</h3>
+          <button class="btn-edit-desc" *ngIf="!isEditingDescription() && issueForm.description" (click)="startDescriptionEdit()">Edit</button>
         </div>
+
         <div class="description-body">
-          <div class="quill-container" #quillContainer></div>
-          <button class="btn-trello-save" (click)="saveIssue()">Save Description</button>
+          <!-- State 1: Collapsed / Preview Box (1st Screenshot) -->
+          <div class="description-preview-box" *ngIf="!isEditingDescription()" (click)="startDescriptionEdit()">
+            <div *ngIf="issueForm.description" [innerHTML]="getSafeHtml(issueForm.description)" class="desc-content-html"></div>
+            <div *ngIf="!issueForm.description" class="desc-placeholder-text">
+              Add a more detailed description...
+            </div>
+          </div>
+
+          <!-- State 2: Expanded Quill Rich Text Editor (2nd Screenshot) -->
+          <div class="description-editor-container" *ngIf="isEditingDescription()">
+            <div class="quill-wrapper focus-blue-border">
+              <div class="quill-container" #quillContainer></div>
+            </div>
+            
+            <div class="description-action-bar">
+              <button class="btn-trello-save" (click)="saveIssue()" type="button">Save</button>
+              <button class="btn-trello-cancel" (click)="cancelDescriptionEdit()" type="button">Cancel</button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- Attachments Section -->
+      <div class="modal-attachments-section" *ngIf="selectedIssue()?.attachments && selectedIssue()?.attachments.length > 0">
+        <div class="section-header">
+          <div class="header-left">
+            <svg lucidePaperclip size="20" class="header-icon"></svg>
+            <h3>Attachments</h3>
+          </div>
+          <button class="btn-edit-desc" (click)="togglePopover('attachment')">Add</button>
+        </div>
+
+        <div class="attachments-list">
+          <div class="attachment-item" *ngFor="let att of selectedIssue()?.attachments">
+            
+            <!-- Thumbnail / File Badge -->
+            <div class="attachment-thumbnail-box cursor-pointer" (click)="openImageLightbox(att)" title="Click to preview image">
+              <img *ngIf="isImageAttachment(att)" [src]="att.fileUrl" (error)="onImageError(att)" class="thumbnail-img" [alt]="att.fileName">
+              <div *ngIf="!isImageAttachment(att)" class="thumbnail-badge-box">
+                <span class="badge-text">{{ getFileExtensionBadge(att) }}</span>
+              </div>
+            </div>
+
+            <!-- Details -->
+            <div class="attachment-info">
+              <div class="attachment-name-row">
+                <span class="attachment-name cursor-pointer" (click)="openImageLightbox(att)" title="Click to preview image">
+                  {{ att.fileName }}
+                </span>
+                <a [href]="att.fileUrl" target="_blank" rel="noopener noreferrer" class="external-link-btn" title="Open in new tab">
+                  <svg lucideExternalLink size="14" class="external-link-icon"></svg>
+                </a>
+              </div>
+
+              <div class="attachment-meta">
+                <span *ngIf="att.fileSize">{{ formatFileSize(att.fileSize) }}</span>
+                <span *ngIf="att.uploader">Uploaded by {{ att.uploader.firstName }}</span>
+                <button class="action-link-btn" (click)="downloadAttachment(att)">Download</button>
+                <button class="action-link-btn" *ngIf="isImageAttachment(att)" (click)="toggleCoverAttachment(att)">
+                  {{ att.isCover ? 'Remove cover' : 'Make cover' }}
+                </button>
+                <button class="action-link-btn delete-action-btn" (click)="deleteAttachment(att)">Delete</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Checklists Section -->
+      <ng-container *ngFor="let checklist of checklists()">
+        <div class="modal-checklist-section">
+          <div class="section-header checklist-section-header">
+            <div class="checklist-header-left">
+              <svg lucideCheckSquare size="18" class="header-icon"></svg>
+              <h3 *ngIf="editingChecklistId() !== checklist.id" style="font-weight: 600; cursor: pointer;" (click)="startEditingChecklistTitle(checklist)" title="Click to rename">{{ checklist.title }}</h3>
+              <input *ngIf="editingChecklistId() === checklist.id" type="text" class="form-control" style="font-weight: 600; font-size: 16px; height: 32px; padding: 2px 8px; width: 220px;" [(ngModel)]="editingChecklistTitle" (keyup.enter)="saveChecklistTitle(checklist)" (blur)="saveChecklistTitle(checklist)" (keyup.escape)="cancelEditingChecklistTitle()" autofocus>
+            </div>
+            <div class="checklist-header-right">
+              <button class="btn-default-outline" (click)="deleteChecklist(checklist.id)">Delete</button>
+            </div>
+          </div>
+          
+          <div class="checklist-body">
+            <div class="checklist-progress-bar-container">
+              <span class="checklist-progress-text">{{ getChecklistProgress(checklist) }}%</span>
+              <div class="checklist-progress-bar">
+                <div class="progress-bar-fill" [style.width.%]="getChecklistProgress(checklist)"></div>
+              </div>
+            </div>
+
+            <div class="checklist-items">
+              <div class="checklist-item-row" *ngFor="let item of checklist.items">
+                <button class="custom-title-checkbox" [class.completed]="item.isCompleted" (click)="toggleCheckitem(checklist.id, item)" type="button">
+                  <span class="checkbox-inner">
+                    <svg *ngIf="item.isCompleted" lucideCheck size="12"></svg>
+                  </span>
+                </button>
+                <span class="checklist-item-text" [class.completed-text]="item.isCompleted">{{ item.title }}</span>
+                <button class="btn-item-delete" (click)="removeCheckitem(checklist.id, item.id)" title="Delete item">
+                  <svg lucideTrash2 size="14"></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="checklist-add-item-box">
+              <input type="text" class="form-control mb-2" [(ngModel)]="checklistInputs[checklist.id]" (keyup.enter)="addCheckitem(checklist.id)" placeholder="Add an item">
+              <div class="add-item-actions-row">
+                <div class="add-actions-left">
+                  <button class="btn-trello-save m-0" (click)="addCheckitem(checklist.id)" [disabled]="!checklistInputs[checklist.id]?.trim()" type="button">Add</button>
+                  <button class="btn-trello-cancel" (click)="checklistInputs[checklist.id] = ''" type="button">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
     </div>
 
     <!-- Side Right Column -->
@@ -309,21 +781,113 @@
           <svg lucideMessageSquare size="18" class="header-icon"></svg>
           <h3>Comments and activity</h3>
         </div>
-        <button class="btn-hide-details">Hide details</button>
+        <button class="btn-hide-details" type="button">Hide details</button>
       </div>
       
+      <!-- Comment Input Area (Collapsed vs Expanded) -->
       <div class="comment-input-area">
-        <input type="text" class="fake-comment-input" placeholder="Write a comment...">
+        <!-- Collapsed Box (Screenshot 1) -->
+        <div class="comment-collapsed-box" *ngIf="!isEditingComment()" (click)="isEditingComment.set(true)">
+          <span>Write a comment...</span>
+        </div>
+
+        <!-- Expanded Editor (Screenshot 2) -->
+        <div class="comment-expanded-editor" *ngIf="isEditingComment()">
+          <div class="comment-editor-box focus-blue-border">
+            <textarea class="comment-textarea" [(ngModel)]="commentText" placeholder="Write a comment..."></textarea>
+          </div>
+          <div class="comment-action-bar">
+            <button class="btn-comment-save" [disabled]="!commentText.trim().length" (click)="postComment()" type="button">Save</button>
+            <label class="comment-watch-checkbox">
+              <input type="checkbox" [checked]="isWatching()" (change)="toggleWatch()">
+              <span>Watch</span>
+            </label>
+            <button class="btn-comment-cancel" (click)="isEditingComment.set(false); commentText = ''" type="button">Cancel</button>
+          </div>
+        </div>
       </div>
 
+      <!-- Activity & Comments Feed (Screenshot 3) -->
       <div class="activity-feed">
+        <!-- Live Comments List -->
+        <div class="activity-item comment-card-item" *ngFor="let comment of comments()">
+          <div class="avatar-bubble orange">
+            {{ comment.author?.firstName ? comment.author.firstName.charAt(0).toUpperCase() : 'T' }}
+          </div>
+          <div class="activity-details">
+            <div class="comment-author-line">
+              <strong>{{ comment.author?.firstName || 'taskhive' }} {{ comment.author?.lastName || '' }}</strong>
+              <a class="activity-time-link">{{ comment.createdAt ? (comment.createdAt | date:'shortTime') : 'just now' }}</a>
+            </div>
+            <div class="comment-white-bubble">{{ comment.body }}</div>
+            <div class="comment-footer-actions">
+              <span class="action-reaction-btn" title="Add reaction">😊</span>
+              <span class="action-dot">•</span>
+              <a class="action-link-btn" (click)="commentText = comment.body; isEditingComment.set(true)">Edit</a>
+              <span class="action-dot">•</span>
+              <a class="action-link-btn" (click)="deleteComment(comment.id)">Delete</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- System Activity Row -->
         <div class="activity-item">
           <div class="avatar-bubble orange">T</div>
           <div class="activity-details">
             <p><strong>taskhive</strong> added this card to {{ getColumnName(issueForm.columnId) }}</p>
-            <a class="activity-time">3 minutes ago</a>
+            <a class="activity-time-link">9 minutes ago</a>
           </div>
         </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Trello Image Preview Lightbox Modal -->
+<div class="image-lightbox-overlay" *ngIf="previewAttachment()" (click)="closeImageLightbox()">
+  <div class="image-lightbox-container" (click)="$event.stopPropagation()">
+    
+    <!-- Top Bar Close Button -->
+    <button class="lightbox-close-btn" (click)="closeImageLightbox()" title="Close">
+      <svg lucideX size="22"></svg>
+    </button>
+
+    <!-- Main Preview Image -->
+    <div class="lightbox-image-wrapper">
+      <img [src]="previewAttachment()?.fileUrl" [alt]="previewAttachment()?.fileName" class="lightbox-img">
+    </div>
+
+    <!-- Bottom Footer Meta & Actions Bar -->
+    <div class="lightbox-footer-bar">
+      <div class="lightbox-title-row">
+        <div class="lightbox-filename">{{ previewAttachment()?.fileName }}</div>
+        <div class="lightbox-meta">
+          <span *ngIf="previewAttachment()?.createdAt">Added {{ previewAttachment()?.createdAt | date:'d MMM yyyy, HH:mm' }}</span>
+          <span *ngIf="previewAttachment()?.fileSize"> • {{ formatFileSize(previewAttachment()?.fileSize) }}</span>
+        </div>
+      </div>
+
+      <div class="lightbox-actions-row">
+        <a [href]="previewAttachment()?.fileUrl" target="_blank" rel="noopener noreferrer" class="lightbox-action-btn">
+          <svg lucideExternalLink size="16"></svg>
+          <span>Open in new tab</span>
+        </a>
+
+        <button type="button" class="lightbox-action-btn" (click)="downloadAttachmentFromLightbox()">
+          <svg lucideDownload size="16"></svg>
+          <span>Download</span>
+        </button>
+
+        <button type="button" class="lightbox-action-btn" (click)="toggleCoverFromLightbox()">
+          <svg lucideImage size="16"></svg>
+          <span>{{ previewAttachment()?.isCover ? 'Remove cover' : 'Make cover' }}</span>
+        </button>
+
+        <button type="button" class="lightbox-action-btn delete-btn" (click)="deleteAttachmentFromLightbox()">
+          <svg lucideTrash2 size="16"></svg>
+          <span>Delete</span>
+        </button>
       </div>
     </div>
 

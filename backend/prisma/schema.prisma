@@ -164,6 +164,7 @@ model Employee {
   projectMembers      ProjectMember[]
   assignedIssues      Issue[]            @relation("IssueAssignee")
   reportedIssues      Issue[]            @relation("IssueReporter")
+  cardMemberships     IssueMember[]
   issueTimeLogs       IssueTimeLog[]
   issueComments       IssueComment[]
   uploadedAttachments IssueAttachment[]
@@ -637,7 +638,11 @@ model Issue {
   status        String    @default("TODO") // TODO, IN_PROGRESS, IN_REVIEW, DONE, CANCELLED
   priority      String    @default("MEDIUM") // CRITICAL, HIGH, MEDIUM, LOW
   storyPoints   Int?
+  startDate     DateTime?
   dueDate       DateTime?
+  recurring     String?
+  dueReminder   String?
+  coverUrl      String?
   position      Int       @default(0) // Sort order within column/backlog
   
   // Time Tracking Markers
@@ -662,8 +667,10 @@ model Issue {
   comments      IssueComment[]
   attachments   IssueAttachment[]
   labels        IssueLabel[]
+  members       IssueMember[]
   activities    IssueActivity[]
   timeLogs      IssueTimeLog[] // Detailed time entries if multiple sessions
+  checklists    Checklist[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -700,6 +707,8 @@ model IssueAttachment {
   fileName  String
   fileUrl   String
   fileSize  Int?     // bytes
+  fileType  String   @default("FILE") // FILE or LINK
+  isCover   Boolean  @default(false)
   issueId   Int
   issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
   uploadedBy Int
@@ -714,8 +723,6 @@ model Label {
   projectId Int
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues    IssueLabel[]
-
-  @@unique([name, projectId])
 }
 
 model IssueLabel {
@@ -739,6 +746,36 @@ model IssueActivity {
   actorId   Int
   actor     Employee @relation(fields: [actorId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+model Checklist {
+  id          Int      @id @default(autoincrement())
+  title       String
+  issueId     Int
+  issue       Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  items       ChecklistItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ChecklistItem {
+  id          Int      @id @default(autoincrement())
+  title       String
+  isCompleted Boolean  @default(false)
+  checklistId Int
+  checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model IssueMember {
+  issueId    Int
+  issue      Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@id([issueId, employeeId])
 }
 
 

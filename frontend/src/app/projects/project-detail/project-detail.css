@@ -237,22 +237,24 @@
 .trello-card {
   background: #ffffff;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 0;
   margin-bottom: 8px;
   box-shadow: 0 1px 3px rgba(9, 30, 66, 0.13), 0 1px 1px rgba(9, 30, 66, 0.08);
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
   border: 1px solid transparent;
+  overflow: hidden;
 }
 
 .card-content-wrapper {
+  width: 100%;
+  padding: 10px 12px;
+  box-sizing: border-box;
   flex: 1;
   min-width: 0;
-  padding-right: 8px;
 }
 
 .trello-card:hover {
@@ -261,10 +263,13 @@
 }
 
 .card-hover-edit-btn {
-  background: transparent;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid #dcdfe4;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -272,10 +277,9 @@
   color: #44546f;
   cursor: pointer;
   opacity: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   transition: opacity 0.15s ease, background 0.15s ease;
-  flex-shrink: 0;
-  margin-top: -2px;
-  margin-right: -2px;
+  z-index: 10;
 }
 
 .trello-card:hover .card-hover-edit-btn {
@@ -283,8 +287,8 @@
 }
 
 .card-hover-edit-btn:hover {
-  background: #f1f2f4;
-  color: #172b4d;
+  background: #ffffff;
+  color: #0c66e4;
 }
 
 .card-labels {
@@ -499,9 +503,15 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(9, 30, 66, 0.54);
-  backdrop-filter: blur(2px);
+  background: rgba(11, 23, 57, 0.65);
+  backdrop-filter: blur(4px);
   z-index: 1000;
+  animation: fadeInOverlay 150ms ease-out forwards;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .trello-modal {
@@ -509,67 +519,119 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 1080px;
-  max-width: 95vw;
+  width: 1280px;
+  max-width: 96vw;
+  min-height: 500px;
   max-height: 88vh;
   background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px -10px rgba(11, 23, 57, 0.4), 0 0 0 1px rgba(12, 102, 228, 0.12);
+  border: 1px solid rgba(220, 223, 228, 0.6);
   z-index: 1001;
   display: flex;
   flex-direction: column;
   overflow: visible;
-  padding: 16px 24px 24px 24px;
+  padding: 20px 28px 28px 28px;
+  animation: modalScaleIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -47%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .trello-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-header-left {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .modal-status-btn {
-  background: #091e420f;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 14px;
+  background: #f4f6fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: #172b4d;
+  color: #0b1739;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 140ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .modal-status-btn:hover {
-  background: #091e4214;
+  background: #ebf3ff;
+  border-color: #cce0ff;
+  color: #0c66e4;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dot-in-progress {
+  background-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
+.dot-todo {
+  background-color: #9ca3af;
+  box-shadow: 0 0 0 2px rgba(156, 163, 175, 0.25);
+}
+
+.dot-in-review {
+  background-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.dot-done {
+  background-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
 }
 
 .modal-header-right {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .modal-icon-btn {
-  background: #091e420f;
+  background: transparent;
   border: none;
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #44546f;
+  color: #64748b;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: all 140ms ease;
 }
 
 .modal-icon-btn:hover {
-  background: #091e4214;
-  color: #172b4d;
+  background: #e0edff;
+  color: #0c66e4;
+  transform: scale(1.05);
 }
 
 .trello-modal-body {
@@ -585,73 +647,485 @@
 }
 
 .modal-side-col {
-  width: 270px;
+  width: 400px;
   flex-shrink: 0;
+  border-left: 1px solid #edf2f7;
+  padding-left: 24px;
 }
 
-/* Title */
+/* Title Row & Custom Circular Checkbox */
 .modal-title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
-.title-icon {
-  color: #44546f;
+.custom-title-checkbox {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 150ms ease;
   flex-shrink: 0;
+  padding: 0;
+}
+
+.custom-title-checkbox:hover {
+  border-color: #0c66e4;
+  box-shadow: 0 0 0 3px rgba(12, 102, 228, 0.15);
+}
+
+.custom-title-checkbox.completed {
+  background: #0c66e4;
+  border-color: #0c66e4;
+  color: #ffffff;
+  animation: checkboxPulse 200ms ease;
+}
+
+@keyframes checkboxPulse {
+  0% { transform: scale(0.85); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
 }
 
 .modal-title-input {
   flex: 1;
-  font-size: 24px;
-  font-weight: 700;
-  color: #172b4d;
+  font-size: 20px;
+  font-weight: 600;
+  color: #0b1739;
   border: 2px solid transparent;
   padding: 4px 8px;
   margin-left: -8px;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   outline: none;
-  transition: background 0.15s, border-color 0.15s;
+  transition: all 140ms ease;
 }
 
 .modal-title-input:focus {
   background: #ffffff;
   border-color: #0c66e4;
+  box-shadow: 0 0 0 3px rgba(12, 102, 228, 0.12);
 }
 
-/* Action Buttons */
+/* Action Chips */
 .modal-action-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-left: 34px;
+  align-items: center;
+  gap: 10px;
+  margin-left: 38px;
   margin-bottom: 24px;
 }
 
 .modal-action-btn {
-  background: #091e420f;
-  border: 1px solid rgba(9, 30, 66, 0.08);
-  border-radius: 8px;
-  padding: 6px 12px;
+  background: #f4f6fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 6px 14px;
   font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 140ms ease;
+}
+
+.modal-action-btn:hover {
+  background: #ebf3ff;
+  border-color: #cce0ff;
+  color: #0c66e4;
+  transform: translateY(-1px);
+}
+
+.modal-action-btn:hover .btn-icon-svg {
+  color: #0c66e4;
+  transform: scale(1.1);
+}
+
+.modal-action-btn:active {
+  transform: scale(0.96);
+}
+
+.modal-action-btn svg,
+.btn-icon-svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
+  color: #64748b;
+  transition: all 140ms ease;
+}
+
+/* Checklist Section & Progress Bar */
+.modal-checklist-section {
+  margin-bottom: 24px;
+}
+
+.checklist-progress-text {
+  font-size: 12px;
   font-weight: 600;
-  color: #172b4d;
+  color: #475569;
+  margin-left: 8px;
+}
+
+/* AI Generation Buttons & Styles */
+.btn-ai-generate {
+  background: linear-gradient(135deg, #a855f7 0%, #8b5cf6 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 140ms ease;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.25);
+}
+
+.btn-ai-generate:hover:not(:disabled) {
+  background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+  transform: translateY(-1px);
+}
+
+.btn-ai-generate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-ai-generate-outline {
+  background: transparent;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 140ms ease;
 }
 
-.modal-action-btn:hover {
-  background: #091e4214;
+.btn-ai-generate-outline:hover:not(:disabled) {
+  background: #f3e8ff;
+  border-color: #d8b4fe;
+  color: #9333ea;
 }
 
-/* Section Header */
+.btn-ai-generate-outline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-default-outline {
+  background: transparent;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.btn-default-outline:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #ef4444;
+}
+
+.badge-new {
+  background: #f3e8ff;
+  color: #9333ea;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+/* Checklist Section Updated Headers */
+.checklist-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.checklist-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checklist-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checklist-body {
+  padding-left: 38px;
+}
+
+.checklist-progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.checklist-progress-bar-container .checklist-progress-text {
+  font-size: 11px;
+  color: #64748b;
+  min-width: 28px;
+}
+
+.checklist-progress-bar-container .checklist-progress-bar {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.checklist-progress-bar {
+  height: 6px;
+  width: 100%;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #0c66e4;
+  border-radius: 3px;
+  transition: width 200ms ease;
+}
+
+.checklist-add-item-box {
+  margin-top: 12px;
+}
+
+.add-item-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.add-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checklist-item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background 120ms ease;
+}
+
+.checklist-item-row:hover {
+  background: #f8fafc;
+}
+
+.checklist-item-row:hover .btn-item-delete {
+  opacity: 1;
+}
+
+.checklist-item-text {
+  flex: 1;
+  font-size: 14px;
+  color: #0b1739;
+  font-weight: 500;
+  transition: color 140ms ease;
+}
+
+.checklist-item-text.completed-text {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+.btn-item-delete {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 140ms ease;
+}
+
+.btn-item-delete:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+/* Lucide icon default sizing */
+svg[lucide], svg[class*=lucide] {
+  max-width: 100%;
+  max-height: 100%;
+  width: 14px;
+  height: 14px;
+}
+
+/* Description Section & Editor */
 .modal-description-section {
   margin-bottom: 24px;
+}
+
+.btn-edit-desc {
+  background: #f4f6fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 140ms ease;
+}
+
+.btn-edit-desc:hover {
+  background: #ebf3ff;
+  border-color: #cce0ff;
+  color: #0c66e4;
+}
+
+/* State 1: Collapsed Preview Box (1st Screenshot) */
+.description-preview-box {
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  padding: 12px 16px;
+  min-height: 56px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.description-preview-box:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.desc-placeholder-text {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.desc-content-html {
+  font-size: 14px;
+  color: #0b1739;
+  line-height: 1.6;
+}
+
+.desc-content-html a {
+  color: #0c66e4;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* State 2: Expanded Editor & Blue Focus Border (2nd Screenshot) */
+.btn-trello-save {
+    background: #0c66e4;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 0;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(12, 102, 228, 0.25);
+    transition: background 140ms ease;
+}
+
+.description-action-bar {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    align-items: center;
+    position: sticky;
+    bottom: 0;
+    padding: 10px;
+    background: #f8f8f8;
+}
+
+.description-action-bar .btn-trello-save {
+    margin: 0;
+}
+
+.action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-trello-cancel {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 140ms ease;
+}
+
+.btn-trello-cancel:hover {
+  background: #f1f5f9;
+  color: #0b1739;
+}
+
+.btn-formatting-help {
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.btn-formatting-help:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0b1739;
 }
 
 .section-header {
@@ -662,45 +1136,142 @@
 }
 
 .header-icon {
-  color: #44546f;
+  color: #475569;
 }
 
 .section-header h3 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: #172b4d;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0b1739;
 }
 
 .description-body {
-  padding-left: 34px;
+  padding-left: 38px;
 }
 
-.quill-container {
-  min-height: 120px;
+/* Custom Unified Quill Editor Styling */
+.quill-wrapper {
   background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #dcdfe4;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 150ms ease;
+}
+
+.quill-wrapper:focus-within {
+  border-color: #0c66e4;
+  box-shadow: 0 0 0 3px rgba(12, 102, 228, 0.15);
+}
+
+.quill-container.ql-container.ql-snow {
+  border: none !important;
+  font-family: inherit;
+  font-size: 14px;
+  color: #0b1739;
+  min-height: 120px;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow {
+  background: #f8fafc;
+  border: none !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 8px 12px !important;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow .ql-picker {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow .ql-picker-label {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: #ffffff;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow .ql-picker-label:hover {
+  border-color: #cbd5e1;
+  color: #0c66e4;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow button {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 140ms ease;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow button:hover {
+  background: #e0edff !important;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow button:hover .ql-stroke {
+  stroke: #0c66e4 !important;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow button:hover .ql-fill {
+  fill: #0c66e4 !important;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow button.ql-active {
+  background: #ebf3ff !important;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow button.ql-active .ql-stroke {
+  stroke: #0c66e4 !important;
+}
+
+.quill-wrapper .ql-toolbar.ql-snow button.ql-active .ql-fill {
+  fill: #0c66e4 !important;
+}
+
+.quill-wrapper .ql-editor {
+  padding: 14px 16px !important;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #0b1739;
+  min-height: 110px;
+}
+
+.quill-wrapper .ql-editor.ql-blank::before {
+  left: 16px !important;
+  top: 14px !important;
+  font-style: italic !important;
+  color: #94a3b8 !important;
+  font-size: 14px;
 }
 
 .btn-trello-save {
   background: #0c66e4;
   color: #ffffff;
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 8px;
+  padding: 8px 18px;
   font-size: 14px;
   font-weight: 500;
-  margin-top: 12px;
+  margin-top: 14px;
   cursor: pointer;
-  transition: background 0.15s;
+  box-shadow: 0 2px 6px rgba(12, 102, 228, 0.25);
+  transition: background 140ms ease;
 }
 
 .btn-trello-save:hover {
-  background: #0055cc;
+  background: #0052cc;
 }
 
-/* Right Side Column */
+/* Right Side Panel (Comments & Activity) */
 .side-header {
   justify-content: space-between;
 }
@@ -712,46 +1283,237 @@
 }
 
 .btn-hide-details {
-  background: #091e420f;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 12px;
+  background: #f4f6fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 4px 10px;
   font-size: 12px;
-  font-weight: 600;
-  color: #172b4d;
+  font-weight: 500;
+  color: #475569;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 140ms ease;
 }
 
 .btn-hide-details:hover {
-  background: #091e4214;
+  background: #ebf3ff;
+  border-color: #cce0ff;
+  color: #0c66e4;
 }
 
-.comment-input-area {
+/* Collapsed Pill Box (Screenshot 1) *//* Comments section styles */
+.modal-comments-section {
+  margin-top: 16px;
+  padding-bottom: 32px;
+}
+
+.comment-collapsed-box {
+    background: #ffffff;
+    border: 1px solid #dcdfe4;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    transition: all 140ms ease;
+    margin-bottom: 2rem;
+}
+
+.comment-white-bubble {
+    background: #ffffff;
+    border: 1px solid #dcdfe4;
+    border-radius: 8px;
+    padding: 7px 11px;
+    font-size: 11px;
+    color: #0b1739;
+    line-height: 1.5;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    width: 100%;
+}/* Expanded Comment Editor (Screenshot 2) */
+.comment-expanded-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comment-editor-box {
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+  border: 2px solid #0c66e4;
+  box-shadow: 0 0 0 3px rgba(12, 102, 228, 0.12);
+}
+
+.comment-textarea {
+  width: 100%;
+  min-height: 80px;
+  border: none;
+  outline: none;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: #0b1739;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.comment-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-comment-save {
+  background: #0c66e4;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.btn-comment-save:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.comment-watch-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+}
+
+.comment-watch-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #0c66e4;
+  cursor: pointer;
+}
+
+.btn-comment-cancel {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.btn-comment-cancel:hover {
+  background: #f1f5f9;
+  color: #0b1739;
+}
+
+/* Comment Cards & Activity Feed (Screenshot 3) */
+.comment-card-item {
+  display: flex;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
-.fake-comment-input {
-  width: 100%;
+.comment-author-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.comment-author-line strong {
+  color: #0b1739;
+  font-weight: 600;
+}
+
+.activity-time-link {
+  font-size: 12px;
+  color: #0c66e4;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.comment-white-bubble {
   background: #ffffff;
   border: 1px solid #dcdfe4;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 14px;
-  color: #172b4d;
-  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.08);
-  outline: none;
-  box-sizing: border-box;
+  color: #0b1739;
+  line-height: 1.5;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.fake-comment-input:focus {
-  border-color: #0c66e4;
+.comment-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.action-reaction-btn {
+  cursor: pointer;
+  font-size: 14px;
+  transition: transform 120ms ease;
+}
+
+.action-reaction-btn:hover {
+  transform: scale(1.2);
+}
+
+.action-dot {
+  color: #cbd5e1;
+}
+
+.action-link-btn {
+  color: #475569;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.action-link-btn:hover {
+  color: #0c66e4;
+  text-decoration: underline;
+}
+
+.activity-feed {
+  position: relative;
+  padding-left: 2px;
+}
+
+.activity-timeline-line {
+  position: absolute;
+  left: 17px;
+  top: 20px;
+  bottom: 10px;
+  width: 2px;
+  background: #e2e8f0;
+  border-radius: 1px;
+  z-index: 0;
 }
 
 .activity-item {
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+  position: relative;
+  z-index: 1;
 }
 
 .avatar-bubble {
@@ -761,10 +1523,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
+  font-weight: 600;
   color: white;
-  font-size: 14px;
+  font-size: 13px;
   flex-shrink: 0;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(12, 102, 228, 0.25);
 }
 
 .avatar-bubble.orange {
@@ -772,10 +1535,21 @@
 }
 
 .activity-details p {
-  margin: 0 0 4px 0;
+  margin: 0;
   font-size: 13px;
-  color: #172b4d;
+  color: #1e293b;
   line-height: 1.4;
+}
+
+.comment-text-bubble {
+  background: #f4f6fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #0b1739;
+  margin: 4px 0;
+  word-break: break-word;
 }
 
 .activity-time {
@@ -785,9 +1559,10 @@
   cursor: pointer;
 }
 
-/* Popovers */
+/* Select List Popover & Animations */
 .popover-container {
   position: relative;
+  display: inline-block;
 }
 
 .trello-popover {
@@ -797,30 +1572,48 @@
   margin-top: 8px;
   width: 304px;
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+  border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(11, 23, 57, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
   z-index: 100;
-  border: 1px solid #e4e6ea;
+  border: 1px solid #e2e8f0;
+  animation: popoverSlideUp 140ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes popoverSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .status-popover {
   left: 0;
-  top: 100%;
+  top: calc(100% + 6px);
+  width: 280px;
+  z-index: 1050;
+}
+
+.popover-item.selected {
+  background: #ebf3ff;
 }
 
 .popover-header {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid #dcdfe4;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
   position: relative;
 }
 
 .popover-header span {
   font-size: 14px;
   font-weight: 600;
-  color: #44546f;
+  color: #0b1739;
 }
 
 .popover-header .btn-icon-tiny {
@@ -830,7 +1623,7 @@
 }
 
 .popover-body {
-  padding: 8px 0;
+  padding: 6px;
 }
 
 .popover-item {
@@ -838,41 +1631,56 @@
   text-align: left;
   background: transparent;
   border: none;
-  padding: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   cursor: pointer;
+  transition: all 120ms ease;
 }
 
 .popover-item:hover {
-  background: #f1f2f4;
+  background: #f0f7ff;
+  color: #0c66e4;
 }
 
 .popover-item svg {
-  color: #44546f;
-  margin-top: 2px;
+  color: #64748b;
+}
+
+.popover-item:hover svg {
+  color: #0c66e4;
 }
 
 .item-text strong {
   display: block;
   font-size: 14px;
-  color: #172b4d;
+  color: #0b1739;
   font-weight: 500;
+}
+
+.popover-item:hover .item-text strong {
+  color: #0c66e4;
 }
 
 .item-text span {
   display: block;
   font-size: 12px;
-  color: #44546f;
+  color: #64748b;
   margin-top: 2px;
 }
 
 .label-color {
   height: 32px;
-  border-radius: 4px;
+  border-radius: 6px;
   margin-bottom: 6px;
   cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.label-color:hover {
+  transform: scale(1.02);
 }
 
 .label-color.green { background: #4bce97; }
@@ -881,3 +1689,1341 @@
 .label-color.red { background: #f87462; }
 .label-color.purple { background: #9f8fef; }
 .label-color.blue { background: #579dff; }
+
+/* Add Checklist Popover Specific Styles */
+.checklist-popover {
+  width: 304px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(9, 30, 66, 0.2), 0 0 0 1px rgba(9, 30, 66, 0.08);
+  border: 1px solid #dcdfe4;
+}
+
+.checklist-popover .popover-body {
+  padding: 16px;
+}
+
+.checklist-popover-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #44546f;
+  margin-bottom: 6px;
+}
+
+.checklist-popover-input {
+  width: 100%;
+  height: 38px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #172b4d;
+  background: #ffffff;
+  border: 1px solid #8c9bab;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  margin-bottom: 14px;
+}
+
+.checklist-popover-input:focus {
+  border-color: #0c66e4;
+  box-shadow: 0 0 0 2px rgba(12, 102, 228, 0.2);
+}
+
+.btn-generate-checklist-popover {
+  width: 100%;
+  height: 38px;
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  color: #172b4d;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  margin-bottom: 12px;
+}
+
+.btn-generate-checklist-popover:hover {
+  background: #f7f8f9;
+  border-color: #cbd5e1;
+}
+
+.btn-add-checklist-popover {
+  width: 100%;
+  height: 38px;
+  background: #0c66e4;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.btn-add-checklist-popover:hover {
+  background: #0055cc;
+}
+
+.btn-add-checklist-popover:disabled {
+  background: #0c66e4;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Labels Popover Styling */
+.labels-popover {
+  width: 304px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(9, 30, 66, 0.2), 0 0 0 1px rgba(9, 30, 66, 0.08);
+  border: 1px solid #dcdfe4;
+}
+
+.label-search-input {
+  width: 100%;
+  height: 38px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #172b4d;
+  background: #ffffff;
+  border: 1px solid #8c9bab;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.label-search-input:focus {
+  border-color: #0c66e4;
+  box-shadow: 0 0 0 2px rgba(12, 102, 228, 0.2);
+}
+
+.labels-list-subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #44546f;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.labels-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.label-row-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.label-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  accent-color: #0c66e4;
+  flex-shrink: 0;
+}
+
+.label-color-bar {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.14s ease, transform 0.12s ease;
+  user-select: none;
+}
+
+.label-color-bar span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.label-color-bar:hover {
+  opacity: 0.9;
+}
+
+.label-edit-btn {
+  background: transparent;
+  border: none;
+  color: #44546f;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.label-edit-btn:hover {
+  background: rgba(9, 30, 66, 0.08);
+  color: #172b4d;
+}
+
+.btn-create-label-outline {
+  width: 100%;
+  height: 38px;
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  color: #172b4d;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.btn-create-label-outline:hover {
+  background: #f7f8f9;
+  border-color: #cbd5e1;
+}
+
+/* Create / Edit Preview Box */
+.label-preview-box-container {
+  background: #f7f8f9;
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.label-preview-bar {
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Color Swatches Grid (5 columns x 6 rows) */
+.color-swatches-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.color-swatch-item {
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.color-swatch-item:hover {
+  transform: scale(1.05);
+}
+
+.swatch-check {
+  color: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+
+.btn-remove-color-outline {
+  height: 38px;
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  color: #44546f;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.btn-remove-color-outline:hover {
+  background: #f7f8f9;
+  color: #172b4d;
+}
+
+.btn-trello-danger {
+  background: #c9372c;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.btn-trello-danger:hover {
+  background: #ae2e24;
+}
+
+.popover-divider {
+  border-top: 1px solid #dcdfe4;
+  margin: 16px -12px 14px -12px;
+}
+
+.btn-trello-create-compact {
+  background: #0c66e4;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.btn-trello-create-compact:hover {
+  background: #0055cc;
+}
+
+.btn-trello-danger-compact {
+  background: #c9372c;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.btn-trello-danger-compact:hover {
+  background: #ae2e24;
+}
+
+/* Kanban Card Label Indicator Bars (Screenshot 3) */
+.card-labels-indicators-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.card-label-indicator-bar {
+  height: 8px;
+  min-width: 40px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* Card Detail Modal Attached Labels Section (Screenshot 2) */
+.modal-attached-labels-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 1rem;
+}
+
+.section-label-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #44546f;
+}
+
+.attached-labels-flex-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.modal-attached-duedate-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attached-duedate-btn {
+  height: 36px;
+  padding: 0 12px;
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #172b4d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.attached-duedate-btn:hover {
+  background: rgba(9, 30, 66, 0.04);
+  border-color: #8c9bab;
+}
+
+.attached-label-pill {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.14s ease;
+  user-select: none;
+}
+
+.attached-label-pill:hover {
+  opacity: 0.85;
+}
+
+.btn-add-label-pill {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background: #091e420f;
+  border: none;
+  color: #44546f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.btn-add-label-pill:hover {
+  background: #091e4214;
+  color: #172b4d;
+}
+
+/* Dates Popover Styling */
+.dates-popover {
+  width: 304px;
+}
+
+.calendar-nav-header {
+  height: 32px;
+}
+
+.calendar-month-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #172b4d;
+}
+
+.btn-cal-nav {
+  background: transparent;
+  border: none;
+  color: #44546f;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.btn-cal-nav:hover {
+  background: rgba(9, 30, 66, 0.08);
+  color: #172b4d;
+}
+
+.calendar-weekdays-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #44546f;
+}
+
+.calendar-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px 0;
+}
+
+.cal-day-cell {
+  background: transparent;
+  border: none;
+  height: 34px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #172b4d;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s ease;
+}
+
+.cal-day-cell.muted {
+  color: #8c9bab;
+}
+
+.cal-day-cell:hover:not(.start-date):not(.due-date) {
+  background: rgba(9, 30, 66, 0.08);
+  border-radius: 4px;
+}
+
+.cal-day-cell.today span {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: #0c66e4;
+  text-underline-offset: 3px;
+}
+
+.cal-day-cell.start-date,
+.cal-day-cell.due-date {
+  background: #0c66e4;
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 6px;
+}
+
+.cal-day-cell.in-range {
+  background: #e9f2ff;
+  color: #0c66e4;
+  font-weight: 600;
+}
+
+.dates-section-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #44546f;
+  display: block;
+}
+
+.dates-caption-text {
+  font-size: 12px;
+  color: #44546f;
+  line-height: 1.4;
+}
+
+.trello-select-btn {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #172b4d;
+  background: #ffffff;
+  border: 1px solid #8c9bab;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.trello-select-btn:hover:not(:disabled) {
+  border-color: #0c66e4;
+}
+
+.trello-select-btn:disabled {
+  background: #f7f8f9;
+  color: #8c9bab;
+  cursor: not-allowed;
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(9, 30, 66, 0.15);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.custom-select-dropdown .dropdown-item {
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #172b4d;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.custom-select-dropdown .dropdown-item:hover {
+  background: #e9f2ff;
+  color: #0c66e4;
+}
+
+.custom-select-dropdown .dropdown-item.selected {
+  background: #e9f2ff;
+  color: #0c66e4;
+  font-weight: 700;
+}
+
+.btn-dates-save {
+  width: 100%;
+  height: 38px;
+  background: #0c66e4;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.btn-dates-save:hover {
+  background: #0055cc;
+}
+
+.btn-dates-remove {
+  width: 100%;
+  height: 38px;
+  background: #ffffff;
+  color: #172b4d;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.btn-dates-remove:hover {
+  background: rgba(9, 30, 66, 0.04);
+}
+
+/* Members Popover & Avatar Styling */
+.members-popover {
+  width: 304px;
+}
+
+.members-popover-list {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.member-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.14s ease;
+  user-select: none;
+}
+
+.member-popover-item:hover {
+  background: rgba(9, 30, 66, 0.04);
+}
+
+.member-popover-item.selected {
+  background: #e9f2ff;
+}
+
+.member-popover-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.member-popover-avatar .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.member-popover-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.member-popover-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #172b4d;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.member-popover-email {
+  font-size: 12px;
+  font-weight: 400;
+  color: #44546f;
+  line-height: 1.2;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.member-check-icon {
+  color: #0c66e4;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.modal-attached-members-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attached-member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: opacity 0.14s ease;
+}
+
+.attached-member-avatar .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.attached-member-avatar:hover {
+  opacity: 0.85;
+}
+
+.attached-member-overflow-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #091e420f;
+  color: #44546f;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.attached-member-overflow-badge:hover {
+  background: #091e4214;
+  color: #172b4d;
+}
+
+.btn-add-member-pill {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #091e420f;
+  border: none;
+  color: #44546f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.btn-add-member-pill:hover {
+  background: #091e4214;
+  color: #172b4d;
+}
+
+.card-member-avatar-tiny {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #ffffff;
+  overflow: hidden;
+}
+
+.card-member-avatar-tiny .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* Card Cover Banner on Kanban Card */
+.card-cover-banner {
+  width: 100%;
+  height: 140px;
+  border-radius: 0;
+  overflow: hidden;
+  margin: 0;
+  background: #f1f5f9;
+  position: relative;
+}
+
+.card-cover-banner .cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Attachment Popover & Items */
+.attachment-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 340px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(11, 23, 57, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  z-index: 1050;
+  border: 1px solid #e2e8f0;
+}
+
+.attachment-popover .popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.attachment-popover .popover-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.attachment-popover .btn-close-popover {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 140ms ease;
+}
+
+.attachment-popover .btn-close-popover:hover {
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.attachment-popover-body {
+  padding: 16px;
+}
+
+.attach-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.attach-section-title.required-link-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.attach-section-title .asterisk {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.attach-section-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.btn-choose-file-trello {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    font-size: 14px;
+    font-weight: 500;
+    color: #334155;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 140ms ease;
+    margin: auto;
+    display: block;
+    text-align: center;
+}
+
+.btn-choose-file-trello:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+input[type=text], input[type=email], input[type=password] {
+    width: 100%;
+    padding: 0.625rem var(--space-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: var(--transition);
+}
+
+.upload-progress-box {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.upload-progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: #cbd5e1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0c66e4, #3b82f6);
+  border-radius: 4px;
+  transition: width 200ms ease-in-out;
+}
+
+.attach-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 16px 0;
+}
+
+.trello-input-field {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #1e293b;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.trello-input-field:focus {
+  border-color: #0c66e4;
+  box-shadow: 0 0 0 2px rgba(12, 102, 228, 0.2);
+}
+
+.link-url-input {
+  margin-bottom: 12px;
+}
+
+.link-name-input {
+  margin-bottom: 4px;
+}
+
+.attach-input-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.attach-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.btn-trello-cancel-text {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 140ms ease;
+}
+
+.btn-trello-cancel-text:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.btn-trello-insert-primary {
+  background: #0c66e4;
+  color: #ffffff;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(12, 102, 228, 0.2);
+  transition: all 140ms ease;
+}
+
+.btn-trello-insert-primary:hover {
+  background: #0055cc;
+  box-shadow: 0 2px 6px rgba(12, 102, 228, 0.3);
+}
+
+/* Attachments Section */
+.modal-attachments-section {
+  margin-bottom: 24px;
+}
+
+.modal-attachments-section .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.modal-attachments-section .header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.attachments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  transition: all 140ms ease;
+}
+
+.attachment-item:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.attachment-thumbnail-box {
+  width: 80px;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #091e420f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.attachment-thumbnail-box .thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail-badge-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #091e420f;
+}
+
+.thumbnail-badge-box .badge-text {
+  font-size: 13px;
+  font-weight: 800;
+  color: #44546f;
+  letter-spacing: 0.5px;
+}
+
+.attachment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attachment-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 140ms ease;
+}
+
+.attachment-name:hover {
+  color: #0c66e4;
+}
+
+.external-link-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.attachment-meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-link-btn {
+  background: transparent;
+  border: none;
+  color: #475569;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  transition: color 140ms ease;
+}
+
+.action-link-btn:hover {
+  text-decoration: underline;
+  color: #0f172a;
+}
+
+.action-link-btn.delete-action-btn {
+  color: #ef4444;
+}
+
+.action-link-btn.delete-action-btn:hover {
+  color: #dc2626;
+}
+
+/* Trello Image Lightbox Preview Modal */
+.image-lightbox-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: lightboxFadeIn 150ms ease-out;
+}
+
+@keyframes lightboxFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.image-lightbox-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-close-btn {
+  position: absolute;
+  top: -44px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #ffffff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.lightbox-close-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.lightbox-image-wrapper {
+  max-width: 85vw;
+  max-height: 72vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4);
+  background: #ffffff;
+}
+
+.lightbox-img {
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  display: block;
+}
+
+.lightbox-footer-bar {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.lightbox-filename {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  word-break: break-all;
+}
+
+.lightbox-meta {
+  font-size: 13px;
+  color: #cbd5e1;
+  margin-top: 2px;
+}
+
+.lightbox-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.lightbox-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.lightbox-action-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.lightbox-action-btn.delete-btn {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.lightbox-action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.45);
+}

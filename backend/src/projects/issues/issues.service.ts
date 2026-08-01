@@ -1,5 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import axios from 'axios';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import FormData from 'form-data';
 
 @Injectable()
 export class IssuesService {
@@ -59,7 +63,9 @@ export class IssuesService {
       include: {
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         reporter: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-        labels: { include: { label: true } }
+        labels: { include: { label: true } },
+        members: { include: { employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } }, designation: { select: { name: true } } } } } },
+        attachments: { include: { uploader: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } }
       },
       orderBy: { position: 'asc' }
     });
@@ -69,13 +75,27 @@ export class IssuesService {
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
 
+    const updateData: any = {};
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.priority !== undefined) updateData.priority = data.priority;
+    if (data.columnId !== undefined) updateData.columnId = Number(data.columnId);
+    if (data.assigneeId !== undefined) updateData.assigneeId = data.assigneeId ? Number(data.assigneeId) : null;
+    if (data.position !== undefined) updateData.position = Number(data.position);
+    if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;
+    if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    if (data.recurring !== undefined) updateData.recurring = data.recurring;
+    if (data.dueReminder !== undefined) updateData.dueReminder = data.dueReminder;
+
     const issue = await this.prisma.issue.update({
       where: { id: issueId },
-      data
+      data: updateData
     });
 
     // Simple activity logging for column change
-    if (data.columnId && data.columnId !== oldIssue.columnId) {
+    if (data.columnId && Number(data.columnId) !== oldIssue.columnId) {
       await this.prisma.issueActivity.create({
         data: {
           action: 'STATUS_CHANGED',
@@ -142,5 +162,385 @@ export class IssuesService {
     });
 
     return { success: true, completedAt: now };
+  }
+
+  async getComments(companyId: number, projectId: number, issueId: number) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    return this.prisma.issueComment.findMany({
+      where: { issueId },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+  }
+
+  async addComment(companyId: number, userId: number, projectId: number, issueId: number, body: string) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    const employee = await this.prisma.employee.findUnique({ where: { userId } });
+    const authorId = employee ? employee.id : userId;
+
+    const comment = await this.prisma.issueComment.create({
+      data: {
+        body,
+        issueId,
+        authorId
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true
+          }
+        }
+      }
+    });
+
+    await this.prisma.issueActivity.create({
+      data: {
+        action: 'COMMENT_ADDED',
+        issueId,
+        actorId: authorId
+      }
+    });
+
+    return comment;
+  }
+
+  async deleteComment(companyId: number, projectId: number, issueId: number, commentId: number) {
+    const comment = await this.prisma.issueComment.findUnique({ where: { id: commentId, issueId } });
+    if (!comment) throw new NotFoundException('Comment not found');
+
+    return this.prisma.issueComment.delete({
+      where: { id: commentId }
+    });
+  }
+
+  async getChecklists(companyId: number, projectId: number, issueId: number) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    return this.prisma.checklist.findMany({
+      where: { issueId },
+      include: {
+        items: {
+          orderBy: { createdAt: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+  }
+
+  async createChecklist(companyId: number, projectId: number, issueId: number, title: string) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    return this.prisma.checklist.create({
+      data: {
+        title: title || 'Checklist',
+        issueId
+      },
+      include: {
+        items: true
+      }
+    });
+  }
+
+  async updateChecklist(companyId: number, projectId: number, issueId: number, checklistId: number, title: string) {
+    const checklist = await this.prisma.checklist.findUnique({ where: { id: checklistId, issueId } });
+    if (!checklist) throw new NotFoundException('Checklist not found');
+
+    return this.prisma.checklist.update({
+      where: { id: checklistId },
+      data: { title: title || 'Checklist' }
+    });
+  }
+
+  async deleteChecklist(companyId: number, projectId: number, issueId: number, checklistId: number) {
+    const checklist = await this.prisma.checklist.findUnique({ where: { id: checklistId, issueId } });
+    if (!checklist) throw new NotFoundException('Checklist not found');
+
+    return this.prisma.checklist.delete({
+      where: { id: checklistId }
+    });
+  }
+
+  async addChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, title: string) {
+    const checklist = await this.prisma.checklist.findUnique({ where: { id: checklistId, issueId } });
+    if (!checklist) throw new NotFoundException('Checklist not found');
+
+    return this.prisma.checklistItem.create({
+      data: {
+        title,
+        checklistId
+      }
+    });
+  }
+
+  async updateChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, itemId: number, data: any) {
+    const item = await this.prisma.checklistItem.findFirst({ where: { id: itemId, checklistId } });
+    if (!item) throw new NotFoundException('Checklist item not found');
+
+    const updateData: any = {};
+    if (data.isCompleted !== undefined) updateData.isCompleted = Boolean(data.isCompleted);
+    if (data.title !== undefined) updateData.title = data.title;
+
+    return this.prisma.checklistItem.update({
+      where: { id: itemId },
+      data: updateData
+    });
+  }
+
+  async deleteChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, itemId: number) {
+    const item = await this.prisma.checklistItem.findFirst({ where: { id: itemId, checklistId } });
+    if (!item) throw new NotFoundException('Checklist item not found');
+
+    return this.prisma.checklistItem.delete({
+      where: { id: itemId }
+    });
+  }
+
+  async generateChecklist(companyId: number, projectId: number, issueId: number) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    const description = issue.description || issue.title;
+    
+    // First create an empty checklist
+    const checklist = await this.prisma.checklist.create({
+      data: { title: 'Checklist', issueId }
+    });
+
+    try {
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a project management assistant. Break down the given task into a checklist. Return ONLY a valid JSON object with an "items" array containing strings. Example: {"items": ["task 1", "task 2"]}'
+            },
+            {
+              role: 'user',
+              content: `Generate a checklist for the following task:\n\nTitle: ${issue.title}\nDescription: ${description}`
+            }
+          ],
+          response_format: { type: 'json_object' }
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const content = response.data.choices[0]?.message?.content;
+      if (!content) throw new Error('No content from Groq');
+
+      const parsed = JSON.parse(content);
+      const items = Array.isArray(parsed.items) ? parsed.items : [];
+
+      if (items.length === 0) {
+        items.push('Review requirements', 'Execute task', 'Verify completion');
+      }
+
+      // Save to database inside the newly created checklist
+      await Promise.all(
+        items.slice(0, 10).map((title: string) => 
+          this.prisma.checklistItem.create({
+            data: { title: String(title).substring(0, 255), checklistId: checklist.id }
+          })
+        )
+      );
+
+      return this.prisma.checklist.findUnique({
+        where: { id: checklist.id },
+        include: { items: { orderBy: { createdAt: 'asc' } } }
+      });
+    } catch (error: any) {
+      console.error('Groq generation error:', error?.response?.data || error.message);
+      
+      // Fallback if API fails
+      await Promise.all(
+        ['Review task details', 'Draft implementation plan', 'Execute implementation', 'Test changes'].map(title => 
+          this.prisma.checklistItem.create({
+            data: { title, checklistId: checklist.id }
+          })
+        )
+      );
+      
+      return this.prisma.checklist.findUnique({
+        where: { id: checklist.id },
+        include: { items: { orderBy: { createdAt: 'asc' } } }
+      });
+    }
+  }
+
+  async getCompanyMembers(companyId: number) {
+    return this.prisma.employee.findMany({
+      where: { companyId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        user: { select: { email: true } },
+        designation: { select: { name: true } }
+      },
+      orderBy: { firstName: 'asc' }
+    });
+  }
+
+  async toggleIssueMember(companyId: number, projectId: number, issueId: number, employeeId: number) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    const existing = await this.prisma.issueMember.findUnique({
+      where: {
+        issueId_employeeId: { issueId, employeeId }
+      }
+    });
+
+    if (existing) {
+      await this.prisma.issueMember.delete({
+        where: { issueId_employeeId: { issueId, employeeId } }
+      });
+      return { attached: false, employeeId };
+    } else {
+      const created = await this.prisma.issueMember.create({
+        data: { issueId, employeeId },
+        include: {
+          employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } }, designation: { select: { name: true } } } }
+        }
+      });
+      return { attached: true, member: created };
+    }
+  }
+
+  async uploadAttachmentToImageKit(companyId: number, employeeId: number, projectId: number, issueId: number, file: Express.Multer.File) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+    if (!file) throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
+
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    if (!privateKey) throw new HttpException('ImageKit not configured', HttpStatus.INTERNAL_SERVER_ERROR);
+
+    try {
+      const ext = path.extname(file.originalname);
+      const filename = `${crypto.randomBytes(12).toString('hex')}${ext}`;
+
+      const form = new FormData();
+      form.append('file', file.buffer, filename);
+      form.append('fileName', filename);
+      form.append('folder', '/card_attachments');
+
+      const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
+
+      const response = await axios.post('https://upload.imagekit.io/api/v1/files/upload', form, {
+        headers: {
+          ...form.getHeaders(),
+          Authorization: authHeader
+        }
+      });
+
+      const fileUrl = response.data.url;
+
+      return await this.prisma.issueAttachment.create({
+        data: {
+          fileName: file.originalname,
+          fileUrl,
+          fileSize: file.size,
+          fileType: 'FILE',
+          issueId,
+          uploadedBy: employeeId
+        },
+        include: { uploader: { select: { id: true, firstName: true, lastName: true } } }
+      });
+    } catch (error: any) {
+      console.error('Attachment ImageKit upload error:', error.response?.data || error.message);
+      throw new HttpException('Failed to upload file to ImageKit', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async addLinkAttachment(companyId: number, employeeId: number, projectId: number, issueId: number, linkUrl: string, linkName?: string) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+    if (!linkUrl) throw new HttpException('Link URL is required', HttpStatus.BAD_REQUEST);
+
+    let formattedUrl = linkUrl.trim();
+    if (!/^https?:\/\//i.test(formattedUrl)) {
+      formattedUrl = 'https://' + formattedUrl;
+    }
+
+    return await this.prisma.issueAttachment.create({
+      data: {
+        fileName: (linkName && linkName.trim()) ? linkName.trim() : formattedUrl,
+        fileUrl: formattedUrl,
+        fileType: 'LINK',
+        issueId,
+        uploadedBy: employeeId
+      },
+      include: { uploader: { select: { id: true, firstName: true, lastName: true } } }
+    });
+  }
+
+  async deleteAttachment(companyId: number, projectId: number, issueId: number, attachmentId: number) {
+    const attachment = await this.prisma.issueAttachment.findFirst({
+      where: { id: attachmentId, issueId }
+    });
+    if (!attachment) throw new NotFoundException('Attachment not found');
+
+    if (attachment.isCover) {
+      await this.prisma.issue.update({
+        where: { id: issueId },
+        data: { coverUrl: null }
+      });
+    }
+
+    await this.prisma.issueAttachment.delete({ where: { id: attachmentId } });
+    return { success: true, attachmentId };
+  }
+
+  async toggleCoverAttachment(companyId: number, projectId: number, issueId: number, attachmentId: number) {
+    const attachment = await this.prisma.issueAttachment.findFirst({
+      where: { id: attachmentId, issueId }
+    });
+    if (!attachment) throw new NotFoundException('Attachment not found');
+
+    const newCoverState = !attachment.isCover;
+
+    if (newCoverState) {
+      await this.prisma.issueAttachment.updateMany({
+        where: { issueId },
+        data: { isCover: false }
+      });
+    }
+
+    await this.prisma.issueAttachment.update({
+      where: { id: attachmentId },
+      data: { isCover: newCoverState }
+    });
+
+    const updatedIssue = await this.prisma.issue.update({
+      where: { id: issueId },
+      data: { coverUrl: newCoverState ? attachment.fileUrl : null }
+    });
+
+    return { isCover: newCoverState, coverUrl: updatedIssue.coverUrl, attachmentId };
   }
 }
