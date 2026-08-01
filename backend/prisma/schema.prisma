@@ -37,6 +37,8 @@ model Company {
   hardwareRequests    HardwareRequest[]
   jobs                Job[]
   jobApplications     JobApplication[]
+  projects            Project[]
+  issues              Issue[]
 }
 
 // Authentication & RBAC
@@ -157,6 +159,15 @@ model Employee {
   assetAssignments  AssetAssignment[]
   hardwareRequests  HardwareRequest[]
   interviews        Interview[]
+
+  ledProjects         Project[]          @relation("ProjectLead")
+  projectMembers      ProjectMember[]
+  assignedIssues      Issue[]            @relation("IssueAssignee")
+  reportedIssues      Issue[]            @relation("IssueReporter")
+  issueTimeLogs       IssueTimeLog[]
+  issueComments       IssueComment[]
+  uploadedAttachments IssueAttachment[]
+  issueActivities     IssueActivity[]
 }
 
 model EmergencyContact {
@@ -556,4 +567,178 @@ model Interview {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
+
+// ═══════════════════════════════════════════
+// PROJECT MANAGEMENT MODULE
+// ═══════════════════════════════════════════
+
+model Project {
+  id            Int       @id @default(autoincrement())
+  name          String
+  key           String    // Auto-generated, unique per company (e.g., "NEX")
+  description   String?
+  color         String    @default("#2563eb") // Project accent color
+  icon          String    @default("folder") // Lucide icon name
+  status        String    @default("ACTIVE") // ACTIVE, ARCHIVED
+  leadId        Int?      // Project lead (Employee)
+  lead          Employee? @relation("ProjectLead", fields: [leadId], references: [id])
+  companyId     Int
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  members       ProjectMember[]
+  boards        Board[]
+  issues        Issue[]
+  labels        Label[]
+
+  @@unique([key, companyId])
+}
+
+model ProjectMember {
+  id         Int      @id @default(autoincrement())
+  role       String   @default("MEMBER") // ADMIN, MEMBER, VIEWER
+  projectId  Int
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  joinedAt   DateTime @default(now())
+
+  @@unique([projectId, employeeId])
+}
+
+model Board {
+  id        Int      @id @default(autoincrement())
+  name      String   @default("Main Board")
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  columns   BoardColumn[]
+  createdAt DateTime @default(now())
+}
+
+model BoardColumn {
+  id        Int      @id @default(autoincrement())
+  name      String   // e.g. "To Do", "In Progress", "In Review", "Done"
+  color     String   @default("#6b7280") // Column header color
+  position  Int      // Sort order (0, 1, 2, ...)
+  boardId   Int
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  issues    Issue[]
+
+  @@unique([boardId, position])
+}
+
+model Issue {
+  id            Int       @id @default(autoincrement())
+  key           String    // Auto-generated: "NEX-1", "NEX-2"
+  title         String
+  description   String?   @db.Text // Quill HTML content
+  type          String    @default("TASK") // EPIC, STORY, TASK, BUG, SUBTASK
+  status        String    @default("TODO") // TODO, IN_PROGRESS, IN_REVIEW, DONE, CANCELLED
+  priority      String    @default("MEDIUM") // CRITICAL, HIGH, MEDIUM, LOW
+  storyPoints   Int?
+  dueDate       DateTime?
+  position      Int       @default(0) // Sort order within column/backlog
+  
+  // Time Tracking Markers
+  workStartedAt   DateTime? // When work actually started
+  workCompletedAt DateTime? // When work actually finished
+
+  // Relationships
+  projectId     Int
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  columnId      Int?
+  column        BoardColumn? @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  assigneeId    Int?
+  assignee      Employee? @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporterId    Int?
+  reporter      Employee? @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  parentId      Int?      // For sub-tasks and Epic→Story linking
+  parent        Issue?    @relation("IssueHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Issue[]   @relation("IssueHierarchy")
+  companyId     Int
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  comments      IssueComment[]
+  attachments   IssueAttachment[]
+  labels        IssueLabel[]
+  activities    IssueActivity[]
+  timeLogs      IssueTimeLog[] // Detailed time entries if multiple sessions
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([key, companyId])
+}
+
+// Support multiple work sessions if a user stops and starts
+model IssueTimeLog {
+  id          Int       @id @default(autoincrement())
+  issueId     Int
+  issue       Issue     @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  employeeId  Int
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  startedAt   DateTime
+  endedAt     DateTime?
+  durationMin Int?      // Calculated duration in minutes
+  createdAt   DateTime  @default(now())
+}
+
+model IssueComment {
+  id        Int      @id @default(autoincrement())
+  body      String   @db.Text // Quill HTML content
+  issueId   Int
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    Employee @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model IssueAttachment {
+  id        Int      @id @default(autoincrement())
+  fileName  String
+  fileUrl   String
+  fileSize  Int?     // bytes
+  issueId   Int
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  uploadedBy Int
+  uploader  Employee @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Label {
+  id        Int      @id @default(autoincrement())
+  name      String   // e.g. "Frontend", "Backend", "Design", "Urgent"
+  color     String   @default("#6b7280")
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues    IssueLabel[]
+
+  @@unique([name, projectId])
+}
+
+model IssueLabel {
+  id       Int   @id @default(autoincrement())
+  issueId  Int
+  issue    Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  labelId  Int
+  label    Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([issueId, labelId])
+}
+
+model IssueActivity {
+  id        Int      @id @default(autoincrement())
+  action    String   // "STATUS_CHANGED", "ASSIGNED", "COMMENT_ADDED", "PRIORITY_CHANGED", "WORK_STARTED", "WORK_STOPPED"
+  field     String?  // Which field changed
+  oldValue  String?
+  newValue  String?
+  issueId   Int
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  actorId   Int
+  actor     Employee @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
 

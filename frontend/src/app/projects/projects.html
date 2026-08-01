@@ -1,0 +1,267 @@
+<div class="boards-page">
+  <!-- Search & Filter Control Bar -->
+  <div class="hub-control-bar">
+    <div class="search-box">
+      <svg lucideSearch size="16" class="search-icon"></svg>
+      <input 
+        type="text" 
+        class="search-input" 
+        placeholder="Search boards..." 
+        [ngModel]="searchQuery()" 
+        (ngModelChange)="searchQuery.set($event)">
+    </div>
+
+    <div class="filter-tabs">
+      <button 
+        class="tab-pill" 
+        [class.active]="activeTab() === 'all'" 
+        (click)="activeTab.set('all')">
+        All Boards
+      </button>
+      <button 
+        class="tab-pill" 
+        [class.active]="activeTab() === 'starred'" 
+        (click)="activeTab.set('starred')">
+        <svg lucideStar size="14" class="tab-icon"></svg>
+        Starred ({{ starredBoardIds().length }})
+      </button>
+      <button 
+        class="tab-pill" 
+        [class.active]="activeTab() === 'recent'" 
+        (click)="activeTab.set('recent')">
+        <svg lucideClock size="14" class="tab-icon"></svg>
+        Recent
+      </button>
+    </div>
+  </div>
+
+  <!-- ⭐ Starred Boards Section -->
+  <div class="section-container" *ngIf="starredProjects().length > 0 && activeTab() !== 'recent'">
+    <div class="section-header">
+      <div class="section-title-group">
+        <svg lucideStar size="20" class="section-icon star-yellow"></svg>
+        <h2>Starred boards</h2>
+      </div>
+    </div>
+
+    <div class="boards-grid">
+      <div 
+        class="board-card" 
+        *ngFor="let p of starredProjects(); let i = index" 
+        (click)="goToProject(p.id)">
+        <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+          <button 
+            type="button" 
+            class="star-btn active" 
+            (click)="toggleStar(p.id, $event)" 
+            title="Unstar board">
+            <svg lucideStar size="16"></svg>
+          </button>
+        </div>
+        <div class="board-card-footer">
+          <div class="title-meta">
+            <span class="board-title">{{ p.name }}</span>
+            <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
+          </div>
+          <div class="card-badge" *ngIf="p._count?.issues">
+            {{ p._count.issues }} tasks
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🕒 Recently Viewed Section -->
+  <div class="section-container" *ngIf="recentlyViewedProjects().length > 0 && activeTab() === 'all'">
+    <div class="section-header">
+      <div class="section-title-group">
+        <svg lucideClock size="20" class="section-icon"></svg>
+        <h2>Recently viewed</h2>
+      </div>
+    </div>
+
+    <div class="boards-grid">
+      <div 
+        class="board-card" 
+        *ngFor="let p of recentlyViewedProjects(); let i = index" 
+        (click)="goToProject(p.id)">
+        <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+          <button 
+            type="button" 
+            class="star-btn" 
+            [class.active]="isStarred(p.id)" 
+            (click)="toggleStar(p.id, $event)" 
+            title="Star board">
+            <svg lucideStar size="16"></svg>
+          </button>
+        </div>
+        <div class="board-card-footer">
+          <div class="title-meta">
+            <span class="board-title">{{ p.name }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👤 Your Boards Section -->
+  <div class="section-container">
+    <div class="section-header">
+      <div class="section-title-group">
+        <svg lucideUser size="22" class="section-icon"></svg>
+        <h2>Your boards</h2>
+      </div>
+    </div>
+
+    <!-- Boards Grid -->
+    <div class="boards-grid">
+      <!-- Existing Boards -->
+      <div 
+        class="board-card" 
+        *ngFor="let p of filteredProjects(); let i = index" 
+        (click)="goToProject(p.id)">
+        <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+          <button 
+            type="button" 
+            class="star-btn" 
+            [class.active]="isStarred(p.id)" 
+            (click)="toggleStar(p.id, $event)" 
+            [title]="isStarred(p.id) ? 'Unstar board' : 'Star board'">
+            <svg lucideStar size="16"></svg>
+          </button>
+        </div>
+        <div class="board-card-footer">
+          <div class="title-meta">
+            <span class="board-title">{{ p.name }}</span>
+            <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
+          </div>
+          <div class="card-badge" *ngIf="p._count?.issues">
+            {{ p._count.issues }} tasks
+          </div>
+        </div>
+      </div>
+
+      <!-- Create New Board Card (with icon!) -->
+      <div class="create-board-card" (click)="openCreateModal()">
+        <svg lucidePlus size="18" class="create-icon"></svg>
+        <span>Create new board</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Backdrop -->
+<div class="modal-overlay" *ngIf="isCreateModalOpen()" (click)="closeCreateModal()"></div>
+
+<!-- Trello-Style Create Board Popover Modal -->
+<div class="create-board-modal" *ngIf="isCreateModalOpen()">
+  <!-- Modal Header -->
+  <div class="modal-header">
+    <button class="btn-icon-ghost" (click)="closeCreateModal()">
+      <svg lucideChevronLeft size="18"></svg>
+    </button>
+    <span class="modal-title">Create board</span>
+    <button class="btn-icon-ghost" (click)="closeCreateModal()">
+      <svg lucideX size="18"></svg>
+    </button>
+  </div>
+
+  <div class="modal-body">
+    <!-- Live Board Preview -->
+    <div class="board-preview-container" [style.background]="selectedBg().startsWith('http') ? 'url(' + selectedBg() + ') center/cover' : selectedBg()">
+      <div class="preview-mini-board">
+        <div class="mini-board-header">
+          <svg lucideKanban size="14" class="mini-logo"></svg>
+        </div>
+        <div class="mini-columns">
+          <div class="mini-column">
+            <div class="mini-card-line"></div>
+            <div class="mini-card-line short"></div>
+          </div>
+          <div class="mini-column">
+            <div class="mini-card-line"></div>
+            <div class="mini-card-line"></div>
+            <div class="mini-card-line short"></div>
+          </div>
+          <div class="mini-column">
+            <div class="mini-card-line"></div>
+            <div class="mini-card-line short"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Background Selection -->
+    <div class="form-section">
+      <label class="section-label">Background</label>
+      
+      <!-- Image Backgrounds Row -->
+      <div class="bg-thumbnails-grid">
+        <button 
+          type="button"
+          class="bg-thumb-item"
+          *ngFor="let img of imageBackgrounds"
+          [style.background]="'url(' + img + ') center/cover'"
+          [class.selected]="selectedBg() === img"
+          (click)="selectBg(img)">
+          <span class="check-badge" *ngIf="selectedBg() === img">
+            <svg lucideCheck size="14"></svg>
+          </span>
+        </button>
+      </div>
+
+      <!-- Color Swatches Row -->
+      <div class="bg-colors-grid">
+        <button 
+          type="button"
+          class="color-thumb-item"
+          *ngFor="let col of colorBackgrounds"
+          [style.background]="col"
+          [class.selected]="selectedBg() === col"
+          (click)="selectBg(col)">
+          <span class="check-badge" *ngIf="selectedBg() === col">
+            <svg lucideCheck size="14"></svg>
+          </span>
+        </button>
+        <button type="button" class="color-thumb-item more-btn">
+          <svg lucideMoreHorizontal size="16"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Board Title Field -->
+    <div class="form-section">
+      <label class="section-label">Board title <span class="required">*</span></label>
+      <input 
+        type="text" 
+        class="trello-input" 
+        [class.invalid]="isSubmitted() && !projectForm.name.trim()"
+        [(ngModel)]="projectForm.name" 
+        placeholder=""
+        #titleInput="ngModel">
+      
+      <div class="error-msg" *ngIf="isSubmitted() && !projectForm.name.trim()">
+        👋 Board title is required
+      </div>
+    </div>
+
+    <!-- Visibility Selection -->
+    <div class="form-section">
+      <label class="section-label">Visibility</label>
+      <select class="trello-select" [(ngModel)]="projectForm.visibility">
+        <option value="Workspace">Workspace</option>
+        <option value="Private">Private</option>
+        <option value="Public">Public</option>
+      </select>
+    </div>
+
+    <!-- Action Button -->
+    <button 
+      type="button" 
+      class="btn-trello-submit" 
+      [disabled]="!projectForm.name.trim()"
+      (click)="saveProject()">
+      Create
+    </button>
+  </div>
+</div>

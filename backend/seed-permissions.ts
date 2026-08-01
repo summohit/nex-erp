@@ -24,6 +24,7 @@ async function main() {
     'ADMIN': [
       'employees', 'employees/directory', 'employees/org-chart', 'employees/onboarding', 'employees/documents',
       'recruitment', 'recruitment/jobs', 'recruitment/candidates', 'recruitment/interviews',
+      'projects', 'projects/all', 'projects/my-work',
       'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/shifts', 'attendance/holidays',
       'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
       'assets', 'assets/inventory', 'assets/assignments', 'assets/requests',
@@ -50,7 +51,8 @@ async function main() {
       'employees', 'employees/directory', 'employees/org-chart', 'employees/documents',
       'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
       'payroll', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
-      'assets', 'assets/requests'
+      'assets', 'assets/requests',
+      'projects', 'projects/all', 'projects/my-work'
     ]
   };
 

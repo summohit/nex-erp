@@ -11,6 +11,11 @@ export const routes: Routes = [
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { 
+    path: 'projects/:id', 
+    canActivate: [authGuard],
+    loadComponent: () => import('./projects/project-detail/project-detail').then(m => m.ProjectDetailComponent) 
+  },
+  { 
     path: '', 
     component: MainLayoutComponent, 
     canActivate: [authGuard],
@@ -86,6 +91,10 @@ export const routes: Routes = [
       {
         path: 'recruitment/interviews',
         loadComponent: () => import('./recruitment/interviews/interviews').then(m => m.InterviewsComponent)
+      },
+      {
+        path: 'projects',
+        loadComponent: () => import('./projects/projects').then(m => m.ProjectsComponent)
       }
     ]
   },

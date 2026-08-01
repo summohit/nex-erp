@@ -5,12 +5,12 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { PermissionsService, RolePermission } from '../../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy } from '@lucide/angular';
+import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban } from '@lucide/angular';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy],
+  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban],
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css']
 })
@@ -62,6 +62,16 @@ export class SidebarComponent implements OnInit {
             { id: 'recruitment/candidates', title: 'Candidates (ATS)', route: '/recruitment/candidates' },
             { id: 'recruitment/interviews', title: 'Interviews', route: '/recruitment/interviews' },
             { id: 'recruitment/careers', title: 'Public Careers Page ↗', route: '/careers', external: true }
+          ]
+        },
+        {
+          id: 'projects',
+          title: 'Projects',
+          icon: 'lucideKanban',
+          route: '/projects',
+          subItems: [
+            { id: 'projects/all', title: 'All Projects', route: '/projects' },
+            { id: 'projects/my-work', title: 'My Work', route: '/projects/my-work' }
           ]
         },
         {
@@ -354,7 +364,8 @@ export class SidebarComponent implements OnInit {
       subItem.route.startsWith('/attendance/') ||
       subItem.route.startsWith('/payroll/') ||
       subItem.route.startsWith('/settings/') ||
-      subItem.route.startsWith('/recruitment/')
+      subItem.route.startsWith('/recruitment/') ||
+      subItem.route.startsWith('/projects')
     ) {
       this.router.navigate([subItem.route]);
     } else {

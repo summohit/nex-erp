@@ -1,0 +1,331 @@
+<div class="trello-board-view" [style.background]="getBoardBackground()">
+  <!-- Top Trello Board Toolbar -->
+  <div class="board-top-bar">
+    <div class="top-bar-left">
+      <!-- Back Arrow Button to Projects Listing -->
+      <button class="top-bar-back-btn" (click)="goBack()" title="Back to Projects">
+        <svg lucideArrowLeft size="18"></svg>
+      </button>
+      <h1 class="board-name-title">{{ project()?.name || 'Board' }}</h1>
+      <button class="board-switcher-btn" (click)="goBack()">
+        <svg lucideKanban size="15"></svg>
+        <svg lucideChevronDown size="14"></svg>
+      </button>
+    </div>
+
+    <div class="top-bar-right">
+      <div class="user-avatar-bubble">
+        <span>{{ (currentUser()?.firstName || 'U')[0] }}</span>
+      </div>
+      <button class="top-bar-icon-btn" title="Power-ups">
+        <svg lucideZap size="16"></svg>
+      </button>
+      <button class="top-bar-icon-btn" title="Automation">
+        <svg lucideSparkles size="16"></svg>
+      </button>
+      <button class="top-bar-icon-btn" title="Filter">
+        <svg lucideFilter size="16"></svg>
+      </button>
+      <button class="top-bar-icon-btn" title="Star board">
+        <svg lucideStar size="16"></svg>
+      </button>
+      <button class="top-bar-share-btn">
+        <svg lucideShare2 size="14"></svg>
+        <span>Share</span>
+      </button>
+      <button class="top-bar-icon-btn" title="Menu">
+        <svg lucideMoreHorizontal size="16"></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Canvas Board Container -->
+  <main class="board-canvas" *ngIf="board()">
+    <div class="trello-columns-container" cdkDropListGroup>
+      
+      <!-- Columns -->
+      <div class="trello-column" *ngFor="let col of columns()">
+        <!-- Column Header -->
+        <div class="trello-column-header">
+          <div class="col-title-group">
+            <h3 class="col-title">{{ col.name }}</h3>
+            <span class="col-count">{{ getColumnIssues(col.id).length }}</span>
+          </div>
+          <div class="col-actions">
+            <button class="btn-icon-tiny"><svg lucideMoreHorizontal size="15"></svg></button>
+          </div>
+        </div>
+
+        <!-- Cards List -->
+        <div class="trello-cards-list" 
+             cdkDropList
+             [id]="'column-' + col.id"
+             [cdkDropListData]="getColumnIssues(col.id)"
+             [cdkDropListConnectedTo]="getConnectedListIds()"
+             (cdkDropListDropped)="drop($event, col.id)">
+          
+          <!-- Existing Cards -->
+          <div class="trello-card" 
+               *ngFor="let issue of getColumnIssues(col.id)" 
+               cdkDrag 
+               (click)="openIssueDetails(issue)">
+            
+            <div class="card-content-wrapper">
+              <div class="card-labels" *ngIf="issue.type && issue.type !== 'TASK'">
+                <span class="type-pill" [ngClass]="issue.type.toLowerCase()">{{ issue.type }}</span>
+              </div>
+
+              <div class="card-title">{{ issue.title }}</div>
+
+              <div class="card-footer-meta" *ngIf="issue.key || (issue.workStartedAt && !issue.workCompletedAt)">
+                <span class="card-key" *ngIf="issue.key">{{ issue.key }}</span>
+                <div class="card-timer" *ngIf="issue.workStartedAt && !issue.workCompletedAt">
+                  <svg lucideClock size="12"></svg>
+                </div>
+              </div>
+            </div>
+            
+            <button type="button" class="card-hover-edit-btn" (click)="$event.stopPropagation(); openIssueDetails(issue)">
+              <svg lucideEdit2 size="14"></svg>
+            </button>
+          </div>
+
+          <!-- Inline Add Card Form -->
+          <div class="inline-add-card-form" *ngIf="addingCardColumnId() === col.id">
+            <textarea 
+              rows="3" 
+              class="inline-card-input" 
+              placeholder="Enter a title or paste a link" 
+              [ngModel]="inlineCardTitle()"
+              (ngModelChange)="inlineCardTitle.set($event)"
+              (keydown.enter)="$event.preventDefault(); submitInlineCard(col.id)">
+            </textarea>
+            <div class="inline-add-actions">
+              <button type="button" class="btn-add-card-submit" (click)="submitInlineCard(col.id)">Add card</button>
+              <button type="button" class="btn-cancel-inline" (click)="cancelInlineAdd()">
+                <svg lucideX size="20"></svg>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Column Footer (Trigger Inline Add) -->
+        <div class="trello-column-footer" *ngIf="addingCardColumnId() !== col.id">
+          <button type="button" class="btn-add-card-trigger" (click)="startInlineAdd(col.id)">
+            <svg lucidePlus size="16"></svg>
+            <span>Add a card</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Add another list button -->
+      <div class="add-another-list-col">
+        <button type="button" class="btn-add-list">
+          <svg lucidePlus size="16"></svg>
+          <span>Add another list</span>
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Floating Bottom Navigation Pill Bar -->
+  <div class="floating-bottom-nav">
+    <button type="button" class="bottom-nav-item">
+      <svg lucideInbox size="16"></svg>
+      <span>Inbox</span>
+    </button>
+    <button type="button" class="bottom-nav-item">
+      <svg lucideCalendar size="16"></svg>
+      <span>Planner</span>
+    </button>
+    <button type="button" class="bottom-nav-item active">
+      <svg lucideKanban size="16"></svg>
+      <span>Board</span>
+    </button>
+    <button type="button" class="bottom-nav-item switch-btn" (click)="goBack()">
+      <svg lucideLayoutDashboard size="16"></svg>
+      <span>Switch boards</span>
+    </button>
+  </div>
+
+</div>
+
+<!-- Trello-style Centered Modal -->
+<div class="trello-modal-overlay" *ngIf="isDrawerOpen()" (click)="closeDrawer()"></div>
+<div class="trello-modal" *ngIf="isDrawerOpen()">
+  
+  <div class="trello-modal-header">
+    <div class="modal-header-left">
+      <button class="modal-status-btn" (click)="togglePopover('status')">
+        <span>{{ getColumnName(issueForm.columnId) }}</span>
+        <svg lucideChevronDown size="14"></svg>
+      </button>
+      
+      <!-- Status Popover -->
+      <div class="trello-popover status-popover" *ngIf="activePopover() === 'status'">
+        <div class="popover-header">
+          <span>Select List</span>
+          <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
+        </div>
+        <div class="popover-body">
+          <button class="popover-item" *ngFor="let col of columns()" (click)="issueForm.columnId = col.id; closePopover()">
+            <div class="item-text"><strong>{{ col.name }}</strong></div>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-header-right">
+      <button class="modal-icon-btn"><svg lucideImage size="18"></svg></button>
+      <button class="modal-icon-btn"><svg lucideMoreHorizontal size="18"></svg></button>
+      <button class="modal-icon-btn" (click)="closeDrawer()"><svg lucideX size="18"></svg></button>
+    </div>
+  </div>
+
+  <div class="trello-modal-body">
+    <!-- Main Left Column -->
+    <div class="modal-main-col">
+      
+      <!-- Card Title Row -->
+      <div class="modal-title-row">
+        <svg lucideCircle size="22" class="title-icon"></svg>
+        <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" placeholder="Card Title">
+      </div>
+
+      <!-- Action Buttons Row -->
+      <div class="modal-action-buttons">
+        <!-- Add Button + Popover -->
+        <div class="popover-container">
+          <button class="modal-action-btn" (click)="togglePopover('add')">
+            <svg lucidePlus size="14"></svg>
+            <span>Add</span>
+          </button>
+          
+          <div class="trello-popover add-popover" *ngIf="activePopover() === 'add'">
+            <div class="popover-header">
+              <span>Add to card</span>
+              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
+            </div>
+            <div class="popover-body">
+              <button class="popover-item"><svg lucideTag size="14"></svg> <div class="item-text"><strong>Labels</strong><span>Organize, categorize, and prioritize</span></div></button>
+              <button class="popover-item"><svg lucideClock size="14"></svg> <div class="item-text"><strong>Dates</strong><span>Start dates, due dates, and reminders</span></div></button>
+              <button class="popover-item"><svg lucideCheckSquare size="14"></svg> <div class="item-text"><strong>Checklist</strong><span>Add subtasks</span></div></button>
+              <button class="popover-item"><svg lucideUsers size="14"></svg> <div class="item-text"><strong>Members</strong><span>Assign members</span></div></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Labels -->
+        <div class="popover-container">
+          <button class="modal-action-btn" (click)="togglePopover('labels')">
+            <svg lucideTag size="14"></svg>
+            <span>Labels</span>
+          </button>
+
+          <div class="trello-popover labels-popover" *ngIf="activePopover() === 'labels'">
+            <div class="popover-header">
+              <span>Labels</span>
+              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
+            </div>
+            <div class="popover-body p-3">
+              <input type="text" class="form-control mb-2" placeholder="Search labels...">
+              <div class="label-color green"></div>
+              <div class="label-color yellow"></div>
+              <div class="label-color orange"></div>
+              <div class="label-color red"></div>
+              <div class="label-color purple"></div>
+              <div class="label-color blue"></div>
+              <button class="btn btn-outline w-full mt-2">Create a new label</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dates -->
+        <div class="popover-container">
+          <button class="modal-action-btn" (click)="togglePopover('dates')">
+            <svg lucideClock size="14"></svg>
+            <span>Dates</span>
+          </button>
+
+          <div class="trello-popover dates-popover" *ngIf="activePopover() === 'dates'">
+            <div class="popover-header">
+              <span>Dates</span>
+              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
+            </div>
+            <div class="popover-body p-3 text-center">
+              <div class="font-bold mb-2">August 2026</div>
+              <div class="text-sm text-gray-500 mb-4">Calendar placeholder</div>
+              <button class="btn btn-primary w-full">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checklist -->
+        <div class="popover-container">
+          <button class="modal-action-btn" (click)="togglePopover('checklist')">
+            <svg lucideCheckSquare size="14"></svg>
+            <span>Checklist</span>
+          </button>
+
+          <div class="trello-popover checklist-popover" *ngIf="activePopover() === 'checklist'">
+            <div class="popover-header">
+              <span>Add checklist</span>
+              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
+            </div>
+            <div class="popover-body p-3">
+              <label class="block text-sm font-bold mb-1">Title</label>
+              <input type="text" class="form-control mb-3" value="Checklist">
+              <button class="btn btn-primary w-full">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Members -->
+        <button class="modal-action-btn">
+          <svg lucideUsers size="14"></svg>
+          <span>Members</span>
+        </button>
+      </div>
+
+      <!-- Description Section -->
+      <div class="modal-description-section">
+        <div class="section-header">
+          <svg lucideAlignLeft size="20" class="header-icon"></svg>
+          <h3>Description</h3>
+        </div>
+        <div class="description-body">
+          <div class="quill-container" #quillContainer></div>
+          <button class="btn-trello-save" (click)="saveIssue()">Save Description</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Side Right Column -->
+    <div class="modal-side-col">
+      <div class="section-header side-header">
+        <div class="side-header-title">
+          <svg lucideMessageSquare size="18" class="header-icon"></svg>
+          <h3>Comments and activity</h3>
+        </div>
+        <button class="btn-hide-details">Hide details</button>
+      </div>
+      
+      <div class="comment-input-area">
+        <input type="text" class="fake-comment-input" placeholder="Write a comment...">
+      </div>
+
+      <div class="activity-feed">
+        <div class="activity-item">
+          <div class="avatar-bubble orange">T</div>
+          <div class="activity-details">
+            <p><strong>taskhive</strong> added this card to {{ getColumnName(issueForm.columnId) }}</p>
+            <a class="activity-time">3 minutes ago</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
