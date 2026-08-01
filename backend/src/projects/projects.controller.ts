@@ -14,11 +14,11 @@ export class ProjectsController {
 
   @Get()
   getProjects(@Req() req) {
-    return this.projectsService.getProjects(req.user.companyId);
+    return this.projectsService.getProjects(req.user.companyId, req.user.sub, req.user.role);
   }
 
   @Get(':id')
   getProjectDetails(@Req() req, @Param('id', ParseIntPipe) id: number) {
-    return this.projectsService.getProjectDetails(req.user.companyId, id);
+    return this.projectsService.getProjectDetails(req.user.companyId, id, req.user.sub, req.user.role);
   }
 }

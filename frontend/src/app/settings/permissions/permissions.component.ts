@@ -61,6 +61,10 @@ export class PermissionsComponent implements OnInit {
       ]
     },
     {
+      id: 'projects', title: 'Projects', isExpanded: true, enabled: false,
+      subItems: []
+    },
+    {
       id: 'attendance', title: 'Attendance & Leave', isExpanded: true, enabled: false,
       subItems: [
         { id: 'attendance/timesheets', title: 'Timesheets', enabled: false },

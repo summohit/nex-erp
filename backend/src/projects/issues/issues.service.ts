@@ -428,6 +428,17 @@ export class IssuesService {
           employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } }, designation: { select: { name: true } } } }
         }
       });
+      
+      // Auto-add to project members if not already a member
+      const isProjectMember = await this.prisma.projectMember.findUnique({
+        where: { projectId_employeeId: { projectId, employeeId } }
+      });
+      if (!isProjectMember) {
+        await this.prisma.projectMember.create({
+          data: { projectId, employeeId, role: 'MEMBER' }
+        });
+      }
+
       return { attached: true, member: created };
     }
   }
@@ -511,6 +522,10 @@ export class IssuesService {
         data: { coverUrl: null }
       });
     }
+
+    // We can't delete from ImageKit because we don't have the fileId stored reliably.
+    // However, since it is important to delete it, we could try to parse the fileId from the URL or query ImageKit
+    // But for now, we'll just delete it from the DB to prevent crashes.
 
     await this.prisma.issueAttachment.delete({ where: { id: attachmentId } });
     return { success: true, attachmentId };

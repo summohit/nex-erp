@@ -71,8 +71,8 @@
                (click)="openIssueDetails(issue)">
             
             <!-- Card Cover Image Banner -->
-            <div class="card-cover-banner" *ngIf="issue.coverUrl">
-              <img [src]="issue.coverUrl" class="cover-img" [alt]="issue.title">
+            <div class="card-cover-banner" *ngIf="issue.coverUrl && !issue.coverImageError">
+              <img [src]="issue.coverUrl" class="cover-img" [alt]="issue.title" (error)="issue.coverImageError = true">
             </div>
 
             <div class="card-content-wrapper">
@@ -193,7 +193,7 @@
           <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
         </div>
         <div class="popover-body">
-          <button class="popover-item" *ngFor="let col of columns()" [class.selected]="issueForm.columnId === col.id" (click)="issueForm.columnId = col.id; closePopover()">
+          <button class="popover-item" *ngFor="let col of columns()" [class.selected]="issueForm.columnId === col.id" (click)="updateStatus(col.id)">
             <span class="status-dot" [ngClass]="getStatusDotClass(col.id)"></span>
             <div class="item-text" style="flex: 1;"><strong>{{ col.name }}</strong></div>
             <svg *ngIf="issueForm.columnId === col.id" lucideCheck size="16" style="color: #0c66e4;"></svg>
@@ -203,8 +203,6 @@
     </div>
     
     <div class="modal-header-right">
-      <button class="modal-icon-btn" title="Image attachment"><svg lucideImage size="18"></svg></button>
-      <button class="modal-icon-btn" title="More options"><svg lucideMoreHorizontal size="18"></svg></button>
       <button class="modal-icon-btn" (click)="closeDrawer()" title="Close"><svg lucideX size="18"></svg></button>
     </div>
   </div>
@@ -567,6 +565,7 @@
                 <div class="progress-bar-track">
                   <div class="progress-bar-fill" [style.width.%]="uploadProgress()"></div>
                 </div>
+                <button type="button" class="btn-cancel-upload" (click)="cancelUpload()">Cancel</button>
               </div>
 
               <hr class="attach-divider">

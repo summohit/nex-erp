@@ -1,0 +1,61 @@
+<div class="org-chart-container" *ngIf="!isLoading">
+  
+  <div class="org-chart-wrapper" *ngIf="rootNodes.length > 0; else noData">
+    <ng-container *ngFor="let root of rootNodes">
+      <ng-container *ngTemplateOutlet="orgNodeTemplate; context: { $implicit: root }"></ng-container>
+    </ng-container>
+  </div>
+
+  <ng-template #noData>
+    <div class="empty-state">
+      <svg lucideUser size="48" style="color: #94a3b8; margin-bottom: 16px;"></svg>
+      <h3>No Organization Chart Data</h3>
+      <p>Assign managers to employees to build the chart.</p>
+    </div>
+  </ng-template>
+
+  <!-- Recursive Node Template -->
+  <ng-template #orgNodeTemplate let-node>
+    <div class="org-node-container">
+      <div class="org-node-card" (click)="toggleExpand(node, $event)">
+        <div class="node-avatar">
+          <img *ngIf="node.avatarUrl" [src]="node.avatarUrl" alt="Avatar">
+          <div *ngIf="!node.avatarUrl" class="avatar-placeholder">
+            {{ node.firstName.charAt(0) }}{{ node.lastName.charAt(0) }}
+          </div>
+        </div>
+        <div class="node-details">
+          <div class="node-name">{{ node.firstName }} {{ node.lastName }}</div>
+          <div class="node-designation" *ngIf="node.designation">{{ node.designation.name }}</div>
+          <div class="node-department" *ngIf="node.department">{{ node.department.name }}</div>
+        </div>
+        
+        <div class="node-expand-btn" *ngIf="node.children.length > 0">
+          <svg *ngIf="!node.isExpanded" lucideChevronDown size="16"></svg>
+          <svg *ngIf="node.isExpanded" lucideChevronUp size="16"></svg>
+        </div>
+      </div>
+
+      <!-- Children Container -->
+      <div class="org-children-container" *ngIf="node.children.length > 0 && node.isExpanded">
+        <!-- Connecting Line from Parent -->
+        <div class="vertical-line"></div>
+        <div class="children-wrapper">
+          <ng-container *ngFor="let child of node.children; let isFirst=first; let isLast=last">
+            <div class="child-node-wrapper">
+              <!-- Horizontal connector -->
+              <div class="horizontal-line" [class.first-child]="isFirst" [class.last-child]="isLast"></div>
+              <ng-container *ngTemplateOutlet="orgNodeTemplate; context: { $implicit: child }"></ng-container>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+
+</div>
+
+<div class="loading-state" *ngIf="isLoading">
+  <div class="spinner"></div>
+  <p>Loading Organization Chart...</p>
+</div>

@@ -96,9 +96,12 @@
           
           <!-- Category Header -->
           <div class="module-header">
-            <div class="cat-title" (click)="toggleExpand(cat)">
-              <svg *ngIf="cat.isExpanded" lucideChevronDown size="20"></svg>
-              <svg *ngIf="!cat.isExpanded" lucideChevronRight size="20"></svg>
+            <div class="cat-title" (click)="toggleExpand(cat)" [ngStyle]="{'cursor': cat.subItems && cat.subItems.length > 0 ? 'pointer' : 'default'}">
+              <ng-container *ngIf="cat.subItems && cat.subItems.length > 0">
+                <svg *ngIf="cat.isExpanded" lucideChevronDown size="20"></svg>
+                <svg *ngIf="!cat.isExpanded" lucideChevronRight size="20"></svg>
+              </ng-container>
+              <div *ngIf="!cat.subItems || cat.subItems.length === 0" style="width: 20px;"></div>
               <h3>{{ cat.title }}</h3>
             </div>
             <label class="toggle-switch">

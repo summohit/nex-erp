@@ -12,6 +12,11 @@ export class EmployeesController {
     return this.employeesService.findAll(req.user.companyId);
   }
 
+  @Get('org-chart')
+  getOrgChart(@Request() req) {
+    return this.employeesService.getOrgChart(req.user.companyId);
+  }
+
   @Post()
   create(@Request() req, @Body() data: any) {
     return this.employeesService.create(req.user.companyId, data);

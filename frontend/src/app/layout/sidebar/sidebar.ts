@@ -68,11 +68,7 @@ export class SidebarComponent implements OnInit {
           id: 'projects',
           title: 'Projects',
           icon: 'lucideKanban',
-          route: '/projects',
-          subItems: [
-            { id: 'projects/all', title: 'All Projects', route: '/projects' },
-            { id: 'projects/my-work', title: 'My Work', route: '/projects/my-work' }
-          ]
+          route: '/projects'
         },
         {
           id: 'attendance',
@@ -330,6 +326,12 @@ export class SidebarComponent implements OnInit {
           this.router.navigate(['/appreciation']);
         } else {
           this.toast.error('You do not have permission to access Appreciation.');
+        }
+      } else if (menuId === 'projects') {
+        if (this.hasAccess('projects')) {
+          this.router.navigate(['/projects']);
+        } else {
+          this.toast.error('You do not have permission to access Projects.');
         }
       } else {
         this.comingSoon(event);

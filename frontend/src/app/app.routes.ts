@@ -8,6 +8,7 @@ import { OnboardingComponent } from './employees/onboarding/onboarding';
 
 export const routes: Routes = [
   { path: '', component: AuthComponent },
+  { path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.OnboardingComponent) },
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { 
@@ -32,6 +33,10 @@ export const routes: Routes = [
       {
         path: 'employees/onboarding',
         component: OnboardingComponent
+      },
+      {
+        path: 'employees/org-chart',
+        loadComponent: () => import('./employees/org-chart/org-chart').then(m => m.OrgChart)
       },
       {
         path: 'employees/:id/profile',

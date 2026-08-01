@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -62,9 +62,18 @@ export class ProjectsService {
     return project;
   }
 
-  async getProjects(companyId: number) {
+  async getProjects(companyId: number, employeeId: number, role: string) {
+    const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN';
+    const whereClause: any = { companyId };
+    
+    if (!isAdmin) {
+      whereClause.members = {
+        some: { employeeId }
+      };
+    }
+
     return this.prisma.project.findMany({
-      where: { companyId },
+      where: whereClause,
       include: {
         _count: {
           select: { members: true, issues: true }
@@ -76,7 +85,18 @@ export class ProjectsService {
     });
   }
 
-  async getProjectDetails(companyId: number, projectId: number) {
+  async getProjectDetails(companyId: number, projectId: number, employeeId: number, role: string) {
+    const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN';
+
+    if (!isAdmin) {
+      const isMember = await this.prisma.projectMember.findFirst({
+        where: { projectId, employeeId }
+      });
+      if (!isMember) {
+        throw new ForbiddenException('You do not have access to this project');
+      }
+    }
+
     const project = await this.prisma.project.findUnique({
       where: { id: projectId, companyId },
       include: {

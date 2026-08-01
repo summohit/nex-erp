@@ -10,8 +10,8 @@ import {
   LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
   LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
-  LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideSend, LucideTrash2, LucideRepeat,
-  LucidePaperclip, LucideExternalLink, LucideFileText, LucideDownload
+  LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
+  LucidePaperclip, LucideExternalLink, LucideDownload
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -30,8 +30,8 @@ declare var Quill: any;
     LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
     LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
     LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
-    LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideSend, LucideTrash2, LucideRepeat,
-    LucidePaperclip, LucideExternalLink, LucideFileText, LucideDownload
+    LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
+    LucidePaperclip, LucideExternalLink, LucideDownload
   ],
   templateUrl: './project-detail.html',
   styleUrls: ['./project-detail.css'],
@@ -172,6 +172,22 @@ export class ProjectDetailComponent implements OnInit {
         error: (err) => {
           this.toast.error('Failed to move issue');
           this.loadBoardAndIssues(); // Revert
+        }
+      });
+    }
+  }
+
+  updateStatus(columnId: number) {
+    this.issueForm.columnId = columnId;
+    this.closePopover();
+    if (this.selectedIssue()) {
+      this.projectsService.updateIssue(this.projectId, this.selectedIssue().id, { columnId }).subscribe({
+        next: () => {
+          this.toast.success('Status updated');
+          this.loadBoardAndIssues();
+        },
+        error: (err) => {
+          this.toast.error('Failed to update status');
         }
       });
     }
@@ -1052,6 +1068,8 @@ export class ProjectDetailComponent implements OnInit {
   // Attachment State & Methods
   isUploadingAttachment = signal(false);
   uploadProgress = signal<number>(0);
+  private uploadSubscription: any = null;
+  private uploadProgressInterval: any = null;
   attachmentLinkUrl = '';
   attachmentLinkName = '';
   previewAttachment = signal<any | null>(null);
@@ -1118,13 +1136,13 @@ export class ProjectDetailComponent implements OnInit {
     this.isUploadingAttachment.set(true);
     this.uploadProgress.set(15);
 
-    const progressInterval = setInterval(() => {
+    this.uploadProgressInterval = setInterval(() => {
       this.uploadProgress.update(p => (p < 85 ? p + 15 : p));
     }, 250);
 
-    this.projectsService.uploadAttachment(this.projectId, issue.id, file).subscribe({
+    this.uploadSubscription = this.projectsService.uploadAttachment(this.projectId, issue.id, file).subscribe({
       next: (att) => {
-        clearInterval(progressInterval);
+        clearInterval(this.uploadProgressInterval);
         this.uploadProgress.set(100);
         setTimeout(() => {
           this.isUploadingAttachment.set(false);
@@ -1137,12 +1155,26 @@ export class ProjectDetailComponent implements OnInit {
         }, 300);
       },
       error: () => {
-        clearInterval(progressInterval);
+        clearInterval(this.uploadProgressInterval);
         this.isUploadingAttachment.set(false);
         this.uploadProgress.set(0);
         this.toast.error('Failed to upload file to ImageKit');
       }
     });
+  }
+
+  cancelUpload() {
+    if (this.uploadSubscription) {
+      this.uploadSubscription.unsubscribe();
+      this.uploadSubscription = null;
+    }
+    if (this.uploadProgressInterval) {
+      clearInterval(this.uploadProgressInterval);
+      this.uploadProgressInterval = null;
+    }
+    this.isUploadingAttachment.set(false);
+    this.uploadProgress.set(0);
+    this.toast.info('Upload cancelled');
   }
 
   addLinkAttachment() {

@@ -651,6 +651,20 @@
   flex-shrink: 0;
   border-left: 1px solid #edf2f7;
   padding-left: 24px;
+  
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: calc(88vh - 120px); /* rough height to fit within modal */
+  overflow-y: auto;
+}
+/* hide scrollbar for sleek look but allow scrolling */
+.modal-side-col::-webkit-scrollbar {
+  width: 4px;
+}
+.modal-side-col::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 /* Title Row & Custom Circular Checkbox */
@@ -1364,6 +1378,7 @@ svg[lucide], svg[class*=lucide] {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: 1rem;
 }
 
 .btn-comment-save {
@@ -3027,3 +3042,4 @@ input[type=text], input[type=email], input[type=password] {
 .lightbox-action-btn.delete-btn:hover {
   background: rgba(239, 68, 68, 0.45);
 }
+.btn-cancel-upload { margin-top: 10px; font-size: 13px; color: #ef4444; background: none; border: none; cursor: pointer; padding: 4px; border-radius: 4px; font-weight: 500; } .btn-cancel-upload:hover { background: #fef2f2; }

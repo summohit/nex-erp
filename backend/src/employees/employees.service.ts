@@ -25,6 +25,23 @@ export class EmployeesService {
     });
   }
 
+  async getOrgChart(companyId: number) {
+    const employees = await this.prisma.employee.findMany({
+      where: { companyId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        managerId: true,
+        designation: { select: { name: true } },
+        department: { select: { name: true } }
+      }
+    });
+
+    return employees;
+  }
+
   async create(companyId: number, data: any) {
     // 1. Check if user already exists
     const existingUser = await this.prisma.user.findUnique({ where: { email: data.email } });
