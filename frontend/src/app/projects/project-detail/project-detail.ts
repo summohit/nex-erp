@@ -1,9 +1,9 @@
-import { Component, signal, inject, OnInit, ViewChild, ElementRef, ViewEncapsulation } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, ViewChild, ElementRef, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
-import { ProjectsService } from '../../services/projects';
+import { ProjectsService, ProjectSummary } from '../../services/projects';
 import { 
   LucideLayoutDashboard, LucideKanban,
   LucidePlus, LucideX, LucideClock, LucideMessageSquare,
@@ -11,12 +11,17 @@ import {
   LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
   LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
-  LucidePaperclip, LucideExternalLink, LucideDownload
+  LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
+  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
 
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { AgGridAngular } from 'ag-grid-angular';
+import { ColDef, ModuleRegistry, AllCommunityModule, ValidationModule, CellClickedEvent } from 'ag-grid-community';
+
+ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 
 declare var Quill: any;
 
@@ -31,7 +36,9 @@ declare var Quill: any;
     LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
     LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
     LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
-    LucidePaperclip, LucideExternalLink, LucideDownload
+    LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
+    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
+    AgGridAngular
   ],
   templateUrl: './project-detail.html',
   styleUrls: ['./project-detail.css'],
@@ -52,8 +59,66 @@ export class ProjectDetailComponent implements OnInit {
   // Organized by columnId
   columns = signal<any[]>([]);
   issuesByColumn = signal<Map<number, any[]>>(new Map());
+  allIssues = signal<any[]>([]);
 
   activeTab = signal<'board'|'backlog'|'analytics'|'settings'>('board');
+  activeProjectTab = signal<string>('board');
+  projectSummary = signal<ProjectSummary | null>(null);
+
+  // Column Management
+  isAddingColumn = signal(false);
+  newColumnName = signal('');
+
+  // Filtering
+  filterQuery = signal('');
+  filterMyIssues = signal(false);
+  filterNoMembers = signal(false);
+  filterSelectedMembers = signal<number[]>([]);
+  filterMarkedComplete = signal(false);
+  filterNotMarkedComplete = signal(false);
+  filterNoDates = signal(false);
+  filterOverdue = signal(false);
+  filterDueNextDay = signal(false);
+  filterDueNextWeek = signal(false);
+  filterDueNextMonth = signal(false);
+  filterNoLabels = signal(false);
+
+  activeFilterCount = computed(() => {
+    let count = 0;
+    if (this.filterQuery()) count++;
+    if (this.filterMyIssues()) count++;
+    if (this.filterNoMembers()) count++;
+    count += this.filterSelectedMembers().length;
+    if (this.filterMarkedComplete()) count++;
+    if (this.filterNotMarkedComplete()) count++;
+    if (this.filterNoDates()) count++;
+    if (this.filterOverdue()) count++;
+    if (this.filterDueNextDay()) count++;
+    if (this.filterDueNextWeek()) count++;
+    if (this.filterDueNextMonth()) count++;
+    if (this.filterNoLabels()) count++;
+    count += this.filterSelectedLabels().length;
+    return count;
+  });
+
+  clearAllFilters() {
+    this.filterQuery.set('');
+    this.filterMyIssues.set(false);
+    this.filterNoMembers.set(false);
+    this.filterSelectedMembers.set([]);
+    this.filterMarkedComplete.set(false);
+    this.filterNotMarkedComplete.set(false);
+    this.filterNoDates.set(false);
+    this.filterOverdue.set(false);
+    this.filterDueNextDay.set(false);
+    this.filterDueNextWeek.set(false);
+    this.filterDueNextMonth.set(false);
+    this.filterNoLabels.set(false);
+    this.filterSelectedLabels.set([]);
+  }
+
+  // Column Actions
+  activeColumnPopoverId = signal<number | null>(null);
 
   // Inline Quick Add Card
   addingCardColumnId = signal<number | null>(null);
@@ -62,6 +127,7 @@ export class ProjectDetailComponent implements OnInit {
   // Issue Drawer / Modal
   isDrawerOpen = signal(false);
   activePopover = signal<string | null>(null);
+  activeMemberProfile = signal<any>(null);
   selectedIssue = signal<any>(null);
   issueForm = {
     title: '',
@@ -78,21 +144,99 @@ export class ProjectDetailComponent implements OnInit {
   
   currentUser = this.authService.currentUser;
 
+  hasAccess = signal<boolean>(true);
+
   ngOnInit() {
     this.route.paramMap.subscribe(params => {
       const id = params.get('id');
       if (id) {
         this.projectId = +id;
+        this.hasAccess.set(true);
         this.loadProjectDetails();
         this.loadBoardAndIssues();
       }
     });
   }
 
+  setProjectTab(tab: string) {
+    this.activeProjectTab.set(tab);
+    if (tab === 'summary') {
+      this.loadSummary();
+    }
+  }
+
+  loadSummary() {
+    this.projectsService.getProjectSummary(this.projectId).subscribe({
+      next: (res) => this.projectSummary.set(res),
+      error: (err) => console.error('Error loading project summary', err)
+    });
+  }
+
+  get summaryTotalItems(): number {
+    const summary = this.projectSummary();
+    if (!summary || !summary.statusOverview) return 0;
+    return summary.statusOverview.reduce((sum, item) => sum + item.count, 0);
+  }
+
+  getStatusColor(status: string): string {
+    const colors: any = {
+      'TODO': '#cbd5e1',
+      'IN_PROGRESS': '#60a5fa',
+      'IN_REVIEW': '#c084fc',
+      'DONE': '#4ade80',
+      'CANCELLED': '#f87171'
+    };
+    return colors[status] || '#94a3b8';
+  }
+
+  getPriorityColor(priority: string): string {
+    const colors: any = {
+      'CRITICAL': '#ef4444',
+      'HIGH': '#f97316',
+      'MEDIUM': '#eab308',
+      'LOW': '#22c55e'
+    };
+    return colors[priority] || '#94a3b8';
+  }
+
+  getAssigneeColor(index: number): string {
+    const palette = ['#3b82f6', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4'];
+    return palette[index % palette.length];
+  }
+
+  get donutGradient(): string {
+    const summary = this.projectSummary();
+    if (!summary || !summary.statusOverview || summary.statusOverview.length === 0) {
+      return 'conic-gradient(#e2e8f0 0% 100%)';
+    }
+    
+    let gradientParts = [];
+    let currentPercentage = 0;
+    const total = this.summaryTotalItems || 1;
+
+    for (const stat of summary.statusOverview) {
+      const percentage = (stat.count / total) * 100;
+      const color = this.getStatusColor(stat.status);
+      gradientParts.push(`${color} ${currentPercentage}% ${currentPercentage + percentage}%`);
+      currentPercentage += percentage;
+    }
+
+    return `conic-gradient(${gradientParts.join(', ')})`;
+  }
+
   loadProjectDetails() {
     this.projectsService.getProject(this.projectId).subscribe({
-      next: (res) => this.project.set(res),
-      error: (err) => console.error(err)
+      next: (res) => {
+        this.hasAccess.set(true);
+        this.project.set(res);
+      },
+      error: (err) => {
+        if (err.status === 403) {
+          this.hasAccess.set(false);
+        } else {
+          console.error(err);
+        }
+      }
     });
   }
 
@@ -105,6 +249,7 @@ export class ProjectDetailComponent implements OnInit {
         // After getting board, get issues
         this.projectsService.getIssues(this.projectId).subscribe({
           next: (issues) => {
+            this.allIssues.set(issues);
             const map = new Map<number, any[]>();
             board.columns.forEach((c: any) => map.set(c.id, []));
             
@@ -133,9 +278,185 @@ export class ProjectDetailComponent implements OnInit {
     return this.columns().map(c => `column-${c.id}`);
   }
 
+  filterSelectedLabels = signal<number[]>([]);
+
   getColumnIssues(columnId: number): any[] {
-    return this.issuesByColumn().get(columnId) || [];
+    let issues = this.issuesByColumn().get(columnId) || [];
+    
+    // Keyword Filter
+    const query = this.filterQuery().toLowerCase().trim();
+    if (query) {
+      issues = issues.filter(i => 
+        i.title.toLowerCase().includes(query) || 
+        i.key?.toLowerCase().includes(query)
+      );
+    }
+
+    // Members Filter
+    const myIssues = this.filterMyIssues();
+    const noMembers = this.filterNoMembers();
+    const selectedMembers = this.filterSelectedMembers();
+    
+    if (myIssues || noMembers || selectedMembers.length > 0) {
+      issues = issues.filter(i => {
+        let match = false;
+        if (myIssues) {
+          const myId = this.currentUser()?.id;
+          if (myId && (i.assigneeId === myId || (i.members && i.members.some((m: any) => m.userId === myId)))) {
+            match = true;
+          }
+        }
+        if (noMembers && (!i.assigneeId && (!i.members || i.members.length === 0))) {
+          match = true;
+        }
+        if (selectedMembers.length > 0) {
+          if (selectedMembers.includes(i.assigneeId)) {
+            match = true;
+          }
+          if (i.members && i.members.some((m: any) => selectedMembers.includes(m.employeeId))) {
+            match = true;
+          }
+        }
+        return match;
+      });
+    }
+
+    // Status Filter (Marked as complete)
+    const markedComplete = this.filterMarkedComplete();
+    const notMarkedComplete = this.filterNotMarkedComplete();
+    if (markedComplete || notMarkedComplete) {
+      issues = issues.filter(i => {
+        let match = false;
+        if (markedComplete && i.completed) match = true;
+        if (notMarkedComplete && !i.completed) match = true;
+        return match;
+      });
+    }
+
+    // Due Date Filters
+    const noDates = this.filterNoDates();
+    const overdue = this.filterOverdue();
+    const dueNextDay = this.filterDueNextDay();
+    const dueNextWeek = this.filterDueNextWeek();
+    const dueNextMonth = this.filterDueNextMonth();
+    
+    if (noDates || overdue || dueNextDay || dueNextWeek || dueNextMonth) {
+      issues = issues.filter(i => {
+        if (noDates && !i.dueDate) return true;
+        
+        if (i.dueDate) {
+          const due = new Date(i.dueDate).getTime();
+          const now = new Date().getTime();
+          const msPerDay = 24 * 60 * 60 * 1000;
+          
+          if (overdue && due < now) return true;
+          if (dueNextDay && due >= now && due <= now + msPerDay) return true;
+          if (dueNextWeek && due >= now && due <= now + 7 * msPerDay) return true;
+          if (dueNextMonth && due >= now && due <= now + 30 * msPerDay) return true;
+        }
+        return false;
+      });
+    }
+
+    // Labels Filter
+    const noLabels = this.filterNoLabels();
+    const selectedLabels = this.filterSelectedLabels();
+    
+    if (noLabels || selectedLabels.length > 0) {
+      issues = issues.filter(i => {
+        let match = false;
+        if (noLabels && (!i.labels || i.labels.length === 0)) {
+          match = true;
+        }
+        if (selectedLabels.length > 0 && i.labels && i.labels.some((il: any) => selectedLabels.includes(il.labelId || il.label?.id))) {
+          match = true;
+        }
+        return match;
+      });
+    }
+
+    return issues;
   }
+
+  addColumn() {
+    const name = this.newColumnName().trim();
+    if (!name || !this.board()) return;
+    
+    this.projectsService.createBoardColumn(this.projectId, { name }).subscribe({
+      next: (col) => {
+        // Update local state
+        this.columns.update(cols => [...cols, col]);
+        this.issuesByColumn.update(map => {
+          map.set(col.id, []);
+          return new Map(map);
+        });
+        
+        // Reset form
+        this.isAddingColumn.set(false);
+        this.newColumnName.set('');
+        this.toast.success('List created');
+      },
+      error: () => this.toast.error('Failed to create list')
+    });
+  }
+
+  toggleColumnPopover(columnId: number) {
+    if (this.activeColumnPopoverId() === columnId) {
+      this.activeColumnPopoverId.set(null);
+    } else {
+      this.activeColumnPopoverId.set(columnId);
+    }
+  }
+
+  changeColumnColor(columnId: number, color: string) {
+    this.projectsService.updateBoardColumn(this.projectId, columnId, { color }).subscribe({
+      next: () => {
+        this.columns.update(cols => 
+          cols.map(c => c.id === columnId ? { ...c, color } : c)
+        );
+        this.activeColumnPopoverId.set(null);
+      },
+      error: () => this.toast.error('Failed to update list color')
+    });
+  }
+
+  archiveColumn(columnId: number) {
+    if (!confirm('Are you sure you want to archive this list? Any cards inside will be moved to the backlog.')) return;
+    
+    this.projectsService.deleteBoardColumn(this.projectId, columnId).subscribe({
+      next: () => {
+        this.columns.update(cols => cols.filter(c => c.id !== columnId));
+        this.issuesByColumn.update(map => {
+          map.delete(columnId);
+          return new Map(map);
+        });
+        this.activeColumnPopoverId.set(null);
+        this.toast.success('List archived');
+        // Reload issues to fetch the updated unassigned/backlog issues
+        this.loadBoardAndIssues();
+      },
+      error: () => this.toast.error('Failed to archive list')
+    });
+  }
+
+  toggleFilterMyIssues() { this.filterMyIssues.set(!this.filterMyIssues()); }
+  toggleFilterNoMembers() { this.filterNoMembers.set(!this.filterNoMembers()); }
+  toggleFilterMember(userId: number) {
+    const current = this.filterSelectedMembers();
+    if (current.includes(userId)) {
+      this.filterSelectedMembers.set(current.filter(id => id !== userId));
+    } else {
+      this.filterSelectedMembers.set([...current, userId]);
+    }
+  }
+  toggleFilterMarkedComplete() { this.filterMarkedComplete.set(!this.filterMarkedComplete()); }
+  toggleFilterNotMarkedComplete() { this.filterNotMarkedComplete.set(!this.filterNotMarkedComplete()); }
+  toggleFilterNoDates() { this.filterNoDates.set(!this.filterNoDates()); }
+  toggleFilterOverdue() { this.filterOverdue.set(!this.filterOverdue()); }
+  toggleFilterDueNextDay() { this.filterDueNextDay.set(!this.filterDueNextDay()); }
+  toggleFilterDueNextWeek() { this.filterDueNextWeek.set(!this.filterDueNextWeek()); }
+  toggleFilterDueNextMonth() { this.filterDueNextMonth.set(!this.filterDueNextMonth()); }
+  toggleFilterNoLabels() { this.filterNoLabels.set(!this.filterNoLabels()); }
 
   getColumnName(columnId: number | null): string {
     if (!columnId) return 'Select List';
@@ -168,13 +489,29 @@ export class ProjectDetailComponent implements OnInit {
       const issue = event.container.data[event.currentIndex];
       
       // Update backend
-      this.projectsService.updateIssue(this.projectId, issue.id, { columnId: targetColumnId }).subscribe({
+      this.projectsService.updateIssue(this.projectId, issue.id, { 
+        columnId: targetColumnId
+      }).subscribe({
         error: (err) => {
           this.toast.error('Failed to move issue');
           this.loadBoardAndIssues(); // Revert
         }
       });
     }
+  }
+
+  dropColumn(event: CdkDragDrop<any[]>) {
+    const cols = [...this.columns()];
+    moveItemInArray(cols, event.previousIndex, event.currentIndex);
+    this.columns.set(cols);
+
+    const columnIds = cols.map(c => c.id);
+    this.projectsService.reorderBoardColumns(this.projectId, columnIds).subscribe({
+      error: () => {
+        this.toast.error('Failed to reorder lists');
+        this.loadBoardAndIssues(); // Revert
+      }
+    });
   }
 
   updateStatus(columnId: number) {
@@ -188,6 +525,22 @@ export class ProjectDetailComponent implements OnInit {
         },
         error: (err) => {
           this.toast.error('Failed to update status');
+        }
+      });
+    }
+  }
+
+  updatePriority(priority: string) {
+    this.issueForm.priority = priority;
+    this.closePopover();
+    if (this.selectedIssue()) {
+      this.projectsService.updateIssue(this.projectId, this.selectedIssue().id, { priority }).subscribe({
+        next: () => {
+          this.toast.success('Priority updated');
+          this.loadBoardAndIssues();
+        },
+        error: (err) => {
+          this.toast.error('Failed to update priority');
         }
       });
     }
@@ -474,6 +827,93 @@ export class ProjectDetailComponent implements OnInit {
     this.closePopover();
   }
 
+  // Workload Modal & AG Grid
+  isWorkloadModalOpen = signal(false);
+  workloadModalTitle = signal('');
+  workloadGridData = signal<any[]>([]);
+
+  workloadColDefs: ColDef[] = [
+    { field: 'key', headerName: 'ID', width: 100 },
+    { field: 'title', headerName: 'Task', flex: 1, filter: true },
+    { 
+      field: 'status', 
+      headerName: 'Status', 
+      width: 140,
+      cellRenderer: (params: any) => {
+        const val = params.value || '';
+        let color = '#94a3b8'; // default gray
+        let bg = '#f1f5f9';
+        if (val === 'DONE') { color = '#16a34a'; bg = '#dcfce7'; }
+        else if (val === 'TODO') { color = '#64748b'; bg = '#f1f5f9'; }
+        else if (val === 'IN_PROGRESS') { color = '#2563eb'; bg = '#dbeafe'; }
+        else if (val === 'IN_REVIEW') { color = '#9333ea'; bg = '#f3e8ff'; }
+        
+        return `<span style="background-color: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">${val.replace('_', ' ')}</span>`;
+      }
+    },
+    { 
+      field: 'priority', 
+      headerName: 'Priority', 
+      width: 130,
+      cellRenderer: (params: any) => {
+        const val = params.value || '';
+        let color = '#94a3b8';
+        if (val === 'CRITICAL') color = '#dc2626';
+        else if (val === 'HIGH') color = '#ea580c';
+        else if (val === 'MEDIUM') color = '#ca8a04';
+        else if (val === 'LOW') color = '#16a34a';
+        
+        return `<div style="display: flex; align-items: center; gap: 6px;">
+                  <div style="width: 8px; height: 8px; border-radius: 50%; background-color: ${color};"></div>
+                  <span style="font-size: 13px; font-weight: 500; color: #334155;">${val}</span>
+                </div>`;
+      }
+    },
+    { 
+      headerName: 'Action', 
+      width: 100, 
+      cellRenderer: (params: any) => {
+        return `<button style="background-color: #eff6ff; color: #2563eb; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#dbeafe'" onmouseout="this.style.backgroundColor='#eff6ff'">
+                  View
+                </button>`;
+      }
+    }
+  ];
+
+  openWorkloadModal(assigneeId: number | null, assigneeName: string) {
+    this.workloadModalTitle.set(`${assigneeName}'s Assigned Tasks`);
+    const all = this.allIssues();
+    
+    let filtered = [];
+    if (assigneeId === null) {
+      filtered = all.filter(issue => 
+        !issue.assigneeId && (!issue.members || issue.members.length === 0)
+      );
+    } else {
+      filtered = all.filter(issue => 
+        issue.assigneeId === assigneeId || 
+        (issue.members && issue.members.some((m: any) => m.employeeId === assigneeId))
+      );
+    }
+    
+    this.workloadGridData.set(filtered);
+    this.isWorkloadModalOpen.set(true);
+  }
+
+  closeWorkloadModal() {
+    this.isWorkloadModalOpen.set(false);
+  }
+
+  onWorkloadGridCellClicked(event: CellClickedEvent) {
+    if (event.colDef.headerName === 'Action') {
+      const issue = event.data;
+      if (issue) {
+        this.closeWorkloadModal();
+        this.openIssueDetails(issue);
+      }
+    }
+  }
+
   togglePopover(popoverName: string) {
     if (this.activePopover() === popoverName) {
       this.closePopover();
@@ -485,6 +925,9 @@ export class ProjectDetailComponent implements OnInit {
         this.loadProjectLabels();
         this.labelPopoverMode.set('list');
       }
+      if (popoverName === 'filter') {
+        this.loadProjectLabels();
+      }
       if (popoverName === 'dates') {
         this.initDatesForm();
       }
@@ -492,8 +935,159 @@ export class ProjectDetailComponent implements OnInit {
         this.loadCompanyMembers();
         this.memberSearchQuery = '';
       }
+      if (popoverName === 'share') {
+        this.loadCompanyMembers();
+        this.memberSearchQuery = '';
+        this.shareTab.set('members');
+      }
       this.activePopover.set(popoverName);
     }
+  }
+
+  get canManageMembers(): boolean {
+    const user = this.currentUser();
+    if (!user) return false;
+    if (user.role === 'SUPERADMIN' || user.role === 'ADMIN') return true;
+    
+    const p = this.project();
+    if (!p) return false;
+    
+    const empId = user.employee?.id || user.id;
+    if (p.leadId && p.leadId === empId) return true;
+
+    const myMember = p.members?.find((m: any) => 
+      m.employeeId === empId || m.employee?.id === empId || m.userId === user.id || m.employee?.userId === user.id
+    );
+    if (myMember && myMember.role === 'ADMIN') return true;
+
+    return false;
+  }
+
+  isProjectMember(employeeId: number): boolean {
+    const p = this.project();
+    if (!p || !p.members) return false;
+    return p.members.some((m: any) => m.employeeId === employeeId || m.employee?.id === employeeId);
+  }
+
+  getMemberRoleLabel(employeeId: number): string {
+    const p = this.project();
+    if (!p) return 'Member';
+
+    if (p.leadId && (p.leadId === employeeId || p.lead?.id === employeeId)) {
+      return 'Owner';
+    }
+
+    const member = p.members?.find((m: any) => m.employeeId === employeeId || m.employee?.id === employeeId);
+    if (member && (member.role === 'ADMIN' || member.role === 'OWNER')) {
+      return member.role === 'OWNER' ? 'Owner' : 'Admin';
+    }
+
+    // If first member in project and role is ADMIN, treat as Owner if no leadId set
+    if (!p.leadId && p.members && p.members.length > 0 && (p.members[0].employeeId === employeeId || p.members[0].employee?.id === employeeId)) {
+      return 'Owner';
+    }
+
+    return 'Member';
+  }
+
+  addProjectMember(employee: any) {
+    if (!this.canManageMembers) {
+      this.toast.error('Only Admins or Project Lead can add members');
+      return;
+    }
+    this.projectsService.addProjectMember(this.projectId, employee.id).subscribe({
+      next: () => {
+        this.loadProjectDetails(); // Reload to get updated roles/state from server
+        this.toast.success(`${employee.firstName || 'Member'} added to project`);
+      },
+      error: () => this.toast.error('Failed to add member to project')
+    });
+  }
+
+  removeProjectMember(employee: any) {
+    if (!this.canManageMembers) {
+      this.toast.error('Only Admins or Project Lead can remove members');
+      return;
+    }
+    this.projectsService.removeProjectMember(this.projectId, employee.id).subscribe({
+      next: () => {
+        // Optimistic update
+        const p = this.project();
+        if (p && p.members) {
+          this.project.set({
+            ...p,
+            members: p.members.filter((m: any) => m.employeeId !== employee.id && m.employee?.id !== employee.id)
+          });
+        }
+        
+        this.toast.success(`${employee.firstName || 'Member'} removed from project`);
+        
+        // If the user removed themselves, redirect to projects list
+        if (this.isSelf(employee.id)) {
+          this.router.navigate(['/projects']);
+        } else {
+          this.loadProjectDetails(); // Reload to get updated leadId/roles from server
+        }
+      },
+      error: () => this.toast.error('Failed to remove member from project')
+    });
+  }
+
+  toggleFilterLabel(labelId: number) {
+    const current = this.filterSelectedLabels();
+    if (current.includes(labelId)) {
+      this.filterSelectedLabels.set(current.filter(id => id !== labelId));
+    } else {
+      this.filterSelectedLabels.set([...current, labelId]);
+    }
+  }
+
+  get isProjectStarred(): boolean {
+    const p = this.project();
+    if (!p || !p.members) return false;
+    const user = this.currentUser();
+    const userId = user?.id;
+    const empId = user?.employee?.id;
+
+    const myMember = p.members.find((m: any) => 
+      (empId && (m.employeeId === empId || m.employee?.id === empId)) ||
+      (userId && (m.userId === userId || m.employee?.userId === userId || m.employeeId === userId))
+    );
+    return myMember ? !!myMember.isStarred : false;
+  }
+
+  toggleStar() {
+    this.projectsService.toggleProjectStar(this.projectId).subscribe({
+      next: (res) => {
+        // Refresh project details from backend to ensure members array is accurate
+        this.loadProjectDetails();
+      },
+      error: (err) => {
+        console.error('Failed to star project:', err);
+        this.toast.error('Failed to update star status');
+      }
+    });
+  }
+
+  isMenuOpen = signal(false);
+  backgroundColors = [
+    '#0079bf', '#d29034', '#519839', '#b04632', '#89609e', '#cd5a91', '#4bbf6b', '#00aecc', '#838c91'
+  ];
+
+  toggleMenu() {
+    this.isMenuOpen.set(!this.isMenuOpen());
+  }
+
+  changeBackground(color: string) {
+    this.projectsService.updateProject(this.projectId, { color }).subscribe({
+      next: (res) => {
+        const p = this.project();
+        if (p) {
+          this.project.set({ ...p, color: res.color });
+        }
+      },
+      error: () => this.toast.error('Failed to update background')
+    });
   }
 
   closePopover() {
@@ -503,6 +1097,11 @@ export class ProjectDetailComponent implements OnInit {
     this.showTimeDropdown.set(false);
     this.showRecurringDropdown.set(false);
     this.showReminderDropdown.set(false);
+  }
+
+  openMemberProfile(member: any) {
+    this.activeMemberProfile.set(member);
+    this.activePopover.set('memberProfile');
   }
 
   projectLabels = signal<any[]>([]);
@@ -994,6 +1593,12 @@ export class ProjectDetailComponent implements OnInit {
   // Members Popover State & Methods
   companyMembers = signal<any[]>([]);
   memberSearchQuery = '';
+  shareTab = signal<'members'|'invite'>('members');
+
+  copyBoardLink() {
+    navigator.clipboard.writeText(window.location.href);
+    this.toast.success('Board link copied to clipboard!');
+  }
 
   loadCompanyMembers() {
     this.projectsService.getCompanyMembers(this.projectId).subscribe({
@@ -1011,6 +1616,36 @@ export class ProjectDetailComponent implements OnInit {
       (m.user?.email || '').toLowerCase().includes(q) ||
       (m.designation?.name || '').toLowerCase().includes(q)
     );
+  }
+
+  get filteredProjectMembers(): any[] {
+    return this.filteredMembers.filter(m => this.isProjectMember(m.id));
+  }
+
+  get filteredAvailableMembers(): any[] {
+    return this.filteredMembers.filter(m => !this.isProjectMember(m.id));
+  }
+
+  isSelf(employeeId: number): boolean {
+    const user = this.currentUser();
+    if (!user) return false;
+    const empId = user.employee?.id || user.id;
+    return empId === employeeId;
+  }
+
+  canRemoveMember(member: any): boolean {
+    const isSelf = this.isSelf(member.id);
+    
+    // If it's themselves, they can remove themselves only if there are other members
+    if (isSelf) {
+      const p = this.project();
+      if (p && p.members && p.members.length <= 1) {
+        return false; // Cannot remove self if they are the only member
+      }
+    }
+    
+    // Otherwise, as long as they have manage permission, they can remove
+    return this.canManageMembers;
   }
 
   isMemberAttached(employeeId: number): boolean {
@@ -1046,6 +1681,15 @@ export class ProjectDetailComponent implements OnInit {
     const fn = (emp?.firstName || '').charAt(0).toUpperCase();
     const ln = (emp?.lastName || '').charAt(0).toUpperCase();
     return (fn + ln) || 'M';
+  }
+
+  copyEmail(email: string | undefined) {
+    if (!email) return;
+    navigator.clipboard.writeText(email).then(() => {
+      this.toast.success('Email copied to clipboard!');
+    }).catch(err => {
+      this.toast.error('Failed to copy email');
+    });
   }
 
   getMemberColor(m: any): string {

@@ -1,4 +1,4 @@
-<div class="trello-board-view" [style.background]="getBoardBackground()">
+<div class="trello-board-view" [style.background]="getBoardBackground()" *ngIf="hasAccess()">
   <!-- Top Trello Board Toolbar -->
   <div class="board-top-bar">
     <div class="top-bar-left">
@@ -7,52 +7,651 @@
         <svg lucideArrowLeft size="18"></svg>
       </button>
       <h1 class="board-name-title">{{ project()?.name || 'Board' }}</h1>
-      <button class="board-switcher-btn" (click)="goBack()">
-        <svg lucideKanban size="15"></svg>
-        <svg lucideChevronDown size="14"></svg>
-      </button>
     </div>
 
     <div class="top-bar-right">
-      <div class="user-avatar-bubble">
-        <span>{{ (currentUser()?.firstName || 'U')[0] }}</span>
+      <div class="user-avatar-bubble-group flex items-center -space-x-1 relative">
+        <div class="user-avatar-bubble cursor-pointer hover:scale-110 transition-transform" *ngFor="let m of project()?.members | slice:0:5" 
+             [title]="$any(m).employee?.firstName + ' ' + $any(m).employee?.lastName"
+             (click)="openMemberProfile(m)">
+          <img *ngIf="$any(m).employee?.avatarUrl" [src]="$any(m).employee?.avatarUrl" class="avatar-img" [alt]="$any(m).employee?.firstName">
+          <span *ngIf="!$any(m).employee?.avatarUrl">{{ ($any(m).employee?.firstName || 'U')[0] }}</span>
+        </div>
+        <div class="user-avatar-bubble overflow-bubble cursor-pointer hover:scale-110 transition-transform" *ngIf="(project()?.members?.length || 0) > 5" (click)="togglePopover('share')">
+          <span>+{{ (project()?.members?.length || 0) - 5 }}</span>
+        </div>
+        <button class="user-avatar-bubble add-member-bubble cursor-pointer hover:scale-110 transition-transform" title="Add member" (click)="togglePopover('share')">
+          <svg lucidePlus size="14"></svg>
+        </button>
+
+        <!-- Member Profile Popover Card -->
+        <div class="member-profile-popover" *ngIf="activePopover() === 'memberProfile'">
+          <div class="member-profile-cover">
+            <button class="member-profile-close" (click)="closePopover()">
+              <svg lucideX size="14"></svg>
+            </button>
+          </div>
+          <div class="member-profile-body">
+            <div class="member-profile-avatar-wrapper">
+              <img *ngIf="activeMemberProfile()?.employee?.avatarUrl" [src]="activeMemberProfile()?.employee?.avatarUrl" class="member-profile-avatar-img" alt="Avatar">
+              <div *ngIf="!activeMemberProfile()?.employee?.avatarUrl" class="member-profile-avatar-fallback" [style.background-color]="getMemberColor(activeMemberProfile())">
+                {{ (activeMemberProfile()?.employee?.firstName || 'U')[0] }}
+              </div>
+            </div>
+
+            <div class="member-profile-info">
+              <h3 class="member-profile-name">
+                {{ activeMemberProfile()?.employee?.firstName }} {{ activeMemberProfile()?.employee?.lastName }}
+              </h3>
+              <div class="member-profile-role-badge">
+                {{ activeMemberProfile()?.role || 'Member' }}
+              </div>
+              <div class="member-profile-email flex items-center justify-center gap-1 group">
+                <svg lucideMail size="13" class="inline-block opacity-60"></svg>
+                <span>{{ activeMemberProfile()?.employee?.user?.email || 'No email provided' }}</span>
+                <button *ngIf="activeMemberProfile()?.employee?.user?.email" 
+                        class="opacity-0 group-hover:opacity-100 transition-opacity ml-1 p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600"
+                        title="Copy Email"
+                        (click)="copyEmail(activeMemberProfile()?.employee?.user?.email)">
+                  <svg lucideCopy size="12"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <button class="top-bar-icon-btn" title="Power-ups">
-        <svg lucideZap size="16"></svg>
-      </button>
-      <button class="top-bar-icon-btn" title="Automation">
-        <svg lucideSparkles size="16"></svg>
-      </button>
-      <button class="top-bar-icon-btn" title="Filter">
-        <svg lucideFilter size="16"></svg>
-      </button>
-      <button class="top-bar-icon-btn" title="Star board">
-        <svg lucideStar size="16"></svg>
-      </button>
-      <button class="top-bar-share-btn">
-        <svg lucideShare2 size="14"></svg>
-        <span>Share</span>
-      </button>
-      <button class="top-bar-icon-btn" title="Menu">
-        <svg lucideMoreHorizontal size="16"></svg>
-      </button>
+
+      <div class="filter-popover-container relative" style="position: relative;">
+        <button *ngIf="activeFilterCount() === 0" class="top-bar-icon-btn" title="Filter" (click)="togglePopover('filter')">
+          <svg lucideFilter size="16"></svg>
+        </button>
+
+        <div *ngIf="activeFilterCount() > 0" class="active-filter-badge-container">
+          <div class="active-filter-left-area" (click)="togglePopover('filter')">
+            <div class="active-filter-icon">
+              <svg lucideFilter size="16"></svg>
+            </div>
+            <div class="active-filter-count-pill">
+              <div class="active-filter-count-dot"></div>
+              <span class="active-filter-count-text">{{ activeFilterCount() }}</span>
+            </div>
+          </div>
+          <button class="active-filter-clear-btn" (click)="clearAllFilters()">
+            Clear all
+          </button>
+        </div>
+        
+        <!-- Filter Popover Panel (Pixel-perfect match with Trello Image 2) -->
+        <div class="trello-popover filter-popover-panel" *ngIf="activePopover() === 'filter'" (click)="$event.stopPropagation()">
+          <div class="popover-header filter-header">
+            <span class="filter-title">Filter</span>
+            <button class="btn-icon-tiny filter-close-btn" (click)="closePopover()">
+              <svg lucideX size="16"></svg>
+            </button>
+          </div>
+
+          <div class="popover-body filter-body">
+            <!-- Keyword -->
+            <div class="filter-section">
+              <label class="filter-section-label">Keyword</label>
+              <input type="text" 
+                     class="filter-input" 
+                     placeholder="Enter a keyword..." 
+                     [ngModel]="filterQuery()" 
+                     (ngModelChange)="filterQuery.set($event)">
+              <div class="filter-caption">Search cards, members, labels, and more.</div>
+            </div>
+
+            <!-- Members -->
+            <div class="filter-section">
+              <label class="filter-section-label">Members</label>
+              <div class="filter-items">
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterNoMembers()" 
+                         (change)="toggleFilterNoMembers()">
+                  <div class="filter-icon-badge bg-gray">
+                    <svg lucideUsers size="14" class="text-gray-600"></svg>
+                  </div>
+                  <span class="filter-item-text">No members</span>
+                </label>
+
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterMyIssues()" 
+                         (change)="toggleFilterMyIssues()">
+                  <div class="filter-icon-badge bg-orange text-white">
+                    {{ (currentUser()?.firstName || 'M')[0] }}
+                  </div>
+                  <span class="filter-item-text">Cards assigned to me</span>
+                </label>
+
+                <!-- Dynamic Project Members -->
+                <label class="filter-item" *ngFor="let m of project()?.members">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterSelectedMembers().includes(m.employeeId)" 
+                         (change)="toggleFilterMember(m.employeeId)">
+                  
+                  <div class="filter-icon-badge overflow-hidden text-white" 
+                       [style.background-color]="!m.employee?.avatarUrl ? getMemberColor(m) : 'transparent'">
+                    <img *ngIf="m.employee?.avatarUrl" 
+                         [src]="m.employee?.avatarUrl" 
+                         style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: block;" 
+                         alt="Avatar">
+                    <span *ngIf="!m.employee?.avatarUrl" class="text-xs font-medium">
+                      {{ (m.employee?.firstName || 'U')[0] }}
+                    </span>
+                  </div>
+                  
+                  <span class="filter-item-text">{{ m.employee?.firstName }} {{ m.employee?.lastName }}</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Card status -->
+            <div class="filter-section">
+              <label class="filter-section-label">Card status</label>
+              <div class="filter-items">
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterMarkedComplete()" 
+                         (change)="toggleFilterMarkedComplete()">
+                  <span class="filter-item-text no-badge">Marked as complete</span>
+                </label>
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterNotMarkedComplete()" 
+                         (change)="toggleFilterNotMarkedComplete()">
+                  <span class="filter-item-text no-badge">Not marked as complete</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Due date -->
+            <div class="filter-section">
+              <label class="filter-section-label">Due date</label>
+              <div class="filter-items">
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterNoDates()" 
+                         (change)="toggleFilterNoDates()">
+                  <div class="filter-icon-badge bg-gray">
+                    <svg lucideCalendar size="14" class="text-gray-600"></svg>
+                  </div>
+                  <span class="filter-item-text">No dates</span>
+                </label>
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterOverdue()" 
+                         (change)="toggleFilterOverdue()">
+                  <div class="filter-icon-badge bg-red">
+                    <svg lucideClock size="14" class="text-white"></svg>
+                  </div>
+                  <span class="filter-item-text">Overdue</span>
+                </label>
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterDueNextDay()" 
+                         (change)="toggleFilterDueNextDay()">
+                  <div class="filter-icon-badge bg-amber">
+                    <svg lucideClock size="14" class="text-white"></svg>
+                  </div>
+                  <span class="filter-item-text">Due in the next day</span>
+                </label>
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterDueNextWeek()" 
+                         (change)="toggleFilterDueNextWeek()">
+                  <div class="filter-icon-badge bg-gray">
+                    <svg lucideClock size="14" class="text-gray-600"></svg>
+                  </div>
+                  <span class="filter-item-text">Due in the next week</span>
+                </label>
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterDueNextMonth()" 
+                         (change)="toggleFilterDueNextMonth()">
+                  <div class="filter-icon-badge bg-gray">
+                    <svg lucideClock size="14" class="text-gray-600"></svg>
+                  </div>
+                  <span class="filter-item-text">Due in the next month</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Labels -->
+            <div class="filter-section">
+              <label class="filter-section-label">Labels</label>
+              <div class="filter-items">
+                <label class="filter-item">
+                  <input type="checkbox" 
+                         class="filter-checkbox"
+                         [checked]="filterNoLabels()" 
+                         (change)="toggleFilterNoLabels()">
+                  <div class="filter-icon-badge bg-gray">
+                    <svg lucideTag size="14" class="text-gray-600"></svg>
+                  </div>
+                  <span class="filter-item-text">No labels</span>
+                </label>
+
+                <div class="filter-item" *ngFor="let label of projectLabels()">
+                  <input type="checkbox" 
+                         [id]="'filter-label-' + label.id" 
+                         class="filter-checkbox"
+                         [checked]="filterSelectedLabels().includes(label.id)" 
+                         (change)="toggleFilterLabel(label.id)">
+                  <label [for]="'filter-label-' + label.id" class="filter-label-bar" [style.backgroundColor]="label.color || '#6b7280'">
+                    <span>{{ label.name }}</span>
+                  </label>
+                </div>
+                <div *ngIf="projectLabels().length === 0" class="text-xs text-gray-400 italic pl-8">No custom labels created</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <div class="star-btn-container">
+        <button class="top-bar-icon-btn" [class.starred]="isProjectStarred" (click)="toggleStar()">
+          <svg lucideStar size="16" 
+               [style.fill]="isProjectStarred ? '#ffc619' : 'none'" 
+               [style.stroke]="isProjectStarred ? '#ffc619' : 'currentColor'" 
+               [style.outline]="isProjectStarred ? '#ffc619' : 'none'">
+          </svg>
+        </button>
+        <div class="star-tooltip">
+          Click to star or unstar this project.<br/>
+          Starred projects show up at the top of your projects list.
+        </div>
+      </div>
+      <div class="popover-container relative" style="position: relative;">
+        <button class="top-bar-share-btn" (click)="togglePopover('share')">
+          <svg lucideShare2 size="14"></svg>
+          <span>Share</span>
+        </button>
+        <!-- Enhanced Share Board Popover -->
+        <div class="share-popover-panel" *ngIf="activePopover() === 'share'" (click)="$event.stopPropagation()">
+          <div class="share-popover-header">
+            <div class="share-title-group">
+              <span class="share-popover-title">Share board</span>
+            </div>
+            <button class="btn-icon-tiny close-share-btn" (click)="closePopover()">
+              <svg lucideX size="16"></svg>
+            </button>
+          </div>
+
+          <div class="share-popover-body">
+            <!-- Share Tabs -->
+            <div class="share-tabs-container mb-3">
+              <button class="share-tab-btn" [class.active]="shareTab() === 'members'" (click)="shareTab.set('members')">Members</button>
+              <button class="share-tab-btn" [class.active]="shareTab() === 'invite'" (click)="shareTab.set('invite')">Invite</button>
+            </div>
+
+            <!-- Search Team Input -->
+            <div class="share-search-wrapper">
+              <input type="text" 
+                     class="share-search-input" 
+                     [(ngModel)]="memberSearchQuery" 
+                     [placeholder]="shareTab() === 'members' ? 'Search board members...' : 'Search company members...'">
+            </div>
+
+            <!-- Members List -->
+            <div class="members-share-list">
+              <!-- Members Tab Content -->
+              <ng-container *ngIf="shareTab() === 'members'">
+                <div class="member-share-item" *ngFor="let m of filteredProjectMembers">
+                  <div class="member-share-info">
+                    <div class="member-share-avatar" [style.background-color]="getMemberColor(m)">
+                      <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="avatar-img" [alt]="m.firstName">
+                      <span *ngIf="!m.avatarUrl">{{ getMemberInitials(m) }}</span>
+                    </div>
+                    <div class="member-share-details">
+                      <div class="member-share-name">
+                        {{ m.firstName }} {{ m.lastName }}
+                        <span *ngIf="isSelf(m.id)" class="text-xs text-slate-500 font-normal ml-1">(You)</span>
+                      </div>
+                      <div class="member-share-email" *ngIf="m.user?.email">{{ m.user?.email }}</div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <!-- 1. Owner Badge -->
+                    <span *ngIf="getMemberRoleLabel(m.id) === 'Owner'" class="badge-owner-pill">
+                      <svg lucideZap size="12"></svg>
+                      Owner
+                    </span>
+  
+                    <!-- 2. Admin Badge -->
+                    <span *ngIf="getMemberRoleLabel(m.id) === 'Admin'" class="badge-admin-pill">
+                      <svg lucideCheck size="12"></svg>
+                      Admin
+                    </span>
+  
+                    <!-- 3. Member Badge -->
+                    <span *ngIf="getMemberRoleLabel(m.id) === 'Member'" class="badge-member-pill">
+                      <svg lucideCheck size="12"></svg>
+                      Member
+                    </span>
+  
+                    <!-- Remove Button -->
+                    <button *ngIf="canManageMembers && canRemoveMember(m)" 
+                            class="btn-remove-member-pill" 
+                            type="button" 
+                            (click)="removeProjectMember(m)" 
+                            title="Remove member from board">
+                      <svg lucideX size="13"></svg>
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                </div>
+                <div *ngIf="filteredProjectMembers.length === 0" class="no-members-empty">
+                  No matching board members found
+                </div>
+              </ng-container>
+
+              <!-- Invite Tab Content -->
+              <ng-container *ngIf="shareTab() === 'invite'">
+                <div class="member-share-item" *ngFor="let m of filteredAvailableMembers">
+                  <div class="member-share-info">
+                    <div class="member-share-avatar" [style.background-color]="getMemberColor(m)">
+                      <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="avatar-img" [alt]="m.firstName">
+                      <span *ngIf="!m.avatarUrl">{{ getMemberInitials(m) }}</span>
+                    </div>
+                    <div class="member-share-details">
+                      <div class="member-share-name">
+                        {{ m.firstName }} {{ m.lastName }}
+                        <span *ngIf="isSelf(m.id)" class="text-xs text-slate-500 font-normal ml-1">(You)</span>
+                      </div>
+                      <div class="member-share-email" *ngIf="m.user?.email">{{ m.user?.email }}</div>
+                    </div>
+                  </div>
+
+                  <button *ngIf="canManageMembers" 
+                          class="btn-add-member-pill" 
+                          type="button" 
+                          (click)="addProjectMember(m)">
+                    <svg lucidePlus size="13"></svg>
+                    <span>Add</span>
+                  </button>
+                </div>
+                <div *ngIf="filteredAvailableMembers.length === 0" class="no-members-empty">
+                  No available members to invite
+                </div>
+              </ng-container>
+            </div>
+
+            <!-- Bottom Copy Link Footer -->
+            <div class="share-popover-footer">
+              <button class="btn-copy-board-link" type="button" (click)="copyBoardLink()">
+                <svg lucideCopy size="14"></svg>
+                <span>Copy board link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
+  <!-- Secondary Tab Bar -->
+  <div class="project-tabs-bar">
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'summary'" (click)="setProjectTab('summary')"><svg lucideGlobe size="14"></svg> Summary</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'board'" (click)="setProjectTab('board')"><svg lucideKanban size="14"></svg> Board</button>
+    <button class="project-tab-btn"><svg lucideList size="14"></svg> List</button>
+    <button class="project-tab-btn"><svg lucideCalendar size="14"></svg> Calendar</button>
+    <button class="project-tab-btn"><svg lucideGanttChart size="14"></svg> Timeline</button>
+    <button class="project-tab-btn"><svg lucideFileText size="14"></svg> Forms</button>
+    <button class="project-tab-btn"><svg lucideFile size="14"></svg> Docs</button>
+    <button class="project-tab-btn"><svg lucidePaperclip size="14"></svg> Attachments</button>
+    <button class="project-tab-btn"><svg lucideBarChart size="14"></svg> Reports</button>
+    <button class="project-tab-btn"><svg lucideBox size="14"></svg> Components</button>
+    <button class="project-tab-btn"><svg lucideArchive size="14"></svg> Archived work items</button>
+  </div>
+
+  <!-- Summary Dashboard Container -->
+  <div class="summary-dashboard" *ngIf="activeProjectTab() === 'summary'">
+    <ng-container *ngIf="projectSummary(); else loadingSummary">
+      <!-- Metric Cards -->
+      <div class="summary-metrics-grid">
+        <div class="summary-metric-card">
+          <div class="metric-icon-box"><svg lucideCheck size="16"></svg></div>
+          <div class="metric-details">
+            <span class="metric-val">{{ projectSummary()?.metrics?.completedLast7Days }} completed</span>
+            <span class="metric-sub">in the last 7 days</span>
+          </div>
+        </div>
+        <div class="summary-metric-card">
+          <div class="metric-icon-box"><svg lucidePencil size="16"></svg></div>
+          <div class="metric-details">
+            <span class="metric-val">{{ projectSummary()?.metrics?.updatedLast7Days }} updated</span>
+            <span class="metric-sub">in the last 7 days</span>
+          </div>
+        </div>
+        <div class="summary-metric-card">
+          <div class="metric-icon-box"><svg lucideCheckSquare size="16"></svg></div>
+          <div class="metric-details">
+            <span class="metric-val">{{ projectSummary()?.metrics?.createdLast7Days }} created</span>
+            <span class="metric-sub">in the last 7 days</span>
+          </div>
+        </div>
+        <div class="summary-metric-card">
+          <div class="metric-icon-box"><svg lucideCalendar size="16"></svg></div>
+          <div class="metric-details">
+            <span class="metric-val">{{ projectSummary()?.metrics?.dueSoonNext7Days }} due soon</span>
+            <span class="metric-sub">in the next 7 days</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Layout Grid -->
+      <div class="summary-content-grid">
+        
+        <!-- Left Column -->
+        <div class="summary-col-left">
+          
+          <!-- Status overview -->
+          <div class="summary-panel">
+            <div class="summary-panel-header">
+              <h3>Status overview</h3>
+              <p>Get a snapshot of the status of your work items. <a href="javascript:void(0)" (click)="setProjectTab('board')">View all work items</a></p>
+            </div>
+            <div class="summary-status-body">
+              <div class="donut-chart-wrapper">
+                <div class="donut-chart" [style.background]="donutGradient">
+                  <div class="donut-hole">
+                    <span class="donut-total">{{ summaryTotalItems }}</span>
+                    <span class="donut-label">Total items</span>
+                  </div>
+                </div>
+              </div>
+              <div class="donut-legend">
+                <div class="legend-item" *ngFor="let stat of projectSummary()?.statusOverview">
+                  <span class="legend-color" [style.background-color]="getStatusColor(stat.status)"></span> {{ stat.status }}: {{ stat.count }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Team workload -->
+          <div class="summary-panel">
+            <div class="summary-panel-header">
+              <h3>Team workload</h3>
+              <p>Monitor the capacity of your team. <a href="javascript:void(0)" (click)="setProjectTab('board')">Reassign work items to get the right balance</a></p>
+            </div>
+            <div class="workload-list">
+              <div class="workload-header-row">
+                <span>Assignee</span>
+                <span>Work distribution</span>
+              </div>
+              <div class="workload-row cursor-pointer hover:bg-gray-50 transition-colors" *ngFor="let item of projectSummary()?.teamWorkload; let i = index" (click)="openWorkloadModal(item.assigneeId, item.name)">
+                <div class="workload-assignee">
+                  <img *ngIf="item.avatarUrl" [src]="item.avatarUrl" class="assignee-avatar" alt="Avatar">
+                  <div *ngIf="!item.avatarUrl" class="assignee-fallback"><svg lucideUsers size="14"></svg></div>
+                  <span>{{ item.name }}</span>
+                </div>
+                <div class="workload-bar-wrapper">
+                  <div class="workload-bar">
+                    <!-- Basic calculation for demo: (item.count / total) * 100 -->
+                    <div class="workload-bar-fill" [style.width.%]="(item.count / (summaryTotalItems || 1)) * 100" [style.background-color]="getAssigneeColor(i)"></div>
+                  </div>
+                  <span class="workload-pct">{{ ((item.count / (summaryTotalItems || 1)) * 100).toFixed(0) }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Priority breakdown -->
+          <div class="summary-panel">
+            <div class="summary-panel-header">
+              <h3>Priority breakdown</h3>
+              <p>Get a holistic view of how work is being prioritized.</p>
+            </div>
+            <div class="priority-chart-container">
+              <!-- Placeholder for Bar Chart using CSS flex -->
+              <div class="priority-bars">
+                <div class="priority-bar-col" *ngFor="let p of projectSummary()?.priorityBreakdown">
+                  <div class="priority-bar-fill" [style.height.%]="(p.count / (summaryTotalItems || 1)) * 100" [style.background-color]="getPriorityColor(p.priority)"></div>
+                  <div class="priority-label">{{ p.priority }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column -->
+        <div class="summary-col-right">
+          <!-- Recent activity -->
+          <div class="summary-panel">
+            <div class="summary-panel-header flex justify-between items-center">
+              <div>
+                <h3>Recent activity</h3>
+                <p>Stay up to date with what's happening across the space.</p>
+              </div>
+              <button class="btn-icon-tiny"><svg lucideExternalLink size="14"></svg></button>
+            </div>
+            <div class="activity-feed">
+              <div class="activity-item" *ngFor="let act of projectSummary()?.recentActivity">
+                <div class="activity-avatar">
+                  <img *ngIf="act.actor?.avatarUrl" [src]="act.actor?.avatarUrl">
+                  <span *ngIf="!act.actor?.avatarUrl">{{ act.actor?.firstName[0] }}</span>
+                </div>
+                <div class="activity-content">
+                  <p>
+                    <strong>{{ act.actor?.firstName }} {{ act.actor?.lastName }}</strong> 
+                    {{ act.action === 'CREATED' ? 'created' : act.action === 'STATUS_CHANGED' ? 'updated status of' : 'updated' }} 
+                    <span class="activity-issue-key cursor-pointer hover:underline" (click)="openIssueDetails(act.issue)"><svg lucideCheckSquare size="12" class="inline"></svg> {{ act.issue?.key }}: {{ act.issue?.title }}</span>
+                  </p>
+                  <span class="activity-time">{{ act.createdAt | date:'short' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </ng-container>
+    <ng-template #loadingSummary>
+      <div class="p-8 text-center text-gray-500">Loading summary...</div>
+    </ng-template>
+  </div>
+
   <!-- Main Canvas Board Container -->
-  <main class="board-canvas" *ngIf="board()">
-    <div class="trello-columns-container" cdkDropListGroup>
+  <main class="board-canvas" *ngIf="board() && activeProjectTab() === 'board'">
+    <div class="trello-columns-container" 
+         cdkDropList 
+         cdkDropListOrientation="horizontal"
+         (cdkDropListDropped)="dropColumn($event)"
+         cdkDropListGroup>
       
       <!-- Columns -->
-      <div class="trello-column" *ngFor="let col of columns()">
+      <div class="trello-column" *ngFor="let col of columns()" 
+           cdkDrag
+           [style.z-index]="activeColumnPopoverId() === col.id ? 50 : 1"
+           [style.background-color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? col.color : ''">
         <!-- Column Header -->
-        <div class="trello-column-header">
+        <div class="trello-column-header" cdkDragHandle>
           <div class="col-title-group">
-            <h3 class="col-title">{{ col.name }}</h3>
-            <span class="col-count">{{ getColumnIssues(col.id).length }}</span>
+            <h3 class="col-title" [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#172b4d'">{{ col.name }}</h3>
+            <span class="col-count" [style.background]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? 'rgba(255,255,255,0.2)' : 'rgba(9, 30, 66, 0.08)'"
+                                    [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'">
+              {{ getColumnIssues(col.id).length }}
+            </span>
           </div>
-          <div class="col-actions">
-            <button class="btn-icon-tiny"><svg lucideMoreHorizontal size="15"></svg></button>
+          <div class="col-actions" style="position: relative;">
+            <button class="btn-icon-tiny" 
+                    [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'"
+                    (click)="toggleColumnPopover(col.id)"><svg lucideMoreHorizontal size="15"></svg></button>
+            
+            <!-- List Actions Popover -->
+            <div class="trello-popover" *ngIf="activeColumnPopoverId() === col.id" style="position: absolute; right: 0; top: 32px; z-index: 100; min-width: 280px; text-align: left;" (click)="$event.stopPropagation()">
+              <div class="popover-header">
+                <span>List actions</span>
+                <button class="btn-icon-tiny" (click)="activeColumnPopoverId.set(null)"><svg lucideX size="14"></svg></button>
+              </div>
+              <div class="popover-body list-actions-body">
+                <button class="list-action-btn" (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id); activeColumnPopoverId.set(null)">Add card</button>
+                <div class="list-action-divider"></div>
+                
+                <div class="popover-subtitle-row">
+                  <span class="popover-subtitle mb-0">Change list color</span>
+                  <span class="premium-badge">PREMIUM</span>
+                </div>
+                <div class="color-swatches-grid">
+                  <!-- Row 1 -->
+                  <button class="color-swatch swatch-green" title="Green" (click)="changeColumnColor(col.id, '#4bce97')">
+                     <svg *ngIf="col.color === '#4bce97'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  <button class="color-swatch swatch-yellow" title="Yellow" (click)="changeColumnColor(col.id, '#e2b203')">
+                     <svg *ngIf="col.color === '#e2b203'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  <button class="color-swatch swatch-orange" title="Orange" (click)="changeColumnColor(col.id, '#faa53d')">
+                     <svg *ngIf="col.color === '#faa53d'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  <button class="color-swatch swatch-red" title="Red" (click)="changeColumnColor(col.id, '#f87462')">
+                     <svg *ngIf="col.color === '#f87462'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  <button class="color-swatch swatch-purple" title="Purple" (click)="changeColumnColor(col.id, '#9f8fef')">
+                     <svg *ngIf="col.color === '#9f8fef'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  
+                  <!-- Row 2 -->
+                  <button class="color-swatch swatch-blue" title="Blue" (click)="changeColumnColor(col.id, '#579dff')">
+                     <svg *ngIf="col.color === '#579dff'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  <button class="color-swatch swatch-lightblue" title="Light Blue" (click)="changeColumnColor(col.id, '#60c6d2')">
+                     <svg *ngIf="col.color === '#60c6d2'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  <button class="color-swatch swatch-lightgreen" title="Light Green" (click)="changeColumnColor(col.id, '#94c748')">
+                     <svg *ngIf="col.color === '#94c748'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  <button class="color-swatch swatch-pink" title="Pink" (click)="changeColumnColor(col.id, '#e774bb')">
+                     <svg *ngIf="col.color === '#e774bb'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                  <button class="color-swatch swatch-gray" title="Gray" (click)="changeColumnColor(col.id, '#8590a2')">
+                     <svg *ngIf="col.color === '#8590a2'" lucideCheck size="16" class="swatch-check"></svg>
+                  </button>
+                </div>
+                
+                <button class="remove-color-btn" (click)="changeColumnColor(col.id, '#6b7280')">
+                  <svg lucideX size="14"></svg>
+                  <span>Remove color</span>
+                </button>
+
+                <div class="list-action-divider"></div>
+                <button class="list-action-btn danger-btn" (click)="archiveColumn(col.id)">Archive this list</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -133,20 +732,36 @@
         </div>
 
         <!-- Column Footer (Trigger Inline Add) -->
-        <div class="trello-column-footer" *ngIf="addingCardColumnId() !== col.id">
-          <button type="button" class="btn-add-card-trigger" (click)="startInlineAdd(col.id)">
+        <div class="trello-column-footer" *ngIf="!addingCardColumnId() || addingCardColumnId() !== col.id">
+          <button class="btn-ghost" 
+                  [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'"
+                  (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id)">
             <svg lucidePlus size="16"></svg>
-            <span>Add a card</span>
+            Add a card
           </button>
         </div>
       </div>
 
       <!-- Add another list button -->
       <div class="add-another-list-col">
-        <button type="button" class="btn-add-list">
+        <button type="button" class="btn-add-list" *ngIf="!isAddingColumn()" (click)="isAddingColumn.set(true)">
           <svg lucidePlus size="16"></svg>
           <span>Add another list</span>
         </button>
+        
+        <div class="add-list-form-container" *ngIf="isAddingColumn()">
+          <input type="text" class="add-list-input" 
+                 placeholder="Enter list title..." 
+                 [ngModel]="newColumnName()" 
+                 (ngModelChange)="newColumnName.set($event)" 
+                 (keyup.enter)="addColumn()" autofocus>
+          <div class="add-list-actions">
+            <button class="btn-primary" (click)="addColumn()">Add list</button>
+            <button class="btn-cancel-inline" (click)="isAddingColumn.set(false); newColumnName.set('')">
+              <svg lucideX size="20"></svg>
+            </button>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -174,6 +789,15 @@
 
 </div>
 
+<div class="access-denied-container" *ngIf="!hasAccess()">
+  <div class="access-denied-card">
+    <svg lucideLock size="48" class="access-icon"></svg>
+    <h2>Access Denied</h2>
+    <p>You don't have access to this project.</p>
+    <button class="btn-back-home" routerLink="/projects">Back to Projects</button>
+  </div>
+</div>
+
 <!-- Trello-style Centered Modal -->
 <div class="trello-modal-overlay" *ngIf="isDrawerOpen()" (click)="closeDrawer()"></div>
 <div class="trello-modal" *ngIf="isDrawerOpen()">
@@ -187,7 +811,7 @@
       </button>
       
       <!-- Status Popover -->
-      <div class="trello-popover status-popover" *ngIf="activePopover() === 'status'">
+      <div class="trello-popover status-popover" *ngIf="activePopover() === 'status'" (click)="$event.stopPropagation()">
         <div class="popover-header">
           <span>Select List</span>
           <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
@@ -225,6 +849,43 @@
       <div class="modal-action-buttons">
 
 
+        <!-- Priority -->
+        <div class="popover-container">
+          <button class="modal-action-btn" (click)="togglePopover('priority')">
+            <svg lucideZap size="14" class="btn-icon-svg"></svg>
+            <span>Priority</span>
+          </button>
+
+          <div class="trello-popover" *ngIf="activePopover() === 'priority'" (click)="$event.stopPropagation()">
+            <div class="popover-header">
+              <span>Change Priority</span>
+              <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
+            </div>
+            <div class="popover-body p-2">
+              <button class="popover-item" [class.selected]="issueForm.priority === 'LOW'" (click)="updatePriority('LOW')">
+                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #16a34a;"></span>
+                <span class="flex-1 text-left">Low</span>
+                <svg *ngIf="issueForm.priority === 'LOW'" lucideCheck size="14"></svg>
+              </button>
+              <button class="popover-item" [class.selected]="issueForm.priority === 'MEDIUM'" (click)="updatePriority('MEDIUM')">
+                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #ca8a04;"></span>
+                <span class="flex-1 text-left">Medium</span>
+                <svg *ngIf="issueForm.priority === 'MEDIUM'" lucideCheck size="14"></svg>
+              </button>
+              <button class="popover-item" [class.selected]="issueForm.priority === 'HIGH'" (click)="updatePriority('HIGH')">
+                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #ea580c;"></span>
+                <span class="flex-1 text-left">High</span>
+                <svg *ngIf="issueForm.priority === 'HIGH'" lucideCheck size="14"></svg>
+              </button>
+              <button class="popover-item" [class.selected]="issueForm.priority === 'CRITICAL'" (click)="updatePriority('CRITICAL')">
+                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #dc2626;"></span>
+                <span class="flex-1 text-left">Critical</span>
+                <svg *ngIf="issueForm.priority === 'CRITICAL'" lucideCheck size="14"></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Labels -->
         <div class="popover-container">
           <button class="modal-action-btn" (click)="togglePopover('labels')">
@@ -232,7 +893,7 @@
             <span>Labels</span>
           </button>
 
-          <div class="trello-popover labels-popover" *ngIf="activePopover() === 'labels'">
+          <div class="trello-popover labels-popover" *ngIf="activePopover() === 'labels'" (click)="$event.stopPropagation()">
             <!-- Sub-view 1: LIST MODE -->
             <ng-container *ngIf="labelPopoverMode() === 'list'">
               <div class="popover-header">
@@ -344,7 +1005,7 @@
             <span>Dates</span>
           </button>
 
-          <div class="trello-popover dates-popover" *ngIf="activePopover() === 'dates'">
+          <div class="trello-popover dates-popover" *ngIf="activePopover() === 'dates'" (click)="$event.stopPropagation()">
             <div class="popover-header">
               <span>Dates</span>
               <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
@@ -476,7 +1137,7 @@
             <span>Checklist</span>
           </button>
 
-          <div class="trello-popover checklist-popover" *ngIf="activePopover() === 'checklist'">
+          <div class="trello-popover checklist-popover" *ngIf="activePopover() === 'checklist'" (click)="$event.stopPropagation()">
             <div class="popover-header">
               <span>Add checklist</span>
               <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
@@ -502,7 +1163,7 @@
             <span>Members</span>
           </button>
 
-          <div class="trello-popover members-popover" *ngIf="activePopover() === 'members'">
+          <div class="trello-popover members-popover" *ngIf="activePopover() === 'members'" (click)="$event.stopPropagation()">
             <div class="popover-header">
               <span>Members</span>
               <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
@@ -540,7 +1201,7 @@
             <span>Attachment</span>
           </button>
 
-          <div class="trello-popover attachment-popover" *ngIf="activePopover() === 'attachment'">
+          <div class="trello-popover attachment-popover" *ngIf="activePopover() === 'attachment'" (click)="$event.stopPropagation()">
             <div class="popover-header">
               <span class="popover-title">Attach</span>
               <button class="btn-icon-tiny btn-close-popover" (click)="closePopover()"><svg lucideX size="16"></svg></button>
@@ -615,7 +1276,7 @@
               +{{ getRemainingMembersCount(selectedIssue()?.members) }}
             </div>
 
-            <button class="btn-add-member-pill" (click)="togglePopover('members')" type="button" title="Add members">
+            <button class="btn-add-member-circle" (click)="togglePopover('members')" type="button" title="Add members">
               <svg lucidePlus size="16"></svg>
             </button>
           </div>
@@ -890,5 +1551,65 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Board Menu Drawer -->
+<div class="fixed inset-0 z-50 flex justify-end" *ngIf="isMenuOpen()" style="pointer-events: none;">
+  <!-- Backdrop -->
+  <div class="absolute inset-0 bg-black/30 transition-opacity" style="pointer-events: auto;" (click)="toggleMenu()"></div>
+  
+  <!-- Drawer -->
+  <div class="relative w-80 bg-[#f4f5f7] h-full shadow-2xl flex flex-col transform transition-transform" style="pointer-events: auto;">
+    <div class="flex items-center justify-between p-4 border-b border-gray-300">
+      <h3 class="font-semibold text-[#172b4d] text-base m-0">Menu</h3>
+      <button class="text-gray-500 hover:bg-gray-200 rounded p-1" (click)="toggleMenu()">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+    <div class="p-4 flex-1 overflow-y-auto">
+      <div class="mb-6">
+        <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+          <div class="w-6 h-6 rounded bg-gray-200 flex items-center justify-center"><div class="w-4 h-4 rounded-sm" [style.background]="project()?.color"></div></div>
+          Change Background
+        </h4>
+        <div class="grid grid-cols-3 gap-2">
+          <button *ngFor="let color of backgroundColors" 
+                  class="h-16 rounded cursor-pointer border-none relative hover:opacity-90 transition-opacity" 
+                  [style.background]="color"
+                  (click)="changeBackground(color)">
+            <svg lucideCheck size="20" *ngIf="project()?.color === color" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow"></svg>
+          </button>
+        </div>
+      </div>
+      <hr class="border-gray-300 my-4">
+      <div class="text-xs text-gray-500 text-center">
+        Activity Log coming soon
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Workload Modal -->
+<div class="workload-modal-overlay" *ngIf="isWorkloadModalOpen()" (click)="closeWorkloadModal()">
+  <div class="workload-modal-content" (click)="$event.stopPropagation()">
+    <div class="workload-modal-header">
+      <h3 class="text-lg font-semibold text-gray-800">{{ workloadModalTitle() }}</h3>
+      <button class="btn-icon-tiny" style="border: none; background: transparent; cursor: pointer;" (click)="closeWorkloadModal()">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+    
+    <div class="workload-modal-body">
+      <ag-grid-angular
+        style="width: 100%; height: 100%;"
+        class="ag-theme-quartz"
+        [theme]="'legacy'"
+        [rowData]="workloadGridData()"
+        [columnDefs]="workloadColDefs"
+        (cellClicked)="onWorkloadGridCellClicked($event)"
+        [defaultColDef]="{ resizable: true, sortable: true }">
+      </ag-grid-angular>
+    </div>
   </div>
 </div>

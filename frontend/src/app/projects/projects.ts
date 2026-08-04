@@ -8,6 +8,7 @@ import {
   LucideStar, LucideSearch, LucideClock
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-projects',
@@ -23,10 +24,13 @@ import { ProjectsService } from '../services/projects';
 export class ProjectsComponent implements OnInit {
   private projectsService = inject(ProjectsService);
   private router = inject(Router);
+  private authService = inject(AuthService);
+
+  currentUser = this.authService.currentUser;
 
   projects = signal<any[]>([]);
   searchQuery = signal<string>('');
-  activeTab = signal<'all' | 'starred' | 'recent'>('all');
+  activeTab = signal<'all' | 'starred' | 'recent' | 'company'>('all');
   
   // Local persistence for Starred & Recently Viewed
   starredBoardIds = signal<number[]>([]);
@@ -68,13 +72,22 @@ export class ProjectsComponent implements OnInit {
     'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
   ];
 
+  get isAdmin(): boolean {
+    const user = this.currentUser();
+    return user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
+  }
+
+  myProjects = computed(() => {
+    return this.projects().filter(p => p.members && p.members.length > 0);
+  });
+
   // Filtered lists
   filteredProjects = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
-    let list = this.projects();
+    let list = this.activeTab() === 'company' ? this.projects() : this.myProjects();
 
     if (this.activeTab() === 'starred') {
-      list = list.filter(p => this.starredBoardIds().includes(p.id));
+      list = list.filter(p => p.members && p.members.length > 0 && p.members[0].isStarred);
     } else if (this.activeTab() === 'recent') {
       list = list.filter(p => this.recentlyViewedIds().includes(p.id));
     }
@@ -84,11 +97,11 @@ export class ProjectsComponent implements OnInit {
   });
 
   starredProjects = computed(() => {
-    return this.projects().filter(p => this.starredBoardIds().includes(p.id));
+    return this.myProjects().filter(p => p.members && p.members.length > 0 && p.members[0].isStarred);
   });
 
   recentlyViewedProjects = computed(() => {
-    return this.projects().filter(p => this.recentlyViewedIds().includes(p.id));
+    return this.myProjects().filter(p => this.recentlyViewedIds().includes(p.id));
   });
 
   ngOnInit() {
@@ -98,9 +111,6 @@ export class ProjectsComponent implements OnInit {
 
   loadStarredAndRecent() {
     try {
-      const starred = localStorage.getItem('starred_board_ids');
-      if (starred) this.starredBoardIds.set(JSON.parse(starred));
-
       const recent = localStorage.getItem('recently_viewed_board_ids');
       if (recent) this.recentlyViewedIds.set(JSON.parse(recent));
     } catch (e) {}
@@ -115,18 +125,32 @@ export class ProjectsComponent implements OnInit {
 
   toggleStar(projectId: number, event?: Event) {
     if (event) event.stopPropagation();
-    let current = [...this.starredBoardIds()];
-    if (current.includes(projectId)) {
-      current = current.filter(id => id !== projectId);
-    } else {
-      current.push(projectId);
-    }
-    this.starredBoardIds.set(current);
-    localStorage.setItem('starred_board_ids', JSON.stringify(current));
+    
+    // Call the backend service
+    this.projectsService.toggleProjectStar(projectId).subscribe({
+      next: () => {
+        // Optimistically update local project state or reload projects
+        this.projects.update(list => list.map(p => {
+          if (p.id === projectId) {
+            const isCurrentlyStarred = p.members && p.members.length > 0 && p.members[0].isStarred;
+            const updatedMembers = p.members && p.members.length > 0 
+              ? [{ ...p.members[0], isStarred: !isCurrentlyStarred }]
+              : [{ isStarred: true }];
+            return { ...p, members: updatedMembers };
+          }
+          return p;
+        }));
+      },
+      error: (err) => console.error('Failed to toggle star', err)
+    });
   }
 
   isStarred(projectId: number): boolean {
-    return this.starredBoardIds().includes(projectId);
+    const p = this.projects().find(proj => proj.id === projectId);
+    if (p && p.members && p.members.length > 0) {
+      return !!p.members[0].isStarred;
+    }
+    return false;
   }
 
   getGradient(color: string, index: number): string {

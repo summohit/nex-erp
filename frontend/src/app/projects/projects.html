@@ -23,7 +23,7 @@
         [class.active]="activeTab() === 'starred'" 
         (click)="activeTab.set('starred')">
         <svg lucideStar size="14" class="tab-icon"></svg>
-        Starred ({{ starredBoardIds().length }})
+        Starred ({{ starredProjects().length }})
       </button>
       <button 
         class="tab-pill" 
@@ -31,6 +31,13 @@
         (click)="activeTab.set('recent')">
         <svg lucideClock size="14" class="tab-icon"></svg>
         Recent
+      </button>
+      <button *ngIf="isAdmin"
+        class="tab-pill" 
+        [class.active]="activeTab() === 'company'" 
+        (click)="activeTab.set('company')">
+        <svg lucideKanban size="14" class="tab-icon"></svg>
+        Company Boards
       </button>
     </div>
   </div>
@@ -55,7 +62,7 @@
             class="star-btn active" 
             (click)="toggleStar(p.id, $event)" 
             title="Unstar board">
-            <svg lucideStar size="16"></svg>
+            <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
           </button>
         </div>
         <div class="board-card-footer">
@@ -92,7 +99,7 @@
             [class.active]="isStarred(p.id)" 
             (click)="toggleStar(p.id, $event)" 
             title="Star board">
-            <svg lucideStar size="16"></svg>
+            <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
           </button>
         </div>
         <div class="board-card-footer">
@@ -104,12 +111,13 @@
     </div>
   </div>
 
-  <!-- 👤 Your Boards Section -->
+  <!-- 📁 Your/Company Boards Section -->
   <div class="section-container">
     <div class="section-header">
       <div class="section-title-group">
-        <svg lucideUser size="22" class="section-icon"></svg>
-        <h2>Your boards</h2>
+        <svg lucideUser size="20" class="section-icon" *ngIf="activeTab() !== 'company'"></svg>
+        <svg lucideKanban size="20" class="section-icon" *ngIf="activeTab() === 'company'"></svg>
+        <h2>{{ activeTab() === 'company' ? 'All Company boards' : 'Your boards' }}</h2>
       </div>
     </div>
 
@@ -127,7 +135,7 @@
             [class.active]="isStarred(p.id)" 
             (click)="toggleStar(p.id, $event)" 
             [title]="isStarred(p.id) ? 'Unstar board' : 'Star board'">
-            <svg lucideStar size="16"></svg>
+            <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
           </button>
         </div>
         <div class="board-card-footer">

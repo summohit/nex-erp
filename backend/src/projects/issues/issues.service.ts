@@ -81,7 +81,19 @@ export class IssuesService {
     if (data.type !== undefined) updateData.type = data.type;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.priority !== undefined) updateData.priority = data.priority;
-    if (data.columnId !== undefined) updateData.columnId = Number(data.columnId);
+    if (data.columnId !== undefined) {
+      updateData.columnId = Number(data.columnId);
+      if (data.status === undefined) {
+        const targetCol = await this.prisma.boardColumn.findUnique({ where: { id: updateData.columnId } });
+        if (targetCol) {
+          const colName = targetCol.name.toLowerCase();
+          if (colName.includes('done') || colName.includes('complete')) updateData.status = 'DONE';
+          else if (colName.includes('progress') || colName.includes('doing')) updateData.status = 'IN_PROGRESS';
+          else if (colName.includes('review')) updateData.status = 'IN_REVIEW';
+          else if (colName.includes('to do') || colName.includes('todo')) updateData.status = 'TODO';
+        }
+      }
+    }
     if (data.assigneeId !== undefined) updateData.assigneeId = data.assigneeId ? Number(data.assigneeId) : null;
     if (data.position !== undefined) updateData.position = Number(data.position);
     if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;

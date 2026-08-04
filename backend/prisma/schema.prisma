@@ -604,6 +604,7 @@ model ProjectMember {
   employeeId Int
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   joinedAt   DateTime @default(now())
+  isStarred  Boolean  @default(false)
 
   @@unique([projectId, employeeId])
 }

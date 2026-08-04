@@ -2,6 +2,19 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 
+export interface ProjectSummary {
+  metrics: {
+    completedLast7Days: number;
+    updatedLast7Days: number;
+    createdLast7Days: number;
+    dueSoonNext7Days: number;
+  };
+  statusOverview: { status: string; count: number }[];
+  teamWorkload: { assigneeId: number; name: string; avatarUrl: string; count: number }[];
+  priorityBreakdown: { priority: string; count: number }[];
+  recentActivity: any[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -17,8 +30,28 @@ export class ProjectsService {
     return this.http.get<any>(`${this.apiUrl}/${id}`);
   }
 
+  getProjectSummary(id: number) {
+    return this.http.get<ProjectSummary>(`${this.apiUrl}/${id}/summary`);
+  }
+
   createProject(data: any) {
     return this.http.post<any>(this.apiUrl, data);
+  }
+
+  updateProject(id: number, data: any) {
+    return this.http.put<any>(`${this.apiUrl}/${id}`, data);
+  }
+
+  toggleProjectStar(id: number) {
+    return this.http.put<any>(`${this.apiUrl}/${id}/star`, {});
+  }
+
+  addProjectMember(id: number, employeeId: number, role: string = 'MEMBER') {
+    return this.http.post<any>(`${this.apiUrl}/${id}/members`, { employeeId, role });
+  }
+
+  removeProjectMember(id: number, employeeId: number) {
+    return this.http.delete<any>(`${this.apiUrl}/${id}/members/${employeeId}`);
   }
 
   getIssues(projectId: number) {
@@ -43,6 +76,18 @@ export class ProjectsService {
 
   getBoard(projectId: number) {
     return this.http.get<any>(`${this.apiUrl}/${projectId}/boards`);
+  }
+
+  createBoardColumn(projectId: number, data: { name: string, color?: string }) {
+    return this.http.post<any>(`${this.apiUrl}/${projectId}/boards/columns`, data);
+  }
+
+  updateBoardColumn(projectId: number, columnId: number, data: { name?: string, color?: string, position?: number }) {
+    return this.http.put<any>(`${this.apiUrl}/${projectId}/boards/columns/${columnId}`, data);
+  }
+
+  deleteBoardColumn(projectId: number, columnId: number) {
+    return this.http.delete<any>(`${this.apiUrl}/${projectId}/boards/columns/${columnId}`);
   }
 
   getIssueComments(projectId: number, issueId: number) {
@@ -133,5 +178,9 @@ export class ProjectsService {
 
   toggleCoverAttachment(projectId: number, issueId: number, attachmentId: number) {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/attachments/${attachmentId}/toggle-cover`, {});
+  }
+
+  reorderBoardColumns(projectId: number, columnIds: number[]) {
+    return this.http.put<any>(`${this.apiUrl}/${projectId}/boards/columns/reorder`, { columnIds });
   }
 }

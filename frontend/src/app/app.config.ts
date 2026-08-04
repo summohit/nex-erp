@@ -15,6 +15,17 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     provideHotToastConfig({
       position: 'top-right',
+      duration: 5000,
+      autoClose: true,
+      success: {
+        duration: 5000,
+      },
+      error: {
+        duration: 5000,
+      },
+      warning: {
+        duration: 5000,
+      }
     })
   ]
 };

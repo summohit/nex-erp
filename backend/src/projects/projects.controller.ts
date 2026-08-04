@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Req, UseGuards, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Req, UseGuards, Param, ParseIntPipe } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -20,5 +20,39 @@ export class ProjectsController {
   @Get(':id')
   getProjectDetails(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.projectsService.getProjectDetails(req.user.companyId, id, req.user.sub, req.user.role);
+  }
+
+  @Get(':id/summary')
+  getProjectSummary(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.getProjectSummary(req.user.companyId, id);
+  }
+
+  @Put(':id')
+  updateProject(@Req() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.projectsService.updateProject(req.user.companyId, id, data);
+  }
+
+  @Get(':id/members')
+  getProjectMembers(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.getProjectMembers(req.user.companyId, id);
+  }
+
+  @Put(':id/star')
+  toggleProjectStar(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.toggleProjectStar(req.user.companyId, id, req.user.sub);
+  }
+
+  @Post(':id/members')
+  addProjectMember(@Req() req, @Param('id', ParseIntPipe) id: number, @Body() data: { employeeId: number, role?: string }) {
+    return this.projectsService.addProjectMember(req.user.companyId, id, data.employeeId, data.role || 'MEMBER');
+  }
+
+  @Delete(':id/members/:employeeId')
+  removeProjectMember(
+    @Req() req, 
+    @Param('id', ParseIntPipe) id: number, 
+    @Param('employeeId', ParseIntPipe) employeeId: number
+  ) {
+    return this.projectsService.removeProjectMember(req.user.companyId, id, employeeId);
   }
 }
