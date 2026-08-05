@@ -35,6 +35,15 @@ export class IssuesController {
     return this.issuesService.updateIssue(req.user.companyId, req.user.sub, projectId, id, data);
   }
 
+  @Put(':id/archive')
+  toggleArchive(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number
+  ) {
+    return this.issuesService.toggleArchive(req.user.companyId, req.user.sub, projectId, id);
+  }
+
   @Post(':id/time-start')
   startTimeTracking(
     @Req() req,

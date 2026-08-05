@@ -125,6 +125,26 @@ export class IssuesService {
     return issue;
   }
 
+  async toggleArchive(companyId: number, employeeId: number, projectId: number, issueId: number) {
+    const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!oldIssue) throw new NotFoundException('Issue not found');
+
+    const issue = await this.prisma.issue.update({
+      where: { id: issueId },
+      data: { isArchived: !oldIssue.isArchived }
+    });
+
+    await this.prisma.issueActivity.create({
+      data: {
+        action: issue.isArchived ? 'ARCHIVED' : 'UNARCHIVED',
+        issueId,
+        actorId: employeeId
+      }
+    });
+
+    return issue;
+  }
+
   async startTimeTracking(companyId: number, employeeId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');

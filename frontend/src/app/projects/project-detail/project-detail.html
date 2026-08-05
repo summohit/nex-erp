@@ -410,8 +410,8 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'list'" (click)="setProjectTab('list')"><svg lucideList size="14"></svg> List</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'attachments'" (click)="setProjectTab('attachments')"><svg lucidePaperclip size="14"></svg> Attachments</button>
-    <button class="project-tab-btn"><svg lucideBarChart size="14"></svg> Reports</button>
-    <button class="project-tab-btn"><svg lucideArchive size="14"></svg> Archived work items</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'reports'" (click)="setProjectTab('reports')"><svg lucideBarChart size="14"></svg> Reports</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'archived'" (click)="setProjectTab('archived')"><svg lucideArchive size="14"></svg> Archived work items</button>
   </div>
 
   <!-- Summary Dashboard Container -->
@@ -1033,6 +1033,198 @@
     </div>
   </div>
 
+  <!-- Reports Tab Container -->
+  <div class="reports-tab-container" *ngIf="activeProjectTab() === 'reports'" style="display: flex; flex-direction: column; flex: 1; padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto;">
+    <div style="max-width: 1200px; width: 100%; margin: 0 auto;">
+      
+      <!-- Metrics Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 32px;">
+        <!-- Completed -->
+        <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 3px rgba(9,30,66,0.05);">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center;">
+            <svg lucideCheckSquare size="24"></svg>
+          </div>
+          <div>
+            <div style="font-size: 24px; font-weight: 700; color: #172b4d; line-height: 1.2;">{{ projectSummary()?.metrics?.completedLast7Days || 0 }}</div>
+            <div style="font-size: 13px; font-weight: 500; color: #5e6c84; margin-top: 2px;">Completed (7d)</div>
+          </div>
+        </div>
+        <!-- Created -->
+        <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 3px rgba(9,30,66,0.05);">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: #e0e7ff; color: #4f46e5; display: flex; align-items: center; justify-content: center;">
+            <svg lucidePlus size="24"></svg>
+          </div>
+          <div>
+            <div style="font-size: 24px; font-weight: 700; color: #172b4d; line-height: 1.2;">{{ projectSummary()?.metrics?.createdLast7Days || 0 }}</div>
+            <div style="font-size: 13px; font-weight: 500; color: #5e6c84; margin-top: 2px;">Created (7d)</div>
+          </div>
+        </div>
+        <!-- Updated -->
+        <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 3px rgba(9,30,66,0.05);">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: #f3e8ff; color: #9333ea; display: flex; align-items: center; justify-content: center;">
+            <svg lucideEdit2 size="24"></svg>
+          </div>
+          <div>
+            <div style="font-size: 24px; font-weight: 700; color: #172b4d; line-height: 1.2;">{{ projectSummary()?.metrics?.updatedLast7Days || 0 }}</div>
+            <div style="font-size: 13px; font-weight: 500; color: #5e6c84; margin-top: 2px;">Updated (7d)</div>
+          </div>
+        </div>
+        <!-- Due Soon -->
+        <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 3px rgba(9,30,66,0.05);">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center;">
+            <svg lucideClock size="24"></svg>
+          </div>
+          <div>
+            <div style="font-size: 24px; font-weight: 700; color: #172b4d; line-height: 1.2;">{{ projectSummary()?.metrics?.dueSoonNext7Days || 0 }}</div>
+            <div style="font-size: 13px; font-weight: 500; color: #5e6c84; margin-top: 2px;">Due Soon (7d)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Section -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        
+        <!-- Status Overview (Stacked Bar) -->
+        <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(9,30,66,0.05);">
+          <h3 style="font-size: 16px; font-weight: 600; color: #172b4d; margin: 0 0 24px 0; display: flex; align-items: center; gap: 8px;">
+            <svg lucideBarChart size="18" style="color: #6b7280;"></svg> Status Overview
+          </h3>
+          
+          <div *ngIf="statusChartData() as scd; else emptyChart" style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Custom Stacked Bar -->
+            <div style="height: 24px; border-radius: 12px; overflow: hidden; display: flex; width: 100%; background: #f4f5f7;">
+              <ng-container *ngFor="let count of scd.datasets[0].data; let i = index">
+                <div *ngIf="count > 0" [style.width]="(count / activeIssues().length * 100) + '%'" [style.background]="scd.datasets[0].backgroundColor[i]" [title]="scd.labels[i] + ': ' + count"></div>
+              </ng-container>
+            </div>
+            
+            <!-- Legend -->
+            <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px;">
+              <ng-container *ngFor="let label of scd.labels; let i = index">
+                <div *ngIf="scd.datasets[0].data[i] > 0" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #42526e; font-weight: 500;">
+                  <div style="width: 12px; height: 12px; border-radius: 3px;" [style.background]="scd.datasets[0].backgroundColor[i]"></div>
+                  {{ label }}: <strong style="color: #172b4d;">{{ scd.datasets[0].data[i] }}</strong>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+
+        <!-- Priority Breakdown (Vertical Bars) -->
+        <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(9,30,66,0.05);">
+          <h3 style="font-size: 16px; font-weight: 600; color: #172b4d; margin: 0 0 24px 0; display: flex; align-items: center; gap: 8px;">
+            <svg lucideZap size="18" style="color: #6b7280;"></svg> Priority Breakdown
+          </h3>
+          
+          <div *ngIf="priorityChartData() as pcd; else emptyChart" style="display: flex; flex-direction: column; gap: 16px;">
+            <ng-container *ngFor="let count of pcd.datasets[0].data; let i = index">
+              <div *ngIf="count > 0" style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 80px; font-size: 13px; font-weight: 600; color: #42526e; text-align: right;">{{ pcd.labels[i] }}</div>
+                <div style="flex: 1; height: 12px; background: #f4f5f7; border-radius: 6px; overflow: hidden; display: flex;">
+                  <div [style.width]="(count / activeIssues().length * 100) + '%'" [style.background]="pcd.datasets[0].backgroundColor[i]" style="border-radius: 6px;"></div>
+                </div>
+                <div style="width: 32px; font-size: 13px; font-weight: 700; color: #172b4d;">{{ count }}</div>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+        
+        <!-- Team Workload (Horizontal Bars) -->
+        <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(9,30,66,0.05); grid-column: 1 / -1;">
+          <h3 style="font-size: 16px; font-weight: 600; color: #172b4d; margin: 0 0 24px 0; display: flex; align-items: center; gap: 8px;">
+            <svg lucideUsers size="18" style="color: #6b7280;"></svg> Team Workload
+          </h3>
+          
+          <div *ngIf="workloadChartData() as wcd; else emptyChart" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+            <ng-container *ngFor="let count of wcd.datasets[0].data; let i = index">
+              <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #f4f5f7; border-radius: 6px; background: #fafbfc;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <span style="font-size: 14px; font-weight: 600; color: #172b4d;">{{ wcd.labels[i] }}</span>
+                  <span style="font-size: 14px; font-weight: 700; color: #4f46e5;">{{ count }} tasks</span>
+                </div>
+                <div style="height: 8px; background: #e0e7ff; border-radius: 4px; overflow: hidden;">
+                  <div [style.width]="(count / wcd.datasets[0].data[0] * 100) + '%'" style="height: 100%; background: #4f46e5; border-radius: 4px; transition: width 0.5s ease-out;"></div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+
+      </div>
+
+      <ng-template #emptyChart>
+        <div style="display: flex; align-items: center; justify-content: center; height: 120px; color: #8590a2; font-size: 14px;">
+          No data available
+        </div>
+      </ng-template>
+
+    </div>
+  </div>
+
+  <!-- Archived Work Items Container -->
+  <div class="archived-tab-container" *ngIf="activeProjectTab() === 'archived'" style="display: flex; flex-direction: column; flex: 1; padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto;">
+    <div style="max-width: 1200px; width: 100%; margin: 0 auto;">
+      <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">Archived Work Items</h2>
+      <p style="font-size: 14px; color: #5e6c84; margin-bottom: 24px;">Items that have been archived are removed from active boards and lists. You can unarchive them to restore them to their original location.</p>
+
+      <div *ngIf="archivedIssues().length > 0; else noArchived" style="border: 1px solid #dfe1e6; border-radius: 8px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+          <thead style="background: #f4f5f7; border-bottom: 1px solid #dfe1e6;">
+            <tr>
+              <th style="padding: 12px 16px; font-size: 12px; font-weight: 600; color: #5e6c84; text-transform: uppercase;">Key</th>
+              <th style="padding: 12px 16px; font-size: 12px; font-weight: 600; color: #5e6c84; text-transform: uppercase;">Title</th>
+              <th style="padding: 12px 16px; font-size: 12px; font-weight: 600; color: #5e6c84; text-transform: uppercase;">Status</th>
+              <th style="padding: 12px 16px; font-size: 12px; font-weight: 600; color: #5e6c84; text-transform: uppercase;">Assignee</th>
+              <th style="padding: 12px 16px; font-size: 12px; font-weight: 600; color: #5e6c84; text-transform: uppercase; text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let issue of archivedIssues()" style="border-bottom: 1px solid #dfe1e6; transition: background 0.15s;" class="hover:bg-slate-50">
+              <td style="padding: 12px 16px; font-size: 13px; font-weight: 600; color: #0052cc; cursor: pointer;" (click)="openIssueDetails(issue)">{{ issue.key }}</td>
+              <td style="padding: 12px 16px; font-size: 14px; color: #172b4d; font-weight: 500; cursor: pointer;" (click)="openIssueDetails(issue)">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <img *ngIf="issue.type === 'TASK'" src="/task_icon.svg" style="width: 16px; height: 16px;" alt="Task">
+                  <img *ngIf="issue.type === 'BUG'" src="/bug_icon.svg" style="width: 16px; height: 16px;" alt="Bug">
+                  <img *ngIf="issue.type === 'STORY'" src="/story_icon.svg" style="width: 16px; height: 16px;" alt="Story">
+                  <img *ngIf="issue.type === 'EPIC'" src="/epic_icon.svg" style="width: 16px; height: 16px;" alt="Epic">
+                  {{ issue.title }}
+                </div>
+              </td>
+              <td style="padding: 12px 16px;">
+                <span [style.background]="getStatusColor(issue.status) + '20'" [style.color]="getStatusColor(issue.status)" style="padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 700;">
+                  {{ issue.status | uppercase }}
+                </span>
+              </td>
+              <td style="padding: 12px 16px;">
+                <div style="display: flex; align-items: center; gap: 8px;" *ngIf="issue.assignee">
+                  <img [src]="issue.assignee.avatarUrl || '/default-avatar.png'" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+                  <span style="font-size: 13px; color: #172b4d;">{{ issue.assignee.firstName }} {{ issue.assignee.lastName }}</span>
+                </div>
+                <span *ngIf="!issue.assignee" style="font-size: 13px; color: #8590a2;">Unassigned</span>
+              </td>
+              <td style="padding: 12px 16px; text-align: right;">
+                <button (click)="toggleIssueArchive(issue.id)" style="background: white; border: 1px solid #dfe1e6; color: #42526e; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;" class="hover:bg-slate-100 hover:text-indigo-600">
+                  Unarchive
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <ng-template #noArchived>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px 0; background: #fafbfc; border-radius: 8px; border: 1px dashed #dfe1e6;">
+          <div style="width: 64px; height: 64px; border-radius: 50%; background: #e0e7ff; display: flex; align-items: center; justify-content: center; color: #4f46e5; margin-bottom: 16px;">
+            <svg lucideArchive size="32"></svg>
+          </div>
+          <h3 style="font-size: 16px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">No archived work items</h3>
+          <p style="font-size: 14px; color: #5e6c84;">Items you archive will appear here.</p>
+        </div>
+      </ng-template>
+
+    </div>
+  </div>
+
   <!-- Main Canvas Board Container -->
   <main class="board-canvas" *ngIf="board() && activeProjectTab() === 'board'">
     <div class="trello-columns-container" 
@@ -1594,6 +1786,11 @@
             </div>
           </div>
         </div>
+
+        <button class="modal-action-btn" (click)="toggleIssueArchive(selectedIssue()!.id)">
+          <svg lucideArchive size="14" class="btn-icon-svg"></svg>
+          <span>{{ selectedIssue()?.isArchived ? 'Unarchive' : 'Archive' }}</span>
+        </button>
       </div>
 
       <!-- Attached Members, Labels & Due Date Row -->

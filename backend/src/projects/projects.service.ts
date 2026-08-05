@@ -152,33 +152,33 @@ export class ProjectsService {
       recentActivity
     ] = await Promise.all([
       this.prisma.issue.count({
-        where: { projectId, companyId, status: 'DONE', updatedAt: { gte: sevenDaysAgo } }
+        where: { projectId, companyId, isArchived: false, status: 'DONE', updatedAt: { gte: sevenDaysAgo } }
       }),
       this.prisma.issue.count({
-        where: { projectId, companyId, updatedAt: { gte: sevenDaysAgo } }
+        where: { projectId, companyId, isArchived: false, updatedAt: { gte: sevenDaysAgo } }
       }),
       this.prisma.issue.count({
-        where: { projectId, companyId, createdAt: { gte: sevenDaysAgo } }
+        where: { projectId, companyId, isArchived: false, createdAt: { gte: sevenDaysAgo } }
       }),
       this.prisma.issue.count({
-        where: { projectId, companyId, dueDate: { gte: new Date(), lte: sevenDaysFromNow }, status: { not: 'DONE' } }
+        where: { projectId, companyId, isArchived: false, dueDate: { gte: new Date(), lte: sevenDaysFromNow }, status: { not: 'DONE' } }
       }),
       this.prisma.issue.groupBy({
         by: ['status'],
-        where: { projectId, companyId },
+        where: { projectId, companyId, isArchived: false },
         _count: { _all: true }
       }),
       this.prisma.issueMember.groupBy({
         by: ['employeeId'],
-        where: { issue: { projectId, companyId } },
+        where: { issue: { projectId, companyId, isArchived: false } },
         _count: { _all: true }
       }),
       this.prisma.issue.count({
-        where: { projectId, companyId, members: { none: {} } }
+        where: { projectId, companyId, isArchived: false, members: { none: {} } }
       }),
       this.prisma.issue.groupBy({
         by: ['priority'],
-        where: { projectId, companyId },
+        where: { projectId, companyId, isArchived: false },
         _count: { _all: true }
       }),
       this.prisma.issueActivity.findMany({

@@ -645,6 +645,7 @@ model Issue {
   dueReminder   String?
   coverUrl      String?
   position      Int       @default(0) // Sort order within column/backlog
+  isArchived    Boolean   @default(false)
   
   // Time Tracking Markers
   workStartedAt   DateTime? // When work actually started

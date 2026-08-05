@@ -62,12 +62,75 @@ export class ProjectDetailComponent implements OnInit {
   columns = signal<any[]>([]);
   issuesByColumn = signal<Map<number, any[]>>(new Map());
   allIssues = signal<any[]>([]);
+  activeIssues = computed(() => this.allIssues().filter(i => !i.isArchived));
+  archivedIssues = computed(() => this.allIssues().filter(i => i.isArchived));
 
   // Attachments Tab Filters
   attSearchQuery = signal<string>('');
   attFilterAddedBy = signal<number[]>([]);
   attFilterTypes = signal<string[]>([]);
   attFilterDate = signal<string>('');
+
+  // Charts Computed Signals
+  statusChartData = computed(() => {
+    const summary = this.projectSummary();
+    if (!summary || !summary.statusOverview) return null;
+    
+    return {
+      labels: summary.statusOverview.map(s => s.status),
+      datasets: [{
+        data: summary.statusOverview.map(s => s.count),
+        backgroundColor: summary.statusOverview.map(s => {
+          if (s.status === 'TODO') return '#94a3b8'; // Slate 400
+          if (s.status === 'IN_PROGRESS') return '#3b82f6'; // Blue 500
+          if (s.status === 'IN_REVIEW') return '#8b5cf6'; // Violet 500
+          if (s.status === 'DONE') return '#10b981'; // Emerald 500
+          if (s.status === 'CANCELLED') return '#ef4444'; // Red 500
+          return '#cbd5e1';
+        }),
+        hoverOffset: 4
+      }]
+    };
+  });
+
+  priorityChartData = computed(() => {
+    const summary = this.projectSummary();
+    if (!summary || !summary.priorityBreakdown) return null;
+    
+    return {
+      labels: summary.priorityBreakdown.map(p => p.priority),
+      datasets: [{
+        label: 'Tasks',
+        data: summary.priorityBreakdown.map(p => p.count),
+        backgroundColor: summary.priorityBreakdown.map(p => {
+          if (p.priority === 'CRITICAL') return '#ef4444'; // Red 500
+          if (p.priority === 'HIGH') return '#f97316'; // Orange 500
+          if (p.priority === 'MEDIUM') return '#eab308'; // Yellow 500
+          if (p.priority === 'LOW') return '#3b82f6'; // Blue 500
+          return '#cbd5e1';
+        }),
+        borderRadius: 4
+      }]
+    };
+  });
+
+  workloadChartData = computed(() => {
+    const summary = this.projectSummary();
+    if (!summary || !summary.teamWorkload) return null;
+    
+    // Sort by count descending
+    const sorted = [...summary.teamWorkload].sort((a, b) => b.count - a.count);
+    
+    return {
+      labels: sorted.map(w => w.name),
+      datasets: [{
+        label: 'Assigned Tasks',
+        data: sorted.map(w => w.count),
+        backgroundColor: '#6366f1', // Indigo 500
+        borderRadius: 4
+      }]
+    };
+  });
 
   toggleAttFilterAddedBy(id: number) {
     const current = this.attFilterAddedBy();
@@ -89,7 +152,7 @@ export class ProjectDetailComponent implements OnInit {
 
   // Compute all attachments across the project
   projectAttachments = computed(() => {
-    const issues = this.allIssues();
+    const issues = this.activeIssues();
     let allAtts: any[] = [];
     
     for (const issue of issues) {
@@ -217,7 +280,7 @@ export class ProjectDetailComponent implements OnInit {
   listFilterMyIssues = signal<boolean>(false);
 
   filteredListIssues = computed(() => {
-    let issues = this.allIssues();
+    let issues = this.activeIssues();
     
     const search = this.listSearchQuery().toLowerCase();
     if (search) {
@@ -455,7 +518,7 @@ export class ProjectDetailComponent implements OnInit {
   }
 
   getIssuesForCalendarDate(dateStr: string): any[] {
-    let issues = this.allIssues();
+    let issues = this.activeIssues();
     const query = (this.calendarSearchQuery() || '').trim().toLowerCase();
 
     if (query) {
@@ -641,7 +704,7 @@ export class ProjectDetailComponent implements OnInit {
   setProjectTab(tab: string) {
     this.activeProjectTab.set(tab);
     localStorage.setItem('project_active_tab', tab);
-    if (tab === 'summary') {
+    if (tab === 'summary' || tab === 'reports') {
       this.loadSummary();
     }
   }
@@ -1363,7 +1426,7 @@ export class ProjectDetailComponent implements OnInit {
 
   openWorkloadModal(assigneeId: number | null, assigneeName: string) {
     this.workloadModalTitle.set(`${assigneeName}'s Assigned Tasks`);
-    const all = this.allIssues();
+    const all = this.activeIssues();
     
     let filtered = [];
     if (assigneeId === null) {
@@ -2585,7 +2648,31 @@ export class ProjectDetailComponent implements OnInit {
         this.toast.success(res.isCover ? 'Cover updated' : 'Cover removed');
         this.loadBoardAndIssues();
       },
-      error: () => this.toast.error('Failed to toggle cover')
+      error: () => this.toast.error('Failed to update cover')
+    });
+  }
+
+  toggleIssueArchive(issueId: number) {
+    this.projectsService.toggleIssueArchive(this.projectId, issueId).subscribe({
+      next: (res) => {
+        // Find if the issue is in the selected state and update it
+        if (this.selectedIssue()?.id === issueId) {
+          this.selectedIssue.update(i => i ? { ...i, isArchived: res.isArchived } : null);
+          if (res.isArchived) {
+             this.closeDrawer();
+          }
+        }
+        
+        // Update allIssues locally to reflect archive status instantly
+        const updatedAll = this.allIssues().map(i => i.id === issueId ? { ...i, isArchived: res.isArchived } : i);
+        this.allIssues.set(updatedAll);
+        
+        // Rebuild board/list/etc. is handled automatically by activeIssues and archivedIssues signals
+        this.loadBoardAndIssues(); 
+        
+        this.toast.success(res.isArchived ? 'Issue archived' : 'Issue unarchived');
+      },
+      error: () => this.toast.error('Failed to toggle archive status')
     });
   }
 

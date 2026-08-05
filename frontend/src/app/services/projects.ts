@@ -102,6 +102,10 @@ export class ProjectsService {
     return this.http.delete<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/comments/${commentId}`);
   }
 
+  toggleIssueArchive(projectId: number, issueId: number) {
+    return this.http.put<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/archive`, {});
+  }
+
   getChecklists(projectId: number, issueId: number) {
     return this.http.get<any[]>(`${this.apiUrl}/${projectId}/issues/${issueId}/checklists`);
   }
