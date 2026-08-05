@@ -604,6 +604,29 @@ button.btn-outline:hover,
   align-items: center;
 }
 
+/* Pinned / Sticky Column Dividers & Borders */
+.ag-theme-quartz .ag-pinned-left-header,
+.ag-theme-quartz .ag-pinned-left-cols-container,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-cell {
+  border-right: 1.5px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+}
+
+.ag-theme-quartz .ag-pinned-left-cols-container {
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.06);
+}
+
+.ag-theme-quartz .ag-pinned-right-header,
+.ag-theme-quartz .ag-pinned-right-cols-container,
+.ag-theme-quartz .ag-pinned-right-cols-container .ag-cell {
+  border-left: 1.5px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+}
+
+.ag-theme-quartz .ag-pinned-right-cols-container {
+  box-shadow: -3px 0 6px -2px rgba(0, 0, 0, 0.06);
+}
+
 /* AG Grid Cell Renderer Classes (Global Styles for Dynamic Cell HTML) */
 .cell-stacked {
   display: flex;

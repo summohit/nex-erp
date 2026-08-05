@@ -12,7 +12,8 @@ import {
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
   LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
   LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
-  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive
+  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
+  LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -38,6 +39,7 @@ declare var Quill: any;
     LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
     LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
     LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
+    LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
     AgGridAngular
   ],
   templateUrl: './project-detail.html',
@@ -61,9 +63,480 @@ export class ProjectDetailComponent implements OnInit {
   issuesByColumn = signal<Map<number, any[]>>(new Map());
   allIssues = signal<any[]>([]);
 
+  // Attachments Tab Filters
+  attSearchQuery = signal<string>('');
+  attFilterAddedBy = signal<number[]>([]);
+  attFilterTypes = signal<string[]>([]);
+  attFilterDate = signal<string>('');
+
+  toggleAttFilterAddedBy(id: number) {
+    const current = this.attFilterAddedBy();
+    if (current.includes(id)) {
+      this.attFilterAddedBy.set(current.filter(x => x !== id));
+    } else {
+      this.attFilterAddedBy.set([...current, id]);
+    }
+  }
+
+  toggleAttFilterType(type: string) {
+    const current = this.attFilterTypes();
+    if (current.includes(type)) {
+      this.attFilterTypes.set(current.filter(x => x !== type));
+    } else {
+      this.attFilterTypes.set([...current, type]);
+    }
+  }
+
+  // Compute all attachments across the project
+  projectAttachments = computed(() => {
+    const issues = this.allIssues();
+    let allAtts: any[] = [];
+    
+    for (const issue of issues) {
+      if (issue.attachments && issue.attachments.length > 0) {
+        issue.attachments.forEach((a: any) => {
+          allAtts.push({
+            ...a,
+            issueId: issue.id,
+            issueKey: issue.key,
+            issueTitle: issue.title
+          });
+        });
+      }
+    }
+    
+    // Sort by most recent first
+    allAtts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Apply filters
+    const search = this.attSearchQuery().toLowerCase();
+    if (search) {
+      allAtts = allAtts.filter(a => a.fileName.toLowerCase().includes(search));
+    }
+
+    const types = this.attFilterTypes();
+    if (types.length > 0) {
+      allAtts = allAtts.filter(a => {
+        const ext = a.fileName.split('.').pop()?.toLowerCase();
+        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext || '');
+        const isPdf = ext === 'pdf';
+        const isDoc = ['doc', 'docx', 'txt'].includes(ext || '');
+        const isSpreadsheet = ['xls', 'xlsx', 'csv'].includes(ext || '');
+        const isPresentation = ['ppt', 'pptx'].includes(ext || '');
+        const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext || '');
+        const isAudio = ['mp3', 'wav', 'ogg'].includes(ext || '');
+
+        return (
+          (types.includes('Images') && isImage) ||
+          (types.includes('PDFs') && isPdf) ||
+          (types.includes('Documents') && isDoc) ||
+          (types.includes('Spreadsheets') && isSpreadsheet) ||
+          (types.includes('Presentations') && isPresentation) ||
+          (types.includes('Videos') && isVideo) ||
+          (types.includes('Audio') && isAudio)
+        );
+      });
+    }
+
+    const addedBy = this.attFilterAddedBy();
+    if (addedBy.length > 0) {
+      allAtts = allAtts.filter(a => a.uploadedBy && addedBy.includes(a.uploadedBy));
+    }
+
+    const dateFilter = this.attFilterDate();
+    if (dateFilter) {
+      const now = new Date();
+      allAtts = allAtts.filter(a => {
+        const d = new Date(a.createdAt);
+        if (dateFilter === 'Today') {
+          return d.toDateString() === now.toDateString();
+        } else if (dateFilter === 'Yesterday') {
+          const yesterday = new Date(now);
+          yesterday.setDate(yesterday.getDate() - 1);
+          return d.toDateString() === yesterday.toDateString();
+        } else if (dateFilter === 'Last 7 days') {
+          const sevenDaysAgo = new Date(now);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          return d >= sevenDaysAgo;
+        } else if (dateFilter === 'Last 30 days') {
+          const thirtyDaysAgo = new Date(now);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return d >= thirtyDaysAgo;
+        } else if (dateFilter === 'This month') {
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        } else if (dateFilter === 'This year (2026)') {
+          return d.getFullYear() === 2026;
+        } else if (dateFilter === 'Last year (2025)') {
+          return d.getFullYear() === 2025;
+        }
+        return true;
+      });
+    }
+
+    return allAtts;
+  });
+
+  getAttachmentIcon(filename: string): string {
+    const ext = filename?.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return 'lucideImage';
+    if (['pdf'].includes(ext)) return 'lucideFile';
+    if (['doc', 'docx', 'txt'].includes(ext)) return 'lucideFileText';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'lucideLayoutGrid';
+    if (['ppt', 'pptx'].includes(ext)) return 'lucideBarChart';
+    if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'lucideVideo';
+    if (['mp3', 'wav', 'ogg'].includes(ext)) return 'lucideMusic';
+    return 'lucideFile';
+  }
+
+  getAttachmentIconColor(filename: string): string {
+    const ext = filename?.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return '#db2777';
+    if (['pdf'].includes(ext)) return '#dc2626';
+    if (['doc', 'docx', 'txt'].includes(ext)) return '#2563eb';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return '#16a34a';
+    if (['ppt', 'pptx'].includes(ext)) return '#ea580c';
+    if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return '#0284c7';
+    if (['mp3', 'wav', 'ogg'].includes(ext)) return '#9333ea';
+    return '#b3bac5';
+  }
+
+  openIssueDetailsById(issueId: number) {
+    const issue = this.allIssues().find(i => i.id === issueId);
+    if (issue) this.openIssueDetails(issue);
+  }
+
   activeTab = signal<'board'|'backlog'|'analytics'|'settings'>('board');
   activeProjectTab = signal<string>('board');
   projectSummary = signal<ProjectSummary | null>(null);
+
+  // List Tab Filters
+  listSearchQuery = signal<string>('');
+  listFilterAssigneeIds = signal<number[]>([]);
+  listFilterColumnIds = signal<number[]>([]);
+  listFilterPriorities = signal<string[]>([]);
+  listFilterMyIssues = signal<boolean>(false);
+
+  filteredListIssues = computed(() => {
+    let issues = this.allIssues();
+    
+    const search = this.listSearchQuery().toLowerCase();
+    if (search) {
+      issues = issues.filter(i => 
+        i.title.toLowerCase().includes(search) || 
+        (i.key && i.key.toLowerCase().includes(search))
+      );
+    }
+    
+    if (this.listFilterMyIssues()) {
+      const myId = this.currentUser()?.id;
+      if (myId) {
+        issues = issues.filter(i => 
+          i.assigneeId === myId || (i.members && i.members.some((m: any) => m.userId === myId))
+        );
+      }
+    } else if (this.listFilterAssigneeIds().length > 0) {
+      const selected = this.listFilterAssigneeIds();
+      issues = issues.filter(i => {
+        // -1 represents "Unassigned"
+        if (selected.includes(-1) && !i.assigneeId && (!i.members || i.members.length === 0)) return true;
+        if (i.assigneeId && selected.includes(i.assigneeId)) return true;
+        if (i.members && i.members.some((m: any) => selected.includes(m.employeeId))) return true;
+        return false;
+      });
+    }
+
+    if (this.listFilterColumnIds().length > 0) {
+      issues = issues.filter(i => this.listFilterColumnIds().includes(i.columnId));
+    }
+
+    if (this.listFilterPriorities().length > 0) {
+      issues = issues.filter(i => this.listFilterPriorities().includes(i.priority));
+    }
+
+    return issues;
+  });
+
+  toggleListFilterAssignee(id: number) {
+    const current = this.listFilterAssigneeIds();
+    if (current.includes(id)) {
+      this.listFilterAssigneeIds.set(current.filter(x => x !== id));
+    } else {
+      this.listFilterAssigneeIds.set([...current, id]);
+    }
+  }
+
+  toggleListFilterColumn(id: number) {
+    const current = this.listFilterColumnIds();
+    if (current.includes(id)) {
+      this.listFilterColumnIds.set(current.filter(x => x !== id));
+    } else {
+      this.listFilterColumnIds.set([...current, id]);
+    }
+  }
+
+  toggleListFilterPriority(priority: string) {
+    const current = this.listFilterPriorities();
+    if (current.includes(priority)) {
+      this.listFilterPriorities.set(current.filter(x => x !== priority));
+    } else {
+      this.listFilterPriorities.set([...current, priority]);
+    }
+  }
+  
+  clearListFilters() {
+    this.listSearchQuery.set('');
+    this.listFilterAssigneeIds.set([]);
+    this.listFilterColumnIds.set([]);
+    this.listFilterPriorities.set([]);
+    this.listFilterMyIssues.set(false);
+  }
+
+  // Calendar View State & Logic
+  calendarCurrentDate = signal<Date>(new Date());
+  calendarSearchQuery = signal<string>('');
+
+  formattedCalendarMonth = computed(() => {
+    const d = this.calendarCurrentDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+    return `${months[d.getMonth()]} ${d.getFullYear()}`;
+  });
+
+  // Calendar Inline Add
+  activeCalendarCreateDate = signal<string | null>(null);
+  calendarInlineTitle = signal<string>('');
+  calendarInlineType = signal<string>('TASK');
+  calendarInlineAssigneeId = signal<number | null>(null);
+
+  startCalendarInlineAdd(dateStr: string) {
+    this.activeCalendarCreateDate.set(dateStr);
+    this.calendarInlineTitle.set('');
+    this.calendarInlineType.set('TASK');
+    this.calendarInlineAssigneeId.set(null);
+  }
+
+  cancelCalendarInlineAdd() {
+    this.activeCalendarCreateDate.set(null);
+  }
+
+  submitCalendarInlineCard() {
+    const title = this.calendarInlineTitle().trim();
+    if (!title) return;
+
+    const col = this.columns()[0];
+    if (!col) {
+      this.toast.error('No lists in board to create task');
+      return;
+    }
+
+    const payload = {
+      title,
+      columnId: col.id,
+      type: this.calendarInlineType(),
+      priority: 'MEDIUM',
+      dueDate: this.activeCalendarCreateDate(),
+      assigneeId: this.calendarInlineAssigneeId()
+    };
+
+    this.projectsService.createIssue(this.projectId, payload).subscribe({
+      next: () => {
+        this.toast.success('Task created');
+        this.cancelCalendarInlineAdd();
+        this.loadBoardAndIssues();
+      },
+      error: () => this.toast.error('Failed to create task')
+    });
+  }
+
+  calendarWeeks = computed(() => {
+    const current = this.calendarCurrentDate();
+    const year = current.getFullYear();
+    const month = current.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    let dayOfWeek = firstDay.getDay() - 1;
+    if (dayOfWeek < 0) dayOfWeek = 6;
+
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - dayOfWeek);
+
+    const weeks: Array<Array<{ date: Date; dayNum: number; isCurrentMonth: boolean; isToday: boolean; dateStr: string }>> = [];
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    let curr = new Date(startDate);
+
+    for (let w = 0; w < 5; w++) {
+      const week: Array<{ date: Date; dayNum: number; isCurrentMonth: boolean; isToday: boolean; dateStr: string }> = [];
+      for (let d = 0; d < 7; d++) {
+        const dObj = new Date(curr);
+        const y = dObj.getFullYear();
+        const m = String(dObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dObj.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${day}`;
+
+        week.push({
+          date: dObj,
+          dayNum: dObj.getDate(),
+          isCurrentMonth: dObj.getMonth() === month,
+          isToday: dateStr === todayStr,
+          dateStr
+        });
+
+        curr.setDate(curr.getDate() + 1);
+      }
+      weeks.push(week);
+    }
+
+    return weeks;
+  });
+
+  calendarPrevMonth() {
+    const d = new Date(this.calendarCurrentDate());
+    d.setMonth(d.getMonth() - 1);
+    this.calendarCurrentDate.set(d);
+  }
+
+  calendarNextMonth() {
+    const d = new Date(this.calendarCurrentDate());
+    d.setMonth(d.getMonth() + 1);
+    this.calendarCurrentDate.set(d);
+  }
+
+  goToToday() {
+    this.calendarCurrentDate.set(new Date());
+  }
+
+  calendarFilterAssignedToMe = signal<boolean>(false);
+  calendarFilterDueThisWeek = signal<boolean>(false);
+  calendarFilterDoneItems = signal<boolean>(false);
+  calendarFilterStartDate = signal<string>('');
+  calendarFilterDueDate = signal<string>('');
+  calendarFilterAssigneeIds = signal<number[]>([]);
+  calendarFilterColumnIds = signal<number[]>([]);
+  calendarFilterPriorities = signal<string[]>([]);
+
+  toggleCalendarFilterAssignee(id: number) {
+    const current = this.calendarFilterAssigneeIds();
+    if (current.includes(id)) {
+      this.calendarFilterAssigneeIds.set(current.filter(x => x !== id));
+    } else {
+      this.calendarFilterAssigneeIds.set([...current, id]);
+    }
+  }
+
+  toggleCalendarFilterColumn(id: number) {
+    const current = this.calendarFilterColumnIds();
+    if (current.includes(id)) {
+      this.calendarFilterColumnIds.set(current.filter(x => x !== id));
+    } else {
+      this.calendarFilterColumnIds.set([...current, id]);
+    }
+  }
+
+  toggleCalendarFilterPriority(priority: string) {
+    const current = this.calendarFilterPriorities();
+    if (current.includes(priority)) {
+      this.calendarFilterPriorities.set(current.filter(x => x !== priority));
+    } else {
+      this.calendarFilterPriorities.set([...current, priority]);
+    }
+  }
+
+  clearCalendarFilters() {
+    this.calendarSearchQuery.set('');
+    this.calendarFilterAssignedToMe.set(false);
+    this.calendarFilterDueThisWeek.set(false);
+    this.calendarFilterDoneItems.set(false);
+    this.calendarFilterStartDate.set('');
+    this.calendarFilterDueDate.set('');
+    this.calendarFilterAssigneeIds.set([]);
+    this.calendarFilterColumnIds.set([]);
+    this.calendarFilterPriorities.set([]);
+  }
+
+  getIssuesForCalendarDate(dateStr: string): any[] {
+    let issues = this.allIssues();
+    const query = (this.calendarSearchQuery() || '').trim().toLowerCase();
+
+    if (query) {
+      issues = issues.filter(i => 
+        (i.title || '').toLowerCase().includes(query) || 
+        (i.key || '').toLowerCase().includes(query)
+      );
+    }
+
+    if (this.calendarFilterAssignedToMe()) {
+      const myId = this.currentUser()?.id;
+      if (myId) {
+        issues = issues.filter(i => 
+          i.assigneeId === myId || (i.members && i.members.some((m: any) => m.userId === myId || m.employeeId === myId))
+        );
+      }
+    }
+
+    if (this.calendarFilterDueThisWeek()) {
+      const now = new Date();
+      const currentDay = now.getDay();
+      const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+      startOfWeek.setHours(0,0,0,0);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23,59,59,999);
+
+      issues = issues.filter(i => {
+        if (!i.dueDate) return false;
+        const d = new Date(i.dueDate);
+        return d >= startOfWeek && d <= endOfWeek;
+      });
+    }
+
+    if (this.calendarFilterDoneItems()) {
+      issues = issues.filter(i => i.status === 'DONE');
+    }
+
+    if (this.calendarFilterAssigneeIds().length > 0) {
+      const selected = this.calendarFilterAssigneeIds();
+      issues = issues.filter(i => {
+        if (selected.includes(-1) && !i.assigneeId && (!i.members || i.members.length === 0)) return true;
+        if (i.assigneeId && selected.includes(i.assigneeId)) return true;
+        if (i.members && i.members.some((m: any) => selected.includes(m.employeeId))) return true;
+        return false;
+      });
+    }
+
+    if (this.calendarFilterColumnIds().length > 0) {
+      issues = issues.filter(i => this.calendarFilterColumnIds().includes(i.columnId));
+    }
+
+    if (this.calendarFilterPriorities().length > 0) {
+      issues = issues.filter(i => this.calendarFilterPriorities().includes(i.priority));
+    }
+
+    return issues.filter(i => {
+      let targetDateStr = '';
+      if (i.dueDate) {
+        const d = new Date(i.dueDate);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        targetDateStr = `${y}-${m}-${day}`;
+      } else if (i.startDate) {
+        const d = new Date(i.startDate);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        targetDateStr = `${y}-${m}-${day}`;
+      }
+
+      if (targetDateStr !== dateStr) return false;
+
+      if (this.calendarFilterStartDate() && targetDateStr < this.calendarFilterStartDate()) return false;
+      if (this.calendarFilterDueDate() && targetDateStr > this.calendarFilterDueDate()) return false;
+
+      return true;
+    });
+  }
 
   // Column Management
   isAddingColumn = signal(false);
@@ -154,12 +627,20 @@ export class ProjectDetailComponent implements OnInit {
         this.hasAccess.set(true);
         this.loadProjectDetails();
         this.loadBoardAndIssues();
+
+        const savedTab = localStorage.getItem('project_active_tab');
+        if (savedTab) {
+          this.setProjectTab(savedTab);
+        } else {
+          this.setProjectTab('board');
+        }
       }
     });
   }
 
   setProjectTab(tab: string) {
     this.activeProjectTab.set(tab);
+    localStorage.setItem('project_active_tab', tab);
     if (tab === 'summary') {
       this.loadSummary();
     }
@@ -914,7 +1395,226 @@ export class ProjectDetailComponent implements OnInit {
     }
   }
 
-  togglePopover(popoverName: string) {
+  // List Tab Grid
+  listGridColDefs: ColDef[] = [
+    { field: 'key', headerName: 'ID', width: 100, pinned: 'left' },
+    { field: 'title', headerName: 'Task', minWidth: 200, flex: 1, filter: true },
+    { 
+      headerName: 'List', 
+      width: 140,
+      valueGetter: (params: any) => {
+        const col = this.columns().find(c => c.id === params.data?.columnId);
+        return col ? col.name : 'Unknown';
+      }
+    },
+    { 
+      field: 'status', 
+      headerName: 'Status', 
+      width: 140,
+      cellRenderer: (params: any) => {
+        const val = params.value || '';
+        let color = '#94a3b8'; let bg = '#f1f5f9';
+        if (val === 'DONE') { color = '#16a34a'; bg = '#dcfce7'; }
+        else if (val === 'TODO') { color = '#64748b'; bg = '#f1f5f9'; }
+        else if (val === 'IN_PROGRESS') { color = '#2563eb'; bg = '#dbeafe'; }
+        else if (val === 'IN_REVIEW') { color = '#9333ea'; bg = '#f3e8ff'; }
+        return `<span style="background-color: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">${val.replace('_', ' ')}</span>`;
+      }
+    },
+    { 
+      field: 'priority', 
+      headerName: 'Priority', 
+      width: 130,
+      cellRenderer: (params: any) => {
+        const val = params.value || '';
+        let color = '#94a3b8';
+        if (val === 'CRITICAL') color = '#dc2626';
+        else if (val === 'HIGH') color = '#ea580c';
+        else if (val === 'MEDIUM') color = '#ca8a04';
+        else if (val === 'LOW') color = '#16a34a';
+        return `<div style="display: flex; align-items: center; gap: 6px;">
+                  <div style="width: 8px; height: 8px; border-radius: 50%; background-color: ${color};"></div>
+                  <span style="font-size: 13px; font-weight: 500; color: #334155;">${val}</span>
+                </div>`;
+      }
+    },
+    { 
+      headerName: 'Assignee', 
+      width: 160, 
+      cellRenderer: (params: any) => {
+        const issue = params.data;
+        if (!issue) return '';
+        
+        const allMembers: any[] = [];
+        if (issue.assignee) {
+          allMembers.push(issue.assignee);
+        }
+        if (issue.members && issue.members.length > 0) {
+          issue.members.forEach((m: any) => {
+            if (m.employee) allMembers.push(m.employee);
+          });
+        }
+        
+        if (allMembers.length === 0) {
+          return '<span style="color: #94a3b8; font-size: 12px;">Unassigned</span>';
+        }
+
+        const maxVisible = 3;
+        const visibleMembers = allMembers.slice(0, maxVisible);
+        const extraCount = allMembers.length - maxVisible;
+        
+        let membersHtml = '';
+        visibleMembers.forEach((emp: any, index: number) => {
+          const name = `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+          const marginLeft = index === 0 ? '0px' : '-8px';
+          const avatar = emp.avatarUrl 
+            ? `<img src="${emp.avatarUrl}" title="${name}" style="width: 26px; height: 26px; border-radius: 50%; border: 2px solid white; margin-left: ${marginLeft}; object-fit: cover; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">` 
+            : `<div title="${name}" style="width: 26px; height: 26px; border-radius: 50%; border: 2px solid white; margin-left: ${marginLeft}; background: #6366f1; color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">${(emp.firstName || 'U')[0]}</div>`;
+          membersHtml += avatar;
+        });
+
+        if (extraCount > 0) {
+          membersHtml += `<div title="${extraCount} more assignees" style="width: 26px; height: 26px; border-radius: 50%; border: 2px solid white; margin-left: -8px; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">+${extraCount}</div>`;
+        }
+
+        return `<div style="display: flex; align-items: center; height: 100%;">${membersHtml}</div>`;
+      }
+    },
+    { 
+      headerName: 'Due Date', 
+      width: 150, 
+      valueGetter: (params: any) => {
+        if (!params.data || (!params.data.dueDate && !params.data.startDate)) return '';
+        return this.formatDisplayDueDate(params.data);
+      }
+    },
+    { 
+      field: 'createdAt', 
+      headerName: 'Created At', 
+      width: 140, 
+      valueGetter: (params: any) => {
+        if (!params.data?.createdAt) return '';
+        const d = new Date(params.data.createdAt);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+    },
+    { 
+      field: 'updatedAt', 
+      headerName: 'Updated At', 
+      width: 140, 
+      valueGetter: (params: any) => {
+        if (!params.data?.updatedAt) return '';
+        const d = new Date(params.data.updatedAt);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+    },
+    { 
+      headerName: 'Action', 
+      width: 100, 
+      pinned: 'right',
+      cellRenderer: () => {
+        return `<button style="background-color: #eff6ff; color: #2563eb; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#dbeafe'" onmouseout="this.style.backgroundColor='#eff6ff'">
+                  View
+                </button>`;
+      }
+    }
+  ];
+
+  onListGridCellClicked(event: CellClickedEvent) {
+    const issue = event.data;
+    if (issue) {
+      this.openIssueDetails(issue);
+    }
+  }
+
+  listGridApi: any;
+
+  onListGridReady(params: any) {
+    this.listGridApi = params.api;
+  }
+
+  exportListGrid(format: 'csv' | 'excel' | 'json') {
+    const data = this.filteredListIssues();
+    const fileName = `project_${this.projectId}_tasks`;
+
+    if (format === 'csv') {
+      if (this.listGridApi) {
+        this.listGridApi.exportDataAsCsv({ fileName: `${fileName}.csv` });
+      } else {
+        let csv = 'ID,Task,Status,Priority,Due Date,Created At,Updated At\n';
+        data.forEach(i => {
+          csv += `"${i.key || ''}","${(i.title || '').replace(/"/g, '""')}","${i.status || ''}","${i.priority || ''}","${i.dueDate || ''}","${i.createdAt || ''}","${i.updatedAt || ''}"\n`;
+        });
+        this.downloadFile(csv, `${fileName}.csv`, 'text/csv');
+      }
+      this.toast.success('Tasks exported as CSV');
+    } else if (format === 'excel') {
+      let tsv = 'ID\tTask\tStatus\tPriority\tDue Date\tCreated At\tUpdated At\n';
+      data.forEach(i => {
+        tsv += `${i.key || ''}\t${(i.title || '').replace(/\t/g, ' ')}\t${i.status || ''}\t${i.priority || ''}\t${i.dueDate || ''}\t${i.createdAt || ''}\t${i.updatedAt || ''}\n`;
+      });
+      this.downloadFile(tsv, `${fileName}.xls`, 'application/vnd.ms-excel');
+      this.toast.success('Tasks exported as Excel (.xls)');
+    } else if (format === 'json') {
+      const jsonContent = JSON.stringify(data, null, 2);
+      this.downloadFile(jsonContent, `${fileName}.json`, 'application/json');
+      this.toast.success('Tasks exported as JSON');
+    }
+  }
+
+  private downloadFile(content: string, fileName: string, mimeType: string) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  popoverPosition = signal<{x: number, y: number, maxHeight?: number} | null>(null);
+  activeMoreTasksDay = signal<{ dateStr: string, issues: any[] } | null>(null);
+
+  togglePopover(popoverName: string, event?: MouseEvent, contextData?: any) {
+    if (event) {
+      event.stopPropagation();
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      
+      let y = rect.bottom + 8;
+      let maxHeight = window.innerHeight - y - 16;
+      
+      if (popoverName === 'more-tasks') {
+        // Open more-tasks above the button by default
+        const itemsCount = contextData?.issues?.length || 3;
+        const approxHeight = (itemsCount * 34) + 60; // 30px per item + 4px gap + 60px header/padding
+        
+        y = rect.top - approxHeight - 8;
+        
+        // If it doesn't fit above, fallback to opening below
+        if (y < 16) {
+          y = rect.bottom + 8;
+          maxHeight = window.innerHeight - y - 16;
+        } else {
+          maxHeight = rect.top - 16;
+        }
+      } else {
+        // Default logic for other popovers like dates
+        // If not enough space below, and more space above, open upwards
+        if (maxHeight < 450 && rect.top > 450) {
+          const approxHeight = 520;
+          y = rect.top - approxHeight - 8;
+          if (y < 16) y = 16;
+          maxHeight = window.innerHeight - 32;
+        } else if (maxHeight < 300) {
+          // If neither fits well, just center it vertically as a fallback
+          y = 32;
+          maxHeight = window.innerHeight - 64;
+        }
+      }
+
+      this.popoverPosition.set({ x: rect.left, y, maxHeight });
+    }
+
     if (this.activePopover() === popoverName) {
       this.closePopover();
     } else {
@@ -940,6 +1640,12 @@ export class ProjectDetailComponent implements OnInit {
         this.memberSearchQuery = '';
         this.shareTab.set('members');
       }
+      if (popoverName === 'more-tasks' && contextData) {
+        this.activeMoreTasksDay.set(contextData);
+      } else {
+        this.activeMoreTasksDay.set(null);
+      }
+      
       this.activePopover.set(popoverName);
     }
   }

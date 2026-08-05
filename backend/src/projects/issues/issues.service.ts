@@ -46,7 +46,9 @@ export class IssuesService {
         columnId,
         reporterId,
         assigneeId: data.assigneeId,
-        position
+        position,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        startDate: data.startDate ? new Date(data.startDate) : null
       }
     });
 

@@ -640,7 +640,7 @@
   transform: translate(-50%, -50%);
   width: 1280px;
   max-width: 96vw;
-  min-height: 500px;
+  min-height: 600px;
   max-height: 88vh;
   background: #ffffff;
   border-radius: 18px;
@@ -784,6 +784,39 @@
 .modal-side-col::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 4px;
+}
+
+/* Calendar Hover Styles */
+.calendar-day-box {
+  border-right: 1px solid #f1f5f9; 
+  padding: 6px; 
+  position: relative; 
+  transition: background 0.1s;
+}
+
+.calendar-add-btn {
+  position: absolute; 
+  top: 6px; 
+  right: 6px; 
+  width: 22px; 
+  height: 22px; 
+  border-radius: 4px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  cursor: pointer; 
+  color: #64748b; 
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.calendar-day-box:hover .calendar-add-btn {
+  opacity: 1;
+}
+
+.calendar-add-btn:hover {
+  background: #e2e8f0;
 }
 
 /* Title Row & Custom Circular Checkbox */
@@ -1134,6 +1167,7 @@ svg[lucide], svg[class*=lucide] {
 
 /* Description Section & Editor */
 .modal-description-section {
+  margin-top: 24px;
   margin-bottom: 24px;
 }
 
