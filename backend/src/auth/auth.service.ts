@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { MailService } from '../mail/mail.service';
+import { CompanySeederService } from '../company-seeder/company-seeder.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -10,7 +11,8 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-    private mailService: MailService
+    private mailService: MailService,
+    private companySeederService: CompanySeederService
   ) {}
 
   async signupCompany(
@@ -146,8 +148,10 @@ export class AuthService {
       });
 
       // 7. Send Verification Email
-      // Note: We don't await this inside the transaction so the transaction can complete quickly
       this.mailService.sendVerificationEmail(adminEmail, token).catch(e => console.error(e));
+
+      // 8. Seed default master data asynchronously
+      this.companySeederService.seedCompanyDefaults(company.id).catch(e => console.error(e));
 
       // We do not return JWTs here because the user must verify their email first.
       return { message: 'Signup successful. Please check your email to verify your account.' };
