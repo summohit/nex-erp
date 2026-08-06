@@ -83,7 +83,7 @@ deploy_backend() {
   log "Dependencies installed."
 
   info "Running Prisma migrations..."
-  remote "cd $REMOTE_DIR/backend && npx prisma db push --accept-data-loss"
+  remote "cd $REMOTE_DIR/backend && npx prisma db push --accept-data-loss && npx prisma generate"
   log "Database synced."
 
   info "Building backend on server..."
@@ -91,7 +91,7 @@ deploy_backend() {
   log "Backend built."
 
   info "Restarting PM2 process..."
-  remote "cd $REMOTE_DIR/backend && pm2 restart nex-erp-backend --update-env || pm2 start dist/src/main.js --name nex-erp-backend"
+  remote "cd $REMOTE_DIR/backend && pm2 restart nex-erp-backend --update-env || pm2 start dist/main.js --name nex-erp-backend"
   remote "pm2 save"
   log "Backend restarted!"
 }
