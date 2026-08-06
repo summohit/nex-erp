@@ -150,20 +150,22 @@ export class CompanySeederService implements OnModuleInit {
 
     // 6. Seed Default Award Types
     const defaultAwards = [
-      { name: 'Employee of the Month', description: 'Awarded for outstanding monthly performance' },
-      { name: 'Star Performer', description: 'Recognizing exceptional contribution to business goals' },
-      { name: 'Team Player Award', description: 'Awarded for exemplary collaboration and teamwork' },
+      { title: 'Employee of the Month', icon: 'trophy', color: 'orange' },
+      { title: 'Star Performer', icon: 'star', color: 'purple' },
+      { title: 'Team Player Award', icon: 'award', color: 'blue' },
     ];
 
     for (const award of defaultAwards) {
       const existing = await this.prisma.awardType.findFirst({
-        where: { companyId, name: award.name },
+        where: { companyId, title: award.title },
       });
       if (!existing) {
         await this.prisma.awardType.create({
           data: {
-            name: award.name,
-            description: award.description,
+            title: award.title,
+            icon: award.icon,
+            color: award.color,
+            status: true,
             companyId,
           },
         });
@@ -172,10 +174,10 @@ export class CompanySeederService implements OnModuleInit {
 
     // 7. Seed Default Assets
     const defaultAssets = [
-      { name: 'MacBook Pro 16"', category: 'Laptop', serialNumber: `MBP-${companyId}-001`, status: 'AVAILABLE' },
-      { name: 'Dell UltraSharp 27" Monitor', category: 'Monitor', serialNumber: `DEL-${companyId}-001`, status: 'AVAILABLE' },
-      { name: 'Ergonomic Office Chair', category: 'Furniture', serialNumber: `CHR-${companyId}-001`, status: 'AVAILABLE' },
-      { name: 'Logitech Wireless Keyboard & Mouse', category: 'Accessory', serialNumber: `LOG-${companyId}-001`, status: 'AVAILABLE' },
+      { name: 'MacBook Pro 16"', assetTag: `AST-${companyId}-001`, category: 'LAPTOP', serialNumber: `MBP-${companyId}-001`, status: 'AVAILABLE' },
+      { name: 'Dell UltraSharp 27" Monitor', assetTag: `AST-${companyId}-002`, category: 'MONITOR', serialNumber: `DEL-${companyId}-001`, status: 'AVAILABLE' },
+      { name: 'Ergonomic Office Chair', assetTag: `AST-${companyId}-003`, category: 'OTHER', serialNumber: `CHR-${companyId}-001`, status: 'AVAILABLE' },
+      { name: 'Logitech Wireless Keyboard & Mouse', assetTag: `AST-${companyId}-004`, category: 'PERIPHERAL', serialNumber: `LOG-${companyId}-001`, status: 'AVAILABLE' },
     ];
 
     for (const asset of defaultAssets) {
@@ -186,6 +188,7 @@ export class CompanySeederService implements OnModuleInit {
         await this.prisma.asset.create({
           data: {
             name: asset.name,
+            assetTag: asset.assetTag,
             category: asset.category,
             serialNumber: asset.serialNumber,
             status: asset.status,
