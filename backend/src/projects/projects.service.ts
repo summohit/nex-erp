@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -48,10 +48,11 @@ export class ProjectsService {
             name: 'Main Board',
             columns: {
               create: [
-                { name: 'To Do', color: '#6b7280', position: 0 },
-                { name: 'In Progress', color: '#3b82f6', position: 1 },
-                { name: 'In Review', color: '#8b5cf6', position: 2 },
-                { name: 'Done', color: '#22c55e', position: 3 },
+                { name: 'To Do', color: '#6b7280', position: 0, isSystem: true },
+                { name: 'In Progress', color: '#3b82f6', position: 1, isSystem: true },
+                { name: 'In Review', color: '#8b5cf6', position: 2, isSystem: true },
+                { name: 'Done', color: '#22c55e', position: 3, isSystem: true },
+                { name: 'Archived', color: '#9ca3af', position: 4, isSystem: true }
               ]
             }
           }
@@ -64,7 +65,7 @@ export class ProjectsService {
 
   async getProjects(companyId: number, userId: number, role: string) {
     const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN';
-    const whereClause: any = { companyId };
+    const whereClause: any = { companyId, status: 'ACTIVE' };
     
     const emp = await this.prisma.employee.findUnique({ where: { userId } });
     const empId = emp ? emp.id : userId;
@@ -89,6 +90,30 @@ export class ProjectsService {
           select: { isStarred: true }
         }
       }
+    });
+  }
+
+  async getArchivedProjects(companyId: number, userId: number, role: string) {
+    const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN';
+    const whereClause: any = { companyId, status: 'ARCHIVED' };
+    
+    const emp = await this.prisma.employee.findUnique({ where: { userId } });
+    const empId = emp ? emp.id : userId;
+
+    if (!isAdmin) {
+      whereClause.members = {
+        some: { employeeId: empId }
+      };
+    }
+
+    return this.prisma.project.findMany({
+      where: whereClause,
+      include: {
+        _count: {
+          select: { members: true, issues: true }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
     });
   }
 
@@ -416,9 +441,53 @@ export class ProjectsService {
       throw new NotFoundException('Project not found');
     }
 
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.color !== undefined) updateData.color = data.color;
+
     return this.prisma.project.update({
       where: { id },
-      data: { color: data.color }
+      data: updateData
+    });
+  }
+
+  async archiveProject(companyId: number, projectId: number, force: boolean) {
+    const project = await this.prisma.project.findUnique({ where: { id: projectId, companyId } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    if (!force) {
+      const activeTasksCount = await this.prisma.issue.count({
+        where: {
+          projectId,
+          companyId,
+          isArchived: false,
+          status: { notIn: ['DONE', 'CANCELLED'] }
+        }
+      });
+      if (activeTasksCount > 0) {
+        throw new ConflictException({
+          message: `There are ${activeTasksCount} active tasks remaining in this board.`,
+          activeTasksCount
+        });
+      }
+    }
+
+    return this.prisma.project.update({
+      where: { id: projectId },
+      data: { status: 'ARCHIVED' }
+    });
+  }
+
+  async unarchiveProject(companyId: number, projectId: number) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, companyId }
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    return this.prisma.project.update({
+      where: { id: projectId },
+      data: { status: 'ACTIVE' }
     });
   }
 }

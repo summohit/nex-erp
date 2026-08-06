@@ -6,18 +6,19 @@ import { AuthService } from '../../services/auth.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
 import { MasterDataService, Department, Designation } from '../../services/master-data.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucidePlus, LucideSearch, LucideX, LucideChevronRight } from '@lucide/angular';
+import { LucidePlus, LucideSearch, LucideX, LucideChevronRight, LucideUpload } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
 import { EmployeeDrawerComponent } from '../employee-drawer/employee-drawer';
+import { BulkUploadModalComponent } from '../components/bulk-upload-modal/bulk-upload-modal';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 @Component({
   selector: 'app-employee-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucidePlus, LucideSearch, LucideX, LucideChevronRight, AgGridAngular, EmployeeDrawerComponent],
+  imports: [CommonModule, FormsModule, LucidePlus, LucideSearch, LucideX, LucideChevronRight, LucideUpload, AgGridAngular, EmployeeDrawerComponent, BulkUploadModalComponent],
   templateUrl: './employee-list.html',
   styleUrls: ['./employee-list.css']
 })
@@ -33,12 +34,25 @@ export class EmployeeListComponent implements OnInit {
   designations = signal<Designation[]>([]);
   
   isDrawerOpen = false;
+  isBulkUploadOpen = false;
   selectedEmployee: Employee | null = null;
   gridApi: any;
 
   isAdmin(): boolean {
     const role = this.authService.currentUser()?.role;
     return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN';
+  }
+
+  openBulkUpload() {
+    this.isBulkUploadOpen = true;
+  }
+
+  onBulkUploadClose(success: boolean) {
+    this.isBulkUploadOpen = false;
+    if (success) {
+      this.toast.success('Bulk upload completed');
+      this.loadEmployees();
+    }
   }
 
   // --- Modal Search State ---
@@ -194,7 +208,14 @@ export class EmployeeListComponent implements OnInit {
       cellRendererParams: {
         onEdit: (data: any) => this.openDrawer(data),
         onDelete: (data: any) => this.deleteEmployee(data.id),
-        onViewProfile: (data: any) => this.router.navigate(['/employees', data.id, 'profile'])
+        onViewProfile: (data: any) => this.router.navigate(['/employees', data.id, 'profile']),
+        onResendVerification: (data: any) => {
+          if (!data.user?.email) return;
+          this.authService.resendVerification(data.user.email).subscribe({
+            next: () => this.toast.success(`Verification email sent to ${data.user.email}`),
+            error: () => this.toast.error('Failed to send verification email')
+          });
+        }
       }
     }
   ];

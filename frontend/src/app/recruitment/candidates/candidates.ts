@@ -63,6 +63,7 @@ export class CandidatesComponent implements OnInit {
   showInterviewForm = signal(false);
   newInterview = signal<any>({});
   editInterviewMode = signal<number | null>(null);
+  isSubmittingInterview = signal<boolean>(false);
   interviews = signal<any[]>([]);
   minDate = new Date().toISOString().slice(0, 16);
   employees = signal<any[]>([]);
@@ -338,6 +339,7 @@ export class CandidatesComponent implements OnInit {
     this.showInterviewForm.set(false);
     this.editInterviewMode.set(null);
     this.newInterview.set({});
+    this.isSubmittingInterview.set(false);
   }
 
   submitInterview() {
@@ -349,6 +351,7 @@ export class CandidatesComponent implements OnInit {
       return;
     }
     
+    this.isSubmittingInterview.set(true);
     const editId = this.editInterviewMode();
     if (editId) {
       this.candidatesService.updateInterview(editId, data).subscribe({
@@ -356,8 +359,12 @@ export class CandidatesComponent implements OnInit {
           this.toast.success('Interview updated');
           this.cancelInterviewForm();
           this.loadInterviews(app.id);
+          this.isSubmittingInterview.set(false);
         },
-        error: () => this.toast.error('Failed to update interview')
+        error: () => {
+          this.toast.error('Failed to update interview');
+          this.isSubmittingInterview.set(false);
+        }
       });
     } else {
       this.candidatesService.scheduleInterview(app.id, data).subscribe({
@@ -365,8 +372,12 @@ export class CandidatesComponent implements OnInit {
           this.toast.success('Interview scheduled');
           this.cancelInterviewForm();
           this.loadInterviews(app.id);
+          this.isSubmittingInterview.set(false);
         },
-        error: () => this.toast.error('Failed to schedule interview')
+        error: () => {
+          this.toast.error('Failed to schedule interview');
+          this.isSubmittingInterview.set(false);
+        }
       });
     }
   }

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Req, UseGuards, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Patch, Body, Req, UseGuards, Param, ParseIntPipe } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -17,6 +17,11 @@ export class ProjectsController {
     return this.projectsService.getProjects(req.user.companyId, req.user.sub, req.user.role);
   }
 
+  @Get('archived')
+  getArchivedProjects(@Req() req) {
+    return this.projectsService.getArchivedProjects(req.user.companyId, req.user.sub, req.user.role);
+  }
+
   @Get(':id')
   getProjectDetails(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.projectsService.getProjectDetails(req.user.companyId, id, req.user.sub, req.user.role);
@@ -25,6 +30,19 @@ export class ProjectsController {
   @Get(':id/summary')
   getProjectSummary(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.projectsService.getProjectSummary(req.user.companyId, id);
+  }
+
+  @Patch(':id/archive')
+  archiveProject(@Req() req, @Param('id', ParseIntPipe) id: number, @Body('force') force: boolean) {
+    return this.projectsService.archiveProject(req.user.companyId, id, force);
+  }
+
+  @Patch(':id/unarchive')
+  unarchiveProject(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number
+  ) {
+    return this.projectsService.unarchiveProject(req.user.companyId, id);
   }
 
   @Put(':id')

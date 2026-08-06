@@ -9,9 +9,11 @@ import { LabelsController } from './labels/labels.controller';
 import { LabelsService } from './labels/labels.service';
 
 import { PrismaModule } from '../prisma/prisma.module';
+import { EventsModule } from '../events/events.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, EventsModule, NotificationsModule],
   controllers: [ProjectsController, IssuesController, BoardsController, LabelsController],
   providers: [ProjectsService, IssuesService, BoardsService, LabelsService]
 })

@@ -93,8 +93,26 @@
         <span class="user-email">{{ user().email }}</span>
       </div>
     </div>
-    <button (click)="logout()" class="btn-logout-icon" title="Logout">
-      <svg lucideChevronRight size="16"></svg>
+    <button (click)="promptLogout()" class="btn-logout-icon" title="Logout">
+      <svg lucideLogOut size="18"></svg>
     </button>
+  </div>
+  
+  <div class="modal-overlay" *ngIf="showLogoutModal()" (click)="cancelLogout()">
+    <div class="modal-container" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Confirm Logout</h3>
+        <button class="btn-icon" (click)="cancelLogout()">
+          <svg lucideX size="20"></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to log out of your session?</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" (click)="cancelLogout()">Cancel</button>
+        <button class="btn-danger" (click)="confirmLogout()">Logout</button>
+      </div>
+    </div>
   </div>
 </aside>

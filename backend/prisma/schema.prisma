@@ -640,6 +640,8 @@ model BoardColumn {
   boardId   Int
   board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   issues    Issue[]
+  isSystem  Boolean  @default(false)
+  isArchived Boolean @default(false)
 
   @@unique([boardId, position])
 }

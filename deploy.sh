@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 # ═══════════════════════════════════════════════════════════
 #  NEX ERP - One-Command Deployment Script

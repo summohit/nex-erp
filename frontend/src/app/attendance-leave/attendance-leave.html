@@ -306,15 +306,24 @@
     </div>
 
     <div class="drawer-body">
+      <!-- HR Unassigned Leave Balances Warning Alert -->
+      <div *ngIf="myBalances().length === 0" style="background-color: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px;">
+        <svg lucideAlertCircle size="20" style="color: #DC2626; flex-shrink: 0; margin-top: 2px;"></svg>
+        <div>
+          <strong style="color: #991B1B; font-size: 14px; display: block; margin-bottom: 2px;">No Leave Balances Assigned</strong>
+          <span style="color: #7F1D1D; font-size: 13px; line-height: 1.4; display: block;">You do not have any active leave types assigned to your profile. Please contact your HR administrator to allocate leave balances.</span>
+        </div>
+      </div>
+
       <div class="form-group mb-4">
         <label>Leave Type <span style="color: #E14B42;">*</span></label>
-        <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#E14B42' : ''">
-          <option value="">Select Leave Type...</option>
+        <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#E14B42' : ''" [disabled]="myBalances().length === 0">
+          <option value="">{{ myBalances().length === 0 ? 'No Leave Types Available' : 'Select Leave Type...' }}</option>
           <option *ngFor="let balance of myBalances()" [value]="balance.leaveType.id">
             {{ balance.leaveType.name }} ({{ balance.allocated + balance.carriedOver - balance.used }} days available)
           </option>
         </select>
-        <div *ngIf="showFormErrors() && !requestForm.leaveTypeId" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Leave Type is required</div>
+        <div *ngIf="showFormErrors() && !requestForm.leaveTypeId && myBalances().length > 0" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Leave Type is required</div>
       </div>
 
       <div class="grid-2-col mb-4">
@@ -363,10 +372,9 @@
     </div>
 
 
-
     <div class="drawer-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
       <button class="btn btn-outline" (click)="closeRequestModal()" style="width: max-content;">Cancel</button>
-      <button class="btn btn-primary" (click)="submitLeaveRequest()" [disabled]="isSubmittingRequest()" style="width: max-content; display: flex; align-items: center; gap: 8px;">
+      <button class="btn btn-primary" (click)="submitLeaveRequest()" [disabled]="isSubmittingRequest() || myBalances().length === 0" style="width: max-content; display: flex; align-items: center; gap: 8px;">
         <span *ngIf="isSubmittingRequest()" class="btn-spinner"></span>
         {{ isSubmittingRequest() ? 'Submitting...' : 'Submit Request' }}
       </button>

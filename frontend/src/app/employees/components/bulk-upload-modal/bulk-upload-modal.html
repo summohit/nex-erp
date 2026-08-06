@@ -1,0 +1,142 @@
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal-container" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="modal-header">
+      <h2>Bulk Import Employees</h2>
+      <button class="close-btn" (click)="closeModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+      
+      <!-- State 1: Uploading -->
+      <div class="state-container" *ngIf="isUploading">
+        <div class="spinner"></div>
+        <p>Uploading and processing your file... Please wait.</p>
+      </div>
+
+      <!-- State 2: Results -->
+      <div class="state-container results-container" *ngIf="uploadResult && !isUploading">
+        <div class="results-summary">
+          <div class="summary-card success">
+            <span class="count">{{ uploadResult.successCount }}</span>
+            <span class="label">Imported Successfully</span>
+          </div>
+          <div class="summary-card failure" *ngIf="uploadResult.failedCount > 0">
+            <span class="count">{{ uploadResult.failedCount }}</span>
+            <span class="label">Failed to Import</span>
+          </div>
+        </div>
+
+        <div class="error-list" *ngIf="uploadResult.errors.length > 0">
+          <h4>Error Details</h4>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Row</th>
+                  <th>Email</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let err of uploadResult.errors">
+                  <td>{{ err.row }}</td>
+                  <td>{{ err.email || 'N/A' }}</td>
+                  <td class="text-danger">{{ err.reason }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="actions center">
+          <button class="btn btn-primary" (click)="closeModal()">Done</button>
+        </div>
+      </div>
+
+      <!-- State 3: File Input (Initial State) -->
+      <div class="state-container" *ngIf="!isUploading && !uploadResult">
+        <div class="info-banner">
+          <p>
+            Download our <a href="javascript:void(0)" (click)="downloadTemplate()" class="text-blue">Example CSV</a> 
+            to see the required format. Unrecognized departments or designations will be marked as "Unassigned".
+          </p>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+          <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #334155;">Bulk Assign (Optional Override)</h4>
+          <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b;">Select values below to apply them to <b>all</b> imported employees, overriding any values in the CSV.</p>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 4px;">Department</label>
+              <select class="form-control" [(ngModel)]="selectedDepartmentId" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: #fff;">
+                <option [ngValue]="null">From CSV</option>
+                <option *ngFor="let d of departments()" [ngValue]="d.id">{{ d.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 4px;">Designation</label>
+              <select class="form-control" [(ngModel)]="selectedDesignationId" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: #fff;">
+                <option [ngValue]="null">From CSV</option>
+                <option *ngFor="let d of designations()" [ngValue]="d.id">{{ d.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 4px;">Role</label>
+              <select class="form-control" [(ngModel)]="selectedRole" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: #fff;">
+                <option [ngValue]="null">From CSV</option>
+                <option value="EMPLOYEE">Employee</option>
+                <option value="HR">HR</option>
+                <option value="ADMIN">Admin</option>
+                <option value="FINANCE">Finance</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div 
+          class="drop-zone" 
+          (dragover)="onDragOver($event)" 
+          (drop)="onDrop($event)"
+          (click)="fileInput.click()"
+          [class.has-file]="!!selectedFile"
+        >
+          <input 
+            type="file" 
+            #fileInput 
+            (change)="onFileSelected($event)" 
+            accept=".csv" 
+            style="display: none;"
+          />
+          
+          <div class="drop-content" *ngIf="!selectedFile">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="upload-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            <p><strong>Click to browse</strong> or drag and drop a CSV file here</p>
+          </div>
+
+          <div class="drop-content" *ngIf="selectedFile">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="file-icon"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <p><strong>{{ selectedFile.name }}</strong> selected</p>
+            <p class="text-sm text-slate-500">{{ (selectedFile.size / 1024).toFixed(1) }} KB</p>
+          </div>
+        </div>
+
+        <div class="error-alert" *ngIf="uploadError">
+          {{ uploadError }}
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-secondary" (click)="closeModal()">Cancel</button>
+          <button class="btn btn-primary" [disabled]="!selectedFile" (click)="uploadFile()">
+            Upload & Import
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

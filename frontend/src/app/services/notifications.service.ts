@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { io, Socket } from 'socket.io-client';
 import { AuthService } from './auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { environment } from '../../environments/environment';
 
 export interface NotificationItem {
   id: number;
@@ -38,7 +39,7 @@ export class NotificationsService {
     const token = this.authService.getToken();
     if (!token) return;
 
-    this.http.get<{ notifications: NotificationItem[]; unreadCount: number }>('/api/notifications')
+    this.http.get<{ notifications: NotificationItem[]; unreadCount: number }>(`${environment.apiUrl}/notifications`)
       .subscribe({
         next: (res) => {
           this.notifications.set(res.notifications || []);

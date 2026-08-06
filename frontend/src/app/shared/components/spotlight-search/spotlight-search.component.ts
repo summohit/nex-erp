@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, HostListener, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, inject, signal, computed, HostListener, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -15,7 +15,7 @@ export interface SearchResultItem {
   category: 'Navigation' | 'Employees' | 'Projects' | 'Settings';
   title: string;
   subtitle?: string;
-  icon: any;
+  iconName: string;
   action: () => void;
 }
 
@@ -48,17 +48,17 @@ export class SpotlightSearchComponent {
 
   // Navigation Items
   private navItems: SearchResultItem[] = [
-    { id: 'nav-dash', category: 'Navigation', title: 'Dashboard', subtitle: 'Executive overview & quick stats', icon: LucideLayers, action: () => this.navigate('/dashboard') },
-    { id: 'nav-emp', category: 'Navigation', title: 'Employee Directory', subtitle: 'View all staff and team profiles', icon: LucideUser, action: () => this.navigate('/employees/directory') },
-    { id: 'nav-org', category: 'Navigation', title: 'Organization Chart', subtitle: 'Interactive visual org hierarchy', icon: LucideBuilding, action: () => this.navigate('/employees/org-chart') },
-    { id: 'nav-docs', category: 'Navigation', title: 'Employee Documents Center', subtitle: 'Company policies & verification files', icon: LucideFileText, action: () => this.navigate('/employees/documents') },
-    { id: 'nav-att', category: 'Navigation', title: 'Attendance & Leave Management', subtitle: 'Clock-in logs & leave requests', icon: LucideCalendar, action: () => this.navigate('/attendance') },
-    { id: 'nav-prj', category: 'Navigation', title: 'Projects & Kanban Board', subtitle: 'Jira-style task management', icon: LucideBriefcase, action: () => this.navigate('/projects') },
-    { id: 'nav-pay', category: 'Navigation', title: 'Payroll & Compensation', subtitle: 'Salary slips & salary structures', icon: LucideDollarSign, action: () => this.navigate('/payroll') },
-    { id: 'nav-ast', category: 'Navigation', title: 'Asset Management', subtitle: 'Company hardware & laptops', icon: LucideBriefcase, action: () => this.navigate('/assets') },
-    { id: 'nav-awa', category: 'Navigation', title: 'Appreciation & Awards', subtitle: 'Employee recognition badges', icon: LucideAward, action: () => this.navigate('/appreciation') },
-    { id: 'nav-master', category: 'Settings', title: 'Master Data Settings', subtitle: 'Manage Branches, Departments & Designations', icon: LucideSettings, action: () => this.navigate('/settings/master-data') },
-    { id: 'nav-perm', category: 'Settings', title: 'Roles & Permissions', subtitle: 'RBAC module access matrix', icon: LucideShieldCheck, action: () => this.navigate('/settings/permissions') },
+    { id: 'nav-dash', category: 'Navigation', title: 'Dashboard', subtitle: 'Executive overview & quick stats', iconName: 'layers', action: () => this.navigate('/dashboard') },
+    { id: 'nav-emp', category: 'Navigation', title: 'Employee Directory', subtitle: 'View all staff and team profiles', iconName: 'user', action: () => this.navigate('/employees/directory') },
+    { id: 'nav-org', category: 'Navigation', title: 'Organization Chart', subtitle: 'Interactive visual org hierarchy', iconName: 'building', action: () => this.navigate('/employees/org-chart') },
+    { id: 'nav-docs', category: 'Navigation', title: 'Employee Documents Center', subtitle: 'Company policies & verification files', iconName: 'file-text', action: () => this.navigate('/employees/documents') },
+    { id: 'nav-att', category: 'Navigation', title: 'Attendance & Leave Management', subtitle: 'Clock-in logs & leave requests', iconName: 'calendar', action: () => this.navigate('/attendance') },
+    { id: 'nav-prj', category: 'Navigation', title: 'Projects & Kanban Board', subtitle: 'Jira-style task management', iconName: 'briefcase', action: () => this.navigate('/projects') },
+    { id: 'nav-pay', category: 'Navigation', title: 'Payroll & Compensation', subtitle: 'Salary slips & salary structures', iconName: 'dollar-sign', action: () => this.navigate('/payroll') },
+    { id: 'nav-ast', category: 'Navigation', title: 'Asset Management', subtitle: 'Company hardware & laptops', iconName: 'briefcase', action: () => this.navigate('/assets') },
+    { id: 'nav-awa', category: 'Navigation', title: 'Appreciation & Awards', subtitle: 'Employee recognition badges', iconName: 'award', action: () => this.navigate('/appreciation') },
+    { id: 'nav-master', category: 'Settings', title: 'Master Data Settings', subtitle: 'Manage Branches, Departments & Designations', iconName: 'settings', action: () => this.navigate('/settings/master-data') },
+    { id: 'nav-perm', category: 'Settings', title: 'Roles & Permissions', subtitle: 'RBAC module access matrix', iconName: 'shield-check', action: () => this.navigate('/settings/permissions') },
   ];
 
   constructor() {
@@ -141,7 +141,7 @@ export class SpotlightSearchComponent {
         category: 'Employees' as const,
         title: `${e.firstName} ${e.lastName}`,
         subtitle: `${e.designation?.name || 'Staff'} • ${e.department?.name || 'General'}`,
-        icon: LucideUser,
+        iconName: 'user',
         action: () => this.navigate(`/employees/${e.id}/profile`)
       }));
 
@@ -154,7 +154,7 @@ export class SpotlightSearchComponent {
         category: 'Projects' as const,
         title: p.name,
         subtitle: `Project Code: ${p.code || 'PRJ'} • Status: ${p.status}`,
-        icon: LucideBriefcase,
+        iconName: 'briefcase',
         action: () => this.navigate(`/projects/${p.id}`)
       }));
 

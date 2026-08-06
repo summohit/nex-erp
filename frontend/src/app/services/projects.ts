@@ -45,6 +45,18 @@ export class ProjectsService {
     return this.http.put<any>(`${this.apiUrl}/${id}`, data);
   }
 
+  archiveProject(id: number, force: boolean = false) {
+    return this.http.patch(`${this.apiUrl}/${id}/archive`, { force });
+  }
+
+  getArchivedProjects() {
+    return this.http.get<any[]>(`${this.apiUrl}/archived`);
+  }
+
+  unarchiveProject(id: number) {
+    return this.http.patch(`${this.apiUrl}/${id}/unarchive`, {});
+  }
+
   toggleProjectStar(id: number) {
     return this.http.put<any>(`${this.apiUrl}/${id}/star`, {});
   }
@@ -90,11 +102,23 @@ export class ProjectsService {
   }
 
   deleteBoardColumn(projectId: number, columnId: number) {
-    return this.http.delete<any>(`${this.apiUrl}/${projectId}/boards/columns/${columnId}`);
+    return this.http.delete(`${this.apiUrl}/${projectId}/boards/columns/${columnId}`);
+  }
+
+  getArchivedBoardColumns(projectId: number) {
+    return this.http.get<any[]>(`${this.apiUrl}/${projectId}/boards/columns/archived`);
+  }
+
+  unarchiveBoardColumn(projectId: number, columnId: number) {
+    return this.http.patch(`${this.apiUrl}/${projectId}/boards/columns/${columnId}/unarchive`, {});
   }
 
   getIssueComments(projectId: number, issueId: number) {
     return this.http.get<any[]>(`${this.apiUrl}/${projectId}/issues/${issueId}/comments`);
+  }
+
+  getIssueActivities(projectId: number, issueId: number) {
+    return this.http.get<any[]>(`${this.apiUrl}/${projectId}/issues/${issueId}/activities`);
   }
 
   addIssueComment(projectId: number, issueId: number, body: string) {

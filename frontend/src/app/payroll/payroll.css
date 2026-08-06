@@ -1294,6 +1294,14 @@
   cursor: pointer;
 }
 
+.drawer-content form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .drawer-body {
   padding: 24px;
   flex: 1;
@@ -1306,6 +1314,8 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  background: #FFFFFF;
+  flex-shrink: 0;
 }
 
 .form-group {

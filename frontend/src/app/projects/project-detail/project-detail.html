@@ -61,6 +61,31 @@
         </div>
       </div>
 
+      <div class="filter-popover-container relative" style="position: relative; margin-left: 12px;">
+        <button class="top-bar-icon-btn" title="Archived lists" (click)="togglePopover('archivedLists')">
+          <svg lucideArchive size="16"></svg>
+        </button>
+
+        <!-- Archived Lists Popover -->
+        <div class="trello-popover filter-popover-panel" *ngIf="activePopover() === 'archivedLists'" (click)="$event.stopPropagation()">
+          <div class="popover-header filter-header">
+            <span class="filter-title">Archived lists</span>
+            <button class="btn-icon-tiny filter-close-btn" (click)="closePopover()">
+              <svg lucideX size="14"></svg>
+            </button>
+          </div>
+          <div class="popover-body filter-body">
+            <div *ngIf="archivedColumns().length === 0" style="padding: 12px; color: #44546f; font-size: 14px; text-align: center;">
+              No archived lists.
+            </div>
+            <div *ngFor="let col of archivedColumns()" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #dfe1e6;">
+              <span style="font-weight: 500; font-size: 14px; color: #172b4d;">{{ col.name }}</span>
+              <button class="btn-primary" style="padding: 4px 8px; font-size: 12px;" (click)="unarchiveColumn(col.id)">Unarchive</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="filter-popover-container relative" style="position: relative;">
         <button *ngIf="activeFilterCount() === 0" class="top-bar-icon-btn" title="Filter" (click)="togglePopover('filter')">
           <svg lucideFilter size="16"></svg>
@@ -589,7 +614,8 @@
                 [style.border-color]="listFilterAssigneeIds().length > 0 ? '#bfdbfe' : '#e2e8f0'">
           Assignee 
           <span *ngIf="listFilterAssigneeIds().length > 0" style="background: #3b82f6; color: white; border-radius: 999px; padding: 0 6px; font-size: 11px;">{{ listFilterAssigneeIds().length }}</span>
-          <svg lucideChevronDown size="14"></svg>
+          <svg *ngIf="activePopover() !== 'list-filter-assignee'" lucideChevronDown size="14"></svg>
+          <svg *ngIf="activePopover() === 'list-filter-assignee'" lucideX size="14"></svg>
         </button>
         <div *ngIf="activePopover() === 'list-filter-assignee'" class="custom-popover" style="position: absolute; top: calc(100% + 4px); left: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); width: 240px; z-index: 1000; padding: 12px;">
            <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Filter by Assignee</div>
@@ -619,7 +645,8 @@
                 [style.border-color]="listFilterColumnIds().length > 0 ? '#bfdbfe' : '#e2e8f0'">
           Status 
           <span *ngIf="listFilterColumnIds().length > 0" style="background: #3b82f6; color: white; border-radius: 999px; padding: 0 6px; font-size: 11px;">{{ listFilterColumnIds().length }}</span>
-          <svg lucideChevronDown size="14"></svg>
+          <svg *ngIf="activePopover() !== 'list-filter-status'" lucideChevronDown size="14"></svg>
+          <svg *ngIf="activePopover() === 'list-filter-status'" lucideX size="14"></svg>
         </button>
         <div *ngIf="activePopover() === 'list-filter-status'" class="custom-popover" style="position: absolute; top: calc(100% + 4px); left: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); width: 200px; z-index: 1000; padding: 12px;">
            <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Filter by Status</div>
@@ -640,7 +667,8 @@
                 [style.border-color]="listFilterPriorities().length > 0 ? '#bfdbfe' : '#e2e8f0'">
           Priority 
           <span *ngIf="listFilterPriorities().length > 0" style="background: #3b82f6; color: white; border-radius: 999px; padding: 0 6px; font-size: 11px;">{{ listFilterPriorities().length }}</span>
-          <svg lucideChevronDown size="14"></svg>
+          <svg *ngIf="activePopover() !== 'list-filter-priority'" lucideChevronDown size="14"></svg>
+          <svg *ngIf="activePopover() === 'list-filter-priority'" lucideX size="14"></svg>
         </button>
         <div *ngIf="activePopover() === 'list-filter-priority'" class="custom-popover" style="position: absolute; top: calc(100% + 4px); left: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); width: 180px; z-index: 1000; padding: 12px;">
            <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Filter by Priority</div>
@@ -670,9 +698,9 @@
       <!-- Clear filters -->
       <button *ngIf="listSearchQuery() || listFilterAssigneeIds().length > 0 || listFilterColumnIds().length > 0 || listFilterPriorities().length > 0 || listFilterMyIssues()" 
               (click)="clearListFilters()" 
-              style="padding: 6px 12px; font-size: 13px; font-weight: 600; color: #dc2626; background: transparent; border: none; cursor: pointer;"
-              class="hover:underline transition-all">
-        Clear all
+              style="display: flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #dc2626; background: #fff0f0; border: 1px solid #ffd7d7; border-radius: 4px; cursor: pointer;"
+              class="hover:bg-red-100 hover:text-red-700 transition-all">
+        <svg lucideX size="13"></svg> Clear filters
       </button>
 
       <!-- Export Dropdown -->
@@ -1066,20 +1094,26 @@
       </div>
       
       <button (click)="togglePopover('attachments-added-by', $event)" [style.background]="attFilterAddedBy().length > 0 ? '#e0e7ff' : '#f4f5f7'" [style.color]="attFilterAddedBy().length > 0 ? '#3730a3' : '#42526e'" style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s;" class="hover:bg-gray-200">
-        <svg lucideUser size="16"></svg> Added by <svg lucideChevronDown size="14"></svg>
+        <svg lucideUser size="16"></svg> Added by 
+        <svg *ngIf="activePopover() !== 'attachments-added-by'" lucideChevronDown size="14"></svg>
+        <svg *ngIf="activePopover() === 'attachments-added-by'" lucideX size="14"></svg>
       </button>
       
       <button (click)="togglePopover('attachments-type', $event)" [style.background]="attFilterTypes().length > 0 ? '#e0e7ff' : '#f4f5f7'" [style.color]="attFilterTypes().length > 0 ? '#3730a3' : '#42526e'" style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s;" class="hover:bg-gray-200">
-        <svg lucideFile size="16"></svg> Attachment type <svg lucideChevronDown size="14"></svg>
+        <svg lucideFile size="16"></svg> Attachment type 
+        <svg *ngIf="activePopover() !== 'attachments-type'" lucideChevronDown size="14"></svg>
+        <svg *ngIf="activePopover() === 'attachments-type'" lucideX size="14"></svg>
       </button>
 
       <button (click)="togglePopover('attachments-date', $event)" [style.background]="attFilterDate() ? '#e0e7ff' : '#f4f5f7'" [style.color]="attFilterDate() ? '#3730a3' : '#42526e'" style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s;" class="hover:bg-gray-200">
-        <svg lucideCalendar size="16"></svg> Date added <svg lucideChevronDown size="14"></svg>
+        <svg lucideCalendar size="16"></svg> Date added 
+        <svg *ngIf="activePopover() !== 'attachments-date'" lucideChevronDown size="14"></svg>
+        <svg *ngIf="activePopover() === 'attachments-date'" lucideX size="14"></svg>
       </button>
 
       <button *ngIf="attSearchQuery() || attFilterAddedBy().length > 0 || attFilterTypes().length > 0 || attFilterDate()"
               (click)="attSearchQuery.set(''); attFilterAddedBy.set([]); attFilterTypes.set([]); attFilterDate.set('')"
-              style="display: flex; align-items: center; gap: 4px; padding: 8px 12px; border: none; background: transparent; color: #5e6c84; font-size: 14px; font-weight: 600; cursor: pointer; transition: color 0.15s; margin-left: 4px;" class="hover:text-gray-900 hover:bg-gray-100 rounded">
+              style="display: flex; align-items: center; gap: 4px; padding: 8px 12px; border: 1px solid #ffd7d7; background: #fff0f0; color: #dc2626; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-left: 4px; border-radius: 4px;" class="hover:bg-red-100 hover:text-red-700">
         <svg lucideX size="14"></svg> Clear filters
       </button>
     </div>
@@ -1423,10 +1457,7 @@
               <td style="padding: 12px 16px; font-size: 13px; font-weight: 600; color: #0052cc; cursor: pointer;" (click)="openIssueDetails(issue)">{{ issue.key }}</td>
               <td style="padding: 12px 16px; font-size: 14px; color: #172b4d; font-weight: 500; cursor: pointer;" (click)="openIssueDetails(issue)">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <img *ngIf="issue.type === 'TASK'" src="/task_icon.svg" style="width: 16px; height: 16px;" alt="Task">
-                  <img *ngIf="issue.type === 'BUG'" src="/bug_icon.svg" style="width: 16px; height: 16px;" alt="Bug">
-                  <img *ngIf="issue.type === 'STORY'" src="/story_icon.svg" style="width: 16px; height: 16px;" alt="Story">
-                  <img *ngIf="issue.type === 'EPIC'" src="/epic_icon.svg" style="width: 16px; height: 16px;" alt="Epic">
+                  <span class="type-pill" [ngClass]="(issue.type || 'TASK').toLowerCase()" style="margin-right: 4px; font-size: 10px; padding: 2px 6px;">{{ issue.type || 'TASK' }}</span>
                   {{ issue.title }}
                 </div>
               </td>
@@ -1481,9 +1512,26 @@
         <!-- Column Header -->
         <div class="trello-column-header" cdkDragHandle>
           <div class="col-title-group">
-            <h3 class="col-title" [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#172b4d'">{{ col.name }}</h3>
-            <span class="col-count" [style.background]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? 'rgba(255,255,255,0.2)' : 'rgba(9, 30, 66, 0.08)'"
-                                    [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'">
+            <h3 class="col-title" 
+                *ngIf="editingColumnId() !== col.id"
+                (click)="startEditingColumn(col)"
+                title="Click to rename"
+                style="cursor: pointer;"
+                [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#172b4d'">{{ col.name }}</h3>
+            
+            <input type="text" 
+                   *ngIf="editingColumnId() === col.id"
+                   class="col-title-input"
+                   [value]="col.name"
+                   (blur)="renameColumn(col, $event)"
+                   (keydown.enter)="renameColumn(col, $event)"
+                   appAutofocus
+                   style="background: rgba(255,255,255,0.9); border: 2px solid #2563eb; border-radius: 4px; padding: 2px 6px; font-size: 14px; font-weight: 600; color: #172b4d; width: 140px; outline: none; margin-right: 8px;">
+
+            <span class="col-count" 
+                  *ngIf="editingColumnId() !== col.id"
+                  [style.background]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? 'rgba(255,255,255,0.2)' : 'rgba(9, 30, 66, 0.08)'"
+                  [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'">
               {{ getColumnIssues(col.id).length }}
             </span>
           </div>
@@ -1605,6 +1653,13 @@
                       <span>{{ ts.display }}</span>
                     </div>
                   </ng-container>
+
+                  <!-- Comments Indicator -->
+                  <div *ngIf="issue._count?.comments > 0" title="{{ issue._count.comments }} comment(s)" style="display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #5e6c84; background: #f4f5f7; padding: 2px 6px; border-radius: 4px;">
+                    <svg lucideMessageSquare size="11"></svg>
+                    <span>{{ issue._count.comments }}</span>
+                    <span style="width: 6px; height: 6px; background: #ef4444; border-radius: 50%; margin-left: 2px; box-shadow: 0 0 0 2px #f4f5f7;" title="New unread comments"></span>
+                  </div>
                 </div>
 
                 <div class="card-member-avatars-row flex items-center -space-x-1" *ngIf="issue.members && issue.members.length > 0">
@@ -2229,6 +2284,7 @@
             <div class="description-action-bar">
               <button class="btn-trello-save" (click)="saveIssue()" type="button">Save</button>
               <button class="btn-trello-cancel" (click)="cancelDescriptionEdit()" type="button">Cancel</button>
+              <button class="btn-trello-cancel" (click)="clearDescription()" type="button">Clear</button>
             </div>
           </div>
         </div>
@@ -2403,37 +2459,51 @@
         </div>
       </div>
 
-      <!-- Activity & Comments Feed (Screenshot 3) -->
+      <!-- Activity & Comments Feed -->
       <div class="activity-feed">
-        <!-- Live Comments List -->
-        <div class="activity-item comment-card-item" *ngFor="let comment of comments()">
-          <div class="avatar-bubble orange">
-            {{ comment.author?.firstName ? comment.author.firstName.charAt(0).toUpperCase() : 'T' }}
-          </div>
-          <div class="activity-details">
-            <div class="comment-author-line">
-              <strong>{{ comment.author?.firstName || 'taskhive' }} {{ comment.author?.lastName || '' }}</strong>
-              <a class="activity-time-link">{{ comment.createdAt ? (comment.createdAt | date:'shortTime') : 'just now' }}</a>
+        <!-- Live Comments & Activities List -->
+        <ng-container *ngFor="let item of feedItems()">
+          
+          <!-- Comment Item -->
+          <div class="activity-item comment-card-item" *ngIf="item.feedType === 'COMMENT'">
+            <div class="avatar-bubble" [style.background]="getMemberColor({employee: item.author})">
+              <img *ngIf="item.author?.avatarUrl" [src]="item.author.avatarUrl" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+              <span *ngIf="!item.author?.avatarUrl">{{ item.author?.firstName ? item.author.firstName.charAt(0).toUpperCase() : 'U' }}</span>
             </div>
-            <div class="comment-white-bubble">{{ comment.body }}</div>
-            <div class="comment-footer-actions">
-              <span class="action-reaction-btn" title="Add reaction">😊</span>
-              <span class="action-dot">•</span>
-              <a class="action-link-btn" (click)="commentText = comment.body; isEditingComment.set(true)">Edit</a>
-              <span class="action-dot">•</span>
-              <a class="action-link-btn" (click)="deleteComment(comment.id)">Delete</a>
+            <div class="activity-details">
+              <div class="comment-author-line">
+                <strong>{{ item.author?.firstName || 'Unknown' }} {{ item.author?.lastName || '' }}</strong>
+                <a class="activity-time-link">{{ item.createdAt | date:'shortTime' }}</a>
+              </div>
+              <div class="comment-white-bubble" [innerHTML]="item.body"></div>
+              <div class="comment-footer-actions">
+                <span class="action-reaction-btn" title="Add reaction">😊</span>
+                <span class="action-dot">•</span>
+                <a class="action-link-btn" (click)="commentText = item.body; isEditingComment.set(true)">Edit</a>
+                <span class="action-dot">•</span>
+                <a class="action-link-btn" (click)="deleteComment(item.id)">Delete</a>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- System Activity Row -->
-        <div class="activity-item">
-          <div class="avatar-bubble orange">T</div>
-          <div class="activity-details">
-            <p><strong>taskhive</strong> added this card to {{ getColumnName(issueForm.columnId) }}</p>
-            <a class="activity-time-link">9 minutes ago</a>
+          <!-- Activity Item -->
+          <div class="activity-item" *ngIf="item.feedType === 'ACTIVITY'">
+            <div class="avatar-bubble" [style.background]="getMemberColor({employee: item.actor})">
+              <img *ngIf="item.actor?.avatarUrl" [src]="item.actor.avatarUrl" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+              <span *ngIf="!item.actor?.avatarUrl">{{ item.actor?.firstName ? item.actor.firstName.charAt(0).toUpperCase() : 'U' }}</span>
+            </div>
+            <div class="activity-details">
+              <p>
+                <strong>{{ item.actor?.firstName || 'Unknown' }}</strong>
+                <span *ngIf="item.action === 'CREATED'"> created this card</span>
+                <span *ngIf="item.action === 'STATUS_CHANGED'"> moved this card to {{ getColumnName(item.newValue) || item.newValue }}</span>
+                <span *ngIf="item.action === 'ASSIGNED'"> assigned this card to someone</span>
+              </p>
+              <a class="activity-time-link">{{ item.createdAt | date:'shortTime' }}</a>
+            </div>
           </div>
-        </div>
+
+        </ng-container>
       </div>
     </div>
 

@@ -9,8 +9,8 @@ export class AttendanceService {
     const employee = await this.prisma.employee.findUnique({ where: { userId } });
     if (!employee) throw new BadRequestException('Employee profile not found');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 
     return this.prisma.attendance.findUnique({
       where: {
@@ -48,8 +48,8 @@ export class AttendanceService {
     });
     if (!employee) throw new BadRequestException('Employee profile not found');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const nowLocal = new Date();
+    const today = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()));
 
     const existing = await this.prisma.attendance.findUnique({
       where: { employeeId_date: { employeeId: employee.id, date: today } }
@@ -109,8 +109,8 @@ export class AttendanceService {
     });
     if (!employee) throw new BadRequestException('Employee profile not found');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const nowLocal = new Date();
+    const today = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()));
 
     const existing = await this.prisma.attendance.findUnique({
       where: { employeeId_date: { employeeId: employee.id, date: today } }

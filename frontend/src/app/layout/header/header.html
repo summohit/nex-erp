@@ -31,7 +31,7 @@
           <button class="btn-close-popover" (click)="isQuickCreateOpen.set(false)"><svg lucideX size="14"></svg></button>
         </div>
         <div class="popover-menu-list">
-          <a routerLink="/employees/directory" (click)="isQuickCreateOpen.set(false)" class="menu-item">
+          <a *ngIf="hasAccessToDirectory()" routerLink="/employees/directory" (click)="isQuickCreateOpen.set(false)" class="menu-item">
             <svg lucideUser size="16" class="text-blue-600"></svg>
             <div class="menu-item-text">
               <span class="item-title">Add New Employee</span>
@@ -105,7 +105,7 @@
           <span *ngIf="!currentUser()?.employee?.avatarUrl">{{ getUserInitials() }}</span>
         </div>
         <div class="user-details hidden md:flex">
-          <span class="user-name">{{ currentUser()?.firstName || 'User' }} {{ currentUser()?.lastName || '' }}</span>
+          <span class="user-name">{{ currentUser()?.employee?.firstName || currentUser()?.firstName || 'User' }} {{ currentUser()?.employee?.lastName || currentUser()?.lastName || '' }}</span>
           <span class="user-role">{{ getUserRoleLabel() }}</span>
         </div>
         <svg lucideChevronDown size="14" class="text-slate-400"></svg>
@@ -114,7 +114,7 @@
       <!-- User Profile Menu -->
       <div class="header-popover profile-menu-popover" *ngIf="isProfileMenuOpen()" (click)="$event.stopPropagation()">
         <div class="profile-menu-header">
-          <span class="menu-user-name">{{ currentUser()?.firstName }} {{ currentUser()?.lastName }}</span>
+          <span class="menu-user-name">{{ currentUser()?.employee?.firstName || currentUser()?.firstName }} {{ currentUser()?.employee?.lastName || currentUser()?.lastName }}</span>
           <span class="menu-user-email">{{ currentUser()?.email }}</span>
         </div>
         
@@ -123,9 +123,9 @@
             <svg lucideUser size="15"></svg>
             <span>My Profile</span>
           </a>
-          <a routerLink="/settings/company" (click)="isProfileMenuOpen.set(false)" class="menu-link">
-            <svg lucideSettings size="15"></svg>
-            <span>Company Settings</span>
+          <a routerLink="/projects" (click)="isProfileMenuOpen.set(false)" class="menu-link">
+            <svg lucideKanban size="15"></svg>
+            <span>Projects</span>
           </a>
         </div>
 

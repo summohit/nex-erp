@@ -4,10 +4,16 @@ import axios from 'axios';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import FormData from 'form-data';
+import { TasksGateway } from '../../events/tasks/tasks.gateway';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 @Injectable()
 export class IssuesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private tasksGateway: TasksGateway,
+    private notificationsService: NotificationsService
+  ) {}
 
   async createIssue(companyId: number, reporterId: number, projectId: number, data: any) {
     const project = await this.prisma.project.findUnique({ where: { id: projectId, companyId } });
@@ -53,9 +59,15 @@ export class IssuesService {
       }
     });
 
-    await this.prisma.issueActivity.create({
-      data: { action: 'CREATED', issueId: issue.id, actorId: reporterId }
+    const activity = await this.prisma.issueActivity.create({
+      data: { action: 'CREATED', issueId: issue.id, actorId: reporterId },
+      include: {
+        actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
+      }
     });
+
+    this.tasksGateway.emitIssueUpdated(issue.id, projectId, issue);
+    this.tasksGateway.emitActivityAdded(issue.id, activity);
 
     return issue;
   }
@@ -71,7 +83,8 @@ export class IssuesService {
         attachments: { include: { uploader: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
         parent: { select: { id: true, key: true, title: true, type: true, status: true } },
         children: { select: { id: true, key: true, title: true, type: true, status: true, priority: true, assignee: { select: { avatarUrl: true } } }, orderBy: { position: 'asc' } },
-        timeLogs: { select: { id: true, durationMin: true, startedAt: true, endedAt: true } }
+        timeLogs: { select: { id: true, durationMin: true, startedAt: true, endedAt: true } },
+        _count: { select: { comments: true } }
       },
       orderBy: { position: 'asc' }
     });
@@ -116,7 +129,7 @@ export class IssuesService {
 
     // Simple activity logging for column change
     if (data.columnId && Number(data.columnId) !== oldIssue.columnId) {
-      await this.prisma.issueActivity.create({
+      const activity = await this.prisma.issueActivity.create({
         data: {
           action: 'STATUS_CHANGED',
           field: 'columnId',
@@ -124,9 +137,17 @@ export class IssuesService {
           newValue: data.columnId.toString(),
           issueId,
           actorId: employeeId
+        },
+        include: {
+          actor: {
+            select: { id: true, firstName: true, lastName: true, avatarUrl: true }
+          }
         }
       });
+      this.tasksGateway.emitActivityAdded(issueId, activity);
     }
+
+    this.tasksGateway.emitIssueUpdated(issueId, projectId, issue);
 
     return issue;
   }
@@ -248,6 +269,26 @@ export class IssuesService {
     });
   }
 
+  async getActivities(companyId: number, projectId: number, issueId: number) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    return this.prisma.issueActivity.findMany({
+      where: { issueId },
+      include: {
+        actor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+  }
+
   async addComment(companyId: number, userId: number, projectId: number, issueId: number, body: string) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
@@ -273,13 +314,44 @@ export class IssuesService {
       }
     });
 
-    await this.prisma.issueActivity.create({
+    const activity = await this.prisma.issueActivity.create({
       data: {
         action: 'COMMENT_ADDED',
         issueId,
         actorId: authorId
+      },
+      include: {
+        actor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true
+          }
+        }
       }
     });
+
+    this.tasksGateway.emitCommentAdded(issueId, comment);
+    this.tasksGateway.emitActivityAdded(issueId, activity);
+
+    // Notify assignee or reporter
+    const notifyUserId = issue.assigneeId && issue.assigneeId !== authorId ? issue.assigneeId : 
+                         issue.reporterId && issue.reporterId !== authorId ? issue.reporterId : null;
+    
+    if (notifyUserId) {
+      const u = await this.prisma.employee.findUnique({ where: { id: notifyUserId }, select: { userId: true } });
+      if (u) {
+        await this.notificationsService.createNotification(
+          u.userId,
+          `New Comment on ${issue.key}`,
+          `${comment.author?.firstName || 'Someone'} commented: ${body.substring(0, 50)}...`,
+          'INFO',
+          `/projects/${projectId}?issue=${issue.key}`,
+          companyId
+        );
+      }
+    }
 
     return comment;
   }

@@ -8,7 +8,7 @@ import { NotificationsService } from '../../services/notifications.service';
 import { SpotlightSearchComponent } from '../../shared/components/spotlight-search/spotlight-search.component';
 import { 
   LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
-  LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX
+  LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban
 } from '@lucide/angular';
 
 @Component({
@@ -20,7 +20,7 @@ import {
     RouterModule,
     SpotlightSearchComponent,
     LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
-    LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX
+    LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban
   ],
   templateUrl: './header.html',
   styleUrls: ['./header.css']
@@ -111,8 +111,8 @@ export class HeaderComponent implements OnInit {
   getUserInitials(): string {
     const u = this.currentUser();
     if (!u) return 'U';
-    const fn = (u.firstName || '').charAt(0).toUpperCase();
-    const ln = (u.lastName || '').charAt(0).toUpperCase();
+    const fn = (u.employee?.firstName || u.firstName || '').charAt(0).toUpperCase();
+    const ln = (u.employee?.lastName || u.lastName || '').charAt(0).toUpperCase();
     return (fn + ln) || 'U';
   }
 
@@ -123,6 +123,11 @@ export class HeaderComponent implements OnInit {
     if (r === 'SUPER_ADMIN' || r === 'ADMIN') return 'Administrator';
     if (r === 'HR_MANAGER') return 'HR Manager';
     return 'Team Member';
+  }
+
+  hasAccessToDirectory(): boolean {
+    const role = this.currentUser()?.role || '';
+    return ['ADMIN', 'SUPER_ADMIN', 'HR_MANAGER'].includes(role);
   }
 
   logout() {

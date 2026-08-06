@@ -3,19 +3,22 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
 import { PermissionsService } from '../permissions/permissions.service';
+import { MailService } from '../mail/mail.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class EmployeesService {
   constructor(
     private prisma: PrismaService,
-    private permissions: PermissionsService
+    private permissions: PermissionsService,
+    private mailService: MailService
   ) {}
 
   async findAll(companyId: number) {
     return this.prisma.employee.findMany({
       where: { companyId },
       include: {
-        user: { select: { email: true, role: true } },
+        user: { select: { email: true, role: true, status: true } },
         department: { select: { name: true } },
         designation: { select: { name: true } },
         branch: { select: { name: true } },
@@ -110,6 +113,16 @@ export class EmployeesService {
           }))
         });
       }
+
+      const token = crypto.randomBytes(32).toString('hex');
+      await prisma.verificationToken.create({
+        data: {
+          identifier: newUser.email,
+          token,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+        }
+      });
+      this.mailService.sendVerificationEmail(newUser.email, token).catch(e => console.error(e));
 
       return newEmployee;
     });

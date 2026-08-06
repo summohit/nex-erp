@@ -3,7 +3,7 @@
     
     <!-- Search Bar Header -->
     <div class="spotlight-header">
-      <lucide-icon name="search" class="search-icon" [size]="20"></lucide-icon>
+      <svg lucideSearch size="20" class="search-icon"></svg>
       <input 
         #searchInput
         type="text" 
@@ -18,7 +18,7 @@
     <!-- Results Body -->
     <div class="spotlight-results">
       <div *ngIf="filteredResults().length === 0" class="no-results">
-        <lucide-icon name="search" [size]="32" class="no-results-icon"></lucide-icon>
+        <svg lucideSearch size="32" class="no-results-icon"></svg>
         <p class="no-results-title">No matching results found</p>
         <p class="no-results-desc">Try searching for employee names, projects, or settings.</p>
       </div>
@@ -31,7 +31,18 @@
         (click)="item.action()"
       >
         <div class="item-icon-wrapper">
-          <lucide-icon [name]="item.icon.prototype.name || 'search'" [size]="18"></lucide-icon>
+          <svg [attr.lucideSearch]="item.iconName === 'search' ? '' : null"
+               [attr.lucideUser]="item.iconName === 'user' ? '' : null"
+               [attr.lucideBriefcase]="item.iconName === 'briefcase' ? '' : null"
+               [attr.lucideLayers]="item.iconName === 'layers' ? '' : null"
+               [attr.lucideCalendar]="item.iconName === 'calendar' ? '' : null"
+               [attr.lucideDollarSign]="item.iconName === 'dollar-sign' ? '' : null"
+               [attr.lucideSettings]="item.iconName === 'settings' ? '' : null"
+               [attr.lucideAward]="item.iconName === 'award' ? '' : null"
+               [attr.lucideShieldCheck]="item.iconName === 'shield-check' ? '' : null"
+               [attr.lucideBuilding]="item.iconName === 'building' ? '' : null"
+               [attr.lucideFileText]="item.iconName === 'file-text' ? '' : null"
+               size="18"></svg>
         </div>
         <div class="item-content">
           <div class="item-title-row">
@@ -40,7 +51,7 @@
           </div>
           <p class="item-subtitle" *ngIf="item.subtitle">{{ item.subtitle }}</p>
         </div>
-        <lucide-icon name="arrow-right" [size]="16" class="item-arrow"></lucide-icon>
+        <svg lucideArrowRight size="16" class="item-arrow"></svg>
       </div>
     </div>
 

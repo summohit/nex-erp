@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, Query, ForbiddenException } from '@nestjs/common';
 import { PermissionsService } from './permissions.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 
 @Controller('permissions')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
@@ -16,9 +18,11 @@ export class PermissionsController {
   }
 
   @Post()
+  @Permissions('settings/permissions')
   setPermission(@Request() req: any, @Body() body: { role: string, module: string, action: string, enabled: boolean }) {
-    // Only Admin/HR should ideally be able to do this, but for now we just rely on JWT
-    // In a real app we'd add an admin guard here.
+    if (req.user.role !== 'SUPERADMIN' && req.user.role !== 'ADMIN') {
+      throw new ForbiddenException('Only Administrators can update role permissions');
+    }
     return this.permissionsService.setPermission(
       req.user.companyId,
       body.role,

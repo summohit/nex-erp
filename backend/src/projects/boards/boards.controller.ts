@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Param, ParseIntPipe, Req, UseGuards } from '@nestjs/common';
 import { BoardsService } from './boards.service';
 import { AuthGuard } from '../../auth/auth.guard';
 
@@ -42,10 +42,27 @@ export class BoardsController {
 
   @Delete('columns/:columnId')
   deleteColumn(
-    @Req() req,
     @Param('projectId', ParseIntPipe) projectId: number,
-    @Param('columnId', ParseIntPipe) columnId: number
+    @Param('columnId', ParseIntPipe) columnId: number,
+    @Req() req: any
   ) {
     return this.boardsService.deleteColumn(req.user.companyId, projectId, columnId);
+  }
+
+  @Get('columns/archived')
+  getArchivedColumns(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Req() req: any
+  ) {
+    return this.boardsService.getArchivedColumns(req.user.companyId, projectId);
+  }
+
+  @Patch('columns/:columnId/unarchive')
+  unarchiveColumn(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('columnId', ParseIntPipe) columnId: number,
+    @Req() req: any
+  ) {
+    return this.boardsService.unarchiveColumn(req.user.companyId, projectId, columnId);
   }
 }

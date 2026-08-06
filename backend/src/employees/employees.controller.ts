@@ -1,11 +1,40 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { EmployeesService } from './employees.service';
+import { EmployeesImportService } from './employees-import.service';
 import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('employees')
 @UseGuards(AuthGuard)
 export class EmployeesController {
-  constructor(private readonly employeesService: EmployeesService) {}
+  constructor(
+    private readonly employeesService: EmployeesService,
+    private readonly employeesImportService: EmployeesImportService
+  ) {}
+
+  @Post('bulk-upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async bulkUpload(
+    @Request() req, 
+    @UploadedFile() file: Express.Multer.File,
+    @Body('departmentId') departmentId?: string,
+    @Body('designationId') designationId?: string,
+    @Body('role') role?: string
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded.');
+    }
+    if (!file.originalname.endsWith('.csv')) {
+      throw new BadRequestException('Only .csv files are supported.');
+    }
+    return this.employeesImportService.processCsv(
+      req.user.companyId, 
+      file.buffer,
+      departmentId ? parseInt(departmentId, 10) : null,
+      designationId ? parseInt(designationId, 10) : null,
+      role || null
+    );
+  }
 
   @Get()
   findAll(@Request() req) {

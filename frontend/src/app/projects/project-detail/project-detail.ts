@@ -18,6 +18,7 @@ import {
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
+import { SocketService } from '../../services/socket.service';
 import { HotToastService } from '@ngneat/hot-toast';
 
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -56,6 +57,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private toast = inject(HotToastService);
   private sanitizer = inject(DomSanitizer);
+  private socketService = inject(SocketService);
 
   Math = Math;
 
@@ -1011,6 +1013,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   
   // Issue Drawer / Modal
   isDrawerOpen = signal(false);
+  archivedColumns = signal<any[]>([]);
   activePopover = signal<string | null>(null);
   activeMemberProfile = signal<any>(null);
   selectedIssue = signal<any>(null);
@@ -1076,7 +1079,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
+    if (this.projectId) {
+      this.socketService.leaveProject(this.projectId);
+    }
+    this.projectSocketSubscriptions.forEach(sub => sub.unsubscribe());
   }
+
+  projectSocketSubscriptions: any[] = [];
 
   ngOnInit() {
     this.route.paramMap.subscribe(params => {
@@ -1086,6 +1095,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.hasAccess.set(true);
         this.loadProjectDetails();
         this.loadBoardAndIssues();
+        
+        // Socket integration for the whole project
+        this.socketService.joinProject(this.projectId);
+        this.projectSocketSubscriptions.push(
+          this.socketService.onIssueUpdated().subscribe(issue => {
+            // Reload the board when any issue changes (e.g. moved by another user)
+            this.loadBoardAndIssues();
+          })
+        );
 
         const savedTab = localStorage.getItem('project_active_tab');
         if (savedTab) {
@@ -1221,7 +1239,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   filterSelectedLabels = signal<number[]>([]);
 
   getColumnIssues(columnId: number): any[] {
-    let issues = this.issuesByColumn().get(columnId) || [];
+    let issues = (this.issuesByColumn().get(columnId) || []).filter(i => !i.isArchived);
     
     // Keyword Filter
     const query = this.filterQuery().toLowerCase().trim();
@@ -1340,12 +1358,57 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadArchivedColumns() {
+    this.projectsService.getArchivedBoardColumns(this.projectId).subscribe({
+      next: (cols) => this.archivedColumns.set(cols),
+      error: () => this.toast.error('Failed to load archived lists')
+    });
+  }
+
+  unarchiveColumn(columnId: number) {
+    this.projectsService.unarchiveBoardColumn(this.projectId, columnId).subscribe({
+      next: () => {
+        this.toast.success('List unarchived');
+        this.loadArchivedColumns();
+        this.loadBoardAndIssues();
+      },
+      error: () => this.toast.error('Failed to unarchive list')
+    });
+  }
+
   toggleColumnPopover(columnId: number) {
     if (this.activeColumnPopoverId() === columnId) {
       this.activeColumnPopoverId.set(null);
     } else {
       this.activeColumnPopoverId.set(columnId);
     }
+  }
+
+  editingColumnId = signal<number | null>(null);
+
+  startEditingColumn(col: any) {
+    this.editingColumnId.set(col.id);
+  }
+
+  renameColumn(col: any, event: Event) {
+    const target = event.target as HTMLInputElement;
+    const newName = target.value.trim();
+    if (!newName || newName === col.name) {
+      this.editingColumnId.set(null);
+      return;
+    }
+    
+    this.projectsService.updateBoardColumn(this.projectId, col.id, { name: newName }).subscribe({
+      next: () => {
+        this.columns.update(cols => cols.map(c => c.id === col.id ? { ...c, name: newName } : c));
+        this.editingColumnId.set(null);
+        this.toast.success('List renamed');
+      },
+      error: (err) => {
+        this.toast.error(err.error?.message || 'Failed to rename list');
+        this.editingColumnId.set(null);
+      }
+    });
   }
 
   changeColumnColor(columnId: number, color: string) {
@@ -1361,21 +1424,27 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   archiveColumn(columnId: number) {
+    const col = this.columns().find(c => c.id === columnId);
+    if (!col) return;
+    
     if (!confirm('Are you sure you want to archive this list? Any cards inside will be moved to the backlog.')) return;
     
     this.projectsService.deleteBoardColumn(this.projectId, columnId).subscribe({
       next: () => {
         this.columns.update(cols => cols.filter(c => c.id !== columnId));
         this.issuesByColumn.update(map => {
-          map.delete(columnId);
-          return new Map(map);
+          const newMap = new Map(map);
+          newMap.delete(columnId);
+          return newMap;
         });
         this.activeColumnPopoverId.set(null);
         this.toast.success('List archived');
-        // Reload issues to fetch the updated unassigned/backlog issues
         this.loadBoardAndIssues();
       },
-      error: () => this.toast.error('Failed to archive list')
+      error: (err) => {
+        this.toast.error(err.error?.message || 'Failed to archive list');
+        this.activeColumnPopoverId.set(null);
+      }
     });
   }
 
@@ -1398,15 +1467,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   toggleFilterDueNextMonth() { this.filterDueNextMonth.set(!this.filterDueNextMonth()); }
   toggleFilterNoLabels() { this.filterNoLabels.set(!this.filterNoLabels()); }
 
-  getColumnName(columnId: number | null): string {
+  getColumnName(columnId: string | number | null): string {
     if (!columnId) return 'Select List';
-    const col = this.columns().find(c => c.id === columnId);
+    const numId = Number(columnId);
+    const col = this.columns().find(c => c.id === numId);
     return col ? col.name : 'Unknown';
   }
 
-  getStatusDotClass(columnId: number | null): string {
+  getStatusDotClass(columnId: string | number | null): string {
     if (!columnId) return 'dot-todo';
-    const col = this.columns().find(c => c.id === columnId);
+    const numId = Number(columnId);
+    const col = this.columns().find(c => c.id === numId);
     if (!col) return 'dot-todo';
     const name = col.name.toLowerCase();
     if (name.includes('progress') || name.includes('doing')) return 'dot-in-progress';
@@ -1432,26 +1503,61 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return Math.round((completed / total) * 100);
   }
 
-  drop(event: CdkDragDrop<any[]>, targetColumnId: number) {
-    if (event.previousContainer === event.container) {
-      moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
+  private optimisticallyUpdateIssueColumn(issueId: number, targetColumnId: number, targetIndex?: number) {
+    const all = this.allIssues();
+    const issueIndex = all.findIndex(i => i.id === issueId);
+    if (issueIndex === -1) return;
+
+    const prevColumnId = all[issueIndex].columnId;
+    const updatedIssue = { ...all[issueIndex], columnId: targetColumnId };
+
+    // 1. Update allIssues signal
+    const updatedAll = [...all];
+    updatedAll[issueIndex] = updatedIssue;
+    this.allIssues.set(updatedAll);
+
+    // 2. Update issuesByColumn Map signal
+    const map = new Map(this.issuesByColumn());
+    const prevList = (map.get(prevColumnId) || []).filter(i => i.id !== issueId);
+    const targetList = (map.get(targetColumnId) || []).filter(i => i.id !== issueId);
+
+    if (targetIndex !== undefined && targetIndex >= 0) {
+      targetList.splice(targetIndex, 0, updatedIssue);
     } else {
-      transferArrayItem(
-        event.previousContainer.data,
-        event.container.data,
-        event.previousIndex,
-        event.currentIndex,
-      );
-      
-      const issue = event.container.data[event.currentIndex];
-      
-      // Update backend
+      targetList.push(updatedIssue);
+    }
+
+    map.set(prevColumnId, prevList);
+    map.set(targetColumnId, targetList);
+    this.issuesByColumn.set(map);
+
+    // 3. Update selectedIssue signal if open
+    if (this.selectedIssue() && this.selectedIssue().id === issueId) {
+      this.selectedIssue.set(updatedIssue);
+    }
+  }
+
+  drop(event: CdkDragDrop<any[]>, targetColumnId: number) {
+    const issue = event.previousContainer.data[event.previousIndex];
+    if (!issue) return;
+
+    if (event.previousContainer === event.container) {
+      const map = new Map(this.issuesByColumn());
+      const colIssues = [...(map.get(targetColumnId) || [])];
+      moveItemInArray(colIssues, event.previousIndex, event.currentIndex);
+      map.set(targetColumnId, colIssues);
+      this.issuesByColumn.set(map);
+    } else {
+      // Instant Optimistic Update
+      this.optimisticallyUpdateIssueColumn(issue.id, targetColumnId, event.currentIndex);
+
+      // Async Backend update
       this.projectsService.updateIssue(this.projectId, issue.id, { 
         columnId: targetColumnId
       }).subscribe({
         error: (err) => {
           this.toast.error('Failed to move issue');
-          this.loadBoardAndIssues(); // Revert
+          this.loadBoardAndIssues(); // Revert on failure
         }
       });
     }
@@ -1475,13 +1581,16 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.issueForm.columnId = columnId;
     this.closePopover();
     if (this.selectedIssue()) {
-      this.projectsService.updateIssue(this.projectId, this.selectedIssue().id, { columnId }).subscribe({
+      const issueId = this.selectedIssue().id;
+      this.optimisticallyUpdateIssueColumn(issueId, columnId);
+
+      this.projectsService.updateIssue(this.projectId, issueId, { columnId }).subscribe({
         next: () => {
           this.toast.success('Status updated');
-          this.loadBoardAndIssues();
         },
         error: (err) => {
           this.toast.error('Failed to update status');
+          this.loadBoardAndIssues();
         }
       });
     }
@@ -1565,6 +1674,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     setTimeout(() => this.initQuill(), 100);
   }
 
+  socketSubscriptions: any[] = [];
+
   openIssueDetails(issue: any) {
     this.selectedIssue.set(issue);
     this.isEditingDescription.set(false);
@@ -1578,8 +1689,44 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       estimatedHours: issue.estimatedHours || null
     };
     this.isDrawerOpen.set(true);
-    this.loadComments(issue.id);
+    this.loadFeedItems(issue.id);
     this.loadChecklists(issue.id);
+
+    // Socket integration
+    this.socketService.joinIssue(issue.id);
+    
+    // Clear old subscriptions
+    this.socketSubscriptions.forEach(sub => sub.unsubscribe());
+    
+    this.socketSubscriptions.push(
+      this.socketService.onCommentAdded().subscribe(comment => {
+        if (comment.issueId === issue.id) {
+          this.comments.update(list => [...list, comment]);
+          this.mergeFeed();
+        }
+      }),
+      this.socketService.onActivityAdded().subscribe(activity => {
+        if (activity.issueId === issue.id) {
+          this.activities.update(list => [...list, activity]);
+          this.mergeFeed();
+        }
+      })
+    );
+  }
+
+  closeDrawer() {
+    const issue = this.selectedIssue();
+    if (issue) {
+      this.socketService.leaveIssue(issue.id);
+    }
+    this.socketSubscriptions.forEach(sub => sub.unsubscribe());
+    this.socketSubscriptions = [];
+    
+    this.isDrawerOpen.set(false);
+    this.selectedIssue.set(null);
+    this.isEditingDescription.set(false);
+    this.quillInstance = null;
+    this.closePopover();
   }
 
   startDescriptionEdit() {
@@ -1591,6 +1738,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const issue = this.selectedIssue();
     this.issueForm.description = issue ? (issue.description || '') : '';
     this.isEditingDescription.set(false);
+  }
+
+  clearDescription() {
+    this.issueForm.description = '';
+    if (this.quillInstance) {
+      this.quillInstance.root.innerHTML = '';
+    }
   }
 
   loadChecklists(issueId: number) {
@@ -1756,11 +1910,39 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadComments(issueId: number) {
+  activities = signal<any[]>([]);
+  feedItems = signal<any[]>([]);
+  
+  loadFeedItems(issueId: number) {
+    // Fetch comments and activities, then merge and sort
     this.projectsService.getIssueComments(this.projectId, issueId).subscribe({
-      next: (res) => this.comments.set(res || []),
-      error: () => this.comments.set([])
+      next: (comms) => {
+        this.comments.set(comms || []);
+        this.mergeFeed();
+      },
+      error: () => {
+        this.comments.set([]);
+        this.mergeFeed();
+      }
     });
+
+    this.projectsService.getIssueActivities(this.projectId, issueId).subscribe({
+      next: (acts) => {
+        this.activities.set(acts || []);
+        this.mergeFeed();
+      },
+      error: () => {
+        this.activities.set([]);
+        this.mergeFeed();
+      }
+    });
+  }
+
+  mergeFeed() {
+    const c = this.comments().map(c => ({ ...c, feedType: 'COMMENT' }));
+    const a = this.activities().map(a => ({ ...a, feedType: 'ACTIVITY' }));
+    const merged = [...c, ...a].sort((x, y) => new Date(x.createdAt).getTime() - new Date(y.createdAt).getTime());
+    this.feedItems.set(merged);
   }
 
   postComment() {
@@ -1779,12 +1961,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  closeDrawer() {
-    this.isDrawerOpen.set(false);
-    this.selectedIssue.set(null);
-    this.quillInstance = null;
-    this.closePopover();
-  }
+
 
   // Workload Modal & AG Grid
   isWorkloadModalOpen = signal(false);
@@ -2108,6 +2285,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       }
       if (popoverName === 'dates') {
         this.initDatesForm();
+      }
+      if (popoverName === 'archivedLists') {
+        this.loadArchivedColumns();
       }
       if (popoverName === 'members') {
         this.loadCompanyMembers();
@@ -2739,6 +2919,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         next: () => {
           this.toast.success('Description saved');
           this.isEditingDescription.set(false);
+          const current = this.selectedIssue();
+          if (current) {
+            current.description = this.issueForm.description;
+          }
           this.loadBoardAndIssues();
         }
       });

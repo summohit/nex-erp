@@ -508,7 +508,12 @@
         </div>
         <div class="form-actions">
           <button class="btn-secondary" (click)="cancelInterviewForm()">Cancel</button>
-          <button class="btn-primary" (click)="submitInterview()">{{ editInterviewMode() ? 'Update Interview' : 'Save Interview' }}</button>
+          <button class="btn-primary" (click)="submitInterview()" [disabled]="isSubmittingInterview()" style="display: flex; align-items: center; gap: 6px;">
+            <span class="btn-spinner" *ngIf="isSubmittingInterview()"></span>
+            <span *ngIf="!isSubmittingInterview()">{{ editInterviewMode() ? 'Update Interview' : 'Save Interview' }}</span>
+            <span *ngIf="isSubmittingInterview()">Saving...</span>
+          </button>
+
         </div>
       </div>
 

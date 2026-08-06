@@ -47,16 +47,19 @@
 }
 
 .filter-tabs {
-  display: flex;
-  gap: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: #f1f2f4;
   padding: 4px;
   border-radius: 8px;
+  width: fit-content;
 }
 
 .tab-pill {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   background: transparent;
   border: none;
@@ -66,21 +69,30 @@
   font-weight: 600;
   color: #44546f;
   cursor: pointer;
+  white-space: nowrap;
+  height: 32px;
+  box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
 .tab-pill.active {
   background: #ffffff;
   color: #0c66e4;
-  box-shadow: 0 1px 3px rgba(9, 30, 66, 0.12);
+  box-shadow: 0 1px 3px rgba(9, 30, 66, 0.15);
 }
 
 .tab-pill:hover:not(.active) {
   color: #172b4d;
+  background: rgba(9, 30, 66, 0.05);
 }
 
 .tab-icon {
-  color: #eab308;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* Section Containers */
@@ -149,13 +161,25 @@
   position: relative;
 }
 
-/* Star Button on Banner */
-.star-btn {
+/* Card Actions Wrapper */
+.card-actions-wrapper {
   position: absolute;
   top: 8px;
   right: 8px;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(2px);
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.board-card:hover .card-actions-wrapper {
+  opacity: 1;
+}
+
+/* Base button style for actions */
+.star-btn, .edit-btn, .archive-btn {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
   border: none;
   color: #ffffff;
   width: 28px;
@@ -165,23 +189,38 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0;
   transition: all 0.2s ease;
 }
 
-.board-card:hover .star-btn,
 .star-btn.active {
+  background: rgba(255, 255, 255, 0.95);
+  color: #eab308;
+  fill: #eab308;
   opacity: 1;
 }
 
-.star-btn.active {
-  background: rgba(255, 255, 255, 0.9);
-  color: #eab308;
-  fill: #eab308;
+.star-btn:hover {
+  background: #eab308;
+  color: #ffffff;
+  transform: scale(1.1);
 }
 
-.star-btn:hover {
+.edit-btn:hover {
+  background: #2563eb;
+  color: #ffffff;
   transform: scale(1.1);
+}
+
+.archive-btn:hover {
+  background: #dc2626;
+  color: #ffffff;
+  transform: scale(1.1);
+}
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.star-btn.active:hover {
+  background: rgba(255, 255, 255, 1);
 }
 
 .board-card-footer {
@@ -552,6 +591,96 @@
 
 .btn-trello-submit:disabled {
   background: #091e420f;
-  color: #091e4240;
+  color: #091e424f;
   cursor: not-allowed;
+}
+
+/* Archived Empty State */
+.archived-empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 480px;
+  margin: 32px auto;
+}
+
+.empty-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.archived-empty-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.archived-empty-card p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Archived Board Card */
+.board-card.archived-card {
+  filter: grayscale(0.2);
+  opacity: 0.85;
+  transition: all 0.2s ease;
+}
+
+.board-card.archived-card:hover {
+  filter: grayscale(0);
+  opacity: 1;
+}
+
+.archived-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  color: #f1f5f9;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.unarchive-btn {
+  background: #0c66e4;
+  color: #ffffff;
+  border: none;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.unarchive-btn:hover {
+  background: #0052cc;
+  transform: scale(1.05);
 }

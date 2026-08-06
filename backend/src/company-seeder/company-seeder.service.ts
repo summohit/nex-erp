@@ -226,7 +226,7 @@ export class CompanySeederService implements OnModuleInit {
         'payroll', 'payroll/payslips', 'payroll/expenses'
       ],
       EMPLOYEE: [
-        'employees', 'employees/directory', 'employees/org-chart', 'employees/documents',
+        'employees', 'employees/documents',
         'recruitment', 'recruitment/interviews',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
         'payroll', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',

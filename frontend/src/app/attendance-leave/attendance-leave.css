@@ -1034,6 +1034,14 @@
   color: #0f172a;
 }
 
+.drawer-content form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .drawer-body {
   padding: 32px;
   overflow-y: auto;
@@ -1044,6 +1052,7 @@
   padding: 24px 32px;
   border-top: 1px solid #f1f5f9;
   background: #f8fafc;
+  flex-shrink: 0;
 }
 
 .form-group {

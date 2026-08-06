@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -10,6 +10,7 @@ export class BoardsService {
       where: { projectId, project: { companyId } },
       include: {
         columns: {
+          where: { isArchived: false },
           orderBy: { position: 'asc' }
         }
       }
@@ -69,9 +70,43 @@ export class BoardsService {
       where: { id: columnId, boardId: board.id }
     });
     if (!col) throw new NotFoundException('Column not found');
+    
+    if (col.isSystem) {
+      throw new BadRequestException('Cannot delete default system columns. You can only rename them.');
+    }
 
-    return this.prisma.boardColumn.delete({
-      where: { id: columnId }
+    return this.prisma.boardColumn.update({
+      where: { id: columnId },
+      data: { isArchived: true }
+    });
+  }
+
+  async getArchivedColumns(companyId: number, projectId: number) {
+    const board = await this.prisma.board.findFirst({
+      where: { projectId, project: { companyId } }
+    });
+    if (!board) throw new NotFoundException('Board not found');
+
+    return this.prisma.boardColumn.findMany({
+      where: { boardId: board.id, isArchived: true },
+      orderBy: { position: 'asc' }
+    });
+  }
+
+  async unarchiveColumn(companyId: number, projectId: number, columnId: number) {
+    const board = await this.prisma.board.findFirst({
+      where: { projectId, project: { companyId } }
+    });
+    if (!board) throw new NotFoundException('Board not found');
+
+    const col = await this.prisma.boardColumn.findFirst({
+      where: { id: columnId, boardId: board.id }
+    });
+    if (!col) throw new NotFoundException('Column not found');
+
+    return this.prisma.boardColumn.update({
+      where: { id: columnId },
+      data: { isArchived: false }
     });
   }
 

@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { 
   LucidePlus, LucideKanban, 
   LucideX, LucideUser, LucideChevronLeft, LucideCheck, LucideMoreHorizontal, 
-  LucideStar, LucideSearch, LucideClock
+  LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { AuthService } from '../services/auth.service';
@@ -16,7 +16,7 @@ import { AuthService } from '../services/auth.service';
   imports: [
     CommonModule, FormsModule, LucidePlus, LucideKanban, 
     LucideX, LucideUser, LucideChevronLeft, 
-    LucideCheck, LucideMoreHorizontal, LucideStar, LucideSearch, LucideClock
+    LucideCheck, LucideMoreHorizontal, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw
   ],
   templateUrl: './projects.html',
   styleUrls: ['./projects.css']
@@ -26,11 +26,16 @@ export class ProjectsComponent implements OnInit {
   private router = inject(Router);
   private authService = inject(AuthService);
 
+  showArchiveWarningModal = false;
+  pendingArchiveProjectId: number | null = null;
+  archiveWarningMessage = '';
+
   currentUser = this.authService.currentUser;
 
   projects = signal<any[]>([]);
+  archivedProjects = signal<any[]>([]);
   searchQuery = signal<string>('');
-  activeTab = signal<'all' | 'starred' | 'recent' | 'company'>('all');
+  activeTab = signal<'all' | 'starred' | 'recent' | 'archived'>('all');
   
   // Local persistence for Starred & Recently Viewed
   starredBoardIds = signal<number[]>([]);
@@ -38,6 +43,7 @@ export class ProjectsComponent implements OnInit {
 
   isCreateModalOpen = signal(false);
   isSubmitted = signal(false);
+  editingProjectId = signal<number | null>(null);
 
   // Background Options (Images & Color gradients matching Trello style)
   imageBackgrounds = [
@@ -55,7 +61,7 @@ export class ProjectsComponent implements OnInit {
     'linear-gradient(135deg, #9333ea 0%, #c026d3 100%)'
   ];
 
-  selectedBg = signal<string>(this.imageBackgrounds[0]);
+  selectedBg = signal<string>(this.colorBackgrounds[1]);
 
   projectForm = {
     name: '',
@@ -84,7 +90,12 @@ export class ProjectsComponent implements OnInit {
   // Filtered lists
   filteredProjects = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
-    let list = this.activeTab() === 'company' ? this.projects() : this.myProjects();
+    
+    if (this.activeTab() === 'archived') {
+      return this.archivedProjects();
+    }
+    
+    let list = this.myProjects();
 
     if (this.activeTab() === 'starred') {
       list = list.filter(p => p.members && p.members.length > 0 && p.members[0].isStarred);
@@ -107,6 +118,14 @@ export class ProjectsComponent implements OnInit {
   ngOnInit() {
     this.loadStarredAndRecent();
     this.loadProjects();
+    this.loadArchivedProjects();
+  }
+
+  setActiveTab(tab: 'all' | 'starred' | 'recent' | 'archived') {
+    this.activeTab.set(tab);
+    if (tab === 'archived') {
+      this.loadArchivedProjects();
+    }
   }
 
   loadStarredAndRecent() {
@@ -166,8 +185,29 @@ export class ProjectsComponent implements OnInit {
   }
 
   openCreateModal() {
+    this.editingProjectId.set(null);
     this.projectForm = { name: '', visibility: 'Workspace', description: '' };
-    this.selectedBg.set(this.imageBackgrounds[0]);
+    this.selectedBg.set(this.colorBackgrounds[1]);
+    this.isSubmitted.set(false);
+    this.isCreateModalOpen.set(true);
+  }
+
+  openEditModal(project: any, event: Event) {
+    if (event) event.stopPropagation();
+    this.editingProjectId.set(project.id);
+    this.projectForm = { 
+      name: project.name, 
+      visibility: 'Workspace', 
+      description: project.description || '' 
+    };
+    
+    // Set the selected background (match it or use gradient as fallback)
+    let color = project.color;
+    if (color && color.startsWith('url(')) {
+      color = color.substring(4, color.length - 1); // remove url()
+    }
+    this.selectedBg.set(color || this.colorBackgrounds[1]);
+    
     this.isSubmitted.set(false);
     this.isCreateModalOpen.set(true);
   }
@@ -190,14 +230,76 @@ export class ProjectsComponent implements OnInit {
       color: bgValue
     };
 
-    this.projectsService.createProject(payload).subscribe({
-      next: (res) => {
+    if (this.editingProjectId()) {
+      this.projectsService.updateProject(this.editingProjectId()!, payload).subscribe({
+        next: (res) => {
+          this.loadProjects();
+          this.closeCreateModal();
+        },
+        error: (err) => console.error('Error updating project', err)
+      });
+    } else {
+      this.projectsService.createProject(payload).subscribe({
+        next: (res) => {
+          this.loadProjects();
+          this.closeCreateModal();
+          this.goToProject(res.id);
+        },
+        error: (err) => console.error('Error creating project', err)
+      });
+    }
+  }
+
+  archiveBoard(project: any, force: boolean, event: Event) {
+    event.stopPropagation();
+    this.projectsService.archiveProject(project.id, force).subscribe({
+      next: () => {
         this.loadProjects();
-        this.closeCreateModal();
-        this.goToProject(res.id);
+        this.loadArchivedProjects();
+        this.closeArchiveModal();
       },
-      error: (err) => console.error('Error creating project', err)
+      error: (err) => {
+        if (err.status === 409) {
+          this.pendingArchiveProjectId = project.id;
+          this.archiveWarningMessage = err.error?.message || 'There are active tasks remaining in this board.';
+          this.showArchiveWarningModal = true;
+        } else {
+          console.error('Failed to archive board', err);
+        }
+      }
     });
+  }
+
+  loadArchivedProjects() {
+    this.projectsService.getArchivedProjects().subscribe({
+      next: (res) => {
+        this.archivedProjects.set(res);
+      },
+      error: () => console.error('Failed to load archived projects')
+    });
+  }
+
+  unarchiveBoard(project: any, event: Event) {
+    event.stopPropagation();
+    this.projectsService.unarchiveProject(project.id).subscribe({
+      next: () => {
+        this.loadProjects();
+        this.loadArchivedProjects();
+      },
+      error: () => console.error('Failed to unarchive board')
+    });
+  }
+
+  closeArchiveModal() {
+    this.showArchiveWarningModal = false;
+    this.pendingArchiveProjectId = null;
+    this.archiveWarningMessage = '';
+  }
+
+  confirmArchiveBoard() {
+    if (this.pendingArchiveProjectId) {
+      this.archiveBoard({ id: this.pendingArchiveProjectId }, true, new Event('click'));
+    }
   }
 
   goToProject(id: number) {

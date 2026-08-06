@@ -5,12 +5,12 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { PermissionsService, RolePermission } from '../../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban } from '@lucide/angular';
+import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX } from '@lucide/angular';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban],
+  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX],
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css']
 })
@@ -47,6 +47,7 @@ export class SidebarComponent implements OnInit {
           route: '/employees',
           subItems: [
             { id: 'employees/directory', title: 'Employee Directory', route: '/employees/directory' },
+            { id: 'employees/me/profile', title: 'My Profile', route: '/employees/me/profile' },
             { id: 'employees/org-chart', title: 'Organization Chart', route: '/employees/org-chart' },
             { id: 'employees/onboarding', title: 'Onboarding', route: '/employees/onboarding' },
             { id: 'employees/documents', title: 'Documents', route: '/employees/documents' }
@@ -286,7 +287,18 @@ export class SidebarComponent implements OnInit {
     }
   }
 
-  logout() {
+  showLogoutModal = signal<boolean>(false);
+
+  promptLogout() {
+    this.showLogoutModal.set(true);
+  }
+
+  cancelLogout() {
+    this.showLogoutModal.set(false);
+  }
+
+  confirmLogout() {
+    this.showLogoutModal.set(false);
     this.authService.logout();
     this.toast.info('Logged out successfully');
     this.router.navigate(['/']);

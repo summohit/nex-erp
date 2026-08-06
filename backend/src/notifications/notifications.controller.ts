@@ -1,6 +1,8 @@
 import { Controller, Get, Put, Param, Req, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
+import { AuthGuard } from '../auth/auth.guard';
 
+@UseGuards(AuthGuard)
 @Controller('notifications')
 export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}

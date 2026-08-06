@@ -12,8 +12,10 @@ export interface ActionCellParams extends ICellRendererParams {
   onViewProfile?: (data: any) => void;
   onView?: (data: any) => void;
   viewLabel?: string;
+  onViewLabel?: string;
   onMarkPaid?: (data: any) => void;
   onFinalize?: (data: any) => void;
+  onResendVerification?: (data: any) => void;
 }
 
 @Component({
@@ -41,6 +43,9 @@ export interface ActionCellParams extends ICellRendererParams {
         </button>
         <button mat-menu-item class="menu-item text-success" (click)="markPaid()" *ngIf="params.onMarkPaid">
           <span class="menu-text">Mark as Paid</span>
+        </button>
+        <button mat-menu-item class="menu-item" (click)="resendVerification()" *ngIf="params.onResendVerification && params.data?.user?.status === 'PENDING_VERIFICATION'">
+          <span class="menu-text text-primary">Resend Verification</span>
         </button>
         <button mat-menu-item class="menu-item text-danger" (click)="delete()" *ngIf="params.onDelete">
           <span class="menu-text">Delete</span>
@@ -141,6 +146,12 @@ export class ActionCellRendererComponent implements ICellRendererAngularComp {
   viewProfile() {
     if (this.params.onViewProfile) {
       this.params.onViewProfile(this.params.data);
+    }
+  }
+
+  resendVerification() {
+    if (this.params.onResendVerification) {
+      this.params.onResendVerification(this.params.data);
     }
   }
 }

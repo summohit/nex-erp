@@ -3,6 +3,7 @@ import { AuthComponent } from './auth/auth.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { MainLayoutComponent } from './layout/main-layout/main-layout';
 import { authGuard } from './guards/auth.guard';
+import { permissionGuard } from './guards/permission.guard';
 import { EmployeeListComponent } from './employees/employee-list/employee-list';
 import { OnboardingComponent } from './employees/onboarding/onboarding';
 
@@ -15,7 +16,8 @@ export const routes: Routes = [
   { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { 
     path: 'projects/:id', 
-    canActivate: [authGuard],
+    canActivate: [authGuard, permissionGuard],
+    data: { module: 'projects' },
     loadComponent: () => import('./projects/project-detail/project-detail').then(m => m.ProjectDetailComponent) 
   },
   { 
@@ -26,38 +28,61 @@ export const routes: Routes = [
       { path: 'dashboard', component: DashboardComponent },
       { 
         path: 'settings/master-data', 
+        canActivate: [permissionGuard],
+        data: { module: 'settings/master-data' },
         loadComponent: () => import('./settings/master-data/master-data').then(m => m.MasterDataComponent) 
       },
       {
         path: 'employees/directory',
+        canActivate: [permissionGuard],
+        data: { module: 'employees/directory' },
         component: EmployeeListComponent
       },
       {
         path: 'employees/onboarding',
+        canActivate: [permissionGuard],
+        data: { module: 'employees/onboarding' },
         component: OnboardingComponent
       },
       {
         path: 'employees/org-chart',
+        canActivate: [permissionGuard],
+        data: { module: 'employees/org-chart' },
         loadComponent: () => import('./employees/org-chart/org-chart').then(m => m.OrgChart)
       },
       {
         path: 'employees/documents',
+        canActivate: [permissionGuard],
+        data: { module: 'employees/documents' },
         loadComponent: () => import('./employees/documents/documents').then(m => m.EmployeeDocumentsComponent)
       },
       {
         path: 'employees/:id/profile',
+        canActivate: [permissionGuard],
+        data: { module: 'employees/me/profile' },
         loadComponent: () => import('./employees/employee-profile/employee-profile').then(m => m.EmployeeProfileComponent)
       },
       {
         path: 'settings/company',
+        canActivate: [permissionGuard],
+        data: { module: 'settings/company' },
         loadComponent: () => import('./settings/company-profile/company-profile').then(m => m.CompanyProfileComponent)
       },
       {
         path: 'settings/permissions',
+        canActivate: [permissionGuard],
+        data: { module: 'settings/permissions' },
         loadComponent: () => import('./settings/permissions/permissions.component').then(m => m.PermissionsComponent)
       },
       {
+        path: 'attendance',
+        redirectTo: 'attendance/my-attendance',
+        pathMatch: 'full'
+      },
+      {
         path: 'attendance/:tab',
+        canActivate: [permissionGuard],
+        data: { module: 'attendance' },
         loadComponent: () => import('./attendance-leave/attendance-leave').then(m => m.AttendanceLeaveComponent)
       },
       {
@@ -67,14 +92,20 @@ export const routes: Routes = [
       },
       {
         path: 'payroll/:tab',
+        canActivate: [permissionGuard],
+        data: { module: 'payroll' },
         loadComponent: () => import('./payroll/payroll').then(m => m.PayrollComponent)
       },
       {
         path: 'appreciation',
+        canActivate: [permissionGuard],
+        data: { module: 'appreciation' },
         loadComponent: () => import('./appreciation/appreciation').then(m => m.AppreciationComponent)
       },
       {
         path: 'appreciation/:tab',
+        canActivate: [permissionGuard],
+        data: { module: 'appreciation' },
         loadComponent: () => import('./appreciation/appreciation').then(m => m.AppreciationComponent)
       },
       {
@@ -84,6 +115,8 @@ export const routes: Routes = [
       },
       {
         path: 'assets/:tab',
+        canActivate: [permissionGuard],
+        data: { module: 'assets' },
         loadComponent: () => import('./assets/assets').then(m => m.AssetsComponent)
       },
       {
@@ -93,18 +126,26 @@ export const routes: Routes = [
       },
       {
         path: 'recruitment/jobs',
+        canActivate: [permissionGuard],
+        data: { module: 'recruitment/jobs' },
         loadComponent: () => import('./recruitment/job-postings/job-postings').then(m => m.JobPostingsComponent)
       },
       {
         path: 'recruitment/candidates',
+        canActivate: [permissionGuard],
+        data: { module: 'recruitment/candidates' },
         loadComponent: () => import('./recruitment/candidates/candidates').then(m => m.CandidatesComponent)
       },
       {
         path: 'recruitment/interviews',
+        canActivate: [permissionGuard],
+        data: { module: 'recruitment/interviews' },
         loadComponent: () => import('./recruitment/interviews/interviews').then(m => m.InterviewsComponent)
       },
       {
         path: 'projects',
+        canActivate: [permissionGuard],
+        data: { module: 'projects' },
         loadComponent: () => import('./projects/projects').then(m => m.ProjectsComponent)
       }
     ]

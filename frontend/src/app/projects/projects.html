@@ -15,35 +15,35 @@
       <button 
         class="tab-pill" 
         [class.active]="activeTab() === 'all'" 
-        (click)="activeTab.set('all')">
+        (click)="setActiveTab('all')">
         All Boards
       </button>
       <button 
         class="tab-pill" 
         [class.active]="activeTab() === 'starred'" 
-        (click)="activeTab.set('starred')">
+        (click)="setActiveTab('starred')">
         <svg lucideStar size="14" class="tab-icon"></svg>
         Starred ({{ starredProjects().length }})
       </button>
       <button 
         class="tab-pill" 
         [class.active]="activeTab() === 'recent'" 
-        (click)="activeTab.set('recent')">
+        (click)="setActiveTab('recent')">
         <svg lucideClock size="14" class="tab-icon"></svg>
         Recent
       </button>
-      <button *ngIf="isAdmin"
+      <button 
         class="tab-pill" 
-        [class.active]="activeTab() === 'company'" 
-        (click)="activeTab.set('company')">
-        <svg lucideKanban size="14" class="tab-icon"></svg>
-        Company Boards
+        [class.active]="activeTab() === 'archived'" 
+        (click)="setActiveTab('archived')">
+        <svg lucideArchive size="14" class="tab-icon"></svg>
+        Archived
       </button>
     </div>
   </div>
 
   <!-- ⭐ Starred Boards Section -->
-  <div class="section-container" *ngIf="starredProjects().length > 0 && activeTab() !== 'recent'">
+  <div class="section-container" *ngIf="starredProjects().length > 0 && (activeTab() === 'all' || activeTab() === 'starred')">
     <div class="section-header">
       <div class="section-title-group">
         <svg lucideStar size="20" class="section-icon star-yellow"></svg>
@@ -57,13 +57,32 @@
         *ngFor="let p of starredProjects(); let i = index" 
         (click)="goToProject(p.id)">
         <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
-          <button 
-            type="button" 
-            class="star-btn active" 
-            (click)="toggleStar(p.id, $event)" 
-            title="Unstar board">
-            <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
-          </button>
+          <div class="card-actions-wrapper">
+            <button 
+              type="button" 
+              class="edit-btn" 
+              (click)="openEditModal(p, $event)" 
+              title="Edit board"
+              *ngIf="isAdmin">
+              <svg lucideEdit2 size="14"></svg>
+            </button>
+            <button 
+              type="button" 
+              class="star-btn" 
+              [class.active]="isStarred(p.id)"
+              (click)="toggleStar(p.id, $event)" 
+              title="Toggle star">
+              <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
+            </button>
+            <button 
+              type="button" 
+              class="archive-btn" 
+              (click)="archiveBoard(p, false, $event)" 
+              title="Archive board"
+              *ngIf="isAdmin">
+              <svg lucideArchive size="14"></svg>
+            </button>
+          </div>
         </div>
         <div class="board-card-footer">
           <div class="title-meta">
@@ -79,7 +98,7 @@
   </div>
 
   <!-- 🕒 Recently Viewed Section -->
-  <div class="section-container" *ngIf="recentlyViewedProjects().length > 0 && activeTab() === 'all'">
+  <div class="section-container" *ngIf="recentlyViewedProjects().length > 0 && (activeTab() === 'all' || activeTab() === 'recent')">
     <div class="section-header">
       <div class="section-title-group">
         <svg lucideClock size="20" class="section-icon"></svg>
@@ -93,14 +112,32 @@
         *ngFor="let p of recentlyViewedProjects(); let i = index" 
         (click)="goToProject(p.id)">
         <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
-          <button 
-            type="button" 
-            class="star-btn" 
-            [class.active]="isStarred(p.id)" 
-            (click)="toggleStar(p.id, $event)" 
-            title="Star board">
-            <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
-          </button>
+          <div class="card-actions-wrapper">
+            <button 
+              type="button" 
+              class="edit-btn" 
+              (click)="openEditModal(p, $event)" 
+              title="Edit board"
+              *ngIf="isAdmin">
+              <svg lucideEdit2 size="14"></svg>
+            </button>
+            <button 
+              type="button" 
+              class="archive-btn" 
+              (click)="archiveBoard(p, false, $event)" 
+              title="Archive board"
+              *ngIf="isAdmin">
+              <svg lucideArchive size="14"></svg>
+            </button>
+            <button 
+              type="button" 
+              class="star-btn" 
+              [class.active]="isStarred(p.id)" 
+              (click)="toggleStar(p.id, $event)" 
+              title="Toggle star">
+              <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
+            </button>
+          </div>
         </div>
         <div class="board-card-footer">
           <div class="title-meta">
@@ -111,13 +148,12 @@
     </div>
   </div>
 
-  <!-- 📁 Your/Company Boards Section -->
-  <div class="section-container">
+  <!-- 📁 Your Boards Section -->
+  <div class="section-container" *ngIf="activeTab() === 'all'">
     <div class="section-header">
       <div class="section-title-group">
-        <svg lucideUser size="20" class="section-icon" *ngIf="activeTab() !== 'company'"></svg>
-        <svg lucideKanban size="20" class="section-icon" *ngIf="activeTab() === 'company'"></svg>
-        <h2>{{ activeTab() === 'company' ? 'All Company boards' : 'Your boards' }}</h2>
+        <svg lucideUser size="20" class="section-icon"></svg>
+        <h2>Your boards</h2>
       </div>
     </div>
 
@@ -129,14 +165,32 @@
         *ngFor="let p of filteredProjects(); let i = index" 
         (click)="goToProject(p.id)">
         <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
-          <button 
-            type="button" 
-            class="star-btn" 
-            [class.active]="isStarred(p.id)" 
-            (click)="toggleStar(p.id, $event)" 
-            [title]="isStarred(p.id) ? 'Unstar board' : 'Star board'">
-            <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
-          </button>
+          <div class="card-actions-wrapper">
+            <button 
+              type="button" 
+              class="edit-btn" 
+              (click)="openEditModal(p, $event)" 
+              title="Edit board"
+              *ngIf="isAdmin">
+              <svg lucideEdit2 size="14"></svg>
+            </button>
+            <button 
+              type="button" 
+              class="archive-btn" 
+              (click)="archiveBoard(p, false, $event)" 
+              title="Archive board"
+              *ngIf="isAdmin">
+              <svg lucideArchive size="14"></svg>
+            </button>
+            <button 
+              type="button" 
+              class="star-btn" 
+              [class.active]="isStarred(p.id)" 
+              (click)="toggleStar(p.id, $event)" 
+              title="Toggle star">
+              <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
+            </button>
+          </div>
         </div>
         <div class="board-card-footer">
           <div class="title-meta">
@@ -156,6 +210,79 @@
       </div>
     </div>
   </div>
+
+  <!-- 🗃️ Archived Section -->
+  <div class="section-container" *ngIf="activeTab() === 'archived'">
+    <div class="section-header">
+      <div class="section-title-group">
+        <svg lucideArchive size="20" class="section-icon"></svg>
+        <h2>Archived boards</h2>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="archived-empty-card" *ngIf="archivedProjects().length === 0">
+      <div class="empty-icon-wrapper">
+        <svg lucideArchive size="32"></svg>
+      </div>
+      <h3>No archived boards</h3>
+      <p>When you archive a board, it will appear here. You can view or restore your archived boards at any time.</p>
+    </div>
+
+    <!-- Archived Boards Grid -->
+    <div class="boards-grid" *ngIf="archivedProjects().length > 0">
+      <div 
+        class="board-card archived-card" 
+        *ngFor="let p of archivedProjects(); let i = index">
+        <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+          <div class="archived-badge">Archived</div>
+          <div class="card-actions-wrapper">
+            <button 
+              type="button" 
+              class="unarchive-btn" 
+              (click)="unarchiveBoard(p, $event)" 
+              title="Restore board">
+              <svg lucideRotateCcw size="14"></svg>
+              <span>Restore</span>
+            </button>
+          </div>
+        </div>
+        <div class="board-card-footer">
+          <div class="title-meta">
+            <span class="board-title">{{ p.name }}</span>
+            <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
+          </div>
+          <div class="card-badge" *ngIf="p._count?.issues">
+            {{ p._count.issues }} tasks
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Archive Warning Modal -->
+<div class="modal-overlay" *ngIf="showArchiveWarningModal">
+  <div class="modal-content" style="max-width: 450px;">
+    <div class="modal-header" style="border-bottom: 0; padding-bottom: 0;">
+      <h2 style="display: flex; align-items: center; gap: 8px; color: #dc2626;">
+        <svg lucideAlertTriangle size="24"></svg> Active Tasks Remaining
+      </h2>
+      <button class="btn-icon-tiny" (click)="closeArchiveModal()"><svg lucideX size="20"></svg></button>
+    </div>
+    <div class="modal-body" style="padding-top: 12px; padding-bottom: 24px;">
+      <p style="font-size: 15px; color: #44546f; margin-bottom: 16px;">
+        {{ archiveWarningMessage }}
+      </p>
+      <p style="font-size: 14px; color: #172b4d; font-weight: 500;">
+        Are you sure you want to archive this board anyway? All active tasks will be hidden from the active workspace.
+      </p>
+    </div>
+    <div class="modal-footer" style="background: #f8f9fa; border-top: 1px solid #dfe1e6;">
+      <button class="btn-default" (click)="closeArchiveModal()">Cancel</button>
+      <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" (click)="confirmArchiveBoard()">Yes, Archive Board</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal Backdrop -->
@@ -168,7 +295,7 @@
     <button class="btn-icon-ghost" (click)="closeCreateModal()">
       <svg lucideChevronLeft size="18"></svg>
     </button>
-    <span class="modal-title">Create board</span>
+    <span class="modal-title">{{ editingProjectId() ? 'Edit board' : 'Create board' }}</span>
     <button class="btn-icon-ghost" (click)="closeCreateModal()">
       <svg lucideX size="18"></svg>
     </button>
@@ -199,25 +326,10 @@
       </div>
     </div>
 
-    <!-- Background Selection -->
+    <!-- Background Gradient Selection -->
     <div class="form-section">
       <label class="section-label">Background</label>
       
-      <!-- Image Backgrounds Row -->
-      <div class="bg-thumbnails-grid">
-        <button 
-          type="button"
-          class="bg-thumb-item"
-          *ngFor="let img of imageBackgrounds"
-          [style.background]="'url(' + img + ') center/cover'"
-          [class.selected]="selectedBg() === img"
-          (click)="selectBg(img)">
-          <span class="check-badge" *ngIf="selectedBg() === img">
-            <svg lucideCheck size="14"></svg>
-          </span>
-        </button>
-      </div>
-
       <!-- Color Swatches Row -->
       <div class="bg-colors-grid">
         <button 
@@ -230,9 +342,6 @@
           <span class="check-badge" *ngIf="selectedBg() === col">
             <svg lucideCheck size="14"></svg>
           </span>
-        </button>
-        <button type="button" class="color-thumb-item more-btn">
-          <svg lucideMoreHorizontal size="16"></svg>
         </button>
       </div>
     </div>
@@ -253,8 +362,8 @@
       </div>
     </div>
 
-    <!-- Visibility Selection -->
-    <div class="form-section">
+    <!-- Visibility Selection (Temporarily Hidden) -->
+    <div class="form-section" *ngIf="false">
       <label class="section-label">Visibility</label>
       <select class="trello-select" [(ngModel)]="projectForm.visibility">
         <option value="Workspace">Workspace</option>
@@ -269,7 +378,7 @@
       class="btn-trello-submit" 
       [disabled]="!projectForm.name.trim()"
       (click)="saveProject()">
-      Create
+      {{ editingProjectId() ? 'Save' : 'Create' }}
     </button>
   </div>
 </div>

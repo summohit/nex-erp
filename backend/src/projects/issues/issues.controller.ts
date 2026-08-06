@@ -81,6 +81,15 @@ export class IssuesController {
     return this.issuesService.getComments(req.user.companyId, projectId, id);
   }
 
+  @Get(':id/activities')
+  getActivities(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number
+  ) {
+    return this.issuesService.getActivities(req.user.companyId, projectId, id);
+  }
+
   @Post(':id/comments')
   addComment(
     @Req() req,
