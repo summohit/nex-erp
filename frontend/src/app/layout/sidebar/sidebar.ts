@@ -36,7 +36,7 @@ export class SidebarComponent implements OnInit {
       items: [
         {
           id: 'overview',
-          title: 'Overview',
+          title: 'Dashboard',
           icon: 'lucideLayoutDashboard',
           route: '/dashboard'
         },

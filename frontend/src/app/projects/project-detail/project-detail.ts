@@ -2,6 +2,7 @@ import { Component, signal, computed, effect, inject, OnInit, OnDestroy, ViewChi
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { environment } from '../../../environments/environment';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ProjectsService, ProjectSummary } from '../../services/projects';
 import { 
@@ -607,7 +608,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     
     if (this.isTimerRunning()) {
       // Stop timer
-      fetch(`http://localhost:3000/projects/${this.projectId}/issues/${issue.id}/time-stop`, {
+      fetch(`${environment.apiUrl}/projects/${this.projectId}/issues/${issue.id}/time-stop`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${this.authService.getToken()}` }
       }).then(res => {
@@ -620,7 +621,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       
     } else {
       // Start timer
-      fetch(`http://localhost:3000/projects/${this.projectId}/issues/${issue.id}/time-start`, {
+      fetch(`${environment.apiUrl}/projects/${this.projectId}/issues/${issue.id}/time-start`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${this.authService.getToken()}` }
       }).then(res => {
@@ -647,7 +648,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
     
     this.isTimerLoading.set(true);
-    fetch(`http://localhost:3000/projects/${this.projectId}/issues/${issue.id}/time-log`, {
+    fetch(`${environment.apiUrl}/projects/${this.projectId}/issues/${issue.id}/time-log`, {
       method: 'POST',
       headers: { 
         'Authorization': `Bearer ${this.authService.getToken()}`,

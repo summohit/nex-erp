@@ -1060,11 +1060,13 @@ export class AttendanceLeaveComponent implements OnInit {
       const tab = params.get('tab');
       if (tab === 'timesheets' || tab === 'attendance') {
         this.activeTab.set('attendance');
-      } else if (tab === 'balances' || tab === 'approvals') {
-        this.activeTab.set(tab as any);
-        this.loadAdminData();
-      } else if (tab) {
+      } else if (tab === 'me' || tab === 'leaves' || tab === 'my-leaves' || tab === 'request') {
+        this.activeTab.set('leaves');
+      } else if (tab === 'balances' || tab === 'approvals' || tab === 'shifts' || tab === 'holidays') {
         this.activeTab.set(tab);
+        if (tab === 'balances' || tab === 'approvals') {
+          this.loadAdminData();
+        }
       } else {
         this.activeTab.set('attendance');
       }

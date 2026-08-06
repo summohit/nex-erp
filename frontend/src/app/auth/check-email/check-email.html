@@ -1,0 +1,46 @@
+<div class="check-email-wrapper">
+  <!-- Dynamic background glow elements -->
+  <div class="glow-bg glow-bg-1"></div>
+  <div class="glow-bg glow-bg-2"></div>
+
+  <div class="check-email-card">
+    
+    <!-- Animated Mail Icon Badge -->
+    <div class="icon-badge">
+      <div class="icon-ping"></div>
+      <svg lucideMail size="44" class="mail-icon"></svg>
+    </div>
+
+    <h2 class="title">Check Your Inbox</h2>
+    
+    <p class="subtitle">
+      We've sent a magic verification link 
+      <strong *ngIf="email()" class="email-highlight">{{ email() }}</strong>
+      <span *ngIf="!email()">to your email address</span>.
+      Please click the link inside to activate your account and start using NEX ERP.
+    </p>
+
+    <!-- Resend Card Section -->
+    <div class="resend-box">
+      <div class="resend-info">
+        <span class="resend-title">Didn't receive the email?</span>
+        <p class="resend-text">Check your spam folder or click below to request a new link.</p>
+      </div>
+
+      <button 
+        (click)="resendEmail()" 
+        [disabled]="isResending() || cooldown() > 0"
+        class="resend-btn">
+        <svg lucideRefreshCw size="16" [class.spin]="isResending()"></svg>
+        <span *ngIf="!isResending() && cooldown() === 0">Resend Verification Email</span>
+        <span *ngIf="isResending()">Sending New Link...</span>
+        <span *ngIf="!isResending() && cooldown() > 0">Resend in {{ cooldown() }}s</span>
+      </button>
+    </div>
+
+    <a routerLink="/auth/login" class="back-login-link">
+      <svg lucideArrowRight size="16" class="arrow-back"></svg>
+      <span>Back to Login</span>
+    </a>
+  </div>
+</div>

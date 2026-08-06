@@ -1,52 +1,324 @@
 <div class="dashboard-container">
-  <div class="welcome-card" *ngIf="user()">
-    <h2>Welcome back, {{ user()?.employee?.firstName }}!</h2>
-    <p>Your dashboard is ready. Select an option from the sidebar to get started.</p>
+  
+  <!-- Welcome Banner -->
+  <div class="welcome-banner" *ngIf="user()">
+    <div class="welcome-left">
+      <div class="user-avatar-large">
+        <img *ngIf="user()?.employee?.avatarUrl" [src]="user().employee.avatarUrl" [alt]="user()?.employee?.firstName">
+        <span *ngIf="!user()?.employee?.avatarUrl">{{ (user()?.employee?.firstName || 'U').charAt(0) }}</span>
+      </div>
+      <div>
+        <h2>Welcome back, {{ user()?.employee?.firstName }} {{ user()?.employee?.lastName }}! 👋</h2>
+        <p class="welcome-subtitle">Here is what is happening across your organization today.</p>
+      </div>
+    </div>
+
+    <div class="role-badge" [ngClass]="userRole().toLowerCase()">
+      <svg lucideShield size="14" *ngIf="isExecutive()"></svg>
+      <svg lucideUsers size="14" *ngIf="isManager()"></svg>
+      <svg lucideUserCheck size="14" *ngIf="isEmployee()"></svg>
+      <span>{{ isExecutive() ? 'Executive Command Center' : (isManager() ? 'Team Manager View' : 'Employee Self-Service') }}</span>
+    </div>
   </div>
 
-  <div class="dashboard-grid" *ngIf="user()">
-    <!-- ATTENDANCE WIDGET -->
-    <div class="widget-card attendance-widget">
-      <div class="widget-header">
-        <h3>Time Tracking</h3>
-        <svg lucideClock size="20" class="text-muted"></svg>
-      </div>
-      
-      <div class="attendance-content">
-        <div class="status-indicator">
-          <div class="pulse-ring" [class.active]="todayAttendance()?.clockIn && !todayAttendance()?.clockOut"></div>
-          <span class="status-text">
-            {{ (!todayAttendance()?.clockIn) ? 'Not Clocked In' : (!todayAttendance()?.clockOut ? 'Currently Clocked In' : 'Clocked Out for the day') }}
-          </span>
+  <!-- KPI METRICS GRID -->
+  <div class="kpi-grid" *ngIf="user()">
+    
+    <!-- Executive KPIs -->
+    <ng-container *ngIf="isExecutive() || isManager()">
+      <div class="kpi-card bg-blue">
+        <div class="kpi-icon"><svg lucideUsers size="20"></svg></div>
+        <div class="kpi-data">
+          <span class="kpi-label">Active Employees</span>
+          <span class="kpi-value">{{ totalEmployeesCount() }}</span>
         </div>
-        
-        <div class="time-logs" *ngIf="todayAttendance()?.clockIn">
-          <div class="log-item">
-            <span class="log-label">Clock In:</span>
-            <span class="log-time">{{ todayAttendance()?.clockIn | date:'shortTime' }}</span>
-          </div>
-          <div class="log-item" *ngIf="todayAttendance()?.clockOut">
-            <span class="log-label">Clock Out:</span>
-            <span class="log-time">{{ todayAttendance()?.clockOut | date:'shortTime' }}</span>
+      </div>
+
+      <div class="kpi-card bg-indigo">
+        <div class="kpi-icon"><svg lucideBriefcase size="20"></svg></div>
+        <div class="kpi-data">
+          <span class="kpi-label">Active Projects</span>
+          <span class="kpi-value">{{ totalProjectsCount() }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card bg-amber">
+        <div class="kpi-icon"><svg lucideAlertCircle size="20"></svg></div>
+        <div class="kpi-data">
+          <span class="kpi-label">Pending Approvals</span>
+          <span class="kpi-value">{{ pendingApprovalsCount() }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card bg-emerald">
+        <div class="kpi-icon"><svg lucideLayers size="20"></svg></div>
+        <div class="kpi-data">
+          <span class="kpi-label">Departments</span>
+          <span class="kpi-value">{{ departmentBreakdown().length }}</span>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Employee / Personal KPIs -->
+    <ng-container *ngIf="isEmployee()">
+      <div class="kpi-card bg-blue">
+        <div class="kpi-icon"><svg lucideCheckSquare size="20"></svg></div>
+        <div class="kpi-data">
+          <span class="kpi-label">Pending Tasks</span>
+          <span class="kpi-value">{{ myPendingTasksCount() }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card bg-emerald">
+        <div class="kpi-icon"><svg lucideCheckCircle2 size="20"></svg></div>
+        <div class="kpi-data">
+          <span class="kpi-label">Completed Tasks</span>
+          <span class="kpi-value">{{ myCompletedTasksCount() }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card bg-purple">
+        <div class="kpi-icon"><svg lucideCalendar size="20"></svg></div>
+        <div class="kpi-data">
+          <span class="kpi-label">Leave Balances</span>
+          <span class="kpi-value">{{ myLeaveBalances().length }} Types</span>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+  <!-- MAIN DASHBOARD CONTENT GRID -->
+  <div class="dashboard-main-grid" *ngIf="user()">
+    
+    <!-- LEFT COLUMN: Charts & Task Lists -->
+    <div class="main-left-col">
+      
+      <!-- Executive: Department Breakdown & Pending Approvals -->
+      <div class="dashboard-card" *ngIf="isExecutive() || isManager()">
+        <div class="card-header">
+          <div class="flex items-center gap-2">
+            <svg lucideBuilding size="18" class="text-blue-600"></svg>
+            <h3>Department Headcount Breakdown</h3>
           </div>
         </div>
 
-        <button 
-          class="btn-primary full-width" 
-          [class.btn-danger]="todayAttendance()?.clockIn && !todayAttendance()?.clockOut"
-          [disabled]="todayAttendance()?.clockOut || isClocking()"
-          (click)="clockInOut()">
-          <span *ngIf="isClocking()" class="loader-text">Locating...</span>
-          <span *ngIf="!isClocking()">
-            {{ (!todayAttendance()?.clockIn) ? 'Clock In' : 'Clock Out' }}
-          </span>
-        </button>
+        <div class="card-body">
+          <div class="dept-list">
+            <div class="dept-item" *ngFor="let dept of departmentBreakdown()">
+              <div class="dept-info">
+                <span class="dept-name">{{ dept.name }}</span>
+                <span class="dept-count">{{ dept.count }} Employees</span>
+              </div>
+              <div class="dept-bar-bg">
+                <div class="dept-bar-fill" [style.width.%]="(dept.count / (totalEmployeesCount() || 1)) * 100"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Executive: Pending Approvals Queue -->
+      <div class="dashboard-card" *ngIf="(isExecutive() || isManager()) && leaveRequests().length > 0">
+        <div class="card-header">
+          <div class="flex items-center gap-2">
+            <svg lucideAlertCircle size="18" class="text-amber-500"></svg>
+            <h3>Pending Leave Approvals Queue</h3>
+          </div>
+        </div>
+
+        <div class="card-body p-0">
+          <table class="dashboard-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Leave Type</th>
+                <th>Dates</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let req of leaveRequests()">
+                <td>
+                  <span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span>
+                </td>
+                <td>{{ req.leaveType?.name }}</td>
+                <td>{{ req.startDate | date:'shortDate' }} - {{ req.endDate | date:'shortDate' }}</td>
+                <td>
+                  <span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span>
+                </td>
+                <td>
+                  <div class="flex gap-2" *ngIf="req.status === 'PENDING'">
+                    <button class="btn-approve-sm" (click)="approveLeave(req.id)">Approve</button>
+                    <button class="btn-reject-sm" (click)="rejectLeave(req.id)">Reject</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- My Tasks & Priorities -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="flex items-center gap-2">
+            <svg lucideCheckSquare size="18" class="text-indigo-600"></svg>
+            <h3>My Priority Tasks & Assignments</h3>
+          </div>
+        </div>
+
+        <div class="card-body p-0">
+          <table class="dashboard-table" *ngIf="myTasks().length > 0">
+            <thead>
+              <tr>
+                <th>Task Title</th>
+                <th>Project</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of myTasks()">
+                <td class="font-medium">{{ t.title }}</td>
+                <td><span class="project-tag">{{ t.projectKey }}</span></td>
+                <td>
+                  <span class="priority-pill" [ngClass]="t.priority.toLowerCase()">{{ t.priority }}</span>
+                </td>
+                <td>
+                  <span class="status-pill" [ngClass]="t.status.toLowerCase()">{{ t.status }}</span>
+                </td>
+                <td>
+                  <a [routerLink]="['/projects', t.projectId || 1]" class="btn-table-action">
+                    <span>View Board</span>
+                    <svg lucideArrowRight size="12"></svg>
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="empty-box p-6 text-center" *ngIf="myTasks().length === 0">
+            <svg lucideCheckCircle2 size="36" class="text-emerald-500 mb-2"></svg>
+            <p style="font-size: 14px; font-weight: 600; color: #1e293b;">You are all caught up!</p>
+            <p style="font-size: 12px; color: #64748b;">No active tasks currently assigned to you.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: Clock-In & Shortcuts -->
+    <div class="main-right-col">
+      
+      <!-- Redesigned Attendance Clock-In Card -->
+      <div class="dashboard-card attendance-card-enhanced">
+        <div class="card-header flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg lucideClock size="18" class="text-blue-600"></svg>
+            <h3>Daily Time Tracker</h3>
+          </div>
+          <span class="today-date-badge">{{ todayDate | date:'EEE, MMM d' }}</span>
+        </div>
+        
+        <div class="card-body">
+          <!-- State 1: Not Clocked In -->
+          <div class="clock-state-box not-clocked" *ngIf="!todayAttendance()?.clockIn">
+            <div class="clock-status-pill offline">
+              <span class="status-dot"></span>
+              <span>Offline / Shift Pending</span>
+            </div>
+
+            <div class="clock-prompt">
+              <span>Ready to start your work shift today?</span>
+            </div>
+
+            <button class="btn-clock-hero clock-in" 
+                    [disabled]="isClocking()" 
+                    (click)="clockInOut()" 
+                    type="button">
+              <svg lucideClock size="16"></svg>
+              <span>{{ isClocking() ? 'Locating & Clocking In...' : 'Clock In Now' }}</span>
+            </button>
+          </div>
+
+          <!-- State 2: Currently Clocked In -->
+          <div class="clock-state-box clocked-in" *ngIf="todayAttendance()?.clockIn && !todayAttendance()?.clockOut">
+            <div class="clock-status-pill active">
+              <span class="status-dot green-pulse"></span>
+              <span>Shift Active</span>
+            </div>
+
+            <div class="clock-stats-row">
+              <div class="clock-stat-item">
+                <span class="stat-lbl">Clocked In At</span>
+                <span class="stat-val text-blue-600">{{ todayAttendance()?.clockIn | date:'shortTime' }}</span>
+              </div>
+            </div>
+
+            <button class="btn-clock-hero clock-out" 
+                    [disabled]="isClocking()" 
+                    (click)="clockInOut()" 
+                    type="button">
+              <svg lucideClock size="16"></svg>
+              <span>{{ isClocking() ? 'Saving & Clocking Out...' : 'Clock Out' }}</span>
+            </button>
+          </div>
+
+          <!-- State 3: Clocked Out for the day -->
+          <div class="clock-state-box clocked-out" *ngIf="todayAttendance()?.clockOut">
+            <div class="clock-status-pill completed">
+              <svg lucideCheckCircle2 size="14" class="text-emerald-600"></svg>
+              <span>Shift Completed Today</span>
+            </div>
+
+            <div class="clock-summary-grid">
+              <div class="summary-col">
+                <span class="sum-lbl">In</span>
+                <span class="sum-val">{{ todayAttendance()?.clockIn | date:'shortTime' }}</span>
+              </div>
+              <div class="summary-divider"></div>
+              <div class="summary-col">
+                <span class="sum-lbl">Out</span>
+                <span class="sum-val">{{ todayAttendance()?.clockOut | date:'shortTime' }}</span>
+              </div>
+            </div>
+
+            <button class="btn-clock-hero disabled" disabled type="button">
+              <svg lucideCheckCircle2 size="16"></svg>
+              <span>Done For Today</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Shortcuts Card -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h3>Quick Shortcuts</h3>
+        </div>
+        <div class="card-body">
+          <div class="shortcuts-grid">
+            <a routerLink="/attendance/leaves" class="shortcut-btn">
+              <svg lucideCalendar size="16" class="text-emerald-600"></svg>
+              <span>Apply for Leave</span>
+            </a>
+            <a routerLink="/employees/documents" class="shortcut-btn">
+              <svg lucideFileText size="16" class="text-blue-600"></svg>
+              <span>My Documents</span>
+            </a>
+            <a routerLink="/payroll/payslips/me" class="shortcut-btn">
+              <svg lucideAward size="16" class="text-purple-600"></svg>
+              <span>View Payslip</span>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- ONBOARDING WIDGET -->
-  <div class="onboarding-widget" *ngIf="user() && onboardingStatus() !== 'COMPLETED' && onboardingTasks().length > 0">
+  <div class="onboarding-widget mt-6" *ngIf="user() && onboardingStatus() !== 'COMPLETED' && onboardingTasks().length > 0">
     <div class="widget-header">
       <div class="header-titles">
         <h3>Welcome to the Team! 🎉</h3>
@@ -72,10 +344,5 @@
         <div class="loading-spinner" *ngIf="isCompletingTask() === task.id"></div>
       </div>
     </div>
-  </div>
-
-  <div class="loading-state" *ngIf="!user()">
-    <div class="loader-spinner"></div>
-    <p>Loading your dashboard...</p>
   </div>
 </div>

@@ -2,12 +2,15 @@ import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/co
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { MailService } from '../mail/mail.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
+    private mailService: MailService
   ) {}
 
   async signupCompany(
@@ -132,15 +135,22 @@ export class AuthService {
         data: permissionData
       });
 
-      // 6. Generate JWT
-      const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId };
-      const access_token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
-      const refresh_token = await this.jwtService.signAsync(payload, { 
-        expiresIn: '7d', 
-        secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh' 
+      // 6. Generate Verification Token
+      const token = crypto.randomBytes(32).toString('hex');
+      await tx.verificationToken.create({
+        data: {
+          identifier: adminEmail,
+          token,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        }
       });
 
-      return { company, access_token, refresh_token };
+      // 7. Send Verification Email
+      // Note: We don't await this inside the transaction so the transaction can complete quickly
+      this.mailService.sendVerificationEmail(adminEmail, token).catch(e => console.error(e));
+
+      // We do not return JWTs here because the user must verify their email first.
+      return { message: 'Signup successful. Please check your email to verify your account.' };
     });
   }
 
@@ -150,6 +160,10 @@ export class AuthService {
 
     const isMatch = await bcrypt.compare(pass, user.password);
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
+
+    if (user.status === 'PENDING_VERIFICATION') {
+      throw new UnauthorizedException('Please verify your email address before logging in.');
+    }
 
     const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId };
     
@@ -180,5 +194,69 @@ export class AuthService {
     } catch (err) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+  }
+
+  async verifyEmail(token: string) {
+    const verificationToken = await this.prisma.verificationToken.findUnique({
+      where: { token }
+    });
+
+    if (!verificationToken) {
+      throw new UnauthorizedException('Invalid verification token.');
+    }
+
+    if (new Date() > verificationToken.expiresAt) {
+      await this.prisma.verificationToken.delete({ where: { id: verificationToken.id } });
+      throw new UnauthorizedException('Verification token has expired.');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { email: verificationToken.identifier } });
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        status: 'ACTIVE'
+      }
+    });
+
+    await this.prisma.verificationToken.delete({ where: { id: verificationToken.id } });
+
+    // Send Welcome Email
+    this.mailService.sendWelcomeEmail(user.email).catch(e => console.error(e));
+
+    return { message: 'Email verified successfully.' };
+  }
+
+  async resendVerificationEmail(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    if (user.status !== 'PENDING_VERIFICATION') {
+      throw new UnauthorizedException('Email is already verified.');
+    }
+
+    // Delete any existing tokens for this user
+    await this.prisma.verificationToken.deleteMany({
+      where: { identifier: email }
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    await this.prisma.verificationToken.create({
+      data: {
+        identifier: email,
+        token: token,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      }
+    });
+
+    this.mailService.sendVerificationEmail(email, token).catch(e => console.error(e));
+
+    return { message: 'Verification email resent successfully.' };
   }
 }

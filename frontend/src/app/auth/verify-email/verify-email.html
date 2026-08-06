@@ -1,0 +1,42 @@
+<div class="auth-container min-h-screen flex items-center justify-center bg-gray-50 p-4">
+  <div class="auth-card max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden text-center p-8">
+    
+    <!-- State 1: Verifying -->
+    <ng-container *ngIf="status() === 'verifying'">
+      <div class="icon-container mx-auto mb-6 w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center">
+        <svg lucideLoader2 size="40" class="text-blue-600 animate-spin"></svg>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Verifying Email...</h2>
+      <p class="text-gray-600">Please wait while we securely verify your email address.</p>
+    </ng-container>
+
+    <!-- State 2: Success -->
+    <ng-container *ngIf="status() === 'success'">
+      <div class="icon-container mx-auto mb-6 w-20 h-20 rounded-full bg-green-50 flex items-center justify-center">
+        <svg lucideCheckCircle2 size="40" class="text-green-600"></svg>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">You're All Set! 🎉</h2>
+      <p class="text-gray-600 mb-8 leading-relaxed">
+        Your email has been successfully verified. You can now log in to your account and start setting up your workspace.
+      </p>
+      <a routerLink="/auth/login" class="w-full inline-block px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors duration-200 shadow-lg shadow-blue-200">
+        Proceed to Login
+      </a>
+    </ng-container>
+
+    <!-- State 3: Error -->
+    <ng-container *ngIf="status() === 'error'">
+      <div class="icon-container mx-auto mb-6 w-20 h-20 rounded-full bg-red-50 flex items-center justify-center">
+        <svg lucideXCircle size="40" class="text-red-600"></svg>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Verification Failed</h2>
+      <p class="text-gray-600 mb-8 leading-relaxed">
+        {{ errorMessage() }}
+      </p>
+      <a routerLink="/auth/login" class="w-full inline-block px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg font-semibold transition-colors duration-200">
+        Back to Login
+      </a>
+    </ng-container>
+
+  </div>
+</div>

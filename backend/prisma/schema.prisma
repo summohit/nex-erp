@@ -49,12 +49,24 @@ model User {
   role      String    @default("EMPLOYEE") // SUPERADMIN, ADMIN, HR, FINANCE, SALES, EMPLOYEE
   companyId Int
   company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailVerifiedAt DateTime?
+  status          String    @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, SUSPENDED
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   employee  Employee?
   approvedLeaveRequests LeaveRequest[]
   approvedExpenseClaims ExpenseClaim[] @relation("ExpenseApprover")
   approvedHardwareRequests HardwareRequest[] @relation("HardwareApprover")
+}
+
+model VerificationToken {
+  id         Int      @id @default(autoincrement())
+  identifier String   // email address
+  token      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([identifier, token])
 }
 
 // Roles & Permissions

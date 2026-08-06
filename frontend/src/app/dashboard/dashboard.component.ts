@@ -1,16 +1,31 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { OnboardingService, EmployeeOnboardingTask } from '../services/onboarding.service';
 import { AttendanceService, AttendanceRecord } from '../services/attendance';
-import { LucideCheckCircle2, LucideCircle, LucideClock } from '@lucide/angular';
+import { EmployeeService } from '../services/employee.service';
+import { ProjectsService } from '../services/projects';
+import { LeavesService } from '../services/leaves';
+import { 
+  LucideCheckCircle2, LucideCircle, LucideClock, LucideUsers, LucideBriefcase,
+  LucideFileText, LucideTrendingUp, LucideCheckSquare, LucideCalendar, LucideUserCheck,
+  LucideAlertCircle, LucideArrowRight, LucidePlus, LucideBuilding, LucideLayers,
+  LucideShield, LucideAward
+} from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, LucideCheckCircle2, LucideCircle, LucideClock],
+  imports: [
+    CommonModule, 
+    RouterModule,
+    LucideCheckCircle2, LucideCircle, LucideClock, LucideUsers, LucideBriefcase,
+    LucideFileText, LucideTrendingUp, LucideCheckSquare, LucideCalendar, LucideUserCheck,
+    LucideAlertCircle, LucideArrowRight, LucidePlus, LucideBuilding, LucideLayers,
+    LucideShield, LucideAward
+  ],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css']
 })
@@ -19,6 +34,9 @@ export class DashboardComponent implements OnInit {
   private router = inject(Router);
   private onboardingService = inject(OnboardingService);
   private attendanceService = inject(AttendanceService);
+  private employeeService = inject(EmployeeService);
+  private projectsService = inject(ProjectsService);
+  private leavesService = inject(LeavesService);
   private toast = inject(HotToastService);
 
   user = signal<any>(null);
@@ -27,7 +45,39 @@ export class DashboardComponent implements OnInit {
   isCompletingTask = signal<number | null>(null);
 
   todayAttendance = signal<AttendanceRecord | null>(null);
+  todayDate = new Date();
   isClocking = signal<boolean>(false);
+
+  // Role Computation
+  userRole = computed(() => this.user()?.role || 'EMPLOYEE');
+  isExecutive = computed(() => ['ADMIN', 'SUPER_ADMIN'].includes(this.userRole()));
+  isManager = computed(() => ['HR_MANAGER', 'MANAGER'].includes(this.userRole()));
+  isEmployee = computed(() => !this.isExecutive() && !this.isManager());
+
+  // Metrics Data Signals
+  employees = signal<any[]>([]);
+  projects = signal<any[]>([]);
+  leaveRequests = signal<any[]>([]);
+  myLeaveBalances = signal<any[]>([]);
+  myTasks = signal<any[]>([]);
+  isLoadingMetrics = signal<boolean>(true);
+
+  // Computed Dashboard Metrics
+  totalEmployeesCount = computed(() => this.employees().length);
+  totalProjectsCount = computed(() => this.projects().length);
+  pendingApprovalsCount = computed(() => this.leaveRequests().filter(r => r.status === 'PENDING').length);
+  
+  departmentBreakdown = computed(() => {
+    const map = new Map<string, number>();
+    for (const emp of this.employees()) {
+      const dept = emp.department?.name || 'Unassigned';
+      map.set(dept, (map.get(dept) || 0) + 1);
+    }
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
+  });
+
+  myPendingTasksCount = computed(() => this.myTasks().filter(t => t.status !== 'DONE').length);
+  myCompletedTasksCount = computed(() => this.myTasks().filter(t => t.status === 'DONE').length);
 
   ngOnInit() {
     this.authService.getMe().subscribe({
@@ -39,11 +89,54 @@ export class DashboardComponent implements OnInit {
         this.user.set(user);
         this.loadOnboardingTasks();
         this.loadAttendance();
+        this.loadRoleMetrics();
       },
       error: () => {
         this.authService.logout();
         this.router.navigate(['/']);
       }
+    });
+  }
+
+  loadRoleMetrics() {
+    this.isLoadingMetrics.set(true);
+
+    // Common: Get Projects
+    this.projectsService.getProjects().subscribe({
+      next: (projs) => {
+        this.projects.set(projs || []);
+        
+        // Extract My Tasks across projects
+        const currentUserId = this.user()?.id;
+        const myTasksList: any[] = [];
+        for (const p of projs || []) {
+          if (p.issues) {
+            for (const issue of p.issues) {
+              if (issue.assigneeId === currentUserId || issue.reporterId === currentUserId) {
+                myTasksList.push({ ...issue, projectKey: p.key, projectName: p.name });
+              }
+            }
+          }
+        }
+        this.myTasks.set(myTasksList);
+      }
+    });
+
+    // Executive / Manager: Load Employees & Leave Approvals
+    if (this.isExecutive() || this.isManager()) {
+      this.employeeService.getEmployees().subscribe({
+        next: (emps) => this.employees.set(emps || [])
+      });
+
+      this.leavesService.getRequests().subscribe({
+        next: (reqs) => this.leaveRequests.set(reqs || [])
+      });
+    }
+
+    // Employee: Load Personal Leave Balances
+    this.leavesService.getMyBalances().subscribe({
+      next: (bals) => this.myLeaveBalances.set(bals || []),
+      complete: () => this.isLoadingMetrics.set(false)
     });
   }
 
@@ -75,7 +168,6 @@ export class DashboardComponent implements OnInit {
         this.toast.success('Task marked as complete!');
         this.isCompletingTask.set(null);
         
-        // Update local state for immediate feedback
         const tasks = [...this.onboardingTasks()];
         const idx = tasks.findIndex(t => t.id === task.id);
         if (idx !== -1) {
@@ -137,6 +229,26 @@ export class DashboardComponent implements OnInit {
         this.toast.error(err.error?.message || 'Failed to clock action');
         this.isClocking.set(false);
       }
+    });
+  }
+
+  approveLeave(reqId: number) {
+    this.leavesService.updateRequestStatus(reqId, 'APPROVED').subscribe({
+      next: () => {
+        this.toast.success('Leave request approved!');
+        this.leaveRequests.update(list => list.map(r => r.id === reqId ? { ...r, status: 'APPROVED' } : r));
+      },
+      error: () => this.toast.error('Failed to approve request')
+    });
+  }
+
+  rejectLeave(reqId: number) {
+    this.leavesService.updateRequestStatus(reqId, 'REJECTED', 'Not feasible for project timeline').subscribe({
+      next: () => {
+        this.toast.success('Leave request rejected');
+        this.leaveRequests.update(list => list.map(r => r.id === reqId ? { ...r, status: 'REJECTED' } : r));
+      },
+      error: () => this.toast.error('Failed to reject request')
     });
   }
 }

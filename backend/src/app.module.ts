@@ -19,9 +19,10 @@ import { AiModule } from './ai/ai.module';
 import { PublicJobsModule } from './public-jobs/public-jobs.module';
 import { RecruitmentModule } from './recruitment/recruitment.module';
 import { ProjectsModule } from './projects/projects.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule],
+  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule],
   controllers: [AppController],
   providers: [AppService],
 })

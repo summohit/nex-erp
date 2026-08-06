@@ -70,8 +70,9 @@ export class AuthComponent {
     this.authService.signup(this.registerForm.value).subscribe({
       next: (res) => {
         this.isSubmitting.set(false);
-        this.toast.success('Registration successful! Please log in with your new credentials.');
-        this.toggleView();
+        this.toast.success(res.message || 'Registration successful! Please check your email.');
+        sessionStorage.setItem('pendingVerificationEmail', this.registerForm.value.email);
+        this.router.navigate(['/auth/check-email']);
       },
       error: (err) => {
         this.isSubmitting.set(false);
@@ -111,7 +112,14 @@ export class AuthComponent {
       },
       error: (err) => {
         this.isSubmitting.set(false);
-        this.toast.error(err.error?.message || 'Invalid credentials.');
+        const errorMsg = err.error?.message;
+        if (errorMsg === 'Please verify your email address before logging in.') {
+          sessionStorage.setItem('pendingVerificationEmail', this.loginForm.value.email);
+          this.router.navigate(['/auth/check-email']);
+          this.toast.error('Please verify your email to continue.');
+        } else {
+          this.toast.error(errorMsg || 'Invalid credentials.');
+        }
       }
     });
   }
