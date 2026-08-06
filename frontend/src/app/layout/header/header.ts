@@ -1,9 +1,11 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { NotificationsService } from '../../services/notifications.service';
+import { SpotlightSearchComponent } from '../../shared/components/spotlight-search/spotlight-search.component';
 import { 
   LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
   LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX
@@ -16,6 +18,7 @@ import {
     CommonModule, 
     FormsModule,
     RouterModule,
+    SpotlightSearchComponent,
     LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
     LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX
   ],
@@ -25,6 +28,9 @@ import {
 export class HeaderComponent implements OnInit {
   private router = inject(Router);
   private authService = inject(AuthService);
+  notificationsService = inject(NotificationsService);
+
+  @ViewChild(SpotlightSearchComponent) spotlightSearch!: SpotlightSearchComponent;
 
   currentUser = this.authService.currentUser;
   pageTitle = signal<string>('Dashboard');
@@ -32,15 +38,6 @@ export class HeaderComponent implements OnInit {
   isNotificationOpen = signal<boolean>(false);
   isProfileMenuOpen = signal<boolean>(false);
   isQuickCreateOpen = signal<boolean>(false);
-  globalSearchQuery = signal<string>('');
-
-  notifications = signal<any[]>([
-    { id: 1, title: 'Task Assigned', desc: 'You were assigned to issue DEN1-2', time: '10m ago', unread: true },
-    { id: 2, title: 'Leave Approved', desc: 'Your annual leave request was approved', time: '1h ago', unread: true },
-    { id: 3, title: 'Payslip Ready', desc: 'Your payslip for this month is generated', time: '1d ago', unread: false }
-  ]);
-
-  unreadNotificationsCount = signal<number>(2);
 
   ngOnInit() {
     this.updateTitle(this.router.url);
@@ -49,6 +46,12 @@ export class HeaderComponent implements OnInit {
     ).subscribe((event: any) => {
       this.updateTitle(event.urlAfterRedirects);
     });
+  }
+
+  openSpotlight() {
+    if (this.spotlightSearch) {
+      this.spotlightSearch.open();
+    }
   }
 
   private updateTitle(url: string) {
@@ -98,8 +101,11 @@ export class HeaderComponent implements OnInit {
   }
 
   markAllAsRead() {
-    this.notifications.update(list => list.map(n => ({ ...n, unread: false })));
-    this.unreadNotificationsCount.set(0);
+    this.notificationsService.markAllAsRead();
+  }
+
+  markSingleAsRead(id: number) {
+    this.notificationsService.markAsRead(id);
   }
 
   getUserInitials(): string {

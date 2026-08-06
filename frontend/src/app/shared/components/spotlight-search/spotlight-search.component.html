@@ -1,0 +1,54 @@
+<div class="spotlight-overlay" *ngIf="isOpen()" (click)="close()">
+  <div class="spotlight-dialog" (click)="$event.stopPropagation()">
+    
+    <!-- Search Bar Header -->
+    <div class="spotlight-header">
+      <lucide-icon name="search" class="search-icon" [size]="20"></lucide-icon>
+      <input 
+        #searchInput
+        type="text" 
+        class="spotlight-input" 
+        placeholder="Type a command, employee name, or project..." 
+        [ngModel]="query()"
+        (ngModelChange)="query.set($event); selectedIndex.set(0)"
+      />
+      <div class="spotlight-badge">ESC</div>
+    </div>
+
+    <!-- Results Body -->
+    <div class="spotlight-results">
+      <div *ngIf="filteredResults().length === 0" class="no-results">
+        <lucide-icon name="search" [size]="32" class="no-results-icon"></lucide-icon>
+        <p class="no-results-title">No matching results found</p>
+        <p class="no-results-desc">Try searching for employee names, projects, or settings.</p>
+      </div>
+
+      <div 
+        *ngFor="let item of filteredResults(); let i = index"
+        class="spotlight-item"
+        [class.selected]="i === selectedIndex()"
+        (mouseenter)="selectedIndex.set(i)"
+        (click)="item.action()"
+      >
+        <div class="item-icon-wrapper">
+          <lucide-icon [name]="item.icon.prototype.name || 'search'" [size]="18"></lucide-icon>
+        </div>
+        <div class="item-content">
+          <div class="item-title-row">
+            <span class="item-title">{{ item.title }}</span>
+            <span class="category-badge">{{ item.category }}</span>
+          </div>
+          <p class="item-subtitle" *ngIf="item.subtitle">{{ item.subtitle }}</p>
+        </div>
+        <lucide-icon name="arrow-right" [size]="16" class="item-arrow"></lucide-icon>
+      </div>
+    </div>
+
+    <!-- Footer Controls -->
+    <div class="spotlight-footer">
+      <div class="key-hint"><span class="kbd">↑</span> <span class="kbd">↓</span> Navigate</div>
+      <div class="key-hint"><span class="kbd">↵</span> Select</div>
+      <div class="key-hint"><span class="kbd">ESC</span> Close</div>
+    </div>
+  </div>
+</div>

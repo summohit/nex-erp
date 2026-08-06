@@ -39,6 +39,7 @@ model Company {
   jobApplications     JobApplication[]
   projects            Project[]
   issues              Issue[]
+  notifications       Notification[]
 }
 
 // Authentication & RBAC
@@ -57,6 +58,7 @@ model User {
   approvedLeaveRequests LeaveRequest[]
   approvedExpenseClaims ExpenseClaim[] @relation("ExpenseApprover")
   approvedHardwareRequests HardwareRequest[] @relation("HardwareApprover")
+  notifications Notification[]
 }
 
 model VerificationToken {
@@ -791,6 +793,21 @@ model IssueMember {
   assignedAt DateTime @default(now())
 
   @@id([issueId, employeeId])
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  type        String   @default("INFO") // INFO, SUCCESS, WARNING, LEAVE_REQUEST, ASSIGNMENT, PAYROLL
+  linkUrl     String?
+  isRead      Boolean  @default(false)
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 

@@ -4,14 +4,16 @@
   </div>
 
   <div class="topbar-right">
-    <!-- Global Search Input -->
-    <div class="global-search-container">
+    <!-- Spotlight Search Component -->
+    <app-spotlight-search></app-spotlight-search>
+
+    <!-- Global Search Input Trigger -->
+    <div class="global-search-container" (click)="openSpotlight()">
       <svg lucideSearch size="15" class="search-icon"></svg>
       <input type="text" 
-             [ngModel]="globalSearchQuery()" 
-             (ngModelChange)="globalSearchQuery.set($event)" 
+             readonly
              placeholder="Search ERP (Press ⌘K)..." 
-             class="global-search-input">
+             class="global-search-input cursor-pointer">
       <span class="search-kbd">⌘K</span>
     </div>
 
@@ -36,7 +38,7 @@
               <span class="item-desc">Onboard team member</span>
             </div>
           </a>
-          <a routerLink="/attendance/leaves" (click)="isQuickCreateOpen.set(false)" class="menu-item">
+          <a routerLink="/attendance" (click)="isQuickCreateOpen.set(false)" class="menu-item">
             <svg lucideBriefcase size="16" class="text-emerald-600"></svg>
             <div class="menu-item-text">
               <span class="item-title">Apply for Leave</span>
@@ -58,22 +60,34 @@
     <div class="relative">
       <button class="btn-header-icon" (click)="toggleNotifications()" type="button" title="Notifications">
         <svg lucideBell size="18"></svg>
-        <span class="notification-badge" *ngIf="unreadNotificationsCount() > 0">{{ unreadNotificationsCount() }}</span>
+        <span class="notification-badge" *ngIf="notificationsService.unreadCount() > 0">
+          {{ notificationsService.unreadCount() }}
+        </span>
       </button>
 
       <!-- Notifications Dropdown -->
       <div class="header-popover notifications-popover" *ngIf="isNotificationOpen()" (click)="$event.stopPropagation()">
         <div class="notifications-header">
           <span>Notifications</span>
-          <button class="mark-read-btn" (click)="markAllAsRead()" *ngIf="unreadNotificationsCount() > 0">Mark all read</button>
+          <button class="mark-read-btn" (click)="markAllAsRead()" *ngIf="notificationsService.unreadCount() > 0">Mark all read</button>
         </div>
         <div class="notifications-list">
-          <div class="notification-item" *ngFor="let n of notifications()" [class.unread]="n.unread">
-            <div class="notification-dot" *ngIf="n.unread"></div>
+          <div *ngIf="notificationsService.notifications().length === 0" class="no-notifications">
+            <svg lucideBell size="28" class="text-slate-300 mb-2"></svg>
+            <p class="text-sm text-slate-500 font-medium">No notifications yet</p>
+          </div>
+
+          <div 
+            class="notification-item" 
+            *ngFor="let n of notificationsService.notifications()" 
+            [class.unread]="!n.isRead"
+            (click)="markSingleAsRead(n.id)"
+          >
+            <div class="notification-dot" *ngIf="!n.isRead"></div>
             <div class="notification-content">
               <div class="notification-title">{{ n.title }}</div>
-              <div class="notification-desc">{{ n.desc }}</div>
-              <div class="notification-time">{{ n.time }}</div>
+              <div class="notification-desc">{{ n.message }}</div>
+              <div class="notification-time">{{ n.createdAt | date:'shortTime' }}</div>
             </div>
           </div>
         </div>
