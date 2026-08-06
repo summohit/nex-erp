@@ -4,7 +4,7 @@
   min-height: 100vh;
   background-color: var(--bg-alt);
   padding-left: 260px; /* Offset for fixed sidebar */
-  padding-top: 72px;   /* Offset for fixed header */
+  padding-top: 0;
 }
 
 .main-content {
