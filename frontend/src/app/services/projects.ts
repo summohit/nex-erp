@@ -13,6 +13,9 @@ export interface ProjectSummary {
   teamWorkload: { assigneeId: number; name: string; avatarUrl: string; count: number }[];
   priorityBreakdown: { priority: string; count: number }[];
   recentActivity: any[];
+  typeDistribution?: { type: string; count: number }[];
+  completionTrends?: { date: string; created: number; completed: number }[];
+  timeTracking?: { estimatedHours: number; loggedHours: number };
 }
 
 @Injectable({

@@ -62,6 +62,16 @@ export class IssuesController {
     return this.issuesService.stopTimeTracking(req.user.companyId, req.user.sub, projectId, id);
   }
 
+  @Post(':id/time-log')
+  addManualTimeLog(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { durationMin: number }
+  ) {
+    return this.issuesService.addManualTimeLog(req.user.companyId, req.user.sub, projectId, id, body);
+  }
+
   @Get(':id/comments')
   getComments(
     @Req() req,

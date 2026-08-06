@@ -1,0 +1,220 @@
+<div class="documents-container">
+  <!-- Header -->
+  <div class="documents-header">
+    <div>
+      <h1 class="page-title">Employee Documents Center</h1>
+      <p class="page-subtitle">Manage, audit, and organize legal documents, contracts, and compliance files for all employees.</p>
+    </div>
+
+    <button class="btn-primary" (click)="openUploadModal()">
+      <svg lucideUploadCloud size="16"></svg>
+      <span>Upload Document</span>
+    </button>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon bg-blue-50 text-blue-600">
+        <svg lucideFileText size="20"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Total Documents</span>
+        <span class="stat-value">{{ totalDocsCount() }}</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon bg-emerald-50 text-emerald-600">
+        <svg lucideFileCheck size="20"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Employees with Files</span>
+        <span class="stat-value">{{ employeesWithDocsCount() }} / {{ employees().length }}</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon bg-indigo-50 text-indigo-600">
+        <svg lucideFolder size="20"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Active Departments</span>
+        <span class="stat-value">{{ departments().length }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Controls -->
+  <div class="controls-bar">
+    <div class="search-box">
+      <svg lucideSearch size="16" class="search-icon"></svg>
+      <input type="text" 
+             [ngModel]="searchQuery()" 
+             (ngModelChange)="searchQuery.set($event)" 
+             placeholder="Search by document name or employee...">
+    </div>
+
+    <div class="filter-box">
+      <svg lucideFilter size="16" class="filter-icon"></svg>
+      <select [ngModel]="selectedDepartment()" (ngModelChange)="selectedDepartment.set($event)">
+        <option value="ALL">All Departments</option>
+        <option *ngFor="let dept of departments()" [value]="dept">{{ dept }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading()">
+    <div class="spinner"></div>
+    <span>Loading employee documents...</span>
+  </div>
+
+  <!-- Documents Grid -->
+  <div class="documents-grid-section" *ngIf="!isLoading()">
+    <div class="documents-grid" *ngIf="filteredDocuments().length > 0">
+      <div class="doc-card" *ngFor="let doc of filteredDocuments()">
+        <div class="doc-card-header">
+          <div class="doc-type-badge">
+            {{ getFileExtension(doc.fileName) }}
+          </div>
+
+          <button class="btn-delete" (click)="deleteDocument(doc)" title="Delete document">
+            <svg lucideTrash2 size="14"></svg>
+          </button>
+        </div>
+
+        <div class="doc-body">
+          <h3 class="doc-name" [title]="doc.fileName">{{ doc.fileName }}</h3>
+          
+          <!-- Employee Info -->
+          <div class="doc-employee-info">
+            <div class="avatar-small">
+              <img *ngIf="doc.employee?.avatarUrl" [src]="doc.employee.avatarUrl" [alt]="doc.employee.firstName">
+              <span *ngIf="!doc.employee?.avatarUrl">{{ (doc.employee?.firstName || 'E').charAt(0) }}</span>
+            </div>
+            <div class="employee-text">
+              <span class="emp-name">{{ doc.employee?.firstName }} {{ doc.employee?.lastName }}</span>
+              <span class="emp-dept">{{ doc.employee?.department?.name || 'No Dept' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="doc-footer">
+          <span class="doc-date" *ngIf="doc.createdAt">Uploaded {{ doc.createdAt | date:'mediumDate' }}</span>
+          
+          <a [href]="doc.fileUrl" target="_blank" class="btn-view-doc" title="Open / Download file">
+            <svg lucideExternalLink size="13"></svg>
+            <span>View</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="filteredDocuments().length === 0">
+      <svg lucideFileText size="48" class="empty-icon"></svg>
+      <h3>No Documents Found</h3>
+      <p>There are no employee documents matching your filter criteria.</p>
+      <button class="btn-primary-sm mt-3" (click)="openUploadModal()">Upload First Document</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Document Modal -->
+<div class="modal-overlay" *ngIf="isUploadModalOpen()">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="flex items-center gap-2">
+        <svg lucidePaperclip size="18" class="text-blue-600"></svg>
+        <h3 class="modal-title">Upload Employee Document</h3>
+      </div>
+      <button class="btn-icon" (click)="closeUploadModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-group mb-4 relative">
+        <label class="form-label">Select Employee *</label>
+        
+        <!-- Custom Searchable Picker Button -->
+        <div class="employee-picker-trigger" (click)="isEmployeeDropdownOpen.set(!isEmployeeDropdownOpen())">
+          <ng-container *ngIf="selectedEmployeeObject() as emp; else noEmp">
+            <div class="flex items-center gap-2">
+              <div class="picker-avatar">
+                <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName">
+                <span *ngIf="!emp.avatarUrl">{{ (emp.firstName || 'E').charAt(0) }}</span>
+              </div>
+              <span class="picker-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+              <span class="picker-dept">({{ emp.department?.name || 'No Dept' }})</span>
+            </div>
+          </ng-container>
+          <ng-template #noEmp>
+            <span class="text-slate-400">Select an employee...</span>
+          </ng-template>
+
+          <svg lucideFilter size="14" class="text-slate-400 ml-auto"></svg>
+        </div>
+
+        <!-- Searchable Dropdown Menu -->
+        <div class="employee-picker-dropdown" *ngIf="isEmployeeDropdownOpen()">
+          <div class="picker-search-box">
+            <svg lucideSearch size="14" class="search-icon"></svg>
+            <input type="text" 
+                   [ngModel]="modalEmployeeSearch()" 
+                   (ngModelChange)="modalEmployeeSearch.set($event)" 
+                   placeholder="Type name or department..." 
+                   (click)="$event.stopPropagation()">
+          </div>
+
+          <div class="picker-list">
+            <div class="picker-item" 
+                 *ngFor="let emp of filteredModalEmployees()" 
+                 [class.selected]="emp.id === uploadEmployeeId()"
+                 (click)="selectEmployee(emp)">
+              <div class="picker-avatar">
+                <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName">
+                <span *ngIf="!emp.avatarUrl">{{ (emp.firstName || 'E').charAt(0) }}</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="picker-item-name">{{ emp.firstName }} {{ emp.lastName }}</div>
+                <div class="picker-item-dept">{{ emp.department?.name || 'No Dept' }}</div>
+              </div>
+              <svg lucideFileCheck size="16" class="text-blue-600" *ngIf="emp.id === uploadEmployeeId()"></svg>
+            </div>
+
+            <div class="picker-empty" *ngIf="filteredModalEmployees().length === 0">
+              No employees match your search
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group mb-4">
+        <label class="form-label">Document Name *</label>
+        <input type="text" class="form-control" [ngModel]="uploadFileName()" (ngModelChange)="uploadFileName.set($event)" placeholder="e.g. Employment Contract 2026.pdf">
+      </div>
+
+      <div class="form-group mb-4">
+        <label class="form-label">File Attachment</label>
+        <div class="file-drop-area">
+          <input type="file" (change)="onFileSelected($event)" class="file-input-hidden" id="fileUploadInput">
+          <label for="fileUploadInput" class="file-drop-label">
+            <svg lucideUploadCloud size="32" class="text-blue-500 mb-2"></svg>
+            <span style="font-weight: 600; color: #1e293b;">Click to choose file</span>
+            <span style="font-size: 12px; color: #64748b;" *ngIf="!uploadFileName()">PDF, DOCX, PNG, JPG up to 10MB</span>
+            <span style="font-size: 13px; font-weight: 600; color: #2563eb;" *ngIf="uploadFileName()">Selected: {{ uploadFileName() }}</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeUploadModal()">Cancel</button>
+      <button class="btn-primary" (click)="submitUpload()" [disabled]="isUploading()">
+        {{ isUploading() ? 'Uploading...' : 'Save Document' }}
+      </button>
+    </div>
+  </div>
+</div>

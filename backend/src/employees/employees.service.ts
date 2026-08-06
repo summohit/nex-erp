@@ -19,7 +19,8 @@ export class EmployeesService {
         department: { select: { name: true } },
         designation: { select: { name: true } },
         branch: { select: { name: true } },
-        shift: { select: { id: true, name: true, startTime: true, endTime: true } }
+        shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+        documents: true
       },
       orderBy: { createdAt: 'desc' }
     });

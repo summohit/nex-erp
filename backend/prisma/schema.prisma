@@ -641,6 +641,7 @@ model Issue {
   storyPoints   Int?
   startDate     DateTime?
   dueDate       DateTime?
+  estimatedHours Float?
   recurring     String?
   dueReminder   String?
   coverUrl      String?

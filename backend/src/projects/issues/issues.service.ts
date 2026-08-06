@@ -48,7 +48,8 @@ export class IssuesService {
         assigneeId: data.assigneeId,
         position,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
-        startDate: data.startDate ? new Date(data.startDate) : null
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        parentId: data.parentId ? Number(data.parentId) : null
       }
     });
 
@@ -67,7 +68,10 @@ export class IssuesService {
         reporter: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         labels: { include: { label: true } },
         members: { include: { employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } }, designation: { select: { name: true } } } } } },
-        attachments: { include: { uploader: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } }
+        attachments: { include: { uploader: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
+        parent: { select: { id: true, key: true, title: true, type: true, status: true } },
+        children: { select: { id: true, key: true, title: true, type: true, status: true, priority: true, assignee: { select: { avatarUrl: true } } }, orderBy: { position: 'asc' } },
+        timeLogs: { select: { id: true, durationMin: true, startedAt: true, endedAt: true } }
       },
       orderBy: { position: 'asc' }
     });
@@ -97,11 +101,13 @@ export class IssuesService {
       }
     }
     if (data.assigneeId !== undefined) updateData.assigneeId = data.assigneeId ? Number(data.assigneeId) : null;
+    if (data.parentId !== undefined) updateData.parentId = data.parentId ? Number(data.parentId) : null;
     if (data.position !== undefined) updateData.position = Number(data.position);
     if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;
     if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
     if (data.recurring !== undefined) updateData.recurring = data.recurring;
     if (data.dueReminder !== undefined) updateData.dueReminder = data.dueReminder;
+    if (data.estimatedHours !== undefined) updateData.estimatedHours = data.estimatedHours ? Number(data.estimatedHours) : null;
 
     const issue = await this.prisma.issue.update({
       where: { id: issueId },
@@ -196,6 +202,30 @@ export class IssuesService {
     });
 
     return { success: true, completedAt: now };
+  }
+
+  async addManualTimeLog(companyId: number, employeeId: number, projectId: number, issueId: number, data: { durationMin: number }) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    const now = new Date();
+    const startedAt = new Date(now.getTime() - data.durationMin * 60000);
+
+    const log = await this.prisma.issueTimeLog.create({
+      data: {
+        issueId,
+        employeeId,
+        startedAt,
+        endedAt: now,
+        durationMin: data.durationMin
+      }
+    });
+
+    await this.prisma.issueActivity.create({
+      data: { action: 'TIME_LOGGED', issueId, actorId: employeeId }
+    });
+
+    return { success: true, log };
   }
 
   async getComments(companyId: number, projectId: number, issueId: number) {

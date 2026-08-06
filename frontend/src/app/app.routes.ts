@@ -39,6 +39,10 @@ export const routes: Routes = [
         loadComponent: () => import('./employees/org-chart/org-chart').then(m => m.OrgChart)
       },
       {
+        path: 'employees/documents',
+        loadComponent: () => import('./employees/documents/documents').then(m => m.EmployeeDocumentsComponent)
+      },
+      {
         path: 'employees/:id/profile',
         loadComponent: () => import('./employees/employee-profile/employee-profile').then(m => m.EmployeeProfileComponent)
       },

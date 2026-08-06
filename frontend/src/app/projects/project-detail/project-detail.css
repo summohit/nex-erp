@@ -401,9 +401,66 @@
   color: #64748b;
 }
 
-.card-timer {
+.card-time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  transition: all 150ms ease;
+}
+
+.card-time-badge svg {
+  color: #64748b;
+}
+
+.card-time-badge.is-running {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.card-time-badge.is-running svg {
   color: #16a34a;
-  animation: pulse 2s infinite;
+}
+
+.card-time-badge.is-running .pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  display: inline-block;
+  animation: pulse-dot-anim 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot-anim {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 5px rgba(34, 197, 94, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.card-time-badge.is-over {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.card-time-badge.is-over svg {
+  color: #dc2626;
 }
 
 /* Inline Add Card Box */
@@ -4548,4 +4605,209 @@ input[type=text], input[type=email], input[type=password] {
   flex: 1;
   min-height: 0;
 }
+
+/* Redesigned Time Tracking Card */
+.modal-time-tracking-section {
+  margin-top: 20px;
+}
+
+.time-tracking-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.time-tracking-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.time-stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.time-stat-box .stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+}
+
+.stat-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 8px;
+  transition: all 150ms ease;
+}
+
+.stat-input-wrapper:focus-within {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.time-est-input {
+  width: 44px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  outline: none;
+  padding: 0;
+}
+
+/* Remove spin buttons from number input */
+.time-est-input::-webkit-outer-spin-button,
+.time-est-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.time-est-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.stat-unit {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  height: 30px;
+  display: flex;
+  align-items: center;
+}
+
+.time-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: #e2e8f0;
+}
+
+.time-progress-box {
+  flex: 1;
+  min-width: 140px;
+}
+
+.time-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.stat-percent {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.time-progress-bar-bg {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 9999px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.time-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  border-radius: 9999px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.time-progress-bar-fill.over-budget {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+
+.time-tracking-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.btn-timer-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+.btn-timer-toggle:hover {
+  background: #1d4ed8;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+}
+
+.btn-timer-toggle.timer-running {
+  background: #dc2626;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.2);
+}
+
+.btn-timer-toggle.timer-running:hover {
+  background: #b91c1c;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+}
+
+.btn-log-work-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.btn-log-work-trigger:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.time-log-popover {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  z-index: 1000;
+  width: 240px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
 

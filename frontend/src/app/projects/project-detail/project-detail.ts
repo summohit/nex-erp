@@ -1,19 +1,20 @@
-import { Component, signal, computed, inject, OnInit, ViewChild, ElementRef, ViewEncapsulation } from '@angular/core';
+import { Component, signal, computed, effect, inject, OnInit, OnDestroy, ViewChild, ElementRef, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ProjectsService, ProjectSummary } from '../../services/projects';
 import { 
   LucideLayoutDashboard, LucideKanban,
-  LucidePlus, LucideX, LucideClock, LucideMessageSquare,
+  LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
   LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
   LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
   LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
   LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
   LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
-  LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid
+  LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
+  LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -32,27 +33,30 @@ declare var Quill: any;
   imports: [
     CommonModule, FormsModule, DragDropModule,
     LucideLayoutDashboard, LucideKanban,
-    LucidePlus, LucideX, LucideClock, LucideMessageSquare,
+    LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
     LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
     LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
     LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
     LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
     LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
-    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
+    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive,
     LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
+    LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
     AgGridAngular
   ],
   templateUrl: './project-detail.html',
   styleUrls: ['./project-detail.css'],
   encapsulation: ViewEncapsulation.None
 })
-export class ProjectDetailComponent implements OnInit {
+export class ProjectDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
   private toast = inject(HotToastService);
   private sanitizer = inject(DomSanitizer);
+
+  Math = Math;
 
   projectId!: number;
   project = signal<any>(null);
@@ -131,6 +135,64 @@ export class ProjectDetailComponent implements OnInit {
       }]
     };
   });
+
+  typeChartData = computed(() => {
+    const summary = this.projectSummary();
+    if (!summary || !summary.typeDistribution) return null;
+    
+    return {
+      labels: summary.typeDistribution.map((t: any) => t.type),
+      datasets: [{
+        data: summary.typeDistribution.map((t: any) => t.count),
+        backgroundColor: summary.typeDistribution.map((t: any) => {
+          if (t.type === 'BUG') return '#ef4444'; // Red
+          if (t.type === 'TASK') return '#3b82f6'; // Blue
+          if (t.type === 'STORY') return '#10b981'; // Green
+          if (t.type === 'EPIC') return '#8b5cf6'; // Purple
+          return '#cbd5e1';
+        })
+      }]
+    };
+  });
+
+  completionTrendData = computed(() => {
+    const summary = this.projectSummary();
+    return summary?.completionTrends || null;
+  });
+
+  timeTrackingData = computed(() => {
+    const summary = this.projectSummary();
+    return summary?.timeTracking || { estimatedHours: 0, loggedHours: 0 };
+  });
+
+  recentActivityData = computed(() => {
+    return this.projectSummary()?.recentActivity || [];
+  });
+
+  exportToCSV() {
+    const summary = this.projectSummary();
+    if (!summary) return;
+    
+    let csv = 'Metric,Value\n';
+    csv += `Completed Last 7 Days,${summary.metrics.completedLast7Days}\n`;
+    csv += `Created Last 7 Days,${summary.metrics.createdLast7Days}\n`;
+    csv += `Updated Last 7 Days,${summary.metrics.updatedLast7Days}\n`;
+    csv += `Due Soon Next 7 Days,${summary.metrics.dueSoonNext7Days}\n`;
+    csv += `Estimated Hours,${summary.timeTracking?.estimatedHours || 0}\n`;
+    csv += `Logged Hours,${summary.timeTracking?.loggedHours || 0}\n`;
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `project_report_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  exportToPDF() {
+    window.print();
+  }
 
   toggleAttFilterAddedBy(id: number) {
     const current = this.attFilterAddedBy();
@@ -352,6 +414,292 @@ export class ProjectDetailComponent implements OnInit {
     this.listFilterColumnIds.set([]);
     this.listFilterPriorities.set([]);
     this.listFilterMyIssues.set(false);
+  }
+
+  // Time Tracking State
+  isTimeLogModalOpen = signal<boolean>(false);
+  timeLogHours = signal<number | null>(null);
+  timeLogMinutes = signal<number | null>(null);
+  isTimerLoading = signal<boolean>(false);
+
+  selectedIssueTimeLogged = computed(() => {
+    const issue = this.selectedIssue();
+    if (!issue || !issue.timeLogs) return { text: '0m', totalMin: 0, rawText: '0m' };
+    const totalMin = issue.timeLogs.reduce((sum: number, log: any) => sum + (log.durationMin || 0), 0);
+    if (totalMin === 0) return { text: '0m', totalMin: 0, rawText: '0m' };
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    let text = '';
+    let rawText = '';
+    if (h > 0) { text += `<span style="font-weight: 600; color: #172b4d;">${h}</span><span style="color: #6b778c; margin-right: 4px;">h</span> `; rawText += `${h}h `; }
+    if (m > 0) { text += `<span style="font-weight: 600; color: #172b4d;">${m}</span><span style="color: #6b778c;">m</span>`; rawText += `${m}m`; }
+    return { text: text.trim(), totalMin, rawText: rawText.trim() };
+  });
+
+  selectedIssueTimeEstimated = computed(() => {
+    const issue = this.selectedIssue();
+    if (!issue || !issue.estimatedHours) return { text: 'None', totalMin: 0, rawText: 'None' };
+    const h = Math.floor(issue.estimatedHours);
+    const m = Math.round((issue.estimatedHours - h) * 60);
+    const totalMin = Math.round(issue.estimatedHours * 60);
+    let text = '';
+    let rawText = '';
+    if (h > 0) { text += `<span style="font-weight: 600; color: #172b4d;">${h}</span><span style="color: #6b778c; margin-right: 4px;">h</span> `; rawText += `${h}h `; }
+    if (m > 0) { text += `<span style="font-weight: 600; color: #172b4d;">${m}</span><span style="color: #6b778c;">m</span>`; rawText += `${m}m`; }
+    return { text: text.trim(), totalMin, rawText: rawText.trim() };
+  });
+
+  timeTrackingProgressPercent = computed(() => {
+    const logged = this.selectedIssueTimeLogged().totalMin;
+    const est = this.selectedIssueTimeEstimated().totalMin;
+    if (est === 0) return 0;
+    return Math.min(100, (logged / est) * 100);
+  });
+
+  isTimerRunning = computed(() => {
+    const issue = this.selectedIssue();
+    return issue && issue.workStartedAt && !issue.workCompletedAt;
+  });
+
+  // Modal Subtasks logic
+  roadmapExpandedEpics = signal<Set<number>>(new Set());
+  roadmapDayWidth = 36; // px per day
+
+  roadmapData = computed(() => {
+    const issues = this.activeIssues();
+    if (issues.length === 0) {
+      return { start: new Date(), end: new Date(), days: [], months: [], tree: [] };
+    }
+
+    // Find min and max dates
+    let minDate = new Date();
+    let maxDate = new Date();
+    let first = true;
+
+    for (const issue of issues) {
+      const dates = [];
+      if (issue.startDate) dates.push(new Date(issue.startDate));
+      if (issue.dueDate) dates.push(new Date(issue.dueDate));
+      for (const d of dates) {
+        if (first || d < minDate) minDate = d;
+        if (first || d > maxDate) maxDate = d;
+        first = false;
+      }
+    }
+
+    // Pad dates: -1 month to min, +1 month to max
+    const startWindow = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
+    const endWindow = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0); // last day of next month
+
+    // Generate days array
+    const days = [];
+    let curr = new Date(startWindow);
+    while (curr <= endWindow) {
+      days.push(new Date(curr));
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    // Generate months array
+    const months = [];
+    let currentMonth = -1;
+    let daysInMonth = 0;
+    for (const d of days) {
+      if (d.getMonth() !== currentMonth) {
+        if (currentMonth !== -1) {
+          const mDate = new Date(d.getFullYear(), currentMonth, 1);
+          const name = mDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+          months.push({ name, daysCount: daysInMonth });
+        }
+        currentMonth = d.getMonth();
+        daysInMonth = 1;
+      } else {
+        daysInMonth++;
+      }
+    }
+    if (daysInMonth > 0) {
+      const mDate = new Date(endWindow.getFullYear(), currentMonth, 1);
+      const name = mDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+      months.push({ name, daysCount: daysInMonth });
+    }
+
+    // Build hierarchical tree
+    const tree: any[] = [];
+    const epics = issues.filter((i: any) => i.type === 'EPIC');
+    const childIssues = issues.filter((i: any) => i.parentId && epics.some((e: any) => e.id === i.parentId));
+    
+    // Add epics with their children
+    for (const epic of epics) {
+      const epicChildren = childIssues.filter((i: any) => i.parentId === epic.id);
+      tree.push({ ...epic, isEpic: true, hasChildren: epicChildren.length > 0 });
+      if (this.roadmapExpandedEpics().has(epic.id)) {
+        for (const child of epicChildren) {
+          tree.push({ ...child, isEpicChild: true });
+        }
+      }
+    }
+
+    // Add standalone issues (not epics, no epic parent)
+    const epicIds = new Set(epics.map((e: any) => e.id));
+    const standalone = issues.filter((i: any) => i.type !== 'EPIC' && (!i.parentId || !epicIds.has(i.parentId)));
+    tree.push(...standalone.map((s: any) => ({ ...s, isStandalone: true })));
+
+    return { start: startWindow, end: endWindow, days, months, tree };
+  });
+
+  toggleRoadmapEpic(epicId: number) {
+    const set = new Set(this.roadmapExpandedEpics());
+    if (set.has(epicId)) {
+      set.delete(epicId);
+    } else {
+      set.add(epicId);
+    }
+    this.roadmapExpandedEpics.set(set);
+  }
+
+  getRoadmapBarStyles(issue: any, windowStart: Date): any {
+    if (!issue.startDate || !issue.dueDate) return { display: 'none' };
+    
+    const start = new Date(issue.startDate);
+    const end = new Date(issue.dueDate);
+    
+    const startOffsetMs = start.getTime() - windowStart.getTime();
+    const durationMs = end.getTime() - start.getTime() + (24 * 60 * 60 * 1000); // include end day
+    
+    const startDays = startOffsetMs / (24 * 60 * 60 * 1000);
+    const durationDays = durationMs / (24 * 60 * 60 * 1000);
+    
+    const leftPx = startDays * this.roadmapDayWidth;
+    const widthPx = durationDays * this.roadmapDayWidth;
+    
+    let bgColor = '#0c66e4';
+    if (issue.status === 'DONE') bgColor = '#16a34a';
+    else if (issue.type === 'EPIC') bgColor = '#8b5cf6';
+    else if (issue.status === 'IN_PROGRESS') bgColor = '#f59e0b';
+    
+    return {
+      left: leftPx + 'px',
+      width: Math.max(widthPx, this.roadmapDayWidth) + 'px', // minimum 1 day width
+      backgroundColor: bgColor
+    };
+  }
+
+  updateIssueDetails(payload: any) {
+    if (!this.selectedIssue()) return;
+    const id = this.selectedIssue().id;
+    this.projectsService.updateIssue(this.projectId, id, payload).subscribe({
+      next: () => {
+        // We will reload everything to keep UI completely in sync, including time tracking
+        this.loadBoardAndIssues();
+        
+        // Also manually update the selected issue right away for fast UI response
+        const current = this.selectedIssue();
+        this.selectedIssue.set({ ...current, ...payload });
+      },
+      error: () => this.toast.error('Failed to update issue')
+    });
+  }
+
+  toggleTimeTimer() {
+    const issue = this.selectedIssue();
+    if (!issue) return;
+    
+    this.isTimerLoading.set(true);
+    
+    if (this.isTimerRunning()) {
+      // Stop timer
+      fetch(`http://localhost:3000/projects/${this.projectId}/issues/${issue.id}/time-stop`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.authService.getToken()}` }
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to stop timer');
+        this.toast.success('Timer stopped');
+        this.loadBoardAndIssues(); // Refreshes time logs
+        this.selectedIssue.set({ ...issue, workCompletedAt: new Date() }); // Optimistic
+      }).catch(() => this.toast.error('Failed to stop timer'))
+      .finally(() => this.isTimerLoading.set(false));
+      
+    } else {
+      // Start timer
+      fetch(`http://localhost:3000/projects/${this.projectId}/issues/${issue.id}/time-start`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.authService.getToken()}` }
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to start timer');
+        this.toast.success('Timer started');
+        this.selectedIssue.set({ ...issue, workStartedAt: new Date(), workCompletedAt: null }); // Optimistic
+        this.loadBoardAndIssues();
+      }).catch(() => this.toast.error('Failed to start timer'))
+      .finally(() => this.isTimerLoading.set(false));
+    }
+  }
+
+  submitManualTimeLog() {
+    const issue = this.selectedIssue();
+    if (!issue) return;
+    
+    const h = this.timeLogHours() || 0;
+    const m = this.timeLogMinutes() || 0;
+    const totalMin = (h * 60) + m;
+    
+    if (totalMin <= 0) {
+      this.toast.error('Please enter a valid duration');
+      return;
+    }
+    
+    this.isTimerLoading.set(true);
+    fetch(`http://localhost:3000/projects/${this.projectId}/issues/${issue.id}/time-log`, {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${this.authService.getToken()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ durationMin: totalMin })
+    }).then(res => {
+      if (!res.ok) throw new Error('Failed to log time');
+      this.toast.success('Time logged successfully');
+      this.isTimeLogModalOpen.set(false);
+      this.timeLogHours.set(null);
+      this.timeLogMinutes.set(null);
+      
+      // Update selected issue time logs optimistically or reload all
+      this.loadBoardAndIssues(); // This ensures tree/roadmap is updated
+      
+    }).catch(() => this.toast.error('Failed to log time'))
+    .finally(() => this.isTimerLoading.set(false));
+  }
+
+  onRoadmapBarDragEnd(event: CdkDragEnd, issue: any) {
+    if (!issue.startDate || !issue.dueDate) return;
+    
+    const movedPx = event.distance.x;
+    const movedDays = Math.round(movedPx / this.roadmapDayWidth);
+    
+    // Reset transform visually immediately so Angular CDK doesn't leave it offset
+    event.source._dragRef.reset();
+    
+    if (movedDays === 0) return;
+    
+    const start = new Date(issue.startDate);
+    const end = new Date(issue.dueDate);
+    
+    start.setDate(start.getDate() + movedDays);
+    end.setDate(end.getDate() + movedDays);
+    
+    const payload = {
+      startDate: start.toISOString(),
+      dueDate: end.toISOString()
+    };
+    
+    this.projectsService.updateIssue(this.projectId, issue.id, payload).subscribe({
+      next: () => {
+        this.toast.success('Dates updated');
+        this.loadBoardAndIssues();
+      },
+      error: () => {
+        this.toast.error('Failed to update dates');
+        this.loadBoardAndIssues();
+      }
+    });
   }
 
   // Calendar View State & Logic
@@ -671,7 +1019,8 @@ export class ProjectDetailComponent implements OnInit {
     type: 'TASK',
     priority: 'MEDIUM',
     columnId: null as number | null,
-    completed: false
+    completed: false,
+    estimatedHours: null as number | null
   };
   commentText = '';
   
@@ -681,6 +1030,52 @@ export class ProjectDetailComponent implements OnInit {
   currentUser = this.authService.currentUser;
 
   hasAccess = signal<boolean>(true);
+
+  activeTimerString = signal<string>('');
+  private timerInterval: any;
+
+  constructor() {
+    effect(() => {
+      if (this.isTimerRunning()) {
+        const issue = this.selectedIssue();
+        if (issue && issue.workStartedAt) {
+          const startTime = new Date(issue.workStartedAt).getTime();
+          this.updateActiveTimerString(startTime);
+          if (this.timerInterval) clearInterval(this.timerInterval);
+          this.timerInterval = setInterval(() => {
+            this.updateActiveTimerString(startTime);
+          }, 1000);
+        }
+      } else {
+        if (this.timerInterval) {
+          clearInterval(this.timerInterval);
+          this.timerInterval = null;
+        }
+        this.activeTimerString.set('');
+      }
+    });
+  }
+
+  updateActiveTimerString(startTimeMs: number) {
+    const diffMs = new Date().getTime() - startTimeMs;
+    if (diffMs <= 0) {
+      this.activeTimerString.set('00:00:00');
+      return;
+    }
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    this.activeTimerString.set(
+      `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    );
+  }
+
+  ngOnDestroy(): void {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
+  }
 
   ngOnInit() {
     this.route.paramMap.subscribe(params => {
@@ -1019,6 +1414,23 @@ export class ProjectDetailComponent implements OnInit {
     return 'dot-todo';
   }
 
+  getStatusDotClassFromStatus(status?: string): string {
+    if (!status) return 'dot-todo';
+    const s = status.toUpperCase();
+    if (s === 'IN_PROGRESS') return 'dot-in-progress';
+    if (s === 'IN_REVIEW') return 'dot-in-review';
+    if (s === 'DONE') return 'dot-done';
+    return 'dot-todo';
+  }
+
+  getSubtaskProgress(): number {
+    const issue = this.selectedIssue();
+    if (!issue || !issue.children || issue.children.length === 0) return 0;
+    const total = issue.children.length;
+    const completed = issue.children.filter((c: any) => c.status === 'DONE').length;
+    return Math.round((completed / total) * 100);
+  }
+
   drop(event: CdkDragDrop<any[]>, targetColumnId: number) {
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
@@ -1145,7 +1557,8 @@ export class ProjectDetailComponent implements OnInit {
       type: 'TASK',
       priority: 'MEDIUM',
       columnId: columnId || (this.columns().length > 0 ? this.columns()[0].id : null),
-      completed: false
+      completed: false,
+      estimatedHours: null
     };
     this.isDrawerOpen.set(true);
     setTimeout(() => this.initQuill(), 100);
@@ -1155,12 +1568,13 @@ export class ProjectDetailComponent implements OnInit {
     this.selectedIssue.set(issue);
     this.isEditingDescription.set(false);
     this.issueForm = {
-      title: issue.title,
-      description: issue.description,
-      type: issue.type,
-      priority: issue.priority,
+      title: issue.title || '',
+      description: issue.description || '',
+      type: issue.type || 'TASK',
+      priority: issue.priority || 'MEDIUM',
       columnId: issue.columnId,
-      completed: !!issue.completed
+      completed: issue.status === 'DONE',
+      estimatedHours: issue.estimatedHours || null
     };
     this.isDrawerOpen.set(true);
     this.loadComments(issue.id);
@@ -2339,6 +2753,37 @@ export class ProjectDetailComponent implements OnInit {
     }
   }
 
+  newSubtaskTitle = '';
+
+  createSubtask() {
+    const parent = this.selectedIssue();
+    if (!parent || !this.newSubtaskTitle.trim()) return;
+
+    const payload = {
+      title: this.newSubtaskTitle.trim(),
+      type: 'SUBTASK',
+      parentId: parent.id,
+      priority: parent.priority, // Inherit priority by default
+      columnId: this.columns().length > 0 ? this.columns()[0].id : undefined
+    };
+
+    this.projectsService.createIssue(this.projectId, payload).subscribe({
+      next: (newSubtask) => {
+        this.toast.success('Subtask created');
+        this.newSubtaskTitle = '';
+        this.loadBoardAndIssues();
+        
+        // Optimistically update the selected issue's children list so UI reflects immediately if we don't refetch the modal
+        const currentSelected = this.selectedIssue();
+        if (currentSelected && currentSelected.id === parent.id) {
+           if (!currentSelected.children) currentSelected.children = [];
+           currentSelected.children.push(newSubtask);
+           this.selectedIssue.set({ ...currentSelected });
+        }
+      }
+    });
+  }
+
   toggleTimeTracking() {
     const issue = this.selectedIssue();
     if (!issue) return;
@@ -2443,6 +2888,45 @@ export class ProjectDetailComponent implements OnInit {
       },
       error: () => this.toast.error('Failed to update member assignment')
     });
+  }
+
+  getIssueTimeSummary(issue: any): { display: string; isRunning: boolean; isOver: boolean; percent: number } | null {
+    if (!issue) return null;
+    const isRunning = !!(issue.workStartedAt && !issue.workCompletedAt);
+    
+    let loggedMin = 0;
+    if (issue.timeLogs && issue.timeLogs.length > 0) {
+      loggedMin = issue.timeLogs.reduce((acc: number, log: any) => acc + (log.durationMin || 0), 0);
+    }
+    
+    const estHours = issue.estimatedHours || 0;
+    const estMin = estHours * 60;
+    
+    if (!isRunning && loggedMin === 0 && estHours === 0) {
+      return null;
+    }
+
+    const formatTime = (min: number) => {
+      if (min < 60) return `${min}m`;
+      const h = (min / 60).toFixed(1).replace('.0', '');
+      return `${h}h`;
+    };
+
+    let display = '';
+    let isOver = false;
+    let percent = 0;
+
+    if (isRunning) {
+      display = 'Timer Active';
+    } else if (estHours > 0) {
+      display = `${formatTime(loggedMin)} / ${formatTime(estMin)}`;
+      percent = Math.min(100, Math.round((loggedMin / estMin) * 100));
+      if (loggedMin > estMin) isOver = true;
+    } else {
+      display = formatTime(loggedMin);
+    }
+
+    return { display, isRunning, isOver, percent };
   }
 
   getMemberInitials(m: any): string {

@@ -149,7 +149,11 @@ export class ProjectsService {
       issueMembersGroups,
       unassignedCount,
       priorityGroups,
-      recentActivity
+      recentActivity,
+      typeGroups,
+      estimatedHoursSum,
+      loggedMinutesSum,
+      fourteenDaysIssues
     ] = await Promise.all([
       this.prisma.issue.count({
         where: { projectId, companyId, isArchived: false, status: 'DONE', updatedAt: { gte: sevenDaysAgo } }
@@ -188,7 +192,30 @@ export class ProjectsService {
           issue: { select: { id: true, key: true, title: true, status: true, type: true } }
         },
         orderBy: { createdAt: 'desc' },
-        take: 10
+        take: 20
+      }),
+      this.prisma.issue.groupBy({
+        by: ['type'],
+        where: { projectId, companyId, isArchived: false },
+        _count: { _all: true }
+      }),
+      this.prisma.issue.aggregate({
+        _sum: { estimatedHours: true },
+        where: { projectId, companyId, isArchived: false }
+      }),
+      this.prisma.issueTimeLog.aggregate({
+        _sum: { durationMin: true },
+        where: { issue: { projectId, companyId } }
+      }),
+      this.prisma.issue.findMany({
+        where: { 
+          projectId, companyId, isArchived: false,
+          OR: [
+            { createdAt: { gte: new Date(new Date().setDate(new Date().getDate() - 14)) } },
+            { status: 'DONE', updatedAt: { gte: new Date(new Date().setDate(new Date().getDate() - 14)) } }
+          ]
+        },
+        select: { createdAt: true, status: true, updatedAt: true }
       })
     ]);
 
@@ -221,6 +248,27 @@ export class ProjectsService {
       });
     }
 
+    const completionTrends: { date: string; created: number; completed: number }[] = [];
+    const fourteenDaysAgoDate = new Date();
+    fourteenDaysAgoDate.setDate(fourteenDaysAgoDate.getDate() - 13);
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(fourteenDaysAgoDate);
+      d.setDate(d.getDate() + i);
+      completionTrends.push({ date: d.toISOString().split('T')[0], created: 0, completed: 0 });
+    }
+
+    fourteenDaysIssues.forEach(issue => {
+      const createdStr = issue.createdAt.toISOString().split('T')[0];
+      const createdBin = completionTrends.find(t => t.date === createdStr);
+      if (createdBin) createdBin.created++;
+
+      if (issue.status === 'DONE' && issue.updatedAt) {
+        const completedStr = issue.updatedAt.toISOString().split('T')[0];
+        const completedBin = completionTrends.find(t => t.date === completedStr);
+        if (completedBin) completedBin.completed++;
+      }
+    });
+
     return {
       metrics: {
         completedLast7Days,
@@ -231,7 +279,13 @@ export class ProjectsService {
       statusOverview: statusGroups.map(g => ({ status: g.status, count: g._count._all })),
       teamWorkload,
       priorityBreakdown: priorityGroups.map(g => ({ priority: g.priority, count: g._count._all })),
-      recentActivity
+      recentActivity,
+      typeDistribution: typeGroups.map(g => ({ type: g.type, count: g._count._all })),
+      timeTracking: {
+        estimatedHours: estimatedHoursSum._sum.estimatedHours || 0,
+        loggedHours: (loggedMinutesSum._sum.durationMin || 0) / 60
+      },
+      completionTrends
     };
   }
 
