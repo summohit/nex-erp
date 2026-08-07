@@ -425,6 +425,23 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   timeLogMinutes = signal<number | null>(null);
   isTimerLoading = signal<boolean>(false);
 
+  // Moving / Updating Issue Loader State
+  updatingIssueIds = signal<Set<number>>(new Set());
+
+  isIssueUpdating(issueId: number): boolean {
+    return this.updatingIssueIds().has(issueId);
+  }
+
+  setIssueUpdating(issueId: number, isUpdating: boolean) {
+    const current = new Set(this.updatingIssueIds());
+    if (isUpdating) {
+      current.add(issueId);
+    } else {
+      current.delete(issueId);
+    }
+    this.updatingIssueIds.set(current);
+  }
+
   selectedIssueTimeLogged = computed(() => {
     const issue = this.selectedIssue();
     if (!issue || !issue.timeLogs) return { text: '0m', totalMin: 0, rawText: '0m' };
@@ -1551,11 +1568,18 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       // Instant Optimistic Update
       this.optimisticallyUpdateIssueColumn(issue.id, targetColumnId, event.currentIndex);
 
+      // Show small loader on card while API call is in flight
+      this.setIssueUpdating(issue.id, true);
+
       // Async Backend update
       this.projectsService.updateIssue(this.projectId, issue.id, { 
         columnId: targetColumnId
       }).subscribe({
+        next: () => {
+          this.setIssueUpdating(issue.id, false);
+        },
         error: (err) => {
+          this.setIssueUpdating(issue.id, false);
           this.toast.error('Failed to move issue');
           this.loadBoardAndIssues(); // Revert on failure
         }
@@ -1583,12 +1607,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (this.selectedIssue()) {
       const issueId = this.selectedIssue().id;
       this.optimisticallyUpdateIssueColumn(issueId, columnId);
+      this.setIssueUpdating(issueId, true);
 
       this.projectsService.updateIssue(this.projectId, issueId, { columnId }).subscribe({
         next: () => {
+          this.setIssueUpdating(issueId, false);
           this.toast.success('Status updated');
         },
         error: (err) => {
+          this.setIssueUpdating(issueId, false);
           this.toast.error('Failed to update status');
           this.loadBoardAndIssues();
         }

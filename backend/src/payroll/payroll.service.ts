@@ -591,9 +591,23 @@ export class PayrollService {
     });
   }
 
-  async updateExpenseClaimStatus(companyId: number, userId: number, id: number, data: { status: string; rejectionReason?: string }) {
-    const claim = await this.prisma.expenseClaim.findFirst({ where: { id, companyId } });
+  async updateExpenseClaimStatus(companyId: number, userId: number, id: number, data: { status: string; rejectionReason?: string }, userRole?: string) {
+    // Only privileged roles can approve/reject expense claims
+    const privilegedRoles = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE'];
+    if (!userRole || !privilegedRoles.includes(userRole)) {
+      throw new BadRequestException('You do not have permission to approve or reject expense claims');
+    }
+
+    const claim = await this.prisma.expenseClaim.findFirst({ where: { id, companyId }, include: { employee: true } });
     if (!claim) throw new NotFoundException('Expense claim not found');
+
+    // Prevent self-approval: check if the approver is the same person who submitted
+    if (claim.employee) {
+      const approverEmployee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
+      if (approverEmployee && approverEmployee.id === claim.employeeId) {
+        throw new BadRequestException('You cannot approve or reject your own expense claim');
+      }
+    }
 
     return this.prisma.expenseClaim.update({
       where: { id },

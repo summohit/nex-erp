@@ -54,11 +54,12 @@ export class ProjectsComponent implements OnInit {
   ];
 
   colorBackgrounds = [
-    'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-    'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-    'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
-    'linear-gradient(135deg, #4338ca 0%, #312e81 100%)',
-    'linear-gradient(135deg, #9333ea 0%, #c026d3 100%)'
+    'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+    'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)',
+    'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    'linear-gradient(135deg, #ef4444 0%, #f43f5e 100%)',
+    'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
   ];
 
   selectedBg = signal<string>(this.colorBackgrounds[1]);
@@ -135,10 +136,19 @@ export class ProjectsComponent implements OnInit {
     } catch (e) {}
   }
 
+  isLoading = signal<boolean>(true);
+
   loadProjects() {
+    this.isLoading.set(true);
     this.projectsService.getProjects().subscribe({
-      next: (res) => this.projects.set(res),
-      error: (err) => console.error('Error loading projects', err)
+      next: (res) => {
+        this.projects.set(res);
+        this.isLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Error loading projects', err);
+        this.isLoading.set(false);
+      }
     });
   }
 

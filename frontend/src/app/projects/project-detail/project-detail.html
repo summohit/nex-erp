@@ -1612,9 +1612,18 @@
           
           <!-- Existing Cards -->
           <div class="trello-card" 
+               [class.is-updating]="isIssueUpdating(issue.id)"
                *ngFor="let issue of getColumnIssues(col.id)" 
                cdkDrag 
                (click)="openIssueDetails(issue)">
+
+            <!-- Moving / Updating Card Overlay Loader -->
+            <div class="card-updating-overlay" *ngIf="isIssueUpdating(issue.id)" (click)="$event.stopPropagation()">
+              <div class="card-updating-pill">
+                <div class="card-updating-spinner"></div>
+                <span>Saving...</span>
+              </div>
+            </div>
             
             <!-- Card Cover Image Banner -->
             <div class="card-cover-banner" *ngIf="issue.coverUrl && !issue.coverImageError">

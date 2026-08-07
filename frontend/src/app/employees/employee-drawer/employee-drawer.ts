@@ -43,7 +43,7 @@ export class EmployeeDrawerComponent implements OnInit {
       firstName: ['', Validators.required],
       lastName: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
-      phone: [''],
+      phone: ['', [Validators.pattern(/^\+?[0-9]{10,15}$/)]],
       departmentId: [null, Validators.required],
       designationId: [null, Validators.required],
       branchId: [null, Validators.required],

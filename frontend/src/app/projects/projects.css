@@ -216,8 +216,7 @@
   color: #ffffff;
   transform: scale(1.1);
 }
-  background: rgba(0, 0, 0, 0.5);
-}
+
 
 .star-btn.active:hover {
   background: rgba(255, 255, 255, 1);
@@ -683,4 +682,55 @@
 .unarchive-btn:hover {
   background: #0052cc;
   transform: scale(1.05);
+}
+
+/* Skeleton Loaders */
+.skeleton-card {
+  pointer-events: none;
+  cursor: default !important;
+  border-color: #e5e7eb !important;
+}
+
+.skeleton-banner {
+  background: #e2e8f0;
+  height: 96px;
+}
+
+.skeleton-footer {
+  background: #ffffff;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: #e2e8f0;
+}
+
+.shimmer::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.4) 20%,
+    rgba(255, 255, 255, 0.7) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 1.5s infinite;
+  content: '';
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }

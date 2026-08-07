@@ -125,6 +125,15 @@ export class ProfileTabComponent implements OnInit {
   saveProfile() {
     if (!this.isOwner) return;
     
+    // Validate phone number
+    if (this.formData.phone) {
+      const phoneRegex = /^\+?[0-9]{10,15}$/;
+      if (!phoneRegex.test(this.formData.phone)) {
+        this.toast.error('Invalid Mobile number. Must be 10-15 digits.');
+        return;
+      }
+    }
+
     // Construct payload
     const payload = {
       ...this.formData

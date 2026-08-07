@@ -124,11 +124,15 @@
 
         <div class="form-group">
           <label>Mobile</label>
-          <div class="compound-input mobile-input">
+          <div class="compound-input mobile-input" [class.error]="phoneInput.invalid && phoneInput.touched">
             <div class="country-code">
               <span class="flag">🇮🇳</span> +91
             </div>
-            <input type="text" class="form-control" [(ngModel)]="formData.phone" [disabled]="!isOwner">
+            <input type="text" class="form-control" name="phone" [(ngModel)]="formData.phone" [disabled]="!isOwner" #phoneInput="ngModel" pattern="^\+?[0-9]{10,15}$">
+          </div>
+          <div class="error-text" *ngIf="phoneInput.invalid && phoneInput.touched" style="color: #dc3545; font-size: 0.85rem; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Valid Mobile number (10-15 digits) is required
           </div>
         </div>
 

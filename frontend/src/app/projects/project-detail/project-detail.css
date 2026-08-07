@@ -334,6 +334,61 @@
   border-color: #0c66e4;
 }
 
+.trello-card.is-updating {
+  pointer-events: none;
+  opacity: 0.88;
+}
+
+.card-updating-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  animation: cardFadeIn 0.15s ease-out;
+}
+
+.card-updating-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #ffffff;
+  padding: 5px 12px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.14), 0 1px 2px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.card-updating-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #0c66e4;
+  border-radius: 50%;
+  animation: cardSpin 0.6s linear infinite;
+}
+
+.card-updating-pill span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  letter-spacing: 0.2px;
+}
+
+@keyframes cardSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .card-hover-edit-btn {
   position: absolute;
   top: 8px;

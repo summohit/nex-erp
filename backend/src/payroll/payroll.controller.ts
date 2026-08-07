@@ -112,7 +112,7 @@ export class PayrollController {
     @Param('id', ParseIntPipe) id: number,
     @Body() data: { status: string; rejectionReason?: string }
   ) {
-    return this.payrollService.updateExpenseClaimStatus(req.user.companyId, req.user.sub, id, data);
+    return this.payrollService.updateExpenseClaimStatus(req.user.companyId, req.user.sub, id, data, req.user.role);
   }
 
   @Delete('expenses/:id')

@@ -93,6 +93,18 @@ export class EmergencyContactsTabComponent implements OnInit {
       this.toast.error('Name and Mobile are required');
       return;
     }
+
+    const nameRegex = /^[a-zA-Z\s.'-]+$/;
+    if (!nameRegex.test(this.newContact.name.trim())) {
+      this.toast.error('Please enter a valid name (letters only)');
+      return;
+    }
+
+    const phoneRegex = /^\+?[0-9\s\-()]{7,15}$/;
+    if (!phoneRegex.test(this.newContact.mobile)) {
+      this.toast.error('Please enter a valid mobile number');
+      return;
+    }
     
     this.employeeService.addContact(this.employeeData.id, this.newContact).subscribe({
       next: () => {

@@ -587,6 +587,22 @@ export class PayrollComponent implements OnInit {
     }
   ];
 
+  // Column definitions for employee's own submitted claims - NO approve/reject, but CAN cancel
+  myExpenseColDefs: ColDef[] = this.expenseColDefs.slice(0, -1).concat([
+    {
+      headerName: 'Actions',
+      width: 110,
+      pinned: 'right',
+      sortable: false,
+      filter: false,
+      cellRenderer: ExpenseActionCellRendererComponent,
+      cellRendererParams: {
+        // No onApprove or onReject — employees cannot approve/reject their own claims
+        onDelete: (data: any) => this.deleteMyExpense(data.id)
+      }
+    }
+  ]);
+
   defaultColDef: ColDef = {
     flex: 1,
     minWidth: 100,

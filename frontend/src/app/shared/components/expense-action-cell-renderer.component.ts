@@ -8,6 +8,7 @@ import { MatMenuModule } from '@angular/material/menu';
 export interface ExpenseActionCellParams extends ICellRendererParams {
   onApprove?: (data: any) => void;
   onReject?: (data: any) => void;
+  onDelete?: (data: any) => void;
 }
 
 @Component({
@@ -16,29 +17,37 @@ export interface ExpenseActionCellParams extends ICellRendererParams {
   imports: [CommonModule, LucideMoreHorizontal, MatMenuModule],
   template: `
     <div class="action-container" *ngIf="!params.data?.isSummaryRow" (click)="$event.stopPropagation()">
-      <button class="btn-icon" [matMenuTriggerFor]="menu">
-        <svg lucideMoreHorizontal size="16"></svg>
-      </button>
 
-      <mat-menu #menu="matMenu" panelClass="custom-action-menu">
-        <button mat-menu-item class="menu-item" (click)="viewReceipt()" *ngIf="params.data?.receiptUrl">
-          <span class="menu-text">View Receipt</span>
+      <!-- Resolved: show a dash -->
+      <span class="resolved-dash" *ngIf="params.data?.status !== 'PENDING'" title="Claim already {{ params.data?.status?.toLowerCase() }}">—</span>
+
+      <!-- Pending: show action menu -->
+      <ng-container *ngIf="params.data?.status === 'PENDING'">
+        <button class="btn-icon" [matMenuTriggerFor]="menu">
+          <svg lucideMoreHorizontal size="16"></svg>
         </button>
-        <ng-container *ngIf="params.data?.status === 'PENDING'">
+
+        <mat-menu #menu="matMenu" panelClass="custom-action-menu">
+          <button mat-menu-item class="menu-item" (click)="viewReceipt()" *ngIf="params.data?.receiptUrl">
+            <span class="menu-text">View Receipt</span>
+          </button>
           <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove">
             <span class="menu-text">Approve</span>
           </button>
           <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject">
             <span class="menu-text">Reject</span>
           </button>
-        </ng-container>
-      </mat-menu>
+          <button mat-menu-item class="menu-item text-danger" (click)="deleteClaim()" *ngIf="params.onDelete">
+            <span class="menu-text">Cancel Claim</span>
+          </button>
+        </mat-menu>
+      </ng-container>
     </div>
   `,
   styles: [`
     .action-container {
       display: flex;
-      justify-content: flex-end;
+      justify-content: center;
       align-items: center;
       height: 100%;
     }
@@ -72,6 +81,14 @@ export interface ExpenseActionCellParams extends ICellRendererParams {
     }
     .text-success { color: #10B981 !important; }
     .text-danger { color: #EF4444 !important; }
+
+    .resolved-dash {
+      color: #CBD5E1;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: default;
+      user-select: none;
+    }
   `]
 })
 export class ExpenseActionCellRendererComponent implements ICellRendererAngularComp {
@@ -95,6 +112,12 @@ export class ExpenseActionCellRendererComponent implements ICellRendererAngularC
   reject() {
     if (this.params.onReject && this.params.data) {
       this.params.onReject(this.params.data);
+    }
+  }
+
+  deleteClaim() {
+    if (this.params.onDelete && this.params.data) {
+      this.params.onDelete(this.params.data);
     }
   }
 

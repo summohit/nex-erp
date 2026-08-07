@@ -159,55 +159,68 @@
 
     <!-- Boards Grid -->
     <div class="boards-grid">
-      <!-- Existing Boards -->
-      <div 
-        class="board-card" 
-        *ngFor="let p of filteredProjects(); let i = index" 
-        (click)="goToProject(p.id)">
-        <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
-          <div class="card-actions-wrapper">
-            <button 
-              type="button" 
-              class="edit-btn" 
-              (click)="openEditModal(p, $event)" 
-              title="Edit board"
-              *ngIf="isAdmin">
-              <svg lucideEdit2 size="14"></svg>
-            </button>
-            <button 
-              type="button" 
-              class="archive-btn" 
-              (click)="archiveBoard(p, false, $event)" 
-              title="Archive board"
-              *ngIf="isAdmin">
-              <svg lucideArchive size="14"></svg>
-            </button>
-            <button 
-              type="button" 
-              class="star-btn" 
-              [class.active]="isStarred(p.id)" 
-              (click)="toggleStar(p.id, $event)" 
-              title="Toggle star">
-              <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
-            </button>
+      <!-- Skeleton Loaders -->
+      <ng-container *ngIf="isLoading(); else boardsContent">
+        <div class="board-card skeleton-card" *ngFor="let s of [1, 2, 3, 4]">
+          <div class="board-card-banner skeleton-banner shimmer"></div>
+          <div class="board-card-footer skeleton-footer">
+            <div class="skeleton-line shimmer" style="width: 55%; height: 14px; border-radius: 4px;"></div>
+            <div class="skeleton-line shimmer" style="width: 25%; height: 12px; border-radius: 4px;"></div>
           </div>
         </div>
-        <div class="board-card-footer">
-          <div class="title-meta">
-            <span class="board-title">{{ p.name }}</span>
-            <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
-          </div>
-          <div class="card-badge" *ngIf="p._count?.issues">
-            {{ p._count.issues }} tasks
-          </div>
-        </div>
-      </div>
+      </ng-container>
 
-      <!-- Create New Board Card (with icon!) -->
-      <div class="create-board-card" (click)="openCreateModal()">
-        <svg lucidePlus size="18" class="create-icon"></svg>
-        <span>Create new board</span>
-      </div>
+      <ng-template #boardsContent>
+        <!-- Existing Boards -->
+        <div 
+          class="board-card" 
+          *ngFor="let p of filteredProjects(); let i = index" 
+          (click)="goToProject(p.id)">
+          <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+            <div class="card-actions-wrapper">
+              <button 
+                type="button" 
+                class="edit-btn" 
+                (click)="openEditModal(p, $event)" 
+                title="Edit board"
+                *ngIf="isAdmin">
+                <svg lucideEdit2 size="14"></svg>
+              </button>
+              <button 
+                type="button" 
+                class="archive-btn" 
+                (click)="archiveBoard(p, false, $event)" 
+                title="Archive board"
+                *ngIf="isAdmin">
+                <svg lucideArchive size="14"></svg>
+              </button>
+              <button 
+                type="button" 
+                class="star-btn" 
+                [class.active]="isStarred(p.id)" 
+                (click)="toggleStar(p.id, $event)" 
+                title="Toggle star">
+                <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
+              </button>
+            </div>
+          </div>
+          <div class="board-card-footer">
+            <div class="title-meta">
+              <span class="board-title">{{ p.name }}</span>
+              <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
+            </div>
+            <div class="card-badge" *ngIf="p._count?.issues">
+              {{ p._count.issues }} tasks
+            </div>
+          </div>
+        </div>
+
+        <!-- Create New Board Card (with icon!) -->
+        <div class="create-board-card" (click)="openCreateModal()">
+          <svg lucidePlus size="18" class="create-icon"></svg>
+          <span>Create new board</span>
+        </div>
+      </ng-template>
     </div>
   </div>
 

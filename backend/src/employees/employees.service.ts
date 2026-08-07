@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
@@ -56,7 +56,15 @@ export class EmployeesService {
     // 2. Hash default password
     const hashedPassword = await bcrypt.hash('Welcome@123', 10);
 
-    // 3. Determine Role from Department
+    // 3. Validate phone number if provided
+    if (data.phone) {
+      const phoneRegex = /^\+?[0-9]{10,15}$/;
+      if (!phoneRegex.test(data.phone)) {
+        throw new BadRequestException('Invalid phone number format. Must be 10-15 digits, optionally starting with +');
+      }
+    }
+
+    // 4. Determine Role from Department
     let assignedRole = data.role || 'EMPLOYEE';
     if (data.departmentId) {
       const dept = await this.prisma.department.findUnique({ where: { id: data.departmentId } });
@@ -135,7 +143,13 @@ export class EmployeesService {
     const updateData: any = {};
     if (data.firstName) updateData.firstName = data.firstName;
     if (data.lastName) updateData.lastName = data.lastName;
-    if (data.phone) updateData.phone = data.phone;
+    if (data.phone) {
+      const phoneRegex = /^\+?[0-9]{10,15}$/;
+      if (!phoneRegex.test(data.phone)) {
+        throw new BadRequestException('Invalid phone number format. Must be 10-15 digits, optionally starting with +');
+      }
+      updateData.phone = data.phone;
+    }
     if (data.departmentId !== undefined) {
       if (data.departmentId) updateData.department = { connect: { id: data.departmentId } };
       else updateData.department = { disconnect: true };
@@ -291,6 +305,20 @@ export class EmployeesService {
 
   async addContact(id: number, companyId: number, currentUserId: number, role: string, data: any) {
     const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+
+    if (!data.name || !data.mobile) {
+      throw new BadRequestException('Name and Mobile are required');
+    }
+
+    const nameRegex = /^[a-zA-Z\s.'-]+$/;
+    if (!nameRegex.test(data.name.trim())) {
+      throw new BadRequestException('Invalid name format. Name should contain only letters and spaces.');
+    }
+
+    const phoneRegex = /^\+?[0-9\s\-()]{7,15}$/;
+    if (!phoneRegex.test(data.mobile)) {
+      throw new BadRequestException('Invalid mobile number format. Must be 7-15 digits, optionally starting with +');
+    }
 
     return this.prisma.emergencyContact.create({
       data: {
