@@ -498,3 +498,80 @@
 .btn-danger:hover {
   background: #dc2626;
 }
+
+/* Skeleton Loader */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  animation: shimmer 1.5s infinite linear;
+  background: linear-gradient(to right, var(--bg-alt, #f1f5f9) 4%, var(--border-light, #e2e8f0) 25%, var(--bg-alt, #f1f5f9) 36%);
+  background-size: 800px 100%;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.skeleton-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  gap: 12px;
+}
+
+.skeleton-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.skeleton-text {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.skeleton-section-title {
+  height: 11px;
+  width: 40px;
+  margin: 16px 12px 8px;
+  border-radius: 2px;
+}
+
+.skeleton-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.skeleton-user-name {
+  height: 14px;
+  width: 100px;
+  margin-bottom: 4px;
+}
+
+.skeleton-user-email {
+  height: 11px;
+  width: 130px;
+}
+
+.sidebar.collapsed .skeleton-text,
+.sidebar.collapsed .skeleton-section-title,
+.sidebar.collapsed .skeleton-user-name,
+.sidebar.collapsed .skeleton-user-email {
+  display: none !important;
+}
+
+.sidebar.collapsed .skeleton-item {
+  justify-content: center;
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 8px auto;
+  border-radius: var(--radius-md);
+}
+
+.sidebar.collapsed .skeleton-item .skeleton-icon {
+  margin: 0;
+}

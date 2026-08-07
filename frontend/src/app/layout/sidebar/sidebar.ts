@@ -25,6 +25,7 @@ export class SidebarComponent implements OnInit {
   allowedModules = signal<Set<string>>(new Set(['overview']));
   isCollapsed = signal<boolean>(false);
   logoFailed = signal<boolean>(false);
+  isLoading = signal<boolean>(true);
 
   onLogoError() {
     this.logoFailed.set(true);
@@ -139,6 +140,9 @@ export class SidebarComponent implements OnInit {
       next: (user) => {
         this.user.set(user);
         this.loadPermissions(user.role);
+      },
+      error: () => {
+        this.isLoading.set(false);
       }
     });
   }
@@ -157,6 +161,7 @@ export class SidebarComponent implements OnInit {
         });
       });
       this.allowedModules.set(allAllowed);
+      this.isLoading.set(false);
       return;
     }
 
@@ -196,6 +201,10 @@ export class SidebarComponent implements OnInit {
         });
 
         this.allowedModules.set(allowed);
+        this.isLoading.set(false);
+      },
+      error: () => {
+        this.isLoading.set(false);
       }
     });
   }

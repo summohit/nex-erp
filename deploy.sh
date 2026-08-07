@@ -51,10 +51,10 @@ deploy_frontend() {
   echo "══════════════════════════════════════"
 
   info "Building Angular app for production..."
-  cd "$FRONTEND_DIR"
-  NODE_OPTIONS="--max-old-space-size=8192" npx ng build --configuration=production
+  # cd "$FRONTEND_DIR"
+  # NODE_OPTIONS="--max-old-space-size=8192" npx ng build --configuration=production
 
-  if [ ! -d "dist/frontend/browser" ]; then
+  if [ ! -d "$FRONTEND_DIR/dist/frontend/browser" ]; then
     err "Build failed — dist/frontend/browser not found!"
     exit 1
   fi

@@ -20,7 +20,21 @@
   </div>
   
   <div class="sidebar-scroll">
-    <ng-container *ngFor="let section of menuSections; let first = first">
+    <ng-container *ngIf="isLoading(); else loadedMenu">
+      <div class="skeleton-section-title skeleton"></div>
+      <div class="skeleton-item" *ngFor="let i of [1,2,3,4,5,6]">
+        <div class="skeleton-icon skeleton"></div>
+        <div class="skeleton-text skeleton" [style.width]="i % 2 === 0 ? '60%' : '80%'"></div>
+      </div>
+      <div class="skeleton-section-title skeleton mt-4"></div>
+      <div class="skeleton-item" *ngFor="let i of [1,2]">
+        <div class="skeleton-icon skeleton"></div>
+        <div class="skeleton-text skeleton" [style.width]="i === 1 ? '70%' : '50%'"></div>
+      </div>
+    </ng-container>
+    
+    <ng-template #loadedMenu>
+      <ng-container *ngFor="let section of menuSections; let first = first">
       <ng-container *ngIf="hasVisibleItems(section)">
         <span class="nav-section-title" [class.mt-4]="!first">{{ section.title }}</span>
         <nav class="sidebar-nav">
@@ -73,12 +87,23 @@
         </ng-container>
         </nav>
       </ng-container>
-    </ng-container>
+      </ng-container>
+    </ng-template>
   </div>
 
   <!-- Sidebar Footer User Profile -->
-  <div class="sidebar-footer" *ngIf="user()">
-    <div class="user-profile-btn" (click)="goToProfile()" style="display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden;">
+  <div class="sidebar-footer" *ngIf="isLoading() || user()">
+    <ng-container *ngIf="isLoading(); else loadedProfile">
+      <div class="user-profile-btn" style="display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; padding-left: 12px;">
+        <div class="skeleton-avatar skeleton"></div>
+        <div class="user-info">
+          <div class="skeleton-user-name skeleton"></div>
+          <div class="skeleton-user-email skeleton"></div>
+        </div>
+      </div>
+    </ng-container>
+    <ng-template #loadedProfile>
+      <div class="user-profile-btn" (click)="goToProfile()" style="display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; overflow: hidden;">
       <ng-container *ngIf="user()?.employee?.avatarUrl; else defaultAvatar">
         <img [src]="user()?.employee?.avatarUrl" alt="User Avatar" class="user-avatar">
       </ng-container>
@@ -93,9 +118,10 @@
         <span class="user-email">{{ user().email }}</span>
       </div>
     </div>
-    <button (click)="promptLogout()" class="btn-logout-icon" title="Logout">
-      <svg lucideLogOut size="18"></svg>
-    </button>
+      <button (click)="promptLogout()" class="btn-logout-icon" title="Logout">
+        <svg lucideLogOut size="18"></svg>
+      </button>
+    </ng-template>
   </div>
   
   <div class="modal-overlay" *ngIf="showLogoutModal()" (click)="cancelLogout()">
