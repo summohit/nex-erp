@@ -52,7 +52,7 @@ deploy_frontend() {
 
   info "Building Angular app for production..."
   cd "$FRONTEND_DIR"
-  npx ng build --configuration=production 2>&1 | tail -5
+  npx ng build --configuration=production
 
   if [ ! -d "dist/frontend/browser" ]; then
     err "Build failed — dist/frontend/browser not found!"
