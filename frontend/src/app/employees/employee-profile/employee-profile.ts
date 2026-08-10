@@ -19,7 +19,7 @@ export class EmployeeProfileComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private toast = inject(HotToastService);
 
-  activeTab = signal<'profile' | 'contacts' | 'documents'>('profile');
+  activeTab = signal<'work' | 'resume' | 'personal' | 'contacts' | 'documents'>('work');
   employeeData = signal<any>(null);
   isLoading = signal(true);
   isOwner = signal(false);
@@ -48,7 +48,7 @@ export class EmployeeProfileComponent implements OnInit {
     });
   }
 
-  setTab(tab: 'profile' | 'contacts' | 'documents') {
+  setTab(tab: 'work' | 'resume' | 'personal' | 'contacts' | 'documents') {
     this.activeTab.set(tab);
   }
 }

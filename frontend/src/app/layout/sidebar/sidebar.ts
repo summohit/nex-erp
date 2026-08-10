@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { MenusService } from '../../services/menus.service';
 import { PermissionsService, RolePermission } from '../../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX } from '@lucide/angular';
@@ -16,6 +17,7 @@ import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarCloc
 })
 export class SidebarComponent implements OnInit {
   private authService = inject(AuthService);
+  private menusService = inject(MenusService);
   private permissionsService = inject(PermissionsService);
   public router = inject(Router);
   private toast = inject(HotToastService);
@@ -31,109 +33,7 @@ export class SidebarComponent implements OnInit {
     this.logoFailed.set(true);
   }
 
-  menuSections = [
-    {
-      title: 'MAIN',
-      items: [
-        {
-          id: 'overview',
-          title: 'Dashboard',
-          icon: 'lucideLayoutDashboard',
-          route: '/dashboard'
-        },
-        {
-          id: 'employees',
-          title: 'Employees',
-          icon: 'lucideUsers',
-          route: '/employees',
-          subItems: [
-            { id: 'employees/directory', title: 'Employee Directory', route: '/employees/directory' },
-            { id: 'employees/me/profile', title: 'My Profile', route: '/employees/me/profile' },
-            { id: 'employees/org-chart', title: 'Organization Chart', route: '/employees/org-chart' },
-            { id: 'employees/onboarding', title: 'Onboarding', route: '/employees/onboarding' },
-            { id: 'employees/documents', title: 'Documents', route: '/employees/documents' }
-          ]
-        },
-        {
-          id: 'recruitment',
-          title: 'Recruitment',
-          icon: 'lucideBriefcase',
-          route: '/recruitment',
-          subItems: [
-            { id: 'recruitment/jobs', title: 'Job Postings', route: '/recruitment/jobs' },
-            { id: 'recruitment/candidates', title: 'Candidates (ATS)', route: '/recruitment/candidates' },
-            { id: 'recruitment/interviews', title: 'Interviews', route: '/recruitment/interviews' },
-            { id: 'recruitment/careers', title: 'Public Careers Page ↗', route: '/careers', external: true }
-          ]
-        },
-        {
-          id: 'projects',
-          title: 'Projects',
-          icon: 'lucideKanban',
-          route: '/projects'
-        },
-        {
-          id: 'attendance',
-          title: 'Attendance & Leave',
-          icon: 'lucideCalendarClock',
-          route: '/attendance',
-          subItems: [
-            { id: 'attendance/timesheets', title: 'Timesheets', route: '/attendance/timesheets' },
-            { id: 'attendance/leaves', title: 'Time Off Requests', route: '/attendance/leaves' },
-            { id: 'attendance/balances', title: 'Leave Balances', route: '/attendance/balances' },
-            { id: 'attendance/shifts', title: 'Shift Roster', route: '/attendance/shifts' },
-            { id: 'attendance/holidays', title: 'Holidays', route: '/attendance/holidays' }
-          ]
-        },
-        {
-          id: 'appreciation',
-          title: 'Appreciation',
-          icon: 'lucideTrophy',
-          route: '/appreciation'
-        },
-        {
-          id: 'payroll',
-          title: 'Payroll & Expenses',
-          icon: 'lucideBanknote',
-          route: '/payroll',
-          subItems: [
-            { id: 'payroll/processing', title: 'Salary Processing', route: '/payroll/processing' },
-            { id: 'payroll/payslips', title: 'Payslips', route: '/payroll/payslips' },
-            { id: 'payroll/expenses', title: 'Expense Claims', route: '/payroll/expenses' },
-            { id: 'payroll/structure', title: 'Salary Structure', route: '/payroll/structure' }
-          ]
-        },
-        {
-          id: 'assets',
-          title: 'Assets & IT',
-          icon: 'lucideLaptop',
-          route: '/assets',
-          subItems: [
-            { id: 'assets/inventory', title: 'Asset Inventory', route: '/assets/inventory' },
-            { id: 'assets/assignments', title: 'Assignments', route: '/assets/assignments' },
-            { id: 'assets/requests', title: 'Hardware Requests', route: '/assets/requests' }
-          ]
-        }
-      ]
-    },
-    {
-      title: 'OTHERS',
-      items: [
-        {
-          id: 'settings',
-          title: 'Settings',
-          icon: 'lucideSettings',
-          route: '/settings',
-          subItems: [
-            { id: 'settings/company', title: 'Company Profile', route: '/settings/company' },
-            { id: 'settings/master-data', title: 'Master Data', route: '/settings/master-data' },
-            { id: 'settings/permissions', title: 'Roles & Permissions', route: '/settings/permissions' },
-            { id: 'settings/integrations', title: 'Integrations', route: '/settings/integrations' }
-          ]
-        }
-      ]
-    }
-  ];
+  menuSections: any[] = [];
 
   constructor() {
     this.authService.getMe().subscribe({
@@ -153,7 +53,7 @@ export class SidebarComponent implements OnInit {
       const allAllowed = new Set<string>();
       allAllowed.add('overview');
       this.menuSections.forEach(sec => {
-        sec.items.forEach(item => {
+        sec.items.forEach((item: any) => {
           allAllowed.add(item.id);
           if (item.subItems) {
             item.subItems.forEach((sub: any) => allAllowed.add(sub.id));
@@ -193,7 +93,7 @@ export class SidebarComponent implements OnInit {
 
         // Auto-add parent module ID if any sub-item is allowed
         this.menuSections.forEach(sec => {
-          sec.items.forEach(item => {
+          sec.items.forEach((item: any) => {
             if (item.subItems && item.subItems.some((sub: any) => allowed.has(sub.id))) {
               allowed.add(item.id);
             }
@@ -247,6 +147,11 @@ export class SidebarComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.menusService.getSidebarMenus().subscribe(menus => {
+      this.menuSections = menus;
+      this.checkExpandedMenu(this.router.url);
+    });
+
     const savedState = localStorage.getItem('sidebar_collapsed');
     if (savedState === 'true') {
       this.isCollapsed.set(true);
@@ -282,7 +187,7 @@ export class SidebarComponent implements OnInit {
     for (const section of this.menuSections) {
       for (const item of section.items) {
         if (item.subItems) {
-          const hasActiveSubItem = item.subItems.some(sub => url.includes(sub.route));
+          const hasActiveSubItem = item.subItems.some((sub: any) => url.includes(sub.route));
           if (hasActiveSubItem) {
             this.expandedMenu.set(item.id);
             activeFound = true;

@@ -10,8 +10,14 @@
     <!-- Tabs Navigation -->
     <div class="tabs-container">
       <div class="tabs">
-        <button class="tab-btn" [class.active]="activeTab() === 'profile'" (click)="setTab('profile')">
-          Profile
+        <button class="tab-btn" [class.active]="activeTab() === 'work'" (click)="setTab('work')">
+          Work
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'resume'" (click)="setTab('resume')">
+          Resume & Skills
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'personal'" (click)="setTab('personal')">
+          Personal
         </button>
         <button class="tab-btn" [class.active]="activeTab() === 'contacts'" (click)="setTab('contacts')">
           Emergency Contacts
@@ -24,7 +30,8 @@
 
     <!-- Tab Content Area -->
     <div class="tab-content">
-      <app-profile-tab *ngIf="activeTab() === 'profile'" 
+      <app-profile-tab *ngIf="activeTab() === 'work' || activeTab() === 'resume' || activeTab() === 'personal'" 
+        [activeSubTab]="activeTab()"
         [employeeData]="employeeData()" 
         [isOwner]="isOwner()"
         (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">

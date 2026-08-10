@@ -11,7 +11,23 @@ export class UsersController {
   async getMe(@Request() req) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.sub },
-      include: { company: true, employee: true }
+      include: { 
+        company: true, 
+        employee: true,
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  include: {
+                    permission: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
     if (user) {
       delete (user as any).password;

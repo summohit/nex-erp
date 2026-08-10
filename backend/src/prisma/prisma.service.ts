@@ -14,8 +14,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     if (!globalForPrisma.pgPool) {
       globalForPrisma.pgPool = new Pool({
         connectionString: process.env.DATABASE_URL || 'postgresql://mohitsingh@localhost:5432/erp_db?host=/tmp',
-        max: 10, // Supabase allows 15 — reserve 5 for migrations/admin tools
-        min: 2, // Keep 2 idle connections warm to reduce cold-start latency
+        max: 4, // Supabase allows 15 in session mode — keep low for clustered instances
+        min: 1, // Keep 1 idle connections warm to reduce cold-start latency
         idleTimeoutMillis: 30000, // Drop idle connections after 30s
         connectionTimeoutMillis: 15000, // 15s timeout for acquiring a connection
         allowExitOnIdle: false, // Keep pool alive

@@ -40,30 +40,35 @@ model Company {
   projects            Project[]
   issues              Issue[]
   notifications       Notification[]
+  appRoles            AppRole[]
+  featureFlags        FeatureFlag[]
+  approvalWorkflows   ApprovalWorkflow[]
 }
 
 // Authentication & RBAC
 model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  password  String
-  role      String    @default("EMPLOYEE") // SUPERADMIN, ADMIN, HR, FINANCE, SALES, EMPLOYEE
-  companyId Int
-  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  emailVerifiedAt DateTime?
-  status          String    @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, SUSPENDED
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  employee  Employee?
-  approvedLeaveRequests LeaveRequest[]
-  approvedExpenseClaims ExpenseClaim[] @relation("ExpenseApprover")
-  approvedHardwareRequests HardwareRequest[] @relation("HardwareApprover")
-  notifications Notification[]
+  id                       Int                @id @default(autoincrement())
+  email                    String             @unique
+  password                 String
+  role                     String             @default("EMPLOYEE") // SUPERADMIN, ADMIN, HR, FINANCE, SALES, EMPLOYEE
+  companyId                Int
+  company                  Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailVerifiedAt          DateTime?
+  status                   String             @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, SUSPENDED
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  employee                 Employee?
+  approvedLeaveRequests    LeaveRequest[]
+  approvedExpenseClaims    ExpenseClaim[]     @relation("ExpenseApprover")
+  approvedHardwareRequests HardwareRequest[]  @relation("HardwareApprover")
+  notifications            Notification[]
+  userRoles                UserRole[]
+  userMenuBookmarks        UserMenuBookmark[]
 }
 
 model VerificationToken {
   id         Int      @id @default(autoincrement())
-  identifier String   // email address
+  identifier String // email address
   token      String   @unique
   expiresAt  DateTime
   createdAt  DateTime @default(now())
@@ -174,10 +179,10 @@ model Employee {
   hardwareRequests  HardwareRequest[]
   interviews        Interview[]
 
-  ledProjects         Project[]          @relation("ProjectLead")
+  ledProjects         Project[]         @relation("ProjectLead")
   projectMembers      ProjectMember[]
-  assignedIssues      Issue[]            @relation("IssueAssignee")
-  reportedIssues      Issue[]            @relation("IssueReporter")
+  assignedIssues      Issue[]           @relation("IssueAssignee")
+  reportedIssues      Issue[]           @relation("IssueReporter")
   cardMemberships     IssueMember[]
   issueTimeLogs       IssueTimeLog[]
   issueComments       IssueComment[]
@@ -232,47 +237,47 @@ model EmployeeOnboardingTask {
 
 // Master Data: Branches & Holidays
 model Branch {
-  id          Int        @id @default(autoincrement())
-  name        String
-  address     String?
-  latitude    Float?
-  longitude   Float?
-  startTime   String     @default("09:00")
-  endTime     String     @default("18:00")
-  weeklyOffs  String     @default("0") // Comma separated integers: 0=Sun, 1=Mon, ..., 6=Sat
-  companyId   Int
-  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employees   Employee[]
-  jobs        Job[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         Int        @id @default(autoincrement())
+  name       String
+  address    String?
+  latitude   Float?
+  longitude  Float?
+  startTime  String     @default("09:00")
+  endTime    String     @default("18:00")
+  weeklyOffs String     @default("0") // Comma separated integers: 0=Sun, 1=Mon, ..., 6=Sat
+  companyId  Int
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employees  Employee[]
+  jobs       Job[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 }
 
 model Holiday {
-  id          Int      @id @default(autoincrement())
-  name        String
-  date        DateTime
-  companyId   Int
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String
+  date      DateTime
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Attendance & Leaves
 model LeaveType {
-  id                Int             @id @default(autoincrement())
+  id                Int            @id @default(autoincrement())
   name              String
   description       String?
-  defaultDays       Int             @default(0)
-  isPaid            Boolean         @default(true)
-  carryForward      Boolean         @default(false)
-  carryForwardLimit Int             @default(0)
+  defaultDays       Int            @default(0)
+  isPaid            Boolean        @default(true)
+  carryForward      Boolean        @default(false)
+  carryForwardLimit Int            @default(0)
   companyId         Int
-  company           Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company           Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   leaveBalances     LeaveBalance[]
   leaveRequests     LeaveRequest[]
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 }
 
 model LeaveBalance {
@@ -310,43 +315,43 @@ model LeaveRequest {
 }
 
 model Attendance {
-  id          Int       @id @default(autoincrement())
-  employeeId  Int
-  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  date        DateTime  @db.Date
-  clockIn     DateTime?
-  clockOut    DateTime?
-  clockInLat  Float?
-  clockInLng  Float?
-  clockOutLat Float?
-  clockOutLng Float?
-  status      String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
-  isLate      Boolean   @default(false)
-  isEarlyLeave Boolean  @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           Int       @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date         DateTime  @db.Date
+  clockIn      DateTime?
+  clockOut     DateTime?
+  clockInLat   Float?
+  clockInLng   Float?
+  clockOutLat  Float?
+  clockOutLng  Float?
+  status       String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
+  isLate       Boolean   @default(false)
+  isEarlyLeave Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([employeeId, date])
 }
 
 model Shift {
-  id                 Int        @id @default(autoincrement())
-  name               String
-  startTime          String     // format "HH:mm"
-  endTime            String     // format "HH:mm"
-  bufferTimeMinutes  Int        @default(15)
-  companyId          Int
-  company            Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employees          Employee[]
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  id                Int        @id @default(autoincrement())
+  name              String
+  startTime         String // format "HH:mm"
+  endTime           String // format "HH:mm"
+  bufferTimeMinutes Int        @default(15)
+  companyId         Int
+  company           Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employees         Employee[]
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 }
 
 // Payroll & Expenses
 model SalaryComponent {
   id               Int               @id @default(autoincrement())
   name             String
-  type             String            // EARNING or DEDUCTION
+  type             String // EARNING or DEDUCTION
   isPreDefined     Boolean           @default(false)
   description      String?
   companyId        Int
@@ -373,7 +378,7 @@ model Payslip {
   id              Int           @id @default(autoincrement())
   employeeId      Int
   employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  month           Int           // 1-12
+  month           Int // 1-12
   year            Int
   workingDays     Int           @default(30)
   presentDays     Float         @default(0)
@@ -399,7 +404,7 @@ model PayslipItem {
   payslipId     Int
   payslip       Payslip  @relation(fields: [payslipId], references: [id], onDelete: Cascade)
   componentName String
-  type          String   // EARNING, DEDUCTION, EXPENSE
+  type          String // EARNING, DEDUCTION, EXPENSE
   amount        Float    @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -499,24 +504,24 @@ model AssetAssignment {
 }
 
 model HardwareRequest {
-  id               Int       @id @default(autoincrement())
+  id               Int      @id @default(autoincrement())
   employeeId       Int
-  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  requestType      String    @default("NEW_DEVICE") // NEW_DEVICE, REPLACEMENT, REPAIR, PERIPHERAL
-  category         String    @default("LAPTOP")
-  urgency          String    @default("MEDIUM") // LOW, MEDIUM, HIGH
-  reason           String    @db.Text
-  images           String?   @db.Text
-  status           String    @default("PENDING") // PENDING, APPROVED, FULFILLED, REJECTED
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  requestType      String   @default("NEW_DEVICE") // NEW_DEVICE, REPLACEMENT, REPAIR, PERIPHERAL
+  category         String   @default("LAPTOP")
+  urgency          String   @default("MEDIUM") // LOW, MEDIUM, HIGH
+  reason           String   @db.Text
+  images           String?  @db.Text
+  status           String   @default("PENDING") // PENDING, APPROVED, FULFILLED, REJECTED
   rejectionReason  String?
   fulfilledAssetId Int?
-  fulfilledAsset   Asset?    @relation(fields: [fulfilledAssetId], references: [id], onDelete: SetNull)
+  fulfilledAsset   Asset?   @relation(fields: [fulfilledAssetId], references: [id], onDelete: SetNull)
   approvedById     Int?
-  approvedBy       User?     @relation("HardwareApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedBy       User?    @relation("HardwareApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   companyId        Int
-  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 // Recruitment & ATS
@@ -543,26 +548,26 @@ model Job {
 }
 
 model JobApplication {
-  id          Int      @id @default(autoincrement())
-  jobId       Int
-  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  companyId   Int
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fullName    String
-  email       String
-  phone       String
+  id              Int         @id @default(autoincrement())
+  jobId           Int
+  job             Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  companyId       Int
+  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fullName        String
+  email           String
+  phone           String
   resumeUrl       String?
   linkedinUrl     String?
   portfolioUrl    String?
   experienceYears String?
   noticePeriod    String?
-  status          String   @default("NEW") // NEW, REVIEWING, SHORTLISTED, REJECTED, HIRED, ONBOARDED
-  answers         String?  @db.Text // Store JSON string of answers
+  status          String      @default("NEW") // NEW, REVIEWING, SHORTLISTED, REJECTED, HIRED, ONBOARDED
+  answers         String?     @db.Text // Store JSON string of answers
   aiScore         Int?
-  aiSummary       String?  @db.Text
-  isAiScored      Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  aiSummary       String?     @db.Text
+  isAiScored      Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
   interviews      Interview[]
 }
 
@@ -572,12 +577,12 @@ model Interview {
   application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   interviewerId Int?
   interviewer   Employee?      @relation(fields: [interviewerId], references: [id], onDelete: SetNull)
-  title         String         // e.g. "Technical Round 1"
+  title         String // e.g. "Technical Round 1"
   scheduledAt   DateTime
   durationMins  Int            @default(30)
-  locationUrl   String?        // Google Meet / Zoom link
+  locationUrl   String? // Google Meet / Zoom link
   status        String         @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
-  rating        Int?           // Scorecard rating (1-5)
+  rating        Int? // Scorecard rating (1-5)
   feedback      String?        @db.Text
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -588,24 +593,24 @@ model Interview {
 // ═══════════════════════════════════════════
 
 model Project {
-  id            Int       @id @default(autoincrement())
-  name          String
-  key           String    // Auto-generated, unique per company (e.g., "NEX")
-  description   String?
-  color         String    @default("#2563eb") // Project accent color
-  icon          String    @default("folder") // Lucide icon name
-  status        String    @default("ACTIVE") // ACTIVE, ARCHIVED
-  leadId        Int?      // Project lead (Employee)
-  lead          Employee? @relation("ProjectLead", fields: [leadId], references: [id])
-  companyId     Int
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  name        String
+  key         String // Auto-generated, unique per company (e.g., "NEX")
+  description String?
+  color       String    @default("#2563eb") // Project accent color
+  icon        String    @default("folder") // Lucide icon name
+  status      String    @default("ACTIVE") // ACTIVE, ARCHIVED
+  leadId      Int? // Project lead (Employee)
+  lead        Employee? @relation("ProjectLead", fields: [leadId], references: [id])
+  companyId   Int
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  members       ProjectMember[]
-  boards        Board[]
-  issues        Issue[]
-  labels        Label[]
+  members ProjectMember[]
+  boards  Board[]
+  issues  Issue[]
+  labels  Label[]
 
   @@unique([key, companyId])
 }
@@ -624,75 +629,75 @@ model ProjectMember {
 }
 
 model Board {
-  id        Int      @id @default(autoincrement())
-  name      String   @default("Main Board")
+  id        Int           @id @default(autoincrement())
+  name      String        @default("Main Board")
   projectId Int
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   columns   BoardColumn[]
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
 }
 
 model BoardColumn {
-  id        Int      @id @default(autoincrement())
-  name      String   // e.g. "To Do", "In Progress", "In Review", "Done"
-  color     String   @default("#6b7280") // Column header color
-  position  Int      // Sort order (0, 1, 2, ...)
-  boardId   Int
-  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  issues    Issue[]
-  isSystem  Boolean  @default(false)
+  id         Int     @id @default(autoincrement())
+  name       String // e.g. "To Do", "In Progress", "In Review", "Done"
+  color      String  @default("#6b7280") // Column header color
+  position   Int // Sort order (0, 1, 2, ...)
+  boardId    Int
+  board      Board   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  issues     Issue[]
+  isSystem   Boolean @default(false)
   isArchived Boolean @default(false)
 
   @@unique([boardId, position])
 }
 
 model Issue {
-  id            Int       @id @default(autoincrement())
-  key           String    // Auto-generated: "NEX-1", "NEX-2"
-  title         String
-  description   String?   @db.Text // Quill HTML content
-  type          String    @default("TASK") // EPIC, STORY, TASK, BUG, SUBTASK
-  status        String    @default("TODO") // TODO, IN_PROGRESS, IN_REVIEW, DONE, CANCELLED
-  priority      String    @default("MEDIUM") // CRITICAL, HIGH, MEDIUM, LOW
-  storyPoints   Int?
-  startDate     DateTime?
-  dueDate       DateTime?
+  id             Int       @id @default(autoincrement())
+  key            String // Auto-generated: "NEX-1", "NEX-2"
+  title          String
+  description    String?   @db.Text // Quill HTML content
+  type           String    @default("TASK") // EPIC, STORY, TASK, BUG, SUBTASK
+  status         String    @default("TODO") // TODO, IN_PROGRESS, IN_REVIEW, DONE, CANCELLED
+  priority       String    @default("MEDIUM") // CRITICAL, HIGH, MEDIUM, LOW
+  storyPoints    Int?
+  startDate      DateTime?
+  dueDate        DateTime?
   estimatedHours Float?
-  recurring     String?
-  dueReminder   String?
-  coverUrl      String?
-  position      Int       @default(0) // Sort order within column/backlog
-  isArchived    Boolean   @default(false)
-  
+  recurring      String?
+  dueReminder    String?
+  coverUrl       String?
+  position       Int       @default(0) // Sort order within column/backlog
+  isArchived     Boolean   @default(false)
+
   // Time Tracking Markers
   workStartedAt   DateTime? // When work actually started
   workCompletedAt DateTime? // When work actually finished
 
   // Relationships
-  projectId     Int
-  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  columnId      Int?
-  column        BoardColumn? @relation(fields: [columnId], references: [id], onDelete: SetNull)
-  assigneeId    Int?
-  assignee      Employee? @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  reporterId    Int?
-  reporter      Employee? @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
-  parentId      Int?      // For sub-tasks and Epic→Story linking
-  parent        Issue?    @relation("IssueHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children      Issue[]   @relation("IssueHierarchy")
-  companyId     Int
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  projectId  Int
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  columnId   Int?
+  column     BoardColumn? @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  assigneeId Int?
+  assignee   Employee?    @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporterId Int?
+  reporter   Employee?    @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  parentId   Int? // For sub-tasks and Epic→Story linking
+  parent     Issue?       @relation("IssueHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Issue[]      @relation("IssueHierarchy")
+  companyId  Int
+  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  comments      IssueComment[]
-  attachments   IssueAttachment[]
-  labels        IssueLabel[]
-  members       IssueMember[]
-  activities    IssueActivity[]
-  timeLogs      IssueTimeLog[] // Detailed time entries if multiple sessions
-  checklists    Checklist[]
+  comments    IssueComment[]
+  attachments IssueAttachment[]
+  labels      IssueLabel[]
+  members     IssueMember[]
+  activities  IssueActivity[]
+  timeLogs    IssueTimeLog[] // Detailed time entries if multiple sessions
+  checklists  Checklist[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([key, companyId])
 }
@@ -706,7 +711,7 @@ model IssueTimeLog {
   employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   startedAt   DateTime
   endedAt     DateTime?
-  durationMin Int?      // Calculated duration in minutes
+  durationMin Int? // Calculated duration in minutes
   createdAt   DateTime  @default(now())
 }
 
@@ -722,42 +727,42 @@ model IssueComment {
 }
 
 model IssueAttachment {
-  id        Int      @id @default(autoincrement())
-  fileName  String
-  fileUrl   String
-  fileSize  Int?     // bytes
-  fileType  String   @default("FILE") // FILE or LINK
-  isCover   Boolean  @default(false)
-  issueId   Int
-  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  fileName   String
+  fileUrl    String
+  fileSize   Int? // bytes
+  fileType   String   @default("FILE") // FILE or LINK
+  isCover    Boolean  @default(false)
+  issueId    Int
+  issue      Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
   uploadedBy Int
-  uploader  Employee @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  uploader   Employee @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
 }
 
 model Label {
-  id        Int      @id @default(autoincrement())
-  name      String   // e.g. "Frontend", "Backend", "Design", "Urgent"
-  color     String   @default("#6b7280")
+  id        Int          @id @default(autoincrement())
+  name      String // e.g. "Frontend", "Backend", "Design", "Urgent"
+  color     String       @default("#6b7280")
   projectId Int
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues    IssueLabel[]
 }
 
 model IssueLabel {
-  id       Int   @id @default(autoincrement())
-  issueId  Int
-  issue    Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  labelId  Int
-  label    Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  id      Int   @id @default(autoincrement())
+  issueId Int
+  issue   Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  labelId Int
+  label   Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
 
   @@unique([issueId, labelId])
 }
 
 model IssueActivity {
   id        Int      @id @default(autoincrement())
-  action    String   // "STATUS_CHANGED", "ASSIGNED", "COMMENT_ADDED", "PRIORITY_CHANGED", "WORK_STARTED", "WORK_STOPPED"
-  field     String?  // Which field changed
+  action    String // "STATUS_CHANGED", "ASSIGNED", "COMMENT_ADDED", "PRIORITY_CHANGED", "WORK_STARTED", "WORK_STOPPED"
+  field     String? // Which field changed
   oldValue  String?
   newValue  String?
   issueId   Int
@@ -768,23 +773,23 @@ model IssueActivity {
 }
 
 model Checklist {
-  id          Int      @id @default(autoincrement())
-  title       String
-  issueId     Int
-  issue       Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  items       ChecklistItem[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int             @id @default(autoincrement())
+  title     String
+  issueId   Int
+  issue     Issue           @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  items     ChecklistItem[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 }
 
 model ChecklistItem {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   title       String
-  isCompleted Boolean  @default(false)
+  isCompleted Boolean   @default(false)
   checklistId Int
   checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model IssueMember {
@@ -798,18 +803,144 @@ model IssueMember {
 }
 
 model Notification {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  message     String
-  type        String   @default("INFO") // INFO, SUCCESS, WARNING, LEAVE_REQUEST, ASSIGNMENT, PAYROLL
-  linkUrl     String?
-  isRead      Boolean  @default(false)
-  companyId   Int
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO, SUCCESS, WARNING, LEAVE_REQUEST, ASSIGNMENT, PAYROLL
+  linkUrl   String?
+  isRead    Boolean  @default(false)
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
+// --- NEW RBAC & DYNAMIC MENUS (Architecture V2) ---
 
+model AppRole {
+  id          Int                 @id @default(autoincrement())
+  companyId   Int
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  isSystem    Boolean             @default(false)
+  priority    Int                 @default(0) // Higher number = higher precedence
+  users       UserRole[]
+  permissions AppRolePermission[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model UserRole {
+  id           Int     @id @default(autoincrement())
+  userId       Int
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId       Int
+  role         AppRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  companyId    Int?
+  branchId     Int?
+  departmentId Int?
+
+  @@unique([userId, roleId])
+}
+
+model PermissionDefinition {
+  id           Int                 @id @default(autoincrement())
+  resourceType String
+  resourceName String
+  action       String
+  roles        AppRolePermission[]
+  menus        Menu[]
+}
+
+model AppRolePermission {
+  id           Int                  @id @default(autoincrement())
+  roleId       Int
+  role         AppRole              @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId Int
+  permission   PermissionDefinition @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  effect       String               @default("ALLOW")
+  condition    Json?
+
+  @@unique([roleId, permissionId])
+}
+
+model FeatureFlag {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  key       String
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, key])
+}
+
+model Menu {
+  id             Int                   @id @default(autoincrement())
+  companyId      Int?
+  parentId       Int?
+  parent         Menu?                 @relation("MenuHierarchy", fields: [parentId], references: [id])
+  children       Menu[]                @relation("MenuHierarchy")
+  title          String
+  icon           String?
+  route          String?
+  externalUrl    String?
+  openInNewTab   Boolean               @default(false)
+  displayOrder   Int                   @default(0)
+  isActive       Boolean               @default(true)
+  featureFlagKey String?
+  requiredPermId Int?
+  requiredPerm   PermissionDefinition? @relation(fields: [requiredPermId], references: [id])
+  bookmarks      UserMenuBookmark[]
+}
+
+model UserMenuBookmark {
+  id          Int     @id @default(autoincrement())
+  userId      Int
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuId      Int
+  menu        Menu    @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  isFavorite  Boolean @default(false)
+  isHidden    Boolean @default(false)
+  customOrder Int?
+
+  @@unique([userId, menuId])
+}
+
+model ApprovalWorkflow {
+  id           Int            @id @default(autoincrement())
+  companyId    Int
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  documentType String
+  conditions   Json?
+  steps        ApprovalStep[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model ApprovalStep {
+  id           Int              @id @default(autoincrement())
+  workflowId   Int
+  workflow     ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepOrder    Int
+  approverType String
+  roleId       Int?
+  isParallel   Boolean          @default(false)
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  actorId    Int?
+  action     String
+  entityType String
+  entityId   String
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+}
