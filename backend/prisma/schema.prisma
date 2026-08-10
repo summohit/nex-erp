@@ -43,6 +43,15 @@ model Company {
   appRoles            AppRole[]
   featureFlags        FeatureFlag[]
   approvalWorkflows   ApprovalWorkflow[]
+  performanceGoals    PerformanceGoal[]
+  performanceReviews  PerformanceReview[]
+  resignations        Resignation[]
+  exitInterviews      ExitInterview[]
+  offboardingTasks    OffboardingTask[]
+  shiftRotations      ShiftRotation[]
+  blackoutDates       BlackoutDate[]
+  clients             Client[]
+  kioskEnabled        Boolean              @default(false)
 }
 
 // Authentication & RBAC
@@ -64,6 +73,10 @@ model User {
   notifications            Notification[]
   userRoles                UserRole[]
   userMenuBookmarks        UserMenuBookmark[]
+  approvedResignations     Resignation[]      @relation("ResignationApprover")
+  conductedExitInterviews  ExitInterview[]    @relation("ExitInterviewer")
+  clearedOffboardingTasks  OffboardingTask[]  @relation("TaskClearer")
+  approvedRegularizations  AttendanceRegularization[]
 }
 
 model VerificationToken {
@@ -100,9 +113,10 @@ model Department {
   updatedAt    DateTime      @updatedAt
   isActive     Boolean       @default(true)
   defaultRole  String        @default("EMPLOYEE")
-  designations Designation[]
-  employees    Employee[]
-  jobs         Job[]
+  designations  Designation[]
+  employees     Employee[]
+  jobs          Job[]
+  blackoutDates BlackoutDate[]
 }
 
 model Designation {
@@ -144,6 +158,7 @@ model Employee {
 
   onboardingStatus String                   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
   onboardingTasks  EmployeeOnboardingTask[]
+  kioskPin         String?                  // 4-digit PIN for Kiosk Mode
 
   // Profile details
   salutation    String?
@@ -158,10 +173,47 @@ model Employee {
   address       String?
   about         String?
 
+  // Bank Details
+  bankName          String?
+  bankAccountNumber String?
+  ifscCode          String?
+
+  // Place of Birth
+  placeOfBirthCity    String?
+  placeOfBirthCountry String?
+
+  // Citizenship & Identification
+  nationality      String?
+  identificationNo String?
+  passportNo       String?
+
+  // Visa & Work Permit
+  visaNo       String?
+  workPermitNo String?
+
+  // Location & Distance
+  zipCode            String?
+  homeWorkDistanceKm Float?
+
+  // Family Details
+  spouseName      String?
+  spouseBirthdate DateTime?
+  childrenCount   Int?
+
+  // Education
+  educationLevel String?
+  fieldOfStudy   String?
+
   // Preferences
   avatarUrl String?
   themePref String? @default("system")
   currency  String? @default("USD")
+
+  // Work Location & Notes
+  usualWorkLocation Json?
+  workNotes         String?
+  nextAppraisalDate DateTime?
+  offboardingStatus String    @default("NONE") // NONE, IN_PROGRESS, SEPARATED
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -178,16 +230,26 @@ model Employee {
   assetAssignments  AssetAssignment[]
   hardwareRequests  HardwareRequest[]
   interviews        Interview[]
+  skills            EmployeeSkill[]
+  resumeLines       EmployeeResume[]
 
-  ledProjects         Project[]         @relation("ProjectLead")
+  ledProjects         Project[]           @relation("ProjectLead")
   projectMembers      ProjectMember[]
-  assignedIssues      Issue[]           @relation("IssueAssignee")
-  reportedIssues      Issue[]           @relation("IssueReporter")
+  assignedIssues      Issue[]             @relation("IssueAssignee")
+  reportedIssues      Issue[]             @relation("IssueReporter")
   cardMemberships     IssueMember[]
   issueTimeLogs       IssueTimeLog[]
   issueComments       IssueComment[]
   uploadedAttachments IssueAttachment[]
   issueActivities     IssueActivity[]
+  performanceGoals    PerformanceGoal[]
+  reviewsGiven        PerformanceReview[] @relation("Reviewer")
+  reviewsReceived     PerformanceReview[] @relation("Reviewee")
+  resignations        Resignation[]
+  exitInterviews      ExitInterview[]
+  offboardingTasks    OffboardingTask[]
+  regularizations     AttendanceRegularization[]
+  shiftRotations      ShiftRotation[]
 }
 
 model EmergencyContact {
@@ -203,13 +265,14 @@ model EmergencyContact {
 }
 
 model EmployeeDocument {
-  id         Int      @id @default(autoincrement())
-  employeeId Int
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  fileName   String
-  fileUrl    String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  documentType String?  @default("Other")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 // Onboarding
@@ -247,6 +310,8 @@ model Branch {
   weeklyOffs String     @default("0") // Comma separated integers: 0=Sun, 1=Mon, ..., 6=Sat
   companyId  Int
   company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  geofenceRadius Int?   @default(500) // meters
+  allowedIps     String? // Comma-separated list of allowed IPs
   employees  Employee[]
   jobs       Job[]
   createdAt  DateTime   @default(now())
@@ -269,6 +334,8 @@ model LeaveType {
   name              String
   description       String?
   defaultDays       Int            @default(0)
+  accrualFrequency  String?        // NONE, MONTHLY, YEARLY
+  accrualAmount     Float          @default(0)
   isPaid            Boolean        @default(true)
   carryForward      Boolean        @default(false)
   carryForwardLimit Int            @default(0)
@@ -304,6 +371,8 @@ model LeaveRequest {
   leaveType       LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
   startDate       DateTime
   endDate         DateTime
+  isHalfDay       Boolean   @default(false)
+  halfDayPeriod   String?   // AM, PM
   reason          String?
   attachmentUrl   String?
   status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
@@ -325,6 +394,7 @@ model Attendance {
   clockInLng   Float?
   clockOutLat  Float?
   clockOutLng  Float?
+  overtimeHours Float     @default(0)
   status       String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
   isLate       Boolean   @default(false)
   isEarlyLeave Boolean   @default(false)
@@ -332,6 +402,22 @@ model Attendance {
   updatedAt    DateTime  @updatedAt
 
   @@unique([employeeId, date])
+}
+
+model AttendanceRegularization {
+  id               Int       @id @default(autoincrement())
+  employeeId       Int
+  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date             DateTime  @db.Date
+  proposedClockIn  DateTime?
+  proposedClockOut DateTime?
+  reason           String?
+  status           String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason  String?
+  approvedById     Int?
+  approvedBy       User?     @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model Shift {
@@ -345,6 +431,19 @@ model Shift {
   employees         Employee[]
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
+}
+
+model ShiftRotation {
+  id            Int        @id @default(autoincrement())
+  name          String
+  description   String?
+  rotationType  String     @default("WEEKLY") // WEEKLY, BIWEEKLY, MONTHLY
+  shiftIds      String     // JSON array of shift IDs in order
+  companyId     Int
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employees     Employee[] // Employees assigned to this rotation
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 }
 
 // Payroll & Expenses
@@ -600,12 +699,22 @@ model Project {
   color       String    @default("#2563eb") // Project accent color
   icon        String    @default("folder") // Lucide icon name
   status      String    @default("ACTIVE") // ACTIVE, ARCHIVED
-  leadId      Int? // Project lead (Employee)
-  lead        Employee? @relation("ProjectLead", fields: [leadId], references: [id])
-  companyId   Int
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  leadId        Int? // Project lead (Employee)
+  lead          Employee? @relation("ProjectLead", fields: [leadId], references: [id])
+  companyId     Int
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // Client & Billing
+  clientId      Int?
+  client        Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  startDate     DateTime?
+  endDate       DateTime?
+  billingType   String    @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
+  budgetAmount  Float?
+  hourlyRate    Float?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   members ProjectMember[]
   boards  Board[]
@@ -943,4 +1052,202 @@ model AuditLog {
   ipAddress  String?
   userAgent  String?
   createdAt  DateTime @default(now())
+}
+
+model EmployeeSkill {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  category   String
+  name       String
+  level      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model EmployeeResume {
+  id            Int      @id @default(autoincrement())
+  employeeId    Int
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type          String // 'Experience' | 'Education' | 'Certification'
+  title         String
+  organization  String
+  startDate     String?
+  endDate       String?
+  description   String?
+  attachmentUrl String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ═══════════════════════════════════════════
+// PERFORMANCE MANAGEMENT MODULE
+// ═══════════════════════════════════════════
+
+model PerformanceGoal {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title       String
+  description String?   @db.Text
+  status      String    @default("IN_PROGRESS") // IN_PROGRESS, ACHIEVED, MISSED
+  dueDate     DateTime?
+  companyId   Int
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model PerformanceReview {
+  id         Int       @id @default(autoincrement())
+  employeeId Int
+  employee   Employee  @relation("Reviewee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewerId Int?
+  reviewer   Employee? @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  cycleName  String // e.g. "Q1 2027", "Annual Review 2026"
+  rating     Int? // 1 to 5
+  feedback   String?   @db.Text
+  status     String    @default("DRAFT") // DRAFT, SUBMITTED, ACKNOWLEDGED
+  companyId  Int
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+// Offboarding & Exit Management
+
+model Resignation {
+  id                     Int       @id @default(autoincrement())
+  employeeId             Int
+  employee               Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  companyId              Int
+  company                Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reason                 String    @db.Text
+  intendedLastWorkingDay DateTime
+  approvedLastWorkingDay DateTime?
+  status                 String    @default("PENDING") // PENDING, APPROVED, REJECTED, WITHDRAWN
+  approverId             Int?
+  approver               User?     @relation("ResignationApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  remarks                String?   @db.Text
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}
+
+model ExitInterview {
+  id            Int       @id @default(autoincrement())
+  employeeId    Int
+  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  companyId     Int
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  feedback      String    @db.Text
+  rating        Int       @default(3) // 1-5
+  interviewerId Int?
+  interviewer   User?     @relation("ExitInterviewer", fields: [interviewerId], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model OffboardingTask {
+  id          Int      @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department  String // IT, HR, FINANCE, ADMIN
+  taskName    String
+  description String?
+  status      String   @default("PENDING") // PENDING, CLEARED
+  clearedById Int?
+  clearedBy   User?    @relation("TaskClearer", fields: [clearedById], references: [id], onDelete: SetNull)
+  remarks     String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BlackoutDate {
+  id           Int         @id @default(autoincrement())
+  date         DateTime    @db.Date
+  reason       String
+  departmentId Int?        // If null, applies to entire company
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  companyId    Int
+  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([date, departmentId, companyId])
+}
+
+// ═══════════════════════════════════════════
+// CLIENT & CRM MODULE
+// ═══════════════════════════════════════════
+
+model Client {
+  id              Int       @id @default(autoincrement())
+  name            String    // e.g., "Acme Corp"
+  logo            String?   // Client logo URL or base64
+  industry        String?
+  website         String?
+  
+  // Status & Portal
+  status          String    @default("ACTIVE") // LEAD, ACTIVE, INACTIVE, ARCHIVED
+  portalEnabled   Boolean   @default(false)    // Preparation for Zoho-style Client Portal
+  
+  // ─── Financial & Billing Details ───
+  currency          String    @default("USD")
+  paymentTerms      String?   @default("Net 30") // Net 15, Net 30, Due on Receipt
+  taxId             String?   // VAT, GST, or EIN for invoicing
+  registrationNo    String?   // Company Registration Number
+  defaultHourlyRate Float?    // Default billing rate for projects under this client
+  creditLimit       Float?    // Optional credit limit
+  outstandingBalance Float?   @default(0.0) // Track unpaid invoices
+
+  // ─── Addresses ───
+  billingAddressLine1 String?
+  billingAddressLine2 String?
+  billingCity         String?
+  billingState        String?
+  billingZipCode      String?
+  billingCountry      String?
+  
+  shippingSameAsBilling Boolean @default(true)
+  shippingAddressLine1  String?
+  shippingCity          String?
+  shippingState         String?
+  shippingZipCode       String?
+  shippingCountry       String?
+  
+  // ─── Relations ───
+  companyId       Int
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  contacts        ClientContact[]
+  projects        Project[]
+  
+  @@unique([name, companyId])
+}
+
+model ClientContact {
+  id          Int      @id @default(autoincrement())
+  firstName   String
+  lastName    String?
+  email       String
+  phone       String?
+  mobile      String?
+  jobTitle    String?
+  
+  isPrimary   Boolean  @default(false) // Primary contact
+  isBilling   Boolean  @default(false) // Contact who receives the invoices
+  
+  clientId    Int
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([email, clientId])
 }

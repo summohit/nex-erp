@@ -26,6 +26,7 @@
     <button class="tab-btn" [class.active]="activeTab() === 'branches'" (click)="switchTab('branches')">Branches</button>
     <button class="tab-btn" [class.active]="activeTab() === 'leave-types'" (click)="switchTab('leave-types')">Leave Types</button>
     <button class="tab-btn" [class.active]="activeTab() === 'holidays'" (click)="switchTab('holidays')">Holidays</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'blackout-dates'" (click)="switchTab('blackout-dates')">Blackout Dates</button>
   </div>
 
   <div class="table-container">
@@ -136,6 +137,18 @@
         </div>
       </div>
     </div>
+
+    <!-- Blackout Dates -->
+    <ag-grid-angular
+      *ngIf="activeTab() === 'blackout-dates'"
+      class="ag-theme-quartz"
+      [theme]="'legacy'"
+      style="width: 100%; height: 500px;"
+      [rowData]="blackoutDates()"
+      [columnDefs]="blackoutColDefs"
+      [defaultColDef]="defaultColDef"
+      [gridOptions]="gridOptions">
+    </ag-grid-angular>
   </div>
 </div>
 
@@ -144,7 +157,7 @@
   <div class="modal-content slide-in">
     <div class="modal-header">
       <div class="header-titles">
-        <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : 'Holiday' }}</h2>
+        <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'holidays' ? 'Holiday' : 'Blackout Date' }}</h2>
         <p class="subtitle">Enter the details to keep your master data organized</p>
       </div>
       <button class="btn-icon close-btn" (click)="closeModal()">
@@ -154,7 +167,7 @@
     
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-group" [class.full-width]="activeTab() === 'departments'" *ngIf="activeTab() !== 'holidays'">
+        <div class="form-group" [class.full-width]="activeTab() === 'departments'" *ngIf="activeTab() !== 'holidays' && activeTab() !== 'blackout-dates'">
           <label>Name</label>
           <input type="text" class="form-control" [(ngModel)]="formData.name" placeholder="Enter name">
         </div>
@@ -192,6 +205,15 @@
         <div class="form-group" *ngIf="activeTab() === 'branches'">
           <label>End Time</label>
           <input type="time" class="form-control" [(ngModel)]="formData.endTime">
+        </div>
+        <div class="form-group" *ngIf="activeTab() === 'branches'">
+          <label>Geofence Radius (meters)</label>
+          <input type="number" class="form-control" [(ngModel)]="formData.geofenceRadius" placeholder="e.g. 500">
+        </div>
+        <div class="form-group full-width" *ngIf="activeTab() === 'branches'">
+          <label>Allowed IPs</label>
+          <input type="text" class="form-control" [(ngModel)]="formData.allowedIps" placeholder="e.g. 192.168.1.1, 203.0.113.5">
+          <p class="help-text">Comma-separated IP addresses allowed for clock-in (leave empty to allow all).</p>
         </div>
         <div class="form-group full-width" *ngIf="activeTab() === 'branches'">
           <label>Weekly Offs</label>
@@ -241,6 +263,20 @@
           <label>Carry Forward Limit (Max Days)</label>
           <input type="number" class="form-control" [(ngModel)]="formData.carryForwardLimit" min="0">
         </div>
+        
+        <div class="form-group full-width" *ngIf="activeTab() === 'leave-types'">
+          <label>Accrual Frequency</label>
+          <select class="form-control" [(ngModel)]="formData.accrualFrequency">
+            <option value="NONE">None</option>
+            <option value="MONTHLY">Monthly</option>
+            <option value="YEARLY">Yearly</option>
+          </select>
+        </div>
+        <div class="form-group full-width" *ngIf="activeTab() === 'leave-types' && formData.accrualFrequency !== 'NONE'">
+          <label>Accrual Amount</label>
+          <input type="number" class="form-control" [(ngModel)]="formData.accrualAmount" min="0" step="0.5">
+          <p class="help-text">Days to accrue every {{ formData.accrualFrequency === 'MONTHLY' ? 'month' : 'year' }}</p>
+        </div>
 
         <!-- Holidays -->
         <div class="form-group" *ngIf="activeTab() === 'holidays'">
@@ -250,6 +286,26 @@
         <div class="form-group" *ngIf="activeTab() === 'holidays'">
           <label>Date</label>
           <input type="date" class="form-control" [(ngModel)]="formData.date">
+        </div>
+
+        <!-- Blackout Dates -->
+        <div class="form-group" *ngIf="activeTab() === 'blackout-dates'">
+          <label>Reason</label>
+          <input type="text" class="form-control" [(ngModel)]="formData.reason" placeholder="e.g. Month End">
+        </div>
+        <div class="form-group" *ngIf="activeTab() === 'blackout-dates'">
+          <label>Date</label>
+          <input type="date" class="form-control" [(ngModel)]="formData.date">
+        </div>
+        <div class="form-group full-width" *ngIf="activeTab() === 'blackout-dates'">
+          <label>Department (Optional)</label>
+          <select class="form-control" [(ngModel)]="formData.departmentId">
+            <option [ngValue]="0">All Departments</option>
+            <option *ngFor="let dept of departments()" [ngValue]="dept.id">
+              {{ dept.name }}
+            </option>
+          </select>
+          <p class="help-text">If you select a department, this blackout date only applies to them.</p>
         </div>
       </div>
     </div>

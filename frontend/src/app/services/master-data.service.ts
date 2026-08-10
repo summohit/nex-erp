@@ -45,6 +45,15 @@ export interface Holiday {
   id: number;
   name: string;
   date: string;
+  companyId: number;
+}
+
+export interface BlackoutDate {
+  id: number;
+  date: string;
+  reason: string;
+  departmentId: number | null;
+  companyId: number;
 }
 
 @Injectable({
@@ -145,4 +154,15 @@ export class MasterDataService {
   deleteHoliday(id: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/holidays/${id}`);
   }
+
+  getShiftRotations(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/shift-rotations`); }
+  createShiftRotation(data: any) { return this.http.post(`${this.apiUrl}/shift-rotations`, data); }
+  updateShiftRotation(id: number, data: any) { return this.http.put(`${this.apiUrl}/shift-rotations/${id}`, data); }
+  deleteShiftRotation(id: number) { return this.http.delete(`${this.apiUrl}/shift-rotations/${id}`); }
+
+  // Blackout Dates
+  getBlackoutDates(): Observable<BlackoutDate[]> { return this.http.get<BlackoutDate[]>(`${this.apiUrl}/blackout-dates`); }
+  createBlackoutDate(data: any) { return this.http.post(`${this.apiUrl}/blackout-dates`, data); }
+  updateBlackoutDate(id: number, data: any) { return this.http.put(`${this.apiUrl}/blackout-dates/${id}`, data); }
+  deleteBlackoutDate(id: number) { return this.http.delete(`${this.apiUrl}/blackout-dates/${id}`); }
 }

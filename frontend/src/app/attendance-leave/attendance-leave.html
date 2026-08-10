@@ -8,10 +8,10 @@
 
   <div class="tabs-wrapper">
     <div class="tabs-nav">
-      <button 
+      <button class="nav-tab"
         [class.active]="activeTab() === 'attendance'" 
-        (click)="setTab('attendance')">
-        Attendance View
+        (click)="setTab('timesheets')">
+        Timesheets
       </button>
         <button class="nav-tab" [class.active]="activeTab() === 'leaves'" (click)="setTab('leaves')">
           My Leaves
@@ -23,7 +23,10 @@
           Manage Balances
         </button>
         <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'shifts'" (click)="setTab('shifts')">
-          Shift Roster
+          Shifts & Rotations
+        </button>
+        <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'timeline'" (click)="setTab('timeline')">
+          Team Timeline
         </button>
         <button class="nav-tab" [class.active]="activeTab() === 'holidays'" (click)="setTab('holidays')">
           Holidays
@@ -224,6 +227,26 @@
           </ag-grid-angular>
         </div>
       </div>
+      
+      <!-- My Regularizations -->
+      <div class="widget-card mt-4">
+        <div class="widget-header">
+          <h3>My Regularizations</h3>
+          <button class="btn btn-outline" (click)="openRegularizationModal()" style="height: 32px; font-size: 13px;">Request</button>
+        </div>
+        <div class="table-container mt-4">
+          <ag-grid-angular
+            class="ag-theme-quartz"
+            [theme]="'legacy'"
+            style="width: 100%; height: 250px;"
+            [rowData]="myRegularizations()"
+            [columnDefs]="regularizationColDefs"
+            [defaultColDef]="defaultColDef"
+            [gridOptions]="gridOptions">
+          </ag-grid-angular>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -340,6 +363,22 @@
         </div>
       </div>
 
+      <div class="form-group mb-4" *ngIf="requestForm.startDate && requestForm.endDate && requestForm.startDate === requestForm.endDate">
+        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer;">
+          <input type="checkbox" [(ngModel)]="requestForm.isHalfDay" style="width: 16px; height: 16px; cursor: pointer;">
+          Apply as Half-Day
+        </label>
+        
+        <div *ngIf="requestForm.isHalfDay" style="margin-top: 12px; display: flex; gap: 16px;">
+          <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; font-size: 14px;">
+            <input type="radio" name="halfDayPeriod" value="AM" [(ngModel)]="requestForm.halfDayPeriod"> Morning (AM)
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; font-size: 14px;">
+            <input type="radio" name="halfDayPeriod" value="PM" [(ngModel)]="requestForm.halfDayPeriod"> Afternoon (PM)
+          </label>
+        </div>
+      </div>
+
       <div class="form-group mb-4">
         <label>Reason (Optional)</label>
         <textarea class="form-control" [(ngModel)]="requestForm.reason" rows="3" placeholder="Additional details..."></textarea>
@@ -374,7 +413,7 @@
 
     <div class="drawer-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
       <button class="btn btn-outline" (click)="closeRequestModal()" style="width: max-content;">Cancel</button>
-      <button class="btn btn-primary" (click)="submitLeaveRequest()" [disabled]="isSubmittingRequest() || myBalances().length === 0" style="width: max-content; display: flex; align-items: center; gap: 8px;">
+      <button class="btn btn-primary" (click)="saveLeaveRequest()" [disabled]="isSubmittingRequest() || myBalances().length === 0" style="width: max-content; display: flex; align-items: center; gap: 8px;">
         <span *ngIf="isSubmittingRequest()" class="btn-spinner"></span>
         {{ isSubmittingRequest() ? 'Submitting...' : 'Submit Request' }}
       </button>
@@ -401,6 +440,25 @@
           [rowClassRules]="rowClassRules"
           [gridOptions]="gridOptions"
           (cellClicked)="onCellClicked($event)">
+        </ag-grid-angular>
+      </div>
+    </div>
+    
+    <div class="widget-card mt-4">
+      <div class="widget-header">
+        <h3>Pending Regularizations</h3>
+      </div>
+      <div class="table-container mt-4">
+        <ag-grid-angular
+          class="ag-theme-quartz"
+          [theme]="'legacy'"
+          style="width: 100%; height: 350px;"
+          [rowData]="pendingRegularizations()"
+          [columnDefs]="hrRegularizationColDefs"
+          [defaultColDef]="defaultColDef"
+          [rowHeight]="64"
+          [headerHeight]="48"
+          [gridOptions]="gridOptions">
         </ag-grid-angular>
       </div>
     </div>
@@ -519,7 +577,6 @@
       </div>
 
     </div>
-  </div>
 
   <!-- SHIFT ROSTER TAB -->
   <div class="tab-content" *ngIf="activeTab() === 'shifts' && isAdmin()">
@@ -544,6 +601,61 @@
           [rowHeight]="50"
           [headerHeight]="48">
         </ag-grid-angular>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEAM TIMELINE TAB -->
+  <div class="tab-content" *ngIf="activeTab() === 'timeline'">
+    <div class="widget-card logs-widget full-width-grid" style="overflow-x: auto; padding: 16px;">
+      <div class="widget-header grid-header" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <h3 class="widget-title">Team Timeline</h3>
+        <div class="period-selectors" style="display: flex; gap: 8px;">
+           <input type="date" class="search-input" style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; font-weight: normal; background: #fff;" [ngModel]="timelineStartDate()" (ngModelChange)="timelineStartDate.set($event); loadTeamTimeline()">
+           <input type="date" class="search-input" style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; font-weight: normal; background: #fff;" [ngModel]="timelineEndDate()" (ngModelChange)="timelineEndDate.set($event); loadTeamTimeline()">
+        </div>
+      </div>
+
+      <div class="timeline-container">
+        <div class="timeline-grid">
+          <div class="timeline-header">
+            <div class="timeline-employee-col" style="font-weight: 600; color: #64748b; font-size: 13px;">Employee</div>
+            <div class="timeline-days">
+              <div class="timeline-day-header" *ngFor="let day of timelineDays()" [class.weekend]="day.isWeekend">
+                <span class="day-num">{{ day.date | date:'dd' }}</span>
+                <span class="day-name">{{ day.date | date:'EEE' }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="timeline-body">
+            <div class="timeline-row" *ngFor="let emp of timelineEmployees()">
+              <div class="timeline-employee-col">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div class="emp-avatar-circle" style="width: 32px; height: 32px; font-size: 12px; background: #f1f5f9; color: #1e293b; border: 1px solid #e2e8f0;">
+                    {{ emp.firstName?.charAt(0) }}{{ emp.lastName?.charAt(0) || '' }}
+                  </div>
+                  <div>
+                    <div class="emp-name">{{ emp.firstName }} {{ emp.lastName }}</div>
+                    <div class="emp-dept">{{ emp.department?.name || 'General' }}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="timeline-days">
+                <div class="timeline-cell cursor-pointer hover:bg-gray-100 transition-colors" 
+                     *ngFor="let day of timelineDays()" 
+                     [class.weekend]="day.isWeekend"
+                     (click)="openRescheduleModal(emp, day.date, getTimelineStatus(emp, day.date))">
+                  <ng-container *ngIf="getTimelineStatus(emp, day.date) as status">
+                    <div class="timeline-status-block {{status.type}}" [title]="status.label"></div>
+                  </ng-container>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="timelineEmployees().length === 0" style="padding: 32px; text-align: center; color: #64748b;">
+              No timeline data available for the selected period.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -883,3 +995,77 @@
     </div>
   </div>
 
+  <!-- Regularization Modal -->
+  <div class="drawer-overlay" *ngIf="isRegularizationModalOpen()" (click)="closeRegularizationModal()">
+    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 500px;">
+      <div class="drawer-header">
+        <h2>Request Regularization</h2>
+        <button class="btn-icon" (click)="closeRegularizationModal()">
+          <svg lucideX size="20"></svg>
+        </button>
+      </div>
+      <div class="drawer-body">
+        <div class="form-group mb-4">
+          <label>Date <span style="color: #E14B42;">*</span></label>
+          <input type="date" class="form-control" [(ngModel)]="regularizationForm.date" [style.border-color]="showFormErrors() && !regularizationForm.date ? '#E14B42' : ''">
+        </div>
+        <div class="grid-2-col mb-4">
+          <div class="form-group">
+            <label>Proposed Clock In</label>
+            <input type="time" class="form-control" [(ngModel)]="regularizationForm.proposedClockIn">
+          </div>
+          <div class="form-group">
+            <label>Proposed Clock Out</label>
+            <input type="time" class="form-control" [(ngModel)]="regularizationForm.proposedClockOut">
+          </div>
+        </div>
+        <div class="form-group mb-4">
+          <label>Reason <span style="color: #E14B42;">*</span></label>
+          <textarea class="form-control" [(ngModel)]="regularizationForm.reason" rows="3" placeholder="Why are you regularizing?" [style.border-color]="showFormErrors() && !regularizationForm.reason ? '#E14B42' : ''"></textarea>
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn btn-primary" (click)="submitRegularization()" [disabled]="isSubmittingRequest()" style="width: 100%;">
+          {{ isSubmittingRequest() ? 'Submitting...' : 'Submit Request' }}
+        </button>
+        <button class="btn btn-outline" (click)="closeRegularizationModal()" style="width: 100%; margin-top: 8px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline Reschedule Modal -->
+  <div class="drawer-overlay" *ngIf="showTimelineRescheduleModal()" (click)="closeRescheduleModal()">
+    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 500px;">
+      <div class="drawer-header">
+        <h2>Reschedule Timeline / Override</h2>
+        <button class="btn-icon" (click)="closeRescheduleModal()">
+          <svg lucideX size="20"></svg>
+        </button>
+      </div>
+      <div class="drawer-body">
+        <div style="margin-bottom: 16px; font-weight: 500;">
+          {{ selectedTimelineEmp()?.firstName }} {{ selectedTimelineEmp()?.lastName }} - {{ selectedTimelineDate() | date:'mediumDate' }}
+        </div>
+        <div class="form-group mb-4">
+          <label>Override Status</label>
+          <select class="form-control" [(ngModel)]="rescheduleForm.status">
+            <option value="PRESENT">Present</option>
+            <option value="ABSENT">Absent</option>
+            <option value="HALFDAY">Half Day</option>
+            <option value="ON_LEAVE">On Leave</option>
+            <option value="WEEKEND">Weekend / Off</option>
+          </select>
+        </div>
+        <div class="form-group mb-4">
+          <label>Reason / Note</label>
+          <textarea class="form-control" [(ngModel)]="rescheduleForm.note" rows="2" placeholder="Reason for schedule change..."></textarea>
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn btn-primary" (click)="submitReschedule()" style="width: 100%;">
+          Apply Change
+        </button>
+        <button class="btn btn-outline" (click)="closeRescheduleModal()" style="width: 100%; margin-top: 8px;">Cancel</button>
+      </div>
+    </div>
+  </div>

@@ -67,7 +67,13 @@ export class ProjectsComponent implements OnInit {
   projectForm = {
     name: '',
     visibility: 'Workspace',
-    description: ''
+    description: '',
+    startDate: '',
+    endDate: '',
+    billingType: 'NON_BILLABLE',
+    budgetAmount: null as number | null,
+    hourlyRate: null as number | null,
+    clientId: null as number | null
   };
 
   gradients = [
@@ -196,7 +202,17 @@ export class ProjectsComponent implements OnInit {
 
   openCreateModal() {
     this.editingProjectId.set(null);
-    this.projectForm = { name: '', visibility: 'Workspace', description: '' };
+    this.projectForm = { 
+      name: '', 
+      visibility: 'Workspace', 
+      description: '',
+      startDate: '',
+      endDate: '',
+      billingType: 'NON_BILLABLE',
+      budgetAmount: null as number | null,
+      hourlyRate: null as number | null,
+      clientId: null as number | null
+    };
     this.selectedBg.set(this.colorBackgrounds[1]);
     this.isSubmitted.set(false);
     this.isCreateModalOpen.set(true);
@@ -208,7 +224,13 @@ export class ProjectsComponent implements OnInit {
     this.projectForm = { 
       name: project.name, 
       visibility: 'Workspace', 
-      description: project.description || '' 
+      description: project.description || '',
+      startDate: project.startDate ? project.startDate.split('T')[0] : '',
+      endDate: project.endDate ? project.endDate.split('T')[0] : '',
+      billingType: project.billingType || 'NON_BILLABLE',
+      budgetAmount: project.budgetAmount,
+      hourlyRate: project.hourlyRate,
+      clientId: project.clientId
     };
     
     // Set the selected background (match it or use gradient as fallback)
@@ -237,7 +259,13 @@ export class ProjectsComponent implements OnInit {
     const payload = {
       name: this.projectForm.name.trim(),
       description: this.projectForm.description,
-      color: bgValue
+      color: bgValue,
+      startDate: this.projectForm.startDate || null,
+      endDate: this.projectForm.endDate || null,
+      billingType: this.projectForm.billingType,
+      budgetAmount: this.projectForm.budgetAmount || null,
+      hourlyRate: this.projectForm.hourlyRate || null,
+      clientId: this.projectForm.clientId || null
     };
 
     if (this.editingProjectId()) {

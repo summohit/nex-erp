@@ -143,6 +143,7 @@ export class EmployeesService {
     const updateData: any = {};
     if (data.firstName) updateData.firstName = data.firstName;
     if (data.lastName) updateData.lastName = data.lastName;
+    if (data.nextAppraisalDate !== undefined) updateData.nextAppraisalDate = data.nextAppraisalDate ? new Date(data.nextAppraisalDate) : null;
     if (data.phone) {
       const phoneRegex = /^\+?[0-9]{10,15}$/;
       if (!phoneRegex.test(data.phone)) {
@@ -210,8 +211,12 @@ export class EmployeesService {
         user: { select: { email: true, role: true, id: true } },
         department: { select: { name: true } },
         designation: { select: { name: true } },
+        branch: { select: { name: true } },
+        manager: { select: { firstName: true, lastName: true, id: true } },
         emergencyContacts: true,
-        documents: true
+        documents: true,
+        skills: true,
+        resumeLines: true
       }
     });
     if (!employee) throw new NotFoundException('Employee profile not found');
@@ -230,7 +235,9 @@ export class EmployeesService {
         manager: { select: { firstName: true, lastName: true, id: true } },
         shift: { select: { name: true, startTime: true, endTime: true } },
         emergencyContacts: true,
-        documents: true
+        documents: true,
+        skills: true,
+        resumeLines: true
       }
     });
     if (!employee) throw new NotFoundException('Employee not found');
@@ -298,7 +305,66 @@ export class EmployeesService {
         maritalStatus: data.maritalStatus,
         address: data.address,
         about: data.about,
-        avatarUrl: data.avatarUrl
+        avatarUrl: data.avatarUrl,
+        managerId: data.managerId || null,
+        branchId: data.branchId || null,
+        departmentId: data.departmentId || null,
+        designationId: data.designationId || null,
+        
+        usualWorkLocation: data.usualWorkLocation ? data.usualWorkLocation : null,
+        workNotes: data.workNotes || null,
+
+        // Bank Details
+        bankName: data.bankName || null,
+        bankAccountNumber: data.bankAccountNumber || null,
+        ifscCode: data.ifscCode || null,
+
+        // Place of Birth
+        placeOfBirthCity: data.placeOfBirthCity || null,
+        placeOfBirthCountry: data.placeOfBirthCountry || null,
+
+        // Citizenship & Identification
+        nationality: data.nationality || null,
+        identificationNo: data.identificationNo || null,
+        passportNo: data.passportNo || null,
+
+        // Visa & Permit
+        visaNo: data.visaNo || null,
+        workPermitNo: data.workPermitNo || null,
+
+        // Location & Distance
+        zipCode: data.zipCode || null,
+        homeWorkDistanceKm: data.homeWorkDistanceKm ? Number(data.homeWorkDistanceKm) : null,
+
+        // Family Details
+        spouseName: data.spouseName || null,
+        spouseBirthdate: data.spouseBirthdate ? new Date(data.spouseBirthdate) : null,
+        childrenCount: data.childrenCount !== null && data.childrenCount !== undefined ? Number(data.childrenCount) : null,
+
+        // Education
+        educationLevel: data.educationLevel || null,
+        fieldOfStudy: data.fieldOfStudy || null,
+
+        skills: data.skills ? {
+          deleteMany: {},
+          create: data.skills.map(s => ({
+            category: s.category,
+            name: s.name,
+            level: s.level
+          }))
+        } : undefined,
+        resumeLines: data.resumeLines ? {
+          deleteMany: {},
+          create: data.resumeLines.map(r => ({
+            type: r.type,
+            title: r.title,
+            organization: r.organization,
+            startDate: r.startDate,
+            endDate: r.endDate,
+            description: r.description,
+            attachmentUrl: r.attachmentUrl
+          }))
+        } : undefined
       }
     });
   }
@@ -344,9 +410,10 @@ export class EmployeesService {
 
     return this.prisma.employeeDocument.create({
       data: {
-        employeeId: id,
+        employeeId: employee.id,
         fileName: data.fileName,
-        fileUrl: data.fileUrl
+        fileUrl: data.fileUrl,
+        documentType: data.documentType || 'Other'
       }
     });
   }

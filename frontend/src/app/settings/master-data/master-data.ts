@@ -11,7 +11,14 @@ import { StatusToggleRendererComponent } from '../../shared/components/status-to
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'holidays';
+type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'holidays' | 'blackout-dates';
+
+export interface BlackoutDate {
+  id: number;
+  reason: string;
+  date: string;
+  departmentId?: number | null;
+}
 
 @Component({
   selector: 'app-master-data',
@@ -31,6 +38,7 @@ export class MasterDataComponent implements OnInit {
   branches = signal<Branch[]>([]);
   leaveTypes = signal<LeaveType[]>([]);
   holidays = signal<Holiday[]>([]);
+  blackoutDates = signal<BlackoutDate[]>([]);
 
   holidayView = signal<'table' | 'calendar'>('table');
   calendarDate = signal(new Date());
@@ -117,16 +125,18 @@ export class MasterDataComponent implements OnInit {
   };
 
   gridOptions = {
-    rowSelection: 'multiple' as const,
-    suppressRowClickSelection: true
+    rowSelection: {
+      mode: 'multiRow' as const,
+      checkboxes: true,
+      headerCheckbox: true,
+      enableClickSelection: false
+    }
   };
 
   deptColDefs: ColDef[] = [
     { 
       field: 'name', 
       headerName: 'Name', 
-      headerCheckboxSelection: true, 
-      checkboxSelection: true,
       minWidth: 200
     },
     {
@@ -156,8 +166,6 @@ export class MasterDataComponent implements OnInit {
     { 
       field: 'name', 
       headerName: 'Name',
-      headerCheckboxSelection: true, 
-      checkboxSelection: true,
       minWidth: 200
     },
     { 
@@ -189,7 +197,7 @@ export class MasterDataComponent implements OnInit {
   ];
 
   branchColDefs: ColDef[] = [
-    { field: 'name', headerName: 'Name', headerCheckboxSelection: true, checkboxSelection: true },
+    { field: 'name', headerName: 'Name' },
     { field: 'address', headerName: 'Address' },
     { field: 'startTime', headerName: 'Start Time' },
     { field: 'endTime', headerName: 'End Time' },
@@ -220,7 +228,7 @@ export class MasterDataComponent implements OnInit {
   ];
 
   leaveTypeColDefs: ColDef[] = [
-    { field: 'name', headerName: 'Name', headerCheckboxSelection: true, checkboxSelection: true },
+    { field: 'name', headerName: 'Name' },
     { field: 'defaultDays', headerName: 'Default Days' },
     { 
       field: 'isPaid', 
@@ -240,6 +248,8 @@ export class MasterDataComponent implements OnInit {
         onToggle: (data: any, isActive: boolean) => this.onLeaveTypeToggle(data, 'carryForward', isActive)
       }
     },
+    { field: 'accrualFrequency', headerName: 'Accrual Frequency' },
+    { field: 'accrualAmount', headerName: 'Accrual Amount' },
     { 
       headerName: 'Actions', width: 120, flex: 0, sortable: false, filter: false,
       cellRenderer: ActionCellRendererComponent,
@@ -251,8 +261,22 @@ export class MasterDataComponent implements OnInit {
   ];
 
   holidayColDefs: ColDef[] = [
-    { field: 'name', headerName: 'Holiday Name', headerCheckboxSelection: true, checkboxSelection: true },
+    { field: 'name', headerName: 'Holiday Name' },
     { field: 'date', headerName: 'Date', valueFormatter: (p) => new Date(p.value).toLocaleDateString() },
+    { 
+      headerName: 'Actions', width: 120, flex: 0, sortable: false, filter: false,
+      cellRenderer: ActionCellRendererComponent,
+      cellRendererParams: {
+        onEdit: (data: any) => this.openModal('edit', data),
+        onDelete: (data: any) => this.deleteItem(data.id)
+      }
+    }
+  ];
+
+  blackoutColDefs: ColDef[] = [
+    { field: 'reason', headerName: 'Reason' },
+    { field: 'date', headerName: 'Date', valueFormatter: (p) => new Date(p.value).toLocaleDateString() },
+    { field: 'departmentId', headerName: 'Department', valueFormatter: (p) => p.value ? (this.departments().find(d => d.id === p.value)?.name ?? 'Unknown') : 'All Departments' },
     { 
       headerName: 'Actions', width: 120, flex: 0, sortable: false, filter: false,
       cellRenderer: ActionCellRendererComponent,
@@ -277,7 +301,9 @@ export class MasterDataComponent implements OnInit {
     departmentId: 0,
     canEditProfiles: false,
     address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0',
+    geofenceRadius: 500, allowedIps: '',
     defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
+    accrualFrequency: 'NONE', accrualAmount: 0,
     date: ''
   };
 
@@ -327,6 +353,7 @@ export class MasterDataComponent implements OnInit {
     this.masterDataService.getBranches().subscribe({ next: (data) => this.branches.set(data) });
     this.masterDataService.getLeaveTypes().subscribe({ next: (data) => this.leaveTypes.set(data) });
     this.masterDataService.getHolidays().subscribe({ next: (data) => this.holidays.set(data) });
+    this.masterDataService.getBlackoutDates().subscribe({ next: (data) => this.blackoutDates.set(data) });
   }
 
   switchTab(tab: Tab) {
@@ -350,10 +377,13 @@ export class MasterDataComponent implements OnInit {
         }
       }
     } else {
-      this.formData = { 
+      this.formData = {
         id: 0, name: '', departmentId: 0, canEditProfiles: false,
-        address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0', latitude: null, longitude: null,
-        defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0, date: ''
+        address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0',
+        geofenceRadius: 500, allowedIps: '',
+        defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
+        accrualFrequency: 'NONE', accrualAmount: 0,
+        date: ''
       };
       if (this.activeTab() === 'branches') {
         this.weeklyOffConditions = { '0': 'all' }; // Default Sunday off
@@ -406,6 +436,9 @@ export class MasterDataComponent implements OnInit {
     } else if (tab === 'holidays') {
       if (mode === 'create') this.masterDataService.createHoliday(this.formData).subscribe({ next: () => onSuccess('Holiday created'), error: () => onError('Error') });
       else this.masterDataService.updateHoliday(id, this.formData).subscribe({ next: () => onSuccess('Holiday updated'), error: () => onError('Error') });
+    } else if (tab === 'blackout-dates') {
+      if (mode === 'create') this.masterDataService.createBlackoutDate(this.formData).subscribe({ next: () => onSuccess('Blackout date created'), error: () => onError('Error') });
+      else this.masterDataService.updateBlackoutDate(id, this.formData).subscribe({ next: () => onSuccess('Blackout date updated'), error: () => onError('Error') });
     }
   }
 
@@ -420,6 +453,7 @@ export class MasterDataComponent implements OnInit {
     else if (tab === 'branches') deleteSub = this.masterDataService.deleteBranch(id);
     else if (tab === 'leave-types') deleteSub = this.masterDataService.deleteLeaveType(id);
     else if (tab === 'holidays') deleteSub = this.masterDataService.deleteHoliday(id);
+    else if (tab === 'blackout-dates') deleteSub = this.masterDataService.deleteBlackoutDate(id);
 
     deleteSub.subscribe({
       next: () => {

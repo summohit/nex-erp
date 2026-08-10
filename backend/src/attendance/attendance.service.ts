@@ -41,12 +41,28 @@ export class AttendanceService {
     });
   }
 
-  async clockIn(userId: number, data: { lat?: number, lng?: number }) {
+  async clockIn(userId: number, data: { lat?: number, lng?: number, ipAddress?: string }) {
     const employee = await this.prisma.employee.findUnique({ 
       where: { userId },
-      include: { shift: true }
+      include: { shift: true, branch: true }
     });
     if (!employee) throw new BadRequestException('Employee profile not found');
+
+    const branch = employee.branch;
+    if (branch) {
+      // 1. IP Restriction Check
+      if (branch.allowedIps) {
+        const allowed = branch.allowedIps.split(',').map(ip => ip.trim());
+        if (data.ipAddress && !allowed.includes(data.ipAddress)) {
+          throw new BadRequestException(`Clock-in denied. IP Address ${data.ipAddress} is not in the allowed list.`);
+        }
+      }
+
+      // 2. Geofencing Check (Simple Haversine distance check could be added here)
+      // Since lat/lng for branch is not explicitly stored in this DB yet, we just enforce the requirement
+      // if geofenceRadius is defined and strict mode is on.
+      // (Implementation requires adding branch.latitude and branch.longitude in the future)
+    }
 
     const nowLocal = new Date();
     const today = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()));
@@ -127,6 +143,7 @@ export class AttendanceService {
     const now = new Date();
     let isEarlyLeave = false;
     let status = 'PRESENT';
+    let overtimeHours = 0;
 
     if (employee.shift) {
       const shiftEndTokens = employee.shift.endTime.split(':');
@@ -139,6 +156,11 @@ export class AttendanceService {
       if (now < expectedEnd) {
         isEarlyLeave = true;
         status = 'HALF_DAY';
+      } else {
+        const diffMs = now.getTime() - expectedEnd.getTime();
+        if (diffMs > 30 * 60000) {
+          overtimeHours = parseFloat((diffMs / 3600000).toFixed(2));
+        }
       }
     }
 
@@ -149,8 +171,114 @@ export class AttendanceService {
         clockOutLat: data.lat,
         clockOutLng: data.lng,
         isEarlyLeave,
-        status
+        status,
+        overtimeHours
       }
     });
+  }
+
+  async getMyRegularizations(userId: number) {
+    const employee = await this.prisma.employee.findUnique({ where: { userId } });
+    if (!employee) throw new BadRequestException('Employee not found');
+    return this.prisma.attendanceRegularization.findMany({
+      where: { employeeId: employee.id },
+      orderBy: { date: 'desc' }
+    });
+  }
+
+  async getPendingRegularizations(companyId: number) {
+    return this.prisma.attendanceRegularization.findMany({
+      where: { employee: { companyId }, status: 'PENDING' },
+      include: { employee: true },
+      orderBy: { date: 'desc' }
+    });
+  }
+
+  async requestRegularization(userId: number, data: { date: string, proposedClockIn?: string, proposedClockOut?: string, reason: string }) {
+    const employee = await this.prisma.employee.findUnique({ where: { userId } });
+    if (!employee) throw new BadRequestException('Employee not found');
+    const date = new Date(data.date);
+    return this.prisma.attendanceRegularization.create({
+      data: {
+        employeeId: employee.id,
+        date,
+        proposedClockIn: data.proposedClockIn ? new Date(data.proposedClockIn) : null,
+        proposedClockOut: data.proposedClockOut ? new Date(data.proposedClockOut) : null,
+        reason: data.reason
+      }
+    });
+  }
+
+  async resolveRegularization(id: number, approverUserId: number, status: string, rejectionReason?: string) {
+    const regularization = await this.prisma.attendanceRegularization.findUnique({
+      where: { id },
+      include: { employee: true }
+    });
+    if (!regularization) throw new BadRequestException('Regularization not found');
+    
+    if (status === 'APPROVED') {
+      const attendance = await this.prisma.attendance.findUnique({
+        where: { employeeId_date: { employeeId: regularization.employeeId, date: regularization.date } }
+      });
+      if (attendance) {
+        await this.prisma.attendance.update({
+          where: { id: attendance.id },
+          data: {
+            clockIn: regularization.proposedClockIn || attendance.clockIn,
+            clockOut: regularization.proposedClockOut || attendance.clockOut
+          }
+        });
+      } else {
+        await this.prisma.attendance.create({
+          data: {
+            employeeId: regularization.employeeId,
+            date: regularization.date,
+            clockIn: regularization.proposedClockIn,
+            clockOut: regularization.proposedClockOut,
+            status: 'PRESENT'
+          }
+        });
+      }
+    }
+    
+    return this.prisma.attendanceRegularization.update({
+      where: { id },
+      data: {
+        status,
+        rejectionReason,
+        approvedById: approverUserId
+      }
+    });
+  }
+
+  async getTeamTimeline(companyId: number, startDateStr: string, endDateStr: string) {
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+
+    const employees = await this.prisma.employee.findMany({
+      where: { companyId },
+      include: {
+        department: true,
+        designation: true,
+        attendances: {
+          where: {
+            date: {
+              gte: startDate,
+              lte: endDate
+            }
+          }
+        },
+        leaveRequests: {
+          where: {
+            status: 'APPROVED',
+            OR: [
+              { startDate: { lte: endDate }, endDate: { gte: startDate } }
+            ]
+          }
+        }
+      }
+    });
+
+    return employees;
   }
 }

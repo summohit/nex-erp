@@ -345,6 +345,7 @@ export class PayrollComponent implements OnInit {
     {
       field: 'employee',
       headerName: 'Employee',
+      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : (p.data?.isSummaryRow ? 'TOTAL' : ''),
       minWidth: 200,
       flex: 1.6,
       pinned: 'left',
@@ -455,6 +456,7 @@ export class PayrollComponent implements OnInit {
     {
       field: 'employee',
       headerName: 'Employee',
+      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : (p.data?.isSummaryRow ? 'TOTAL' : ''),
       minWidth: 200,
       flex: 1.5,
       pinned: 'left',

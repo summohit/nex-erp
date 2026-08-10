@@ -113,8 +113,12 @@ export class JobPostingsComponent implements OnInit {
   };
 
   gridOptions = {
-    rowSelection: 'multiple' as const,
-    suppressRowClickSelection: true,
+    rowSelection: {
+      mode: 'multiRow' as const,
+      checkboxes: true,
+      headerCheckbox: true,
+      enableClickSelection: false
+    },
     pagination: true,
     paginationPageSize: 10,
     paginationPageSizeSelector: [10, 25, 50, 100]
@@ -124,8 +128,6 @@ export class JobPostingsComponent implements OnInit {
     { 
       headerName: 'Job Title', 
       field: 'title',
-      headerCheckboxSelection: true, 
-      checkboxSelection: true,
       minWidth: 220,
       flex: 1.5,
       pinned: 'left',

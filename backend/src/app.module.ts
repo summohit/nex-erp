@@ -24,9 +24,13 @@ import { CompanySeederModule } from './company-seeder/company-seeder.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { EventsModule } from './events/events.module';
 import { MenusModule } from './menus/menus.module';
+import { PerformanceModule } from './performance/performance.module';
+import { OffboardingModule } from './offboarding/offboarding.module';
+import { KioskModule } from './kiosk/kiosk.module';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule],
+  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -98,6 +98,10 @@ export class PermissionsComponent implements OnInit {
       ]
     },
     {
+      id: 'clients', title: 'Clients', isExpanded: true, enabled: false,
+      subItems: []
+    },
+    {
       id: 'settings', title: 'Settings', isExpanded: true, enabled: false,
       subItems: [
         { id: 'settings/company', title: 'Company Profile', enabled: false },

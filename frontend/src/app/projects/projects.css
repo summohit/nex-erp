@@ -734,3 +734,12 @@
     transform: translateX(100%);
   }
 }
+
+.form-section.row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.form-section .col {
+  flex: 1;
+}

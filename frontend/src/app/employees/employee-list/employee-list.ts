@@ -114,16 +114,18 @@ export class EmployeeListComponent implements OnInit {
   };
 
   gridOptions = {
-    rowSelection: 'multiple' as const,
-    suppressRowClickSelection: true
+    rowSelection: {
+      mode: 'multiRow' as const,
+      checkboxes: true,
+      headerCheckbox: true,
+      enableClickSelection: false
+    }
   };
 
   colDefs: ColDef[] = [
     { 
       headerName: 'Employee Name',
       field: 'firstName',
-      headerCheckboxSelection: true, 
-      checkboxSelection: true,
       minWidth: 260,
       flex: 1.5,
       cellRenderer: (params: any) => {

@@ -25,7 +25,7 @@ export class LeavesController {
   }
 
   @Post('request')
-  requestLeave(@Request() req, @Body() data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string }) {
+  requestLeave(@Request() req, @Body() data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
     return this.leavesService.requestLeave(req.user.sub, data);
   }
 
@@ -40,7 +40,7 @@ export class LeavesController {
   }
 
   @Put('requests/:id')
-  updateRequest(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string }) {
+  updateRequest(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
     return this.leavesService.updateRequest(req.user.sub, id, data);
   }
 

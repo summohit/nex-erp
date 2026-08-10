@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Patch, Body, Req, UseGuards, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Patch, Body, Req, UseGuards, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -8,8 +8,13 @@ export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
-  createProject(@Req() req, @Body() data: { name: string, description?: string, color?: string, icon?: string }) {
+  createProject(@Req() req, @Body() data: any) {
     return this.projectsService.createProject(req.user.companyId, req.user.sub, data);
+  }
+
+  @Get('timesheets/my-week')
+  getMyTimesheets(@Req() req, @Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+    return this.projectsService.getMyTimesheets(req.user.companyId, req.user.sub, startDate, endDate);
   }
 
   @Get()

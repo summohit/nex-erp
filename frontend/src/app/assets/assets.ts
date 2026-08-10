@@ -305,6 +305,7 @@ export class AssetsComponent implements OnInit {
     {
       headerName: 'Assigned Employee',
       field: 'employee',
+      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
       flex: 1.4,
       minWidth: 200,
       cellRenderer: (params: any) => {
@@ -400,6 +401,7 @@ export class AssetsComponent implements OnInit {
     {
       headerName: 'Requested By',
       field: 'employee',
+      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
       flex: 1.4,
       cellRenderer: (params: any) => {
         const emp = params.data?.employee;

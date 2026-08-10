@@ -5,9 +5,9 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
-  async createProject(companyId: number, leadId: number, data: { name: string, description?: string, color?: string, icon?: string }) {
+  async createProject(companyId: number, leadId: number, data: any) {
     // Generate base key from name
-    const words = data.name.split(' ').filter(w => w.length > 0);
+    const words = data.name.split(' ').filter((w: string) => w.length > 0);
     let baseKey = '';
     if (words.length >= 2) {
       baseKey = (words[0].substring(0, 2) + words[1][0]).toUpperCase();
@@ -35,6 +35,12 @@ export class ProjectsService {
         description: data.description,
         color: data.color || '#2563eb',
         icon: data.icon || 'folder',
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        billingType: data.billingType || 'NON_BILLABLE',
+        budgetAmount: data.budgetAmount ? parseFloat(data.budgetAmount) : null,
+        hourlyRate: data.hourlyRate ? parseFloat(data.hourlyRate) : null,
+        clientId: data.clientId ? parseInt(data.clientId, 10) : null,
         companyId,
         leadId,
         members: {
@@ -445,6 +451,13 @@ export class ProjectsService {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.color !== undefined) updateData.color = data.color;
+    if (data.icon !== undefined) updateData.icon = data.icon;
+    if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;
+    if (data.endDate !== undefined) updateData.endDate = data.endDate ? new Date(data.endDate) : null;
+    if (data.billingType !== undefined) updateData.billingType = data.billingType;
+    if (data.budgetAmount !== undefined) updateData.budgetAmount = data.budgetAmount ? parseFloat(data.budgetAmount) : null;
+    if (data.hourlyRate !== undefined) updateData.hourlyRate = data.hourlyRate ? parseFloat(data.hourlyRate) : null;
+    if (data.clientId !== undefined) updateData.clientId = data.clientId ? parseInt(data.clientId, 10) : null;
 
     return this.prisma.project.update({
       where: { id },
@@ -489,5 +502,50 @@ export class ProjectsService {
       where: { id: projectId },
       data: { status: 'ACTIVE' }
     });
+  }
+
+  async getMyTimesheets(companyId: number, employeeUserId: number, startDateStr: string, endDateStr: string) {
+    const employee = await this.prisma.employee.findUnique({ where: { userId: employeeUserId, companyId } });
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+    endDate.setHours(23, 59, 59, 999);
+
+    const timeLogs = await this.prisma.issueTimeLog.findMany({
+      where: {
+        employeeId: employee.id,
+        startedAt: {
+          gte: startDate,
+          lte: endDate
+        },
+        issue: {
+          companyId
+        }
+      },
+      include: {
+        issue: {
+          include: {
+            project: true
+          }
+        }
+      },
+      orderBy: {
+        startedAt: 'desc'
+      }
+    });
+
+    return timeLogs.map(log => ({
+      id: log.id,
+      issueId: log.issueId,
+      issueKey: log.issue.key,
+      issueTitle: log.issue.title,
+      projectId: log.issue.projectId,
+      projectName: log.issue.project.name,
+      projectColor: log.issue.project.color,
+      startedAt: log.startedAt,
+      endedAt: log.endedAt,
+      durationMin: log.durationMin
+    }));
   }
 }

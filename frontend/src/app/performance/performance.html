@@ -1,0 +1,217 @@
+<div class="performance-container">
+  <div class="page-header">
+    <div>
+      <h1>Performance & Appraisals</h1>
+      <p>Set goals, track progress, and review performance</p>
+    </div>
+    <button class="btn-primary" (click)="activeTab() === 'goals' ? openGoalModal() : openReviewModal()" *ngIf="activeTab() === 'goals' || isManager()">
+      <svg lucidePlus size="20"></svg>
+      {{ activeTab() === 'goals' ? 'New Goal' : 'New Appraisal' }}
+    </button>
+  </div>
+
+  <div class="tabs-container">
+    <button class="tab-btn" [class.active]="activeTab() === 'goals'" (click)="setTab('goals')">
+      <svg lucideTarget size="18"></svg>
+      My Goals
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'reviews'" (click)="setTab('reviews')">
+      <svg lucideAward size="18"></svg>
+      Appraisals & Reviews
+    </button>
+  </div>
+
+  <!-- Goals Tab -->
+  <div *ngIf="activeTab() === 'goals'">
+    <div class="goals-grid" *ngIf="myGoals().length > 0; else noGoals">
+      <div class="goal-card" *ngFor="let goal of myGoals()">
+        <div class="goal-meta">
+          <span class="status-badge" [ngClass]="goal.status.toLowerCase()">
+            {{ goal.status.replace('_', ' ') }}
+          </span>
+          <span *ngIf="goal.dueDate" style="display: flex; align-items: center; gap: 4px;">
+            <svg lucideClock size="14"></svg>
+            {{ goal.dueDate | date:'mediumDate' }}
+          </span>
+        </div>
+        <div class="goal-title">{{ goal.title }}</div>
+        <div class="goal-desc">{{ goal.description || 'No description provided.' }}</div>
+        
+        <div class="goal-actions" *ngIf="goal.status !== 'ACHIEVED' && goal.status !== 'MISSED'">
+          <button (click)="updateGoalStatus(goal.id, 'ACHIEVED')" style="color: #16A34A; border-color: #BBF7D0;">
+            Mark Achieved
+          </button>
+          <button (click)="updateGoalStatus(goal.id, 'MISSED')" style="color: #DC2626; border-color: #FECACA;">
+            Mark Missed
+          </button>
+        </div>
+        
+        <button style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #94A3B8; cursor: pointer;" (click)="deleteGoal(goal.id)">
+          <svg lucideTrash size="16"></svg>
+        </button>
+      </div>
+    </div>
+    <ng-template #noGoals>
+      <div style="text-align: center; padding: 60px; background: white; border-radius: 16px; border: 1px dashed #CBD5E1;">
+        <svg lucideTarget size="48" style="color: #94A3B8; margin-bottom: 16px;"></svg>
+        <h3 style="margin: 0 0 8px 0; color: #334155;">No Goals Yet</h3>
+        <p style="margin: 0; color: #64748B;">Set your first performance goal to start tracking progress.</p>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- Reviews Tab -->
+  <div *ngIf="activeTab() === 'reviews'" class="reviews-section">
+    
+    <!-- My Reviews (Received) -->
+    <div class="reviews-table-container">
+      <h2>My Appraisals</h2>
+      <table class="table" *ngIf="myReviews().length > 0; else noMyReviews">
+        <thead>
+          <tr>
+            <th>Cycle</th>
+            <th>Reviewer</th>
+            <th>Rating</th>
+            <th>Status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let rev of myReviews()">
+            <td style="font-weight: 600;">{{ rev.cycleName }}</td>
+            <td>{{ rev.reviewer?.firstName }} {{ rev.reviewer?.lastName }}</td>
+            <td>
+              <span *ngIf="rev.rating" style="display: flex; gap: 2px;">
+                <svg lucideAward size="16" style="color: #EAB308;" *ngFor="let _ of [].constructor(rev.rating)"></svg>
+              </span>
+              <span *ngIf="!rev.rating">-</span>
+            </td>
+            <td>
+              <span class="status-badge" [ngClass]="{'achieved': rev.status === 'SUBMITTED', 'in_progress': rev.status === 'DRAFT'}">{{ rev.status }}</span>
+            </td>
+            <td>{{ rev.createdAt | date:'mediumDate' }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <ng-template #noMyReviews>
+        <div style="padding: 32px; text-align: center; color: #64748B;">No appraisals received yet.</div>
+      </ng-template>
+    </div>
+
+    <!-- Team Reviews (Given by me) -->
+    <div class="reviews-table-container" *ngIf="isManager()">
+      <h2>Team Appraisals</h2>
+      <table class="table" *ngIf="teamReviews().length > 0; else noTeamReviews">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Cycle</th>
+            <th>Rating</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let rev of teamReviews()">
+            <td style="display: flex; align-items: center; gap: 12px;">
+              <img [src]="rev.employee?.avatarUrl || 'assets/default-avatar.png'" style="width: 32px; height: 32px; border-radius: 50%;" />
+              <span style="font-weight: 600;">{{ rev.employee?.firstName }} {{ rev.employee?.lastName }}</span>
+            </td>
+            <td>{{ rev.cycleName }}</td>
+            <td>{{ rev.rating || '-' }} / 5</td>
+            <td>
+              <span class="status-badge" [ngClass]="{'achieved': rev.status === 'SUBMITTED', 'in_progress': rev.status === 'DRAFT'}">{{ rev.status }}</span>
+            </td>
+            <td>
+              <button (click)="openReviewModal(rev)" style="background: none; border: none; color: #2563EB; font-weight: 600; cursor: pointer;">Edit</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <ng-template #noTeamReviews>
+        <div style="padding: 32px; text-align: center; color: #64748B;">You haven't submitted any appraisals for your team yet.</div>
+      </ng-template>
+    </div>
+  </div>
+</div>
+
+<!-- Goal Modal -->
+<div class="modal-overlay" *ngIf="isGoalModalOpen()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>New Performance Goal</h2>
+      <button style="background: none; border: none; cursor: pointer;" (click)="closeGoalModal()">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Goal Title</label>
+        <input type="text" class="form-control" [(ngModel)]="goalForm.title" placeholder="e.g. Complete AWS Certification">
+      </div>
+      <div class="form-group">
+        <label>Target Date</label>
+        <input type="date" class="form-control" [(ngModel)]="goalForm.dueDate">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea class="form-control" [(ngModel)]="goalForm.description" rows="3" placeholder="Define the success metrics..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeGoalModal()">Cancel</button>
+      <button class="btn-primary" (click)="saveGoal()">Save Goal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal-overlay" *ngIf="isReviewModalOpen()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>{{ reviewForm.id ? 'Edit Appraisal' : 'New Appraisal' }}</h2>
+      <button style="background: none; border: none; cursor: pointer;" (click)="closeReviewModal()">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Employee</label>
+        <select class="form-control" [(ngModel)]="reviewForm.employeeId" [disabled]="!!reviewForm.id">
+          <option value="">Select direct report</option>
+          <option *ngFor="let emp of mySubordinates()" [value]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Review Cycle</label>
+        <input type="text" class="form-control" [(ngModel)]="reviewForm.cycleName" placeholder="e.g. Q3 2026 Review">
+      </div>
+      <div class="form-group">
+        <label>Rating (1-5)</label>
+        <select class="form-control" [(ngModel)]="reviewForm.rating">
+          <option [value]="0">Unrated</option>
+          <option [value]="1">1 - Needs Improvement</option>
+          <option [value]="2">2 - Below Expectations</option>
+          <option [value]="3">3 - Meets Expectations</option>
+          <option [value]="4">4 - Exceeds Expectations</option>
+          <option [value]="5">5 - Outstanding</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Manager Feedback</label>
+        <textarea class="form-control" [(ngModel)]="reviewForm.feedback" rows="4" placeholder="Provide constructive feedback..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select class="form-control" [(ngModel)]="reviewForm.status">
+          <option value="DRAFT">Draft</option>
+          <option value="SUBMITTED">Submitted to HR</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeReviewModal()">Cancel</button>
+      <button class="btn-primary" (click)="saveReview()">Save Appraisal</button>
+    </div>
+  </div>
+</div>

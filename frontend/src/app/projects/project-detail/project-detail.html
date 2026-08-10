@@ -481,6 +481,44 @@
         <!-- Left Column -->
         <div class="summary-col-left">
           
+          <!-- Budget & Billing -->
+          <div class="summary-panel" *ngIf="project()?.billingType !== 'NON_BILLABLE'">
+            <div class="summary-panel-header">
+              <h3>Budget & Billing</h3>
+              <p>Track project financials and tracked time.</p>
+            </div>
+            <div class="summary-status-body" style="padding: 16px;">
+              
+              <div *ngIf="project()?.billingType === 'FIXED'" style="margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-weight: 500;">Fixed Budget</span>
+                  <span class="font-mono text-primary" style="font-weight: 600;">{{ project()?.budgetAmount | currency }}</span>
+                </div>
+                <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
+                  <!-- Mock progress for now -->
+                  <div style="height: 100%; background: #10b981; width: 45%;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: var(--text-muted);">
+                  <span>45% consumed</span>
+                  <span>{{ (project()?.budgetAmount * 0.55) | currency }} remaining</span>
+                </div>
+              </div>
+
+              <div *ngIf="project()?.billingType === 'HOURLY'" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 12px; color: var(--text-muted);">Hourly Rate</div>
+                  <div style="font-weight: 600; font-size: 16px;" class="font-mono">{{ project()?.hourlyRate | currency }}/hr</div>
+                </div>
+                <!-- This will be populated dynamically once time logs are pulled in summary -->
+                <div style="text-align: right;">
+                  <div style="font-size: 12px; color: var(--text-muted);">Billable Time Logged</div>
+                  <div style="font-weight: 600; font-size: 16px;" class="text-primary font-mono">12.5 hrs</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          
           <!-- Status overview -->
           <div class="summary-panel">
             <div class="summary-panel-header">

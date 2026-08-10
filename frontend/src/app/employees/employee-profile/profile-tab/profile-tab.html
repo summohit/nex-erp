@@ -15,28 +15,27 @@
             <div class="form-row-item">
               <label class="item-label">Department</label>
               <div class="item-value">
-                <input type="text" class="form-control" [(ngModel)]="formData.departmentName" [disabled]="!isOwner" placeholder="e.g. Sales">
+                <select class="form-control" [(ngModel)]="formData.departmentId" [disabled]="!canEditWorkDetails">
+                  <option [ngValue]="null">Select Department</option>
+                  <option *ngFor="let dep of companyDepartments" [ngValue]="dep.id">{{ dep.name }}</option>
+                </select>
               </div>
             </div>
 
             <div class="form-row-item">
-              <label class="item-label">Job Position</label>
+              <label class="item-label">Job Title / Position</label>
               <div class="item-value">
-                <input type="text" class="form-control" [(ngModel)]="formData.jobPosition" [disabled]="!isOwner" placeholder="e.g. Sales Manager">
-              </div>
-            </div>
-
-            <div class="form-row-item">
-              <label class="item-label">Job Title</label>
-              <div class="item-value">
-                <input type="text" class="form-control" [(ngModel)]="formData.jobTitle" [disabled]="!isOwner" placeholder="e.g. Senior Software Engineer">
+                <select class="form-control" [(ngModel)]="formData.designationId" [disabled]="!canEditWorkDetails">
+                  <option [ngValue]="null">Select Job Title</option>
+                  <option *ngFor="let des of companyDesignations" [ngValue]="des.id">{{ des.name }}</option>
+                </select>
               </div>
             </div>
 
             <div class="form-row-item">
               <label class="item-label">Manager</label>
               <div class="item-value">
-                <select class="form-control" [(ngModel)]="formData.managerId" [disabled]="!isOwner">
+                <select class="form-control" [(ngModel)]="formData.managerId" [disabled]="!canEditWorkDetails">
                   <option [ngValue]="null">No Manager (Top Level)</option>
                   <option *ngFor="let emp of allEmployees" [ngValue]="emp.id">
                     {{ emp.firstName }} {{ emp.lastName }} ({{ emp.designation?.name || 'Staff' }})
@@ -51,7 +50,7 @@
                 <span class="help-icon" title="Date of next performance appraisal">?</span>
               </label>
               <div class="item-value">
-                <input type="date" class="form-control" [(ngModel)]="formData.nextAppraisalDate" [disabled]="!isOwner">
+                <input type="date" class="form-control" [(ngModel)]="formData.nextAppraisalDate" [disabled]="!canEditWorkDetails">
               </div>
             </div>
 
@@ -64,16 +63,12 @@
           <div class="form-grid-stack">
             
             <div class="form-row-item">
-              <label class="item-label">Work Address</label>
+              <label class="item-label">Branch (Work Location)</label>
               <div class="item-value">
-                <input type="text" class="form-control" [(ngModel)]="formData.workAddress" [disabled]="!isOwner" placeholder="e.g. CES Tech India">
-              </div>
-            </div>
-
-            <div class="form-row-item">
-              <label class="item-label">Work Location</label>
-              <div class="item-value">
-                <input type="text" class="form-control" [(ngModel)]="formData.workLocation" [disabled]="!isOwner" placeholder="e.g. Building 2, Remote, etc.">
+                <select class="form-control select-location" [(ngModel)]="formData.branchId" [disabled]="!canEditWorkDetails">
+                  <option [ngValue]="null">Select a branch</option>
+                  <option *ngFor="let branch of companyBranches" [ngValue]="branch.id">{{ branch.name }}</option>
+                </select>
               </div>
             </div>
 
@@ -88,11 +83,8 @@
             <div class="form-row-item">
               <label class="item-label">Monday</label>
               <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.monday" [disabled]="!isOwner">
-                  <option value="Unspecified">Unspecified</option>
-                  <option value="Home">Home</option>
-                  <option value="Office">Office</option>
-                  <option value="Other">Other</option>
+                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.monday" [disabled]="!canEditWorkDetails">
+                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
                 </select>
               </div>
             </div>
@@ -100,11 +92,8 @@
             <div class="form-row-item">
               <label class="item-label">Tuesday</label>
               <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.tuesday" [disabled]="!isOwner">
-                  <option value="Unspecified">Unspecified</option>
-                  <option value="Home">Home</option>
-                  <option value="Office">Office</option>
-                  <option value="Other">Other</option>
+                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.tuesday" [disabled]="!canEditWorkDetails">
+                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
                 </select>
               </div>
             </div>
@@ -112,11 +101,8 @@
             <div class="form-row-item">
               <label class="item-label">Wednesday</label>
               <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.wednesday" [disabled]="!isOwner">
-                  <option value="Unspecified">Unspecified</option>
-                  <option value="Home">Home</option>
-                  <option value="Office">Office</option>
-                  <option value="Other">Other</option>
+                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.wednesday" [disabled]="!canEditWorkDetails">
+                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
                 </select>
               </div>
             </div>
@@ -124,11 +110,8 @@
             <div class="form-row-item">
               <label class="item-label">Thursday</label>
               <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.thursday" [disabled]="!isOwner">
-                  <option value="Unspecified">Unspecified</option>
-                  <option value="Home">Home</option>
-                  <option value="Office">Office</option>
-                  <option value="Other">Other</option>
+                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.thursday" [disabled]="!canEditWorkDetails">
+                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
                 </select>
               </div>
             </div>
@@ -136,11 +119,8 @@
             <div class="form-row-item">
               <label class="item-label">Friday</label>
               <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.friday" [disabled]="!isOwner">
-                  <option value="Unspecified">Unspecified</option>
-                  <option value="Home">Home</option>
-                  <option value="Office">Office</option>
-                  <option value="Other">Other</option>
+                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.friday" [disabled]="!canEditWorkDetails">
+                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
                 </select>
               </div>
             </div>
@@ -148,11 +128,8 @@
             <div class="form-row-item">
               <label class="item-label">Saturday</label>
               <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.saturday" [disabled]="!isOwner">
-                  <option value="Unspecified">Unspecified</option>
-                  <option value="Home">Home</option>
-                  <option value="Office">Office</option>
-                  <option value="Other">Other</option>
+                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.saturday" [disabled]="!canEditWorkDetails">
+                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
                 </select>
               </div>
             </div>
@@ -160,11 +137,8 @@
             <div class="form-row-item">
               <label class="item-label">Sunday</label>
               <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.sunday" [disabled]="!isOwner">
-                  <option value="Unspecified">Unspecified</option>
-                  <option value="Home">Home</option>
-                  <option value="Office">Office</option>
-                  <option value="Other">Other</option>
+                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.sunday" [disabled]="!canEditWorkDetails">
+                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
                 </select>
               </div>
             </div>
@@ -180,7 +154,7 @@
               class="form-control note-textarea" 
               rows="3" 
               [(ngModel)]="formData.workNotes" 
-              [disabled]="!isOwner" 
+              [disabled]="!canEditWorkDetails" 
               placeholder="Provide additional information about this version...">
             </textarea>
           </div>
@@ -191,14 +165,18 @@
       <!-- RIGHT COLUMN: Organization Chart -->
       <div class="work-right-panel">
         <div class="org-chart-card">
-          <h3 class="section-title">ORGANIZATION CHART</h3>
+          <div class="org-header-row">
+            <h3 class="section-title">ORGANIZATION CHART</h3>
+            <span class="org-badge">Hierarchical</span>
+          </div>
           <p class="org-chart-subtitle">Set a manager or reports to show in org chart.</p>
 
           <div class="mini-org-tree">
             <!-- Manager Node -->
             <div class="org-node manager-node" *ngIf="selectedManager; else noManager">
               <div class="org-avatar">
-                <img [src]="selectedManager.avatarUrl || 'assets/default-avatar.png'" alt="Manager">
+                <img *ngIf="selectedManager.avatarUrl" [src]="selectedManager.avatarUrl" alt="Manager">
+                <div class="avatar-initials" *ngIf="!selectedManager.avatarUrl">{{ (selectedManager.firstName.charAt(0) || '') + (selectedManager.lastName.charAt(0) || '') }}</div>
               </div>
               <div class="org-details">
                 <div class="org-name">{{ selectedManager.firstName }} {{ selectedManager.lastName }}</div>
@@ -221,7 +199,8 @@
             <!-- Current Employee Node -->
             <div class="org-node current-node">
               <div class="org-avatar">
-                <img [src]="formData.avatarUrl || 'assets/default-avatar.png'" alt="Current Employee">
+                <img *ngIf="formData.avatarUrl" [src]="formData.avatarUrl" alt="Current Employee">
+                <div class="avatar-initials" *ngIf="!formData.avatarUrl">{{ (formData.firstName.charAt(0) || '') + (formData.lastName.charAt(0) || '') }}</div>
               </div>
               <div class="org-details">
                 <div class="org-name">
@@ -238,7 +217,8 @@
               <div class="subordinates-list">
                 <div class="org-node sub-node" *ngFor="let report of directReports">
                   <div class="org-avatar">
-                    <img [src]="report.avatarUrl || 'assets/default-avatar.png'" alt="Report">
+                    <img *ngIf="report.avatarUrl" [src]="report.avatarUrl" alt="Report">
+                    <div class="avatar-initials" *ngIf="!report.avatarUrl">{{ (report.firstName.charAt(0) || '') + (report.lastName.charAt(0) || '') }}</div>
                   </div>
                   <div class="org-details">
                     <div class="org-name">{{ report.firstName }} {{ report.lastName }}</div>
@@ -286,9 +266,14 @@
           <div class="resume-line-card" *ngFor="let item of formData.resumeLines; let i = index">
             <div class="resume-card-header">
               <span class="type-pill" [ngClass]="item.type?.toLowerCase()">{{ item.type }}</span>
-              <button type="button" class="btn-icon-del" (click)="removeResumeLine(i)" *ngIf="isOwner" title="Remove">
-                <svg lucideTrash2 size="14"></svg>
-              </button>
+              <div class="card-actions" *ngIf="isOwner">
+                <button type="button" class="btn-icon-edit" (click)="openCreateResumeModal(item, i)" title="Edit">
+                  <svg lucideEdit2 size="14"></svg>
+                </button>
+                <button type="button" class="btn-icon-del" (click)="removeResumeLine(i)" title="Remove">
+                  <svg lucideTrash2 size="14"></svg>
+                </button>
+              </div>
             </div>
             <div class="resume-line-title">{{ item.title }}</div>
             <div class="resume-line-org">{{ item.organization }}</div>
@@ -296,6 +281,15 @@
               {{ item.startDate }} - {{ item.endDate || 'Present' }}
             </div>
             <div class="resume-line-desc" *ngIf="item.description">{{ item.description }}</div>
+            <div class="resume-line-attachment mt-3" *ngIf="item.attachmentUrl">
+              <a [href]="item.attachmentUrl" target="_blank" class="attachment-badge">
+                <div class="attachment-icon"><svg lucidePaperclip size="16"></svg></div>
+                <div class="attachment-info">
+                  <span class="attachment-name">Attached Document</span>
+                  <span class="attachment-action">Click to view</span>
+                </div>
+              </a>
+            </div>
           </div>
 
           <button type="button" class="btn-odoo-action mt-4" (click)="openCreateResumeModal()" *ngIf="isOwner">
@@ -347,7 +341,7 @@
       <div class="form-group profile-pic-group">
         <label>Profile Picture <span class="help-icon" title="Upload a clear photo">?</span></label>
         <div class="profile-pic-upload" [class.has-image]="formData.avatarUrl">
-          <input type="file" (change)="handleAvatarUpload($event)" accept="image/*" [disabled]="!isOwner" class="file-input">
+          <input type="file" (change)="handleAvatarUpload($event)" accept="image/*" [disabled]="!canEditPersonalDetails" class="file-input">
           
           <div class="avatar-preview">
             <img [src]="formData.avatarUrl || 'assets/default-avatar.png'" alt="Avatar" *ngIf="formData.avatarUrl">
@@ -367,156 +361,408 @@
       </div>
     </div>
 
-    <!-- SECTION: PERSONAL -->
-    <div class="field-section">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Your Name</label>
-          <div class="compound-input name-inputs">
-            <select class="form-control salutation" [(ngModel)]="formData.salutation" [disabled]="!isOwner">
-              <option value="Mr">Mr</option>
-              <option value="Mrs">Mrs</option>
-              <option value="Ms">Ms</option>
-            </select>
-            <input type="text" class="form-control" [(ngModel)]="formData.firstName" [disabled]="!isOwner" placeholder="First Name">
-            <input type="text" class="form-control" [(ngModel)]="formData.lastName" [disabled]="!isOwner" placeholder="Last Name">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Your Email <span class="required">*</span></label>
-          <input type="email" class="form-control" [(ngModel)]="formData.email" disabled>
-        </div>
-
-        <div class="form-group" *ngIf="isOwner">
-          <label>Your Password</label>
-          <div class="compound-input password-input">
-            <input [type]="showPassword ? 'text' : 'password'" class="form-control" [(ngModel)]="formData.password" placeholder="Must have at least 8 characters">
-            <button type="button" class="icon-btn" (click)="togglePassword()">
-              <svg lucideEye size="16" *ngIf="!showPassword"></svg>
-              <svg lucideEyeOff size="16" *ngIf="showPassword"></svg>
-            </button>
-            <button type="button" class="icon-btn" (click)="generatePassword()" title="Generate Random Password">
-              <svg lucideShuffle size="16"></svg>
-            </button>
-          </div>
-          <small class="hint-text">Leave blank to keep current password.</small>
-        </div>
-        <div class="form-group" *ngIf="!isOwner"></div>
-      </div>
+    <!-- PERSONAL TAB SUB-PILL NAVIGATION BAR (MERGED OPTION A + B) -->
+    <div class="personal-subtab-bar">
+      <button type="button" class="subtab-pill" [class.active]="personalSubTab === 'all'" (click)="setPersonalSubTab('all')">
+        <svg lucideLayoutGrid size="14"></svg> All Sections
+      </button>
+      <button type="button" class="subtab-pill" [class.active]="personalSubTab === 'contact_bank'" (click)="setPersonalSubTab('contact_bank')">
+        <svg lucideCreditCard size="14"></svg> Banking & Contact
+      </button>
+      <button type="button" class="subtab-pill" [class.active]="personalSubTab === 'personal'" (click)="setPersonalSubTab('personal')">
+        <svg lucideUser size="14"></svg> Personal Info
+      </button>
+      <button type="button" class="subtab-pill" [class.active]="personalSubTab === 'citizenship_visa'" (click)="setPersonalSubTab('citizenship_visa')">
+        <svg lucideShieldCheck size="14"></svg> Identity & Visa
+      </button>
+      <button type="button" class="subtab-pill" [class.active]="personalSubTab === 'location'" (click)="setPersonalSubTab('location')">
+        <svg lucideMapPin size="14"></svg> Location
+      </button>
+      <button type="button" class="subtab-pill" [class.active]="personalSubTab === 'family_edu'" (click)="setPersonalSubTab('family_edu')">
+        <svg lucideGraduationCap size="14"></svg> Family & Education
+      </button>
     </div>
 
-    <!-- SECTION: CONTACT & ADDITIONAL -->
-    <div class="field-section">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Country</label>
-          <select class="form-control" [(ngModel)]="formData.country" (ngModelChange)="onCountryChange()" [disabled]="!isOwner">
-            <option value="">Select Country</option>
-            <option *ngFor="let c of countries" [value]="c.isoCode">{{ c.name }}</option>
-          </select>
+    <!-- 2-COLUMN EXECUTIVE CARDS GRID -->
+    <div class="personal-cards-grid">
+      <!-- CARD 1: PRIVATE CONTACT & BANKING -->
+      <div class="card-section" *ngIf="personalSubTab === 'all' || personalSubTab === 'contact_bank'">
+        <div class="card-header-bar">
+          <div class="card-icon-badge blue">
+            <svg lucideCreditCard size="16"></svg>
+          </div>
+          <h3>Private Contact & Banking</h3>
         </div>
+        <div class="card-body-grid">
+          <div class="form-group">
+            <label>Private Email <span class="required">*</span></label>
+            <input type="email" class="form-control" [(ngModel)]="formData.email" disabled>
+          </div>
 
-        <div class="form-group">
-          <label>State / Province</label>
-          <select class="form-control" [(ngModel)]="formData.state" (ngModelChange)="onStateChange()" [disabled]="!isOwner || !states.length">
-            <option value="">Select State</option>
-            <option *ngFor="let s of states" [value]="s.isoCode">{{ s.name }}</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>City</label>
-          <select class="form-control" [(ngModel)]="formData.city" [disabled]="!isOwner || !cities.length">
-            <option value="">Select City</option>
-            <option *ngFor="let c of cities" [value]="c.name">{{ c.name }}</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Mobile</label>
-          <div class="compound-input mobile-input" [class.error]="phoneInput.invalid && phoneInput.touched">
-            <div class="country-code">
-              <span class="flag">🇮🇳</span> +91
+          <div class="form-group">
+            <label>Mobile Phone</label>
+            <div class="compound-input mobile-input" [class.error]="phoneInput.invalid && phoneInput.touched">
+              <div class="country-code">
+                <span class="flag">🇮🇳</span> +91
+              </div>
+              <input type="text" class="form-control" name="phone" [(ngModel)]="formData.phone" [disabled]="!canEditPersonalDetails" #phoneInput="ngModel" pattern="^\+?[0-9]{10,15}$">
             </div>
-            <input type="text" class="form-control" name="phone" [(ngModel)]="formData.phone" [disabled]="!isOwner" #phoneInput="ngModel" pattern="^\+?[0-9]{10,15}$">
+            <div class="error-text" *ngIf="phoneInput.invalid && phoneInput.touched" style="color: #dc3545; font-size: 0.85rem; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              Valid Mobile number is required
+            </div>
           </div>
-          <div class="error-text" *ngIf="phoneInput.invalid && phoneInput.touched" style="color: #dc3545; font-size: 0.85rem; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
-            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-            Valid Mobile number (10-15 digits) is required
+
+          <div class="form-group">
+            <label>Bank Name</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.bankName" [disabled]="!canEditPersonalDetails" placeholder="e.g. HDFC Bank / ICICI Bank">
           </div>
-        </div>
 
-        <div class="form-group">
-          <label>Change Language</label>
-          <select class="form-control" [(ngModel)]="formData.language" [disabled]="!isOwner">
-            <option value="English">English</option>
-            <option value="Hindi">Hindi</option>
-            <option value="Spanish">Spanish</option>
-          </select>
-        </div>
+          <div class="form-group">
+            <label>Bank Account Number</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.bankAccountNumber" [disabled]="!canEditPersonalDetails" placeholder="e.g. 50100012345678">
+          </div>
 
-        <div class="form-group">
-          <label>Gender</label>
-          <select class="form-control" [(ngModel)]="formData.gender" [disabled]="!isOwner">
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Date of Birth</label>
-          <input type="date" class="form-control" [(ngModel)]="formData.dateOfBirth" [disabled]="!isOwner">
-        </div>
-
-        <div class="form-group">
-          <label>Slack Member ID</label>
-          <div class="compound-input slack-input">
-            <span class="prefix">@</span>
-            <input type="text" class="form-control" [(ngModel)]="formData.slackId" [disabled]="!isOwner">
+          <div class="form-group">
+            <label>IFSC / SWIFT Code</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.ifscCode" [disabled]="!canEditPersonalDetails" placeholder="e.g. HDFC0001234">
           </div>
         </div>
+      </div>
 
-        <div class="form-group">
-          <label>Marital Status</label>
-          <select class="form-control" [(ngModel)]="formData.maritalStatus" [disabled]="!isOwner">
-            <option value="Single">Single</option>
-            <option value="Married">Married</option>
-          </select>
+      <!-- CARD 2: PERSONAL INFORMATION -->
+      <div class="card-section" *ngIf="personalSubTab === 'all' || personalSubTab === 'personal'">
+        <div class="card-header-bar">
+          <div class="card-icon-badge purple">
+            <svg lucideUser size="16"></svg>
+          </div>
+          <h3>Personal Information</h3>
         </div>
+        <div class="card-body-grid">
+          <div class="form-group">
+            <label>Legal Name</label>
+            <div class="compound-input name-inputs">
+              <select class="form-control salutation" [(ngModel)]="formData.salutation" [disabled]="!canEditPersonalDetails">
+                <option value="Mr">Mr</option>
+                <option value="Mrs">Mrs</option>
+                <option value="Ms">Ms</option>
+                <option value="Dr">Dr</option>
+              </select>
+              <input type="text" class="form-control" [(ngModel)]="formData.firstName" [disabled]="!canEditPersonalDetails" placeholder="First Name">
+              <input type="text" class="form-control" [(ngModel)]="formData.lastName" [disabled]="!canEditPersonalDetails" placeholder="Last Name">
+            </div>
+          </div>
 
-        <div class="form-group full-width">
-          <label>Your Address</label>
-          <textarea class="form-control" rows="3" [(ngModel)]="formData.address" [disabled]="!isOwner"></textarea>
+          <div class="form-group" *ngIf="isOwner">
+            <label>Account Password</label>
+            <div class="compound-input password-input">
+              <input [type]="showPassword ? 'text' : 'password'" class="form-control" [(ngModel)]="formData.password" placeholder="Must have at least 8 characters">
+              <button type="button" class="icon-btn" (click)="togglePassword()">
+                <svg lucideEye size="16" *ngIf="!showPassword"></svg>
+                <svg lucideEyeOff size="16" *ngIf="showPassword"></svg>
+              </button>
+              <button type="button" class="icon-btn" (click)="generatePassword()" title="Generate Random Password">
+                <svg lucideShuffle size="16"></svg>
+              </button>
+            </div>
+            <small class="hint-text">Leave blank to keep current password.</small>
+          </div>
+
+          <div class="form-group">
+            <label>Sex / Gender</label>
+            <select class="form-control" [(ngModel)]="formData.gender" [disabled]="!canEditPersonalDetails">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Birthday / Date of Birth</label>
+            <input type="date" class="form-control" [(ngModel)]="formData.dateOfBirth" [disabled]="!canEditPersonalDetails">
+          </div>
+
+          <div class="form-group">
+            <label>Place of Birth (City)</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.placeOfBirthCity" [disabled]="!canEditPersonalDetails" placeholder="e.g. Mumbai">
+          </div>
+
+          <div class="form-group">
+            <label>Place of Birth (Country)</label>
+            <select class="form-control" [(ngModel)]="formData.placeOfBirthCountry" [disabled]="!canEditPersonalDetails">
+              <option value="">Select Country</option>
+              <option *ngFor="let c of countries" [value]="c.name">{{ c.name }}</option>
+            </select>
+          </div>
         </div>
+      </div>
 
-        <div class="form-group full-width">
-          <label>About</label>
-          <textarea class="form-control" rows="4" [(ngModel)]="formData.about" [disabled]="!isOwner"></textarea>
+      <!-- CARD 3: CITIZENSHIP & IDENTIFICATION -->
+      <div class="card-section" *ngIf="personalSubTab === 'all' || personalSubTab === 'citizenship_visa'">
+        <div class="card-header-bar">
+          <div class="card-icon-badge green">
+            <svg lucideShieldCheck size="16"></svg>
+          </div>
+          <h3>Citizenship & Identification</h3>
+        </div>
+        <div class="card-body-grid">
+          <div class="form-group">
+            <label>Nationality (Country)</label>
+            <select class="form-control" [(ngModel)]="formData.nationality" [disabled]="!canEditPersonalDetails">
+              <option value="">Select Nationality</option>
+              <option *ngFor="let c of countries" [value]="c.name">{{ c.name }}</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Identification No (Govt ID / Aadhaar)</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.identificationNo" [disabled]="!canEditPersonalDetails" placeholder="Issued by Government">
+          </div>
+
+          <div class="form-group">
+            <label>Passport No</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.passportNo" [disabled]="!canEditPersonalDetails" placeholder="Passport Number">
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 4: VISA & WORK PERMIT -->
+      <div class="card-section" *ngIf="personalSubTab === 'all' || personalSubTab === 'citizenship_visa'">
+        <div class="card-header-bar">
+          <div class="card-icon-badge orange">
+            <svg lucidePlane size="16"></svg>
+          </div>
+          <h3>Visa & Work Permit</h3>
+        </div>
+        <div class="card-body-grid">
+          <div class="form-group">
+            <label>Visa No</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.visaNo" [disabled]="!canEditPersonalDetails" placeholder="Visa Number">
+          </div>
+
+          <div class="form-group">
+            <label>Work Permit No</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.workPermitNo" [disabled]="!canEditPersonalDetails" placeholder="Work Permit Number">
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 5: LOCATION & ADDRESS -->
+      <div class="card-section" *ngIf="personalSubTab === 'all' || personalSubTab === 'location'">
+        <div class="card-header-bar">
+          <div class="card-icon-badge teal">
+            <svg lucideMapPin size="16"></svg>
+          </div>
+          <h3>Location & Address</h3>
+        </div>
+        <div class="card-body-grid">
+          <div class="form-group">
+            <label>Country</label>
+            <select class="form-control" [(ngModel)]="formData.country" (ngModelChange)="onCountryChange()" [disabled]="!canEditPersonalDetails">
+              <option value="">Select Country</option>
+              <option *ngFor="let c of countries" [value]="c.isoCode">{{ c.name }}</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>State / Province</label>
+            <select class="form-control" [(ngModel)]="formData.state" (ngModelChange)="onStateChange()" [disabled]="!canEditPersonalDetails || !states.length">
+              <option value="">Select State</option>
+              <option *ngFor="let s of states" [value]="s.isoCode">{{ s.name }}</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>City</label>
+            <select class="form-control" [(ngModel)]="formData.city" [disabled]="!canEditPersonalDetails || !cities.length">
+              <option value="">Select City</option>
+              <option *ngFor="let c of cities" [value]="c.name">{{ c.name }}</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Zip / Postal Code</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.zipCode" [disabled]="!canEditPersonalDetails" placeholder="e.g. 110001">
+          </div>
+
+          <div class="form-group">
+            <label>Home-Work Distance (km)</label>
+            <input type="number" class="form-control" [(ngModel)]="formData.homeWorkDistanceKm" [disabled]="!canEditPersonalDetails" placeholder="0">
+          </div>
+
+          <div class="form-group full-width">
+            <label>Private Street Address</label>
+            <textarea class="form-control" rows="3" [(ngModel)]="formData.address" [disabled]="!canEditPersonalDetails" placeholder="Street 1, Street 2..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 6: FAMILY DETAILS -->
+      <div class="card-section" *ngIf="personalSubTab === 'all' || personalSubTab === 'family_edu'">
+        <div class="card-header-bar">
+          <div class="card-icon-badge red">
+            <svg lucideUsers size="16"></svg>
+          </div>
+          <h3>Family Details</h3>
+        </div>
+        <div class="card-body-grid">
+          <div class="form-group">
+            <label>Marital Status</label>
+            <select class="form-control" [(ngModel)]="formData.maritalStatus" [disabled]="!canEditPersonalDetails">
+              <option value="Single">Single</option>
+              <option value="Married">Married</option>
+              <option value="Divorced">Divorced</option>
+              <option value="Widowed">Widowed</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Spouse Legal Name</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.spouseName" [disabled]="!canEditPersonalDetails" placeholder="Spouse Name">
+          </div>
+
+          <div class="form-group">
+            <label>Spouse Birthdate</label>
+            <input type="date" class="form-control" [(ngModel)]="formData.spouseBirthdate" [disabled]="!canEditPersonalDetails">
+          </div>
+
+          <div class="form-group">
+            <label>Dependent Children Count</label>
+            <input type="number" min="0" class="form-control" [(ngModel)]="formData.childrenCount" [disabled]="!canEditPersonalDetails" placeholder="0">
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 7: EDUCATION -->
+      <div class="card-section" *ngIf="personalSubTab === 'all' || personalSubTab === 'family_edu'">
+        <div class="card-header-bar">
+          <div class="card-icon-badge indigo">
+            <svg lucideGraduationCap size="16"></svg>
+          </div>
+          <h3>Education & Qualifications</h3>
+        </div>
+        <div class="card-body-grid">
+          <div class="form-group">
+            <label>Certificate Level</label>
+            <select class="form-control" [(ngModel)]="formData.educationLevel" [disabled]="!canEditPersonalDetails">
+              <option value="High School">High School</option>
+              <option value="Diploma">Diploma</option>
+              <option value="Bachelor">Bachelor</option>
+              <option value="Master">Master</option>
+              <option value="Doctorate / PhD">Doctorate / PhD</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Field of Study (Major)</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.fieldOfStudy" [disabled]="!canEditPersonalDetails" placeholder="e.g. Engineering, Commerce, Computer Science">
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 8: PREFERENCES & BIO -->
+      <div class="card-section" *ngIf="personalSubTab === 'all' || personalSubTab === 'bio' || personalSubTab === 'personal'">
+        <div class="card-header-bar">
+          <div class="card-icon-badge gray">
+            <svg lucideSettings size="16"></svg>
+          </div>
+          <h3>Preferences & Bio</h3>
+        </div>
+        <div class="card-body-grid">
+          <div class="form-group">
+            <label>Preferred Language</label>
+            <select class="form-control" [(ngModel)]="formData.language" [disabled]="!canEditPersonalDetails">
+              <option value="English">English</option>
+              <option value="Hindi">Hindi</option>
+              <option value="Spanish">Spanish</option>
+              <option value="French">French</option>
+              <option value="German">German</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Slack Member ID</label>
+            <div class="compound-input slack-input">
+              <span class="prefix">@</span>
+              <input type="text" class="form-control" [(ngModel)]="formData.slackId" [disabled]="!canEditPersonalDetails">
+            </div>
+          </div>
+
+          <div class="form-group full-width">
+            <label>About Me</label>
+            <textarea class="form-control" rows="3" [(ngModel)]="formData.about" [disabled]="!canEditPersonalDetails" placeholder="Tell us about yourself..."></textarea>
+            <div class="resume-lines-list" *ngIf="formData.resumeLines.length > 0">
+              <div class="resume-line-card" *ngFor="let item of formData.resumeLines; let i = index">
+                <div class="resume-card-header">
+                  <span class="type-pill" [ngClass]="item.type?.toLowerCase()">{{ item.type }}</span>
+                  <div class="card-actions" *ngIf="isOwner">
+                    <button type="button" class="btn-icon-edit" (click)="openCreateResumeModal(item, i)" title="Edit">
+                      <svg lucideEdit2 size="14"></svg>
+                    </button>
+                    <button type="button" class="btn-icon-del" (click)="removeResumeLine(i)" title="Remove">
+                      <svg lucideTrash2 size="14"></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="resume-line-title">{{ item.title }}</div>
+                <div class="resume-line-org">{{ item.organization }}</div>
+                <div class="resume-line-dates" *ngIf="item.startDate || item.endDate">
+                  {{ item.startDate }} - {{ item.endDate || 'Present' }}
+                </div>
+                <div class="resume-line-desc" *ngIf="item.description">{{ item.description }}</div>
+                <div class="resume-line-attachment mt-3" *ngIf="item.attachmentUrl">
+                  <a [href]="item.attachmentUrl" target="_blank" class="attachment-badge">
+                    <div class="attachment-icon"><svg lucidePaperclip size="16"></svg></div>
+                    <div class="attachment-info">
+                      <span class="attachment-name">Attached Document</span>
+                      <span class="attachment-action">Click to view</span>
+                    </div>
+                  </a>
+                </div>
+              </div>
+              <button type="button" class="btn-odoo-action mt-4" (click)="openCreateResumeModal()" *ngIf="isOwner">
+                <svg lucidePlus size="14"></svg> Create Resume Lines
+              </button>
+            </div>
+          </div>
+          <!-- RIGHT COLUMN: SKILLS & CERTIFICATIONS -->
+          <div class="skills-right-panel">
+            <h3 class="section-title mb-2">SKILLS & CERTIFICATIONS</h3>
+            <hr class="section-divider">
+            <p class="skills-subtitle">
+              You can add skills from our library to the employee profile. If skills are missing, they can be created by an HR officer.
+            </p>
+            <div class="skills-badges-container">
+              <div class="skill-badge-chip" *ngFor="let sk of formData.skills; let idx = index">
+                <span class="skill-category-label">{{ sk.category }}:</span>
+                <span class="skill-name-label">{{ sk.name }}</span>
+                <span class="skill-level-pill">{{ sk.level }}</span>
+                <button type="button" class="remove-skill-btn" (click)="removeSkill(idx)" *ngIf="isOwner">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </div>
+              <button type="button" class="btn-odoo-action mt-3" (click)="openUpdateSkillsModal()" *ngIf="isOwner">
+                Pick a skill from the list
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-
   </div>
-
-
   <!-- ==================== FORM ACTIONS ==================== -->
   <div class="form-actions mt-4">
     <button type="button" class="btn-secondary" (click)="goBack()">
       <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
       Go Back
     </button>
-
     <button class="btn-primary" (click)="saveProfile()" *ngIf="isOwner">
       <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
       Save Profile
     </button>
   </div>
-
 </div>
-
-
 <!-- ==================== UPDATE SKILLS MODAL (SCREENSHOT 5) ==================== -->
 <div class="modal-backdrop" *ngIf="isUpdateSkillsModalOpen" (click)="closeUpdateSkillsModal()">
   <div class="modal-box skills-modal" (click)="$event.stopPropagation()">
@@ -526,7 +772,6 @@
         <svg lucideX size="18"></svg>
       </button>
     </div>
-
     <div class="modal-body">
       <!-- Category Chips -->
       <div class="modal-field-group">
@@ -542,7 +787,6 @@
           </button>
         </div>
       </div>
-
       <!-- Skill Name Chips -->
       <div class="modal-field-group">
         <label class="modal-label">Skill</label>
@@ -557,7 +801,6 @@
           </button>
         </div>
       </div>
-
       <!-- Skill Level Chips -->
       <div class="modal-field-group">
         <label class="modal-label">Skill Level</label>
@@ -573,26 +816,22 @@
         </div>
       </div>
     </div>
-
     <div class="modal-footer">
-      <button type="button" class="btn-primary-purple" (click)="saveSkill(false)">Save & Close</button>
-      <button type="button" class="btn-secondary-purple" (click)="saveSkill(true)">Save & New</button>
       <button type="button" class="btn-discard" (click)="closeUpdateSkillsModal()">Discard</button>
+      <button type="button" class="btn-secondary-purple" (click)="saveSkill(true)">Save & New</button>
+      <button type="button" class="btn-primary-purple" (click)="saveSkill(false)">Save & Close</button>
     </div>
   </div>
 </div>
-
-
 <!-- ==================== CREATE RESUME LINE MODAL ==================== -->
 <div class="modal-backdrop" *ngIf="isCreateResumeModalOpen" (click)="closeCreateResumeModal()">
   <div class="modal-box resume-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h2>Create Resume Line</h2>
+      <h2>{{ editingResumeLineIndex !== null ? 'Edit Resume Line' : 'Create Resume Line' }}</h2>
       <button type="button" class="close-btn" (click)="closeCreateResumeModal()">
         <svg lucideX size="18"></svg>
       </button>
     </div>
-
     <div class="modal-body">
       <div class="form-group mb-3">
         <label>Type</label>
@@ -602,37 +841,103 @@
           <option value="Certification">Certification</option>
         </select>
       </div>
-
       <div class="form-group mb-3">
         <label>Title / Position <span class="required">*</span></label>
-        <input type="text" class="form-control" [(ngModel)]="newResumeLine.title" placeholder="e.g. Sales Manager or B.Sc Computer Science">
+        <input 
+          type="text" 
+          class="form-control" 
+          [class.is-invalid]="resumeFormSubmitted && !newResumeLine.title?.trim()"
+          [(ngModel)]="newResumeLine.title" 
+          placeholder="e.g. Sales Manager or B.Sc Computer Science">
+        <small class="error-msg" *ngIf="resumeFormSubmitted && !newResumeLine.title?.trim()">Title / Position is required</small>
       </div>
-
       <div class="form-group mb-3">
         <label>Organization / Institution <span class="required">*</span></label>
-        <input type="text" class="form-control" [(ngModel)]="newResumeLine.organization" placeholder="e.g. Acme Corp or Oxford University">
+        <input 
+          type="text" 
+          class="form-control" 
+          [class.is-invalid]="resumeFormSubmitted && !newResumeLine.organization?.trim()"
+          [(ngModel)]="newResumeLine.organization" 
+          placeholder="e.g. Acme Corp or Oxford University">
+        <small class="error-msg" *ngIf="resumeFormSubmitted && !newResumeLine.organization?.trim()">Organization / Institution is required</small>
       </div>
-
-      <div class="form-grid mb-3">
+      <div class="form-grid-2 mb-3">
         <div class="form-group">
           <label>Start Date</label>
           <input type="date" class="form-control" [(ngModel)]="newResumeLine.startDate">
         </div>
         <div class="form-group">
           <label>End Date</label>
-          <input type="date" class="form-control" [(ngModel)]="newResumeLine.endDate">
+          <input 
+            type="date" 
+            class="form-control" 
+            [class.is-invalid]="resumeFormSubmitted && isEndDateInvalid()"
+            [(ngModel)]="newResumeLine.endDate">
+          <small class="error-msg" *ngIf="resumeFormSubmitted && isEndDateInvalid()">End Date must be on or after Start Date</small>
         </div>
       </div>
+      <div class="form-group mb-4">
+        <label class="form-label-styled">Attachment (PDF) <span class="optional-pill">Optional</span></label>
+        <div class="file-upload-dropzone">
+          <input 
+            type="file" 
+            id="resumeAttachmentInput"
+            class="hidden-file-input" 
+            accept=".pdf"
+            (change)="onResumeFileSelected($event)">
+          
+          <!-- Default Dropzone Area when no file selected and no existing attachment -->
+          <label 
+            for="resumeAttachmentInput" 
+            class="dropzone-box" 
+            *ngIf="!selectedResumeFile && !newResumeLine.attachmentUrl">
+            <div class="dropzone-icon-circle">
+              <svg lucideUploadCloud size="22"></svg>
+            </div>
+            <div class="dropzone-text-group">
+              <p class="dropzone-title">Click to upload <span class="normal-weight">or drag & drop</span></p>
+              <p class="dropzone-sub">PDF document up to 10MB</p>
+            </div>
+          </label>
 
+          <!-- Selected / Attached File Card -->
+          <div class="file-attached-card" *ngIf="selectedResumeFile || newResumeLine.attachmentUrl">
+            <div class="file-card-icon red-pdf">
+              <svg lucideFileText size="22"></svg>
+            </div>
+            <div class="file-card-details">
+              <div class="file-card-name">
+                {{ selectedResumeFile ? selectedResumeFile.name : 'Attached_Document.pdf' }}
+              </div>
+              <div class="file-card-status">
+                <span class="status-badge-success">
+                  <svg lucideCheckCircle2 size="12"></svg> {{ selectedResumeFile ? 'Ready to upload' : 'Attached' }}
+                </span>
+              </div>
+            </div>
+            <div class="file-card-actions">
+              <label for="resumeAttachmentInput" class="btn-replace-file" title="Replace File">
+                Replace
+              </label>
+              <button type="button" class="btn-remove-file" (click)="clearResumeFile($event)" title="Remove File">
+                <svg lucideX size="14"></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <small class="hint-text mt-1.5 display-block">Upload supporting documents such as experience certificates, marksheets, or letters.</small>
+      </div>
       <div class="form-group">
         <label>Description</label>
         <textarea class="form-control" rows="3" [(ngModel)]="newResumeLine.description" placeholder="Provide details..."></textarea>
       </div>
     </div>
-
     <div class="modal-footer">
-      <button type="button" class="btn-primary-purple" (click)="saveResumeLine()">Save & Close</button>
-      <button type="button" class="btn-discard" (click)="closeCreateResumeModal()">Discard</button>
+      <button type="button" class="btn-discard" (click)="closeCreateResumeModal()" [disabled]="isUploadingResume">Discard</button>
+      <button type="button" class="btn-primary-purple" (click)="saveResumeLine()" [disabled]="isUploadingResume">
+        <span *ngIf="!isUploadingResume">Save & Close</span>
+        <span *ngIf="isUploadingResume">Uploading...</span>
+      </button>
     </div>
   </div>
 </div>

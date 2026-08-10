@@ -375,14 +375,39 @@
       </div>
     </div>
 
-    <!-- Visibility Selection (Temporarily Hidden) -->
-    <div class="form-section" *ngIf="false">
-      <label class="section-label">Visibility</label>
-      <select class="trello-select" [(ngModel)]="projectForm.visibility">
-        <option value="Workspace">Workspace</option>
-        <option value="Private">Private</option>
-        <option value="Public">Public</option>
+    <!-- Billing & Schedule Fields -->
+    <div class="form-section row">
+      <div class="col">
+        <label class="section-label">Start Date</label>
+        <input type="date" class="trello-input" [(ngModel)]="projectForm.startDate">
+      </div>
+      <div class="col" style="margin-left: 12px;">
+        <label class="section-label">End Date</label>
+        <input type="date" class="trello-input" [(ngModel)]="projectForm.endDate">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="section-label">Billing Type</label>
+      <select class="trello-select" [(ngModel)]="projectForm.billingType">
+        <option value="NON_BILLABLE">Non-Billable</option>
+        <option value="HOURLY">Hourly Rate</option>
+        <option value="FIXED">Fixed Budget</option>
       </select>
+    </div>
+
+    <div class="form-section row" *ngIf="projectForm.billingType === 'FIXED'">
+      <div class="col">
+        <label class="section-label">Budget Amount</label>
+        <input type="number" class="trello-input" [(ngModel)]="projectForm.budgetAmount" placeholder="e.g. 10000">
+      </div>
+    </div>
+
+    <div class="form-section row" *ngIf="projectForm.billingType === 'HOURLY'">
+      <div class="col">
+        <label class="section-label">Hourly Rate</label>
+        <input type="number" class="trello-input" [(ngModel)]="projectForm.hourlyRate" placeholder="e.g. 150">
+      </div>
     </div>
 
     <!-- Action Button -->

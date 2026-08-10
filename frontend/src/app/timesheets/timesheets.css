@@ -1,0 +1,114 @@
+.timesheets-container {
+  padding: 24px;
+}
+
+.timesheets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.date-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.btn-icon:hover {
+  background-color: var(--hover-bg);
+}
+
+.week-display {
+  font-weight: 500;
+  font-size: 1.1rem;
+}
+
+.timesheet-grid {
+  display: grid;
+  grid-template-columns: 2fr repeat(7, 1fr) 1fr;
+  gap: 12px;
+  background-color: var(--surface-color);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.grid-header {
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.grid-header.project-col {
+  text-align: left;
+}
+
+.grid-row {
+  display: contents;
+}
+
+.grid-cell {
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.grid-cell.project-col {
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.project-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.task-name {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.time-input {
+  width: 60px;
+  text-align: center;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+}
+
+.time-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.grid-footer {
+  display: contents;
+  font-weight: 600;
+}
+
+.grid-footer .grid-cell {
+  border-top: 2px solid var(--border-color);
+  border-bottom: none;
+  background-color: var(--hover-bg);
+}

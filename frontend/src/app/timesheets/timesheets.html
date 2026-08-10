@@ -1,0 +1,66 @@
+<div class="timesheets-container">
+  <div class="timesheets-header">
+    <h2>Timesheets</h2>
+    
+    <div class="date-controls">
+      <button class="btn-icon" (click)="previousWeek()">
+        <svg lucideChevronLeft size="18"></svg>
+      </button>
+      <div class="week-display">
+        {{ startDate | date:'MMM d' }} - {{ endDate | date:'MMM d, y' }}
+      </div>
+      <button class="btn-icon" (click)="nextWeek()">
+        <svg lucideChevronRight size="18"></svg>
+      </button>
+      <button class="btn btn-outline" (click)="currentWeek()">Today</button>
+    </div>
+  </div>
+
+  <div class="timesheet-grid">
+    <!-- Header Row -->
+    <div class="grid-header project-col">Project / Task</div>
+    <div class="grid-header" *ngFor="let day of weekDays">
+      <div>{{ day.date | date:'EEE' }}</div>
+      <div style="font-size: 0.8em; color: var(--text-muted)">{{ day.date | date:'dd' }}</div>
+    </div>
+    <div class="grid-header">Total</div>
+
+    <!-- Data Rows -->
+    <div class="grid-row" *ngFor="let row of rows">
+      <div class="grid-cell project-col">
+        <div class="project-name">
+          <span class="badge" [style.backgroundColor]="row.projectColor" style="width: 8px; height: 8px; display: inline-block; border-radius: 50%; margin-right: 6px; padding: 0;"></span>
+          {{ row.projectName }}
+        </div>
+        <div class="task-name">{{ row.issueKey }} - {{ row.issueTitle }}</div>
+      </div>
+      
+      <div class="grid-cell" *ngFor="let day of weekDays">
+        <input type="text" class="time-input" 
+               [value]="formatDuration(row.days[day.dateString])"
+               (blur)="updateTime(row, day.dateString, $event)">
+      </div>
+      
+      <div class="grid-cell font-mono font-medium">
+        {{ formatDuration(row.total) }}
+      </div>
+    </div>
+
+    <!-- Footer / Totals -->
+    <div class="grid-footer" *ngIf="rows.length > 0">
+      <div class="grid-cell project-col">Total</div>
+      <div class="grid-cell font-mono" *ngFor="let day of weekDays">
+        {{ formatDuration(dailyTotals[day.dateString] || 0) }}
+      </div>
+      <div class="grid-cell font-mono text-primary">
+        {{ formatDuration(grandTotal) }}
+      </div>
+    </div>
+  </div>
+  
+  <div class="empty-state" *ngIf="rows.length === 0">
+    <svg lucideClock size="48" style="color: var(--text-muted); margin-bottom: 16px;"></svg>
+    <h3>No time logged this week</h3>
+    <p class="text-muted">Start tracking time on your assigned tasks.</p>
+  </div>
+</div>

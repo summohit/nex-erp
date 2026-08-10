@@ -1,9 +1,57 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class LeavesService {
+export class LeavesService implements OnModuleInit {
+  private readonly logger = new Logger(LeavesService.name);
+
   constructor(private prisma: PrismaService) {}
+
+  onModuleInit() {
+    this.startAccrualCron();
+  }
+
+  private startAccrualCron() {
+    // Run once a day at midnight
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    setInterval(() => {
+      this.processAutomatedAccruals().catch(err => this.logger.error('Failed to process accruals', err));
+    }, ONE_DAY_MS);
+    
+    // Also run immediately on startup if needed, but usually we just let it run on schedule
+  }
+
+  async processAutomatedAccruals() {
+    this.logger.log('Running automated leave accruals check...');
+    const now = new Date();
+    // Only run on the 1st of the month for MONTHLY accruals, or Jan 1st for YEARLY.
+    // For simplicity in this implementation, we will assume it runs and checks logic.
+    const isFirstOfMonth = now.getDate() === 1;
+    const isFirstOfYear = now.getMonth() === 0 && now.getDate() === 1;
+    const year = now.getFullYear();
+
+    if (!isFirstOfMonth && !isFirstOfYear) return;
+
+    const leaveTypes = await this.prisma.leaveType.findMany({
+      where: { accrualAmount: { gt: 0 } }
+    });
+
+    for (const lt of leaveTypes) {
+      if (lt.accrualFrequency === 'MONTHLY' && isFirstOfMonth) {
+        await this.prisma.leaveBalance.updateMany({
+          where: { leaveTypeId: lt.id, year },
+          data: { allocated: { increment: lt.accrualAmount } }
+        });
+        this.logger.log(`Credited ${lt.accrualAmount} for Monthly Leave Type: ${lt.name}`);
+      } else if (lt.accrualFrequency === 'YEARLY' && isFirstOfYear) {
+        await this.prisma.leaveBalance.updateMany({
+          where: { leaveTypeId: lt.id, year },
+          data: { allocated: { increment: lt.accrualAmount } }
+        });
+        this.logger.log(`Credited ${lt.accrualAmount} for Yearly Leave Type: ${lt.name}`);
+      }
+    }
+  }
 
   async assignLeaveBalance(data: { employeeId: number, leaveTypeId: number, allocated: number, year: number }) {
     return this.prisma.leaveBalance.upsert({
@@ -46,18 +94,45 @@ export class LeavesService {
     });
   }
 
-  async requestLeave(userId: number, data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string }) {
-    const employee = await this.prisma.employee.findUnique({ where: { userId } });
+  async requestLeave(userId: number, data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
+    const employee = await this.prisma.employee.findUnique({ 
+      where: { userId },
+      include: { user: true }
+    });
     if (!employee) throw new BadRequestException('Employee not found');
+
+    const startDate = new Date(data.startDate);
+    const endDate = new Date(data.endDate);
+
+    if (employee.user.role !== 'SUPERADMIN' && employee.user.role !== 'ADMIN' && employee.user.role !== 'HR') {
+      const blackouts = await this.prisma.blackoutDate.findMany({
+        where: {
+          companyId: employee.companyId,
+          date: {
+            gte: startDate,
+            lte: endDate
+          },
+          OR: [
+            { departmentId: null },
+            { departmentId: employee.departmentId }
+          ]
+        }
+      });
+      if (blackouts.length > 0) {
+        throw new BadRequestException(`Leave request overlaps with a blackout date: ${blackouts[0].date.toDateString()} - ${blackouts[0].reason}`);
+      }
+    }
 
     return this.prisma.leaveRequest.create({
       data: {
         employeeId: employee.id,
         leaveTypeId: data.leaveTypeId,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
+        startDate,
+        endDate,
         reason: data.reason,
-        attachmentUrl: data.attachmentUrl
+        attachmentUrl: data.attachmentUrl,
+        isHalfDay: data.isHalfDay || false,
+        halfDayPeriod: data.halfDayPeriod || null
       }
     });
   }
@@ -73,7 +148,7 @@ export class LeavesService {
     });
   }
 
-  async updateRequest(userId: number, requestId: number, data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string }) {
+  async updateRequest(userId: number, requestId: number, data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
     const employee = await this.prisma.employee.findUnique({ where: { userId } });
     if (!employee) throw new BadRequestException('Employee not found');
 
@@ -89,6 +164,8 @@ export class LeavesService {
     if (data.endDate) updateData.endDate = new Date(data.endDate);
     if (data.reason !== undefined) updateData.reason = data.reason;
     if (data.attachmentUrl !== undefined) updateData.attachmentUrl = data.attachmentUrl;
+    if (data.isHalfDay !== undefined) updateData.isHalfDay = data.isHalfDay;
+    if (data.halfDayPeriod !== undefined) updateData.halfDayPeriod = data.halfDayPeriod;
 
     return this.prisma.leaveRequest.update({
       where: { id: requestId },
@@ -119,7 +196,7 @@ export class LeavesService {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
         const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        const diffDays = request.isHalfDay ? 0.5 : (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -171,7 +248,7 @@ export class LeavesService {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
         const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        const diffDays = request.isHalfDay ? 0.5 : (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -187,7 +264,7 @@ export class LeavesService {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
         const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        const diffDays = request.isHalfDay ? 0.5 : (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
         
         await tx.leaveBalance.updateMany({
           where: {

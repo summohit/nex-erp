@@ -1,140 +1,159 @@
 <header class="topbar">
-  <div class="topbar-left">
-    <h1 class="page-title">{{ pageTitle() }}</h1>
+  <!-- Spotlight Search Component -->
+  <app-spotlight-search></app-spotlight-search>
+
+  <!-- Global Search Input Trigger -->
+  <div class="global-search-container" (click)="openSpotlight()">
+    <svg lucideSearch size="15" class="search-icon"></svg>
+    <input type="text" 
+           readonly
+           placeholder="Search ERP (Press ⌘K)..." 
+           class="global-search-input cursor-pointer">
+    <span class="search-kbd">⌘K</span>
   </div>
 
-  <div class="topbar-right">
-    <!-- Spotlight Search Component -->
-    <app-spotlight-search></app-spotlight-search>
-
-    <!-- Global Search Input Trigger -->
-    <div class="global-search-container" (click)="openSpotlight()">
-      <svg lucideSearch size="15" class="search-icon"></svg>
-      <input type="text" 
-             readonly
-             placeholder="Search ERP (Press ⌘K)..." 
-             class="global-search-input cursor-pointer">
-      <span class="search-kbd">⌘K</span>
+  <!-- Global Systray Clock-in Widget -->
+  <div class="clock-systray-widget" [class.is-active]="isClockedIn()">
+    <div class="clock-timer-display">
+      <div class="status-indicator-wrapper">
+        <div class="status-indicator-ring" *ngIf="isClockedIn()"></div>
+        <div class="status-indicator-dot"></div>
+      </div>
+      <svg lucideClock size="14" class="clock-icon-muted"></svg>
+      <span class="timer-digits">{{ timerStr() }}</span>
     </div>
 
-    <!-- Quick Create (+ Button) -->
-    <div class="relative">
-      <button class="btn-quick-create" (click)="toggleQuickCreate()" type="button" title="Quick Actions">
-        <svg lucidePlus size="16"></svg>
-        <span class="hidden sm:inline">Create</span>
-      </button>
+    <div class="clock-divider"></div>
 
-      <!-- Quick Create Dropdown Menu -->
-      <div class="header-popover quick-create-popover" *ngIf="isQuickCreateOpen()" (click)="$event.stopPropagation()">
-        <div class="popover-title-row">
-          <span>Quick Actions</span>
-          <button class="btn-close-popover" (click)="isQuickCreateOpen.set(false)"><svg lucideX size="14"></svg></button>
+    <button 
+      type="button" 
+      (click)="toggleClock()"
+      [disabled]="isClocking()"
+      class="btn-clock-action"
+      [class.btn-clock-in]="!isClockedIn()"
+      [class.btn-clock-out]="isClockedIn()"
+      [title]="isClockedIn() ? 'Clock Out of your current shift' : 'Clock In to start your shift'">
+      <svg lucidePlay size="12" *ngIf="!isClockedIn() && !isClocking()" fill="currentColor"></svg>
+      <svg lucideSquare size="12" *ngIf="isClockedIn() && !isClocking()" fill="currentColor"></svg>
+      <svg lucideLoader2 size="12" *ngIf="isClocking()" class="spinner-icon"></svg>
+      <span>{{ isClocking() ? 'Processing...' : (isClockedIn() ? 'Clock Out' : 'Clock In') }}</span>
+    </button>
+  </div>
+
+  <!-- Quick Create (+ Button) -->
+  <div class="relative">
+    <button class="btn-quick-create" (click)="toggleQuickCreate()" type="button" title="Quick Actions">
+      <svg lucidePlus size="16"></svg>
+      <span class="hidden sm:inline">Create</span>
+    </button>
+
+    <!-- Quick Create Dropdown Menu -->
+    <div class="header-popover quick-create-popover" *ngIf="isQuickCreateOpen()" (click)="$event.stopPropagation()">
+      <div class="popover-title-row">
+        <span>Quick Actions</span>
+        <button class="btn-close-popover" (click)="isQuickCreateOpen.set(false)"><svg lucideX size="14"></svg></button>
+      </div>
+      <div class="popover-menu-list">
+        <a *ngIf="hasAccessToDirectory()" routerLink="/employees/directory" (click)="isQuickCreateOpen.set(false)" class="menu-item">
+          <svg lucideUser size="16" class="text-blue-600"></svg>
+          <div class="menu-item-text">
+            <span class="item-title">Add New Employee</span>
+            <span class="item-desc">Onboard team member</span>
+          </div>
+        </a>
+        <a routerLink="/attendance" (click)="isQuickCreateOpen.set(false)" class="menu-item">
+          <svg lucideBriefcase size="16" class="text-emerald-600"></svg>
+          <div class="menu-item-text">
+            <span class="item-title">Apply for Leave</span>
+            <span class="item-desc">Request time off</span>
+          </div>
+        </a>
+        <a routerLink="/employees/documents" (click)="isQuickCreateOpen.set(false)" class="menu-item">
+          <svg lucideFileText size="16" class="text-amber-600"></svg>
+          <div class="menu-item-text">
+            <span class="item-title">Upload Document</span>
+            <span class="item-desc">Add employee file</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifications Bell -->
+  <div class="relative">
+    <button class="btn-header-icon" (click)="toggleNotifications()" type="button" title="Notifications">
+      <svg lucideBell size="18"></svg>
+      <span class="notification-badge" *ngIf="notificationsService.unreadCount() > 0">
+        {{ notificationsService.unreadCount() }}
+      </span>
+    </button>
+
+    <!-- Notifications Dropdown -->
+    <div class="header-popover notifications-popover" *ngIf="isNotificationOpen()" (click)="$event.stopPropagation()">
+      <div class="notifications-header">
+        <span>Notifications</span>
+        <button class="mark-read-btn" (click)="markAllAsRead()" *ngIf="notificationsService.unreadCount() > 0">Mark all read</button>
+      </div>
+      <div class="notifications-list">
+        <div *ngIf="notificationsService.notifications().length === 0" class="no-notifications">
+          <svg lucideBell size="28" class="text-slate-300 mb-2"></svg>
+          <p class="text-sm text-slate-500 font-medium">No notifications yet</p>
         </div>
-        <div class="popover-menu-list">
-          <a *ngIf="hasAccessToDirectory()" routerLink="/employees/directory" (click)="isQuickCreateOpen.set(false)" class="menu-item">
-            <svg lucideUser size="16" class="text-blue-600"></svg>
-            <div class="menu-item-text">
-              <span class="item-title">Add New Employee</span>
-              <span class="item-desc">Onboard team member</span>
-            </div>
-          </a>
-          <a routerLink="/attendance" (click)="isQuickCreateOpen.set(false)" class="menu-item">
-            <svg lucideBriefcase size="16" class="text-emerald-600"></svg>
-            <div class="menu-item-text">
-              <span class="item-title">Apply for Leave</span>
-              <span class="item-desc">Request time off</span>
-            </div>
-          </a>
-          <a routerLink="/employees/documents" (click)="isQuickCreateOpen.set(false)" class="menu-item">
-            <svg lucideFileText size="16" class="text-amber-600"></svg>
-            <div class="menu-item-text">
-              <span class="item-title">Upload Document</span>
-              <span class="item-desc">Add employee file</span>
-            </div>
-          </a>
+
+        <div 
+          class="notification-item" 
+          *ngFor="let n of notificationsService.notifications()" 
+          [class.unread]="!n.isRead"
+          (click)="markSingleAsRead(n.id)"
+        >
+          <div class="notification-dot" *ngIf="!n.isRead"></div>
+          <div class="notification-content">
+            <div class="notification-title">{{ n.title }}</div>
+            <div class="notification-desc">{{ n.message }}</div>
+            <div class="notification-time">{{ n.createdAt | date:'shortTime' }}</div>
+          </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Notifications Bell -->
-    <div class="relative">
-      <button class="btn-header-icon" (click)="toggleNotifications()" type="button" title="Notifications">
-        <svg lucideBell size="18"></svg>
-        <span class="notification-badge" *ngIf="notificationsService.unreadCount() > 0">
-          {{ notificationsService.unreadCount() }}
-        </span>
-      </button>
-
-      <!-- Notifications Dropdown -->
-      <div class="header-popover notifications-popover" *ngIf="isNotificationOpen()" (click)="$event.stopPropagation()">
-        <div class="notifications-header">
-          <span>Notifications</span>
-          <button class="mark-read-btn" (click)="markAllAsRead()" *ngIf="notificationsService.unreadCount() > 0">Mark all read</button>
-        </div>
-        <div class="notifications-list">
-          <div *ngIf="notificationsService.notifications().length === 0" class="no-notifications">
-            <svg lucideBell size="28" class="text-slate-300 mb-2"></svg>
-            <p class="text-sm text-slate-500 font-medium">No notifications yet</p>
-          </div>
-
-          <div 
-            class="notification-item" 
-            *ngFor="let n of notificationsService.notifications()" 
-            [class.unread]="!n.isRead"
-            (click)="markSingleAsRead(n.id)"
-          >
-            <div class="notification-dot" *ngIf="!n.isRead"></div>
-            <div class="notification-content">
-              <div class="notification-title">{{ n.title }}</div>
-              <div class="notification-desc">{{ n.message }}</div>
-              <div class="notification-time">{{ n.createdAt | date:'shortTime' }}</div>
-            </div>
-          </div>
-        </div>
+  <!-- User Profile Dropdown -->
+  <div class="relative">
+    <button class="user-profile-trigger" (click)="toggleProfileMenu()" type="button">
+      <div class="user-avatar">
+        <img *ngIf="currentUser()?.employee?.avatarUrl" [src]="currentUser().employee.avatarUrl" [alt]="currentUser()?.firstName">
+        <span *ngIf="!currentUser()?.employee?.avatarUrl">{{ getUserInitials() }}</span>
       </div>
-    </div>
+      <div class="user-details hidden md:flex">
+        <span class="user-name">{{ currentUser()?.employee?.firstName || currentUser()?.firstName || 'User' }} {{ currentUser()?.employee?.lastName || currentUser()?.lastName || '' }}</span>
+        <span class="user-role">{{ getUserRoleLabel() }}</span>
+      </div>
+      <svg lucideChevronDown size="14" class="text-slate-400"></svg>
+    </button>
 
-    <!-- Divider -->
-    <div class="header-divider"></div>
+    <!-- User Profile Menu -->
+    <div class="header-popover profile-menu-popover" *ngIf="isProfileMenuOpen()" (click)="$event.stopPropagation()">
+      <div class="profile-menu-header">
+        <span class="menu-user-name">{{ currentUser()?.employee?.firstName || currentUser()?.firstName }} {{ currentUser()?.employee?.lastName || currentUser()?.lastName }}</span>
+        <span class="menu-user-email">{{ currentUser()?.email }}</span>
+      </div>
+      
+      <div class="profile-menu-body">
+        <a [routerLink]="['/employees', currentUser()?.employee?.id || 1, 'profile']" (click)="isProfileMenuOpen.set(false)" class="menu-link">
+          <svg lucideUser size="15"></svg>
+          <span>My Profile</span>
+        </a>
+        <a routerLink="/projects" (click)="isProfileMenuOpen.set(false)" class="menu-link">
+          <svg lucideKanban size="15"></svg>
+          <span>Projects</span>
+        </a>
+      </div>
 
-    <!-- User Profile Dropdown -->
-    <div class="relative">
-      <button class="user-profile-trigger" (click)="toggleProfileMenu()" type="button">
-        <div class="user-avatar">
-          <img *ngIf="currentUser()?.employee?.avatarUrl" [src]="currentUser().employee.avatarUrl" [alt]="currentUser()?.firstName">
-          <span *ngIf="!currentUser()?.employee?.avatarUrl">{{ getUserInitials() }}</span>
-        </div>
-        <div class="user-details hidden md:flex">
-          <span class="user-name">{{ currentUser()?.employee?.firstName || currentUser()?.firstName || 'User' }} {{ currentUser()?.employee?.lastName || currentUser()?.lastName || '' }}</span>
-          <span class="user-role">{{ getUserRoleLabel() }}</span>
-        </div>
-        <svg lucideChevronDown size="14" class="text-slate-400"></svg>
-      </button>
-
-      <!-- User Profile Menu -->
-      <div class="header-popover profile-menu-popover" *ngIf="isProfileMenuOpen()" (click)="$event.stopPropagation()">
-        <div class="profile-menu-header">
-          <span class="menu-user-name">{{ currentUser()?.employee?.firstName || currentUser()?.firstName }} {{ currentUser()?.employee?.lastName || currentUser()?.lastName }}</span>
-          <span class="menu-user-email">{{ currentUser()?.email }}</span>
-        </div>
-        
-        <div class="profile-menu-body">
-          <a [routerLink]="['/employees', currentUser()?.employee?.id || 1, 'profile']" (click)="isProfileMenuOpen.set(false)" class="menu-link">
-            <svg lucideUser size="15"></svg>
-            <span>My Profile</span>
-          </a>
-          <a routerLink="/projects" (click)="isProfileMenuOpen.set(false)" class="menu-link">
-            <svg lucideKanban size="15"></svg>
-            <span>Projects</span>
-          </a>
-        </div>
-
-        <div class="profile-menu-footer">
-          <button class="logout-btn" (click)="logout()" type="button">
-            <svg lucideLogOut size="15"></svg>
-            <span>Log Out</span>
-          </button>
-        </div>
+      <div class="profile-menu-footer">
+        <button class="logout-btn" (click)="logout()" type="button">
+          <svg lucideLogOut size="15"></svg>
+          <span>Log Out</span>
+        </button>
       </div>
     </div>
   </div>

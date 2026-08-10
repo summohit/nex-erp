@@ -97,4 +97,24 @@ export class EmployeeService {
       headers: { Authorization: `Bearer ${token}` }
     });
   }
+
+  // --- Uploads ---
+
+  uploadDocument(file: File): Observable<{ url: string }> {
+    const token = localStorage.getItem('access_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ url: string }>(`${environment.apiUrl}/upload`, formData, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  uploadResumePdf(file: File): Observable<{ url: string }> {
+    const token = localStorage.getItem('access_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ url: string }>(`${environment.apiUrl}/upload/resume`, formData, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
 }

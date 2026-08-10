@@ -1,0 +1,238 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">Clients Directory</h1>
+      <p class="page-subtitle">Manage your clients and billing contacts</p>
+    </div>
+    <div class="header-right">
+      <button class="btn btn-primary" (click)="openDrawer()">
+        <svg lucidePlus size="16"></svg>
+        Add Client
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <ag-grid-angular
+      style="width: 100%; height: 500px;"
+      class="ag-theme-quartz"
+      [theme]="'legacy'"
+      [rowData]="clients"
+      [columnDefs]="columnDefs"
+      [defaultColDef]="defaultColDef"
+      [animateRows]="true"
+      [pagination]="true"
+      [paginationPageSize]="15"
+      [rowHeight]="64"
+      (gridReady)="onGridReady($event)"
+      (cellClicked)="onCellClicked($event)">
+    </ag-grid-angular>
+  </div>
+</div>
+
+
+<!-- Add Client Slide-over Drawer -->
+<div class="drawer-overlay" *ngIf="showDrawer" (click)="closeDrawer()">
+  <div class="drawer-panel" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>Add New Client</h3>
+      <button class="btn-close" (click)="closeDrawer()"><svg lucideX size="18"></svg></button>
+    </div>
+    
+    <div class="drawer-body">
+      <form [formGroup]="clientForm" id="clientForm" (ngSubmit)="onSubmit()">
+        
+        <div class="form-section">
+          <h4 class="section-title">Company Details & Logo</h4>
+          
+          <!-- Drag and Drop Logo Dropzone -->
+          <div class="form-group mb-3">
+            <label class="form-label">Client Logo</label>
+            <input type="file" #logoInput (change)="onLogoFileSelected($event)" accept="image/*" class="hidden-file-input" style="display: none;">
+            
+            <div class="logo-dropzone" 
+                 [class.dragging]="isDraggingLogo"
+                 (click)="logoInput.click()"
+                 (dragover)="onLogoDragOver($event)"
+                 (dragleave)="onLogoDragLeave($event)"
+                 (drop)="onLogoDrop($event)">
+                 
+              <div *ngIf="!logoPreview" class="dropzone-empty">
+                <div class="upload-icon-circle">
+                  <svg lucideUploadCloud size="20"></svg>
+                </div>
+                <div class="upload-text">
+                  <span class="primary-text">Drag & drop company logo here, or <strong>browse</strong></span>
+                  <span class="sub-text">PNG, JPG, WebP or SVG (Max 2MB)</span>
+                </div>
+              </div>
+
+              <div *ngIf="logoPreview" class="logo-preview-wrapper" (click)="$event.stopPropagation()">
+                <img [src]="logoPreview" alt="Client Logo Preview" class="logo-preview-img">
+                <div class="logo-actions">
+                  <button type="button" class="btn-change-logo" (click)="logoInput.click()">Change Logo</button>
+                  <button type="button" class="btn-remove-logo" (click)="removeLogo($event)">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Company Name <span class="text-danger">*</span></label>
+            <input type="text" formControlName="name" class="form-control" placeholder="Acme Corp">
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">Industry</label>
+              <input type="text" formControlName="industry" class="form-control" placeholder="Technology">
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">Website</label>
+              <input type="text" formControlName="website" class="form-control" placeholder="https://acme.com">
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">Status</label>
+              <select formControlName="status" class="form-control">
+                <option value="ACTIVE">Active Client</option>
+                <option value="LEAD">Lead (Prospect)</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="ARCHIVED">Archived</option>
+              </select>
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">Client Portal</label>
+              <select formControlName="portalEnabled" class="form-control">
+                <option [ngValue]="false">Disabled (Default)</option>
+                <option [ngValue]="true">Enabled</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <hr class="form-separator">
+        
+        <div class="form-section">
+          <h4 class="section-title">Financial & Billing</h4>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">Currency</label>
+              <select formControlName="currency" class="form-control">
+                <option value="INR">INR (₹) - Indian Rupee</option>
+                <option value="USD">USD ($) - US Dollar</option>
+                <option value="EUR">EUR (€) - Euro</option>
+                <option value="GBP">GBP (£) - British Pound</option>
+              </select>
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">Payment Terms</label>
+              <select formControlName="paymentTerms" class="form-control">
+                <option value="Due on Receipt">Due on Receipt</option>
+                <option value="Net 15">Net 15</option>
+                <option value="Net 30">Net 30</option>
+                <option value="Net 45">Net 45</option>
+                <option value="Net 60">Net 60</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">Tax ID (VAT/GST)</label>
+              <input type="text" formControlName="taxId" class="form-control" placeholder="e.g. 123456789">
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">Registration No.</label>
+              <input type="text" formControlName="registrationNo" class="form-control" placeholder="e.g. CRN12345">
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">Default Hourly Rate</label>
+              <input type="number" formControlName="defaultHourlyRate" class="form-control" placeholder="0.00">
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">Credit Limit</label>
+              <input type="number" formControlName="creditLimit" class="form-control" placeholder="0.00">
+            </div>
+          </div>
+        </div>
+        
+        <hr class="form-separator">
+        
+        <div class="form-section">
+          <h4 class="section-title">Billing Address</h4>
+          <div class="form-group">
+            <label class="form-label">Address Line 1</label>
+            <input type="text" formControlName="billingAddressLine1" class="form-control" placeholder="123 Main St">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Address Line 2</label>
+            <input type="text" formControlName="billingAddressLine2" class="form-control" placeholder="Suite/Apt">
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">City</label>
+              <input type="text" formControlName="billingCity" class="form-control" placeholder="City">
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">State/Province</label>
+              <input type="text" formControlName="billingState" class="form-control" placeholder="State">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">ZIP/Postal Code</label>
+              <input type="text" formControlName="billingZipCode" class="form-control" placeholder="ZIP">
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">Country</label>
+              <input type="text" formControlName="billingCountry" class="form-control" placeholder="Country">
+            </div>
+          </div>
+        </div>
+        
+        <hr class="form-separator">
+        
+        <div class="form-section">
+          <h4 class="section-title">Primary Contact</h4>
+          <p class="section-subtitle">This person will be designated as the primary billing contact.</p>
+          
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">First Name <span class="text-danger">*</span></label>
+              <input type="text" formControlName="contactFirstName" class="form-control" placeholder="John">
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">Last Name</label>
+              <input type="text" formControlName="contactLastName" class="form-control" placeholder="Doe">
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label class="form-label">Email <span class="text-danger">*</span></label>
+              <input type="email" formControlName="contactEmail" class="form-control" placeholder="john@acme.com">
+            </div>
+            <div class="form-group col-6">
+              <label class="form-label">Phone</label>
+              <input type="text" formControlName="contactPhone" class="form-control" placeholder="+1 (555) 000-0000">
+            </div>
+          </div>
+        </div>
+        
+      </form>
+    </div>
+    
+    <div class="drawer-footer">
+      <button type="button" class="btn btn-outline" (click)="closeDrawer()" [disabled]="isSubmitting">Cancel</button>
+      <button type="submit" form="clientForm" class="btn btn-primary" [disabled]="clientForm.invalid || isSubmitting">
+        {{ isSubmitting ? 'Saving...' : 'Create Client' }}
+      </button>
+    </div>
+  </div>
+</div>

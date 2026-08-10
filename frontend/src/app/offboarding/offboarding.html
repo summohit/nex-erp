@@ -1,0 +1,255 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Offboarding & Exit Management</h1>
+      <p>Manage resignations, clearance tasks, and exit interviews.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="openResignModal()" *ngIf="activeTab() === 'resignations'">
+        Submit Resignation
+      </button>
+      <button class="btn-primary" (click)="openInterviewModal()" *ngIf="activeTab() === 'exit' && isAdminOrHr()">
+        Record Interview
+      </button>
+    </div>
+  </div>
+
+  <div class="tabs-container">
+    <button class="tab-btn" [class.active]="activeTab() === 'resignations'" (click)="setTab('resignations')">
+      <svg lucideDoorOpen size="18"></svg>
+      Resignations
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'tasks'" (click)="setTab('tasks')" *ngIf="canClearTasks()">
+      <svg lucideCheckCircle2 size="18"></svg>
+      Clearance Tasks
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'exit'" (click)="setTab('exit')" *ngIf="isAdminOrHr()">
+      <svg lucideClipboardCheck size="18"></svg>
+      Exit Interviews
+    </button>
+  </div>
+
+  <!-- Resignations Tab -->
+  <div class="tab-content" *ngIf="activeTab() === 'resignations'">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Reason</th>
+            <th>Intended LWD</th>
+            <th>Approved LWD</th>
+            <th>Status</th>
+            <th>Approver</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let res of resignations()">
+            <td>{{ res.employee?.user?.email }}</td>
+            <td class="truncate">{{ res.reason }}</td>
+            <td>{{ res.intendedLastWorkingDay | date:'mediumDate' }}</td>
+            <td>{{ res.approvedLastWorkingDay ? (res.approvedLastWorkingDay | date:'mediumDate') : '-' }}</td>
+            <td>
+              <span class="badge" [ngClass]="'badge-' + res.status.toLowerCase()">
+                {{ res.status }}
+              </span>
+            </td>
+            <td>{{ res.approver?.email || '-' }}</td>
+            <td>
+              <button class="btn-sm btn-outline" (click)="openApproveModal(res)" *ngIf="res.status === 'PENDING' && isManagerOrAdmin()">
+                Review
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="empty-state" *ngIf="resignations().length === 0">
+        <svg lucideDoorOpen size="48" style="color: #94A3B8; margin-bottom: 16px;"></svg>
+        <h3>No resignations found</h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tasks Tab -->
+  <div class="tab-content" *ngIf="activeTab() === 'tasks' && canClearTasks()">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Employee (User ID)</th>
+            <th>Department</th>
+            <th>Task Name</th>
+            <th>Status</th>
+            <th>Cleared By</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let task of tasks()">
+            <td>{{ task.employee?.userId }}</td>
+            <td><span class="badge badge-department">{{ task.department }}</span></td>
+            <td>
+              <div style="font-weight: 500;">{{ task.taskName }}</div>
+              <div style="font-size: 12px; color: #64748B;">{{ task.description }}</div>
+            </td>
+            <td>
+              <span class="badge" [ngClass]="'badge-' + task.status.toLowerCase()">
+                {{ task.status }}
+              </span>
+            </td>
+            <td>{{ task.clearedBy?.email || '-' }}</td>
+            <td>
+              <button class="btn-sm btn-outline" (click)="openTaskModal(task)" *ngIf="task.status === 'PENDING'">
+                Clear Task
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="empty-state" *ngIf="tasks().length === 0">
+        <svg lucideCheckCircle2 size="48" style="color: #94A3B8; margin-bottom: 16px;"></svg>
+        <h3>No tasks pending</h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exit Interviews Tab -->
+  <div class="tab-content" *ngIf="activeTab() === 'exit' && isAdminOrHr()">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Employee ID</th>
+            <th>Date Completed</th>
+            <th>Rating (1-5)</th>
+            <th>Interviewer</th>
+            <th>Feedback Summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of interviews()">
+            <td>{{ item.employee?.id }}</td>
+            <td>{{ item.completedAt | date:'mediumDate' }}</td>
+            <td>{{ item.rating }}</td>
+            <td>{{ item.interviewer?.email }}</td>
+            <td class="truncate">{{ item.feedback }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="empty-state" *ngIf="interviews().length === 0">
+        <svg lucideClipboardCheck size="48" style="color: #94A3B8; margin-bottom: 16px;"></svg>
+        <h3>No exit interviews recorded</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Resign Modal -->
+<div class="modal-overlay" *ngIf="showResignModal()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Submit Resignation</h2>
+      <button class="close-btn" (click)="closeResignModal()"><svg lucideX size="20"></svg></button>
+    </div>
+    <div class="modal-body form-grid">
+      <div class="form-group full-width">
+        <label>Reason for leaving</label>
+        <textarea [(ngModel)]="resignForm.reason" rows="3" class="form-control" placeholder="Optional brief explanation..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Intended Last Working Day</label>
+        <input type="date" [(ngModel)]="resignForm.intendedLastWorkingDay" class="form-control" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" (click)="closeResignModal()">Cancel</button>
+      <button class="btn-danger" (click)="submitResignation()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Approve Resignation Modal -->
+<div class="modal-overlay" *ngIf="showApproveModal()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Review Resignation</h2>
+      <button class="close-btn" (click)="closeApproveModal()"><svg lucideX size="20"></svg></button>
+    </div>
+    <div class="modal-body form-grid">
+      <div class="form-group">
+        <label>Action</label>
+        <select [(ngModel)]="approveForm.status" class="form-control">
+          <option value="APPROVED">Approve</option>
+          <option value="REJECTED">Reject / Retain</option>
+          <option value="WITHDRAWN">Withdrawn</option>
+        </select>
+      </div>
+      <div class="form-group" *ngIf="approveForm.status === 'APPROVED'">
+        <label>Approved Last Working Day</label>
+        <input type="date" [(ngModel)]="approveForm.approvedLastWorkingDay" class="form-control" />
+      </div>
+      <div class="form-group full-width">
+        <label>Remarks</label>
+        <textarea [(ngModel)]="approveForm.remarks" rows="2" class="form-control"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" (click)="closeApproveModal()">Cancel</button>
+      <button class="btn-primary" (click)="submitApprove()">Update Status</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clear Task Modal -->
+<div class="modal-overlay" *ngIf="showTaskModal()">
+  <div class="modal-content" style="max-width: 400px;">
+    <div class="modal-header">
+      <h2>Clear Task</h2>
+      <button class="close-btn" (click)="closeTaskModal()"><svg lucideX size="20"></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Remarks / Notes (Optional)</label>
+        <textarea [(ngModel)]="taskForm.remarks" rows="3" class="form-control"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" (click)="closeTaskModal()">Cancel</button>
+      <button class="btn-primary" (click)="submitTask()">Mark as Cleared</button>
+    </div>
+  </div>
+</div>
+
+<!-- Record Interview Modal -->
+<div class="modal-overlay" *ngIf="showInterviewModal()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Record Exit Interview</h2>
+      <button class="close-btn" (click)="closeInterviewModal()"><svg lucideX size="20"></svg></button>
+    </div>
+    <div class="modal-body form-grid">
+      <div class="form-group">
+        <label>Employee</label>
+        <select [(ngModel)]="interviewForm.employeeId" class="form-control">
+          <option [value]="0">Select Employee...</option>
+          <option *ngFor="let emp of employees()" [value]="emp.id">
+            {{ emp.user?.email || 'ID ' + emp.id }}
+          </option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Overall Rating (1-5)</label>
+        <input type="number" [(ngModel)]="interviewForm.rating" class="form-control" min="1" max="5" />
+      </div>
+      <div class="form-group full-width">
+        <label>Interview Notes / Feedback</label>
+        <textarea [(ngModel)]="interviewForm.feedback" rows="4" class="form-control"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" (click)="closeInterviewModal()">Cancel</button>
+      <button class="btn-primary" (click)="submitInterview()">Save Record</button>
+    </div>
+  </div>
+</div>

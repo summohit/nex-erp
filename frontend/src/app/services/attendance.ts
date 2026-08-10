@@ -53,4 +53,24 @@ export class AttendanceService {
   clockOut(lat?: number, lng?: number) {
     return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out`, { lat, lng });
   }
+
+  getMyRegularizations(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/regularization/me`);
+  }
+
+  getPendingRegularizations(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/regularization/pending`);
+  }
+
+  requestRegularization(data: { date: string, proposedClockIn?: string, proposedClockOut?: string, reason: string }) {
+    return this.http.post(`${this.apiUrl}/regularization`, data);
+  }
+
+  resolveRegularization(id: number, status: string, rejectionReason?: string) {
+    return this.http.post(`${this.apiUrl}/regularization/${id}/resolve`, { status, rejectionReason });
+  }
+
+  getTeamTimeline(start: string, end: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/team/timeline?start=${start}&end=${end}`);
+  }
 }

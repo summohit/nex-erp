@@ -22,6 +22,21 @@ export class DocumentsTabComponent implements OnInit {
   selectedFile: File | null = null;
   selectedFileUrl: string | null = null;
 
+  documentTypes = [
+    'PAN Card',
+    'Aadhaar Card',
+    'Passport',
+    'Bank Proof / Cancelled Cheque',
+    'Educational Certificate',
+    'Relieving / Experience Letter',
+    'Payslips',
+    'Form 16 / Tax Proof',
+    'Driving License / Voter ID',
+    'Other'
+  ];
+
+  selectedDocumentType = 'PAN Card';
+
   constructor(private employeeService: EmployeeService, private toast: HotToastService) {}
 
   ngOnInit() {}
@@ -29,6 +44,7 @@ export class DocumentsTabComponent implements OnInit {
   openModal() {
     this.showModal = true;
     this.fileName = '';
+    this.selectedDocumentType = 'PAN Card';
     this.selectedFile = null;
     this.selectedFileUrl = null;
   }
@@ -44,37 +60,42 @@ export class DocumentsTabComponent implements OnInit {
       if (!this.fileName) {
         this.fileName = file.name.split('.')[0];
       }
-      
-      const reader = new FileReader();
-      reader.onload = (e: any) => {
-        this.selectedFileUrl = e.target.result;
-      };
-      reader.readAsDataURL(file);
     }
   }
 
   submitDocument() {
-    if (!this.fileName || !this.selectedFileUrl) {
+    if (!this.fileName || !this.selectedFile) {
       this.toast.error('File name and file are required');
       return;
     }
     
     this.uploading = true;
-    
-    const payload = {
-      fileName: this.fileName,
-      fileUrl: this.selectedFileUrl
-    };
+    this.toast.loading('Uploading document...', { id: 'doc-upload' });
 
-    this.employeeService.addDocument(this.employeeData.id, payload).subscribe({
-      next: () => {
-        this.toast.success('Document uploaded');
-        this.closeModal();
-        this.refreshProfile.emit();
-        this.uploading = false;
+    this.employeeService.uploadDocument(this.selectedFile).subscribe({
+      next: (uploadRes) => {
+        const payload = {
+          fileName: this.fileName,
+          fileUrl: uploadRes.url,
+          documentType: this.selectedDocumentType
+        };
+
+        this.employeeService.addDocument(this.employeeData.id, payload).subscribe({
+          next: () => {
+            this.toast.success('Document uploaded successfully', { id: 'doc-upload' });
+            this.closeModal();
+            this.refreshProfile.emit();
+            this.uploading = false;
+          },
+          error: (err: any) => {
+            this.toast.error('Failed to save document record', { id: 'doc-upload' });
+            console.error(err);
+            this.uploading = false;
+          }
+        });
       },
       error: (err: any) => {
-        this.toast.error('Failed to upload document');
+        this.toast.error('Failed to upload file to ImageKit', { id: 'doc-upload' });
         console.error(err);
         this.uploading = false;
       }

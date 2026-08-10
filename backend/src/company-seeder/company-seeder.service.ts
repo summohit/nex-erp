@@ -206,31 +206,36 @@ export class CompanySeederService implements OnModuleInit {
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/shifts', 'attendance/holidays',
         'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
         'assets', 'assets/inventory', 'assets/assignments', 'assets/requests',
-        'settings', 'settings/company', 'settings/master-data', 'settings/permissions', 'settings/integrations'
+        'settings', 'settings/company', 'settings/master-data', 'settings/permissions', 'settings/integrations',
+        'projects'
       ],
       HR: [
         'employees', 'employees/directory', 'employees/org-chart', 'employees/onboarding', 'employees/documents',
         'recruitment', 'recruitment/jobs', 'recruitment/candidates', 'recruitment/interviews',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/shifts', 'attendance/holidays',
-        'payroll', 'payroll/processing', 'payroll/payslips'
+        'payroll', 'payroll/processing', 'payroll/payslips',
+        'projects'
       ],
       FINANCE: [
         'employees', 'employees/directory', 'employees/org-chart',
         'attendance', 'attendance/timesheets',
         'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
-        'assets', 'assets/inventory', 'assets/assignments'
+        'assets', 'assets/inventory', 'assets/assignments',
+        'projects'
       ],
       SALES: [
-        'employees', 'employees/directory', 'employees/org-chart',
+        'employees', 'employees/org-chart',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
-        'payroll', 'payroll/payslips', 'payroll/expenses'
+        'payroll', 'payroll/payslips', 'payroll/expenses',
+        'projects'
       ],
       EMPLOYEE: [
-        'employees', 'employees/documents',
+        'employees', 'employees/org-chart',
         'recruitment', 'recruitment/interviews',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
         'payroll', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
-        'assets', 'assets/requests'
+        'assets', 'assets/requests',
+        'projects'
       ]
     };
 

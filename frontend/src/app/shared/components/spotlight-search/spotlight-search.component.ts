@@ -5,9 +5,7 @@ import { Router } from '@angular/router';
 import { EmployeeService } from '../../../services/employee.service';
 import { ProjectsService } from '../../../services/projects';
 import { 
-  LucideSearch, LucideUser, LucideBriefcase, LucideLayers, LucideCalendar, 
-  LucideDollarSign, LucideSettings, LucideAward, LucideShieldCheck, LucideCommand, LucideX,
-  LucideArrowRight, LucideBuilding, LucideFileText
+  LucideSearch, LucideArrowRight
 } from '@lucide/angular';
 
 export interface SearchResultItem {
@@ -25,9 +23,7 @@ export interface SearchResultItem {
   imports: [
     CommonModule,
     FormsModule,
-    LucideSearch, LucideUser, LucideBriefcase, LucideLayers, LucideCalendar, 
-    LucideDollarSign, LucideSettings, LucideAward, LucideShieldCheck, LucideCommand, LucideX,
-    LucideArrowRight, LucideBuilding, LucideFileText
+    LucideSearch, LucideArrowRight
   ],
   templateUrl: './spotlight-search.component.html',
   styleUrls: ['./spotlight-search.component.css']

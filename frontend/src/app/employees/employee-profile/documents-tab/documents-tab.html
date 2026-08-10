@@ -18,6 +18,7 @@
         <svg *ngIf="!doc.fileUrl.startsWith('data:image') && !doc.fileUrl.startsWith('data:video')" lucideFileText size="32"></svg>
       </div>
       <div class="doc-info">
+        <span class="doc-badge">{{ doc.documentType || 'Document' }}</span>
         <h3>{{ doc.fileName }}</h3>
         <p>{{ timeAgo(doc.createdAt) }}</p>
       </div>
@@ -50,6 +51,13 @@
     </div>
     
     <div class="modal-body">
+      <div class="form-group">
+        <label>Document Type <span class="required">*</span></label>
+        <select class="form-control" [(ngModel)]="selectedDocumentType">
+          <option *ngFor="let type of documentTypes" [value]="type">{{ type }}</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label>File name <span class="required">*</span></label>
         <input type="text" class="form-control" [(ngModel)]="fileName">

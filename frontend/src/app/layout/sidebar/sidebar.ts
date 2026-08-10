@@ -6,12 +6,12 @@ import { AuthService } from '../../services/auth.service';
 import { MenusService } from '../../services/menus.service';
 import { PermissionsService, RolePermission } from '../../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX } from '@lucide/angular';
+import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding } from '@lucide/angular';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX],
+  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding],
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css']
 })
@@ -82,6 +82,7 @@ export class SidebarComponent implements OnInit {
             allowed.add('assets/inventory');
             allowed.add('assets/assignments');
             allowed.add('assets/requests');
+            allowed.add('clients');
           } else {
             // Standard Employee / Other roles: Only Hardware Requests
             allowed.add('assets');
@@ -258,6 +259,12 @@ export class SidebarComponent implements OnInit {
           this.router.navigate(['/projects']);
         } else {
           this.toast.error('You do not have permission to access Projects.');
+        }
+      } else if (menuId === 'clients') {
+        if (this.hasAccess('clients')) {
+          this.router.navigate(['/clients']);
+        } else {
+          this.toast.error('You do not have permission to access Clients.');
         }
       } else {
         this.comingSoon(event);

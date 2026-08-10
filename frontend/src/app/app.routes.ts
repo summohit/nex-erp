@@ -6,11 +6,13 @@ import { authGuard } from './guards/auth.guard';
 import { permissionGuard } from './guards/permission.guard';
 import { EmployeeListComponent } from './employees/employee-list/employee-list';
 import { OnboardingComponent } from './employees/onboarding/onboarding';
+import { TimesheetsComponent } from './timesheets/timesheets.component';
 
 export const routes: Routes = [
   { path: '', component: AuthComponent },
   { path: 'auth/check-email', loadComponent: () => import('./auth/check-email/check-email').then(m => m.CheckEmailComponent) },
   { path: 'auth/verify-email', loadComponent: () => import('./auth/verify-email/verify-email').then(m => m.VerifyEmailComponent) },
+  { path: 'kiosk/:companyId', loadComponent: () => import('./kiosk/kiosk').then(m => m.Kiosk) },
   { path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.OnboardingComponent) },
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
@@ -26,6 +28,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: 'dashboard', component: DashboardComponent },
+      { 
+        path: 'timesheets',
+        canActivate: [permissionGuard],
+        data: { module: 'timesheets' },
+        loadComponent: () => import('./timesheets/timesheets.component').then(m => m.TimesheetsComponent)
+      },
       { 
         path: 'settings/master-data', 
         canActivate: [permissionGuard],
@@ -55,6 +63,18 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'employees/documents' },
         loadComponent: () => import('./employees/documents/documents').then(m => m.EmployeeDocumentsComponent)
+      },
+      {
+        path: 'performance',
+        canActivate: [permissionGuard],
+        data: { module: 'performance' },
+        loadComponent: () => import('./performance/performance').then(m => m.PerformanceComponent)
+      },
+      {
+        path: 'offboarding',
+        canActivate: [permissionGuard],
+        data: { module: 'offboarding' },
+        loadComponent: () => import('./offboarding/offboarding').then(m => m.OffboardingComponent)
       },
       {
         path: 'employees/:id/profile',
@@ -147,6 +167,18 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'projects' },
         loadComponent: () => import('./projects/projects').then(m => m.ProjectsComponent)
+      },
+      {
+        path: 'clients',
+        canActivate: [permissionGuard],
+        data: { module: 'clients' },
+        loadComponent: () => import('./clients/clients-list/clients-list.component').then(m => m.ClientsListComponent)
+      },
+      {
+        path: 'clients/:id',
+        canActivate: [permissionGuard],
+        data: { module: 'clients' },
+        loadComponent: () => import('./clients/client-profile/client-profile.component').then(m => m.ClientProfileComponent)
       }
     ]
   },

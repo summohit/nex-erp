@@ -1,15 +1,18 @@
-import { Component, inject, signal, OnInit, ViewChild } from '@angular/core';
+import { Component, inject, signal, OnInit, ViewChild, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { NotificationsService } from '../../services/notifications.service';
+import { AttendanceService } from '../../services/attendance';
 import { SpotlightSearchComponent } from '../../shared/components/spotlight-search/spotlight-search.component';
 import { 
   LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
-  LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban
+  LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
+  LucidePlay, LucideSquare, LucideLoader2
 } from '@lucide/angular';
+import { HotToastService } from '@ngneat/hot-toast';
 
 @Component({
   selector: 'app-header',
@@ -20,14 +23,17 @@ import {
     RouterModule,
     SpotlightSearchComponent,
     LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
-    LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban
+    LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
+    LucidePlay, LucideSquare, LucideLoader2
   ],
   templateUrl: './header.html',
   styleUrls: ['./header.css']
 })
-export class HeaderComponent implements OnInit {
+export class HeaderComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private authService = inject(AuthService);
+  private attendanceService = inject(AttendanceService);
+  private toast = inject(HotToastService);
   notificationsService = inject(NotificationsService);
 
   @ViewChild(SpotlightSearchComponent) spotlightSearch!: SpotlightSearchComponent;
@@ -39,6 +45,13 @@ export class HeaderComponent implements OnInit {
   isProfileMenuOpen = signal<boolean>(false);
   isQuickCreateOpen = signal<boolean>(false);
 
+  // Systray Attendance
+  isClockedIn = signal<boolean>(false);
+  isClocking = signal<boolean>(false);
+  clockInTime = signal<Date | null>(null);
+  timerStr = signal<string>('00:00:00');
+  private timerInterval: any;
+
   ngOnInit() {
     this.updateTitle(this.router.url);
     this.router.events.pipe(
@@ -46,6 +59,75 @@ export class HeaderComponent implements OnInit {
     ).subscribe((event: any) => {
       this.updateTitle(event.urlAfterRedirects);
     });
+
+    this.checkTodayAttendance();
+  }
+
+  ngOnDestroy() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+  }
+
+  checkTodayAttendance() {
+    this.attendanceService.getTodayAttendance().subscribe({
+      next: (res) => {
+        if (res && res.clockIn && !res.clockOut) {
+          this.isClockedIn.set(true);
+          this.clockInTime.set(new Date(res.clockIn));
+          this.startTimer();
+        } else {
+          this.isClockedIn.set(false);
+          this.clockInTime.set(null);
+          this.timerStr.set('00:00:00');
+          if (this.timerInterval) clearInterval(this.timerInterval);
+        }
+      },
+      error: () => {
+        this.isClockedIn.set(false);
+      }
+    });
+  }
+
+  startTimer() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.timerInterval = setInterval(() => {
+      const inTime = this.clockInTime();
+      if (!inTime) return;
+      const diff = new Date().getTime() - inTime.getTime();
+      const hrs = Math.floor(diff / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      this.timerStr.set(`${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+    }, 1000);
+  }
+
+  toggleClock() {
+    if (this.isClocking()) return;
+    this.isClocking.set(true);
+    if (this.isClockedIn()) {
+      this.attendanceService.clockOut().subscribe({
+        next: () => {
+          this.toast.success('Clocked out successfully');
+          this.checkTodayAttendance();
+          this.isClocking.set(false);
+        },
+        error: (err) => {
+          this.toast.error(err.error?.message || 'Failed to clock out');
+          this.isClocking.set(false);
+        }
+      });
+    } else {
+      this.attendanceService.clockIn().subscribe({
+        next: () => {
+          this.toast.success('Clocked in successfully');
+          this.checkTodayAttendance();
+          this.isClocking.set(false);
+        },
+        error: (err) => {
+          this.toast.error(err.error?.message || 'Failed to clock in');
+          this.isClocking.set(false);
+        }
+      });
+    }
   }
 
   openSpotlight() {

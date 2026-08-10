@@ -70,6 +70,7 @@ export class AppreciationComponent implements OnInit {
     {
       field: 'employee',
       headerName: 'Given To',
+      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
       minWidth: 240,
       flex: 1.5,
       cellRenderer: (params: any) => {

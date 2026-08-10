@@ -4,9 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { EmployeeService } from '../../services/employee.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { 
-  LucideFileText, LucideSearch, LucideUploadCloud, LucideDownload, 
-  LucideTrash2, LucideFilter, LucideUser, LucideFileCheck, LucideFolder,
-  LucidePlus, LucideX, LucideExternalLink, LucidePaperclip
+  LucideFileText, LucideSearch, LucideUploadCloud,
+  LucideTrash2, LucideFilter, LucideFileCheck, LucideFolder,
+  LucideX, LucideExternalLink, LucidePaperclip
 } from '@lucide/angular';
 
 @Component({
@@ -15,9 +15,9 @@ import {
   imports: [
     CommonModule, 
     FormsModule,
-    LucideFileText, LucideSearch, LucideUploadCloud, LucideDownload, 
-    LucideTrash2, LucideFilter, LucideUser, LucideFileCheck, LucideFolder,
-    LucidePlus, LucideX, LucideExternalLink, LucidePaperclip
+    LucideFileText, LucideSearch, LucideUploadCloud,
+    LucideTrash2, LucideFilter, LucideFileCheck, LucideFolder,
+    LucideX, LucideExternalLink, LucidePaperclip
   ],
   templateUrl: './documents.html',
   styleUrls: ['./documents.css']

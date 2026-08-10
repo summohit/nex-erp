@@ -1,0 +1,221 @@
+<div class="page-container" *ngIf="!isLoading && client">
+  <!-- Header -->
+  <div class="profile-header card">
+    <div class="profile-title-area">
+      <div class="client-avatar">
+        <svg lucideBuilding size="32"></svg>
+      </div>
+      <div class="client-name-block">
+        <h1 class="client-name">{{ client.name }}</h1>
+        <div class="client-meta">
+          <span class="meta-item" *ngIf="client.industry"><svg lucideBriefcase size="14"></svg> {{ client.industry }}</span>
+          <span class="meta-item"><svg lucideMapPin size="14"></svg> {{ client.billingCity || 'No Location' }}</span>
+          <span class="badge" [class.badge-active]="client.status === 'ACTIVE'" [class.badge-lead]="client.status === 'LEAD'">{{ client.status }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="tabs-nav">
+    <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="setTab('overview')">Overview</button>
+    <button class="tab-btn" [class.active]="activeTab === 'financials'" (click)="setTab('financials')">Financials</button>
+    <button class="tab-btn" [class.active]="activeTab === 'contacts'" (click)="setTab('contacts')">Contacts</button>
+    <button class="tab-btn" [class.active]="activeTab === 'projects'" (click)="setTab('projects')">Projects</button>
+  </div>
+
+  <div class="tab-content">
+    
+    <!-- Overview Tab -->
+    <div class="tab-pane" *ngIf="activeTab === 'overview'">
+      <div class="grid-2-col">
+        <!-- About -->
+        <div class="card p-24">
+          <h3 class="card-title">Company Info</h3>
+          <div class="info-list">
+            <div class="info-row">
+              <span class="info-label">Website</span>
+              <span class="info-value">
+                <a [href]="client.website" target="_blank" *ngIf="client.website">{{ client.website }}</a>
+                <span *ngIf="!client.website" class="text-muted">Not provided</span>
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Industry</span>
+              <span class="info-value">{{ client.industry || 'Not provided' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Client Since</span>
+              <span class="info-value">{{ client.createdAt | date:'mediumDate' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Portal Access</span>
+              <span class="info-value">
+                <span *ngIf="client.portalEnabled" class="text-success"><svg lucideCheckCircle2 size="14"></svg> Enabled</span>
+                <span *ngIf="!client.portalEnabled" class="text-muted">Disabled</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Primary Contacts Snippet -->
+        <div class="card p-24">
+          <h3 class="card-title">Key Contacts</h3>
+          <div class="contacts-list" *ngIf="(client.contacts?.length ?? 0) > 0">
+            <div class="contact-item" *ngFor="let contact of client.contacts | slice:0:3">
+              <div class="contact-avatar">{{ contact.firstName.charAt(0) }}{{ contact.lastName ? contact.lastName.charAt(0) : '' }}</div>
+              <div class="contact-details">
+                <div class="contact-name">{{ contact.firstName }} {{ contact.lastName }} <span class="badge badge-sm badge-primary" *ngIf="contact.isPrimary">Primary</span></div>
+                <div class="contact-email"><svg lucideMail size="12"></svg> {{ contact.email }}</div>
+                <div class="contact-phone" *ngIf="contact.phone"><svg lucidePhone size="12"></svg> {{ contact.phone }}</div>
+              </div>
+            </div>
+          </div>
+          <p class="text-muted" *ngIf="client.contacts?.length === 0">No contacts added yet.</p>
+          <button class="btn btn-outline btn-sm mt-16" (click)="setTab('contacts')">View All Contacts</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Financials Tab -->
+    <div class="tab-pane" *ngIf="activeTab === 'financials'">
+      <div class="grid-3-col mb-24">
+        <!-- Financial Metrics -->
+        <div class="stat-card">
+          <div class="stat-icon"><svg lucideDollarSign size="24"></svg></div>
+          <div class="stat-content">
+            <div class="stat-label">Outstanding Balance</div>
+            <div class="stat-value text-danger">{{ client.outstandingBalance | currency:client.currency }}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon text-primary bg-primary-light"><svg lucideFileText size="24"></svg></div>
+          <div class="stat-content">
+            <div class="stat-label">Payment Terms</div>
+            <div class="stat-value">{{ client.paymentTerms || 'Not Set' }}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon text-success bg-success-light"><svg lucideBriefcase size="24"></svg></div>
+          <div class="stat-content">
+            <div class="stat-label">Default Hourly Rate</div>
+            <div class="stat-value">{{ (client.defaultHourlyRate | currency:client.currency) || 'Project Default' }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2-col">
+        <!-- Billing Details -->
+        <div class="card p-24">
+          <h3 class="card-title">Billing Information</h3>
+          <div class="info-list">
+            <div class="info-row">
+              <span class="info-label">Currency</span>
+              <span class="info-value font-mono">{{ client.currency }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Tax / VAT ID</span>
+              <span class="info-value font-mono">{{ client.taxId || 'Not provided' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Registration No.</span>
+              <span class="info-value font-mono">{{ client.registrationNo || 'Not provided' }}</span>
+            </div>
+          </div>
+          
+          <h4 class="section-subtitle mt-24">Billing Address</h4>
+          <address class="address-block">
+            {{ client.billingAddressLine1 || 'No billing address provided' }}<br *ngIf="client.billingAddressLine1">
+            {{ client.billingAddressLine2 }}<br *ngIf="client.billingAddressLine2">
+            {{ client.billingCity }} {{ client.billingState }} {{ client.billingZipCode }}<br *ngIf="client.billingCity">
+            {{ client.billingCountry }}
+          </address>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contacts Tab -->
+    <div class="tab-pane" *ngIf="activeTab === 'contacts'">
+      <div class="card">
+        <div class="card-header border-bottom p-24 flex-between">
+          <h3 class="card-title m-0">All Contacts</h3>
+          <button class="btn btn-primary btn-sm">Add Contact</button>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Title</th>
+                <th>Contact Info</th>
+                <th>Roles</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let contact of client.contacts">
+                <td>
+                  <div class="flex-align-center gap-12">
+                    <div class="contact-avatar-sm">{{ contact.firstName.charAt(0) }}</div>
+                    <strong>{{ contact.firstName }} {{ contact.lastName }}</strong>
+                  </div>
+                </td>
+                <td>{{ contact.jobTitle || '-' }}</td>
+                <td>
+                  <div class="text-sm"><a href="mailto:{{contact.email}}">{{ contact.email }}</a></div>
+                  <div class="text-sm text-muted">{{ contact.phone || contact.mobile || '-' }}</div>
+                </td>
+                <td>
+                  <div class="badges">
+                    <span class="badge badge-sm badge-primary" *ngIf="contact.isPrimary">Primary</span>
+                    <span class="badge badge-sm badge-warning" *ngIf="contact.isBilling">Billing</span>
+                  </div>
+                </td>
+                <td><button class="btn-icon">Edit</button></td>
+              </tr>
+              <tr *ngIf="client.contacts?.length === 0">
+                <td colspan="5" class="text-center p-24 text-muted">No contacts found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projects Tab -->
+    <div class="tab-pane" *ngIf="activeTab === 'projects'">
+      <div class="card">
+        <div class="card-header border-bottom p-24">
+          <h3 class="card-title m-0">Associated Projects</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Project Name</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let project of client.projects">
+                <td><a [routerLink]="['/projects', project.id]" class="fw-500">{{ project.name }}</a></td>
+                <td><span class="badge">{{ project.status }}</span></td>
+                <td>{{ project.createdAt | date:'mediumDate' }}</td>
+              </tr>
+              <tr *ngIf="!client.projects || client.projects.length === 0">
+                <td colspan="3" class="text-center p-24 text-muted">No projects associated with this client.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="page-container" *ngIf="isLoading">
+  <!-- Skeleton loader could go here -->
+  <p>Loading client profile...</p>
+</div>

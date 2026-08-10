@@ -39,6 +39,15 @@ export class EmergencyContactsTabComponent implements OnInit {
     sortable: true
   };
 
+  gridOptions = {
+    rowSelection: {
+      mode: 'multiRow' as const,
+      checkboxes: true,
+      headerCheckbox: true,
+      enableClickSelection: false
+    }
+  };
+
   constructor(private employeeService: EmployeeService, private toast: HotToastService) {}
 
   ngOnInit() {
@@ -47,9 +56,7 @@ export class EmergencyContactsTabComponent implements OnInit {
         field: 'name', 
         headerName: 'Name', 
         flex: 1, 
-        minWidth: 150,
-        headerCheckboxSelection: true,
-        checkboxSelection: true
+        minWidth: 150
       },
       { field: 'email', headerName: 'Email', flex: 1, minWidth: 200, valueFormatter: p => p.value || '-' },
       { field: 'mobile', headerName: 'Mobile', flex: 1, minWidth: 150 },

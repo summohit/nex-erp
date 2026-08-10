@@ -1,0 +1,46 @@
+<div class="kiosk-container">
+  <div class="kiosk-header">
+    <h1>{{ currentTime() | date:'shortTime' }}</h1>
+    <p>{{ currentTime() | date:'EEEE, MMMM d, yyyy' }}</p>
+    <div style="margin-top: 16px; font-size: 1.25rem; font-weight: 500;">
+      Enter your PIN to clock in/out
+    </div>
+  </div>
+
+  <div class="pin-display">
+    <div class="pin-dot" [class.filled]="pin().length >= 1"></div>
+    <div class="pin-dot" [class.filled]="pin().length >= 2"></div>
+    <div class="pin-dot" [class.filled]="pin().length >= 3"></div>
+    <div class="pin-dot" [class.filled]="pin().length >= 4"></div>
+  </div>
+
+  <div class="numpad">
+    <button (click)="appendPin(1)">1</button>
+    <button (click)="appendPin(2)">2</button>
+    <button (click)="appendPin(3)">3</button>
+    <button (click)="appendPin(4)">4</button>
+    <button (click)="appendPin(5)">5</button>
+    <button (click)="appendPin(6)">6</button>
+    <button (click)="appendPin(7)">7</button>
+    <button (click)="appendPin(8)">8</button>
+    <button (click)="appendPin(9)">9</button>
+    <button class="action" (click)="clearPin()">Clear</button>
+    <button (click)="appendPin(0)">0</button>
+    <button class="action" (click)="deleteLast()">Del</button>
+  </div>
+
+  <div class="actions">
+    <button 
+      class="btn-clock btn-in" 
+      [disabled]="pin().length !== 4 || isProcessing()"
+      (click)="clockIn()">
+      Clock In
+    </button>
+    <button 
+      class="btn-clock btn-out" 
+      [disabled]="pin().length !== 4 || isProcessing()"
+      (click)="clockOut()">
+      Clock Out
+    </button>
+  </div>
+</div>

@@ -9,8 +9,8 @@ import { ProjectsService } from '../services/projects';
 import { LeavesService } from '../services/leaves';
 import { 
   LucideCheckCircle2, LucideCircle, LucideClock, LucideUsers, LucideBriefcase,
-  LucideFileText, LucideTrendingUp, LucideCheckSquare, LucideCalendar, LucideUserCheck,
-  LucideAlertCircle, LucideArrowRight, LucidePlus, LucideBuilding, LucideLayers,
+  LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
+  LucideAlertCircle, LucideArrowRight, LucideBuilding, LucideLayers,
   LucideShield, LucideAward
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -22,8 +22,8 @@ import { HotToastService } from '@ngneat/hot-toast';
     CommonModule, 
     RouterModule,
     LucideCheckCircle2, LucideCircle, LucideClock, LucideUsers, LucideBriefcase,
-    LucideFileText, LucideTrendingUp, LucideCheckSquare, LucideCalendar, LucideUserCheck,
-    LucideAlertCircle, LucideArrowRight, LucidePlus, LucideBuilding, LucideLayers,
+    LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
+    LucideAlertCircle, LucideArrowRight, LucideBuilding, LucideLayers,
     LucideShield, LucideAward
   ],
   templateUrl: './dashboard.html',

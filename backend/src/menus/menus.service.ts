@@ -1,9 +1,66 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class MenusService {
+export class MenusService implements OnModuleInit {
+  private readonly logger = new Logger(MenusService.name);
+
   constructor(private prisma: PrismaService) {}
+
+  async onModuleInit() {
+    try {
+      const parent = await this.prisma.menu.findFirst({ where: { parentId: null, title: 'MAIN' } });
+      if (parent) {
+        const perfMenu = await this.prisma.menu.findFirst({ where: { title: 'Performance', parentId: parent.id } });
+        if (!perfMenu) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Performance',
+              icon: 'target',
+              route: '/performance',
+              displayOrder: 4,
+              parentId: parent.id,
+              isActive: true
+            }
+          });
+          this.logger.log('Performance menu auto-seeded successfully.');
+        }
+
+        const offMenu = await this.prisma.menu.findFirst({ where: { title: 'Offboarding', parentId: parent.id } });
+        if (!offMenu) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Offboarding',
+              icon: 'door-open', // generic lucide door-open icon
+              route: '/offboarding',
+              displayOrder: 5,
+              parentId: parent.id,
+              isActive: true
+            }
+          });
+          this.logger.log('Offboarding menu auto-seeded successfully.');
+        }
+
+        const clientsMenu = await this.prisma.menu.findFirst({ where: { title: 'Clients', parentId: parent.id } });
+        if (!clientsMenu) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Clients',
+              icon: 'building', 
+              route: '/clients',
+              displayOrder: 6,
+              parentId: parent.id,
+              isActive: true
+            }
+          });
+          this.logger.log('Clients menu auto-seeded successfully.');
+        }
+      }
+    } catch (err) {
+      this.logger.error('Failed to auto-seed menus:', err);
+    }
+  }
+
 
   async getSidebarMenus(companyId: number, userId: number, roleName: string) {
     // 1. Fetch all active menus (system global + company specific)

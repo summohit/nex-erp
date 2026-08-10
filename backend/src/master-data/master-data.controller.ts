@@ -252,4 +252,96 @@ export class MasterDataController {
       where: { id, companyId: req.user.companyId }
     });
   }
+
+  // --- Blackout Date CRUD ---
+  @Get('blackout-dates')
+  async getBlackoutDates(@Request() req) {
+    return this.prisma.blackoutDate.findMany({
+      where: { companyId: req.user.companyId },
+      orderBy: { date: 'asc' }
+    });
+  }
+
+  @Post('blackout-dates')
+  async createBlackoutDate(@Request() req, @Body() data: { date: string, reason: string, departmentId?: number }) {
+    return this.prisma.blackoutDate.create({
+      data: {
+        date: new Date(data.date),
+        reason: data.reason,
+        departmentId: data.departmentId ? Number(data.departmentId) : null,
+        companyId: req.user.companyId,
+      }
+    });
+  }
+
+  @Put('blackout-dates/:id')
+  async updateBlackoutDate(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { date?: string, reason?: string, departmentId?: number }) {
+    const updateData: any = {};
+    if (data.date !== undefined) updateData.date = new Date(data.date);
+    if (data.reason !== undefined) updateData.reason = data.reason;
+    if (data.departmentId !== undefined) updateData.departmentId = data.departmentId ? Number(data.departmentId) : null;
+
+    return this.prisma.blackoutDate.update({
+      where: { id, companyId: req.user.companyId },
+      data: updateData
+    });
+  }
+
+  @Delete('blackout-dates/:id')
+  async deleteBlackoutDate(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.prisma.blackoutDate.delete({
+      where: { id, companyId: req.user.companyId }
+    });
+  }
+
+  // --- Shift Rotation CRUD ---
+  @Get('shift-rotations')
+  async getShiftRotations(@Request() req) {
+    return this.prisma.shiftRotation.findMany({
+      where: { companyId: req.user.companyId },
+      include: { employees: { select: { id: true, firstName: true, lastName: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  @Post('shift-rotations')
+  async createShiftRotation(@Request() req, @Body() data: any) {
+    return this.prisma.shiftRotation.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        rotationType: data.rotationType,
+        shiftIds: data.shiftIds, // Should be a JSON string like "[1,2]"
+        companyId: req.user.companyId,
+        employees: data.employeeIds ? {
+          connect: data.employeeIds.map((id: number) => ({ id }))
+        } : undefined
+      },
+      include: { employees: true }
+    });
+  }
+
+  @Put('shift-rotations/:id')
+  async updateShiftRotation(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.prisma.shiftRotation.update({
+      where: { id, companyId: req.user.companyId },
+      data: {
+        name: data.name,
+        description: data.description,
+        rotationType: data.rotationType,
+        shiftIds: data.shiftIds,
+        employees: data.employeeIds ? {
+          set: data.employeeIds.map((id: number) => ({ id }))
+        } : undefined
+      },
+      include: { employees: true }
+    });
+  }
+
+  @Delete('shift-rotations/:id')
+  async deleteShiftRotation(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.prisma.shiftRotation.delete({
+      where: { id, companyId: req.user.companyId }
+    });
+  }
 }

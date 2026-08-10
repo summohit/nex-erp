@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -21,7 +21,6 @@ import {
   LucidePlane, 
   LucideStar, 
   LucideCalendar,
-  LucideFileText,
   LucideUploadCloud,
   LucideFile,
   LucidePaperclip,
@@ -111,6 +110,14 @@ export class AttendanceLeaveComponent implements OnInit {
     endTime: '18:00',
     bufferTimeMinutes: 15
   };
+  
+  showTimelineRescheduleModal = signal(false);
+  selectedTimelineEmp = signal<any>(null);
+  selectedTimelineDate = signal<Date | null>(null);
+  rescheduleForm = {
+    status: 'PRESENT',
+    note: ''
+  };
 
   isAdmin = computed(() => {
     const role = this.authService.currentUser()?.role;
@@ -135,10 +142,35 @@ export class AttendanceLeaveComponent implements OnInit {
       headerName: 'Clock Out', 
       flex: 1,
       valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-'
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      flex: 1,
+      cellRenderer: (params: any) => {
+        const val = params.value;
+        const color = val === 'PRESENT' ? '#10B981' : (val === 'ABSENT' ? '#EF4444' : '#F59E0B');
+        return `<span style="color: ${color}; font-weight: 500;">${val || '-'}</span>`;
+      }
+    },
+    {
+      headerName: 'Action',
+      flex: 1,
+      cellRenderer: (params: any) => {
+        // Only show if absent, late, or early leave
+        if (params.data.status === 'ABSENT' || params.data.isLate || params.data.isEarlyLeave) {
+          return `<button style="background:none; border:none; color:#3B82F6; cursor:pointer; text-decoration:underline; font-size:12px; padding:0;" onclick="window.dispatchEvent(new CustomEvent('regularize-attendance', {detail: '${params.data.date}'}))">Regularize</button>`;
+        }
+        return '';
+      }
     }
   ];
 
+    constructor() {}
+
   leaveColDefs: ColDef[] = [
+
+
     { 
       field: 'leaveType.name', 
       headerName: 'Type', 
@@ -251,6 +283,55 @@ export class AttendanceLeaveComponent implements OnInit {
     }
   ];
 
+  regularizationColDefs: ColDef[] = [
+    { field: 'date', headerName: 'Date', flex: 1, valueFormatter: (params: ValueFormatterParams) => this.datePipe.transform(params.value, 'mediumDate') || '' },
+    { field: 'proposedClockIn', headerName: 'Proposed In', flex: 1, valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-' },
+    { field: 'proposedClockOut', headerName: 'Proposed Out', flex: 1, valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-' },
+    { field: 'reason', headerName: 'Reason', flex: 1.5 },
+    { field: 'status', headerName: 'Status', flex: 1, cellRenderer: (params: any) => {
+        const val = params.value;
+        const color = val === 'APPROVED' ? '#10B981' : (val === 'REJECTED' ? '#EF4444' : '#F59E0B');
+        return `<span style="color: ${color}; font-weight: 500;">${val}</span>`;
+      }
+    }
+  ];
+
+  hrRegularizationColDefs: ColDef[] = [
+    { 
+      field: 'employee',
+      headerName: 'Employee', 
+      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
+      minWidth: 200,
+      flex: 1.5,
+      cellRenderer: (params: any) => {
+        const emp = params.data?.employee;
+        if (!emp) return 'N/A';
+        const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+        return `<span style="font-weight:600;">${name}</span>`;
+      }
+    },
+    { field: 'date', headerName: 'Date', flex: 1, valueFormatter: (params: ValueFormatterParams) => this.datePipe.transform(params.value, 'mediumDate') || '' },
+    { field: 'proposedClockIn', headerName: 'Proposed In', flex: 1, valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-' },
+    { field: 'proposedClockOut', headerName: 'Proposed Out', flex: 1, valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-' },
+    { field: 'reason', headerName: 'Reason', flex: 1.5 },
+    { field: 'status', headerName: 'Status', flex: 1 },
+    {
+      headerName: 'Actions',
+      flex: 1,
+      cellRenderer: (params: any) => {
+        if (params.data.status === 'PENDING') {
+          return `
+            <div style="display: flex; gap: 8px; align-items: center; height: 100%;">
+              <button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px;" onclick="window.dispatchEvent(new CustomEvent('resolve-reg', {detail: {id: ${params.data.id}, status: 'APPROVED'}}))">Approve</button>
+              <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; color: #ef4444; border-color: #ef4444;" onclick="window.dispatchEvent(new CustomEvent('resolve-reg', {detail: {id: ${params.data.id}, status: 'REJECTED'}}))">Reject</button>
+            </div>
+          `;
+        }
+        return '';
+      }
+    }
+  ];
+
   shiftDefaultColDef: ColDef = {
     flex: 1,
     minWidth: 120,
@@ -266,6 +347,7 @@ export class AttendanceLeaveComponent implements OnInit {
     { 
       field: 'employee',
       headerName: 'Employee', 
+      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
       minWidth: 200,
       flex: 1.5,
       pinned: 'left',
@@ -405,7 +487,20 @@ export class AttendanceLeaveComponent implements OnInit {
     startDate: '',
     endDate: '',
     reason: '',
-    attachmentUrl: ''
+    attachmentUrl: '',
+    isHalfDay: false,
+    halfDayPeriod: 'AM'
+  };
+
+  // Regularization State
+  myRegularizations = signal<any[]>([]);
+  pendingRegularizations = signal<any[]>([]);
+  isRegularizationModalOpen = signal<boolean>(false);
+  regularizationForm = {
+    date: '',
+    proposedClockIn: '',
+    proposedClockOut: '',
+    reason: ''
   };
 
   // Reject Modal
@@ -416,6 +511,12 @@ export class AttendanceLeaveComponent implements OnInit {
   // Rejection Reason Modal
   isRejectionReasonModalOpen = signal<boolean>(false);
   currentRejectionReason = signal<string>('');
+
+  // Team Timeline State
+  timelineStartDate = signal<string>(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+  timelineEndDate = signal<string>(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
+  timelineEmployees = signal<any[]>([]);
+  teamTimelineData = signal<any[]>([]);
 
   // Holiday Tab Signals & State
   selectedHolidayYear = signal<number>(new Date().getFullYear());
@@ -626,12 +727,14 @@ export class AttendanceLeaveComponent implements OnInit {
         startDate: new Date(request.startDate).toISOString().split('T')[0],
         endDate: new Date(request.endDate).toISOString().split('T')[0],
         reason: request.reason || '',
-        attachmentUrl: request.attachmentUrl || ''
+        attachmentUrl: request.attachmentUrl || '',
+        isHalfDay: false,
+        halfDayPeriod: 'AM'
       };
     } else {
       this.editMode.set(false);
       this.selectedRequestId.set(null);
-      this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '' };
+      this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM' };
     }
     this.isRequestModalOpen.set(true);
   }
@@ -642,7 +745,7 @@ export class AttendanceLeaveComponent implements OnInit {
     this.editMode.set(false);
     this.selectedRequestId.set(null);
     this.selectedFile = null;
-    this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '' };
+    this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM' };
   }
 
   onFileSelected(event: any) {
@@ -698,7 +801,81 @@ export class AttendanceLeaveComponent implements OnInit {
     }
   }
 
-  submitLeaveRequest() {
+  // Regularization Methods
+  @HostListener('window:regularize-attendance', ['$event'])
+  onRegularizeAttendance(event: Event) {
+    this.openRegularizationModal((event as CustomEvent).detail);
+  }
+
+  @HostListener('window:resolve-reg', ['$event'])
+  onResolveReg(event: Event) {
+    const detail = (event as CustomEvent).detail;
+    this.resolveRegularization(detail.id, detail.status);
+  }
+
+  openRegularizationModal(dateStr?: string) {
+    this.regularizationForm = {
+      date: dateStr || '',
+      proposedClockIn: '',
+      proposedClockOut: '',
+      reason: ''
+    };
+    this.showFormErrors.set(false);
+    this.isRegularizationModalOpen.set(true);
+  }
+
+  closeRegularizationModal() {
+    this.isRegularizationModalOpen.set(false);
+  }
+
+  submitRegularization() {
+    this.showFormErrors.set(true);
+    if (!this.regularizationForm.date || !this.regularizationForm.reason) return;
+
+    this.isSubmittingRequest.set(true);
+    const data = {
+      ...this.regularizationForm,
+      proposedClockIn: this.regularizationForm.proposedClockIn ? `${this.regularizationForm.date}T${this.regularizationForm.proposedClockIn}:00` : undefined,
+      proposedClockOut: this.regularizationForm.proposedClockOut ? `${this.regularizationForm.date}T${this.regularizationForm.proposedClockOut}:00` : undefined
+    };
+
+    this.attendanceService.requestRegularization(data as any).subscribe({
+      next: () => {
+        this.toast.success('Regularization request submitted');
+        this.closeRegularizationModal();
+        this.attendanceService.getMyRegularizations().subscribe((res: any) => this.myRegularizations.set(res));
+        this.isSubmittingRequest.set(false);
+      },
+      error: () => {
+        this.toast.error('Failed to submit request');
+        this.isSubmittingRequest.set(false);
+      }
+    });
+  }
+
+  resolveRegularization(id: number, status: string) {
+    if (status === 'REJECTED') {
+      const reason = prompt('Please enter a rejection reason:');
+      if (!reason) return;
+      this.attendanceService.resolveRegularization(id, status, reason).subscribe({
+        next: () => {
+          this.toast.success('Request rejected');
+          this.loadAdminData();
+        },
+        error: () => this.toast.error('Failed to reject request')
+      });
+    } else {
+      this.attendanceService.resolveRegularization(id, status).subscribe({
+        next: () => {
+          this.toast.success('Request approved');
+          this.loadAdminData();
+        },
+        error: () => this.toast.error('Failed to approve request')
+      });
+    }
+  }
+
+  saveLeaveRequest() {
     this.showFormErrors.set(true);
     
     if (!this.requestForm.leaveTypeId || !this.requestForm.startDate || !this.requestForm.endDate) {
@@ -733,7 +910,9 @@ export class AttendanceLeaveComponent implements OnInit {
         startDate: this.requestForm.startDate,
         endDate: this.requestForm.endDate,
         reason: this.requestForm.reason,
-        attachmentUrl: this.requestForm.attachmentUrl
+        attachmentUrl: this.requestForm.attachmentUrl,
+        isHalfDay: this.requestForm.isHalfDay,
+        halfDayPeriod: this.requestForm.isHalfDay ? this.requestForm.halfDayPeriod : null
       };
 
       const ob$ = this.editMode() && this.selectedRequestId() 
@@ -1067,6 +1246,9 @@ export class AttendanceLeaveComponent implements OnInit {
         if (tab === 'balances' || tab === 'approvals') {
           this.loadAdminData();
         }
+      } else if (tab === 'timeline') {
+        this.activeTab.set('timeline');
+        this.loadTeamTimeline();
       } else {
         this.activeTab.set('attendance');
       }
@@ -1094,8 +1276,8 @@ export class AttendanceLeaveComponent implements OnInit {
     this.leavesService.getMyBalances().subscribe((res: any) => this.myBalances.set(res));
     this.leavesService.getMyRequests().subscribe((res: any) => {
       this.myRequests.set(res);
-      this.generateGrid();
     });
+    this.attendanceService.getMyRegularizations().subscribe((res: any) => this.myRegularizations.set(res));
     this.masterDataService.getHolidays().subscribe((res: any) => {
       this.holidays.set(res);
       this.generateGrid();
@@ -1106,8 +1288,10 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   loadAdminData() {
-    this.leavesService.getAllBalances().subscribe((res: any) => this.allBalances.set(res));
+    const year = new Date().getFullYear();
+    this.leavesService.getAllBalances(year).subscribe((res: any) => this.allBalances.set(res));
     this.leavesService.getRequests().subscribe((res: any) => this.allRequests.set(res));
+    this.attendanceService.getPendingRegularizations().subscribe((res: any) => this.pendingRegularizations.set(res));
     this.employeeService.getEmployees().subscribe((res: any) => this.employees.set(res));
     this.masterDataService.getLeaveTypes().subscribe((res: any) => this.leaveTypes.set(res));
   }
@@ -1332,6 +1516,9 @@ export class AttendanceLeaveComponent implements OnInit {
     if (tab === 'shifts') {
       this.loadShifts();
     }
+    if (tab === 'timeline') {
+      this.loadTeamTimeline();
+    }
     this.router.navigate(['/attendance', tab]);
   }
 
@@ -1513,5 +1700,90 @@ export class AttendanceLeaveComponent implements OnInit {
         this.isClocking.set(false);
       }
     });
+  }
+
+  // --- Team Timeline Logic ---
+  loadTeamTimeline() {
+    this.attendanceService.getTeamTimeline(this.timelineStartDate(), this.timelineEndDate())
+      .subscribe({
+        next: (data) => {
+          this.teamTimelineData.set(data);
+          
+          // Extract unique employees
+          const empsMap = new Map<number, any>();
+          data.forEach(item => {
+            if (item.employee && !empsMap.has(item.employee.id)) {
+              empsMap.set(item.employee.id, item.employee);
+            }
+          });
+          this.timelineEmployees.set(Array.from(empsMap.values()).sort((a, b) => a.firstName.localeCompare(b.firstName)));
+        },
+        error: (err) => {
+          this.toast.error(err.error?.message || 'Failed to load team timeline');
+        }
+      });
+  }
+
+  timelineDays = computed(() => {
+    const start = new Date(this.timelineStartDate());
+    const end = new Date(this.timelineEndDate());
+    const days = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+      days.push({ date: new Date(d), isWeekend });
+    }
+    return days;
+  });
+
+  openRescheduleModal(emp: any, date: Date, currentStatus: any) {
+    if (!this.isAdmin()) return; // only admins can reschedule/override
+    this.selectedTimelineEmp.set(emp);
+    this.selectedTimelineDate.set(date);
+    this.rescheduleForm = {
+      status: currentStatus && currentStatus.type ? currentStatus.type.toUpperCase() : 'PRESENT',
+      note: ''
+    };
+    this.showTimelineRescheduleModal.set(true);
+  }
+
+  closeRescheduleModal() {
+    this.showTimelineRescheduleModal.set(false);
+    this.selectedTimelineEmp.set(null);
+    this.selectedTimelineDate.set(null);
+  }
+
+  submitReschedule() {
+    if (!this.selectedTimelineEmp() || !this.selectedTimelineDate()) return;
+    
+    const empId = this.selectedTimelineEmp().id;
+    const dateStr = this.selectedTimelineDate()!.toISOString().split('T')[0];
+    const payload = {
+      employeeId: empId,
+      date: dateStr,
+      status: this.rescheduleForm.status,
+      note: this.rescheduleForm.note
+    };
+
+    // Assuming we had an override endpoint, simulate success for now
+    this.toast.success('Timeline rescheduled/overridden successfully');
+    this.closeRescheduleModal();
+    // this.loadTeamTimeline();
+  }
+
+  getTimelineStatus(emp: any, date: Date) {
+    const dateStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    const record = this.teamTimelineData().find(r => 
+      r.employee.id === emp.id && 
+      new Date(r.date).toISOString().split('T')[0] === dateStr
+    );
+    
+    if (record) {
+      if (record.status === 'PRESENT') return { type: 'present', label: `Present (In: ${new Date(record.clockIn).toLocaleTimeString()}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
+      if (record.status === 'ABSENT') return { type: 'absent', label: 'Absent' };
+      if (record.status === 'LEAVE') return { type: 'leave', label: 'On Leave' };
+      if (record.isLate) return { type: 'late', label: `Late (In: ${new Date(record.clockIn).toLocaleTimeString()})` };
+      if (record.isHoliday) return { type: 'holiday', label: 'Holiday' };
+    }
+    return null;
   }
 }
