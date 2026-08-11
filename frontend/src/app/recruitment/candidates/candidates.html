@@ -609,23 +609,23 @@
       </select>
     </div>
     
-    <div style="display: flex; gap: 10px;">
-      <button *ngIf="app.status === 'HIRED' && app.approvalStatus !== 'PENDING_APPROVAL'" class="btn-primary" (click)="onboardCandidate()" style="display: flex; align-items: center; gap: 6px;">
+    <div class="drawer-actions">
+      <button *ngIf="app.status === 'HIRED' && app.approvalStatus !== 'PENDING_APPROVAL'" class="btn-primary drawer-action-btn" (click)="onboardCandidate()">
         <svg lucideBriefcase size="16"></svg> Onboard Candidate
       </button>
 
-      <button *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" class="btn-primary" (click)="approveSalary()" style="background: #10b981; border-color: #10b981;">
+      <button *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" class="btn-primary btn-approve-salary drawer-action-btn" (click)="approveSalary()">
         Approve Salary
       </button>
-      <button *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" class="btn-danger-outline" (click)="rejectSalary()">
+      <button *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" class="btn-danger-outline drawer-action-btn" (click)="rejectSalary()">
         Reject Salary
       </button>
 
-      <button *ngIf="app.offeredSalary && app.approvalStatus !== 'REJECTED'" class="btn-outline" (click)="viewAnnexure(app.id)" style="display: flex; align-items: center; gap: 6px; border-color: #3b82f6; color: #3b82f6;">
+      <button *ngIf="app.offeredSalary && app.approvalStatus !== 'REJECTED'" class="btn-outline btn-view-annexure drawer-action-btn" (click)="viewAnnexure(app.id)">
         <svg lucideFileText size="16"></svg> View Offer Annexure
       </button>
       
-      <button class="btn-danger-outline" (click)="deleteApplication()">
+      <button class="btn-danger-outline drawer-action-btn" (click)="deleteApplication()">
         <svg lucideTrash2 size="16"></svg> Delete
       </button>
     </div>

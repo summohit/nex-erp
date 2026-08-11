@@ -147,6 +147,18 @@ export class PayrollService {
   }
 
   async generatePayslips(companyId: number, month: number, year: number) {
+    const existingPayslips = await this.prisma.payslip.findMany({
+      where: { companyId, month: Number(month), year: Number(year) },
+      select: { status: true }
+    });
+
+    if (existingPayslips.length > 0) {
+      const hasFinalized = existingPayslips.some(p => p.status === 'FINALIZED' || p.status === 'PAID');
+      if (hasFinalized) {
+        throw new BadRequestException('Blocked or overrides existing DRAFT. Cannot override FINALIZED.');
+      }
+    }
+
     const employees = await this.prisma.employee.findMany({
       where: { companyId },
       include: {
@@ -448,10 +460,10 @@ export class PayrollService {
     const payslip = await this.prisma.payslip.findFirst({ where: { id, companyId } });
     if (!payslip) throw new NotFoundException('Payslip not found');
 
-    const lossOfPay = data.lossOfPay !== undefined ? Number(data.lossOfPay) : payslip.lossOfPay;
-    const totalEarnings = data.totalEarnings !== undefined ? Number(data.totalEarnings) : payslip.totalEarnings;
-    const totalDeductions = data.totalDeductions !== undefined ? Number(data.totalDeductions) : payslip.totalDeductions;
-    const expenseAmount = data.expenseAmount !== undefined ? Number(data.expenseAmount) : payslip.expenseAmount;
+    const lossOfPay = Math.max(0, data.lossOfPay !== undefined ? Number(data.lossOfPay) : payslip.lossOfPay);
+    const totalEarnings = Math.max(0, data.totalEarnings !== undefined ? Number(data.totalEarnings) : payslip.totalEarnings);
+    const totalDeductions = Math.max(0, data.totalDeductions !== undefined ? Number(data.totalDeductions) : payslip.totalDeductions);
+    const expenseAmount = Math.max(0, data.expenseAmount !== undefined ? Number(data.expenseAmount) : payslip.expenseAmount);
 
     const netPay = Math.max(0, Math.round((totalEarnings - totalDeductions - lossOfPay + expenseAmount) * 100) / 100);
 
@@ -463,7 +475,7 @@ export class PayrollService {
       if (deductionItems.length === 1) {
         await this.prisma.payslipItem.update({
           where: { id: deductionItems[0].id },
-          data: { amount: totalDeductions }
+          data: { amount: Math.max(0, totalDeductions) }
         });
       } else if (deductionItems.length > 1) {
         const oldSum = deductionItems.reduce((sum, item) => sum + item.amount, 0);
@@ -472,7 +484,7 @@ export class PayrollService {
           const newAmt = oldSum > 0 ? Math.round((item.amount / oldSum) * totalDeductions * 100) / 100 : (i === 0 ? totalDeductions : 0);
           await this.prisma.payslipItem.update({
             where: { id: item.id },
-            data: { amount: newAmt }
+            data: { amount: Math.max(0, newAmt) }
           });
         }
       }
@@ -490,7 +502,7 @@ export class PayrollService {
           const newAmt = oldSum > 0 ? Math.round((item.amount / oldSum) * totalEarnings * 100) / 100 : (i === 0 ? totalEarnings : 0);
           await this.prisma.payslipItem.update({
             where: { id: item.id },
-            data: { amount: newAmt }
+            data: { amount: Math.max(0, newAmt) }
           });
         }
       }

@@ -8,6 +8,7 @@ import {
   LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
+import { ClientsService } from '../services/clients';
 import { AuthService } from '../services/auth.service';
 
 @Component({
@@ -23,6 +24,7 @@ import { AuthService } from '../services/auth.service';
 })
 export class ProjectsComponent implements OnInit {
   private projectsService = inject(ProjectsService);
+  private clientsService = inject(ClientsService);
   private router = inject(Router);
   private authService = inject(AuthService);
 
@@ -34,6 +36,7 @@ export class ProjectsComponent implements OnInit {
 
   projects = signal<any[]>([]);
   archivedProjects = signal<any[]>([]);
+  clients = signal<any[]>([]);
   searchQuery = signal<string>('');
   activeTab = signal<'all' | 'starred' | 'recent' | 'archived'>('all');
   
@@ -126,6 +129,14 @@ export class ProjectsComponent implements OnInit {
     this.loadStarredAndRecent();
     this.loadProjects();
     this.loadArchivedProjects();
+    this.loadClients();
+  }
+
+  loadClients() {
+    this.clientsService.getClients().subscribe({
+      next: (res) => this.clients.set(res || []),
+      error: (err) => console.error('Error loading clients', err)
+    });
   }
 
   setActiveTab(tab: 'all' | 'starred' | 'recent' | 'archived') {

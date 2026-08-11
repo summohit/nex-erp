@@ -24,6 +24,21 @@ export class ClientsListComponent implements OnInit {
 
   // Grid
   columnDefs: ColDef[] = [
+    {
+      field: 'logo',
+      headerName: 'Logo',
+      width: 72,
+      sortable: false,
+      filter: false,
+      cellRenderer: (params: any) => {
+        const logo = params.data?.logo;
+        const fallbackIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>`;
+        if (logo) {
+          return `<div class="client-logo-cell"><span class="client-logo-fallback" style="display:none">${fallbackIcon}</span><img src="${logo}" alt="" class="client-logo-img" onerror="this.style.display='none';this.previousElementSibling.style.display='flex'"></div>`;
+        }
+        return `<div class="client-logo-cell"><span class="client-logo-fallback">${fallbackIcon}</span></div>`;
+      }
+    },
     { 
       field: 'name', 
       headerName: 'Client Name', 

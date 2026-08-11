@@ -185,8 +185,27 @@
     <!-- Projects Tab -->
     <div class="tab-pane" *ngIf="activeTab === 'projects'">
       <div class="card">
-        <div class="card-header border-bottom p-24">
+        <div class="card-header border-bottom p-24 flex-between">
           <h3 class="card-title m-0">Associated Projects</h3>
+          <button class="btn btn-primary btn-sm" (click)="openLinkProjectModal()">
+            <svg lucidePlus size="14"></svg> Link Project
+          </button>
+        </div>
+        <div class="project-toolbar">
+          <div class="project-search">
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Search by project name..."
+              [(ngModel)]="projectSearchQuery">
+          </div>
+          <div class="project-status-filter">
+            <select class="form-control" [(ngModel)]="projectStatusFilter">
+              <option value="">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="ARCHIVED">Archived</option>
+            </select>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -198,13 +217,16 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let project of client.projects">
+              <tr *ngFor="let project of filteredProjects">
                 <td><a [routerLink]="['/projects', project.id]" class="fw-500">{{ project.name }}</a></td>
                 <td><span class="badge">{{ project.status }}</span></td>
                 <td>{{ project.createdAt | date:'mediumDate' }}</td>
               </tr>
-              <tr *ngIf="!client.projects || client.projects.length === 0">
+              <tr *ngIf="client.projects?.length === 0">
                 <td colspan="3" class="text-center p-24 text-muted">No projects associated with this client.</td>
+              </tr>
+              <tr *ngIf="(client.projects?.length ?? 0) > 0 && filteredProjects.length === 0">
+                <td colspan="3" class="text-center p-24 text-muted">No projects match your filters.</td>
               </tr>
             </tbody>
           </table>
@@ -218,4 +240,33 @@
 <div class="page-container" *ngIf="isLoading">
   <!-- Skeleton loader could go here -->
   <p>Loading client profile...</p>
+</div>
+
+<!-- Link Existing Project Modal -->
+<div class="modal-overlay" *ngIf="linkModalOpen">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Link Existing Project</h2>
+      <button class="close-btn" (click)="linkModalOpen = false"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" *ngIf="linkableProjects.length > 0">
+        <label>Select Project</label>
+        <select class="form-control" [(ngModel)]="selectedLinkProjectId">
+          <option [ngValue]="null" disabled>Choose a project...</option>
+          <option *ngFor="let p of linkableProjects" [ngValue]="p.id">{{ p.name }}</option>
+        </select>
+      </div>
+      <p class="text-muted m-0" *ngIf="linkableProjects.length === 0">No projects available to link.</p>
+
+      <div class="error-msg" *ngIf="linkError">{{ linkError }}</div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline btn-sm" (click)="linkModalOpen = false" [disabled]="isSavingLink">Cancel</button>
+        <button class="btn btn-primary btn-sm" (click)="linkProjectToClient()" [disabled]="isSavingLink || !selectedLinkProjectId">
+          {{ isSavingLink ? 'Linking...' : 'Link Project' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

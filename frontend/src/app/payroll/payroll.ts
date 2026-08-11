@@ -79,6 +79,11 @@ export class PayrollComponent implements OnInit {
   selectedPayslipToAdjust = signal<Payslip | null>(null);
   adjustForm = { lossOfPay: 0, totalEarnings: 0, totalDeductions: 0, expenseAmount: 0 };
 
+  get adjustedNetPay(): number {
+    const raw = (this.adjustForm.totalEarnings || 0) - (this.adjustForm.totalDeductions || 0) - (this.adjustForm.lossOfPay || 0) + (this.adjustForm.expenseAmount || 0);
+    return Math.max(0, raw);
+  }
+
   isExpenseModalOpen = signal<boolean>(false);
   expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '', receipts: [] as string[], purchaseDate: '', purchasedFrom: '' };
   
@@ -999,5 +1004,11 @@ export class PayrollComponent implements OnInit {
     return items
       .filter(i => i.component.type === 'DEDUCTION')
       .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+  }
+
+  calculateNetPay(items: SalaryStructureItem[]): number {
+    const gross = this.calculateTotalEarnings(items);
+    const deductions = this.calculateTotalDeductions(items);
+    return Math.max(0, gross - deductions);
   }
 }

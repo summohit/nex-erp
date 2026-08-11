@@ -200,7 +200,10 @@ export class ApplicationsService {
     const hra = Math.round(ctc * (settings.hraPercent / 100));
     const pf = Math.round(basic * (settings.pfPercent / 100));
     const gratuity = Math.round(basic * (settings.gratuityPercent / 100));
-    const specialAllowance = Math.round(ctc - (basic + hra + pf + gratuity));
+    const specialAllowance = Math.max(0, Math.round(ctc - (basic + hra + pf + gratuity)));
+
+    const grossAnnual = basic + hra + specialAllowance;
+    const netPayAnnual = Math.max(0, grossAnnual - pf);
 
     return {
       candidateName: application.fullName,
@@ -212,7 +215,7 @@ export class ApplicationsService {
           basic: { annual: basic, monthly: Math.round(basic / 12) },
           hra: { annual: hra, monthly: Math.round(hra / 12) },
           specialAllowance: { annual: specialAllowance, monthly: Math.round(specialAllowance / 12) },
-          totalGross: { annual: basic + hra + specialAllowance, monthly: Math.round((basic + hra + specialAllowance) / 12) }
+          totalGross: { annual: grossAnnual, monthly: Math.round(grossAnnual / 12) }
         },
         deductions: {
           pf: { annual: pf, monthly: Math.round(pf / 12) },
@@ -220,8 +223,8 @@ export class ApplicationsService {
           totalDeductions: { annual: pf + gratuity, monthly: Math.round((pf + gratuity) / 12) }
         },
         netPay: {
-          annual: (basic + hra + specialAllowance) - (pf), // Gratuity isn't typically deducted from monthly in-hand directly, but depends on company. We'll simplify to Gross - PF.
-          monthly: Math.round(((basic + hra + specialAllowance) - pf) / 12)
+          annual: netPayAnnual, // Gratuity isn't typically deducted from monthly in-hand directly, but depends on company. We'll simplify to Gross - PF.
+          monthly: Math.round(netPayAnnual / 12)
         }
       }
     };

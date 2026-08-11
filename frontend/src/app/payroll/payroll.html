@@ -27,7 +27,7 @@
         </div>
         <div class="kpi-info">
           <span class="kpi-label">Net Take-Home</span>
-          <span class="kpi-value text-emerald">₹{{ (calculateTotalEarnings(currentStructure()) - calculateTotalDeductions(currentStructure())).toLocaleString('en-IN') }}</span>
+          <span class="kpi-value text-emerald">₹{{ calculateNetPay(currentStructure()).toLocaleString('en-IN') }}</span>
           <span class="kpi-subtext">Estimated Net Payout</span>
         </div>
       </div>
@@ -504,7 +504,7 @@
           <div class="summary-divider">=</div>
           <div class="summary-item net-item">
             <span class="sum-label">Net Take-Home Pay</span>
-            <span class="sum-val net-highlight">₹{{ (calculateTotalEarnings(currentStructure()) - calculateTotalDeductions(currentStructure())).toLocaleString('en-IN') }}</span>
+            <span class="sum-val net-highlight">₹{{ calculateNetPay(currentStructure()).toLocaleString('en-IN') }}</span>
           </div>
         </div>
 
@@ -554,7 +554,7 @@
           </div>
           <div class="net-calc-box">
             <span>Revised Net Pay:</span>
-            <strong>₹{{ (adjustForm.totalEarnings - adjustForm.totalDeductions - adjustForm.lossOfPay + adjustForm.expenseAmount).toLocaleString('en-IN') }}</strong>
+            <strong>₹{{ adjustedNetPay.toLocaleString('en-IN') }}</strong>
           </div>
         </div>
         <div class="drawer-footer">

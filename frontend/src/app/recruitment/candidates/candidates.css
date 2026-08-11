@@ -517,6 +517,49 @@
   gap: 12px;
 }
 
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.drawer-actions .drawer-action-btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  white-space: nowrap;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.drawer-actions .btn-view-annexure {
+  background: #eff6ff !important;
+  border: 1px solid #3b82f6 !important;
+  color: #2563eb !important;
+}
+
+.drawer-actions .btn-view-annexure:hover {
+  background: #dbeafe !important;
+  border-color: #2563eb !important;
+  color: #1d4ed8 !important;
+}
+
+.drawer-actions .btn-approve-salary {
+  background: #10b981 !important;
+}
+
+.drawer-actions .btn-approve-salary:hover {
+  background: #059669 !important;
+}
+
 .status-select {
   min-width: 150px;
   font-weight: 500;
