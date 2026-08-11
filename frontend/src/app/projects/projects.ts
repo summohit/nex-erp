@@ -16,7 +16,7 @@ import { AuthService } from '../services/auth.service';
   imports: [
     CommonModule, FormsModule, LucidePlus, LucideKanban, 
     LucideX, LucideUser, LucideChevronLeft, 
-    LucideCheck, LucideMoreHorizontal, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw
+    LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw
   ],
   templateUrl: './projects.html',
   styleUrls: ['./projects.css']

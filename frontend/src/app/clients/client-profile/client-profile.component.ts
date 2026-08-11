@@ -43,7 +43,7 @@ interface Client {
 @Component({
   selector: 'app-client-profile',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideBuilding, LucideMail, LucidePhone, LucideMapPin, LucideBriefcase, LucideDollarSign, LucideUsers, LucideCheckCircle2, LucideFileText],
+  imports: [CommonModule, RouterModule, LucideBuilding, LucideMail, LucidePhone, LucideMapPin, LucideBriefcase, LucideDollarSign, LucideCheckCircle2, LucideFileText],
   templateUrl: './client-profile.html',
   styleUrls: ['./client-profile.css']
 })

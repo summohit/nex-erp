@@ -22,8 +22,6 @@ import {
     FormsModule, 
     LucideDoorOpen,
     LucideCheckCircle2,
-    LucideClock,
-    LucideXCircle,
     LucideClipboardCheck,
     LucideX
   ],

@@ -18,7 +18,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 @Component({
   selector: 'app-employee-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucidePlus, LucideSearch, LucideX, LucideChevronRight, LucideUpload, AgGridAngular, EmployeeDrawerComponent, BulkUploadModalComponent],
+  imports: [CommonModule, FormsModule, LucidePlus, LucideSearch, LucideX, LucideChevronRight, AgGridAngular, EmployeeDrawerComponent, BulkUploadModalComponent],
   templateUrl: './employee-list.html',
   styleUrls: ['./employee-list.css']
 })

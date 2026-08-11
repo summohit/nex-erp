@@ -19,7 +19,7 @@ interface OrgNode {
 @Component({
   selector: 'app-org-chart',
   standalone: true,
-  imports: [CommonModule, LucideUser, LucideMoreHorizontal, LucideChevronDown, LucideChevronUp],
+  imports: [CommonModule, LucideUser, LucideChevronDown, LucideChevronUp],
   templateUrl: './org-chart.html',
   styleUrls: ['./org-chart.css']
 })

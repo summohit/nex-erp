@@ -23,7 +23,7 @@ import { HotToastService } from '@ngneat/hot-toast';
     RouterModule,
     SpotlightSearchComponent,
     LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
-    LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
+    LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
     LucidePlay, LucideSquare, LucideLoader2
   ],
   templateUrl: './header.html',
