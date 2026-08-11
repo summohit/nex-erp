@@ -552,6 +552,16 @@ export class PayrollService {
     const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
     if (!employee) throw new NotFoundException('Employee not found');
 
+    const amount = Number(data.amount);
+    if (!amount || amount <= 0) {
+      throw new BadRequestException('Claim amount must be greater than zero');
+    }
+
+    const MAX_CLAIM_LIMIT = 100000;
+    if (amount > MAX_CLAIM_LIMIT) {
+      throw new BadRequestException(`Expense limit exceeded. Maximum claim limit is ₹1,00,000 (${amount.toLocaleString('en-IN')} cannot be claimed).`);
+    }
+
     if (data.purchaseDate) {
       const pDate = new Date(data.purchaseDate);
       const today = new Date();
@@ -566,7 +576,7 @@ export class PayrollService {
         companyId,
         title: data.title,
         description: data.description,
-        amount: Number(data.amount),
+        amount: amount,
         category: data.category || 'OTHER',
         receiptUrl: data.receiptUrl,
         purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null,

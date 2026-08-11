@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -22,9 +22,9 @@ export class ClientsService {
     });
   }
 
-  async findAll(companyId: number) {
+  async findAll(companyId: number, status?: string) {
     return this.prisma.client.findMany({
-      where: { companyId },
+      where: { companyId, ...(status ? { status } : {}) },
       include: {
         contacts: {
           where: { isPrimary: true },
@@ -70,8 +70,30 @@ export class ClientsService {
     });
   }
 
+  async archive(companyId: number, id: number) {
+    const client = await this.findOne(companyId, id);
+    return this.prisma.client.update({
+      where: { id: client.id },
+      data: { status: 'ARCHIVED' },
+    });
+  }
+
+  async restore(companyId: number, id: number) {
+    const client = await this.findOne(companyId, id);
+    return this.prisma.client.update({
+      where: { id: client.id },
+      data: { status: 'ACTIVE' },
+    });
+  }
+
   async remove(companyId: number, id: number) {
     const client = await this.findOne(companyId, id);
+
+    const projectCount = await this.prisma.project.count({ where: { clientId: client.id } });
+    if (projectCount > 0) {
+      throw new BadRequestException('Cannot delete a client with linked projects. Archive the client instead.');
+    }
+
     return this.prisma.client.delete({
       where: { id: client.id },
     });

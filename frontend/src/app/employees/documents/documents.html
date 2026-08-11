@@ -192,20 +192,24 @@
       </div>
 
       <div class="form-group mb-4">
-        <label class="form-label">Document Name *</label>
-        <input type="text" class="form-control" [ngModel]="uploadFileName()" (ngModelChange)="uploadFileName.set($event)" placeholder="e.g. Employment Contract 2026.pdf">
-      </div>
-
-      <div class="form-group mb-4">
-        <label class="form-label">File Attachment</label>
+        <label class="form-label">File Attachment <span class="text-blue-600">(Max {{ maxUploadFiles }} files)</span></label>
         <div class="file-drop-area">
-          <input type="file" (change)="onFileSelected($event)" class="file-input-hidden" id="fileUploadInput">
+          <input type="file" multiple (change)="onFileSelected($event)" class="file-input-hidden" id="fileUploadInput">
           <label for="fileUploadInput" class="file-drop-label">
             <svg lucideUploadCloud size="32" class="text-blue-500 mb-2"></svg>
-            <span style="font-weight: 600; color: #1e293b;">Click to choose file</span>
-            <span style="font-size: 12px; color: #64748b;" *ngIf="!uploadFileName()">PDF, DOCX, PNG, JPG up to 10MB</span>
-            <span style="font-size: 13px; font-weight: 600; color: #2563eb;" *ngIf="uploadFileName()">Selected: {{ uploadFileName() }}</span>
+            <span style="font-weight: 600; color: #1e293b;">Click to choose files</span>
+            <span style="font-size: 12px; color: #64748b;">PDF, DOCX, PNG, JPG up to 10MB. You can upload up to {{ maxUploadFiles }} files at a time.</span>
           </label>
+        </div>
+
+        <div class="selected-files" *ngIf="selectedFiles().length > 0">
+          <div class="selected-file" *ngFor="let file of selectedFiles(); let i = index">
+            <svg lucidePaperclip size="14" class="text-blue-500 shrink-0"></svg>
+            <span class="selected-file-name">{{ file.name }}</span>
+            <button type="button" class="btn-icon btn-icon-sm" (click)="removeSelectedFile(i)" title="Remove file">
+              <svg lucideX size="14"></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -213,7 +217,7 @@
     <div class="modal-footer">
       <button class="btn-secondary" (click)="closeUploadModal()">Cancel</button>
       <button class="btn-primary" (click)="submitUpload()" [disabled]="isUploading()">
-        {{ isUploading() ? 'Uploading...' : 'Save Document' }}
+        {{ isUploading() ? 'Uploading...' : 'Upload Document' + (selectedFiles().length > 1 ? 's' : '') }}
       </button>
     </div>
   </div>

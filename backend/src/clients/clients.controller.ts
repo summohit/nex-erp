@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Query } from '@nestjs/common';
 import { ClientsService } from './clients.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -13,8 +13,8 @@ export class ClientsController {
   }
 
   @Get()
-  findAll(@Req() req: any) {
-    return this.clientsService.findAll(req.user.companyId);
+  findAll(@Req() req: any, @Query('status') status?: string) {
+    return this.clientsService.findAll(req.user.companyId, status);
   }
 
   @Get(':id')
@@ -25,6 +25,16 @@ export class ClientsController {
   @Patch(':id')
   update(@Req() req: any, @Param('id') id: string, @Body() updateClientDto: any) {
     return this.clientsService.update(req.user.companyId, +id, updateClientDto);
+  }
+
+  @Patch(':id/archive')
+  archive(@Req() req: any, @Param('id') id: string) {
+    return this.clientsService.archive(req.user.companyId, +id);
+  }
+
+  @Patch(':id/restore')
+  restore(@Req() req: any, @Param('id') id: string) {
+    return this.clientsService.restore(req.user.companyId, +id);
   }
 
   @Delete(':id')

@@ -724,6 +724,9 @@ button.btn-outline:hover,
 .status-retired { background: #FCE7F3 !important; color: #EC4899 !important; border-color: #F9A8D4 !important; }
 .status-retired .status-dot { background: #EC4899 !important; }
 
+.status-archived { background: #F1F5F9 !important; color: #64748B !important; border-color: #CBD5E1 !important; }
+.status-archived .status-dot { background: #64748B !important; }
+
 .status-returned { background: #F1F5F9 !important; color: #64748B !important; border-color: #CBD5E1 !important; }
 .status-returned .status-dot { background: #64748B !important; }
 

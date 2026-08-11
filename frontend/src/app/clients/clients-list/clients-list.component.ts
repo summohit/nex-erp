@@ -4,13 +4,14 @@ import { RouterModule, Router } from '@angular/router';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef } from 'ag-grid-community';
 import { ClientsService } from '../../services/clients';
+import { ClientActionCellRendererComponent } from '../../shared/components/client-action-cell-renderer.component';
 import { LucidePlus, LucideUploadCloud, LucideX } from '@lucide/angular';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 @Component({
   selector: 'app-clients-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, AgGridModule, LucidePlus, LucideUploadCloud, LucideX, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, RouterModule, AgGridModule, ClientActionCellRendererComponent, LucidePlus, LucideUploadCloud, LucideX, FormsModule, ReactiveFormsModule],
   templateUrl: './clients-list.html',
   styleUrls: ['./clients-list.css']
 })
@@ -21,6 +22,7 @@ export class ClientsListComponent implements OnInit {
 
   clients: any[] = [];
   isLoading = true;
+  statusTab: 'ACTIVE' | 'ARCHIVED' = 'ACTIVE';
 
   // Grid
   columnDefs: ColDef[] = [
@@ -79,6 +81,7 @@ export class ClientsListComponent implements OnInit {
         if (s === 'ACTIVE') statusClass = 'status-available';
         else if (s === 'LEAD') statusClass = 'status-assigned';
         else if (s === 'INACTIVE') statusClass = 'status-retired';
+        else if (s === 'ARCHIVED') statusClass = 'status-archived';
         
         return `
           <span class="status-pill ${statusClass}">
@@ -97,12 +100,16 @@ export class ClientsListComponent implements OnInit {
     { 
       field: 'actions', 
       headerName: 'Actions', 
-      width: 100, 
+      width: 90, 
       sortable: false, 
       filter: false,
       pinned: 'right',
-      cellRenderer: (params: any) => {
-        return `<button class="btn btn-outline btn-xs" data-action="view" data-id="${params.data.id}">View</button>`;
+      cellRenderer: ClientActionCellRendererComponent,
+      cellRendererParams: {
+        onView: (data: any) => this.viewClient(data.id),
+        onArchive: (data: any) => this.archiveClient(data.id),
+        onRestore: (data: any) => this.restoreClient(data.id),
+        onDelete: (data: any) => this.deleteClient(data.id)
       }
     }
   ];
@@ -157,7 +164,7 @@ export class ClientsListComponent implements OnInit {
 
   loadClients() {
     this.isLoading = true;
-    this.clientsService.getClients().subscribe({
+    this.clientsService.getClients(this.statusTab).subscribe({
       next: (data) => {
         this.clients = data;
         this.isLoading = false;
@@ -169,15 +176,48 @@ export class ClientsListComponent implements OnInit {
     });
   }
 
+  setStatusTab(tab: 'ACTIVE' | 'ARCHIVED') {
+    if (this.statusTab === tab) return;
+    this.statusTab = tab;
+    this.loadClients();
+  }
+
   onGridReady(params: any) {
     params.api.sizeColumnsToFit();
   }
 
   onCellClicked(event: any) {
-    if (event.event.target.getAttribute('data-action') === 'view' || event.column.getColId() === 'name') {
-      const id = event.event.target.getAttribute('data-id') || event.data.id;
-      this.router.navigate(['/clients', id]);
+    if (event.column.getColId() === 'name') {
+      this.viewClient(event.data.id);
     }
+  }
+
+  viewClient(id: number) {
+    this.router.navigate(['/clients', id]);
+  }
+
+  archiveClient(id: number) {
+    if (!confirm('Archive this client? Archived clients can be restored anytime.')) return;
+    this.clientsService.archiveClient(id).subscribe({
+      next: () => this.loadClients(),
+      error: (err) => alert(err?.error?.message || 'Failed to archive client.')
+    });
+  }
+
+  restoreClient(id: number) {
+    if (!confirm('Restore this client to active clients?')) return;
+    this.clientsService.restoreClient(id).subscribe({
+      next: () => this.loadClients(),
+      error: (err) => alert(err?.error?.message || 'Failed to restore client.')
+    });
+  }
+
+  deleteClient(id: number) {
+    if (!confirm('Are you sure you want to permanently delete this client? This action cannot be undone.')) return;
+    this.clientsService.deleteClient(id).subscribe({
+      next: () => this.loadClients(),
+      error: (err) => alert(err?.error?.message || 'Failed to delete client.')
+    });
   }
 
   openDrawer() {

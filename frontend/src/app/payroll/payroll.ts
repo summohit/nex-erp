@@ -908,10 +908,22 @@ export class PayrollComponent implements OnInit {
       return;
     }
 
+    const amount = Number(this.expenseForm.amount);
+    if (!amount || amount <= 0) {
+      this.toast.error('Claim amount must be greater than zero');
+      return;
+    }
+
+    const MAX_CLAIM_LIMIT = 100000;
+    if (amount > MAX_CLAIM_LIMIT) {
+      this.toast.error(`Expense limit exceeded. Maximum claim limit is ₹1,00,000. You entered ₹${amount.toLocaleString('en-IN')}.`);
+      return;
+    }
+
     const payload = {
       title: this.expenseForm.title,
       description: this.expenseForm.description,
-      amount: Number(this.expenseForm.amount),
+      amount: amount,
       category: this.expenseForm.category,
       purchaseDate: this.expenseForm.purchaseDate,
       purchasedFrom: this.expenseForm.purchasedFrom,

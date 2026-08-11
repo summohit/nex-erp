@@ -422,6 +422,28 @@ export class EmployeesService {
     });
   }
 
+  async addDocuments(id: number, companyId: number, currentUserId: number, role: string, data: { docs: any[] }) {
+    const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+
+    const MAX_DOCS_PER_REQUEST = 5;
+    const docs = Array.isArray(data.docs) ? data.docs : [];
+    if (docs.length === 0) throw new BadRequestException('No documents provided.');
+    if (docs.length > MAX_DOCS_PER_REQUEST) {
+      throw new BadRequestException(`You can upload a maximum of ${MAX_DOCS_PER_REQUEST} documents at a time.`);
+    }
+
+    return this.prisma.$transaction(
+      docs.map(d => this.prisma.employeeDocument.create({
+        data: {
+          employeeId: employee.id,
+          fileName: d.fileName,
+          fileUrl: d.fileUrl,
+          documentType: d.documentType || 'Other'
+        }
+      }))
+    );
+  }
+
   async deleteDocument(id: number, documentId: number, companyId: number, currentUserId: number, role: string) {
     const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
 

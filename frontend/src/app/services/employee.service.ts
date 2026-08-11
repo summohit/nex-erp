@@ -91,6 +91,13 @@ export class EmployeeService {
     });
   }
 
+  addDocuments(id: number | string, docs: any[]): Observable<any> {
+    const token = localStorage.getItem('access_token');
+    return this.http.post<any>(`${this.apiUrl}/${id}/documents/bulk`, { docs }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   deleteDocument(id: number | string, documentId: number): Observable<any> {
     const token = localStorage.getItem('access_token');
     return this.http.delete<any>(`${this.apiUrl}/${id}/documents/${documentId}`, {

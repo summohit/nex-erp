@@ -33,6 +33,42 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
+.client-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: 10px;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.client-tab {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748B;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.client-tab:hover {
+  color: #0F172A;
+  background: #E2E8F0;
+}
+
+.client-tab.active {
+  background: #FFFFFF;
+  color: #FF5A1F;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
 .client-logo-cell {
   display: flex;
   align-items: center;
@@ -93,7 +129,6 @@
 
 .btn-outline:hover {
   background: #F8FAFC;
-  border-color: #94A3B8;
 }
 
 .btn:disabled {

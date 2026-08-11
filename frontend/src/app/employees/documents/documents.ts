@@ -34,8 +34,8 @@ export class EmployeeDocumentsComponent implements OnInit {
   
   isUploadModalOpen = signal<boolean>(false);
   uploadEmployeeId = signal<number | null>(null);
-  uploadFileName = signal<string>('');
-  uploadFileUrl = signal<string>('');
+  selectedFiles = signal<{ name: string; url: string }[]>([]);
+  readonly maxUploadFiles = 5;
   isUploading = signal<boolean>(false);
 
   ngOnInit() {
@@ -120,8 +120,7 @@ export class EmployeeDocumentsComponent implements OnInit {
   openUploadModal(employeeId?: number) {
     if (employeeId) this.uploadEmployeeId.set(employeeId);
     else if (this.employees().length > 0) this.uploadEmployeeId.set(this.employees()[0].id);
-    this.uploadFileName.set('');
-    this.uploadFileUrl.set('');
+    this.selectedFiles.set([]);
     this.modalEmployeeSearch.set('');
     this.isEmployeeDropdownOpen.set(false);
     this.isUploadModalOpen.set(true);
@@ -138,38 +137,63 @@ export class EmployeeDocumentsComponent implements OnInit {
   }
 
   onFileSelected(event: any) {
-    const file = event.target.files[0];
-    if (file) {
-      this.uploadFileName.set(file.name);
+    const files: File[] = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    if (files.length > this.maxUploadFiles) {
+      this.toast.error(`You can upload a maximum of ${this.maxUploadFiles} files at a time. Please remove ${files.length - this.maxUploadFiles} file(s) and try again.`);
+      event.target.value = '';
+      this.selectedFiles.set([]);
+      return;
+    }
+
+    const results: { name: string; url: string }[] = [];
+    let readCount = 0;
+    files.forEach(file => {
       const reader = new FileReader();
       reader.onload = (e: any) => {
-        this.uploadFileUrl.set(e.target.result);
+        results.push({ name: file.name, url: e.target.result });
+        readCount++;
+        if (readCount === files.length) {
+          this.selectedFiles.set(results);
+        }
       };
       reader.readAsDataURL(file);
-    }
+    });
+  }
+
+  removeSelectedFile(index: number) {
+    this.selectedFiles.update(list => list.filter((_, i) => i !== index));
   }
 
   submitUpload() {
     const empId = this.uploadEmployeeId();
-    const name = this.uploadFileName().trim();
-    const url = this.uploadFileUrl().trim() || 'https://via.placeholder.com/150';
+    const files = this.selectedFiles();
 
-    if (!empId || !name) {
-      this.toast.error('Please select an employee and specify a document name');
+    if (!empId) {
+      this.toast.error('Please select an employee');
+      return;
+    }
+    if (files.length === 0) {
+      this.toast.error('Please select at least one file to upload');
+      return;
+    }
+    if (files.length > this.maxUploadFiles) {
+      this.toast.error(`You can upload a maximum of ${this.maxUploadFiles} files at a time.`);
       return;
     }
 
     this.isUploading.set(true);
-    this.employeeService.addDocument(empId, { fileName: name, fileUrl: url }).subscribe({
+    this.employeeService.addDocuments(empId, files).subscribe({
       next: () => {
-        this.toast.success('Document uploaded successfully!');
         this.isUploading.set(false);
+        this.toast.success(`${files.length} document${files.length > 1 ? 's' : ''} uploaded successfully!`);
         this.closeUploadModal();
         this.loadEmployeesAndDocs();
       },
-      error: () => {
-        this.toast.error('Failed to upload document');
+      error: (err) => {
         this.isUploading.set(false);
+        this.toast.error(err?.error?.message || 'Failed to upload documents');
       }
     });
   }

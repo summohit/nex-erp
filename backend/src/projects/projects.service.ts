@@ -6,6 +6,14 @@ export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
   async createProject(companyId: number, leadId: number, data: any) {
+    // Ensure unique project name per company (case-insensitive)
+    const existingProject = await this.prisma.project.findFirst({
+      where: { companyId, name: { equals: data.name.trim(), mode: 'insensitive' } }
+    });
+    if (existingProject) {
+      throw new BadRequestException(`Project with name "${data.name}" already exists`);
+    }
+
     // Generate base key from name
     const words = data.name.split(' ').filter((w: string) => w.length > 0);
     let baseKey = '';

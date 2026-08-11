@@ -12,6 +12,21 @@
     </div>
   </div>
 
+  <div class="client-tabs">
+    <button
+      class="client-tab"
+      [class.active]="statusTab === 'ACTIVE'"
+      (click)="setStatusTab('ACTIVE')">
+      Active Clients
+    </button>
+    <button
+      class="client-tab"
+      [class.active]="statusTab === 'ARCHIVED'"
+      (click)="setStatusTab('ARCHIVED')">
+      Archived Clients
+    </button>
+  </div>
+
   <div class="card">
     <ag-grid-angular
       style="width: 100%; height: 500px;"

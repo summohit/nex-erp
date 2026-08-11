@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ClientsService } from '../../services/clients';
 import { ProjectsService } from '../../services/projects';
 import { LucideBuilding, LucideMail, LucidePhone, LucideMapPin, LucideBriefcase, LucideDollarSign, LucideCheckCircle2, LucideFileText, LucidePlus, LucideX } from '@lucide/angular';
@@ -51,6 +51,7 @@ interface Client {
 })
 export class ClientProfileComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private clientsService = inject(ClientsService);
   private projectsService = inject(ProjectsService);
 
@@ -140,6 +141,42 @@ export class ClientProfileComponent implements OnInit {
         this.linkError = err?.error?.message || 'Failed to link project. Please try again.';
         console.error('Error linking project', err);
       }
+    });
+  }
+
+  archiveClient() {
+    if (!this.client) return;
+    if (!confirm(`Archive "${this.client.name}"? Archived clients are hidden from the active directory but can be restored anytime.`)) return;
+    this.clientsService.archiveClient(this.client.id).subscribe({
+      next: () => {
+        this.loadClient(this.client!.id);
+        alert('Client archived successfully.');
+      },
+      error: (err) => alert(err?.error?.message || 'Failed to archive client.')
+    });
+  }
+
+  restoreClient() {
+    if (!this.client) return;
+    if (!confirm(`Restore "${this.client.name}" to active clients?`)) return;
+    this.clientsService.restoreClient(this.client.id).subscribe({
+      next: () => {
+        this.loadClient(this.client!.id);
+        alert('Client restored successfully.');
+      },
+      error: (err) => alert(err?.error?.message || 'Failed to restore client.')
+    });
+  }
+
+  deleteClient() {
+    if (!this.client) return;
+    if (!confirm(`Are you sure you want to permanently delete "${this.client.name}"? This action cannot be undone.`)) return;
+    this.clientsService.deleteClient(this.client.id).subscribe({
+      next: () => {
+        alert('Client deleted successfully.');
+        this.router.navigate(['/clients']);
+      },
+      error: (err) => alert(err?.error?.message || 'Failed to delete client.')
     });
   }
 }

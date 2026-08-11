@@ -10,6 +10,7 @@ import {
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
 import { AuthService } from '../services/auth.service';
+import { HotToastService } from '@ngneat/hot-toast';
 
 @Component({
   selector: 'app-projects',
@@ -27,6 +28,7 @@ export class ProjectsComponent implements OnInit {
   private clientsService = inject(ClientsService);
   private router = inject(Router);
   private authService = inject(AuthService);
+  private toast = inject(HotToastService);
 
   showArchiveWarningModal = false;
   pendingArchiveProjectId: number | null = null;
@@ -285,7 +287,7 @@ export class ProjectsComponent implements OnInit {
           this.loadProjects();
           this.closeCreateModal();
         },
-        error: (err) => console.error('Error updating project', err)
+        error: (err) => this.toast.error(err?.error?.message || 'Error updating project')
       });
     } else {
       this.projectsService.createProject(payload).subscribe({
@@ -294,7 +296,7 @@ export class ProjectsComponent implements OnInit {
           this.closeCreateModal();
           this.goToProject(res.id);
         },
-        error: (err) => console.error('Error creating project', err)
+        error: (err) => this.toast.error(err?.error?.message || 'Error creating project')
       });
     }
   }

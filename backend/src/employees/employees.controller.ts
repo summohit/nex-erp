@@ -91,6 +91,11 @@ export class EmployeesController {
     return this.employeesService.addDocument(+id, req.user.companyId, req.user.sub, req.user.role, data);
   }
 
+  @Post(':id/documents/bulk')
+  addDocuments(@Request() req, @Param('id') id: string, @Body() data: any) {
+    return this.employeesService.addDocuments(+id, req.user.companyId, req.user.sub, req.user.role, data);
+  }
+
   @Delete(':id/documents/:documentId')
   deleteDocument(@Request() req, @Param('id') id: string, @Param('documentId') documentId: string) {
     return this.employeesService.deleteDocument(+id, +documentId, req.user.companyId, req.user.sub, req.user.role);

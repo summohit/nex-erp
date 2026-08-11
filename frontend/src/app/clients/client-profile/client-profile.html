@@ -10,9 +10,20 @@
         <div class="client-meta">
           <span class="meta-item" *ngIf="client.industry"><svg lucideBriefcase size="14"></svg> {{ client.industry }}</span>
           <span class="meta-item"><svg lucideMapPin size="14"></svg> {{ client.billingCity || 'No Location' }}</span>
-          <span class="badge" [class.badge-active]="client.status === 'ACTIVE'" [class.badge-lead]="client.status === 'LEAD'">{{ client.status }}</span>
+          <span class="badge" [class.badge-active]="client.status === 'ACTIVE'" [class.badge-lead]="client.status === 'LEAD'" [class.badge-archived]="client.status === 'ARCHIVED'">{{ client.status }}</span>
         </div>
       </div>
+    </div>
+    <div class="profile-actions">
+      <button class="btn btn-outline btn-sm" (click)="restoreClient()" *ngIf="client.status === 'ARCHIVED'">
+        Restore Client
+      </button>
+      <button class="btn btn-outline btn-sm" (click)="archiveClient()" *ngIf="client.status !== 'ARCHIVED'">
+        Archive Client
+      </button>
+      <button class="btn btn-danger btn-sm" (click)="deleteClient()">
+        Delete Client
+      </button>
     </div>
   </div>
 

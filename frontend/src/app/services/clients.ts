@@ -10,8 +10,9 @@ export class ClientsService {
   private http = inject(HttpClient);
   private apiUrl = environment.apiUrl + '/v1/clients';
 
-  getClients(): Observable<any[]> {
-    return this.http.get<any[]>(this.apiUrl);
+  getClients(status?: string): Observable<any[]> {
+    const params = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.http.get<any[]>(this.apiUrl + params);
   }
 
   getClient(id: number): Observable<any> {
@@ -24,6 +25,14 @@ export class ClientsService {
 
   updateClient(id: number, data: any): Observable<any> {
     return this.http.patch<any>(`${this.apiUrl}/${id}`, data);
+  }
+
+  archiveClient(id: number): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/${id}/archive`, {});
+  }
+
+  restoreClient(id: number): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/${id}/restore`, {});
   }
 
   deleteClient(id: number): Observable<any> {

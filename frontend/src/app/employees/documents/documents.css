@@ -444,6 +444,41 @@
   cursor: pointer;
 }
 
+.selected-files {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.selected-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.selected-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.btn-icon-sm {
+  padding: 4px;
+  border-radius: 4px;
+}
+
 /* Custom Searchable Employee Picker */
 .employee-picker-trigger {
   display: flex;
