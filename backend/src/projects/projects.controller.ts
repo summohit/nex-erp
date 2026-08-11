@@ -1,15 +1,45 @@
-import { Controller, Post, Get, Put, Delete, Patch, Body, Req, UseGuards, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Patch, Body, Req, UseGuards, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProjectsService } from './projects.service';
+import { ProjectAiService } from './project-ai.service';
 import { AuthGuard } from '../auth/auth.guard';
 
 @UseGuards(AuthGuard)
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly projectAiService: ProjectAiService
+  ) {}
 
   @Post()
   createProject(@Req() req, @Body() data: any) {
     return this.projectsService.createProject(req.user.companyId, req.user.sub, data);
+  }
+
+  @Post('ai-onboarding')
+  createAiProject(@Req() req, @Body() data: any) {
+    return this.projectsService.createAiProject(req.user.companyId, req.user.sub, data);
+  }
+
+  @Post(':id/documents')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadProjectDocument(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.projectsService.uploadProjectDocument(req.user.companyId, id, req.user.sub, file);
+  }
+
+  @Post(':id/analyze')
+  analyzeProjectDocuments(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectAiService.analyzeProjectDocuments(req.user.companyId, id);
+  }
+
+  @Get(':id/analysis')
+  getProjectAnalysis(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.getProjectAnalysis(req.user.companyId, id);
   }
 
   @Get('timesheets/my-week')

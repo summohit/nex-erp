@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
+import { ProjectAiService } from './project-ai.service';
 import { IssuesController } from './issues/issues.controller';
 import { IssuesService } from './issues/issues.service';
 import { BoardsController } from './boards/boards.controller';
@@ -15,6 +16,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [PrismaModule, EventsModule, NotificationsModule],
   controllers: [ProjectsController, IssuesController, BoardsController, LabelsController],
-  providers: [ProjectsService, IssuesService, BoardsService, LabelsService]
+  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService]
 })
 export class ProjectsModule {}

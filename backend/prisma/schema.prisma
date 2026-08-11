@@ -57,26 +57,26 @@ model Company {
 
 // Authentication & RBAC
 model User {
-  id                       Int                @id @default(autoincrement())
-  email                    String             @unique
+  id                       Int                        @id @default(autoincrement())
+  email                    String                     @unique
   password                 String
-  role                     String             @default("EMPLOYEE") // SUPERADMIN, ADMIN, HR, FINANCE, SALES, EMPLOYEE
+  role                     String                     @default("EMPLOYEE") // SUPERADMIN, ADMIN, HR, FINANCE, SALES, EMPLOYEE
   companyId                Int
-  company                  Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company                  Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   emailVerifiedAt          DateTime?
-  status                   String             @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, SUSPENDED
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
+  status                   String                     @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, SUSPENDED
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
   employee                 Employee?
   approvedLeaveRequests    LeaveRequest[]
-  approvedExpenseClaims    ExpenseClaim[]     @relation("ExpenseApprover")
-  approvedHardwareRequests HardwareRequest[]  @relation("HardwareApprover")
+  approvedExpenseClaims    ExpenseClaim[]             @relation("ExpenseApprover")
+  approvedHardwareRequests HardwareRequest[]          @relation("HardwareApprover")
   notifications            Notification[]
   userRoles                UserRole[]
   userMenuBookmarks        UserMenuBookmark[]
-  approvedResignations     Resignation[]      @relation("ResignationApprover")
-  conductedExitInterviews  ExitInterview[]    @relation("ExitInterviewer")
-  clearedOffboardingTasks  OffboardingTask[]  @relation("TaskClearer")
+  approvedResignations     Resignation[]              @relation("ResignationApprover")
+  conductedExitInterviews  ExitInterview[]            @relation("ExitInterviewer")
+  clearedOffboardingTasks  OffboardingTask[]          @relation("TaskClearer")
   approvedRegularizations  AttendanceRegularization[]
 }
 
@@ -106,14 +106,14 @@ model RolePermission {
 
 // Master Data
 model Department {
-  id           Int           @id @default(autoincrement())
-  name         String
-  companyId    Int
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  isActive     Boolean       @default(true)
-  defaultRole  String        @default("EMPLOYEE")
+  id            Int            @id @default(autoincrement())
+  name          String
+  companyId     Int
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isActive      Boolean        @default(true)
+  defaultRole   String         @default("EMPLOYEE")
   designations  Designation[]
   employees     Employee[]
   jobs          Job[]
@@ -159,7 +159,7 @@ model Employee {
 
   onboardingStatus String                   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
   onboardingTasks  EmployeeOnboardingTask[]
-  kioskPin         String?                  // 4-digit PIN for Kiosk Mode
+  kioskPin         String? // 4-digit PIN for Kiosk Mode
   recruitedJobs    Job[]                    @relation("JobRecruiter")
 
   // Profile details
@@ -235,23 +235,24 @@ model Employee {
   skills            EmployeeSkill[]
   resumeLines       EmployeeResume[]
 
-  ledProjects         Project[]           @relation("ProjectLead")
-  projectMembers      ProjectMember[]
-  assignedIssues      Issue[]             @relation("IssueAssignee")
-  reportedIssues      Issue[]             @relation("IssueReporter")
-  cardMemberships     IssueMember[]
-  issueTimeLogs       IssueTimeLog[]
-  issueComments       IssueComment[]
-  uploadedAttachments IssueAttachment[]
-  issueActivities     IssueActivity[]
-  performanceGoals    PerformanceGoal[]
-  reviewsGiven        PerformanceReview[] @relation("Reviewer")
-  reviewsReceived     PerformanceReview[] @relation("Reviewee")
-  resignations        Resignation[]
-  exitInterviews      ExitInterview[]
-  offboardingTasks    OffboardingTask[]
-  regularizations     AttendanceRegularization[]
-  shiftRotations      ShiftRotation[]
+  ledProjects              Project[]                  @relation("ProjectLead")
+  projectMembers           ProjectMember[]
+  assignedIssues           Issue[]                    @relation("IssueAssignee")
+  reportedIssues           Issue[]                    @relation("IssueReporter")
+  cardMemberships          IssueMember[]
+  issueTimeLogs            IssueTimeLog[]
+  issueComments            IssueComment[]
+  uploadedAttachments      IssueAttachment[]
+  issueActivities          IssueActivity[]
+  performanceGoals         PerformanceGoal[]
+  reviewsGiven             PerformanceReview[]        @relation("Reviewer")
+  reviewsReceived          PerformanceReview[]        @relation("Reviewee")
+  resignations             Resignation[]
+  exitInterviews           ExitInterview[]
+  offboardingTasks         OffboardingTask[]
+  regularizations          AttendanceRegularization[]
+  shiftRotations           ShiftRotation[]
+  uploadedProjectDocuments ProjectDocument[]
 }
 
 model EmergencyContact {
@@ -302,23 +303,23 @@ model EmployeeOnboardingTask {
 
 // Master Data: Branches & Holidays
 model Branch {
-  id         Int        @id @default(autoincrement())
-  name       String
-  address    String?
-  latitude   Float?
-  longitude  Float?
-  startTime  String     @default("09:00")
-  endTime    String     @default("18:00")
-  weeklyOffs String     @default("0") // Comma separated integers: 0=Sun, 1=Mon, ..., 6=Sat
-  isActive   Boolean    @default(true)
-  companyId  Int
-  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  geofenceRadius Int?   @default(500) // meters
+  id             Int        @id @default(autoincrement())
+  name           String
+  address        String?
+  latitude       Float?
+  longitude      Float?
+  startTime      String     @default("09:00")
+  endTime        String     @default("18:00")
+  weeklyOffs     String     @default("0") // Comma separated integers: 0=Sun, 1=Mon, ..., 6=Sat
+  isActive       Boolean    @default(true)
+  companyId      Int
+  company        Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  geofenceRadius Int?       @default(500) // meters
   allowedIps     String? // Comma-separated list of allowed IPs
-  employees  Employee[]
-  jobs       Job[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  employees      Employee[]
+  jobs           Job[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 }
 
 model Holiday {
@@ -337,7 +338,7 @@ model LeaveType {
   name              String
   description       String?
   defaultDays       Int            @default(0)
-  accrualFrequency  String?        // NONE, MONTHLY, YEARLY
+  accrualFrequency  String? // NONE, MONTHLY, YEARLY
   accrualAmount     Float          @default(0)
   isPaid            Boolean        @default(true)
   carryForward      Boolean        @default(false)
@@ -375,7 +376,7 @@ model LeaveRequest {
   startDate       DateTime
   endDate         DateTime
   isHalfDay       Boolean   @default(false)
-  halfDayPeriod   String?   // AM, PM
+  halfDayPeriod   String? // AM, PM
   reason          String?
   attachmentUrl   String?
   status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
@@ -387,22 +388,22 @@ model LeaveRequest {
 }
 
 model Attendance {
-  id           Int       @id @default(autoincrement())
-  employeeId   Int
-  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  date         DateTime  @db.Date
-  clockIn      DateTime?
-  clockOut     DateTime?
-  clockInLat   Float?
-  clockInLng   Float?
-  clockOutLat  Float?
-  clockOutLng  Float?
+  id            Int       @id @default(autoincrement())
+  employeeId    Int
+  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date          DateTime  @db.Date
+  clockIn       DateTime?
+  clockOut      DateTime?
+  clockInLat    Float?
+  clockInLng    Float?
+  clockOutLat   Float?
+  clockOutLng   Float?
   overtimeHours Float     @default(0)
-  status       String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
-  isLate       Boolean   @default(false)
-  isEarlyLeave Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  status        String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
+  isLate        Boolean   @default(false)
+  isEarlyLeave  Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([employeeId, date])
 }
@@ -437,16 +438,16 @@ model Shift {
 }
 
 model ShiftRotation {
-  id            Int        @id @default(autoincrement())
-  name          String
-  description   String?
-  rotationType  String     @default("WEEKLY") // WEEKLY, BIWEEKLY, MONTHLY
-  shiftIds      String     // JSON array of shift IDs in order
-  companyId     Int
-  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employees     Employee[] // Employees assigned to this rotation
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id           Int        @id @default(autoincrement())
+  name         String
+  description  String?
+  rotationType String     @default("WEEKLY") // WEEKLY, BIWEEKLY, MONTHLY
+  shiftIds     String // JSON array of shift IDs in order
+  companyId    Int
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employees    Employee[] // Employees assigned to this rotation
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
 
 // Payroll & Expenses
@@ -713,29 +714,386 @@ model Project {
   color       String    @default("#2563eb") // Project accent color
   icon        String    @default("folder") // Lucide icon name
   status      String    @default("ACTIVE") // ACTIVE, ARCHIVED
-  leadId        Int? // Project lead (Employee)
-  lead          Employee? @relation("ProjectLead", fields: [leadId], references: [id])
-  companyId     Int
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  leadId      Int? // Project lead (Employee)
+  lead        Employee? @relation("ProjectLead", fields: [leadId], references: [id])
+  companyId   Int
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   // Client & Billing
-  clientId      Int?
-  client        Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  startDate     DateTime?
-  endDate       DateTime?
-  billingType   String    @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
-  budgetAmount  Float?
-  hourlyRate    Float?
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  clientId     Int?
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  startDate    DateTime?
+  endDate      DateTime?
+  billingType  String    @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
+  budgetAmount Float?
+  hourlyRate   Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   members ProjectMember[]
   boards  Board[]
   issues  Issue[]
   labels  Label[]
 
+  // AI Onboarding
+  onboardingStatus String @default("DRAFT") // DRAFT, DOCUMENTS_UPLOADED, ANALYZING, ANALYZED, UNDER_REVIEW, CHANGES_REQUIRED, APPROVED, READY_FOR_KICKOFF, IN_PROGRESS, COMPLETED, ERROR
+
+  documents    ProjectDocument[]
+  analysisRuns ProjectAnalysisRun[]
+
   @@unique([key, companyId])
+}
+
+model ProjectDocument {
+  id        Int     @id @default(autoincrement())
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name       String
+  url        String // ImageKit URL
+  fileId     String? // ImageKit fileId
+  type       String // MIME type or category (e.g. SOW, RFP)
+  rawText    String?  @db.Text
+  status     String   @default("PENDING") // PENDING, EXTRACTED, ERROR
+  uploadedBy Int
+  employee   Employee @relation(fields: [uploadedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProjectAnalysisRun {
+  id                 Int     @id @default(autoincrement())
+  projectId          Int
+  project            Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version            Int     @default(1)
+  status             String  @default("PROCESSING") // PROCESSING, COMPLETED, FAILED
+  aiModel            String  @default("llama3-70b-8192")
+  promptVersion      String?
+  documentsAnalyzed  Int     @default(0)
+  processingDuration Int? // in milliseconds
+  overallConfidence  Float?
+  errorMessage       String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // AI Generated Entities
+  summary          ProjectSummary?
+  scope            ProjectScope?
+  requirements     ProjectRequirement[]
+  wbsTasks         ProjectWbsTask[]
+  resourcePlans    ProjectResourcePlan[]
+  costEstimate     ProjectCostEstimate?
+  roadmap          ProjectRoadmap?
+  milestones       ProjectMilestone[]
+  risks            ProjectRisk[]
+  dependencies     ProjectDependency[]
+  assumptions      ProjectAssumption[]
+  stakeholders     ProjectStakeholder[]
+  raci             ProjectRaci[]
+  openQuestions    ProjectOpenQuestion[]
+  missingInfo      ProjectMissingInfo[]
+  recommendations  ProjectRecommendation[]
+  aiConfidence     ProjectAiConfidence?
+  health           ProjectHealth?
+  kickoffReadiness ProjectKickoffReadiness?
+}
+
+model ProjectSummary {
+  id         Int                @id @default(autoincrement())
+  analysisId Int                @unique
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  executiveSummary  String @db.Text
+  businessObjective String @db.Text
+  projectGoals      String @db.Text
+  projectType       String
+  projectComplexity String
+  projectPriority   String
+  successCriteria   String @db.Text
+}
+
+model ProjectScope {
+  id         Int                @id @default(autoincrement())
+  analysisId Int                @unique
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  inScope            String  @db.Text
+  outOfScope         String  @db.Text
+  deliverables       String  @db.Text
+  features           String  @db.Text
+  acceptanceCriteria String  @db.Text
+  scopeConfidence    Float?
+  scopeGaps          String? @db.Text
+}
+
+model ProjectRequirement {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  title              String
+  description        String  @db.Text
+  category           String
+  priority           String
+  sourceDocument     String?
+  sourceReference    String?
+  acceptanceCriteria String? @db.Text
+  confidence         Float?
+  status             String  @default("AI_GENERATED")
+  duplicateInfo      String? @db.Text
+  type               String  @default("EXTRACTED")
+}
+
+model ProjectWbsTask {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  phase           String
+  module          String
+  feature         String
+  task            String
+  subtask         String?
+  description     String? @db.Text
+  estimatedEffort Float?
+  dependencies    String? @db.Text
+  requiredSkill   String?
+  requiredLevel   String?
+  priority        String
+}
+
+model ProjectResourcePlan {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  role              String
+  seniority         String?
+  quantity          Int       @default(1)
+  allocationPercent Int       @default(100)
+  estimatedHours    Float?
+  startDate         DateTime?
+  endDate           DateTime?
+  requiredSkills    String?   @db.Text
+  responsibilities  String?   @db.Text
+  reason            String?   @db.Text
+  confidence        Float?
+  type              String    @default("AI_ESTIMATED")
+  status            String    @default("AI_GENERATED")
+}
+
+model ProjectCostEstimate {
+  id         Int                @id @default(autoincrement())
+  analysisId Int                @unique
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  resourceCost       Float?
+  infrastructureCost Float?
+  vendorCost         Float?
+  licenseCost        Float?
+  otherCost          Float?
+  contingency        Float?
+  totalCost          Float?
+  estimatedRevenue   Float?
+  estimatedProfit    Float?
+  estimatedMargin    Float?
+  currency           String @default("USD")
+  confidence         Float?
+  type               String @default("AI_ESTIMATED")
+}
+
+model ProjectRoadmap {
+  id         Int                @id @default(autoincrement())
+  analysisId Int                @unique
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  startDate          DateTime?
+  completionDate     DateTime?
+  estimatedDuration  Int? // in days
+  phases             String    @db.Text // JSON string or text block
+  criticalPath       String?   @db.Text
+  scheduleConfidence Float?
+}
+
+model ProjectMilestone {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  name            String
+  description     String?   @db.Text
+  targetDate      DateTime?
+  deliverables    String?   @db.Text
+  dependencies    String?   @db.Text
+  responsibleRole String?
+  approvalReq     String?
+  status          String    @default("AI_GENERATED")
+}
+
+model ProjectRisk {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  risk        String
+  description String  @db.Text
+  category    String
+  probability String
+  impact      String
+  riskScore   Float?
+  mitigation  String? @db.Text
+  contingency String? @db.Text
+  owner       String?
+  source      String?
+  confidence  Float?
+  status      String  @default("AI_GENERATED")
+}
+
+model ProjectDependency {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  dependency       String
+  type             String
+  description      String?   @db.Text
+  dependentTask    String?
+  internalExternal String
+  owner            String?
+  dueDate          DateTime?
+  impact           String?   @db.Text
+  status           String    @default("AI_GENERATED")
+}
+
+model ProjectAssumption {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  assumption        String  @db.Text
+  reason            String? @db.Text
+  source            String?
+  impactIfIncorrect String? @db.Text
+  confidence        Float?
+  status            String  @default("AI_GENERATED")
+}
+
+model ProjectStakeholder {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  stakeholder       String
+  organization      String?
+  role              String?
+  influence         String?
+  interest          String?
+  responsibility    String? @db.Text
+  communicationReq  String? @db.Text
+  approvalAuthority Boolean @default(false)
+}
+
+model ProjectRaci {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  projectArea String
+  responsible String?
+  accountable String?
+  consulted   String?
+  informed    String?
+}
+
+model ProjectOpenQuestion {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  question        String  @db.Text
+  category        String?
+  importance      String?
+  isBlocking      Boolean @default(false)
+  source          String?
+  suggestedAnswer String? @db.Text
+  status          String  @default("OPEN")
+}
+
+model ProjectMissingInfo {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  missingItem String
+  whyRequired String  @db.Text
+  impact      String  @db.Text
+  priority    String
+  isBlocking  Boolean @default(false)
+}
+
+model ProjectRecommendation {
+  id         Int                @id @default(autoincrement())
+  analysisId Int
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  recommendation String  @db.Text
+  category       String
+  reason         String  @db.Text
+  expectedImpact String  @db.Text
+  confidence     Float?
+  source         String?
+  status         String  @default("AI_GENERATED")
+}
+
+model ProjectAiConfidence {
+  id         Int                @id @default(autoincrement())
+  analysisId Int                @unique
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  scope        Float?
+  requirements Float?
+  timeline     Float?
+  resourcePlan Float?
+  cost         Float?
+  riskAnalysis Float?
+  overall      Float?
+}
+
+model ProjectHealth {
+  id         Int                @id @default(autoincrement())
+  analysisId Int                @unique
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  readinessScore     Float?
+  scopeScore         Float?
+  requirementScore   Float?
+  resourceScore      Float?
+  budgetScore        Float?
+  timelineScore      Float?
+  riskScore          Float?
+  documentationScore Float?
+  healthStatus       String // HEALTHY, AT_RISK, CRITICAL
+}
+
+model ProjectKickoffReadiness {
+  id         Int                @id @default(autoincrement())
+  analysisId Int                @unique
+  analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  reqsApproved       Boolean @default(false)
+  scopeApproved      Boolean @default(false)
+  budgetApproved     Boolean @default(false)
+  resourcesAvailable Boolean @default(false)
+  timelineFeasible   Boolean @default(false)
+  stakeholdersIded   Boolean @default(false)
+  dependenciesIded   Boolean @default(false)
+  risksReviewed      Boolean @default(false)
+  docsAvailable      Boolean @default(false)
+  clientApprovals    Boolean @default(false)
+  overallStatus      String // READY, READY_WITH_CONDITIONS, NOT_READY
 }
 
 model ProjectMember {
@@ -1183,7 +1541,7 @@ model BlackoutDate {
   id           Int         @id @default(autoincrement())
   date         DateTime    @db.Date
   reason       String
-  departmentId Int?        // If null, applies to entire company
+  departmentId Int? // If null, applies to entire company
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   companyId    Int
   company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1198,24 +1556,24 @@ model BlackoutDate {
 // ═══════════════════════════════════════════
 
 model Client {
-  id              Int       @id @default(autoincrement())
-  name            String    // e.g., "Acme Corp"
-  logo            String?   // Client logo URL or base64
-  industry        String?
-  website         String?
-  
+  id       Int     @id @default(autoincrement())
+  name     String // e.g., "Acme Corp"
+  logo     String? // Client logo URL or base64
+  industry String?
+  website  String?
+
   // Status & Portal
-  status          String    @default("ACTIVE") // LEAD, ACTIVE, INACTIVE, ARCHIVED
-  portalEnabled   Boolean   @default(false)    // Preparation for Zoho-style Client Portal
-  
+  status        String  @default("ACTIVE") // LEAD, ACTIVE, INACTIVE, ARCHIVED
+  portalEnabled Boolean @default(false) // Preparation for Zoho-style Client Portal
+
   // ─── Financial & Billing Details ───
-  currency          String    @default("USD")
-  paymentTerms      String?   @default("Net 30") // Net 15, Net 30, Due on Receipt
-  taxId             String?   // VAT, GST, or EIN for invoicing
-  registrationNo    String?   // Company Registration Number
-  defaultHourlyRate Float?    // Default billing rate for projects under this client
-  creditLimit       Float?    // Optional credit limit
-  outstandingBalance Float?   @default(0.0) // Track unpaid invoices
+  currency           String  @default("USD")
+  paymentTerms       String? @default("Net 30") // Net 15, Net 30, Due on Receipt
+  taxId              String? // VAT, GST, or EIN for invoicing
+  registrationNo     String? // Company Registration Number
+  defaultHourlyRate  Float? // Default billing rate for projects under this client
+  creditLimit        Float? // Optional credit limit
+  outstandingBalance Float?  @default(0.0) // Track unpaid invoices
 
   // ─── Addresses ───
   billingAddressLine1 String?
@@ -1224,57 +1582,57 @@ model Client {
   billingState        String?
   billingZipCode      String?
   billingCountry      String?
-  
+
   shippingSameAsBilling Boolean @default(true)
   shippingAddressLine1  String?
   shippingCity          String?
   shippingState         String?
   shippingZipCode       String?
   shippingCountry       String?
-  
-  // ─── Relations ───
-  companyId       Int
-  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
 
-  contacts        ClientContact[]
-  projects        Project[]
-  
+  // ─── Relations ───
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts ClientContact[]
+  projects Project[]
+
   @@unique([name, companyId])
 }
 
 model ClientContact {
-  id          Int      @id @default(autoincrement())
-  firstName   String
-  lastName    String?
-  email       String
-  phone       String?
-  mobile      String?
-  jobTitle    String?
-  
-  isPrimary   Boolean  @default(false) // Primary contact
-  isBilling   Boolean  @default(false) // Contact who receives the invoices
-  
-  clientId    Int
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id        Int     @id @default(autoincrement())
+  firstName String
+  lastName  String?
+  email     String
+  phone     String?
+  mobile    String?
+  jobTitle  String?
+
+  isPrimary Boolean @default(false) // Primary contact
+  isBilling Boolean @default(false) // Contact who receives the invoices
+
+  clientId Int
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([email, clientId])
 }
 
 // Payroll Configuration
 model PayrollSetting {
-  id               Int      @id @default(autoincrement())
-  companyId        Int      @unique
-  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  basicPercent     Float    @default(50.0) // 50% of CTC
-  hraPercent       Float    @default(20.0) // 20% of CTC
-  pfPercent        Float    @default(12.0) // 12% of Basic
-  gratuityPercent  Float    @default(4.81) // 4.81% of Basic
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  companyId       Int      @unique
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  basicPercent    Float    @default(50.0) // 50% of CTC
+  hraPercent      Float    @default(20.0) // 20% of CTC
+  pfPercent       Float    @default(12.0) // 12% of Basic
+  gratuityPercent Float    @default(4.81) // 4.81% of Basic
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

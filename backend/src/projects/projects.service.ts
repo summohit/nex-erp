@@ -1,5 +1,12 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import axios from 'axios';
+import FormData from 'form-data';
+const pdfParse = require('pdf-parse');
+import * as mammoth from 'mammoth';
+import * as xlsx from 'xlsx';
 
 @Injectable()
 export class ProjectsService {
@@ -75,6 +82,185 @@ export class ProjectsService {
     });
 
     return project;
+  }
+
+  async createAiProject(companyId: number, leadId: number, data: any) {
+    const words = data.name.split(' ').filter((w: string) => w.length > 0);
+    let baseKey = '';
+    if (words.length >= 2) {
+      baseKey = (words[0].substring(0, 2) + words[1][0]).toUpperCase();
+    } else {
+      baseKey = data.name.substring(0, 3).toUpperCase();
+    }
+    
+    let finalKey = baseKey;
+    let counter = 1;
+    while (true) {
+      const existing = await this.prisma.project.findUnique({
+        where: { key_companyId: { key: finalKey, companyId } }
+      });
+      if (!existing) break;
+      finalKey = `${baseKey}${counter}`;
+      counter++;
+    }
+
+    try {
+      const newProject = await this.prisma.project.create({
+        data: {
+          name: data.name,
+          key: finalKey,
+          description: data.description,
+          companyId,
+          leadId,
+          status: 'DRAFT',
+          onboardingStatus: 'DRAFT',
+          budgetAmount: data.budgetAmount ? parseFloat(data.budgetAmount) : null,
+          startDate: data.startDate ? new Date(data.startDate) : null,
+          endDate: data.endDate ? new Date(data.endDate) : null,
+          clientId: data.clientId ? parseInt(data.clientId) : null,
+        }
+      });
+
+      return newProject;
+    } catch (error) {
+      console.error(error);
+      throw new BadRequestException('Could not create AI project draft');
+    }
+  }
+
+  async getProjectAnalysis(companyId: number, projectId: number) {
+    const run = await this.prisma.projectAnalysisRun.findFirst({
+      where: { projectId, project: { companyId } },
+      orderBy: { version: 'desc' },
+      include: {
+        summary: true,
+        scope: true,
+        requirements: true,
+        wbsTasks: true,
+        resourcePlans: true,
+        costEstimate: true,
+        roadmap: true,
+        milestones: true,
+        risks: true,
+        dependencies: true,
+        assumptions: true,
+        stakeholders: true,
+        raci: true,
+        openQuestions: true,
+        missingInfo: true,
+        recommendations: true,
+        aiConfidence: true,
+        health: true,
+        kickoffReadiness: true,
+      }
+    });
+
+    if (!run) {
+      throw new NotFoundException('No analysis run found for this project');
+    }
+    return run;
+  }
+
+  async uploadProjectDocument(companyId: number, projectId: number, uploadedBy: number, file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file provided');
+
+    // Verify project access
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, companyId }
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    if (!privateKey) throw new HttpException('ImageKit not configured', HttpStatus.INTERNAL_SERVER_ERROR);
+
+    try {
+      // 1. Upload to ImageKit
+      const ext = path.extname(file.originalname);
+      const filename = `${crypto.randomBytes(16).toString('hex')}${ext}`;
+      
+      const form = new FormData();
+      form.append('file', file.buffer, filename);
+      form.append('fileName', filename);
+      form.append('folder', '/project_documents');
+
+      const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
+      const response = await axios.post('https://upload.imagekit.io/api/v1/files/upload', form, {
+        headers: { ...form.getHeaders(), Authorization: authHeader }
+      });
+
+      const url = response.data.url;
+      const fileId = response.data.fileId;
+
+      // 2. Extract Text (if PDF, DOCX, or XLSX)
+      let rawText: string | null = null;
+      let status = 'PENDING';
+      const fileExt = ext.toLowerCase();
+
+      try {
+        if (fileExt === '.pdf') {
+          if (typeof pdfParse === 'function') {
+            const data = await pdfParse(file.buffer);
+            rawText = data.text;
+          } else if (pdfParse && pdfParse.PDFParse) {
+            const parser = new pdfParse.PDFParse({ data: file.buffer });
+            const res = await parser.getText();
+            rawText = res.text;
+            if (typeof parser.destroy === 'function') await parser.destroy();
+          } else if ((pdfParse as any).default && typeof (pdfParse as any).default === 'function') {
+            const data = await (pdfParse as any).default(file.buffer);
+            rawText = data.text;
+          }
+          status = 'EXTRACTED';
+        } else if (fileExt === '.docx') {
+          const result = await mammoth.extractRawText({ buffer: file.buffer });
+          rawText = result.value;
+          status = 'EXTRACTED';
+        } else if (fileExt === '.xlsx' || fileExt === '.xls') {
+          const workbook = xlsx.read(file.buffer, { type: 'buffer' });
+          const sheetsText = workbook.SheetNames.map(sheetName => {
+            const worksheet = workbook.Sheets[sheetName];
+            return `--- Sheet: ${sheetName} ---\n` + xlsx.utils.sheet_to_csv(worksheet);
+          }).join('\n\n');
+          rawText = sheetsText;
+          status = 'EXTRACTED';
+        } else if (['.txt', '.csv', '.md', '.json', '.log'].includes(fileExt)) {
+          rawText = file.buffer.toString('utf-8');
+          status = 'EXTRACTED';
+        } else {
+          // Fallback plain text read
+          rawText = file.buffer.toString('utf-8');
+          status = 'EXTRACTED';
+        }
+      } catch (e) {
+        console.error(`Parse error for ${fileExt}:`, e);
+        status = 'ERROR';
+      }
+
+      // 3. Save to database
+      const doc = await this.prisma.projectDocument.create({
+        data: {
+          projectId,
+          name: file.originalname,
+          url,
+          fileId,
+          type: ext.toLowerCase().replace('.', ''),
+          rawText,
+          status,
+          uploadedBy
+        }
+      });
+
+      return doc;
+    } catch (error) {
+      console.error(error);
+      throw new HttpException('Failed to process project document', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async analyzeProjectDocuments(companyId: number, projectId: number) {
+    // Phase 2: AI Orchestration goes here
+    // For now, return a success indicator
+    return { status: 'ANALYZING', message: 'Analysis started in background' };
   }
 
   async getProjects(companyId: number, userId: number, role: string) {

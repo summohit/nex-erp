@@ -1,0 +1,379 @@
+<div class="wizard-container">
+  <!-- Header -->
+  <header class="wizard-header">
+    <div class="logo-area">
+      <svg lucideBrainCircuit class="icon-lg text-primary"></svg>
+      <div>
+        <h2>Project Setup</h2>
+        <p class="subtitle">Upload project documents to automatically generate complete scope, WBS & cost estimation</p>
+      </div>
+    </div>
+    
+    <div class="stepper">
+      <div class="step" [class.active]="currentStep() >= 1" [class.completed]="currentStep() > 1">
+        <div class="step-circle">
+          <svg lucideCheck *ngIf="currentStep() > 1" class="icon-sm"></svg>
+          <svg lucideUploadCloud *ngIf="currentStep() <= 1" class="icon-sm"></svg>
+        </div>
+        <span>Upload</span>
+      </div>
+      <div class="step-line" [class.active]="currentStep() >= 2"></div>
+      
+      <div class="step" [class.active]="currentStep() >= 2" [class.completed]="currentStep() > 3">
+        <div class="step-circle">
+          <svg lucideCheck *ngIf="currentStep() > 2" class="icon-sm"></svg>
+          <svg lucideBrainCircuit *ngIf="currentStep() <= 2" class="icon-sm"></svg>
+        </div>
+        <span>Analyze</span>
+      </div>
+      <div class="step-line" [class.active]="currentStep() >= 3"></div>
+      
+      <div class="step" [class.active]="currentStep() >= 3">
+        <div class="step-circle">
+          <svg lucideCheckCircle2 class="icon-sm"></svg>
+        </div>
+        <span>Review</span>
+      </div>
+    </div>
+    
+    <div class="actions">
+      <button class="btn btn-outline" routerLink="/projects">Cancel</button>
+    </div>
+  </header>
+
+  <!-- Step 1: Upload Documents (Drag and Drop Multi-file, Max 8) -->
+  <div class="wizard-content" *ngIf="currentStep() === 1">
+    <div class="upload-wrapper">
+      
+      <!-- Drag & Drop Zone -->
+      <div 
+        class="upload-zone"
+        [class.dragging]="isDragging()"
+        [class.has-files]="selectedFiles().length > 0"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)">
+        
+        <div class="upload-icon-wrapper">
+          <svg lucideUploadCloud class="icon-xl text-primary"></svg>
+        </div>
+        
+        <h3>Drag & Drop Project Documents Here</h3>
+        <p class="text-muted">Upload up to <strong>8 files</strong> (RFPs, SOWs, Requirements, Specs, Spreadsheets)</p>
+        <p class="file-formats">Supported formats: PDF, DOCX, XLSX, TXT, CSV (Max 25MB per file)</p>
+
+        <div class="file-input-wrapper mt-4">
+          <input 
+            type="file" 
+            id="fileInput" 
+            multiple 
+            (change)="onFileSelected($event)" 
+            accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.csv" />
+          
+          <label for="fileInput" class="btn btn-primary btn-select">
+            <svg lucidePlus class="icon-sm mr-1"></svg>
+            {{ selectedFiles().length > 0 ? 'Add More Files' : 'Browse Files from Computer' }}
+          </label>
+        </div>
+      </div>
+
+      <!-- Warnings / Error alert -->
+      <div *ngIf="fileLimitError()" class="alert alert-warning mt-3">
+        <svg lucideAlertCircle class="icon-sm mr-2"></svg>
+        <span>{{ fileLimitError() }}</span>
+      </div>
+
+      <!-- File List Section (when files are selected) -->
+      <div class="selected-files-section mt-4" *ngIf="selectedFiles().length > 0">
+        <div class="files-header">
+          <div class="d-flex align-items-center gap-2">
+            <h4>Uploaded Files</h4>
+            <span class="file-count-badge">{{ selectedFiles().length }} / {{ MAX_FILES }}</span>
+          </div>
+          <button type="button" class="btn-text-danger" (click)="clearAllFiles()">
+            <svg lucideTrash2 class="icon-xs mr-1"></svg> Remove All
+          </button>
+        </div>
+
+        <div class="files-grid">
+          <div class="file-card" *ngFor="let file of selectedFiles(); let i = index">
+            <div class="file-icon-box">
+              <svg lucideFileText class="icon-md text-primary"></svg>
+            </div>
+            <div class="file-info">
+              <span class="file-name" [title]="file.name">{{ file.name }}</span>
+              <span class="file-size">{{ formatFileSize(file.size) }}</span>
+            </div>
+            <button type="button" class="btn-remove-file" (click)="removeFile(i)" title="Remove file">
+              <svg lucideX class="icon-sm"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Button Footer -->
+      <div class="upload-footer mt-5 text-center">
+        <button 
+          class="btn btn-primary btn-lg btn-analyze" 
+          [disabled]="selectedFiles().length === 0 || isUploading()" 
+          (click)="startOnboarding()">
+          <span *ngIf="isUploading()" class="d-flex align-items-center gap-2">
+            <span class="spinner"></span>
+            Uploading Documents ({{ uploadProgress() }}%)...
+          </span>
+          <span *ngIf="!isUploading()" class="d-flex align-items-center gap-2">
+            <svg lucideBrainCircuit class="icon-md"></svg>
+            Start Analysis ({{ selectedFiles().length }} {{ selectedFiles().length === 1 ? 'File' : 'Files' }})
+            <svg lucideChevronRight class="icon-sm ml-1"></svg>
+          </span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Step 2: Processing -->
+  <div class="wizard-content text-center" *ngIf="currentStep() === 2">
+    <div class="processing-container">
+      <div class="processing-animation">
+        <div class="pulse-ring"></div>
+        <div class="pulse-ring delay"></div>
+        <svg lucideBrainCircuit class="icon-xxl text-primary"></svg>
+      </div>
+      <h3 class="mt-4">Analyzing Project Intelligence</h3>
+      <p class="text-muted">Engine is scanning <strong>{{ selectedFiles().length }} uploaded documents</strong> to build requirements, WBS, risk logs, and resource allocation...</p>
+      
+      <div class="processing-steps-status mt-4" *ngIf="!analysisError()">
+        <div class="status-item active">
+          <span class="dot"></span> Extracting document text & structures
+        </div>
+        <div class="status-item active">
+          <span class="dot"></span> Identifying business objectives & scope limits
+        </div>
+        <div class="status-item active">
+          <span class="dot"></span> Generating Work Breakdown Structure & estimate
+        </div>
+      </div>
+
+      <!-- Friendly Error Card -->
+      <div *ngIf="analysisError()" class="friendly-error-card mt-4">
+        <div class="error-badge">
+          <svg lucideAlertTriangle class="icon-md"></svg>
+        </div>
+        <h4>Analysis Needs Attention</h4>
+        <p class="error-msg">{{ analysisError() }}</p>
+
+        <div class="error-action-btns mt-4">
+          <button class="btn btn-primary" (click)="runAiAnalysis(projectId()!)">
+            Try Analysis Again
+          </button>
+          <button class="btn btn-outline ml-2" (click)="currentStep.set(1)">
+            Change / Upload Files
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Review -->
+  <div class="wizard-content review-container" *ngIf="currentStep() === 3 && analysisData()">
+    
+    <!-- Navigation Sidebar -->
+    <div class="review-sidebar">
+      <h3>Project Intelligence</h3>
+      <ul class="nav-links">
+        <li><a href="#summary"><svg lucideFileText class="icon-xs mr-2"></svg> Executive Summary</a></li>
+        <li><a href="#scope"><svg lucideLayers class="icon-xs mr-2"></svg> Scope & Gaps</a></li>
+        <li><a href="#requirements"><svg lucideListChecks class="icon-xs mr-2"></svg> Requirements ({{analysisData()?.requirements?.length || 0}})</a></li>
+        <li><a href="#wbs"><svg lucideCheckSquare class="icon-xs mr-2"></svg> WBS & Tasks ({{analysisData()?.wbsTasks?.length || 0}})</a></li>
+        <li><a href="#resources"><svg lucideUsers class="icon-xs mr-2"></svg> Resource Plan ({{analysisData()?.resourcePlans?.length || 0}})</a></li>
+        <li><a href="#cost"><svg lucideDollarSign class="icon-xs mr-2"></svg> Cost Estimate</a></li>
+        <li><a href="#risks"><svg lucideShieldAlert class="icon-xs mr-2"></svg> Risks ({{analysisData()?.risks?.length || 0}})</a></li>
+      </ul>
+      
+      <div class="health-card mt-auto">
+        <h4>Project Health & Readiness</h4>
+        <div class="health-score-container">
+          <div class="health-score" [class.healthy]="analysisData()?.health?.healthStatus === 'HEALTHY' || (analysisData()?.health?.readinessScore > 0.6 || analysisData()?.health?.readinessScore > 60)">
+            {{ formatPercent(analysisData()?.health?.readinessScore) }}
+          </div>
+        </div>
+        <p class="health-status-label">{{ analysisData()?.health?.healthStatus || 'HEALTHY' }}</p>
+      </div>
+    </div>
+
+    <!-- Main Content Review -->
+    <div class="review-main">
+      <div class="d-flex justify-between align-items-center mb-4">
+        <div>
+          <h2>Review Project Intelligence Plan</h2>
+          <p class="text-muted">Generated from {{ selectedFiles().length > 0 ? selectedFiles().length : 'uploaded' }} source document(s)</p>
+        </div>
+        <button class="btn btn-success btn-lg" (click)="approveProject()">
+          <svg lucideCheck class="icon-sm mr-1"></svg> Approve & Kickoff Project
+        </button>
+      </div>
+
+      <!-- Executive Summary -->
+      <section id="summary" class="review-card">
+        <h3><svg lucideFileText class="icon-sm mr-2 text-primary"></svg> Executive Summary</h3>
+        <p class="lead-text">{{ analysisData()?.summary?.executiveSummary }}</p>
+        <div class="grid-2 mt-3">
+          <div class="detail-box">
+            <strong>Business Objective:</strong>
+            <p>{{ analysisData()?.summary?.businessObjective }}</p>
+          </div>
+          <div class="detail-box">
+            <strong>Success Criteria:</strong>
+            <p>{{ analysisData()?.summary?.successCriteria }}</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scope & Deliverables -->
+      <section id="scope" class="review-card mt-4" *ngIf="analysisData()?.scope">
+        <h3><svg lucideLayers class="icon-sm mr-2 text-primary"></svg> Scope & Deliverables</h3>
+        <div class="grid-2">
+          <div class="detail-box">
+            <strong class="text-success mb-2 d-block"><svg lucideCheck class="icon-xs mr-1"></svg> In Scope:</strong>
+            <p>{{ analysisData()?.scope?.inScope }}</p>
+          </div>
+          <div class="detail-box">
+            <strong class="text-danger mb-2 d-block"><svg lucideX class="icon-xs mr-1"></svg> Out of Scope:</strong>
+            <p>{{ analysisData()?.scope?.outOfScope }}</p>
+          </div>
+        </div>
+        <div class="detail-box mt-3" *ngIf="analysisData()?.scope?.deliverables">
+          <strong>Key Deliverables:</strong>
+          <p>{{ analysisData()?.scope?.deliverables }}</p>
+        </div>
+      </section>
+
+      <!-- Requirements -->
+      <section id="requirements" class="review-card mt-4">
+        <h3><svg lucideListChecks class="icon-sm mr-2 text-primary"></svg> Requirements</h3>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Category</th>
+                <th>Priority</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let req of analysisData()?.requirements">
+                <td><strong>{{ req.title }}</strong></td>
+                <td><span class="badge">{{ req.category }}</span></td>
+                <td><span class="badge badge-priority-{{req.priority?.toLowerCase()}}">{{ req.priority }}</span></td>
+                <td><span class="confidence-tag">{{ formatPercent(req.confidence) }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- WBS -->
+      <section id="wbs" class="review-card mt-4">
+        <h3><svg lucideCheckSquare class="icon-sm mr-2 text-primary"></svg> Work Breakdown Structure</h3>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>Module</th>
+                <th>Task</th>
+                <th>Effort (hrs)</th>
+                <th>Required Skill</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let task of analysisData()?.wbsTasks">
+                <td><span class="badge">{{ task.phase }}</span></td>
+                <td>{{ task.module }}</td>
+                <td><strong>{{ task.task }}</strong></td>
+                <td>{{ task.estimatedEffort }} hrs</td>
+                <td>{{ task.requiredSkill }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Resource Allocation Plan -->
+      <section id="resources" class="review-card mt-4" *ngIf="analysisData()?.resourcePlans?.length > 0">
+        <h3><svg lucideUsers class="icon-sm mr-2 text-primary"></svg> Resource Allocation Plan</h3>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Seniority</th>
+                <th>Quantity</th>
+                <th>Allocation</th>
+                <th>Est. Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let res of analysisData()?.resourcePlans">
+                <td><strong>{{ res.role }}</strong></td>
+                <td><span class="badge">{{ res.seniority }}</span></td>
+                <td>{{ res.quantity }}</td>
+                <td>{{ formatPercent(res.allocationPercent) }}</td>
+                <td>{{ res.estimatedHours }} hrs</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Cost Estimate -->
+      <section id="cost" class="review-card mt-4">
+        <h3><svg lucideDollarSign class="icon-sm mr-2 text-primary"></svg> Cost Estimate</h3>
+        <div class="grid-4 text-center">
+          <div class="stat-box">
+            <span>Resource Cost</span>
+            <h4>{{ analysisData()?.costEstimate?.resourceCost | currency:(analysisData()?.costEstimate?.currency || 'INR') }}</h4>
+          </div>
+          <div class="stat-box">
+            <span>Infrastructure</span>
+            <h4>{{ analysisData()?.costEstimate?.infrastructureCost | currency:(analysisData()?.costEstimate?.currency || 'INR') }}</h4>
+          </div>
+          <div class="stat-box highlight">
+            <span>Total Cost</span>
+            <h4>{{ analysisData()?.costEstimate?.totalCost | currency:(analysisData()?.costEstimate?.currency || 'INR') }}</h4>
+          </div>
+          <div class="stat-box success">
+            <span>Estimated Margin</span>
+            <h4>{{ formatPercent(analysisData()?.costEstimate?.estimatedMargin) }}</h4>
+          </div>
+        </div>
+      </section>
+
+      <!-- Risks & Mitigation -->
+      <section id="risks" class="review-card mt-4" *ngIf="analysisData()?.risks?.length > 0">
+        <h3><svg lucideShieldAlert class="icon-sm mr-2 text-primary"></svg> Risks & Mitigation</h3>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Risk</th>
+                <th>Impact</th>
+                <th>Mitigation Strategy</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of analysisData()?.risks">
+                <td><strong>{{ r.risk }}</strong></td>
+                <td><span class="badge badge-priority-{{r.impact?.toLowerCase()}}">{{ r.impact }}</span></td>
+                <td>{{ r.mitigation }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>

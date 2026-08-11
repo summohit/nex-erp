@@ -52,7 +52,7 @@ deploy_frontend() {
 
   info "Building Angular app for production..."
   cd "$FRONTEND_DIR"
-  npm run build
+  NODE_OPTIONS="--max_old_space_size=4096" npm run build
 
   if [ ! -d "$FRONTEND_DIR/dist/frontend/browser" ]; then
     err "Build failed — dist/frontend/browser not found!"

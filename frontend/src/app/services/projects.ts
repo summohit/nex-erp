@@ -45,6 +45,24 @@ export class ProjectsService {
     return this.http.put<any>(`${this.apiUrl}/${id}`, data);
   }
 
+  createAiProject(data: { name: string, description?: string }) {
+    return this.http.post<any>(`${this.apiUrl}/ai-onboarding`, data);
+  }
+
+  uploadProjectDocument(projectId: number, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<any>(`${this.apiUrl}/${projectId}/documents`, formData);
+  }
+
+  analyzeProjectDocuments(projectId: number) {
+    return this.http.post<any>(`${this.apiUrl}/${projectId}/analyze`, {});
+  }
+
+  getProjectAnalysis(projectId: number) {
+    return this.http.get<any>(`${this.apiUrl}/${projectId}/analysis`);
+  }
+
   archiveProject(id: number, force: boolean = false) {
     return this.http.patch(`${this.apiUrl}/${id}/archive`, { force });
   }

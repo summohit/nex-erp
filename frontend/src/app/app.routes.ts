@@ -17,6 +17,12 @@ export const routes: Routes = [
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { 
+    path: 'projects/onboarding/:id', 
+    canActivate: [authGuard, permissionGuard],
+    data: { module: 'projects' },
+    loadComponent: () => import('./projects/project-wizard/project-wizard').then(m => m.ProjectWizardComponent) 
+  },
+  { 
     path: 'projects/:id', 
     canActivate: [authGuard, permissionGuard],
     data: { module: 'projects' },
