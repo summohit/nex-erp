@@ -10,9 +10,14 @@ export interface PublicJob {
   experienceYears?: string;
   type: string;
   postedDate: string;
+  startDate?: string;
+  endDate?: string;
   descriptionHtml: string;
   screeningQuestions: string[];
   companyId?: string;
+  minSalary?: number;
+  maxSalary?: number;
+  workLocationType?: string;
 }
 
 export class CandidateApplicationDto {
@@ -117,7 +122,7 @@ export class PublicJobsService {
         questions = [j.screeningQuestions];
       }
     }
-    return {
+    const publicJob: PublicJob = {
       id: j.id,
       title: j.title,
       department: j.department?.name || 'General',
@@ -125,10 +130,20 @@ export class PublicJobsService {
       address: j.branch?.address || '',
       experienceYears: j.experienceYears || '0-1 Years',
       type: j.type,
+      workLocationType: j.workLocationType || 'On-site',
       postedDate: j.postedDate ? j.postedDate.toISOString() : j.createdAt.toISOString(),
+      startDate: j.startDate ? j.startDate.toISOString() : undefined,
+      endDate: j.endDate ? j.endDate.toISOString() : undefined,
       descriptionHtml: j.descriptionHtml || '',
       screeningQuestions: questions,
       companyId: String(j.companyId)
     };
+
+    if (j.discloseSalary) {
+      if (j.minSalary != null) publicJob.minSalary = j.minSalary;
+      if (j.maxSalary != null) publicJob.maxSalary = j.maxSalary;
+    }
+
+    return publicJob;
   }
 }

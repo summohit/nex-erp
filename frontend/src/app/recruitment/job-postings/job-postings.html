@@ -92,6 +92,11 @@
             <span class="stat-val">{{ job.type }}</span>
           </div>
           <div class="stat-box">
+            <span class="stat-label">Salary Range</span>
+            <span class="stat-val" *ngIf="job.minSalary && job.maxSalary">₹{{ job.minSalary | number }} - ₹{{ job.maxSalary | number }}</span>
+            <span class="stat-val" *ngIf="!job.minSalary || !job.maxSalary">Not specified</span>
+          </div>
+          <div class="stat-box">
             <span class="stat-label">Posted Date</span>
             <span class="stat-val">{{ job.postedDate | date:'mediumDate' }}</span>
           </div>
@@ -127,12 +132,39 @@
   <ng-container *ngIf="drawerMode() !== 'view'">
     <div class="drawer-body">
       <div class="form-grid">
-        <div class="form-group">
-          <label>Department</label>
-          <select class="form-control" [(ngModel)]="jobForm.departmentId" (change)="onDepartmentChange()">
-            <option value="">Select Department</option>
-            <option *ngFor="let dept of departments()" [value]="dept.id">{{ dept.name }}</option>
-          </select>
+        <!-- Searchable Department -->
+        <div class="form-group dropdown-field-container">
+          <label>Department <span class="required-star">*</span></label>
+          <div class="custom-select-trigger" (click)="toggleDeptDropdown()" [class.active]="deptDropdownOpen">
+            <div class="selected-val">
+              <svg lucideBuilding class="select-icon" *ngIf="jobForm.departmentName"></svg>
+              <span *ngIf="jobForm.departmentName" class="selected-text">{{ jobForm.departmentName }}</span>
+              <span *ngIf="!jobForm.departmentName" class="placeholder-text">Select Department...</span>
+            </div>
+            <svg lucideChevronDown class="chevron-icon" [class.rotated]="deptDropdownOpen"></svg>
+          </div>
+
+          <div class="custom-dropdown-panel" *ngIf="deptDropdownOpen">
+            <div class="dropdown-search-wrapper" (click)="$event.stopPropagation()">
+              <svg lucideSearch class="search-ico"></svg>
+              <input type="text" class="dropdown-search-input" [(ngModel)]="deptSearchQuery" placeholder="Search department..." autofocus>
+            </div>
+            <div class="dropdown-options-list">
+              <div class="dropdown-item" 
+                   *ngFor="let dept of filteredDepartmentOptions" 
+                   (click)="selectDepartment(dept); $event.stopPropagation()"
+                   [class.selected]="jobForm.departmentId == dept.id">
+                <div class="dept-badge">
+                  <svg lucideBuilding class="badge-ico"></svg>
+                </div>
+                <span class="dept-name">{{ dept.name }}</span>
+                <svg lucideCheck class="check-ico" *ngIf="jobForm.departmentId == dept.id"></svg>
+              </div>
+              <div class="no-options-msg" *ngIf="filteredDepartmentOptions.length === 0">
+                No departments found matching "{{ deptSearchQuery }}"
+              </div>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label>Designation (Job Role)</label>
@@ -161,10 +193,105 @@
         <div class="form-group">
           <label>Employment Type</label>
           <select class="form-control" [(ngModel)]="jobForm.type">
-            <option>Full-time</option>
-            <option>Part-time</option>
+            <option>Full Time</option>
+            <option>Part Time</option>
             <option>Contract</option>
+            <option>Internship</option>
+            <option>Temporary</option>
+            <option>Freelance</option>
+            <option>Other</option>
           </select>
+        </div>
+
+        <div class="form-group" *ngIf="jobForm.type === 'Other'">
+          <label>Custom Employment Type</label>
+          <input type="text" class="form-control" [(ngModel)]="jobForm.typeOther" placeholder="e.g. Volunteer">
+        </div>
+
+        <div class="form-group">
+          <label>Work Location Type</label>
+          <select class="form-control" [(ngModel)]="jobForm.workLocationType">
+            <option>On-site</option>
+            <option>Remote</option>
+            <option>Hybrid</option>
+          </select>
+        </div>
+
+        <!-- Searchable Recruiter with Avatar -->
+        <div class="form-group dropdown-field-container">
+          <label>Recruiter (HR Department)</label>
+          <div class="custom-select-trigger" (click)="toggleRecruiterDropdown()" [class.active]="recruiterDropdownOpen">
+            <div class="selected-val" *ngIf="selectedRecruiterEmployee">
+              <div class="user-avatar-circle" [style.background-color]="getAvatarColor(selectedRecruiterEmployee.firstName + ' ' + selectedRecruiterEmployee.lastName)">
+                <img *ngIf="selectedRecruiterEmployee.avatarUrl || selectedRecruiterEmployee.user?.avatarUrl" 
+                     [src]="selectedRecruiterEmployee.avatarUrl || selectedRecruiterEmployee.user?.avatarUrl" 
+                     alt="Avatar" class="avatar-img">
+                <span *ngIf="!selectedRecruiterEmployee.avatarUrl && !selectedRecruiterEmployee.user?.avatarUrl">
+                  {{ getInitials(selectedRecruiterEmployee.firstName, selectedRecruiterEmployee.lastName) }}
+                </span>
+              </div>
+              <div class="selected-user-info">
+                <span class="user-name">{{ selectedRecruiterEmployee.firstName }} {{ selectedRecruiterEmployee.lastName }}</span>
+              </div>
+            </div>
+            <div class="selected-val" *ngIf="!selectedRecruiterEmployee">
+              <svg lucideUser class="select-icon"></svg>
+              <span class="placeholder-text">Select Recruiter...</span>
+            </div>
+            <svg lucideChevronDown class="chevron-icon" [class.rotated]="recruiterDropdownOpen"></svg>
+          </div>
+
+          <div class="custom-dropdown-panel" *ngIf="recruiterDropdownOpen">
+            <div class="dropdown-search-wrapper" (click)="$event.stopPropagation()">
+              <svg lucideSearch class="search-ico"></svg>
+              <input type="text" class="dropdown-search-input" [(ngModel)]="recruiterSearchQuery" placeholder="Search recruiter by name or email..." autofocus>
+            </div>
+            <div class="dropdown-options-list">
+              <div class="dropdown-item" (click)="selectRecruiter(null); $event.stopPropagation()" [class.selected]="!jobForm.recruiterId">
+                <div class="user-avatar-circle unassigned">
+                  <svg lucideUser class="unassigned-ico"></svg>
+                </div>
+                <div class="user-details">
+                  <span class="user-name">Unassigned</span>
+                  <span class="user-sub">No recruiter assigned</span>
+                </div>
+              </div>
+              <div class="dropdown-item" 
+                   *ngFor="let emp of filteredRecruiterOptions" 
+                   (click)="selectRecruiter(emp); $event.stopPropagation()"
+                   [class.selected]="jobForm.recruiterId == emp.id">
+                <div class="user-avatar-circle" [style.background-color]="getAvatarColor(emp.firstName + ' ' + emp.lastName)">
+                  <img *ngIf="emp.avatarUrl || emp.user?.avatarUrl" [src]="emp.avatarUrl || emp.user?.avatarUrl" alt="Avatar" class="avatar-img">
+                  <span *ngIf="!emp.avatarUrl && !emp.user?.avatarUrl">
+                    {{ getInitials(emp.firstName, emp.lastName) }}
+                  </span>
+                </div>
+                <div class="user-details">
+                  <span class="user-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                  <span class="user-sub">{{ emp.email || 'HR Department' }}</span>
+                </div>
+                <svg lucideCheck class="check-ico" *ngIf="jobForm.recruiterId == emp.id"></svg>
+              </div>
+              <div class="no-options-msg" *ngIf="filteredRecruiterOptions.length === 0">
+                No recruiters found matching "{{ recruiterSearchQuery }}"
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Total Openings</label>
+          <input type="number" class="form-control" [(ngModel)]="jobForm.totalOpenings" min="1" placeholder="e.g. 1">
+        </div>
+
+        <div class="form-group">
+          <label>Start Date (Optional)</label>
+          <input type="date" class="form-control" [(ngModel)]="jobForm.startDate">
+        </div>
+
+        <div class="form-group">
+          <label>End Date (Optional)</label>
+          <input type="date" class="form-control" [(ngModel)]="jobForm.endDate">
         </div>
 
         <div class="form-group">
@@ -174,6 +301,58 @@
             <option value="Open">Open</option>
             <option value="Closed">Closed</option>
           </select>
+        </div>
+
+        <!-- Enhanced Salary & Compensation Card with Toggle -->
+        <div class="form-group full-width salary-card-section">
+          <div class="salary-card-header">
+            <div class="salary-header-title">
+              <span class="section-tag">COMPENSATION</span>
+              <h4>Salary Range & Public Visibility</h4>
+            </div>
+            <div class="disclosure-status-pill" [class.disclosed]="jobForm.discloseSalary">
+              <svg lucideEye *ngIf="jobForm.discloseSalary" class="pill-ico"></svg>
+              <svg lucideEyeOff *ngIf="!jobForm.discloseSalary" class="pill-ico"></svg>
+              <span>{{ jobForm.discloseSalary ? 'Publicly Disclosed' : 'Hidden from Public' }}</span>
+            </div>
+          </div>
+
+          <div class="salary-inputs-row">
+            <div class="form-group">
+              <label>Min Salary (₹)</label>
+              <div class="input-with-currency">
+                <span class="currency-symbol">₹</span>
+                <input type="number" class="form-control pl-curr" [(ngModel)]="jobForm.minSalary" placeholder="e.g. 500000">
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label>Max Salary (₹)</label>
+              <div class="input-with-currency">
+                <span class="currency-symbol">₹</span>
+                <input type="number" class="form-control pl-curr" [(ngModel)]="jobForm.maxSalary" placeholder="e.g. 800000">
+              </div>
+            </div>
+          </div>
+          
+          <div class="toggle-control-box" [class.active]="jobForm.discloseSalary" (click)="jobForm.discloseSalary = !jobForm.discloseSalary">
+            <div class="toggle-info">
+              <div class="toggle-title-row">
+                <strong>Disclose Salary on Public Careers Page</strong>
+              </div>
+              <p class="toggle-desc" *ngIf="jobForm.discloseSalary">
+                Job seekers visiting your public portal will see salary range: 
+                <strong class="highlight-range">₹{{ (jobForm.minSalary | number) || '0' }} - ₹{{ (jobForm.maxSalary | number) || '0' }}</strong>
+              </p>
+              <p class="toggle-desc" *ngIf="!jobForm.discloseSalary">
+                Salary details will remain confidential and will <strong>not</strong> be shown on the public careers portal.
+              </p>
+            </div>
+            <label class="toggle-switch" (click)="$event.stopPropagation()">
+              <input type="checkbox" [(ngModel)]="jobForm.discloseSalary">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
 
         <div class="form-group">

@@ -188,16 +188,20 @@ export class EmployeesService {
   }
 
   async delete(id: number, companyId: number) {
-    const employee = await this.prisma.employee.findFirst({ where: { id, companyId }, select: { userId: true } });
+    const employee = await this.prisma.employee.findFirst({ where: { id, companyId }, select: { id: true, userId: true } });
     if (!employee) throw new NotFoundException('Employee not found');
 
-    // Due to Cascade delete on User -> Employee, deleting the User will delete the Employee.
-    // If it's the other way around, we should just delete the User.
-    // Let's check schema: user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-    // Wait, the schema says: Employee has a userId that references User. OnDelete: Cascade.
-    // This means if we delete the User, the Employee is deleted. 
-    // So we delete the User.
-    await this.prisma.user.delete({ where: { id: employee.userId } });
+    // Soft delete / deactivate instead of hard delete
+    await this.prisma.user.update({
+      where: { id: employee.userId },
+      data: { status: 'SUSPENDED' }
+    });
+
+    // Set subordinates' managerId to null
+    await this.prisma.employee.updateMany({
+      where: { managerId: employee.id, companyId },
+      data: { managerId: null }
+    });
     
     return { success: true };
   }

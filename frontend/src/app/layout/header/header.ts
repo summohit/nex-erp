@@ -92,7 +92,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.timerInterval = setInterval(() => {
       const inTime = this.clockInTime();
       if (!inTime) return;
-      const diff = new Date().getTime() - inTime.getTime();
+      let diff = new Date().getTime() - inTime.getTime();
+      if (diff < 0) diff = 0;
       const hrs = Math.floor(diff / 3600000);
       const mins = Math.floor((diff % 3600000) / 60000);
       const secs = Math.floor((diff % 60000) / 1000);

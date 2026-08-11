@@ -113,6 +113,9 @@ export class EmployeeListComponent implements OnInit {
     sortable: true
   };
 
+  paginationPageSize = 20;
+  paginationPageSizeSelector = [10, 20, 50, 100];
+
   gridOptions = {
     rowSelection: {
       mode: 'multiRow' as const,
@@ -210,6 +213,7 @@ export class EmployeeListComponent implements OnInit {
       cellRendererParams: {
         onEdit: (data: any) => this.openDrawer(data),
         onDelete: (data: any) => this.deleteEmployee(data.id),
+        deleteLabel: 'Deactivate',
         onViewProfile: (data: any) => this.router.navigate(['/employees', data.id, 'profile']),
         onResendVerification: (data: any) => {
           if (!data.user?.email) return;
@@ -314,14 +318,14 @@ export class EmployeeListComponent implements OnInit {
   }
 
   deleteEmployee(id: number) {
-    if (!confirm('Are you sure you want to delete this employee? This will also remove their user account and login access.')) return;
+    if (!confirm('Are you sure you want to deactivate this employee? Their account will be blocked and they will not be able to login.')) return;
 
     this.employeeService.deleteEmployee(id).subscribe({
       next: () => {
-        this.toast.success('Employee deleted');
+        this.toast.success('Employee deactivated successfully');
         this.loadEmployees();
       },
-      error: () => this.toast.error('Failed to delete employee')
+      error: () => this.toast.error('Failed to deactivate employee')
     });
   }
 }

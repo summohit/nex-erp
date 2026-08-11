@@ -164,7 +164,11 @@ export class AuthService {
   }
 
   async login(email: string, pass: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: { equals: email, mode: 'insensitive' }
+      }
+    });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const isMatch = await bcrypt.compare(pass, user.password);
@@ -172,6 +176,10 @@ export class AuthService {
 
     if (user.status === 'PENDING_VERIFICATION') {
       throw new UnauthorizedException('Please verify your email address before logging in.');
+    }
+    
+    if (user.status === 'SUSPENDED' || user.status === 'INACTIVE' || user.status === 'BLOCKED') {
+      throw new UnauthorizedException('Account is blocked connect administration');
     }
 
     const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId };
@@ -241,7 +249,11 @@ export class AuthService {
   }
 
   async resendVerificationEmail(email: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: { equals: email, mode: 'insensitive' }
+      }
+    });
     if (!user) {
       throw new UnauthorizedException('User not found.');
     }

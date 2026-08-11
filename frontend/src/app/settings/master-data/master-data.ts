@@ -217,6 +217,15 @@ export class MasterDataComponent implements OnInit {
         }).join(', ');
       }
     },
+    {
+      field: 'isActive',
+      headerName: 'Status',
+      width: 150,
+      cellRenderer: StatusToggleRendererComponent,
+      cellRendererParams: {
+        onToggle: this.onBranchToggle.bind(this)
+      }
+    },
     { 
       headerName: 'Actions', width: 120, flex: 0, sortable: false, filter: false,
       cellRenderer: ActionCellRendererComponent,
@@ -302,6 +311,7 @@ export class MasterDataComponent implements OnInit {
     canEditProfiles: false,
     address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0',
     geofenceRadius: 500, allowedIps: '',
+    isActive: true,
     defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
     accrualFrequency: 'NONE', accrualAmount: 0,
     date: ''
@@ -381,6 +391,7 @@ export class MasterDataComponent implements OnInit {
         id: 0, name: '', departmentId: 0, canEditProfiles: false,
         address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0',
         geofenceRadius: 500, allowedIps: '',
+        isActive: true,
         defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
         accrualFrequency: 'NONE', accrualAmount: 0,
         date: ''
@@ -413,32 +424,33 @@ export class MasterDataComponent implements OnInit {
       this.closeModal();
       this.isSaving.set(false);
     };
-    const onError = (msg: string) => {
+    const onError = (err: any) => {
+      const msg = err.error?.message || err.message || 'An error occurred';
       this.toast.error(msg);
       this.isSaving.set(false);
     };
 
     if (tab === 'departments') {
-      if (mode === 'create') this.masterDataService.createDepartment(this.formData).subscribe({ next: () => onSuccess('Department created'), error: () => onError('Error') });
-      else this.masterDataService.updateDepartment(id, this.formData).subscribe({ next: () => onSuccess('Department updated'), error: () => onError('Error') });
+      if (mode === 'create') this.masterDataService.createDepartment(this.formData).subscribe({ next: () => onSuccess('Department created'), error: onError });
+      else this.masterDataService.updateDepartment(id, this.formData).subscribe({ next: () => onSuccess('Department updated'), error: onError });
     } else if (tab === 'designations') {
-      if (mode === 'create') this.masterDataService.createDesignation(this.formData).subscribe({ next: () => onSuccess('Designation created'), error: () => onError('Error') });
-      else this.masterDataService.updateDesignation(id, this.formData).subscribe({ next: () => onSuccess('Designation updated'), error: () => onError('Error') });
+      if (mode === 'create') this.masterDataService.createDesignation(this.formData).subscribe({ next: () => onSuccess('Designation created'), error: onError });
+      else this.masterDataService.updateDesignation(id, this.formData).subscribe({ next: () => onSuccess('Designation updated'), error: onError });
     } else if (tab === 'branches') {
-      if (mode === 'create') this.masterDataService.createBranch(this.formData).subscribe({ next: () => onSuccess('Branch created'), error: () => onError('Error') });
-      else this.masterDataService.updateBranch(id, this.formData).subscribe({ next: () => onSuccess('Branch updated'), error: () => onError('Error') });
+      if (mode === 'create') this.masterDataService.createBranch(this.formData).subscribe({ next: () => onSuccess('Branch created'), error: onError });
+      else this.masterDataService.updateBranch(id, this.formData).subscribe({ next: () => onSuccess('Branch updated'), error: onError });
     } else if (tab === 'leave-types') {
       // parse numeric
       this.formData.defaultDays = Number(this.formData.defaultDays);
       this.formData.carryForwardLimit = Number(this.formData.carryForwardLimit);
-      if (mode === 'create') this.masterDataService.createLeaveType(this.formData).subscribe({ next: () => onSuccess('Leave Type created'), error: () => onError('Error') });
-      else this.masterDataService.updateLeaveType(id, this.formData).subscribe({ next: () => onSuccess('Leave Type updated'), error: () => onError('Error') });
+      if (mode === 'create') this.masterDataService.createLeaveType(this.formData).subscribe({ next: () => onSuccess('Leave Type created'), error: onError });
+      else this.masterDataService.updateLeaveType(id, this.formData).subscribe({ next: () => onSuccess('Leave Type updated'), error: onError });
     } else if (tab === 'holidays') {
-      if (mode === 'create') this.masterDataService.createHoliday(this.formData).subscribe({ next: () => onSuccess('Holiday created'), error: () => onError('Error') });
-      else this.masterDataService.updateHoliday(id, this.formData).subscribe({ next: () => onSuccess('Holiday updated'), error: () => onError('Error') });
+      if (mode === 'create') this.masterDataService.createHoliday(this.formData).subscribe({ next: () => onSuccess('Holiday created'), error: onError });
+      else this.masterDataService.updateHoliday(id, this.formData).subscribe({ next: () => onSuccess('Holiday updated'), error: onError });
     } else if (tab === 'blackout-dates') {
-      if (mode === 'create') this.masterDataService.createBlackoutDate(this.formData).subscribe({ next: () => onSuccess('Blackout date created'), error: () => onError('Error') });
-      else this.masterDataService.updateBlackoutDate(id, this.formData).subscribe({ next: () => onSuccess('Blackout date updated'), error: () => onError('Error') });
+      if (mode === 'create') this.masterDataService.createBlackoutDate(this.formData).subscribe({ next: () => onSuccess('Blackout date created'), error: onError });
+      else this.masterDataService.updateBlackoutDate(id, this.formData).subscribe({ next: () => onSuccess('Blackout date updated'), error: onError });
     }
   }
 
@@ -483,6 +495,19 @@ export class MasterDataComponent implements OnInit {
     this.masterDataService.updateDesignation(data.id, { isActive }).subscribe({
       next: () => {
         this.toast.success(`Designation is now ${isActive ? 'Active' : 'Inactive'}`);
+      },
+      error: (err) => {
+        console.error(err);
+        this.toast.error('Failed to update status');
+        this.loadData();
+      }
+    });
+  }
+
+  onBranchToggle(data: any, isActive: boolean) {
+    this.masterDataService.updateBranch(data.id, { isActive }).subscribe({
+      next: () => {
+        this.toast.success(`Branch is now ${isActive ? 'Active' : 'Inactive'}`);
       },
       error: (err) => {
         console.error(err);

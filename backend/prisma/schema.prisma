@@ -52,6 +52,7 @@ model Company {
   blackoutDates       BlackoutDate[]
   clients             Client[]
   kioskEnabled        Boolean              @default(false)
+  payrollSetting      PayrollSetting?
 }
 
 // Authentication & RBAC
@@ -159,6 +160,7 @@ model Employee {
   onboardingStatus String                   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
   onboardingTasks  EmployeeOnboardingTask[]
   kioskPin         String?                  // 4-digit PIN for Kiosk Mode
+  recruitedJobs    Job[]                    @relation("JobRecruiter")
 
   // Profile details
   salutation    String?
@@ -308,6 +310,7 @@ model Branch {
   startTime  String     @default("09:00")
   endTime    String     @default("18:00")
   weeklyOffs String     @default("0") // Comma separated integers: 0=Sun, 1=Mon, ..., 6=Sat
+  isActive   Boolean    @default(true)
   companyId  Int
   company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   geofenceRadius Int?   @default(500) // meters
@@ -636,11 +639,20 @@ model Job {
   experienceYears    String?
   type               String           @default("Full-time")
   status             String           @default("Draft") // Open, Draft, Closed
+  minSalary          Float?
+  maxSalary          Float?
+  discloseSalary     Boolean          @default(false)
   descriptionHtml    String?          @db.Text
   screeningQuestions String?          @db.Text // Store as JSON string or comma-separated
   companyId          Int
   company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   postedDate         DateTime?
+  startDate          DateTime?
+  endDate            DateTime?
+  totalOpenings      Int              @default(1)
+  recruiterId        Int?
+  recruiter          Employee?        @relation("JobRecruiter", fields: [recruiterId], references: [id], onDelete: SetNull)
+  workLocationType   String           @default("On-site") // On-site, Remote, Hybrid
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   applications       JobApplication[]
@@ -661,6 +673,8 @@ model JobApplication {
   experienceYears String?
   noticePeriod    String?
   status          String      @default("NEW") // NEW, REVIEWING, SHORTLISTED, REJECTED, HIRED, ONBOARDED
+  offeredSalary   Float?
+  approvalStatus  String?     @default("APPROVED") // PENDING_APPROVAL, APPROVED, REJECTED
   answers         String?     @db.Text // Store JSON string of answers
   aiScore         Int?
   aiSummary       String?     @db.Text
@@ -1250,4 +1264,17 @@ model ClientContact {
   updatedAt   DateTime @updatedAt
   
   @@unique([email, clientId])
+}
+
+// Payroll Configuration
+model PayrollSetting {
+  id               Int      @id @default(autoincrement())
+  companyId        Int      @unique
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  basicPercent     Float    @default(50.0) // 50% of CTC
+  hraPercent       Float    @default(20.0) // 20% of CTC
+  pfPercent        Float    @default(12.0) // 12% of Basic
+  gratuityPercent  Float    @default(4.81) // 4.81% of Basic
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

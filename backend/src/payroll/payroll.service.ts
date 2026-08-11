@@ -540,6 +540,14 @@ export class PayrollService {
     const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
     if (!employee) throw new NotFoundException('Employee not found');
 
+    if (data.purchaseDate) {
+      const pDate = new Date(data.purchaseDate);
+      const today = new Date();
+      if (pDate > today) {
+        throw new BadRequestException('Purchase date cannot be in the future');
+      }
+    }
+
     return this.prisma.expenseClaim.create({
       data: {
         employeeId: employee.id,

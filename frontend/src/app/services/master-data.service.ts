@@ -29,6 +29,7 @@ export interface Branch {
   startTime?: string;
   endTime?: string;
   weeklyOffs?: string;
+  isActive?: boolean;
 }
 
 export interface LeaveType {

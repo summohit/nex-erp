@@ -22,6 +22,11 @@ export interface PublicJob {
   postedDate: string;
   descriptionHtml: string;
   screeningQuestions: string[];
+  minSalary?: number;
+  maxSalary?: number;
+  workLocationType?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 @Component({
@@ -38,6 +43,7 @@ export interface PublicJob {
 })
 export class CareersComponent implements OnInit {
   private http = inject(HttpClient);
+  private route = inject(ActivatedRoute);
 
   jobs = signal<PublicJob[]>([]);
   filteredJobs = signal<PublicJob[]>([]);
@@ -75,8 +81,14 @@ export class CareersComponent implements OnInit {
 
   async fetchPublicJobs() {
     try {
+      const encryptedCompanyId = this.route.snapshot.paramMap.get('companyId');
+      
+      const url = encryptedCompanyId 
+        ? `${environment.apiUrl}/public/jobs/${encryptedCompanyId}`
+        : `${environment.apiUrl}/public/jobs`;
+        
       const res: any = await firstValueFrom(
-        this.http.get(`${environment.apiUrl}/public/jobs`)
+        this.http.get(url)
       );
       this.jobs.set(res || []);
       this.filteredJobs.set(res || []);

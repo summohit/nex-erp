@@ -9,6 +9,7 @@ export interface ActionCellParams extends ICellRendererParams {
   onEdit?: (data: any) => void;
   editLabel?: string;
   onDelete?: (data: any) => void;
+  deleteLabel?: string;
   onViewProfile?: (data: any) => void;
   onView?: (data: any) => void;
   viewLabel?: string;
@@ -48,7 +49,7 @@ export interface ActionCellParams extends ICellRendererParams {
           <span class="menu-text text-primary">Resend Verification</span>
         </button>
         <button mat-menu-item class="menu-item text-danger" (click)="delete()" *ngIf="params.onDelete">
-          <span class="menu-text">Delete</span>
+          <span class="menu-text">{{ params.deleteLabel || 'Delete' }}</span>
         </button>
       </mat-menu>
     </div>

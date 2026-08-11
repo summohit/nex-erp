@@ -1,0 +1,71 @@
+<div class="settings-container">
+  <div class="settings-header">
+    <h2>Payroll Configuration Rules</h2>
+    <p>Define standard salary component percentages for automatic Annexure generation.</p>
+  </div>
+
+  <div class="settings-content" *ngIf="!isLoading">
+    <div class="card">
+      <div class="card-body">
+        <h3 class="section-title">Earnings Breakdown</h3>
+        
+        <div class="form-group">
+          <label>Basic Salary (% of Total CTC)</label>
+          <div class="input-group">
+            <input type="number" class="form-control" [(ngModel)]="settings.basicPercent">
+            <span class="input-group-addon">%</span>
+          </div>
+          <small class="help-text">Standard practice is 40% - 50%.</small>
+        </div>
+
+        <div class="form-group">
+          <label>HRA (% of Total CTC)</label>
+          <div class="input-group">
+            <input type="number" class="form-control" [(ngModel)]="settings.hraPercent">
+            <span class="input-group-addon">%</span>
+          </div>
+          <small class="help-text">Standard practice is 20% (or 40-50% of Basic).</small>
+        </div>
+        
+        <div class="form-group">
+          <label>Special Allowance</label>
+          <div class="input-group">
+            <input type="text" class="form-control" value="Auto-balanced" disabled>
+          </div>
+          <small class="help-text">Special Allowance automatically balances the remaining amount to match the exact target CTC.</small>
+        </div>
+
+        <h3 class="section-title" style="margin-top: 30px;">Deductions Breakdown</h3>
+
+        <div class="form-group">
+          <label>Provident Fund (Employer Contribution) (% of Basic)</label>
+          <div class="input-group">
+            <input type="number" class="form-control" [(ngModel)]="settings.pfPercent">
+            <span class="input-group-addon">%</span>
+          </div>
+          <small class="help-text">Standard is 12% of Basic.</small>
+        </div>
+
+        <div class="form-group">
+          <label>Gratuity (% of Basic)</label>
+          <div class="input-group">
+            <input type="number" class="form-control" [(ngModel)]="settings.gratuityPercent">
+            <span class="input-group-addon">%</span>
+          </div>
+          <small class="help-text">Standard is 4.81% of Basic.</small>
+        </div>
+      </div>
+      
+      <div class="card-footer">
+        <button class="btn-primary" (click)="saveSettings()" [disabled]="isSaving">
+          {{ isSaving ? 'Saving...' : 'Save Configuration' }}
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <p>Loading settings...</p>
+  </div>
+</div>

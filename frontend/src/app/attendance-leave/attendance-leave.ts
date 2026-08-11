@@ -45,6 +45,8 @@ export interface DayStatus {
   status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty';
   tooltip?: string;
   isFuture: boolean;
+  clockInStr?: string;
+  clockOutStr?: string;
 }
 
 @Component({
@@ -1378,6 +1380,8 @@ export class AttendanceLeaveComponent implements OnInit {
 
       let status: DayStatus['status'] = 'Empty';
       let tooltip = '';
+      let clockInStr = '';
+      let clockOutStr = '';
 
       if (isFuture) {
         status = 'Empty';
@@ -1426,6 +1430,9 @@ export class AttendanceLeaveComponent implements OnInit {
           const outStr = log.clockOut ? new Date(log.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '...';
           tooltip = `In: ${inStr} - Out: ${outStr} (Click for details)`;
           
+          clockInStr = inStr;
+          clockOutStr = log.clockOut ? outStr : '';
+
           if (!isWeekend && !holiday) workingDaysCount++; // if they worked on weekend, does it increase working days? yes, they worked.
         } 
         else if (holiday) {
@@ -1461,7 +1468,9 @@ export class AttendanceLeaveComponent implements OnInit {
         weekdayStr,
         status,
         tooltip,
-        isFuture
+        isFuture,
+        clockInStr,
+        clockOutStr
       });
     }
 
@@ -1494,16 +1503,24 @@ export class AttendanceLeaveComponent implements OnInit {
     const grid = this.monthlyGrid();
     if (!grid.length) return;
 
-    let csv = 'Date,Day,Status,Notes\n';
+    let empName = 'My';
+    if (this.selectedAttendanceEmployeeId()) {
+      const emp = this.employees().find(e => e.id === this.selectedAttendanceEmployeeId());
+      if (emp) {
+        empName = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+      }
+    }
+
+    let csv = 'Employee,Date,Day,Status,Clock In,Clock Out,Notes\n';
     for (const d of grid) {
-      csv += `${this.getLocalDateString(d.date)},${d.weekdayStr},${d.status},"${d.tooltip || ''}"\n`;
+      csv += `"${empName}",${this.getLocalDateString(d.date)},${d.weekdayStr},${d.status},"${d.clockInStr || ''}","${d.clockOutStr || ''}","${d.tooltip || ''}"\n`;
     }
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `attendance_${this.months[this.selectedMonth()]}_${this.selectedYear()}.csv`;
+    a.download = `${empName.replace(/\s+/g, '_')}_Attendance_${this.months[this.selectedMonth()]}_${this.selectedYear()}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   }

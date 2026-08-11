@@ -61,6 +61,14 @@ export class CandidatesComponent implements OnInit {
   selectedApp = signal<JobApplication | null>(null);
   activeTab = signal<'details' | 'interviews'>('details');
   showInterviewForm = signal(false);
+  showSalaryPrompt = signal(false);
+  pendingStatusChange = signal<{ id: number, status: string } | null>(null);
+  offeredSalaryInput = signal<number | null>(null);
+  
+  showAnnexureModal = signal(false);
+  annexureData = signal<any>(null);
+  isLoadingAnnexure = signal(false);
+  
   newInterview = signal<any>({});
   editInterviewMode = signal<number | null>(null);
   isSubmittingInterview = signal<boolean>(false);
@@ -277,19 +285,57 @@ export class CandidatesComponent implements OnInit {
       );
       
       const movedItem = event.container.data[event.currentIndex];
-      movedItem.status = newStatus;
       
-      this.candidatesService.updateStatus(movedItem.id, newStatus).subscribe({
-        next: () => {
-          this.toast.success(`Moved ${movedItem.fullName} to ${newStatus}`);
-          this.loadApplications(); // Refresh to sync state perfectly
-        },
-        error: () => {
-          this.toast.error('Failed to update status');
-          this.loadApplications(); // Revert on error
-        }
-      });
+      if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
+        this.pendingStatusChange.set({ id: movedItem.id, status: newStatus });
+        this.offeredSalaryInput.set(null);
+        this.showSalaryPrompt.set(true);
+      } else {
+        movedItem.status = newStatus;
+        this.candidatesService.updateStatus(movedItem.id, newStatus).subscribe({
+          next: () => {
+            this.toast.success(`Moved ${movedItem.fullName} to ${newStatus}`);
+            this.loadApplications(); 
+          },
+          error: () => {
+            this.toast.error('Failed to update status');
+            this.loadApplications(); 
+          }
+        });
+      }
     }
+  }
+
+  submitSalaryPrompt() {
+    const pending = this.pendingStatusChange();
+    if (!pending) return;
+    
+    this.candidatesService.updateStatus(pending.id, pending.status, this.offeredSalaryInput() || undefined).subscribe({
+      next: (updatedApp) => {
+        if (updatedApp.approvalStatus === 'PENDING_APPROVAL') {
+          this.toast.success('Salary exceeds maximum. Sent for approval.');
+        } else {
+          this.toast.success(`Moved to ${updatedApp.status}`);
+        }
+        this.closeSalaryPrompt();
+        this.loadApplications();
+        if (this.selectedApp()?.id === updatedApp.id) {
+           this.selectedApp.set(updatedApp);
+        }
+      },
+      error: () => {
+        this.toast.error('Failed to update status');
+        this.closeSalaryPrompt();
+        this.loadApplications();
+      }
+    });
+  }
+
+  closeSalaryPrompt() {
+    this.showSalaryPrompt.set(false);
+    this.pendingStatusChange.set(null);
+    this.offeredSalaryInput.set(null);
+    this.loadApplications(); // Revert kanban UI if canceled
   }
 
   // --- Detail Drawer ---
@@ -314,6 +360,29 @@ export class CandidatesComponent implements OnInit {
 
   closeDrawer() {
     this.selectedApp.set(null);
+    this.offeredSalaryInput.set(null);
+  }
+
+  viewAnnexure(applicationId: number) {
+    this.isLoadingAnnexure.set(true);
+    this.showAnnexureModal.set(true);
+    this.candidatesService.getAnnexure(applicationId).subscribe({
+      next: (data) => {
+        this.annexureData.set(data);
+        this.isLoadingAnnexure.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load annexure', err);
+        this.toast.error(err.error?.message || 'Failed to load annexure');
+        this.closeAnnexureModal();
+      }
+    });
+  }
+
+  closeAnnexureModal() {
+    this.showAnnexureModal.set(false);
+    this.annexureData.set(null);
+    this.isLoadingAnnexure.set(false);
   }
 
   loadInterviews(appId: number) {
@@ -397,13 +466,50 @@ export class CandidatesComponent implements OnInit {
     const app = this.selectedApp();
     if (!app) return;
     
+    if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
+      this.pendingStatusChange.set({ id: app.id, status: newStatus });
+      this.offeredSalaryInput.set(null);
+      this.showSalaryPrompt.set(true);
+      return;
+    }
+
     this.candidatesService.updateStatus(app.id, newStatus).subscribe({
-      next: () => {
+      next: (updatedApp) => {
         this.toast.success('Status updated');
-        app.status = newStatus;
+        this.selectedApp.set(updatedApp);
         this.loadApplications(); // Sync main board
       },
       error: () => this.toast.error('Failed to update status')
+    });
+  }
+
+  approveSalary() {
+    const app = this.selectedApp();
+    if (!app) return;
+    this.candidatesService.approveSalary(app.id).subscribe({
+      next: () => {
+        this.toast.success('Salary approved');
+        this.loadApplications();
+        if (this.selectedApp()?.id === app.id) {
+          this.selectedApp.update(a => ({ ...a!, approvalStatus: 'APPROVED' }));
+        }
+      },
+      error: () => this.toast.error('Failed to approve salary')
+    });
+  }
+
+  rejectSalary() {
+    const app = this.selectedApp();
+    if (!app) return;
+    this.candidatesService.rejectSalary(app.id).subscribe({
+      next: () => {
+        this.toast.success('Salary rejected');
+        this.loadApplications();
+        if (this.selectedApp()?.id === app.id) {
+          this.selectedApp.update(a => ({ ...a!, approvalStatus: 'REJECTED' }));
+        }
+      },
+      error: () => this.toast.error('Failed to reject salary')
     });
   }
 

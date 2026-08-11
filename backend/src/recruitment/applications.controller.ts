@@ -43,13 +43,33 @@ export class ApplicationsController {
   }
 
   @Put(':id/status')
-  updateStatus(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('status') status: string) {
-    return this.applicationsService.updateStatus(id, req.user.companyId, status);
+  updateStatus(
+    @Request() req, 
+    @Param('id', ParseIntPipe) id: number, 
+    @Body('status') status: string,
+    @Body('offeredSalary') offeredSalary?: number
+  ) {
+    return this.applicationsService.updateStatus(id, req.user.companyId, status, offeredSalary);
+  }
+
+  @Post(':id/approve-salary')
+  approveSalary(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.applicationsService.approveSalary(id, req.user.companyId);
+  }
+
+  @Post(':id/reject-salary')
+  rejectSalary(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.applicationsService.rejectSalary(id, req.user.companyId);
   }
 
   @Post(':id/onboard')
   onboardCandidate(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.applicationsService.onboardCandidate(id, req.user.companyId);
+  }
+
+  @Get(':id/annexure')
+  getAnnexure(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.applicationsService.generateAnnexure(id, req.user.companyId);
   }
 
   @Get(':id/interviews')

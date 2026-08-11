@@ -56,6 +56,24 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Clients menu auto-seeded successfully.');
         }
       }
+
+      // Also ensure Payroll Rules is under Settings
+      const settingsParent = await this.prisma.menu.findFirst({ where: { title: 'Settings', parentId: { not: null } } });
+      if (settingsParent) {
+        const payrollRulesMenu = await this.prisma.menu.findFirst({ where: { title: 'Payroll Rules', parentId: settingsParent.id } });
+        if (!payrollRulesMenu) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Payroll Rules',
+              route: '/settings/payroll',
+              displayOrder: 10,
+              parentId: settingsParent.id,
+              isActive: true
+            }
+          });
+          this.logger.log('Payroll Rules menu auto-seeded successfully.');
+        }
+      }
     } catch (err) {
       this.logger.error('Failed to auto-seed menus:', err);
     }

@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PayrollSettingsService } from '../payroll/payroll-settings.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class ApplicationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private payrollSettingsService: PayrollSettingsService
+  ) {}
 
   async findAll(companyId: number, jobId?: number) {
     const whereClause: any = { companyId };
@@ -37,6 +41,8 @@ export class ApplicationsService {
             departmentId: true,
             designationId: true,
             branchId: true,
+            minSalary: true,
+            maxSalary: true,
             department: { select: { name: true } },
             designation: { select: { name: true } },
             branch: { select: { name: true, address: true } }
@@ -51,11 +57,44 @@ export class ApplicationsService {
     return application;
   }
 
-  async updateStatus(id: number, companyId: number, status: string) {
+  async updateStatus(id: number, companyId: number, status: string, offeredSalary?: number) {
+    const application = await this.findOne(id, companyId);
+    
+    let approvalStatus = application.approvalStatus;
+    let finalStatus = status;
+
+    if (offeredSalary !== undefined && (status === 'HIRED' || status === 'OFFERED')) {
+      if (application.job?.maxSalary && offeredSalary > application.job.maxSalary) {
+        approvalStatus = 'PENDING_APPROVAL';
+        finalStatus = 'OFFERED'; // Enforce OFFERED if pending approval
+      } else {
+        approvalStatus = 'APPROVED';
+      }
+    }
+
+    return this.prisma.jobApplication.update({
+      where: { id: application.id },
+      data: { 
+        status: finalStatus,
+        ...(offeredSalary !== undefined && { offeredSalary }),
+        approvalStatus
+      },
+    });
+  }
+
+  async approveSalary(id: number, companyId: number) {
     const application = await this.findOne(id, companyId);
     return this.prisma.jobApplication.update({
       where: { id: application.id },
-      data: { status },
+      data: { approvalStatus: 'APPROVED' },
+    });
+  }
+
+  async rejectSalary(id: number, companyId: number) {
+    const application = await this.findOne(id, companyId);
+    return this.prisma.jobApplication.update({
+      where: { id: application.id },
+      data: { approvalStatus: 'REJECTED' },
     });
   }
 
@@ -71,6 +110,10 @@ export class ApplicationsService {
     
     if (application.status !== 'HIRED') {
       throw new BadRequestException('Only HIRED candidates can be onboarded');
+    }
+
+    if (application.approvalStatus === 'PENDING_APPROVAL') {
+      throw new BadRequestException('Cannot onboard candidate with pending salary approval');
     }
 
     const existingUser = await this.prisma.user.findUnique({
@@ -142,6 +185,46 @@ export class ApplicationsService {
     });
 
     return newEmployee;
+  }
+
+  async generateAnnexure(id: number, companyId: number) {
+    const application = await this.findOne(id, companyId);
+    if (!application.offeredSalary) {
+      throw new BadRequestException('Cannot generate annexure. Salary is not finalized for this application.');
+    }
+
+    const ctc = application.offeredSalary;
+    const settings = await this.payrollSettingsService.getSettings(companyId);
+
+    const basic = Math.round(ctc * (settings.basicPercent / 100));
+    const hra = Math.round(ctc * (settings.hraPercent / 100));
+    const pf = Math.round(basic * (settings.pfPercent / 100));
+    const gratuity = Math.round(basic * (settings.gratuityPercent / 100));
+    const specialAllowance = Math.round(ctc - (basic + hra + pf + gratuity));
+
+    return {
+      candidateName: application.fullName,
+      jobTitle: application.job?.title || 'Position',
+      totalCTC: ctc,
+      monthlyCTC: Math.round(ctc / 12),
+      breakdown: {
+        earnings: {
+          basic: { annual: basic, monthly: Math.round(basic / 12) },
+          hra: { annual: hra, monthly: Math.round(hra / 12) },
+          specialAllowance: { annual: specialAllowance, monthly: Math.round(specialAllowance / 12) },
+          totalGross: { annual: basic + hra + specialAllowance, monthly: Math.round((basic + hra + specialAllowance) / 12) }
+        },
+        deductions: {
+          pf: { annual: pf, monthly: Math.round(pf / 12) },
+          gratuity: { annual: gratuity, monthly: Math.round(gratuity / 12) }, // Employer contribution
+          totalDeductions: { annual: pf + gratuity, monthly: Math.round((pf + gratuity) / 12) }
+        },
+        netPay: {
+          annual: (basic + hra + specialAllowance) - (pf), // Gratuity isn't typically deducted from monthly in-hand directly, but depends on company. We'll simplify to Gross - PF.
+          monthly: Math.round(((basic + hra + specialAllowance) - pf) / 12)
+        }
+      }
+    };
   }
 
   // --- Interview Methods ---

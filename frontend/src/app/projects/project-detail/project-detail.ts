@@ -60,6 +60,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private socketService = inject(SocketService);
 
   Math = Math;
+  paginationPageSizeSelector = [10, 25, 50, 100];
 
   projectId!: number;
   project = signal<any>(null);

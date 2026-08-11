@@ -4,11 +4,13 @@ import { PayrollController } from './payroll.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PdfService } from './pdf.service';
 import { EmailService } from './email.service';
+import { PayrollSettingsService } from './payroll-settings.service';
+import { PayrollSettingsController } from './payroll-settings.controller';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [PayrollController],
-  providers: [PayrollService, PdfService, EmailService],
-  exports: [PayrollService, PdfService, EmailService]
+  controllers: [PayrollController, PayrollSettingsController],
+  providers: [PayrollService, PdfService, EmailService, PayrollSettingsService],
+  exports: [PayrollService, PdfService, EmailService, PayrollSettingsService]
 })
 export class PayrollModule {}

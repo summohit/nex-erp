@@ -17,6 +17,8 @@ export interface Job {
   status: string; // Open, Draft, Closed
   descriptionHtml?: string;
   screeningQuestions?: string;
+  minSalary?: number;
+  maxSalary?: number;
   companyId: number;
   postedDate?: Date;
   createdAt?: Date;

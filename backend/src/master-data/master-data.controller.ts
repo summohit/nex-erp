@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, Query, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -33,6 +33,17 @@ export class MasterDataController {
   // --- Department CRUD ---
   @Post('departments')
   async createDepartment(@Request() req, @Body() data: { name: string, defaultRole?: string }) {
+    const existing = await this.prisma.department.findFirst({
+      where: {
+        name: { equals: data.name, mode: 'insensitive' },
+        companyId: req.user.companyId
+      }
+    });
+
+    if (existing) {
+      throw new BadRequestException('Department already exists');
+    }
+
     return this.prisma.department.create({
       data: {
         name: data.name,
@@ -126,6 +137,7 @@ export class MasterDataController {
         latitude: data.latitude,
         longitude: data.longitude,
         weeklyOffs: data.weeklyOffs,
+        isActive: data.isActive !== undefined ? data.isActive : true,
         companyId: req.user.companyId,
       }
     });
@@ -143,6 +155,7 @@ export class MasterDataController {
         latitude: data.latitude,
         longitude: data.longitude,
         weeklyOffs: data.weeklyOffs,
+        isActive: data.isActive,
       }
     });
   }
@@ -211,6 +224,9 @@ export class MasterDataController {
 
   @Post('holidays')
   async createHoliday(@Request() req, @Body() data: any) {
+    if (data.name && data.name.length > 100) {
+      throw new BadRequestException('Holiday name cannot exceed 100 characters');
+    }
     return this.prisma.holiday.create({
       data: {
         name: data.name,

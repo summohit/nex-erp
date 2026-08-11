@@ -59,6 +59,7 @@
           <div class="card-header">
             <span class="dept-badge">{{ job.department }}</span>
             <span class="type-badge">{{ job.type }}</span>
+            <span class="type-badge" style="background: #e0f2fe; color: #0284c7;" *ngIf="job.workLocationType">{{ job.workLocationType }}</span>
           </div>
 
           <h3 class="job-card-title">{{ job.title }}</h3>
@@ -67,6 +68,7 @@
             <span class="meta-item"><svg lucideMapPin size="14"></svg> {{ job.location }}</span>
             <span class="meta-item" *ngIf="job.experienceYears"><svg lucideBriefcase size="14"></svg> {{ job.experienceYears }}</span>
             <span class="meta-item"><svg lucideClock size="14"></svg> Posted {{ job.postedDate | date:'mediumDate' }}</span>
+            <span class="meta-item" *ngIf="job.minSalary"><svg lucideBriefcase size="14"></svg> ₹{{ job.minSalary | number }} - ₹{{ job.maxSalary | number }}</span>
           </div>
 
           <p class="job-address" *ngIf="job.address">
@@ -98,7 +100,11 @@
       <div class="drawer-header">
         <div>
           <h2>{{ job.title }}</h2>
-          <p class="drawer-sub">{{ job.department }} • {{ job.location }}</p>
+          <p class="drawer-sub">
+            {{ job.department }} • {{ job.location }} 
+            <ng-container *ngIf="job.workLocationType">• {{ job.workLocationType }}</ng-container>
+            <ng-container *ngIf="job.minSalary">• ₹{{ job.minSalary | number }} - ₹{{ job.maxSalary | number }}</ng-container>
+          </p>
         </div>
         <button class="btn-close" (click)="closeApplyDrawer()"><svg lucideX size="20"></svg></button>
       </div>

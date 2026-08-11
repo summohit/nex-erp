@@ -6,12 +6,12 @@ import { AuthService } from '../../services/auth.service';
 import { MenusService } from '../../services/menus.service';
 import { PermissionsService, RolePermission } from '../../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding } from '@lucide/angular';
+import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen } from '@lucide/angular';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding],
+  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen],
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css']
 })
@@ -90,7 +90,7 @@ export class SidebarComponent implements OnInit {
           }
         }
         
-        allowed.add('recruitment/careers');
+        allowed.add('careers');
 
         // Auto-add parent module ID if any sub-item is allowed
         this.menuSections.forEach(sec => {
@@ -265,6 +265,18 @@ export class SidebarComponent implements OnInit {
           this.router.navigate(['/clients']);
         } else {
           this.toast.error('You do not have permission to access Clients.');
+        }
+      } else if (menuId === 'offboarding') {
+        if (this.hasAccess('offboarding')) {
+          this.router.navigate(['/offboarding']);
+        } else {
+          this.toast.error('You do not have permission to access Offboarding.');
+        }
+      } else if (menuId === 'performance') {
+        if (this.hasAccess('performance')) {
+          this.router.navigate(['/performance']);
+        } else {
+          this.toast.error('You do not have permission to access Performance.');
         }
       } else {
         this.comingSoon(event);

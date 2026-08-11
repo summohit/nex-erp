@@ -79,9 +79,10 @@
       [rowData]="employees()"
       [columnDefs]="colDefs"
       [defaultColDef]="defaultColDef"
-      [gridOptions]="gridOptions"
       [pagination]="true"
-      [paginationPageSize]="20"
+      [paginationPageSize]="paginationPageSize"
+      [paginationPageSizeSelector]="paginationPageSizeSelector"
+      [gridOptions]="gridOptions"
       (gridReady)="onGridReady($event)"
       [theme]="'legacy'">
     </ag-grid-angular>

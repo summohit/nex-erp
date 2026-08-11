@@ -95,6 +95,12 @@ export const routes: Routes = [
         loadComponent: () => import('./settings/permissions/permissions.component').then(m => m.PermissionsComponent)
       },
       {
+        path: 'settings/payroll',
+        canActivate: [permissionGuard],
+        data: { module: 'settings/company' }, // Re-using company permission for now
+        loadComponent: () => import('./settings/payroll-settings/payroll-settings').then(m => m.PayrollSettingsComponent)
+      },
+      {
         path: 'attendance',
         redirectTo: 'attendance/my-attendance',
         pathMatch: 'full'

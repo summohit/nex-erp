@@ -57,7 +57,8 @@ export class PermissionsComponent implements OnInit {
       subItems: [
         { id: 'recruitment/jobs', title: 'Job Postings', enabled: false },
         { id: 'recruitment/candidates', title: 'Candidates (ATS)', enabled: false },
-        { id: 'recruitment/interviews', title: 'Interviews', enabled: false }
+        { id: 'recruitment/interviews', title: 'Interviews', enabled: false },
+        { id: 'recruitment/careers-page', title: 'Public Careers Page', enabled: false }
       ]
     },
     {

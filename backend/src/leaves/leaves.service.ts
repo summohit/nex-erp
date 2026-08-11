@@ -97,12 +97,18 @@ export class LeavesService implements OnModuleInit {
   async requestLeave(userId: number, data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
     const employee = await this.prisma.employee.findUnique({ 
       where: { userId },
-      include: { user: true }
+      include: { user: true, branch: true }
     });
     if (!employee) throw new BadRequestException('Employee not found');
 
     const startDate = new Date(data.startDate);
     const endDate = new Date(data.endDate);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (startDate < today) {
+      throw new BadRequestException('Cannot apply for leave in the past');
+    }
 
     if (employee.user.role !== 'SUPERADMIN' && employee.user.role !== 'ADMIN' && employee.user.role !== 'HR') {
       const blackouts = await this.prisma.blackoutDate.findMany({
@@ -121,6 +127,24 @@ export class LeavesService implements OnModuleInit {
       if (blackouts.length > 0) {
         throw new BadRequestException(`Leave request overlaps with a blackout date: ${blackouts[0].date.toDateString()} - ${blackouts[0].reason}`);
       }
+    }
+
+    const overlappingLeaves = await this.prisma.leaveRequest.findMany({
+      where: {
+        employeeId: employee.id,
+        status: { in: ['PENDING', 'APPROVED'] },
+        startDate: { lte: endDate },
+        endDate: { gte: startDate }
+      }
+    });
+
+    if (overlappingLeaves.length > 0) {
+      throw new BadRequestException('Leave overlaps with existing request');
+    }
+
+    const workingDays = this.calculateWorkingDays(startDate, endDate, employee.branch?.weeklyOffs || '0', data.isHalfDay || false);
+    if (workingDays === 0) {
+      throw new BadRequestException('Leave duration evaluates to 0 working days.');
     }
 
     return this.prisma.leaveRequest.create({
@@ -174,7 +198,10 @@ export class LeavesService implements OnModuleInit {
   }
 
   async cancelRequest(userId: number, requestId: number) {
-    const employee = await this.prisma.employee.findUnique({ where: { userId } });
+    const employee = await this.prisma.employee.findUnique({ 
+      where: { userId },
+      include: { branch: true }
+    });
     if (!employee) throw new BadRequestException('Employee not found');
 
     const request = await this.prisma.leaveRequest.findFirst({
@@ -195,8 +222,7 @@ export class LeavesService implements OnModuleInit {
       if (request.status === 'APPROVED') {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = request.isHalfDay ? 0.5 : (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+        const diffDays = this.calculateWorkingDays(start, end, employee.branch?.weeklyOffs || '0', request.isHalfDay);
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -228,7 +254,7 @@ export class LeavesService implements OnModuleInit {
   async updateRequestStatus(userId: number, requestId: number, status: string, rejectionReason?: string) {
     const request = await this.prisma.leaveRequest.findUnique({
       where: { id: requestId },
-      include: { employee: true }
+      include: { employee: { include: { branch: true } } }
     });
 
     if (!request) throw new BadRequestException('Request not found');
@@ -247,8 +273,7 @@ export class LeavesService implements OnModuleInit {
       if (status === 'APPROVED' && request.status !== 'APPROVED') {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = request.isHalfDay ? 0.5 : (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+        const diffDays = this.calculateWorkingDays(start, end, request.employee.branch?.weeklyOffs || '0', request.isHalfDay);
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -263,8 +288,7 @@ export class LeavesService implements OnModuleInit {
       } else if (status === 'REJECTED' && request.status === 'APPROVED') {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = request.isHalfDay ? 0.5 : (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+        const diffDays = this.calculateWorkingDays(start, end, request.employee.branch?.weeklyOffs || '0', request.isHalfDay);
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -280,5 +304,32 @@ export class LeavesService implements OnModuleInit {
 
       return updatedRequest;
     });
+  }
+
+  private calculateWorkingDays(start: Date, end: Date, weeklyOffsStr: string, isHalfDay: boolean): number {
+    const offDays = new Set<number>();
+    if (weeklyOffsStr) {
+      weeklyOffsStr.split(',').forEach(p => {
+        const parts = p.trim().split(':');
+        if (parts[0]) offDays.add(parseInt(parts[0], 10));
+      });
+    } else {
+      offDays.add(0); // Default to Sunday
+    }
+
+    let count = 0;
+    const current = new Date(start);
+    current.setHours(0,0,0,0);
+    const last = new Date(end);
+    last.setHours(0,0,0,0);
+
+    while (current <= last) {
+      if (!offDays.has(current.getDay())) {
+        count++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    return isHalfDay ? (count > 0 ? 0.5 : 0) : count;
   }
 }

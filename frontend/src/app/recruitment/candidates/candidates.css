@@ -1474,6 +1474,36 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.approval-badge {
+  font-size: 11px;
+  background-color: #fef3c7;
+  color: #d97706;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-top: 6px;
+  display: inline-block;
+  font-weight: 500;
+  border: 1px solid #fde68a;
+}
+
+.pending-approval {
+  border-left: 4px solid #f59e0b !important;
+}
+
+.approval-alert {
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
 .search-input-wrapper {
   padding: 8px 12px;
   border-bottom: 1px solid #F1F5F9;

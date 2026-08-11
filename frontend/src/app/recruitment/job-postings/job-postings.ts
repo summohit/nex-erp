@@ -6,12 +6,14 @@ import { firstValueFrom } from 'rxjs';
 import { 
   LucidePlus, LucideBriefcase, LucideMapPin, LucideClock, LucideSparkles, 
   LucideX, LucideMoreVertical, LucideSearch, LucideBold, LucideItalic, 
-  LucideList, LucideListOrdered, LucideHelpCircle, LucideTrash2, LucideBuilding 
+  LucideList, LucideListOrdered, LucideHelpCircle, LucideTrash2, LucideBuilding,
+  LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { MasterDataService, Department, Designation, Branch } from '../../services/master-data.service';
 import { JobsService, Job } from '../../services/jobs.service';
+import { EmployeeService, Employee } from '../../services/employee.service';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
 import { environment } from '../../../environments/environment';
 
@@ -25,7 +27,9 @@ declare var Quill: any;
   imports: [
     CommonModule, FormsModule, LucidePlus, 
     LucideSparkles, LucideX, LucideSearch, 
-    LucideHelpCircle, LucideTrash2, LucideBuilding, AgGridAngular, DatePipe
+    LucideHelpCircle, LucideTrash2, LucideBuilding,
+    LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff,
+    AgGridAngular, DatePipe
   ],
   templateUrl: './job-postings.html',
   styleUrls: ['./job-postings.css'],
@@ -35,6 +39,7 @@ export class JobPostingsComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private http = inject(HttpClient);
   private jobsService = inject(JobsService);
+  private employeeService = inject(EmployeeService);
   
   @ViewChild('quillContainer') quillContainer!: ElementRef;
   private quillInstance: any = null;
@@ -43,6 +48,7 @@ export class JobPostingsComponent implements OnInit {
   designations = signal<Designation[]>([]);
   filteredDesignations = signal<Designation[]>([]);
   branches = signal<Branch[]>([]);
+  hrEmployees = signal<Employee[]>([]);
 
   jobs = signal<Job[]>([]);
 
@@ -55,6 +61,14 @@ export class JobPostingsComponent implements OnInit {
     });
     this.masterDataService.getBranches().subscribe(res => {
       this.branches.set(res);
+    });
+    this.employeeService.getEmployees().subscribe(res => {
+      this.hrEmployees.set(res.filter(e => e.department?.name === 'HR' || e.department?.name === 'Human Resources'));
+      // Sync selected recruiter if editing
+      if (this.jobForm.recruiterId) {
+        const hr = this.hrEmployees().find(e => String(e.id) === String(this.jobForm.recruiterId));
+        if (hr) this.selectedRecruiterEmployee = hr;
+      }
     });
     this.loadJobs();
   }
@@ -84,10 +98,14 @@ export class JobPostingsComponent implements OnInit {
   }
 
   onDepartmentChange() {
+    const dept = this.departments().find(d => d.name === this.jobForm.departmentName);
+    this.jobForm.departmentId = dept ? String(dept.id) : '';
     const deptId = Number(this.jobForm.departmentId);
     if (deptId) {
       this.filteredDesignations.set(this.designations().filter(d => d.departmentId === deptId));
       this.jobForm.designationId = '';
+    } else {
+      this.filteredDesignations.set([]);
     }
   }
 
@@ -141,6 +159,22 @@ export class JobPostingsComponent implements OnInit {
     { field: 'experienceYears', headerName: 'Experience', width: 140, flex: 0 },
     { field: 'location', headerName: 'Location' },
     { field: 'type', headerName: 'Type', width: 120, flex: 0 },
+    { 
+      headerName: 'Recruiter',
+      width: 140, 
+      flex: 0,
+      valueGetter: (params: any) => params.data.recruiter ? `${params.data.recruiter.firstName} ${params.data.recruiter.lastName}` : 'Unassigned'
+    },
+    {
+      headerName: 'Openings',
+      width: 120,
+      flex: 0,
+      valueGetter: (params: any) => {
+        const total = params.data.totalOpenings || 1;
+        const filled = params.data.applications?.length || 0;
+        return `${filled} / ${total}`;
+      }
+    },
     {
       field: 'status',
       headerName: 'Status',
@@ -155,7 +189,6 @@ export class JobPostingsComponent implements OnInit {
         return `<span style="background: ${bg}; color: ${color}; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase;">${val}</span>`;
       }
     },
-    { field: 'applicants', headerName: 'Applicants', width: 120, flex: 0 },
     {
       field: 'postedDate',
       headerName: 'Posted Date',
@@ -222,35 +255,135 @@ export class JobPostingsComponent implements OnInit {
   jobForm: any = {
     title: '',
     departmentId: '',
+    departmentName: '',
     designationId: '',
     branchId: '',
     experienceYears: '3-5 Years',
     type: 'Full-time',
+    typeOther: '',
+    workLocationType: 'On-site',
+    recruiterId: '',
+    recruiterName: '',
+    totalOpenings: 1,
+    startDate: '',
+    endDate: '',
+    discloseSalary: false,
     status: 'Open',
     location: '',
     address: '',
     descriptionHtml: '',
+    minSalary: '',
+    maxSalary: '',
     aiPrompt: ''
   };
+
+  // Searchable Dropdowns state
+  deptDropdownOpen = false;
+  deptSearchQuery = '';
+  
+  recruiterDropdownOpen = false;
+  recruiterSearchQuery = '';
+  selectedRecruiterEmployee: Employee | null = null;
+
+  toggleDeptDropdown() {
+    this.deptDropdownOpen = !this.deptDropdownOpen;
+    if (this.deptDropdownOpen) {
+      this.deptSearchQuery = '';
+      this.recruiterDropdownOpen = false;
+    }
+  }
+
+  selectDepartment(dept: Department) {
+    this.jobForm.departmentId = String(dept.id);
+    this.jobForm.departmentName = dept.name;
+    this.deptDropdownOpen = false;
+    this.onDepartmentChange();
+  }
+
+  get filteredDepartmentOptions(): Department[] {
+    const q = this.deptSearchQuery.toLowerCase().trim();
+    if (!q) return this.departments();
+    return this.departments().filter(d => d.name.toLowerCase().includes(q));
+  }
+
+  toggleRecruiterDropdown() {
+    this.recruiterDropdownOpen = !this.recruiterDropdownOpen;
+    if (this.recruiterDropdownOpen) {
+      this.recruiterSearchQuery = '';
+      this.deptDropdownOpen = false;
+    }
+  }
+
+  selectRecruiter(emp: Employee | null) {
+    if (!emp) {
+      this.jobForm.recruiterId = '';
+      this.jobForm.recruiterName = '';
+      this.selectedRecruiterEmployee = null;
+    } else {
+      this.jobForm.recruiterId = String(emp.id);
+      this.jobForm.recruiterName = `${emp.firstName} ${emp.lastName}`;
+      this.selectedRecruiterEmployee = emp;
+    }
+    this.recruiterDropdownOpen = false;
+  }
+
+  get filteredRecruiterOptions(): Employee[] {
+    const q = this.recruiterSearchQuery.toLowerCase().trim();
+    if (!q) return this.hrEmployees();
+    return this.hrEmployees().filter(e => 
+      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+      (e.email && e.email.toLowerCase().includes(q))
+    );
+  }
+
+  getInitials(firstName?: string, lastName?: string): string {
+    const f = firstName ? firstName.charAt(0).toUpperCase() : '';
+    const l = lastName ? lastName.charAt(0).toUpperCase() : '';
+    return f + l || 'HR';
+  }
+
+  getAvatarColor(name: string): string {
+    if (!name) return '#6366f1';
+    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#10b981', '#06b6d4', '#3b82f6', '#f59e0b'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }
 
   // AI State
   isGeneratingAI = signal(false);
 
   openCreateModal() {
+    this.deptDropdownOpen = false;
+    this.recruiterDropdownOpen = false;
+    this.selectedRecruiterEmployee = null;
     this.drawerMode.set('create');
     this.selectedJob.set(null);
     this.screeningQuestions.set([]);
     this.jobForm = { 
       title: '', 
       departmentId: '', 
+      departmentName: '',
       designationId: '', 
       branchId: '',
       experienceYears: '3-5 Years',
       type: 'Full-time', 
+      typeOther: '',
+      workLocationType: 'On-site',
+      recruiterId: '',
+      recruiterName: '',
+      totalOpenings: 1,
+      startDate: '',
+      endDate: '',
+      discloseSalary: false,
       status: 'Open',
       location: '', 
       address: '',
       descriptionHtml: '', 
+      minSalary: '',
+      maxSalary: '',
       aiPrompt: '' 
     };
     this.filteredDesignations.set([]);
@@ -259,10 +392,14 @@ export class JobPostingsComponent implements OnInit {
   }
 
   closeCreateModal() {
+    this.deptDropdownOpen = false;
+    this.recruiterDropdownOpen = false;
     this.isCreateModalOpen.set(false);
   }
 
   editJob(job: Job) {
+    this.deptDropdownOpen = false;
+    this.recruiterDropdownOpen = false;
     this.selectedJob.set(job);
     this.drawerMode.set('edit');
     const dept = this.departments().find(d => d.name.toLowerCase() === job.department.toLowerCase());
@@ -271,21 +408,33 @@ export class JobPostingsComponent implements OnInit {
     if (deptId) {
       this.filteredDesignations.set(this.designations().filter(d => d.departmentId === Number(deptId)));
     }
-    
     const desig = this.designations().find(d => d.name.toLowerCase() === (job.designation || '').toLowerCase());
     const branch = this.branches().find(b => b.name.toLowerCase() === (job.location || '').toLowerCase());
+    const hr = this.hrEmployees().find(e => e.id === (job as any).recruiterId);
+    this.selectedRecruiterEmployee = hr || null;
     
     this.jobForm = {
       title: job.title,
       departmentId: deptId,
+      departmentName: dept ? dept.name : '',
       designationId: desig ? String(desig.id) : '',
       branchId: branch ? String(branch.id) : '',
       experienceYears: job.experienceYears || '3-5 Years',
-      type: job.type,
+      type: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Temporary', 'Freelance'].includes(job.type) ? job.type : 'Other',
+      typeOther: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Temporary', 'Freelance'].includes(job.type) ? '' : job.type,
+      workLocationType: (job as any).workLocationType || 'On-site',
+      recruiterId: (job as any).recruiterId ? String((job as any).recruiterId) : '',
+      recruiterName: hr ? `${hr.firstName} ${hr.lastName}` : '',
+      totalOpenings: (job as any).totalOpenings || 1,
+      startDate: (job as any).startDate ? new Date((job as any).startDate).toISOString().split('T')[0] : '',
+      endDate: (job as any).endDate ? new Date((job as any).endDate).toISOString().split('T')[0] : '',
+      discloseSalary: (job as any).discloseSalary || false,
       status: job.status || 'Open',
       location: job.location || '',
       address: job.address || branch?.address || '',
       descriptionHtml: job.descriptionHtml || `<h3>About the Role</h3><p>We are seeking an experienced ${job.title} to join our ${job.department} team.</p>`,
+      minSalary: job.minSalary || '',
+      maxSalary: job.maxSalary || '',
       aiPrompt: ''
     };
     this.screeningQuestions.set((job.screeningQuestions as any) || []);
@@ -311,7 +460,9 @@ export class JobPostingsComponent implements OnInit {
   }
 
   saveJob() {
-    const deptId = Number(this.jobForm.departmentId) || null;
+    const dept = this.departments().find(d => d.name === this.jobForm.departmentName);
+    const deptId = dept ? dept.id : null;
+    const hr = this.hrEmployees().find(e => `${e.firstName} ${e.lastName}` === this.jobForm.recruiterName);
     const desigId = Number(this.jobForm.designationId) || null;
     const branchId = Number(this.jobForm.branchId) || null;
     
@@ -321,8 +472,16 @@ export class JobPostingsComponent implements OnInit {
       designationId: desigId,
       branchId: branchId,
       experienceYears: this.jobForm.experienceYears,
-      type: this.jobForm.type,
+      type: this.jobForm.type === 'Other' ? this.jobForm.typeOther : this.jobForm.type,
+      workLocationType: this.jobForm.workLocationType,
+      recruiterId: hr ? hr.id : null,
+      totalOpenings: this.jobForm.totalOpenings ? Number(this.jobForm.totalOpenings) : 1,
+      startDate: this.jobForm.startDate || null,
+      endDate: this.jobForm.endDate || null,
+      discloseSalary: this.jobForm.discloseSalary,
       status: this.jobForm.status,
+      minSalary: this.jobForm.minSalary ? Number(this.jobForm.minSalary) : null,
+      maxSalary: this.jobForm.maxSalary ? Number(this.jobForm.maxSalary) : null,
       descriptionHtml: this.jobForm.descriptionHtml,
       screeningQuestions: JSON.stringify(this.screeningQuestions())
     };

@@ -39,8 +39,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleDestroy() {
     await this.$disconnect();
-    if (process.env.NODE_ENV === 'production') {
+    // Close the PG pool on shutdown to prevent connection leaks during dev hot-reloads
+    if (this.pgPool) {
       await this.pgPool.end();
+      (global as any).pgPool = undefined;
     }
   }
 

@@ -17,6 +17,8 @@ export interface JobApplication {
   noticePeriod?: string;
   status: string; // NEW, REVIEWING, SHORTLISTED, INTERVIEWING, OFFERED, HIRED, REJECTED
   answers?: string; 
+  offeredSalary?: number;
+  approvalStatus?: string;
   aiScore?: number;
   aiSummary?: string;
   isAiScored?: boolean;
@@ -28,6 +30,8 @@ export interface JobApplication {
     department?: { name: string };
     designation?: { name: string };
     branch?: { name: string; address?: string };
+    minSalary?: number;
+    maxSalary?: number;
   };
 }
 
@@ -47,8 +51,16 @@ export class CandidatesService {
     return this.http.get<JobApplication>(`${this.apiUrl}/${id}`);
   }
 
-  updateStatus(id: number, status: string): Observable<JobApplication> {
-    return this.http.put<JobApplication>(`${this.apiUrl}/${id}/status`, { status });
+  updateStatus(id: number, status: string, offeredSalary?: number): Observable<JobApplication> {
+    return this.http.put<JobApplication>(`${this.apiUrl}/${id}/status`, { status, offeredSalary });
+  }
+
+  approveSalary(id: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${id}/approve-salary`, {});
+  }
+
+  rejectSalary(id: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${id}/reject-salary`, {});
   }
 
   onboardCandidate(id: number): Observable<any> {
@@ -63,6 +75,10 @@ export class CandidatesService {
   
   getInterviews(applicationId: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/${applicationId}/interviews`);
+  }
+
+  getAnnexure(applicationId: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/${applicationId}/annexure`);
   }
 
   scheduleInterview(applicationId: number, data: any): Observable<any> {

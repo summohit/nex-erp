@@ -178,9 +178,12 @@
         <h3>Offered <span>{{colOffered().length}}</span></h3>
       </div>
       <div class="col-body" cdkDropList [cdkDropListData]="colOffered()" (cdkDropListDropped)="drop($event, 'OFFERED')">
-        <div class="kanban-card" *ngFor="let item of colOffered()" cdkDrag (click)="openApplication(item)">
+        <div class="kanban-card" *ngFor="let item of colOffered()" cdkDrag (click)="openApplication(item)" [class.pending-approval]="item.approvalStatus === 'PENDING_APPROVAL'">
           <div class="card-title">{{item.fullName}}</div>
           <div class="card-meta">{{item.job?.title}}</div>
+          <div class="approval-badge" *ngIf="item.approvalStatus === 'PENDING_APPROVAL'">
+            ⚠️ Pending Salary Approval
+          </div>
           <div class="card-footer-row">
             <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
               <svg lucideSparkles size="12"></svg>
@@ -198,9 +201,12 @@
         <h3>Hired <span>{{colHired().length}}</span></h3>
       </div>
       <div class="col-body" cdkDropList [cdkDropListData]="colHired()" (cdkDropListDropped)="drop($event, 'HIRED')">
-        <div class="kanban-card" *ngFor="let item of colHired()" cdkDrag (click)="openApplication(item)">
+        <div class="kanban-card" *ngFor="let item of colHired()" cdkDrag (click)="openApplication(item)" [class.pending-approval]="item.approvalStatus === 'PENDING_APPROVAL'">
           <div class="card-title">{{item.fullName}}</div>
           <div class="card-meta">{{item.job?.title}}</div>
+          <div class="approval-badge" *ngIf="item.approvalStatus === 'PENDING_APPROVAL'">
+            ⚠️ Pending Salary Approval
+          </div>
           <div class="card-footer-row">
             <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
               <svg lucideSparkles size="12"></svg>
@@ -265,6 +271,9 @@
       <div class="profile-info">
         <h3>{{app.fullName}}</h3>
         <p class="role-badge" [innerHtml]="renderStatusBadge(app.status)"></p>
+        <div class="approval-alert" *ngIf="app.approvalStatus === 'PENDING_APPROVAL'">
+          ⚠️ Salary Pending Approval (Offered: ₹{{app.offeredSalary | number}})
+        </div>
       </div>
     </div>
 
@@ -601,13 +610,47 @@
     </div>
     
     <div style="display: flex; gap: 10px;">
-      <button *ngIf="app.status === 'HIRED'" class="btn-primary" (click)="onboardCandidate()" style="display: flex; align-items: center; gap: 6px;">
+      <button *ngIf="app.status === 'HIRED' && app.approvalStatus !== 'PENDING_APPROVAL'" class="btn-primary" (click)="onboardCandidate()" style="display: flex; align-items: center; gap: 6px;">
         <svg lucideBriefcase size="16"></svg> Onboard Candidate
+      </button>
+
+      <button *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" class="btn-primary" (click)="approveSalary()" style="background: #10b981; border-color: #10b981;">
+        Approve Salary
+      </button>
+      <button *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" class="btn-danger-outline" (click)="rejectSalary()">
+        Reject Salary
+      </button>
+
+      <button *ngIf="app.offeredSalary && app.approvalStatus !== 'REJECTED'" class="btn-outline" (click)="viewAnnexure(app.id)" style="display: flex; align-items: center; gap: 6px; border-color: #3b82f6; color: #3b82f6;">
+        <svg lucideFileText size="16"></svg> View Offer Annexure
       </button>
       
       <button class="btn-danger-outline" (click)="deleteApplication()">
         <svg lucideTrash2 size="16"></svg> Delete
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Salary Prompt Modal -->
+<div class="modal-overlay" *ngIf="showSalaryPrompt()" (click)="closeSalaryPrompt()">
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 400px;">
+    <div class="modal-header">
+      <h2>Enter Offered Salary</h2>
+      <button class="close-btn" (click)="closeSalaryPrompt()"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 14px; color: #475569; margin-bottom: 16px;">
+        Please enter the salary offered to the candidate for validation.
+      </p>
+      <div class="form-group">
+        <label>Offered Salary (₹)</label>
+        <input type="number" class="form-control" [(ngModel)]="offeredSalaryInput" placeholder="e.g. 75000">
+      </div>
+    </div>
+    <div class="modal-footer" style="padding: 16px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
+      <button class="btn-outline" (click)="closeSalaryPrompt()">Cancel</button>
+      <button class="btn-primary" (click)="submitSalaryPrompt()" [disabled]="!offeredSalaryInput()">Confirm & Submit</button>
     </div>
   </div>
 </div>
@@ -763,6 +806,115 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Annexure Modal -->
+<div class="modal-overlay" *ngIf="showAnnexureModal()" (click)="closeAnnexureModal()">
+  <div class="modal-content annexure-modal" (click)="$event.stopPropagation()" style="max-width: 800px; width: 100%;">
+    <div class="modal-header">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="icon-circle" style="background: #eff6ff; padding: 10px; border-radius: 50%;">
+          <svg lucideFileText size="20" color="#3b82f6"></svg>
+        </div>
+        <div>
+          <h2 style="margin: 0; font-size: 18px;">Offer Annexure</h2>
+          <p style="margin: 0; font-size: 13px; color: #64748b;" *ngIf="annexureData()">{{annexureData().candidateName}} - {{annexureData().jobTitle}}</p>
+        </div>
+      </div>
+      <button class="close-btn" (click)="closeAnnexureModal()"><svg lucideX size="18"></svg></button>
+    </div>
+    
+    <div class="modal-body" style="padding: 24px;" *ngIf="isLoadingAnnexure()">
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 40px; color: #64748b;">
+        <div class="spinner" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px;"></div>
+        Generating Annexure...
+      </div>
+    </div>
+
+    <div class="modal-body" style="padding: 0;" *ngIf="!isLoadingAnnexure() && annexureData()">
+      
+      <div class="annexure-summary-box" style="display: flex; gap: 20px; padding: 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+        <div class="summary-item" style="flex: 1;">
+          <span class="label" style="display: block; font-size: 13px; color: #64748b; margin-bottom: 4px;">Total Annual CTC</span>
+          <span class="value" style="display: block; font-size: 24px; font-weight: 600; color: #0f172a;">₹{{annexureData().totalCTC | number}}</span>
+        </div>
+        <div class="summary-item" style="flex: 1;">
+          <span class="label" style="display: block; font-size: 13px; color: #64748b; margin-bottom: 4px;">Monthly CTC</span>
+          <span class="value" style="display: block; font-size: 24px; font-weight: 600; color: #0f172a;">₹{{annexureData().monthlyCTC | number}}</span>
+        </div>
+      </div>
+
+      <div class="annexure-table-container" style="padding: 24px;">
+        <table class="annexure-table" style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; font-weight: 600;">Salary Component</th>
+              <th style="text-align: right; padding: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; font-weight: 600;">Monthly (₹)</th>
+              <th style="text-align: right; padding: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; font-weight: 600;">Annual (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="section-header" style="background: #f8fafc;">
+              <td colspan="3" style="padding: 12px; font-weight: 600; border: 1px solid #e2e8f0;">A. EARNINGS</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px; border: 1px solid #e2e8f0;">Basic Salary</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.basic.monthly | number}}</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.basic.annual | number}}</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px; border: 1px solid #e2e8f0;">House Rent Allowance (HRA)</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.hra.monthly | number}}</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.hra.annual | number}}</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px; border: 1px solid #e2e8f0;">Special Allowance / Bonus</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.specialAllowance.monthly | number}}</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.specialAllowance.annual | number}}</td>
+            </tr>
+            <tr class="subtotal-row" style="background: #eff6ff; font-weight: 600;">
+              <td style="padding: 12px; border: 1px solid #e2e8f0;">Total Gross Salary (A)</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.totalGross.monthly | number}}</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.totalGross.annual | number}}</td>
+            </tr>
+            
+            <tr class="section-header" style="background: #f8fafc;">
+              <td colspan="3" style="padding: 12px; font-weight: 600; border: 1px solid #e2e8f0;">B. EMPLOYER CONTRIBUTIONS (DEDUCTIONS)</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px; border: 1px solid #e2e8f0;">Provident Fund (Employer)</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.pf.monthly | number}}</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.pf.annual | number}}</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px; border: 1px solid #e2e8f0;">Gratuity</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.gratuity.monthly | number}}</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.gratuity.annual | number}}</td>
+            </tr>
+            <tr class="subtotal-row" style="background: #fff1f2; font-weight: 600;">
+              <td style="padding: 12px; border: 1px solid #e2e8f0;">Total Deductions (B)</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.totalDeductions.monthly | number}}</td>
+              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.totalDeductions.annual | number}}</td>
+            </tr>
+
+            <tr class="grand-total-row" style="background: #f1f5f9; font-weight: 700;">
+              <td style="padding: 16px 12px; border: 1px solid #cbd5e1;">Total Cost to Company (A + B)</td>
+              <td style="text-align: right; padding: 16px 12px; border: 1px solid #cbd5e1;">{{annexureData().monthlyCTC | number}}</td>
+              <td style="text-align: right; padding: 16px 12px; border: 1px solid #cbd5e1;">{{annexureData().totalCTC | number}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+    
+    <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; background: #f8fafc; border-radius: 0 0 12px 12px;">
+      <button class="btn-outline" (click)="closeAnnexureModal()">Close</button>
+      <button class="btn-primary" style="display: flex; align-items: center; gap: 8px;" [disabled]="isLoadingAnnexure()">
+        <svg lucideDownload size="16"></svg> Download PDF
+      </button>
     </div>
   </div>
 </div>

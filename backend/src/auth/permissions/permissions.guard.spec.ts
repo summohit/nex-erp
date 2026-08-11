@@ -2,6 +2,6 @@ import { PermissionsGuard } from './permissions.guard';
 
 describe('PermissionsGuard', () => {
   it('should be defined', () => {
-    expect(new PermissionsGuard()).toBeDefined();
+    expect(new PermissionsGuard(null as any, null as any)).toBeDefined();
   });
 });
