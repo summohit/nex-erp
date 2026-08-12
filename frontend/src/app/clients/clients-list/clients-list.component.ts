@@ -139,8 +139,8 @@ export class ClientsListComponent implements OnInit {
       paymentTerms: ['Net 30'],
       taxId: [''],
       registrationNo: [''],
-      defaultHourlyRate: [null],
-      creditLimit: [null],
+      defaultHourlyRate: [null, Validators.pattern(/^\d+(\.\d{1,2})?$/)],
+      creditLimit: [null, Validators.pattern(/^\d+(\.\d{1,2})?$/)],
       
       // Billing Address
       billingAddressLine1: [''],
@@ -228,6 +228,12 @@ export class ClientsListComponent implements OnInit {
 
   closeDrawer() {
     this.showDrawer = false;
+  }
+
+  onNumericKeyDown(event: KeyboardEvent) {
+    const allowed = ['0','1','2','3','4','5','6','7','8','9','.','Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'];
+    if (allowed.includes(event.key)) return;
+    event.preventDefault();
   }
 
   onLogoFileSelected(event: Event) {

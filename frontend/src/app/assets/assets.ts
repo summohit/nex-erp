@@ -89,6 +89,8 @@ export class AssetsComponent implements OnInit {
   requests = signal<HardwareRequest[]>([]);
   employees = signal<Employee[]>([]);
 
+  readonly maxUploadFiles = 5;
+
   // User Auth Role
   currentUser = signal<any>(null);
   isAdmin = computed(() => {
@@ -625,6 +627,12 @@ export class AssetsComponent implements OnInit {
     const files: FileList = event.target.files;
     if (!files || files.length === 0) return;
 
+    if (files.length > this.maxUploadFiles) {
+      this.toast.error(`You can upload a maximum of ${this.maxUploadFiles} images at a time. Please remove ${files.length - this.maxUploadFiles} file(s) and try again.`);
+      event.target.value = '';
+      return;
+    }
+
     Array.from(files).forEach(file => {
       this.uploadService.uploadFile(file).subscribe({
         next: (res) => {
@@ -800,6 +808,12 @@ export class AssetsComponent implements OnInit {
   onRequestFileSelected(event: any) {
     const files: FileList = event.target.files;
     if (!files || files.length === 0) return;
+
+    if (files.length > this.maxUploadFiles) {
+      this.toast.error(`You can upload a maximum of ${this.maxUploadFiles} attachments at a time. Please remove ${files.length - this.maxUploadFiles} file(s) and try again.`);
+      event.target.value = '';
+      return;
+    }
 
     Array.from(files).forEach(file => {
       this.uploadService.uploadFile(file).subscribe({
