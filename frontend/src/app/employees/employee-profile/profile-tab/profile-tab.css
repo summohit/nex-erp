@@ -735,6 +735,45 @@ select.form-control:disabled {
   color: #111827;
 }
 
+.reset-email-btn {
+  margin-top: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  background: #fff;
+  border: 1px solid #FF5200;
+  color: #FF5200;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reset-email-btn:hover:not(:disabled) {
+  background: rgba(255, 82, 0, 0.08);
+}
+
+.reset-email-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 82, 0, 0.3);
+  border-top-color: #FF5200;
+  border-radius: 50%;
+  animation: reset-spin 0.7s linear infinite;
+}
+
+@keyframes reset-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Photo Upload */
 .profile-pic-upload {
   display: flex;

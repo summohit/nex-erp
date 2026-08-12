@@ -466,6 +466,12 @@
               </button>
             </div>
             <small class="hint-text">Leave blank to keep current password.</small>
+            <button type="button" class="reset-email-btn" (click)="sendPasswordResetEmail()" [disabled]="isSendingResetEmail">
+              <svg lucideMail size="15" *ngIf="!isSendingResetEmail"></svg>
+              <span *ngIf="!isSendingResetEmail">Send Password Reset Email</span>
+              <span *ngIf="isSendingResetEmail" class="btn-spinner"></span>
+            </button>
+            <small class="hint-text" *ngIf="isOwner">A verification code will be emailed to you to reset your password.</small>
           </div>
 
           <div class="form-group">

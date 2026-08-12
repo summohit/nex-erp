@@ -23,6 +23,7 @@ export interface AttendanceRecord {
   status: 'PRESENT' | 'ABSENT' | 'HALF_DAY';
   isLate: boolean;
   isEarlyLeave: boolean;
+  totalHours?: number;
   employeeId: number;
   employee?: any;
 }

@@ -276,7 +276,7 @@ export class AssetsComponent implements OnInit {
       cellRendererParams: {
         onEdit: (data: Asset) => this.openEditAssetDrawer(data),
         onAssign: (data: Asset) => this.openAssignDrawer(data.id),
-        onDelete: (data: Asset) => this.deleteAsset(data.id)
+        onDelete: (data: Asset) => this.deleteAsset(data)
       }
     }
   ];
@@ -677,9 +677,13 @@ export class AssetsComponent implements OnInit {
     }
   }
 
-  deleteAsset(id: number) {
-    if (!confirm('Are you sure you want to delete this asset from inventory?')) return;
-    this.assetService.deleteAsset(id).subscribe({
+  deleteAsset(asset: Asset) {
+    if (asset.status === 'ASSIGNED') {
+      this.toast.error('Deletion blocked due to active assignment. Must archive or return first.');
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete ${asset.name} from inventory?`)) return;
+    this.assetService.deleteAsset(asset.id).subscribe({
       next: () => {
         this.toast.success('Asset deleted');
         this.loadAllData();

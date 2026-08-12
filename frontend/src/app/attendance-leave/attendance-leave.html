@@ -19,6 +19,9 @@
         <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'approvals'" (click)="setTab('approvals')">
           Leave Approvals
         </button>
+        <button class="nav-tab" *ngIf="isManager() && !isAdmin()" [class.active]="activeTab() === 'team-approvals'" (click)="setTab('team-approvals')">
+          Team Leave Approvals
+        </button>
         <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'balances'" (click)="setTab('balances')">
           Manage Balances
         </button>
@@ -266,6 +269,10 @@
                 <svg lucideCalendar [size]="20"></svg>
               </div>
             </div>
+            <div class="halfday-badge" *ngIf="balance.leaveType.allowHalfDay !== false">
+              <svg lucideClock [size]="11"></svg>
+              Half Day Allowed
+            </div>
             <div class="balance-amount-wrapper">
               <span class="balance-amount">{{ balance.allocated + balance.carriedOver - balance.used }}</span>
               <span class="days-label">days left</span>
@@ -340,7 +347,7 @@
 
       <div class="form-group mb-4">
         <label>Leave Type <span style="color: #E14B42;">*</span></label>
-        <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#E14B42' : ''" [disabled]="myBalances().length === 0">
+        <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#E14B42' : ''" [disabled]="myBalances().length === 0">
           <option value="">{{ myBalances().length === 0 ? 'No Leave Types Available' : 'Select Leave Type...' }}</option>
           <option *ngFor="let balance of myBalances()" [value]="balance.leaveType.id">
             {{ balance.leaveType.name }} ({{ balance.allocated + balance.carriedOver - balance.used }} days available)
@@ -363,7 +370,7 @@
         </div>
       </div>
 
-      <div class="form-group mb-4" *ngIf="requestForm.startDate && requestForm.endDate && requestForm.startDate === requestForm.endDate">
+      <div class="form-group mb-4" *ngIf="requestForm.startDate && requestForm.endDate && requestForm.startDate === requestForm.endDate && selectedLeaveTypeAllowsHalfDay()">
         <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer;">
           <input type="checkbox" [(ngModel)]="requestForm.isHalfDay" style="width: 16px; height: 16px; cursor: pointer;">
           Apply as Half-Day
@@ -377,6 +384,9 @@
             <input type="radio" name="halfDayPeriod" value="PM" [(ngModel)]="requestForm.halfDayPeriod"> Afternoon (PM)
           </label>
         </div>
+      </div>
+      <div class="form-group mb-4" *ngIf="requestForm.startDate && requestForm.endDate && requestForm.startDate === requestForm.endDate && !selectedLeaveTypeAllowsHalfDay()" style="padding: 10px 12px; background: #F1F5F9; border-radius: 8px;">
+        <span style="color: #64748B; font-size: 13px;">Half-day leave is not allowed for this leave type.</span>
       </div>
 
       <div class="form-group mb-4">
@@ -460,6 +470,33 @@
           [headerHeight]="48"
           [gridOptions]="gridOptions">
         </ag-grid-angular>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEAM LEAVE APPROVALS (Manager) TAB -->
+  <div class="tab-content" *ngIf="activeTab() === 'team-approvals' && isManager() && !isAdmin()">
+    <div class="widget-card">
+      <div class="widget-header">
+        <h3>Pending Team Leave Approvals</h3>
+      </div>
+      <div class="table-container mt-4">
+        <ag-grid-angular
+          class="ag-theme-quartz"
+          [theme]="'legacy'"
+          style="width: 100%; height: 500px;"
+          [rowData]="managerRequests()"
+          [columnDefs]="hrRequestsColDefs"
+          [defaultColDef]="defaultColDef"
+          [rowHeight]="64"
+          [headerHeight]="48"
+          [rowClassRules]="rowClassRules"
+          [gridOptions]="gridOptions"
+          (cellClicked)="onCellClicked($event)">
+        </ag-grid-angular>
+        <div class="empty-state" *ngIf="managerRequests().length === 0">
+          <h3>No pending leave requests from your team</h3>
+        </div>
       </div>
     </div>
   </div>
@@ -885,6 +922,7 @@
           <div class="form-group mb-4">
             <label>Holiday Name</label>
             <input type="text" class="form-control" name="hName" [(ngModel)]="holidayForm.name" required maxlength="100" placeholder="e.g. Independence Day">
+            <small style="color: #94A3B8;">{{ holidayForm.name.length }}/100</small>
           </div>
           <div class="form-group mb-4">
             <label>Date</label>

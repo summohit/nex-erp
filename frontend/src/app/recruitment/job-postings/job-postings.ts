@@ -332,7 +332,7 @@ export class JobPostingsComponent implements OnInit {
     if (!q) return this.hrEmployees();
     return this.hrEmployees().filter(e => 
       `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
-      (e.email && e.email.toLowerCase().includes(q))
+      `${e.user?.email || ''}`.toLowerCase().includes(q)
     );
   }
 

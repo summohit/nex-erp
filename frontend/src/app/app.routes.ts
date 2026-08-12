@@ -12,6 +12,7 @@ export const routes: Routes = [
   { path: '', component: AuthComponent },
   { path: 'auth/check-email', loadComponent: () => import('./auth/check-email/check-email').then(m => m.CheckEmailComponent) },
   { path: 'auth/verify-email', loadComponent: () => import('./auth/verify-email/verify-email').then(m => m.VerifyEmailComponent) },
+  { path: 'auth/forgot-password', loadComponent: () => import('./auth/forgot-password/forgot-password').then(m => m.ForgotPasswordComponent) },
   { path: 'kiosk/:companyId', loadComponent: () => import('./kiosk/kiosk').then(m => m.Kiosk) },
   { path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.OnboardingComponent) },
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },

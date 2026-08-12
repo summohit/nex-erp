@@ -261,7 +261,9 @@
             </div>
             <div class="form-group col-6">
               <label class="form-label">Phone</label>
-              <input type="text" formControlName="contactPhone" class="form-control" placeholder="+1 (555) 000-0000">
+              <input type="text" formControlName="contactPhone" class="form-control" placeholder="+1 (555) 000-0000"
+                [class.is-invalid]="clientForm.get('contactPhone')?.invalid && (clientForm.get('contactPhone')?.touched || clientForm.get('contactPhone')?.dirty)">
+              <div *ngIf="clientForm.get('contactPhone')?.invalid && (clientForm.get('contactPhone')?.touched || clientForm.get('contactPhone')?.dirty)" class="text-danger small mt-1">Please enter a valid phone number (e.g. 1234567890, +91-9876-543-210, (555) 000-0000)</div>
             </div>
           </div>
         </div>

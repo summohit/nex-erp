@@ -13,3 +13,6 @@ backend/uploads/
 # System files
 .DS_Store
 *.log
+
+# Temporary debug scripts (may contain local credentials)
+backend/_tmp_*.js

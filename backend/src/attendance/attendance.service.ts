@@ -19,7 +19,17 @@ export class AttendanceService {
           date: today
         }
       }
-    });
+    }).then(r => this.withTotalHours(r));
+  }
+
+  private withTotalHours(record: any) {
+    if (!record) return record;
+    let totalHours = 0;
+    if (record.clockIn) {
+      const end = record.clockOut || new Date();
+      totalHours = Math.max(0, (end.getTime() - record.clockIn.getTime()) / 3600000);
+    }
+    return { ...record, totalHours: parseFloat(totalHours.toFixed(2)) };
   }
 
   async getMyHistory(userId: number) {
@@ -30,7 +40,7 @@ export class AttendanceService {
       where: { employeeId: employee.id },
       include: { employee: { include: { department: true } } },
       orderBy: { date: 'desc' }
-    });
+    }).then(rows => rows.map(r => this.withTotalHours(r)));
   }
 
   async getEmployeeHistory(employeeId: number) {
@@ -38,7 +48,7 @@ export class AttendanceService {
       where: { employeeId },
       include: { employee: { include: { department: true } } },
       orderBy: { date: 'desc' }
-    });
+    }).then(rows => rows.map(r => this.withTotalHours(r)));
   }
 
   async clockIn(userId: number, data: { lat?: number, lng?: number, ipAddress?: string }) {
@@ -103,7 +113,7 @@ export class AttendanceService {
           clockInLng: data.lng,
           isLate
         }
-      });
+      }).then(r => this.withTotalHours(r));
     }
 
     return this.prisma.attendance.create({
@@ -115,7 +125,7 @@ export class AttendanceService {
         clockInLng: data.lng,
         isLate
       }
-    });
+    }).then(r => this.withTotalHours(r));
   }
 
   async clockOut(userId: number, data: { lat?: number, lng?: number }) {
@@ -174,7 +184,7 @@ export class AttendanceService {
         status,
         overtimeHours
       }
-    });
+    }).then(r => this.withTotalHours(r));
   }
 
   async getMyRegularizations(userId: number) {

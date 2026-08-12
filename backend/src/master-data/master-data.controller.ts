@@ -184,6 +184,7 @@ export class MasterDataController {
         description: data.description,
         defaultDays: data.defaultDays,
         isPaid: data.isPaid,
+        allowHalfDay: data.allowHalfDay !== undefined ? data.allowHalfDay : true,
         carryForward: data.carryForward,
         carryForwardLimit: data.carryForwardLimit,
         companyId: req.user.companyId,
@@ -200,6 +201,7 @@ export class MasterDataController {
         description: data.description,
         defaultDays: data.defaultDays,
         isPaid: data.isPaid,
+        allowHalfDay: data.allowHalfDay,
         carryForward: data.carryForward,
         carryForwardLimit: data.carryForwardLimit,
       }

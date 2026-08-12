@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface PublicJob {
@@ -86,12 +86,21 @@ export class PublicJobsService {
       throw new NotFoundException('Job not found');
     }
 
+    const email = (dto.email || '').trim().toLowerCase();
+
+    const existing = await this.prisma.jobApplication.findFirst({
+      where: { jobId: job.id, email: { equals: email, mode: 'insensitive' } }
+    });
+    if (existing) {
+      throw new ConflictException('You have already applied for this position with this email.');
+    }
+
     const application = await this.prisma.jobApplication.create({
       data: {
         jobId: job.id,
         companyId: job.companyId,
         fullName: dto.fullName,
-        email: dto.email,
+        email: email,
         phone: dto.phone,
         resumeUrl: dto.resumeUrl,
         linkedinUrl: dto.linkedinUrl,

@@ -257,6 +257,15 @@ export class MasterDataComponent implements OnInit {
         onToggle: (data: any, isActive: boolean) => this.onLeaveTypeToggle(data, 'carryForward', isActive)
       }
     },
+    { 
+      field: 'allowHalfDay', 
+      headerName: 'Allow Half Day', 
+      cellRenderer: StatusToggleRendererComponent,
+      cellRendererParams: {
+        activeLabel: 'Yes', inactiveLabel: 'No',
+        onToggle: (data: any, isActive: boolean) => this.onLeaveTypeToggle(data, 'allowHalfDay', isActive)
+      }
+    },
     { field: 'accrualFrequency', headerName: 'Accrual Frequency' },
     { field: 'accrualAmount', headerName: 'Accrual Amount' },
     { 
@@ -314,6 +323,7 @@ export class MasterDataComponent implements OnInit {
     isActive: true,
     defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
     accrualFrequency: 'NONE', accrualAmount: 0,
+    allowHalfDay: true,
     date: ''
   };
 
@@ -394,6 +404,7 @@ export class MasterDataComponent implements OnInit {
         isActive: true,
         defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
         accrualFrequency: 'NONE', accrualAmount: 0,
+        allowHalfDay: true,
         date: ''
       };
       if (this.activeTab() === 'branches') {
@@ -446,6 +457,10 @@ export class MasterDataComponent implements OnInit {
       if (mode === 'create') this.masterDataService.createLeaveType(this.formData).subscribe({ next: () => onSuccess('Leave Type created'), error: onError });
       else this.masterDataService.updateLeaveType(id, this.formData).subscribe({ next: () => onSuccess('Leave Type updated'), error: onError });
     } else if (tab === 'holidays') {
+      if (this.formData.name.trim().length > 100) {
+        this.toast.error('Holiday name must be 100 characters or less');
+        return;
+      }
       if (mode === 'create') this.masterDataService.createHoliday(this.formData).subscribe({ next: () => onSuccess('Holiday created'), error: onError });
       else this.masterDataService.updateHoliday(id, this.formData).subscribe({ next: () => onSuccess('Holiday updated'), error: onError });
     } else if (tab === 'blackout-dates') {

@@ -341,6 +341,7 @@ model LeaveType {
   accrualFrequency  String? // NONE, MONTHLY, YEARLY
   accrualAmount     Float          @default(0)
   isPaid            Boolean        @default(true)
+  allowHalfDay      Boolean        @default(true)
   carryForward      Boolean        @default(false)
   carryForwardLimit Int            @default(0)
   companyId         Int
@@ -668,6 +669,8 @@ model JobApplication {
   fullName        String
   email           String
   phone           String
+
+  @@unique([jobId, email])
   resumeUrl       String?
   linkedinUrl     String?
   portfolioUrl    String?

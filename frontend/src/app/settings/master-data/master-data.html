@@ -251,6 +251,16 @@
         </div>
         <div class="form-group full-width toggle-group" *ngIf="activeTab() === 'leave-types'">
           <div class="toggle-info">
+            <label>Allow Half Day</label>
+            <p class="help-text">Can employees avail this leave type as a half day (AM/PM)?</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" [(ngModel)]="formData.allowHalfDay">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="form-group full-width toggle-group" *ngIf="activeTab() === 'leave-types'">
+          <div class="toggle-info">
             <label>Carry Forward</label>
             <p class="help-text">Can employees carry this leave into the next year?</p>
           </div>
@@ -281,7 +291,8 @@
         <!-- Holidays -->
         <div class="form-group" *ngIf="activeTab() === 'holidays'">
           <label>Holiday Name</label>
-          <input type="text" class="form-control" [(ngModel)]="formData.name" placeholder="e.g. Christmas">
+          <input type="text" class="form-control" [(ngModel)]="formData.name" placeholder="e.g. Christmas" maxlength="100">
+          <p class="help-text">Maximum 100 characters</p>
         </div>
         <div class="form-group" *ngIf="activeTab() === 'holidays'">
           <label>Date</label>

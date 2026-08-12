@@ -644,6 +644,34 @@
   gap: 14px;
 }
 
+/* Error Banner */
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  border-radius: 8px;
+}
+
+.error-banner svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.error-banner p {
+  font-size: 14px;
+  color: #991b1b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.text-red {
+  color: #dc2626;
+}
+
 .text-green {
   color: #16a34a;
 }

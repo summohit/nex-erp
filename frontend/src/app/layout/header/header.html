@@ -20,7 +20,9 @@
         <div class="status-indicator-dot"></div>
       </div>
       <svg lucideClock size="14" class="clock-icon-muted"></svg>
-      <span class="timer-digits">{{ timerStr() }}</span>
+      <span class="timer-digits" *ngIf="isClockedIn()">{{ timerStr() }}</span>
+      <span class="timer-digits" *ngIf="!isClockedIn() && totalHoursStr()">{{ totalHoursStr() }}</span>
+      <span class="timer-digits" *ngIf="!isClockedIn() && !totalHoursStr()">{{ timerStr() }}</span>
     </div>
 
     <div class="clock-divider"></div>

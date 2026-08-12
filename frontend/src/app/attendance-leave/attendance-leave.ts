@@ -30,7 +30,8 @@ import {
   LucideGrid,
   LucideList,
   LucideChevronLeft,
-  LucideChevronRight
+  LucideChevronRight,
+  LucideClock
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -72,7 +73,8 @@ export interface DayStatus {
     LucideGrid,
     LucideList,
     LucideChevronLeft,
-    LucideChevronRight
+    LucideChevronRight,
+    LucideClock
   ],
   providers: [DatePipe],
   templateUrl: './attendance-leave.html',
@@ -124,6 +126,11 @@ export class AttendanceLeaveComponent implements OnInit {
   isAdmin = computed(() => {
     const role = this.authService.currentUser()?.role;
     return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN';
+  });
+
+  isManager = computed(() => {
+    const role = this.authService.currentUser()?.role;
+    return role === 'MANAGER';
   });
 
   attendanceColDefs: ColDef[] = [
@@ -196,6 +203,14 @@ export class AttendanceLeaveComponent implements OnInit {
         const start = this.datePipe.transform(params.data.startDate, 'MMM d');
         const end = this.datePipe.transform(params.data.endDate, 'MMM d');
         return `${start} - ${end}`;
+      },
+      cellRenderer: (params: any) => {
+        const start = this.datePipe.transform(params.data.startDate, 'MMM d');
+        const end = this.datePipe.transform(params.data.endDate, 'MMM d');
+        const halfBadge = params.data.isHalfDay
+          ? `<span class="status-badge status-half-day" style="background: rgba(236, 95, 42, 0.12); color: #EC5F2A; font-size: 10px; margin-left: 6px; padding: 2px 6px; border-radius: 10px;">Half Day (${params.data.halfDayPeriod || 'AM'})</span>`
+          : '';
+        return `<div style="display: flex; align-items: center;">${start} - ${end}${halfBadge}</div>`;
       }
     },
     { 
@@ -400,11 +415,13 @@ export class AttendanceLeaveComponent implements OnInit {
         const s = new Date(params.data.startDate);
         const e = new Date(params.data.endDate);
         const diffDays = Math.ceil(Math.abs(e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const durationDays = params.data.isHalfDay ? 0.5 : diffDays;
+        const halfLabel = params.data.isHalfDay ? ` · Half Day (${params.data.halfDayPeriod || 'AM'})` : '';
         
         return `
           <div class="cell-stacked">
             <div class="cell-title-bold">${start} → ${end}</div>
-            <div class="user-text-stack text-secondary">${diffDays} day${diffDays > 1 ? 's' : ''} duration</div>
+            <div class="user-text-stack text-secondary">${durationDays} day${durationDays === 1 ? '' : 's'} duration${halfLabel}</div>
           </div>
         `;
       }
@@ -466,9 +483,18 @@ export class AttendanceLeaveComponent implements OnInit {
   // Manage Balances (HR/Admin)
   allBalances = signal<LeaveBalance[]>([]);
   allRequests = signal<LeaveRequest[]>([]);
+  managerRequests = signal<LeaveRequest[]>([]);
   employees = signal<Employee[]>([]);
   leaveTypes = signal<LeaveType[]>([]);
   
+  // Whether the currently selected leave type allows half-day
+  selectedLeaveTypeAllowsHalfDay = computed(() => {
+    const id = this.requestForm.leaveTypeId;
+    if (!id) return true;
+    const balance = this.myBalances().find(b => b.leaveType?.id === Number(id));
+    return balance ? (balance.leaveType.allowHalfDay !== false) : true;
+  });
+
   // Assignment Form State
   assignToAll = signal<boolean>(false);
   selectedEmployeeId = signal<string>('');
@@ -730,8 +756,8 @@ export class AttendanceLeaveComponent implements OnInit {
         endDate: new Date(request.endDate).toISOString().split('T')[0],
         reason: request.reason || '',
         attachmentUrl: request.attachmentUrl || '',
-        isHalfDay: false,
-        halfDayPeriod: 'AM'
+        isHalfDay: !!request.isHalfDay,
+        halfDayPeriod: request.halfDayPeriod || 'AM'
       };
     } else {
       this.editMode.set(false);
@@ -739,6 +765,12 @@ export class AttendanceLeaveComponent implements OnInit {
       this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM' };
     }
     this.isRequestModalOpen.set(true);
+  }
+
+  onLeaveTypeChange() {
+    if (!this.selectedLeaveTypeAllowsHalfDay()) {
+      this.requestForm.isHalfDay = false;
+    }
   }
 
   closeRequestModal() {
@@ -890,16 +922,30 @@ export class AttendanceLeaveComponent implements OnInit {
       return;
     }
 
+    if (this.requestForm.isHalfDay) {
+      if (this.requestForm.startDate !== this.requestForm.endDate) {
+        this.toast.error('Half-day leave is only allowed for a single day.');
+        this.requestForm.isHalfDay = false;
+        return;
+      }
+      if (!this.selectedLeaveTypeAllowsHalfDay()) {
+        this.toast.error('Half-day leave is not allowed for this leave type.');
+        this.requestForm.isHalfDay = false;
+        return;
+      }
+    }
+
     const start = new Date(this.requestForm.startDate);
     const end = new Date(this.requestForm.endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const requestedDays = this.requestForm.isHalfDay ? 0.5 : diffDays;
 
     const balance = this.myBalances().find(b => b.leaveType.id === Number(this.requestForm.leaveTypeId));
     if (balance) {
       const available = balance.allocated + balance.carriedOver - balance.used;
-      if (diffDays > available) {
-        this.toast.error(`Insufficient balance. You requested ${diffDays} days but only have ${available} days available.`);
+      if (requestedDays > available) {
+        this.toast.error(`Insufficient balance. You requested ${requestedDays} ${requestedDays === 1 ? 'day' : 'days'} but only have ${available} days available.`);
         return;
       }
     }
@@ -961,6 +1007,7 @@ export class AttendanceLeaveComponent implements OnInit {
         next: () => {
           this.toast.success('Leave request approved');
           this.loadAdminData();
+          this.loadManagerData();
           this.loadData();
         },
         error: (err) => this.toast.error('Failed to approve request')
@@ -1015,6 +1062,7 @@ export class AttendanceLeaveComponent implements OnInit {
           this.loadAdminData();
           this.loadShifts();
         }
+        this.loadManagerData();
         this.loadData();
       },
       error: (err) => {
@@ -1052,15 +1100,21 @@ export class AttendanceLeaveComponent implements OnInit {
     ];
 
     const types = new Set<string>();
+    const typeHalfDay = new Map<string, boolean>();
     balances.forEach((b: any) => {
       if (b.leaveType && b.leaveType.name) {
         types.add(b.leaveType.name);
+        if (!typeHalfDay.has(b.leaveType.name)) {
+          typeHalfDay.set(b.leaveType.name, b.leaveType.allowHalfDay !== false);
+        }
       }
     });
 
     Array.from(types).forEach(type => {
+      const halfDay = typeHalfDay.get(type);
+      const suffix = halfDay === false ? ' · No Half Day' : ' · Half Day';
       cols.push({
-        headerName: `${type} (Avail / Total)`,
+        headerName: `${type} (Avail / Total)${suffix}`,
         field: type,
         flex: 1,
         minWidth: 160
@@ -1286,6 +1340,7 @@ export class AttendanceLeaveComponent implements OnInit {
     });
 
     this.loadAdminData();
+    this.loadManagerData();
     this.loadShifts();
   }
 
@@ -1296,6 +1351,10 @@ export class AttendanceLeaveComponent implements OnInit {
     this.attendanceService.getPendingRegularizations().subscribe((res: any) => this.pendingRegularizations.set(res));
     this.employeeService.getEmployees().subscribe((res: any) => this.employees.set(res));
     this.masterDataService.getLeaveTypes().subscribe((res: any) => this.leaveTypes.set(res));
+  }
+
+  loadManagerData() {
+    this.leavesService.getManagerRequests().subscribe((res: any) => this.managerRequests.set(res));
   }
 
   onPeriodChange() {
@@ -1530,6 +1589,9 @@ export class AttendanceLeaveComponent implements OnInit {
     if (tab === 'balances' || tab === 'approvals') {
       this.loadAdminData();
     }
+    if (tab === 'team-approvals') {
+      this.loadManagerData();
+    }
     if (tab === 'shifts') {
       this.loadShifts();
     }
@@ -1572,6 +1634,10 @@ export class AttendanceLeaveComponent implements OnInit {
   saveHoliday() {
     if (!this.holidayForm.name.trim() || !this.holidayForm.date) {
       this.toast.error('Holiday name and date are required');
+      return;
+    }
+    if (this.holidayForm.name.trim().length > 100) {
+      this.toast.error('Holiday name must be 100 characters or less');
       return;
     }
     this.isSavingHoliday.set(true);

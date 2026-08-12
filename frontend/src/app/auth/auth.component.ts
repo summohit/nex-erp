@@ -58,6 +58,10 @@ export class AuthComponent {
     this.showPassword = !this.showPassword;
   }
 
+  goToForgotPassword() {
+    this.router.navigate(['/auth/forgot-password']);
+  }
+
   onRegister() {
     if (this.registerForm.invalid) {
       this.registerForm.markAllAsTouched();

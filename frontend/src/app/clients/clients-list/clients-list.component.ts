@@ -154,7 +154,7 @@ export class ClientsListComponent implements OnInit {
       contactFirstName: ['', Validators.required],
       contactLastName: [''],
       contactEmail: ['', [Validators.required, Validators.email]],
-      contactPhone: ['']
+      contactPhone: ['', [Validators.pattern(/^\+?[0-9\s\-().]{7,20}$/)]],
     });
   }
 

@@ -7,11 +7,12 @@ import {
   LucideTrash2, LucideLayoutGrid,
   LucideCreditCard, LucideUser, LucideShieldCheck, LucideGraduationCap,
   LucidePlane, LucideUsers, LucideSettings, LucideEdit2, LucidePaperclip, LucideMapPin,
-  LucideUploadCloud, LucideFileText, LucideCheckCircle2
+  LucideUploadCloud, LucideFileText, LucideCheckCircle2, LucideMail
 } from '@lucide/angular';
 import { EmployeeService, Employee } from '../../../services/employee.service';
 import { MasterDataService, Branch, Department, Designation } from '../../../services/master-data.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { AuthService } from '../../../services/auth.service';
 import { Country, State, City } from 'country-state-city';
 
 export interface ResumeLine {
@@ -57,7 +58,8 @@ export interface SkillItem {
     LucidePaperclip,
     LucideUploadCloud,
     LucideFileText,
-    LucideCheckCircle2
+    LucideCheckCircle2,
+    LucideMail
   ],
   templateUrl: './profile-tab.html',
   styleUrls: ['./profile-tab.css']
@@ -149,7 +151,8 @@ export class ProfileTabComponent implements OnInit {
     private employeeService: EmployeeService, 
     private masterDataService: MasterDataService,
     private toast: HotToastService, 
-    private router: Router
+    private router: Router,
+    private authService: AuthService
   ) {}
 
   ngOnInit() {
@@ -522,6 +525,23 @@ export class ProfileTabComponent implements OnInit {
       pass += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     this.formData.password = pass;
+  }
+
+  isSendingResetEmail = false;
+
+  sendPasswordResetEmail() {
+    if (!this.isOwner || this.isSendingResetEmail) return;
+    this.isSendingResetEmail = true;
+    this.authService.sendPasswordResetEmail().subscribe({
+      next: (res: any) => {
+        this.isSendingResetEmail = false;
+        this.toast.success(res?.message || 'Password reset code sent to your email.');
+      },
+      error: (err: any) => {
+        this.isSendingResetEmail = false;
+        this.toast.error(err.error?.message || 'Failed to send password reset email.');
+      }
+    });
   }
 
   handleAvatarUpload(event: any) {

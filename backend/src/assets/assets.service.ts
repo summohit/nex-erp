@@ -36,11 +36,18 @@ export class AssetsService {
   }
 
   async createAsset(companyId: number, data: any) {
-    let assetTag = data.assetTag;
+    let assetTag = data.assetTag ? String(data.assetTag).trim() : '';
     if (!assetTag) {
       const count = await this.prisma.asset.count({ where: { companyId } });
       const year = new Date().getFullYear();
       assetTag = `AST-${year}-${(count + 1).toString().padStart(3, '0')}`;
+    }
+
+    const existing = await this.prisma.asset.findFirst({
+      where: { companyId, assetTag: { equals: assetTag, mode: 'insensitive' } }
+    });
+    if (existing) {
+      throw new BadRequestException('Asset tag must be unique');
     }
 
     const imagesStr = Array.isArray(data.images) ? JSON.stringify(data.images) : (data.images || null);
@@ -72,11 +79,25 @@ export class AssetsService {
     const asset = await this.prisma.asset.findFirst({ where: { id, companyId } });
     if (!asset) throw new NotFoundException('Asset not found');
 
+    let assetTag = data.assetTag !== undefined && data.assetTag !== null && data.assetTag !== ''
+      ? String(data.assetTag).trim()
+      : asset.assetTag;
+
+    if (assetTag !== asset.assetTag) {
+      const existing = await this.prisma.asset.findFirst({
+        where: { companyId, assetTag: { equals: assetTag, mode: 'insensitive' }, NOT: { id } }
+      });
+      if (existing) {
+        throw new BadRequestException('Asset tag must be unique');
+      }
+    }
+
     const imagesStr = Array.isArray(data.images) ? JSON.stringify(data.images) : (data.images !== undefined ? data.images : undefined);
 
     const updated = await this.prisma.asset.update({
       where: { id },
       data: {
+        assetTag,
         name: data.name,
         category: data.category,
         brand: data.brand,
@@ -99,6 +120,13 @@ export class AssetsService {
   async deleteAsset(companyId: number, id: number) {
     const asset = await this.prisma.asset.findFirst({ where: { id, companyId } });
     if (!asset) throw new NotFoundException('Asset not found');
+
+    const activeAssignments = await this.prisma.assetAssignment.findMany({
+      where: { assetId: id, companyId, status: 'ACTIVE' }
+    });
+    if (activeAssignments.length > 0) {
+      throw new BadRequestException('Deletion blocked due to active assignment. Must archive or return first.');
+    }
 
     return this.prisma.asset.delete({ where: { id } });
   }

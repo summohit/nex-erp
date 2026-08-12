@@ -7,7 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { 
   LucideSearch, LucideMapPin, LucideBriefcase, LucideClock, LucideBuilding, 
   LucideCheckCircle, LucideX, LucideUpload, LucideSparkles, LucideHelpCircle, 
-  LucideArrowRight, LucideFilter, LucideLoader 
+  LucideArrowRight, LucideFilter, LucideLoader, LucideAlertCircle 
 } from '@lucide/angular';
 import { environment } from '../../../environments/environment';
 
@@ -35,7 +35,7 @@ export interface PublicJob {
   imports: [
     CommonModule, FormsModule, DatePipe, LucideSearch, LucideMapPin, 
     LucideBriefcase, LucideClock, LucideBuilding, LucideCheckCircle, 
-    LucideX, LucideUpload, LucideHelpCircle, LucideArrowRight, LucideFilter, LucideLoader
+    LucideX, LucideUpload, LucideHelpCircle, LucideArrowRight, LucideFilter, LucideLoader, LucideAlertCircle
   ],
   templateUrl: './careers.html',
   styleUrls: ['./careers.css'],
@@ -59,6 +59,7 @@ export class CareersComponent implements OnInit {
   isUploading = signal<boolean>(false);
   isSubmitting = signal<boolean>(false);
   isSubmittedSuccess = signal<boolean>(false);
+  submitError = signal<string | null>(null);
   showValidationErrors = signal<boolean>(false);
 
   // Candidate Application Form
@@ -139,6 +140,7 @@ export class CareersComponent implements OnInit {
     this.answersMap = {};
     (job.screeningQuestions || []).forEach(q => this.answersMap[q] = '');
     this.isSubmittedSuccess.set(false);
+    this.submitError.set(null);
     this.uploadFileName.set('');
     this.isApplyDrawerOpen.set(true);
   }
@@ -205,10 +207,16 @@ export class CareersComponent implements OnInit {
       await firstValueFrom(
         this.http.post(`${environment.apiUrl}/public/applications`, payload)
       );
+      this.submitError.set(null);
       this.isSubmittedSuccess.set(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting application:', err);
-      this.isSubmittedSuccess.set(true);
+      if (err?.status === 409) {
+        this.submitError.set('You have already applied for this position with this email.');
+      } else {
+        this.submitError.set('Something went wrong while submitting your application. Please try again.');
+      }
+      this.isSubmittedSuccess.set(false);
     } finally {
       this.isSubmitting.set(false);
     }

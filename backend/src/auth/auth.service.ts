@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -8,6 +8,7 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -246,6 +247,131 @@ export class AuthService {
     this.mailService.sendWelcomeEmail(user.email).catch(e => console.error(e));
 
     return { message: 'Email verified successfully.' };
+  }
+
+  async forgotPassword(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: 'insensitive' }
+      }
+    });
+
+    if (user) {
+      const otp = await this.createPasswordResetToken(normalizedEmail);
+
+      try {
+        await this.mailService.sendPasswordResetOtpEmail(normalizedEmail, otp);
+      } catch (error: any) {
+        this.logger.error(`Password reset email failed to send for ${normalizedEmail}: ${error?.message}`);
+        throw new HttpException(
+          `Could not send the password reset email. ${error?.message || 'Please try again later.'}`,
+          HttpStatus.INTERNAL_SERVER_ERROR
+        );
+      }
+    }
+
+    // Only reach here when the email does not exist (or was sent successfully)
+    return { message: 'If an account exists for this email, a password reset code has been sent.' };
+  }
+
+  async resetPassword(email: string, otp: string, newPassword: string) {
+    if (!otp) {
+      throw new BadRequestException('Verification code is required.');
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters.');
+    }
+
+    const verificationToken = await this.prisma.verificationToken.findFirst({
+      where: {
+        identifier: email.trim().toLowerCase(),
+        token: otp
+      }
+    });
+
+    if (!verificationToken) {
+      throw new BadRequestException('Invalid or expired verification code.');
+    }
+
+    if (new Date() > verificationToken.expiresAt) {
+      await this.prisma.verificationToken.delete({ where: { id: verificationToken.id } });
+      throw new BadRequestException('Verification code has expired. Please request a new one.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() }
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    });
+
+    // Consume the code so it cannot be reused
+    await this.prisma.verificationToken.deleteMany({
+      where: { identifier: email.trim().toLowerCase() }
+    });
+
+    return { message: 'Password reset successfully. Please log in with your new password.' };
+  }
+
+  private async createPasswordResetToken(identifier: string): Promise<string> {
+    const maxAttempts = 5;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const otp = crypto.randomInt(100000, 999999).toString();
+
+      await this.prisma.verificationToken.deleteMany({
+        where: { identifier }
+      });
+
+      try {
+        await this.prisma.verificationToken.create({
+          data: {
+            identifier,
+            token: otp,
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+          }
+        });
+        return otp;
+      } catch (error: any) {
+        if (error?.code === 'P2002' && attempt < maxAttempts) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new Error('Could not generate a unique password reset code. Please try again.');
+  }
+
+  async sendResetCodeToUser(userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    const otp = await this.createPasswordResetToken(user.email);
+
+    try {
+      await this.mailService.sendPasswordResetOtpEmail(user.email, otp);
+    } catch (error: any) {
+      this.logger.error(`Password reset email failed to send for ${user.email}: ${error?.message}`);
+      throw new HttpException(
+        `Could not send the password reset email. ${error?.message || 'Please try again later.'}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+
+    return { message: 'Password reset code sent to your email. It is valid for 10 minutes.' };
   }
 
   async resendVerificationEmail(email: string) {

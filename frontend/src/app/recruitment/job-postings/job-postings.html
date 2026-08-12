@@ -268,7 +268,7 @@
                 </div>
                 <div class="user-details">
                   <span class="user-name">{{ emp.firstName }} {{ emp.lastName }}</span>
-                  <span class="user-sub">{{ emp.email || 'HR Department' }}</span>
+                  <span class="user-sub">{{ emp.user?.email || emp.email || 'HR Department' }}</span>
                 </div>
                 <svg lucideCheck class="check-ico" *ngIf="jobForm.recruiterId == emp.id"></svg>
               </div>

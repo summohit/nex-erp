@@ -122,6 +122,12 @@
         <!-- FORM STATE -->
         <ng-container *ngIf="!isSubmittedSuccess()">
           
+          <!-- ERROR STATE -->
+          <div class="error-banner" *ngIf="submitError()">
+            <svg lucideAlertCircle size="24" class="text-red"></svg>
+            <p>{{ submitError() }}</p>
+          </div>
+
           <!-- Job Overview Section -->
           <div class="job-details-box">
             <h4>Job Overview</h4>

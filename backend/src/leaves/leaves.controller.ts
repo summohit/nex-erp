@@ -34,6 +34,11 @@ export class LeavesController {
     return this.leavesService.getMyRequests(req.user.sub);
   }
 
+  @Get('requests/managers')
+  getManagerRequests(@Request() req) {
+    return this.leavesService.getManagerRequests(req.user.sub);
+  }
+
   @Get('requests')
   getRequests(@Request() req, @Query() filter: any) {
     return this.leavesService.getRequests(req.user.companyId, filter);

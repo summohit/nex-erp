@@ -8,9 +8,6 @@
       <button class="btn-primary" (click)="openResignModal()" *ngIf="activeTab() === 'resignations'">
         Submit Resignation
       </button>
-      <button class="btn-primary" (click)="openInterviewModal()" *ngIf="activeTab() === 'exit' && isAdminOrHr()">
-        Record Interview
-      </button>
     </div>
   </div>
 
@@ -22,10 +19,6 @@
     <button class="tab-btn" [class.active]="activeTab() === 'tasks'" (click)="setTab('tasks')" *ngIf="canClearTasks()">
       <svg lucideCheckCircle2 size="18"></svg>
       Clearance Tasks
-    </button>
-    <button class="tab-btn" [class.active]="activeTab() === 'exit'" (click)="setTab('exit')" *ngIf="isAdminOrHr()">
-      <svg lucideClipboardCheck size="18"></svg>
-      Exit Interviews
     </button>
   </div>
 

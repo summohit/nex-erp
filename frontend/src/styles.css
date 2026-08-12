@@ -312,6 +312,16 @@ button.btn-outline:hover,
   box-shadow: var(--shadow-sm);
 }
 
+.forgot-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.35rem;
+}
+
+.forgot-link {
+  font-size: 0.85rem;
+}
+
 /* Sleek Transparent Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;

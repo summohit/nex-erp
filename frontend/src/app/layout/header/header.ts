@@ -50,6 +50,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   isClocking = signal<boolean>(false);
   clockInTime = signal<Date | null>(null);
   timerStr = signal<string>('00:00:00');
+  totalHoursStr = signal<string>('');
   private timerInterval: any;
 
   ngOnInit() {
@@ -73,12 +74,22 @@ export class HeaderComponent implements OnInit, OnDestroy {
         if (res && res.clockIn && !res.clockOut) {
           this.isClockedIn.set(true);
           this.clockInTime.set(new Date(res.clockIn));
+          this.totalHoursStr.set('');
           this.startTimer();
         } else {
           this.isClockedIn.set(false);
           this.clockInTime.set(null);
-          this.timerStr.set('00:00:00');
           if (this.timerInterval) clearInterval(this.timerInterval);
+          if (res && res.clockIn && res.clockOut) {
+            this.timerStr.set('');
+            const total = res.totalHours || (new Date(res.clockOut).getTime() - new Date(res.clockIn).getTime()) / 3600000;
+            const hrs = Math.floor(total);
+            const mins = Math.round((total - hrs) * 60);
+            this.totalHoursStr.set(`${hrs}h ${mins}m`);
+          } else {
+            this.timerStr.set('00:00:00');
+            this.totalHoursStr.set('');
+          }
         }
       },
       error: () => {

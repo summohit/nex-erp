@@ -38,6 +38,7 @@ export interface LeaveType {
   description?: string;
   defaultDays: number;
   isPaid: boolean;
+  allowHalfDay: boolean;
   carryForward: boolean;
   carryForwardLimit: number;
 }

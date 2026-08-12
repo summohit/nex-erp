@@ -27,7 +27,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status === 401 && !req.url.includes('/auth/login') && !req.url.includes('/auth/signup')) {
+      if (error.status === 401 && !req.url.includes('/auth/login') && !req.url.includes('/auth/signup') && !req.url.includes('/auth/forgot-password') && !req.url.includes('/auth/reset-password') && !req.url.includes('/auth/reset-password-email')) {
         return from(sessionModal.prompt()).pipe(
           switchMap((shouldContinue) => {
             if (shouldContinue) {

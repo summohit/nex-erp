@@ -15,6 +15,7 @@ export interface LeaveBalance {
     id: number;
     name: string;
     isPaid: boolean;
+    allowHalfDay?: boolean;
   };
   employee?: {
     id: number;
@@ -33,6 +34,8 @@ export interface LeaveRequest {
   attachmentUrl?: string | null;
   status: string;
   rejectionReason?: string | null;
+  isHalfDay?: boolean;
+  halfDayPeriod?: string | null;
   leaveType: {
     name: string;
   };
@@ -65,7 +68,7 @@ export class LeavesService {
     return this.http.get<LeaveBalance[]>(`${this.apiUrl}/balances`, { params });
   }
 
-  requestLeave(data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string }): Observable<LeaveRequest> {
+  requestLeave(data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }): Observable<LeaveRequest> {
     return this.http.post<LeaveRequest>(`${this.apiUrl}/request`, data);
   }
 
@@ -77,11 +80,15 @@ export class LeavesService {
     return this.http.get<LeaveRequest[]>(`${this.apiUrl}/requests`);
   }
 
+  getManagerRequests() {
+    return this.http.get<LeaveRequest[]>(`${this.apiUrl}/requests/managers`);
+  }
+
   updateRequestStatus(id: number, status: string, rejectionReason?: string) {
     return this.http.put<LeaveRequest>(`${this.apiUrl}/requests/${id}/status`, { status, rejectionReason });
   }
 
-  updateRequest(id: number, data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string }) {
+  updateRequest(id: number, data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
     return this.http.put<LeaveRequest>(`${this.apiUrl}/requests/${id}`, data);
   }
 

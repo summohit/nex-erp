@@ -134,6 +134,9 @@
           </button>
         </div>
         <div *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched" class="error-text">Please enter your password</div>
+        <div class="forgot-row">
+          <a class="link forgot-link" (click)="goToForgotPassword()">Forgot password?</a>
+        </div>
       </div>
 
       <button type="submit" class="btn-primary mb-4" [disabled]="isSubmitting()">

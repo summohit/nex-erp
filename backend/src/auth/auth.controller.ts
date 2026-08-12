@@ -1,5 +1,6 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { AuthGuard } from './auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -55,5 +56,30 @@ export class AuthController {
       throw new Error('Email is required');
     }
     return this.authService.resendVerificationEmail(body.email);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password')
+  forgotPassword(@Body() body: { email: string }) {
+    if (!body.email) {
+      throw new Error('Email is required');
+    }
+    return this.authService.forgotPassword(body.email);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('reset-password')
+  resetPassword(@Body() body: { email: string; otp: string; newPassword: string }) {
+    if (!body.email) {
+      throw new Error('Email is required');
+    }
+    return this.authService.resetPassword(body.email, body.otp, body.newPassword);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @Post('reset-password-email')
+  resetPasswordEmail(@Req() req: any) {
+    return this.authService.sendResetCodeToUser(req.user.sub);
   }
 }
