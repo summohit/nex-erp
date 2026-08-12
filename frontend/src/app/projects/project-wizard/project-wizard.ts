@@ -9,8 +9,42 @@ import {
   LucideCheck, LucideChevronRight, LucideChevronLeft,
   LucideTrash2, LucideFile, LucidePlus, LucideX, LucideAlertCircle,
   LucideLayers, LucideListChecks, LucideUsers, LucideDollarSign,
-  LucideShieldAlert, LucideCheckSquare, LucideTarget, LucideActivity
+  LucideShieldAlert, LucideCheckSquare, LucideTarget, LucideActivity,
+  LucideCalendar, LucideHelpCircle, LucideAward, LucideInfo,
+  LucideSparkles, LucideClock, LucidePieChart, LucideTrendingUp,
+  LucideShield, LucideLock, LucideZap, LucideAlertOctagon, LucideCheckCircle,
+  LucideUser, LucideLink, LucideRotateCcw
 } from '@lucide/angular';
+
+export interface ValidationWarning {
+  code: string;
+  severity: 'BLOCKING' | 'NON_BLOCKING';
+  message: string;
+}
+
+export interface AnalysisData {
+  validationWarnings?: ValidationWarning[];
+  isReadyForKickoff?: boolean;
+  kickoffBlockers?: string[];
+  costEstimate?: any;
+  health?: any;
+  requirements?: any[];
+  wbsTasks?: any[];
+  resourcePlans?: any[];
+  risks?: any[];
+  dependencies?: any[];
+  assumptions?: any[];
+  stakeholders?: any[];
+  raci?: any[];
+  openQuestions?: any[];
+  missingInfo?: any[];
+  roadmap?: any;
+  milestones?: any[];
+  summary?: any;
+  scope?: any;
+  estimatedMargin?: any;
+  marginDisplay?: any;
+}
 
 @Component({
   selector: 'app-project-wizard',
@@ -22,18 +56,24 @@ import {
     LucideCheck, LucideChevronRight, LucideChevronLeft,
     LucideTrash2, LucideFile, LucidePlus, LucideX, LucideAlertCircle,
     LucideLayers, LucideListChecks, LucideUsers, LucideDollarSign,
-    LucideShieldAlert, LucideCheckSquare, LucideTarget, LucideActivity
+    LucideShieldAlert, LucideCheckSquare, LucideTarget, LucideActivity,
+    LucideCalendar, LucideHelpCircle, LucideAward, LucideInfo,
+    LucideSparkles, LucideClock, LucidePieChart, LucideTrendingUp,
+    LucideShield, LucideLock, LucideZap, LucideAlertOctagon, LucideCheckCircle,
+    LucideUser, LucideLink, LucideRotateCcw
   ],
   templateUrl: './project-wizard.html',
   styleUrls: ['./project-wizard.css']
 })
 export class ProjectWizardComponent implements OnInit {
+  protected readonly Math = Math;
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private projectsService = inject(ProjectsService);
 
   projectId = signal<number | null>(null);
   currentStep = signal<number>(1);
+  activeSection = signal<string>('summary');
   
   // Status flags
   isUploading = signal(false);
@@ -45,17 +85,57 @@ export class ProjectWizardComponent implements OnInit {
   // Drag and Drop state
   isDragging = signal(false);
 
+  // Kickoff Approval Modal state
+  showKickoffModal = signal(false);
+
   // Multiple files tracking (max 8)
   readonly MAX_FILES = 8;
   selectedFiles = signal<File[]>([]);
 
   // AI Output
-  analysisData = signal<any>(null);
+  analysisData = signal<AnalysisData | null>(null);
   
+  // Resource Constraints State
+  resourceConfig = signal({
+    engineerCount: 3,
+    maxHoursPerDay: 8,
+    daysOff: { Saturday: true, Sunday: true, Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false } as Record<string, boolean>,
+    startDate: new Date().toISOString().split('T')[0]
+  });
+
+  toggleDayOff(day: string) {
+    const current = this.resourceConfig();
+    const updated = {
+      ...current,
+      daysOff: {
+        ...current.daysOff,
+        [day]: !current.daysOff[day]
+      }
+    };
+    this.resourceConfig.set(updated);
+  }
+
+  setWeekendOnly() {
+    const current = this.resourceConfig();
+    this.resourceConfig.set({
+      ...current,
+      daysOff: {
+        Monday: false,
+        Tuesday: false,
+        Wednesday: false,
+        Thursday: false,
+        Friday: false,
+        Saturday: true,
+        Sunday: true
+      }
+    });
+  }
+
   steps = [
     { id: 1, title: 'Upload Documents', icon: 'LucideUploadCloud' },
-    { id: 2, title: 'Processing', icon: 'LucideBrainCircuit' },
-    { id: 3, title: 'Review & Approve', icon: 'LucideCheckCircle2' }
+    { id: 2, title: 'Resource Configuration', icon: 'LucideUsers' },
+    { id: 3, title: 'Processing', icon: 'LucideBrainCircuit' },
+    { id: 4, title: 'Review & Approve', icon: 'LucideCheckCircle2' }
   ];
 
   ngOnInit() {
@@ -66,6 +146,18 @@ export class ProjectWizardComponent implements OnInit {
         this.fetchExistingAnalysis(+id);
       }
     });
+  }
+
+  scrollToSection(sectionId: string, event?: Event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    this.activeSection.set(sectionId);
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   onDragOver(event: DragEvent) {
@@ -125,6 +217,10 @@ export class ProjectWizardComponent implements OnInit {
       !currentList.some(cf => cf.name === nf.name && cf.size === nf.size)
     );
 
+    if (uniqueNewFiles.length < newFilesToAdd.length) {
+      this.fileLimitError.set('Duplicate file(s) were automatically skipped.');
+    }
+
     this.selectedFiles.set([...currentList, ...uniqueNewFiles]);
   }
 
@@ -158,7 +254,44 @@ export class ProjectWizardComponent implements OnInit {
     return Math.round(num) + '%';
   }
 
-  async startOnboarding() {
+  hasMarginData(): boolean {
+    const cost = this.analysisData()?.costEstimate;
+    return !!(cost && cost.estimatedMargin !== null && cost.estimatedMargin !== undefined && cost.estimatedRevenue && cost.estimatedRevenue > 0);
+  }
+
+  getHealthBadgeClass(): string {
+    const status = this.analysisData()?.health?.healthStatus;
+    const scoreRaw = this.analysisData()?.health?.readinessScore;
+    let score = typeof scoreRaw === 'number' ? scoreRaw : parseFloat(scoreRaw || '0');
+    if (score <= 1 && score > 0) score = score * 100;
+
+    if (status === 'CRITICAL' || score < 50) return 'critical';
+    if (status === 'AT_RISK' || (score >= 50 && score < 80)) return 'at-risk';
+    return 'healthy';
+  }
+
+  getHealthStatusLabel(): string {
+    const status = this.analysisData()?.health?.healthStatus;
+    const scoreRaw = this.analysisData()?.health?.readinessScore;
+    let score = typeof scoreRaw === 'number' ? scoreRaw : parseFloat(scoreRaw || '0');
+    if (score <= 1 && score > 0) score = score * 100;
+
+    if (score >= 80) return 'HEALTHY';
+    if (score >= 50) return 'AT_RISK';
+    return 'CRITICAL';
+  }
+
+  getTotalWbsHours(): number {
+    const tasks = this.analysisData()?.wbsTasks || [];
+    return tasks.reduce((sum: number, t: any) => sum + (t.estimatedEffort || 0), 0);
+  }
+
+  getTotalResourceHours(): number {
+    const plans = this.analysisData()?.resourcePlans || [];
+    return plans.reduce((sum: number, r: any) => sum + (r.estimatedHours || 0), 0);
+  }
+
+  async goToResourceConfig() {
     const files = this.selectedFiles();
     if (files.length === 0) return;
     
@@ -178,9 +311,7 @@ export class ProjectWizardComponent implements OnInit {
       }
       
       this.isUploading.set(false);
-      this.currentStep.set(2);
-      
-      this.runAiAnalysis(pId);
+      this.currentStep.set(2); // Go to Resource Config
       
     } catch (err: any) {
       this.analysisError.set(err.message || 'Error during document upload/setup');
@@ -188,11 +319,32 @@ export class ProjectWizardComponent implements OnInit {
     }
   }
 
+  async startAnalysis() {
+    const pId = this.projectId();
+    if (!pId) return;
+    
+    this.currentStep.set(3); // Go to Processing
+    this.runAiAnalysis(pId);
+  }
+
   async runAiAnalysis(id: number) {
     this.isAnalyzing.set(true);
     this.analysisError.set(null);
     try {
-      await this.projectsService.analyzeProjectDocuments(id).toPromise();
+      // Map daysOff dictionary to array of strings
+      const config = this.resourceConfig();
+      const daysOffArray = Object.keys(config.daysOff).filter(day => config.daysOff[day]);
+      
+      const payload = {
+        resourceConstraints: {
+          engineerCount: config.engineerCount,
+          maxHoursPerDay: config.maxHoursPerDay,
+          startDate: config.startDate,
+          daysOff: daysOffArray
+        }
+      };
+
+      await this.projectsService.analyzeProjectDocuments(id, payload).toPromise();
       await this.fetchExistingAnalysis(id);
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -207,6 +359,7 @@ export class ProjectWizardComponent implements OnInit {
       this.analysisError.set(message);
     } finally {
       this.isAnalyzing.set(false);
+      this.currentStep.set(4);
     }
   }
 
@@ -220,7 +373,90 @@ export class ProjectWizardComponent implements OnInit {
     }
   }
 
-  approveProject() {
+  openKickoffGate() {
+    this.showKickoffModal.set(true);
+  }
+
+  closeKickoffGate() {
+    this.showKickoffModal.set(false);
+  }
+
+  confirmKickoff() {
+    this.showKickoffModal.set(false);
     this.router.navigate(['/projects', this.projectId()]);
+  }
+
+  // --- UI Enhancement Helpers ---
+
+  getParsedInScope(): string[] {
+    const text = this.analysisData()?.scope?.inScope;
+    if (!text) return [];
+    if (Array.isArray(text)) return text;
+    return text.split(/(?:\. |\n|; )/).map((s: string) => s.trim()).filter((s: string) => s.length > 3);
+  }
+
+  getParsedOutOfScope(): string[] {
+    const text = this.analysisData()?.scope?.outOfScope;
+    if (!text) return [];
+    if (Array.isArray(text)) return text;
+    return text.split(/(?:\. |\n|; )/).map((s: string) => s.trim()).filter((s: string) => s.length > 3);
+  }
+
+  getParsedDeliverables(): string[] {
+    const text = this.analysisData()?.scope?.deliverables;
+    if (!text) return [];
+    if (Array.isArray(text)) return text;
+    return text.split(/(?:\. |\n|; )/).map((s: string) => s.trim()).filter((s: string) => s.length > 3);
+  }
+
+  getSumOfCostComponents(): number {
+    const c = this.analysisData()?.costEstimate;
+    if (!c) return 0;
+    return (c.resourceCost || 0) + 
+           (c.infrastructureCost || 0) + 
+           (c.vendorCost || 0) + 
+           (c.licenseCost || 0) + 
+           (c.contingency || 0) + 
+           (c.otherCost || 0);
+  }
+
+  getUnexplainedVariance(): number {
+    const reportedTotal = this.analysisData()?.costEstimate?.totalCost || 0;
+    const sumComponents = this.getSumOfCostComponents();
+    return Math.abs(sumComponents - reportedTotal);
+  }
+
+  hasCostVariance(): boolean {
+    const reportedTotal = this.analysisData()?.costEstimate?.totalCost || 0;
+    const sumComponents = this.getSumOfCostComponents();
+    return reportedTotal > 0 && sumComponents > 0 && Math.abs(sumComponents - reportedTotal) > 100;
+  }
+
+  getWbsVarianceDetails() {
+    const wbsHrs = this.getTotalWbsHours();
+    const resHrs = this.getTotalResourceHours();
+    const diff = resHrs - wbsHrs;
+    const pct = resHrs > 0 ? Math.round((diff / resHrs) * 100) : 0;
+    return {
+      wbsHrs,
+      resHrs,
+      diff,
+      pct,
+      isExcessCapacity: diff > 0,
+      isDeficit: diff < 0
+    };
+  }
+
+  getCostComponentPercentage(val: number): number {
+    const total = this.getSumOfCostComponents() || this.analysisData()?.costEstimate?.totalCost || 1;
+    if (total <= 0) return 0;
+    return Math.min(100, Math.max(0, Math.round((val / total) * 100)));
+  }
+
+  getWbsCapacityPercentage(): number {
+    const resHrs = this.getTotalResourceHours();
+    const wbsHrs = this.getTotalWbsHours();
+    if (resHrs <= 0) return 22;
+    return Math.min(100, Math.round((wbsHrs / resHrs) * 100));
   }
 }

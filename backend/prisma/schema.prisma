@@ -776,6 +776,25 @@ model ProjectAnalysisRun {
   overallConfidence  Float?
   errorMessage       String? @db.Text
 
+  // Validation & Normalization Layer
+  totalCost          Float?
+  costCurrency       String?
+  costBreakdown      Json?
+  costTotalMismatch  Boolean?
+  estimatedRevenue   Float?
+  estimatedMarginPct Float?
+  marginDisplay      String?
+  
+  readinessScore     Int?
+  healthStatus       String?
+  healthBreakdown    Json?
+  
+  validationWarnings Json?
+  isReadyForKickoff  Boolean?
+  kickoffBlockers    Json?
+
+  resourceConstraints Json? // { engineerCount: number, maxDailyHours: number, daysOff: string[], startDate: string }
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -852,6 +871,7 @@ model ProjectWbsTask {
   analysisId Int
   analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
 
+  wbsId           String?
   phase           String
   module          String
   feature         String
@@ -859,6 +879,15 @@ model ProjectWbsTask {
   subtask         String?
   description     String? @db.Text
   estimatedEffort Float?
+  quantity        Int?
+  engineer        String?
+  workingDays     Float?
+  startDate       DateTime?
+  startTime       String?
+  endDate         DateTime?
+  endTime         String?
+  sourceReference String?
+  remarks         String? @db.Text
   dependencies    String? @db.Text
   requiredSkill   String?
   requiredLevel   String?

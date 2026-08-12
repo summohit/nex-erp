@@ -98,4 +98,41 @@ export class ClientsService {
       where: { id: client.id },
     });
   }
+
+  async addContact(companyId: number, clientId: number, contactData: any) {
+    const client = await this.findOne(companyId, clientId);
+    return this.prisma.clientContact.create({
+      data: {
+        ...contactData,
+        clientId: client.id,
+      },
+    });
+  }
+
+  async updateContact(companyId: number, clientId: number, contactId: number, contactData: any) {
+    await this.findOne(companyId, clientId); // Verify ownership
+    const contact = await this.prisma.clientContact.findFirst({
+      where: { id: contactId, clientId },
+    });
+    if (!contact) {
+      throw new NotFoundException(`Contact with ID ${contactId} not found for this client`);
+    }
+    return this.prisma.clientContact.update({
+      where: { id: contactId },
+      data: contactData,
+    });
+  }
+
+  async deleteContact(companyId: number, clientId: number, contactId: number) {
+    await this.findOne(companyId, clientId); // Verify ownership
+    const contact = await this.prisma.clientContact.findFirst({
+      where: { id: contactId, clientId },
+    });
+    if (!contact) {
+      throw new NotFoundException(`Contact with ID ${contactId} not found for this client`);
+    }
+    return this.prisma.clientContact.delete({
+      where: { id: contactId },
+    });
+  }
 }

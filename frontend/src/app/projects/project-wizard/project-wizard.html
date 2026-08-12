@@ -2,10 +2,15 @@
   <!-- Header -->
   <header class="wizard-header">
     <div class="logo-area">
-      <svg lucideBrainCircuit class="icon-lg text-primary"></svg>
+      <div class="logo-icon-glow">
+        <svg lucideBrainCircuit class="icon-lg text-primary"></svg>
+      </div>
       <div>
-        <h2>Project Setup</h2>
-        <p class="subtitle">Upload project documents to automatically generate complete scope, WBS & cost estimation</p>
+        <div class="d-flex align-items-center gap-2">
+          <h2>Project Intelligence Setup</h2>
+          <span class="ai-chip"><svg lucideSparkles class="icon-xs mr-1"></svg> AI Engine v2.4</span>
+        </div>
+        <p class="subtitle">AI-Powered Scope, WBS, Resource Plan & Cost Estimation Engine</p>
       </div>
     </div>
     
@@ -15,7 +20,7 @@
           <svg lucideCheck *ngIf="currentStep() > 1" class="icon-sm"></svg>
           <svg lucideUploadCloud *ngIf="currentStep() <= 1" class="icon-sm"></svg>
         </div>
-        <span>Upload</span>
+        <span>Upload Documents</span>
       </div>
       <div class="step-line" [class.active]="currentStep() >= 2"></div>
       
@@ -24,7 +29,7 @@
           <svg lucideCheck *ngIf="currentStep() > 2" class="icon-sm"></svg>
           <svg lucideBrainCircuit *ngIf="currentStep() <= 2" class="icon-sm"></svg>
         </div>
-        <span>Analyze</span>
+        <span>AI Intelligence</span>
       </div>
       <div class="step-line" [class.active]="currentStep() >= 3"></div>
       
@@ -32,12 +37,12 @@
         <div class="step-circle">
           <svg lucideCheckCircle2 class="icon-sm"></svg>
         </div>
-        <span>Review</span>
+        <span>Executive Review</span>
       </div>
     </div>
     
     <div class="actions">
-      <button class="btn btn-outline" routerLink="/projects">Cancel</button>
+      <button class="btn btn-outline-light" routerLink="/projects">Cancel</button>
     </div>
   </header>
 
@@ -116,14 +121,14 @@
         <button 
           class="btn btn-primary btn-lg btn-analyze" 
           [disabled]="selectedFiles().length === 0 || isUploading()" 
-          (click)="startOnboarding()">
+          (click)="goToResourceConfig()">
           <span *ngIf="isUploading()" class="d-flex align-items-center gap-2">
             <span class="spinner"></span>
             Uploading Documents ({{ uploadProgress() }}%)...
           </span>
           <span *ngIf="!isUploading()" class="d-flex align-items-center gap-2">
             <svg lucideBrainCircuit class="icon-md"></svg>
-            Start Analysis ({{ selectedFiles().length }} {{ selectedFiles().length === 1 ? 'File' : 'Files' }})
+            Proceed to Resource Configuration ({{ selectedFiles().length }} {{ selectedFiles().length === 1 ? 'File' : 'Files' }})
             <svg lucideChevronRight class="icon-sm ml-1"></svg>
           </span>
         </button>
@@ -132,8 +137,136 @@
     </div>
   </div>
 
-  <!-- Step 2: Processing -->
-  <div class="wizard-content text-center" *ngIf="currentStep() === 2">
+  <!-- Step 2: Resource Configuration -->
+  <div class="wizard-content" *ngIf="currentStep() === 2">
+    <div class="resource-card-container">
+      
+      <!-- Card Header -->
+      <div class="resource-card-header">
+        <div class="header-icon-box">
+          <svg lucideUsers class="header-icon"></svg>
+        </div>
+        <div class="header-text-content">
+          <h3>Resource & Scheduling Constraints</h3>
+          <p>Provide team capacity and work schedule parameters for AI Gantt generation and Work Breakdown Structure (WBS) optimization.</p>
+        </div>
+      </div>
+
+      <!-- Main Form Grid -->
+      <div class="resource-form-grid">
+        
+        <!-- Field 1: Available Engineers -->
+        <div class="config-field-card">
+          <div class="field-header">
+            <label class="field-label">Available Engineers</label>
+            <span class="field-badge">Capacity</span>
+          </div>
+          <div class="custom-input-group">
+            <div class="input-icon-wrapper">
+              <svg lucideUsers class="input-icon"></svg>
+            </div>
+            <input 
+              type="number" 
+              class="custom-form-input" 
+              [(ngModel)]="resourceConfig().engineerCount" 
+              min="1" 
+              max="100" 
+            />
+            <span class="input-suffix">FTEs</span>
+          </div>
+          <span class="field-help-text">Number of full-time equivalents available for this project.</span>
+        </div>
+
+        <!-- Field 2: Max Hours Per Day -->
+        <div class="config-field-card">
+          <div class="field-header">
+            <label class="field-label">Max Hours Per Day</label>
+            <span class="field-badge">Daily Cap</span>
+          </div>
+          <div class="custom-input-group">
+            <div class="input-icon-wrapper">
+              <svg lucideClock class="input-icon"></svg>
+            </div>
+            <input 
+              type="number" 
+              class="custom-form-input" 
+              [(ngModel)]="resourceConfig().maxHoursPerDay" 
+              min="1" 
+              max="24" 
+            />
+            <span class="input-suffix">hrs/day</span>
+          </div>
+          <span class="field-help-text">Maximum working hours per engineer per day.</span>
+        </div>
+
+        <!-- Field 3: Project Start Date -->
+        <div class="config-field-card">
+          <div class="field-header">
+            <label class="field-label">Project Start Date</label>
+            <span class="field-badge">Baseline</span>
+          </div>
+          <div class="custom-input-group">
+            <div class="input-icon-wrapper">
+              <svg lucideCalendar class="input-icon"></svg>
+            </div>
+            <input 
+              type="date" 
+              class="custom-form-input" 
+              [(ngModel)]="resourceConfig().startDate" 
+            />
+          </div>
+          <span class="field-help-text">The baseline start date for WBS schedule calculation.</span>
+        </div>
+
+        <!-- Field 4: Days Off (Full Width) -->
+        <div class="config-field-card full-width">
+          <div class="field-header">
+            <div>
+              <label class="field-label">Non-Working Days (Days Off)</label>
+              <span class="field-help-text d-block mt-05">Select team non-working days for accurate timeline estimation.</span>
+            </div>
+            <button type="button" class="btn-preset-link" (click)="setWeekendOnly()">
+              <svg lucideRotateCcw class="icon-xs"></svg> Reset to Sat & Sun
+            </button>
+          </div>
+
+          <div class="days-pill-container">
+            <button 
+              type="button"
+              class="day-toggle-pill" 
+              *ngFor="let day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']"
+              [class.active]="resourceConfig().daysOff[day]"
+              (click)="toggleDayOff(day)"
+            >
+              <span class="day-check" *ngIf="resourceConfig().daysOff[day]">
+                <svg lucideCheck class="icon-xs"></svg>
+              </span>
+              <span class="day-name">{{ day.substring(0, 3) }}</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Action Footer -->
+      <div class="resource-card-footer">
+        <button type="button" class="btn-back-step" (click)="currentStep.set(1)">
+          <svg lucideChevronLeft class="icon-sm"></svg>
+          Back
+        </button>
+        
+        <button type="button" class="btn-generate-plan" (click)="startAnalysis()">
+          <svg lucideBrainCircuit class="icon-md"></svg>
+          <span>Generate Project Plan</span>
+          <svg lucideChevronRight class="icon-sm arrow-icon"></svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Step 3: Processing -->
+  <div class="wizard-content text-center" *ngIf="currentStep() === 3">
     <div class="processing-container">
       <div class="processing-animation">
         <div class="pulse-ring"></div>
@@ -175,136 +308,380 @@
     </div>
   </div>
 
-  <!-- Step 3: Review -->
-  <div class="wizard-content review-container" *ngIf="currentStep() === 3 && analysisData()">
+  <!-- Step 4: Executive Review -->
+  <div class="wizard-content" *ngIf="currentStep() === 4 && analysisData()">
     
-    <!-- Navigation Sidebar -->
-    <div class="review-sidebar">
-      <h3>Project Intelligence</h3>
-      <ul class="nav-links">
-        <li><a href="#summary"><svg lucideFileText class="icon-xs mr-2"></svg> Executive Summary</a></li>
-        <li><a href="#scope"><svg lucideLayers class="icon-xs mr-2"></svg> Scope & Gaps</a></li>
-        <li><a href="#requirements"><svg lucideListChecks class="icon-xs mr-2"></svg> Requirements ({{analysisData()?.requirements?.length || 0}})</a></li>
-        <li><a href="#wbs"><svg lucideCheckSquare class="icon-xs mr-2"></svg> WBS & Tasks ({{analysisData()?.wbsTasks?.length || 0}})</a></li>
-        <li><a href="#resources"><svg lucideUsers class="icon-xs mr-2"></svg> Resource Plan ({{analysisData()?.resourcePlans?.length || 0}})</a></li>
-        <li><a href="#cost"><svg lucideDollarSign class="icon-xs mr-2"></svg> Cost Estimate</a></li>
-        <li><a href="#risks"><svg lucideShieldAlert class="icon-xs mr-2"></svg> Risks ({{analysisData()?.risks?.length || 0}})</a></li>
-      </ul>
-      
-      <div class="health-card mt-auto">
-        <h4>Project Health & Readiness</h4>
-        <div class="health-score-container">
-          <div class="health-score" [class.healthy]="analysisData()?.health?.healthStatus === 'HEALTHY' || (analysisData()?.health?.readinessScore > 0.6 || analysisData()?.health?.readinessScore > 60)">
-            {{ formatPercent(analysisData()?.health?.readinessScore) }}
+    <!-- Sidebar Navigation -->
+    <aside class="review-sidebar">
+      <div class="sidebar-card">
+        <div class="sidebar-header">
+          <h3>Project Navigation</h3>
+          <span class="sidebar-badge">{{ selectedFiles().length > 0 ? selectedFiles().length : 7 }} Docs</span>
+        </div>
+        
+        <ul class="nav-links">
+          <li>
+            <a (click)="scrollToSection('summary', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'summary'">
+              <span class="nav-icon-badge bg-indigo-light text-indigo"><svg lucideFileText class="icon-xs"></svg></span>
+              <span>Executive Summary</span>
+            </a>
+          </li>
+          <li>
+            <a (click)="scrollToSection('scope', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'scope'">
+              <span class="nav-icon-badge bg-emerald-light text-emerald"><svg lucideLayers class="icon-xs"></svg></span>
+              <span>Scope & Deliverables</span>
+            </a>
+          </li>
+          <li>
+            <a (click)="scrollToSection('requirements', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'requirements'">
+              <span class="nav-icon-badge bg-amber-light text-amber"><svg lucideListChecks class="icon-xs"></svg></span>
+              <span>Requirements</span>
+              <span class="count-pill">{{analysisData()?.requirements?.length || 0}}</span>
+            </a>
+          </li>
+          <li>
+            <a (click)="scrollToSection('wbs', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'wbs'">
+              <span class="nav-icon-badge bg-blue-light text-blue"><svg lucideCheckSquare class="icon-xs"></svg></span>
+              <span>WBS & Tasks</span>
+              <span class="count-pill">{{analysisData()?.wbsTasks?.length || 0}}</span>
+            </a>
+          </li>
+          <li>
+            <a (click)="scrollToSection('resources', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'resources'">
+              <span class="nav-icon-badge bg-purple-light text-purple"><svg lucideUsers class="icon-xs"></svg></span>
+              <span>Resource Plan</span>
+              <span class="count-pill">{{analysisData()?.resourcePlans?.length || 0}}</span>
+            </a>
+          </li>
+          <li>
+            <a (click)="scrollToSection('cost', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'cost'">
+              <span class="nav-icon-badge bg-green-light text-green"><svg lucideDollarSign class="icon-xs"></svg></span>
+              <span>Cost Breakdown</span>
+            </a>
+          </li>
+          <li>
+            <a (click)="scrollToSection('risks', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'risks'">
+              <span class="nav-icon-badge bg-rose-light text-rose"><svg lucideShieldAlert class="icon-xs"></svg></span>
+              <span>Risks & Mitigation</span>
+              <span class="count-pill">{{analysisData()?.risks?.length || 0}}</span>
+            </a>
+          </li>
+          <li *ngIf="(analysisData()?.dependencies?.length || 0) > 0">
+            <a (click)="scrollToSection('dependencies', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'dependencies'">
+              <span class="nav-icon-badge bg-cyan-light text-cyan"><svg lucideActivity class="icon-xs"></svg></span>
+              <span>Dependencies</span>
+              <span class="count-pill">{{analysisData()?.dependencies?.length || 0}}</span>
+            </a>
+          </li>
+          <li *ngIf="(analysisData()?.assumptions?.length || 0) > 0">
+            <a (click)="scrollToSection('assumptions', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'assumptions'">
+              <span class="nav-icon-badge bg-amber-light text-amber"><svg lucideInfo class="icon-xs"></svg></span>
+              <span>Assumptions</span>
+              <span class="count-pill">{{analysisData()?.assumptions?.length || 0}}</span>
+            </a>
+          </li>
+          <li *ngIf="(analysisData()?.stakeholders?.length || 0) > 0">
+            <a (click)="scrollToSection('stakeholders', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'stakeholders'">
+              <span class="nav-icon-badge bg-purple-light text-purple"><svg lucideUsers class="icon-xs"></svg></span>
+              <span>Stakeholders</span>
+              <span class="count-pill">{{analysisData()?.stakeholders?.length || 0}}</span>
+            </a>
+          </li>
+          <li *ngIf="(analysisData()?.raci?.length || 0) > 0">
+            <a (click)="scrollToSection('raci', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'raci'">
+              <span class="nav-icon-badge bg-indigo-light text-indigo"><svg lucideAward class="icon-xs"></svg></span>
+              <span>RACI Matrix</span>
+              <span class="count-pill">{{analysisData()?.raci?.length || 0}}</span>
+            </a>
+          </li>
+          <li *ngIf="(analysisData()?.openQuestions?.length || 0) > 0">
+            <a (click)="scrollToSection('open-questions', $event)" href="javascript:void(0)" [class.active]="activeSection() === 'open-questions'">
+              <span class="nav-icon-badge bg-rose-light text-rose"><svg lucideHelpCircle class="icon-xs"></svg></span>
+              <span>Open Questions</span>
+              <span class="count-pill">{{analysisData()?.openQuestions?.length || 0}}</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Health KPI Widget -->
+      <div class="health-card" [class]="getHealthBadgeClass()">
+        <div class="health-card-header">
+          <svg lucideTarget class="icon-sm mr-2"></svg>
+          <span>Project Health & Readiness</span>
+        </div>
+        <div class="health-gauge">
+          <div class="gauge-circle" [class]="getHealthBadgeClass()">
+            <span class="gauge-value">{{ formatPercent(analysisData()?.health?.readinessScore) }}</span>
+            <span class="gauge-label">Readiness</span>
           </div>
         </div>
-        <p class="health-status-label">{{ analysisData()?.health?.healthStatus || 'HEALTHY' }}</p>
-      </div>
-    </div>
-
-    <!-- Main Content Review -->
-    <div class="review-main">
-      <div class="d-flex justify-between align-items-center mb-4">
-        <div>
-          <h2>Review Project Intelligence Plan</h2>
-          <p class="text-muted">Generated from {{ selectedFiles().length > 0 ? selectedFiles().length : 'uploaded' }} source document(s)</p>
+        <div class="health-status-pill" [class]="getHealthBadgeClass()">
+          <span class="status-dot"></span> {{ getHealthStatusLabel() }}
         </div>
-        <button class="btn btn-success btn-lg" (click)="approveProject()">
-          <svg lucideCheck class="icon-sm mr-1"></svg> Approve & Kickoff Project
-        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Body -->
+    <main class="review-main">
+      <!-- Title & Hero Bar -->
+      <div class="main-title-bar d-flex justify-between align-items-center mb-4">
+        <div>
+          <span class="title-category-badge">Project Intelligence Plan</span>
+          <h2>Executive Project Baseline</h2>
+          <p class="text-muted">Generated from {{ selectedFiles().length > 0 ? selectedFiles().length : 7 }} source document(s)</p>
+        </div>
+        <div class="d-flex flex-column align-items-end">
+          <button 
+            class="btn btn-kickoff" 
+            [class.btn-kickoff-warning]="analysisData()?.isReadyForKickoff === false"
+            (click)="openKickoffGate()">
+            <svg lucideCheck class="icon-sm mr-1.5" *ngIf="analysisData()?.isReadyForKickoff !== false"></svg>
+            <svg lucideAlertTriangle class="icon-sm mr-1.5" *ngIf="analysisData()?.isReadyForKickoff === false"></svg>
+            Approve & Kickoff Project
+          </button>
+        </div>
       </div>
 
-      <!-- Executive Summary -->
+      <!-- KICKOFF BLOCKED HERO CALLOUT CARD (Replaces text bullet list) -->
+      <div class="kickoff-blocker-card mb-4" *ngIf="analysisData()?.isReadyForKickoff === false">
+        <div class="blocker-header">
+          <div class="d-flex align-items-center gap-2">
+            <span class="blocker-icon-pulse">
+              <svg lucideAlertOctagon class="icon-md text-rose"></svg>
+            </span>
+            <div>
+              <h3>Kickoff Gate Blocked</h3>
+              <p class="blocker-sub">Project baseline contains critical variances that require reconciliation before approval.</p>
+            </div>
+          </div>
+          <span class="blocker-count-pill">{{ analysisData()?.kickoffBlockers?.length || 0 }} Blockers</span>
+        </div>
+
+        <div class="blockers-grid mt-3">
+          <div class="blocker-item-card" *ngFor="let blocker of analysisData()?.kickoffBlockers; let i = index">
+            <div class="blocker-num">{{ i + 1 }}</div>
+            <div class="blocker-content">
+              <div class="d-flex align-items-center justify-content-between">
+                <span class="blocker-title" *ngIf="blocker.includes('total') || blocker.includes('cost')">Financial Cost Variance</span>
+                <span class="blocker-title" *ngIf="blocker.includes('WBS') || blocker.includes('effort')">Effort vs Capacity Variance</span>
+                <span class="blocker-title" *ngIf="!blocker.includes('cost') && !blocker.includes('WBS')">Baseline Inconsistency</span>
+                
+                <span class="badge badge-rose-light" *ngIf="blocker.includes('cost')">Cost Mismatch</span>
+                <span class="badge badge-amber-light" *ngIf="blocker.includes('WBS')">Scope Mismatch</span>
+              </div>
+              <p class="blocker-desc">{{ blocker }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VALIDATION WARNINGS HERO CARD -->
+      <div class="analysis-warnings-card mb-4" *ngIf="(analysisData()?.validationWarnings?.length || 0) > 0">
+        <div class="warnings-header">
+          <div class="d-flex align-items-center gap-2">
+            <span class="warning-icon-bg">
+              <svg lucideAlertTriangle class="icon-sm text-amber"></svg>
+            </span>
+            <h4>Analysis Warnings ({{ analysisData()?.validationWarnings?.length }})</h4>
+          </div>
+          <span class="warning-badge">Review Recommended</span>
+        </div>
+
+        <div class="warning-items-list mt-2">
+          <div class="warning-row" *ngFor="let warning of analysisData()?.validationWarnings">
+            <span class="warning-dot"></span>
+            <span class="warning-msg">{{ warning.message }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Executive Summary Card -->
       <section id="summary" class="review-card">
-        <h3><svg lucideFileText class="icon-sm mr-2 text-primary"></svg> Executive Summary</h3>
+        <div class="card-header-badge">
+          <span class="icon-badge bg-indigo-light text-indigo"><svg lucideFileText class="icon-sm"></svg></span>
+          <h3>Executive Summary</h3>
+        </div>
         <p class="lead-text">{{ analysisData()?.summary?.executiveSummary }}</p>
-        <div class="grid-2 mt-3">
-          <div class="detail-box">
-            <strong>Business Objective:</strong>
+        
+        <div class="grid-2 mt-4">
+          <div class="detail-box objective-box">
+            <strong class="detail-box-title text-indigo">
+              <svg lucideTarget class="icon-xs text-indigo"></svg> Business Objective
+            </strong>
             <p>{{ analysisData()?.summary?.businessObjective }}</p>
           </div>
-          <div class="detail-box">
-            <strong>Success Criteria:</strong>
+          <div class="detail-box success-box">
+            <strong class="detail-box-title text-emerald">
+              <svg lucideAward class="icon-xs text-emerald"></svg> Success Criteria
+            </strong>
             <p>{{ analysisData()?.summary?.successCriteria }}</p>
           </div>
         </div>
       </section>
 
-      <!-- Scope & Deliverables -->
+      <!-- Scope & Deliverables Card -->
       <section id="scope" class="review-card mt-4" *ngIf="analysisData()?.scope">
-        <h3><svg lucideLayers class="icon-sm mr-2 text-primary"></svg> Scope & Deliverables</h3>
-        <div class="grid-2">
-          <div class="detail-box">
-            <strong class="text-success mb-2 d-block"><svg lucideCheck class="icon-xs mr-1"></svg> In Scope:</strong>
+        <div class="card-header-badge">
+          <span class="icon-badge bg-emerald-light text-emerald"><svg lucideLayers class="icon-sm"></svg></span>
+          <h3>Scope & Deliverables</h3>
+        </div>
+        
+        <div class="grid-2 mt-3">
+          <div class="detail-box scope-in-card">
+            <div class="scope-card-header text-emerald">
+              <svg lucideCheckCircle class="icon-sm"></svg>
+              <strong>In Scope</strong>
+            </div>
             <p>{{ analysisData()?.scope?.inScope }}</p>
           </div>
-          <div class="detail-box">
-            <strong class="text-danger mb-2 d-block"><svg lucideX class="icon-xs mr-1"></svg> Out of Scope:</strong>
+          <div class="detail-box scope-out-card">
+            <div class="scope-card-header text-rose">
+              <svg lucideX class="icon-sm"></svg>
+              <strong>Out of Scope</strong>
+            </div>
             <p>{{ analysisData()?.scope?.outOfScope }}</p>
           </div>
         </div>
-        <div class="detail-box mt-3" *ngIf="analysisData()?.scope?.deliverables">
-          <strong>Key Deliverables:</strong>
-          <p>{{ analysisData()?.scope?.deliverables }}</p>
+
+        <div class="deliverables-panel mt-4" *ngIf="analysisData()?.scope?.deliverables">
+          <div class="deliverables-header">
+            <svg lucideSparkles class="icon-xs text-indigo"></svg>
+            <strong>Key Deliverables & Milestones</strong>
+          </div>
+          <p class="deliverables-body">{{ analysisData()?.scope?.deliverables }}</p>
         </div>
       </section>
 
-      <!-- Requirements -->
+      <!-- Requirements Table Card -->
       <section id="requirements" class="review-card mt-4">
-        <h3><svg lucideListChecks class="icon-sm mr-2 text-primary"></svg> Requirements</h3>
-        <div class="table-responsive">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-amber-light text-amber"><svg lucideListChecks class="icon-sm"></svg></span>
+            <h3>Requirements</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.requirements?.length || 0}} Items</span>
+        </div>
+
+        <div class="table-container mt-3">
           <table class="table">
             <thead>
               <tr>
                 <th>Title</th>
                 <th>Category</th>
                 <th>Priority</th>
-                <th>Confidence</th>
+                <th class="text-right">Confidence</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let req of analysisData()?.requirements">
-                <td><strong>{{ req.title }}</strong></td>
-                <td><span class="badge">{{ req.category }}</span></td>
-                <td><span class="badge badge-priority-{{req.priority?.toLowerCase()}}">{{ req.priority }}</span></td>
-                <td><span class="confidence-tag">{{ formatPercent(req.confidence) }}</span></td>
+                <td><strong class="cell-title">{{ req.title }}</strong></td>
+                <td><span class="badge category-badge">{{ req.category }}</span></td>
+                <td>
+                  <span class="priority-pill" [class]="'priority-' + (req.priority?.toLowerCase() || 'medium')">
+                    <span class="priority-dot"></span>
+                    {{ req.priority }}
+                  </span>
+                </td>
+                <td class="text-right">
+                  <div class="confidence-bar-wrapper">
+                    <div class="confidence-track">
+                      <div class="confidence-fill" [style.width]="formatPercent(req.confidence)"></div>
+                    </div>
+                    <span class="confidence-val">{{ formatPercent(req.confidence) }}</span>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- WBS -->
+      <!-- WBS Card (With Visual Workload Reconciliation Bar) -->
       <section id="wbs" class="review-card mt-4">
-        <h3><svg lucideCheckSquare class="icon-sm mr-2 text-primary"></svg> Work Breakdown Structure</h3>
-        <div class="table-responsive">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-blue-light text-blue"><svg lucideCheckSquare class="icon-sm"></svg></span>
+            <h3>Work Breakdown Structure</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.wbsTasks?.length || 0}} Tasks</span>
+        </div>
+
+        <!-- VISUAL RECONCILIATION METER -->
+        <div class="workload-reconciliation-card mt-3 mb-3">
+          <div class="d-flex align-items-center justify-between mb-2">
+            <div class="d-flex align-items-center gap-2">
+              <svg lucideClock class="icon-xs text-blue"></svg>
+              <strong class="reconcile-title">Workload Capacity Meter</strong>
+            </div>
+            <span class="capacity-status-badge" [class.badge-emerald]="getTotalResourceHours() >= getTotalWbsHours()" [class.badge-rose]="getTotalResourceHours() < getTotalWbsHours()">
+              {{ getTotalResourceHours() >= getTotalWbsHours() ? (getTotalResourceHours() - getTotalWbsHours()) + ' hrs buffer capacity' : 'Workload Deficit' }}
+            </span>
+          </div>
+
+          <div class="workload-bar-track">
+            <div 
+              class="workload-bar-fill" 
+              [style.width.%]="getWbsCapacityPercentage()">
+            </div>
+          </div>
+
+          <div class="d-flex justify-between align-items-center mt-2 reconcile-stats">
+            <span>WBS Effort: <strong>{{ getTotalWbsHours() }} hrs</strong></span>
+            <span>Allocated Capacity: <strong>{{ getTotalResourceHours() }} hrs</strong></span>
+          </div>
+        </div>
+
+        <div class="table-container">
           <table class="table">
             <thead>
               <tr>
+                <th>WBS ID</th>
                 <th>Phase</th>
-                <th>Module</th>
-                <th>Task</th>
-                <th>Effort (hrs)</th>
-                <th>Required Skill</th>
+                <th>Task Description</th>
+                <th>Qty</th>
+                <th>Engineer</th>
+                <th>Effort</th>
+                <th>Days</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Dependency</th>
+                <th>Remarks</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let task of analysisData()?.wbsTasks">
-                <td><span class="badge">{{ task.phase }}</span></td>
-                <td>{{ task.module }}</td>
-                <td><strong>{{ task.task }}</strong></td>
-                <td>{{ task.estimatedEffort }} hrs</td>
-                <td>{{ task.requiredSkill }}</td>
+                <td><span class="badge wbs-badge">{{ task.wbsId || '-' }}</span></td>
+                <td><span class="badge phase-badge">{{ task.phase }}</span></td>
+                <td>
+                  <strong class="cell-title">{{ task.task }}</strong>
+                  <div class="text-muted text-sm mt-1" *ngIf="task.module">{{ task.module }}</div>
+                </td>
+                <td>{{ task.quantity || '-' }}</td>
+                <td><span class="engineer-tag" *ngIf="task.engineer"><svg lucideUser class="icon-xs mr-1"></svg>{{ task.engineer }}</span></td>
+                <td><span class="effort-pill"><svg lucideClock class="icon-xs mr-1"></svg>{{ task.estimatedEffort }}h</span></td>
+                <td><span class="days-pill">{{ task.workingDays || '-' }}d</span></td>
+                <td><span class="date-pill" *ngIf="task.startDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.startDate | date:'mediumDate' }}</span></td>
+                <td><span class="date-pill" *ngIf="task.endDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.endDate | date:'mediumDate' }}</span></td>
+                <td><span class="dependency-tag" *ngIf="task.dependencies"><svg lucideLink class="icon-xs mr-1"></svg>{{ task.dependencies }}</span></td>
+                <td><span class="text-sm text-muted">{{ task.remarks || '-' }}</span></td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- Resource Allocation Plan -->
-      <section id="resources" class="review-card mt-4" *ngIf="analysisData()?.resourcePlans?.length > 0">
-        <h3><svg lucideUsers class="icon-sm mr-2 text-primary"></svg> Resource Allocation Plan</h3>
-        <div class="table-responsive">
+      <!-- Resource Allocation Plan Card -->
+      <section id="resources" class="review-card mt-4" *ngIf="(analysisData()?.resourcePlans?.length || 0) > 0">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-purple-light text-purple"><svg lucideUsers class="icon-sm"></svg></span>
+            <h3>Resource Allocation Plan</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.resourcePlans?.length || 0}} Roles</span>
+        </div>
+
+        <div class="table-container mt-3">
           <table class="table">
             <thead>
               <tr>
@@ -317,56 +694,116 @@
             </thead>
             <tbody>
               <tr *ngFor="let res of analysisData()?.resourcePlans">
-                <td><strong>{{ res.role }}</strong></td>
-                <td><span class="badge">{{ res.seniority }}</span></td>
-                <td>{{ res.quantity }}</td>
-                <td>{{ formatPercent(res.allocationPercent) }}</td>
-                <td>{{ res.estimatedHours }} hrs</td>
+                <td><strong class="cell-title">{{ res.role }}</strong></td>
+                <td><span class="badge seniority-badge">{{ res.seniority }}</span></td>
+                <td><strong class="text-main">{{ res.quantity }}</strong></td>
+                <td><span class="badge category-badge">{{ formatPercent(res.allocationPercent) }}</span></td>
+                <td><span class="effort-pill">{{ res.estimatedHours }} hrs</span></td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- Cost Estimate -->
+      <!-- Cost Estimate Dashboard Card (Financial Command Center) -->
       <section id="cost" class="review-card mt-4">
-        <h3><svg lucideDollarSign class="icon-sm mr-2 text-primary"></svg> Cost Estimate</h3>
-        <div class="grid-4 text-center">
-          <div class="stat-box">
-            <span>Resource Cost</span>
-            <h4>{{ analysisData()?.costEstimate?.resourceCost | currency:(analysisData()?.costEstimate?.currency || 'INR') }}</h4>
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-green-light text-green"><svg lucideDollarSign class="icon-sm"></svg></span>
+            <h3>Cost Estimate & Financial Breakdown</h3>
           </div>
-          <div class="stat-box">
-            <span>Infrastructure</span>
-            <h4>{{ analysisData()?.costEstimate?.infrastructureCost | currency:(analysisData()?.costEstimate?.currency || 'INR') }}</h4>
+          <span class="financial-currency-badge">INR (₹)</span>
+        </div>
+        
+        <!-- COST KPI DASHBOARD CARDS -->
+        <div class="cost-summary-grid mt-3">
+          <div class="cost-stat-card">
+            <span class="stat-label">Resource Cost</span>
+            <h4 class="stat-val">{{ (analysisData()?.costEstimate?.resourceCost || 0) | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</h4>
+            <span class="stat-sub">Team Personnel</span>
           </div>
-          <div class="stat-box highlight">
-            <span>Total Cost</span>
-            <h4>{{ analysisData()?.costEstimate?.totalCost | currency:(analysisData()?.costEstimate?.currency || 'INR') }}</h4>
+
+          <div class="cost-stat-card">
+            <span class="stat-label">Infrastructure</span>
+            <h4 class="stat-val">{{ (analysisData()?.costEstimate?.infrastructureCost || 0) | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</h4>
+            <span class="stat-sub">Hardware & Cloud</span>
           </div>
-          <div class="stat-box success">
-            <span>Estimated Margin</span>
-            <h4>{{ formatPercent(analysisData()?.costEstimate?.estimatedMargin) }}</h4>
+
+          <div class="cost-stat-card total-cost-card">
+            <span class="stat-label">Total Estimated Cost</span>
+            <h4 class="stat-val text-primary-glow">{{ (analysisData()?.costEstimate?.totalCost || 0) | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</h4>
+            <span class="stat-sub">Project Baseline</span>
+          </div>
+
+          <div class="cost-stat-card margin-card">
+            <span class="stat-label">Estimated Margin</span>
+            <h4 class="stat-val" [class.text-success]="(analysisData()?.estimatedMargin || analysisData()?.marginDisplay || '') !== 'Not Available'" [class.stat-val-na]="(analysisData()?.estimatedMargin || analysisData()?.marginDisplay) === 'Not Available'">
+              {{ analysisData()?.estimatedMargin || analysisData()?.marginDisplay || 'Not Available' }}
+            </h4>
+            <span class="stat-sub">Gross Profit Metric</span>
+          </div>
+        </div>
+
+        <!-- Line Item Breakdown Grid -->
+        <div class="cost-breakdown-panel mt-4" *ngIf="analysisData()?.costEstimate">
+          <h4>Line Item Breakdown</h4>
+          <div class="cost-line-items mt-2">
+            <div class="cost-item">
+              <span>Resource Cost:</span>
+              <strong>{{ (analysisData()?.costEstimate?.resourceCost || 0) | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</strong>
+            </div>
+            <div class="cost-item">
+              <span>Infrastructure Cost:</span>
+              <strong>{{ (analysisData()?.costEstimate?.infrastructureCost || 0) | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</strong>
+            </div>
+            <div class="cost-item" *ngIf="analysisData()?.costEstimate?.vendorCost > 0">
+              <span>Vendor / Third-Party Services:</span>
+              <strong>{{ analysisData()?.costEstimate?.vendorCost | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</strong>
+            </div>
+            <div class="cost-item" *ngIf="analysisData()?.costEstimate?.licenseCost > 0">
+              <span>Software Licensing:</span>
+              <strong>{{ analysisData()?.costEstimate?.licenseCost | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</strong>
+            </div>
+            <div class="cost-item" *ngIf="analysisData()?.costEstimate?.contingency > 0">
+              <span>Contingency Buffer:</span>
+              <strong>{{ analysisData()?.costEstimate?.contingency | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</strong>
+            </div>
+            <div class="cost-item" *ngIf="analysisData()?.costEstimate?.otherCost > 0">
+              <span>Other Direct Costs:</span>
+              <strong>{{ analysisData()?.costEstimate?.otherCost | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</strong>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- Risks & Mitigation -->
-      <section id="risks" class="review-card mt-4" *ngIf="analysisData()?.risks?.length > 0">
-        <h3><svg lucideShieldAlert class="icon-sm mr-2 text-primary"></svg> Risks & Mitigation</h3>
-        <div class="table-responsive">
+      <!-- Risks & Mitigation Card -->
+      <section id="risks" class="review-card mt-4" *ngIf="(analysisData()?.risks?.length || 0) > 0">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-rose-light text-rose"><svg lucideShieldAlert class="icon-sm"></svg></span>
+            <h3>Risks & Mitigation</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.risks?.length || 0}} Items</span>
+        </div>
+
+        <div class="table-container mt-3">
           <table class="table">
             <thead>
               <tr>
-                <th>Risk</th>
+                <th>Risk Description</th>
                 <th>Impact</th>
                 <th>Mitigation Strategy</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let r of analysisData()?.risks">
-                <td><strong>{{ r.risk }}</strong></td>
-                <td><span class="badge badge-priority-{{r.impact?.toLowerCase()}}">{{ r.impact }}</span></td>
+                <td><strong class="cell-title text-rose-dark">{{ r.risk }}</strong></td>
+                <td>
+                  <span class="priority-pill" [class]="'priority-' + (r.impact?.toLowerCase() || 'medium')">
+                    <span class="priority-dot"></span>
+                    {{ r.impact }}
+                  </span>
+                </td>
                 <td>{{ r.mitigation }}</td>
               </tr>
             </tbody>
@@ -374,6 +811,232 @@
         </div>
       </section>
 
+      <!-- Dependencies Card -->
+      <section id="dependencies" class="review-card mt-4" *ngIf="(analysisData()?.dependencies?.length || 0) > 0">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-cyan-light text-cyan"><svg lucideActivity class="icon-sm"></svg></span>
+            <h3>Dependencies</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.dependencies?.length || 0}} Items</span>
+        </div>
+        <div class="table-container mt-3">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Dependency</th>
+                <th>Type</th>
+                <th>Impact</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let dep of analysisData()?.dependencies">
+                <td><strong class="cell-title">{{ dep.dependency }}</strong></td>
+                <td><span class="badge category-badge">{{ dep.type }}</span></td>
+                <td>{{ dep.impact }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Assumptions Card -->
+      <section id="assumptions" class="review-card mt-4" *ngIf="(analysisData()?.assumptions?.length || 0) > 0">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-amber-light text-amber"><svg lucideInfo class="icon-sm"></svg></span>
+            <h3>Key Assumptions</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.assumptions?.length || 0}} Items</span>
+        </div>
+        <div class="table-container mt-3">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Assumption</th>
+                <th>Reasoning</th>
+                <th>Impact If Incorrect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let ass of analysisData()?.assumptions">
+                <td><strong class="cell-title">{{ ass.assumption }}</strong></td>
+                <td>{{ ass.reason }}</td>
+                <td>{{ ass.impactIfIncorrect }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Stakeholders Card -->
+      <section id="stakeholders" class="review-card mt-4" *ngIf="(analysisData()?.stakeholders?.length || 0) > 0">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-purple-light text-purple"><svg lucideUsers class="icon-sm"></svg></span>
+            <h3>Key Stakeholders</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.stakeholders?.length || 0}} Items</span>
+        </div>
+        <div class="table-container mt-3">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Stakeholder</th>
+                <th>Organization</th>
+                <th>Role</th>
+                <th>Influence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let st of analysisData()?.stakeholders">
+                <td><strong class="cell-title">{{ st.stakeholder }}</strong></td>
+                <td>{{ st.organization }}</td>
+                <td>{{ st.role }}</td>
+                <td><span class="badge seniority-badge">{{ st.influence }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RACI Matrix Card -->
+      <section id="raci" class="review-card mt-4" *ngIf="(analysisData()?.raci?.length || 0) > 0">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-indigo-light text-indigo"><svg lucideAward class="icon-sm"></svg></span>
+            <h3>RACI Responsibility Matrix</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.raci?.length || 0}} Areas</span>
+        </div>
+        <div class="table-container mt-3">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Project Area</th>
+                <th>Responsible</th>
+                <th>Accountable</th>
+                <th>Consulted</th>
+                <th>Informed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let raci of analysisData()?.raci">
+                <td><strong class="cell-title">{{ raci.projectArea }}</strong></td>
+                <td><span class="raci-tag r-tag">{{ raci.responsible }}</span></td>
+                <td><span class="raci-tag a-tag">{{ raci.accountable }}</span></td>
+                <td>{{ raci.consulted }}</td>
+                <td>{{ raci.informed }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Open Questions Card -->
+      <section id="open-questions" class="review-card mt-4" *ngIf="(analysisData()?.openQuestions?.length || 0) > 0">
+        <div class="card-header-badge justify-between">
+          <div class="d-flex align-items-center gap-2">
+            <span class="icon-badge bg-rose-light text-rose"><svg lucideHelpCircle class="icon-sm"></svg></span>
+            <h3>Open Questions</h3>
+          </div>
+          <span class="section-count-badge">{{analysisData()?.openQuestions?.length || 0}} Questions</span>
+        </div>
+        <div class="table-container mt-3">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Question</th>
+                <th>Importance</th>
+                <th>Suggested Answer</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let q of analysisData()?.openQuestions">
+                <td><strong class="cell-title">{{ q.question }}</strong></td>
+                <td>
+                  <span class="priority-pill" [class]="'priority-' + (q.importance?.toLowerCase() || 'medium')">
+                    <span class="priority-dot"></span>
+                    {{ q.importance }}
+                  </span>
+                </td>
+                <td>{{ q.suggestedAnswer }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Kickoff Readiness Approval Gate Modal -->
+<div class="modal-backdrop" *ngIf="showKickoffModal()">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="d-flex align-items-center gap-2">
+        <svg lucideCheckCircle2 class="icon-md text-success" *ngIf="analysisData()?.isReadyForKickoff !== false"></svg>
+        <svg lucideAlertTriangle class="icon-md text-amber" *ngIf="analysisData()?.isReadyForKickoff === false"></svg>
+        <h3>{{ analysisData()?.isReadyForKickoff === false ? 'Executive Warning Acknowledgment Gate' : 'Kickoff Readiness Review Gate' }}</h3>
+      </div>
+      <button class="btn-close" (click)="closeKickoffGate()"><svg lucideX class="icon-sm"></svg></button>
+    </div>
+
+    <div class="modal-body mt-3">
+      <!-- WARNING ACKNOWLEDGMENT BANNER (Shown when blockers exist) -->
+      <div class="modal-warning-box mb-3" *ngIf="(analysisData()?.kickoffBlockers?.length || 0) > 0">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <svg lucideAlertTriangle class="icon-sm text-amber"></svg>
+          <strong class="text-amber-dark">Baseline Warnings Detected ({{ analysisData()?.kickoffBlockers?.length }})</strong>
+        </div>
+        <p class="small text-muted mb-2">By proceeding, you acknowledge and override the following baseline variances for this project launch:</p>
+        <ul class="modal-warning-list">
+          <li *ngFor="let blocker of analysisData()?.kickoffBlockers">{{ blocker }}</li>
+        </ul>
+      </div>
+
+      <p class="text-muted">Verification summary prior to authorizing project kickoff:</p>
+      
+      <div class="gate-summary-grid mt-3">
+        <div class="gate-stat">
+          <span>Requirements</span>
+          <strong>{{ analysisData()?.requirements?.length || 0 }} Items</strong>
+        </div>
+        <div class="gate-stat">
+          <span>WBS Tasks</span>
+          <strong>{{ analysisData()?.wbsTasks?.length || 0 }} Tasks</strong>
+        </div>
+        <div class="gate-stat">
+          <span>Resource Roles</span>
+          <strong>{{ analysisData()?.resourcePlans?.length || 0 }} Roles</strong>
+        </div>
+        <div class="gate-stat">
+          <span>Total Cost</span>
+          <strong>{{ (analysisData()?.costEstimate?.totalCost || 0) | currency:(analysisData()?.costEstimate?.currency || 'INR'):'symbol':'1.0-0' }}</strong>
+        </div>
+      </div>
+
+      <div class="reconciliation-box mt-3">
+        <strong>Hours Reconciliation:</strong>
+        <p class="mb-0">WBS Effort: <strong>{{ getTotalWbsHours() }} hrs</strong> | Allocated Capacity: <strong>{{ getTotalResourceHours() }} hrs</strong></p>
+      </div>
+
+      <div class="readiness-checks mt-4">
+        <h4 class="mb-2">Readiness Verification Checklist:</h4>
+        <div class="check-item"><svg lucideCheck class="icon-xs text-success mr-2"></svg> Scope & Deliverables Verified</div>
+        <div class="check-item"><svg lucideCheck class="icon-xs text-success mr-2"></svg> Requirements Categorized</div>
+        <div class="check-item"><svg lucideCheck class="icon-xs text-success mr-2"></svg> WBS & Resource Allocation Reconciled</div>
+        <div class="check-item"><svg lucideCheck class="icon-xs text-success mr-2"></svg> Cost Breakdown & Contingency Approved</div>
+      </div>
+    </div>
+
+    <div class="modal-footer mt-4">
+      <button class="btn btn-outline" (click)="closeKickoffGate()">Review Plan Further</button>
+      <button class="btn btn-success btn-lg" (click)="confirmKickoff()">
+        <svg lucideCheck class="icon-sm mr-1"></svg> 
+        {{ analysisData()?.isReadyForKickoff === false ? 'Acknowledge Warnings & Launch' : 'Confirm & Launch Project' }}
+      </button>
     </div>
   </div>
 </div>

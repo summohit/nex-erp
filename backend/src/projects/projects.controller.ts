@@ -33,8 +33,12 @@ export class ProjectsController {
   }
 
   @Post(':id/analyze')
-  analyzeProjectDocuments(@Req() req, @Param('id', ParseIntPipe) id: number) {
-    return this.projectAiService.analyzeProjectDocuments(req.user.companyId, id);
+  analyzeProjectDocuments(
+    @Req() req, 
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any
+  ) {
+    return this.projectAiService.analyzeProjectDocuments(req.user.companyId, id, body?.resourceConstraints);
   }
 
   @Get(':id/analysis')

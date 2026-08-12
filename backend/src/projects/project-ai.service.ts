@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import Groq from 'groq-sdk';
+import { normalizeAndValidateAnalysis } from './project-analysis-validator';
 
 @Injectable()
 export class ProjectAiService {
@@ -12,7 +13,7 @@ export class ProjectAiService {
     });
   }
 
-  async analyzeProjectDocuments(companyId: number, projectId: number) {
+  async analyzeProjectDocuments(companyId: number, projectId: number, constraints?: any) {
     if (!process.env.GROQ_API_KEY) {
       throw new HttpException('Groq API Key not configured', HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -24,7 +25,17 @@ export class ProjectAiService {
 
     if (!project) throw new NotFoundException('Project not found');
 
-    const extractedDocs = project.documents.filter(d => d.rawText && d.rawText.trim().length > 0);
+    // Deduplicate documents by file name (keep latest updated document per name)
+    const uniqueDocsMap = new Map<string, typeof project.documents[0]>();
+    for (const doc of project.documents) {
+      if (doc.rawText && doc.rawText.trim().length > 0) {
+        const existing = uniqueDocsMap.get(doc.name);
+        if (!existing || new Date(doc.updatedAt || doc.createdAt) > new Date(existing.updatedAt || existing.createdAt)) {
+          uniqueDocsMap.set(doc.name, doc);
+        }
+      }
+    }
+    const extractedDocs = Array.from(uniqueDocsMap.values());
     
     if (extractedDocs.length === 0) {
       throw new BadRequestException('No readable text found in uploaded documents. Please ensure files are not empty or password-protected.');
@@ -41,6 +52,7 @@ export class ProjectAiService {
         status: 'PROCESSING',
         aiModel: 'llama-3.3-70b-versatile',
         documentsAnalyzed: extractedDocs.length,
+        resourceConstraints: constraints || null
       }
     });
 
@@ -56,8 +68,40 @@ export class ProjectAiService {
       combinedText = combinedText.substring(0, 25000) + '\n...[TRUNCATED]';
     }
 
-    const systemPrompt = `You are an expert AI Project Manager. Analyze the provided project documents to generate a comprehensive project intelligence payload.
-Return the response in strict JSON matching EXACTLY the structure requested below. Every requested field MUST exist in the JSON. If info is missing, provide reasonable expert estimates and mark them as AI_ESTIMATED, or leave empty if inapplicable.
+    let constraintsPrompt = '';
+    if (constraints && constraints.engineerCount) {
+      constraintsPrompt = `
+5. SCHEDULING CONSTRAINTS (STRICT):
+   - You must act as a precise Project Scheduler. You have ${constraints.engineerCount} engineers available, working a maximum of ${constraints.maxHoursPerDay} hours per day, starting on ${constraints.startDate || 'a realistic date'}, with ${constraints.daysOff?.join(', ') || 'weekends'} off.
+   - For every WBS task, you MUST calculate the 'workingDays', 'startDate', 'startTime', 'endDate', and 'endTime' respecting these constraints and respecting task 'dependencies'.
+   - Assign 'quantity' of engineers and the specific 'engineer' role to each WBS task.`;
+    }
+
+    const systemPrompt = `You are an expert Senior Project Manager. Analyze the provided project documents to generate a comprehensive, highly thorough project intelligence payload.
+
+STRICT COMPREHENSIVENESS & RECONCILIATION DIRECTIVES:
+1. DEPTH & COMPLETENESS: Do NOT truncate arrays. Provide a thorough, realistic breakdown based on the input documents.
+   - Requirements: Extract ALL functional and non-functional requirements (minimum 6-12 distinct items).
+   - WBS Tasks: Break down work into detailed tasks across phases (e.g. Planning, Architecture/Design, Procurement, Implementation, Testing, Deployment). Generate at least 8-15 detailed tasks.
+   - Risks: Identify ALL technical, financial, and operational risks (minimum 4-8 items).
+   - Resource Plans: Detail ALL required roles and team members (minimum 3-6 distinct role allocations).
+   - Dependencies, Assumptions, Stakeholders, RACI, Open Questions: Populate every section thoroughly!
+
+2. FINANCIAL & COST MATHEMATICS (STRICT):
+   - CRITICAL REQUIREMENT: For Indian-context projects, calculate all financial metrics (hourly rates, material costs, totals) in Indian Rupees (INR). Set currency to 'INR'. Do NOT assume USD magnitude for Indian resources.
+   - totalCost MUST equal the EXACT sum of: resourceCost + infrastructureCost + vendorCost + licenseCost + otherCost + contingency. If this math is wrong, the entire object is invalid.
+   - If contract revenue or price is missing from the source documents, estimatedRevenue and estimatedMargin MUST be null or omitted (do NOT guess a margin if there is no revenue data).
+
+3. WBS vs RESOURCE RECONCILIATION:
+   - The total estimated hours across all Resource Plans ("estimatedHours") MUST logically reconcile with the total effort needed to complete all WBS tasks ("estimatedEffort") plus reasonable contingency/management overhead buffer.
+
+4. HEALTH SCORE & STATUS AGREEMENT:
+   - "readinessScore" must be a number between 0 and 100.
+   - If readinessScore >= 80: healthStatus MUST be "HEALTHY".
+   - If readinessScore is between 50 and 79: healthStatus MUST be "AT_RISK".
+   - If readinessScore < 50: healthStatus MUST be "CRITICAL".
+   - DO NOT provide contradictory readinessScore and healthStatus!
+${constraintsPrompt}
 
 JSON SCHEMA:
 {
@@ -70,9 +114,9 @@ JSON SCHEMA:
     "acceptanceCriteria": "string", "scopeConfidence": number, "scopeGaps": "string"
   },
   "requirements": [{ "title": "string", "description": "string", "category": "string", "priority": "string", "sourceDocument": "string", "sourceReference": "string", "acceptanceCriteria": "string", "confidence": number, "type": "EXTRACTED|AI_ESTIMATED" }],
-  "wbsTasks": [{ "phase": "string", "module": "string", "feature": "string", "task": "string", "subtask": "string", "description": "string", "estimatedEffort": number, "dependencies": "string", "requiredSkill": "string", "requiredLevel": "string", "priority": "string" }],
+  "wbsTasks": [{ "wbsId": "string", "phase": "string", "module": "string", "feature": "string", "task": "string", "subtask": "string", "description": "string", "estimatedEffort": number, "quantity": number, "engineer": "string", "workingDays": number, "startDate": "YYYY-MM-DD", "startTime": "string", "endDate": "YYYY-MM-DD", "endTime": "string", "sourceReference": "string", "remarks": "string", "dependencies": "string", "requiredSkill": "string", "requiredLevel": "string", "priority": "string" }],
   "resourcePlans": [{ "role": "string", "seniority": "string", "quantity": number, "allocationPercent": number, "estimatedHours": number, "requiredSkills": "string", "responsibilities": "string", "reason": "string", "confidence": number, "type": "EXTRACTED|AI_ESTIMATED" }],
-  "costEstimate": { "resourceCost": number, "infrastructureCost": number, "vendorCost": number, "licenseCost": number, "otherCost": number, "contingency": number, "totalCost": number, "estimatedRevenue": number, "estimatedProfit": number, "estimatedMargin": number, "currency": "USD", "confidence": number, "type": "EXTRACTED|AI_ESTIMATED" },
+  "costEstimate": { "resourceCost": number, "infrastructureCost": number, "hardwareCost": number, "licenseCost": number, "vendorCost": number, "cloudCost": number, "implementationCost": number, "travelCost": number, "otherCost": number, "contingency": number, "totalCost": number, "estimatedRevenue": number, "estimatedProfit": number, "estimatedMargin": number, "currency": "INR", "confidence": number, "type": "EXTRACTED|AI_ESTIMATED" },
   "roadmap": { "estimatedDuration": number, "phases": "string (JSON array representation)", "criticalPath": "string", "scheduleConfidence": number },
   "milestones": [{ "name": "string", "description": "string", "deliverables": "string", "dependencies": "string", "responsibleRole": "string", "approvalReq": "string" }],
   "risks": [{ "risk": "string", "description": "string", "category": "string", "probability": "string", "impact": "string", "riskScore": number, "mitigation": "string", "contingency": "string", "owner": "string", "source": "string", "confidence": number }],
@@ -84,7 +128,7 @@ JSON SCHEMA:
   "missingInfo": [{ "missingItem": "string", "whyRequired": "string", "impact": "string", "priority": "string", "isBlocking": boolean }],
   "recommendations": [{ "recommendation": "string", "category": "string", "reason": "string", "expectedImpact": "string", "confidence": number, "source": "string" }],
   "aiConfidence": { "scope": number, "requirements": number, "timeline": number, "resourcePlan": number, "cost": number, "riskAnalysis": number, "overall": number },
-  "health": { "readinessScore": number, "scopeScore": number, "requirementScore": number, "resourceScore": number, "budgetScore": number, "timelineScore": number, "riskScore": number, "documentationScore": number, "healthStatus": "HEALTHY|AT_RISK|CRITICAL" },
+  "health": { "breakdown": { "requirementCompleteness": number, "scopeClarity": number, "resourceAvailability": number, "timelineFeasibility": number, "budgetConfidence": number, "riskLevel": number, "documentationCompleteness": number } },
   "kickoffReadiness": { "reqsApproved": boolean, "scopeApproved": boolean, "budgetApproved": boolean, "resourcesAvailable": boolean, "timelineFeasible": boolean, "stakeholdersIded": boolean, "dependenciesIded": boolean, "risksReviewed": boolean, "docsAvailable": boolean, "clientApprovals": boolean, "overallStatus": "READY|READY_WITH_CONDITIONS|NOT_READY" }
 }`;
 
@@ -104,6 +148,8 @@ JSON SCHEMA:
       const processingDuration = Date.now() - startTime;
       const responseText = completion.choices[0]?.message?.content || '{}';
       const ai = JSON.parse(responseText);
+
+      const normalized = normalizeAndValidateAnalysis(ai);
 
       // Explicit mapping in a massive transaction
       await this.prisma.$transaction(async (tx) => {
@@ -158,20 +204,39 @@ JSON SCHEMA:
 
         if (ai.wbsTasks?.length) {
           await tx.projectWbsTask.createMany({
-            data: ai.wbsTasks.map((w: any) => ({
-              analysisId: aId,
-              phase: w.phase || 'General',
-              module: w.module || '',
-              feature: w.feature || '',
-              task: w.task || 'Untitled Task',
-              subtask: w.subtask,
-              description: w.description,
-              estimatedEffort: w.estimatedEffort,
-              dependencies: w.dependencies,
-              requiredSkill: w.requiredSkill,
-              requiredLevel: w.requiredLevel,
-              priority: w.priority || 'MEDIUM'
-            }))
+            data: ai.wbsTasks.map((w: any) => {
+              // Convert "YYYY-MM-DD" to Date safely if exists
+              const parseDate = (dString: any) => {
+                if (!dString) return null;
+                const d = new Date(dString);
+                return isNaN(d.getTime()) ? null : d;
+              };
+
+              return {
+                analysisId: aId,
+                wbsId: w.wbsId || null,
+                phase: w.phase || 'General',
+                module: w.module || '',
+                feature: w.feature || '',
+                task: w.task || 'Untitled Task',
+                subtask: w.subtask,
+                description: w.description,
+                estimatedEffort: w.estimatedEffort,
+                quantity: w.quantity || null,
+                engineer: w.engineer || null,
+                workingDays: w.workingDays || null,
+                startDate: parseDate(w.startDate),
+                startTime: w.startTime || null,
+                endDate: parseDate(w.endDate),
+                endTime: w.endTime || null,
+                sourceReference: w.sourceReference || null,
+                remarks: w.remarks || null,
+                dependencies: w.dependencies,
+                requiredSkill: w.requiredSkill,
+                requiredLevel: w.requiredLevel,
+                priority: w.priority || 'MEDIUM'
+              };
+            })
           });
         }
 
@@ -207,7 +272,7 @@ JSON SCHEMA:
               estimatedRevenue: ai.costEstimate.estimatedRevenue,
               estimatedProfit: ai.costEstimate.estimatedProfit,
               estimatedMargin: ai.costEstimate.estimatedMargin,
-              currency: ai.costEstimate.currency || 'USD',
+              currency: ai.costEstimate.currency || 'INR',
               confidence: ai.costEstimate.confidence,
               type: ai.costEstimate.type || 'AI_ESTIMATED'
             }
@@ -414,29 +479,45 @@ JSON SCHEMA:
           data: {
             status: 'COMPLETED',
             processingDuration,
-            overallConfidence: ai.aiConfidence?.overall
+            overallConfidence: ai.aiConfidence?.overall,
+            totalCost: normalized.costEstimate.totalCost,
+            costCurrency: normalized.costEstimate.currency,
+            costBreakdown: normalized.costEstimate.components as any,
+            costTotalMismatch: normalized.costEstimate.totalMismatch,
+            estimatedRevenue: normalized.costEstimate.contractValue,
+            estimatedMarginPct: normalized.costEstimate.estimatedMarginPct,
+            marginDisplay: normalized.costEstimate.marginDisplay,
+            readinessScore: normalized.health.score,
+            healthStatus: normalized.health.status,
+            healthBreakdown: normalized.health.breakdown as any,
+            validationWarnings: normalized.warnings as any,
+            isReadyForKickoff: normalized.isReadyForKickoff,
+            kickoffBlockers: normalized.kickoffBlockers
           }
         });
 
         // Finalize project
         await tx.project.update({
           where: { id: projectId },
-          data: { onboardingStatus: 'ANALYZED' }
+          data: { onboardingStatus: normalized.isReadyForKickoff ? 'ANALYZED' : 'ANALYZED_WITH_WARNINGS' }
         });
       });
 
       return {
         status: 'SUCCESS',
-        message: 'Project analysis completed successfully',
+        message: normalized.isReadyForKickoff 
+          ? 'Project analysis completed successfully' 
+          : `Project analysis completed with ${normalized.kickoffBlockers.length} blocking issue(s) requiring review`,
         projectId,
         analysisId: analysisRun.id,
         analysisVersion: newVersion,
-        onboardingStatus: 'ANALYZED',
-        readinessScore: ai.health?.readinessScore,
-        healthStatus: ai.health?.healthStatus,
-        estimatedCost: ai.costEstimate?.totalCost,
-        estimatedRevenue: ai.costEstimate?.estimatedRevenue,
-        estimatedMargin: ai.costEstimate?.estimatedMargin,
+        onboardingStatus: normalized.isReadyForKickoff ? 'ANALYZED' : 'ANALYZED_WITH_WARNINGS',
+        readinessScore: normalized.health.score,
+        healthStatus: normalized.health.status,
+        estimatedCost: normalized.costEstimate.totalCost,
+        currency: normalized.costEstimate.currency,
+        estimatedRevenue: normalized.costEstimate.contractValue,
+        estimatedMargin: normalized.costEstimate.marginDisplay,
         resourceCount: ai.resourcePlans?.length || 0,
         milestoneCount: ai.milestones?.length || 0,
         riskCount: ai.risks?.length || 0,
@@ -444,7 +525,9 @@ JSON SCHEMA:
         openQuestionCount: ai.openQuestions?.length || 0,
         blockingIssueCount: ai.missingInfo?.filter((m: any) => m.isBlocking).length || 0,
         confidence: ai.aiConfidence?.overall,
-        nextAction: 'UNDER_REVIEW'
+        validationWarnings: normalized.warnings,
+        isReadyForKickoff: normalized.isReadyForKickoff,
+        nextAction: normalized.isReadyForKickoff ? 'UNDER_REVIEW' : 'NEEDS_ATTENTION'
       };
     } catch (error: any) {
       console.error('Groq AI Error:', error);

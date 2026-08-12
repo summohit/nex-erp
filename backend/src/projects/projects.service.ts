@@ -236,19 +236,39 @@ export class ProjectsService {
         status = 'ERROR';
       }
 
-      // 3. Save to database
-      const doc = await this.prisma.projectDocument.create({
-        data: {
-          projectId,
-          name: file.originalname,
-          url,
-          fileId,
-          type: ext.toLowerCase().replace('.', ''),
-          rawText,
-          status,
-          uploadedBy
-        }
+      // 3. Save or Update in database (Handle re-upload of same file name)
+      const existingDoc = await this.prisma.projectDocument.findFirst({
+        where: { projectId, name: file.originalname }
       });
+
+      let doc;
+      if (existingDoc) {
+        doc = await this.prisma.projectDocument.update({
+          where: { id: existingDoc.id },
+          data: {
+            url,
+            fileId,
+            type: ext.toLowerCase().replace('.', ''),
+            rawText,
+            status,
+            uploadedBy,
+            updatedAt: new Date()
+          }
+        });
+      } else {
+        doc = await this.prisma.projectDocument.create({
+          data: {
+            projectId,
+            name: file.originalname,
+            url,
+            fileId,
+            type: ext.toLowerCase().replace('.', ''),
+            rawText,
+            status,
+            uploadedBy
+          }
+        });
+      }
 
       return doc;
     } catch (error) {

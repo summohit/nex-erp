@@ -41,4 +41,19 @@ export class ClientsController {
   remove(@Req() req: any, @Param('id') id: string) {
     return this.clientsService.remove(req.user.companyId, +id);
   }
+
+  @Post(':id/contacts')
+  addContact(@Req() req: any, @Param('id') id: string, @Body() contactDto: any) {
+    return this.clientsService.addContact(req.user.companyId, +id, contactDto);
+  }
+
+  @Patch(':id/contacts/:contactId')
+  updateContact(@Req() req: any, @Param('id') id: string, @Param('contactId') contactId: string, @Body() contactDto: any) {
+    return this.clientsService.updateContact(req.user.companyId, +id, +contactId, contactDto);
+  }
+
+  @Delete(':id/contacts/:contactId')
+  deleteContact(@Req() req: any, @Param('id') id: string, @Param('contactId') contactId: string) {
+    return this.clientsService.deleteContact(req.user.companyId, +id, +contactId);
+  }
 }

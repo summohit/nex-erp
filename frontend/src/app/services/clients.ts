@@ -38,4 +38,16 @@ export class ClientsService {
   deleteClient(id: number): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/${id}`);
   }
+
+  addContact(clientId: number, data: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/${clientId}/contacts`, data);
+  }
+
+  updateContact(clientId: number, contactId: number, data: any): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/${clientId}/contacts/${contactId}`, data);
+  }
+
+  deleteContact(clientId: number, contactId: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/${clientId}/contacts/${contactId}`);
+  }
 }

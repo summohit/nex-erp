@@ -55,8 +55,8 @@ export class ProjectsService {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/documents`, formData);
   }
 
-  analyzeProjectDocuments(projectId: number) {
-    return this.http.post<any>(`${this.apiUrl}/${projectId}/analyze`, {});
+  analyzeProjectDocuments(projectId: number, payload?: any) {
+    return this.http.post<any>(`${this.apiUrl}/${projectId}/analyze`, payload || {});
   }
 
   getProjectAnalysis(projectId: number) {

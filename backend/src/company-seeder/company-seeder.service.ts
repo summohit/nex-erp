@@ -9,13 +9,16 @@ export class CompanySeederService implements OnModuleInit {
 
   async onModuleInit() {
     // Automatically seed all existing companies when the application starts up
-    try {
-      this.logger.log('Starting company default data verification & seeding...');
-      await this.seedAllExistingCompanies();
-      this.logger.log('Company default data seeding completed.');
-    } catch (error) {
-      this.logger.error('Failed to seed existing companies during module init:', error);
-    }
+    // Disabled by default to prevent long startup times.
+    // Uncomment or run manually if you need to re-seed all companies.
+    
+    // try {
+    //   this.logger.log('Starting company default data verification & seeding...');
+    //   await this.seedAllExistingCompanies();
+    //   this.logger.log('Company default data seeding completed.');
+    // } catch (error) {
+    //   this.logger.error('Failed to seed existing companies during module init:', error);
+    // }
   }
 
   async seedAllExistingCompanies() {

@@ -94,7 +94,9 @@
 
           <div class="form-group">
             <label class="form-label">Company Name <span class="text-danger">*</span></label>
-            <input type="text" formControlName="name" class="form-control" placeholder="Acme Corp">
+            <input type="text" formControlName="name" class="form-control" placeholder="Acme Corp"
+              [class.is-invalid]="clientForm.get('name')?.invalid && (clientForm.get('name')?.touched || clientForm.get('name')?.dirty)">
+            <div *ngIf="clientForm.get('name')?.invalid && (clientForm.get('name')?.touched || clientForm.get('name')?.dirty)" class="text-danger small mt-1">Company name is required</div>
           </div>
           
           <div class="form-row">
@@ -120,10 +122,16 @@
             </div>
             <div class="form-group col-6">
               <label class="form-label">Client Portal</label>
-              <select formControlName="portalEnabled" class="form-control">
-                <option [ngValue]="false">Disabled (Default)</option>
-                <option [ngValue]="true">Enabled</option>
-              </select>
+              <div class="toggle-switch-container">
+                <div class="toggle-switch-label">
+                  <span class="toggle-title">Portal Access</span>
+                  <span class="toggle-subtitle">Allow client login</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" formControlName="portalEnabled">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -188,8 +196,10 @@
         <div class="form-section">
           <h4 class="section-title">Billing Address</h4>
           <div class="form-group">
-            <label class="form-label">Address Line 1</label>
-            <input type="text" formControlName="billingAddressLine1" class="form-control" placeholder="123 Main St">
+            <label class="form-label">Address Line 1 <span class="text-danger">*</span></label>
+            <input type="text" formControlName="billingAddressLine1" class="form-control" placeholder="123 Main St"
+              [class.is-invalid]="clientForm.get('billingAddressLine1')?.invalid && (clientForm.get('billingAddressLine1')?.touched || clientForm.get('billingAddressLine1')?.dirty)">
+            <div *ngIf="clientForm.get('billingAddressLine1')?.invalid && (clientForm.get('billingAddressLine1')?.touched || clientForm.get('billingAddressLine1')?.dirty)" class="text-danger small mt-1">Address Line 1 is required</div>
           </div>
           <div class="form-group">
             <label class="form-label">Address Line 2</label>
@@ -197,12 +207,16 @@
           </div>
           <div class="form-row">
             <div class="form-group col-6">
-              <label class="form-label">City</label>
-              <input type="text" formControlName="billingCity" class="form-control" placeholder="City">
+              <label class="form-label">City <span class="text-danger">*</span></label>
+              <input type="text" formControlName="billingCity" class="form-control" placeholder="City"
+                [class.is-invalid]="clientForm.get('billingCity')?.invalid && (clientForm.get('billingCity')?.touched || clientForm.get('billingCity')?.dirty)">
+              <div *ngIf="clientForm.get('billingCity')?.invalid && (clientForm.get('billingCity')?.touched || clientForm.get('billingCity')?.dirty)" class="text-danger small mt-1">City is required</div>
             </div>
             <div class="form-group col-6">
-              <label class="form-label">State/Province</label>
-              <input type="text" formControlName="billingState" class="form-control" placeholder="State">
+              <label class="form-label">State/Province <span class="text-danger">*</span></label>
+              <input type="text" formControlName="billingState" class="form-control" placeholder="State"
+                [class.is-invalid]="clientForm.get('billingState')?.invalid && (clientForm.get('billingState')?.touched || clientForm.get('billingState')?.dirty)">
+              <div *ngIf="clientForm.get('billingState')?.invalid && (clientForm.get('billingState')?.touched || clientForm.get('billingState')?.dirty)" class="text-danger small mt-1">State is required</div>
             </div>
           </div>
           <div class="form-row">
@@ -211,8 +225,10 @@
               <input type="text" formControlName="billingZipCode" class="form-control" placeholder="ZIP">
             </div>
             <div class="form-group col-6">
-              <label class="form-label">Country</label>
-              <input type="text" formControlName="billingCountry" class="form-control" placeholder="Country">
+              <label class="form-label">Country <span class="text-danger">*</span></label>
+              <input type="text" formControlName="billingCountry" class="form-control" placeholder="Country"
+                [class.is-invalid]="clientForm.get('billingCountry')?.invalid && (clientForm.get('billingCountry')?.touched || clientForm.get('billingCountry')?.dirty)">
+              <div *ngIf="clientForm.get('billingCountry')?.invalid && (clientForm.get('billingCountry')?.touched || clientForm.get('billingCountry')?.dirty)" class="text-danger small mt-1">Country is required</div>
             </div>
           </div>
         </div>
@@ -226,7 +242,9 @@
           <div class="form-row">
             <div class="form-group col-6">
               <label class="form-label">First Name <span class="text-danger">*</span></label>
-              <input type="text" formControlName="contactFirstName" class="form-control" placeholder="John">
+              <input type="text" formControlName="contactFirstName" class="form-control" placeholder="John"
+                [class.is-invalid]="clientForm.get('contactFirstName')?.invalid && (clientForm.get('contactFirstName')?.touched || clientForm.get('contactFirstName')?.dirty)">
+              <div *ngIf="clientForm.get('contactFirstName')?.invalid && (clientForm.get('contactFirstName')?.touched || clientForm.get('contactFirstName')?.dirty)" class="text-danger small mt-1">First Name is required</div>
             </div>
             <div class="form-group col-6">
               <label class="form-label">Last Name</label>
@@ -237,7 +255,9 @@
           <div class="form-row">
             <div class="form-group col-6">
               <label class="form-label">Email <span class="text-danger">*</span></label>
-              <input type="email" formControlName="contactEmail" class="form-control" placeholder="john@acme.com">
+              <input type="email" formControlName="contactEmail" class="form-control" placeholder="john@acme.com"
+                [class.is-invalid]="clientForm.get('contactEmail')?.invalid && (clientForm.get('contactEmail')?.touched || clientForm.get('contactEmail')?.dirty)">
+              <div *ngIf="clientForm.get('contactEmail')?.invalid && (clientForm.get('contactEmail')?.touched || clientForm.get('contactEmail')?.dirty)" class="text-danger small mt-1">Valid Email is required</div>
             </div>
             <div class="form-group col-6">
               <label class="form-label">Phone</label>
@@ -251,7 +271,7 @@
     
     <div class="drawer-footer">
       <button type="button" class="btn btn-outline" (click)="closeDrawer()" [disabled]="isSubmitting">Cancel</button>
-      <button type="submit" form="clientForm" class="btn btn-primary" [disabled]="clientForm.invalid || isSubmitting">
+      <button type="submit" form="clientForm" class="btn btn-primary" [disabled]="isSubmitting">
         {{ isSubmitting ? 'Saving...' : 'Create Client' }}
       </button>
     </div>

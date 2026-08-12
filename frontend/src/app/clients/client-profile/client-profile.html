@@ -1,246 +1,544 @@
-<div class="page-container" *ngIf="!isLoading && client">
-  <!-- Header -->
-  <div class="profile-header card">
-    <div class="profile-title-area">
-      <div class="client-avatar">
-        <svg lucideBuilding size="32"></svg>
+<div class="client-profile-wrapper" *ngIf="!isLoading && client">
+  <!-- Hero Header Card -->
+  <div class="hero-card">
+    <div class="hero-top">
+      <div class="client-identity">
+        <div class="avatar-gradient" *ngIf="!client.logo">
+          <span>{{ getInitials(client.name) }}</span>
+        </div>
+        <img *ngIf="client.logo" [src]="client.logo" alt="{{ client.name }} Logo" class="client-logo-img" style="width: 72px; height: 72px; border-radius: 16px; object-fit: contain; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #EBECEF;">
+        <div class="identity-info">
+          <div class="title-row">
+            <h1 class="client-title">{{ client.name }}</h1>
+            <span class="status-pill" 
+                  [class.status-active]="client.status === 'ACTIVE'" 
+                  [class.status-lead]="client.status === 'LEAD'" 
+                  [class.status-archived]="client.status === 'ARCHIVED'">
+              <span class="status-dot"></span>
+              {{ client.status }}
+            </span>
+          </div>
+          <div class="meta-strip">
+            <span class="meta-pill" *ngIf="client.industry">
+              <svg lucideBriefcase size="14"></svg> {{ client.industry }}
+            </span>
+            <span class="meta-pill">
+              <svg lucideMapPin size="14"></svg> {{ client.billingCity ? (client.billingCity + (client.billingCountry ? ', ' + client.billingCountry : '')) : 'No Location specified' }}
+            </span>
+            <span class="meta-pill" *ngIf="client.website">
+              <svg lucideGlobe size="14"></svg> 
+              <a [href]="formattedWebsiteUrl" target="_blank" class="meta-link">
+                {{ client.website }} <svg lucideExternalLink size="12"></svg>
+              </a>
+            </span>
+          </div>
+        </div>
       </div>
-      <div class="client-name-block">
-        <h1 class="client-name">{{ client.name }}</h1>
-        <div class="client-meta">
-          <span class="meta-item" *ngIf="client.industry"><svg lucideBriefcase size="14"></svg> {{ client.industry }}</span>
-          <span class="meta-item"><svg lucideMapPin size="14"></svg> {{ client.billingCity || 'No Location' }}</span>
-          <span class="badge" [class.badge-active]="client.status === 'ACTIVE'" [class.badge-lead]="client.status === 'LEAD'" [class.badge-archived]="client.status === 'ARCHIVED'">{{ client.status }}</span>
+
+      <div class="hero-actions">
+        <button class="btn btn-outline-pill" (click)="openEditClientModal()">
+          <svg lucideEdit size="16"></svg> Edit Client
+        </button>
+        <button class="btn btn-primary-pill" (click)="openLinkProjectModal()">
+          <svg lucidePlus size="16"></svg> Link Project
+        </button>
+        <button class="btn btn-outline-pill" (click)="restoreClient()" *ngIf="client.status === 'ARCHIVED'">
+          <svg lucideRotateCcw size="16"></svg> Restore
+        </button>
+        <button class="btn btn-outline-pill" (click)="archiveClient()" *ngIf="client.status !== 'ARCHIVED'">
+          <svg lucideArchive size="16"></svg> Archive
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Stats Grid inside Hero -->
+    <div class="hero-stats-grid">
+      <div class="stat-chip">
+        <div class="stat-chip-icon icon-balance">
+          <svg lucideDollarSign size="18"></svg>
+        </div>
+        <div class="stat-chip-body">
+          <span class="chip-label">Outstanding Balance</span>
+          <span class="chip-value" [class.value-danger]="(client.outstandingBalance || 0) > 0">
+            {{ client.outstandingBalance | currency:(client.currency || 'INR') }}
+          </span>
+        </div>
+      </div>
+
+      <div class="stat-chip">
+        <div class="stat-chip-icon icon-projects">
+          <svg lucideBriefcase size="18"></svg>
+        </div>
+        <div class="stat-chip-body">
+          <span class="chip-label">Active Projects</span>
+          <span class="chip-value">{{ activeProjectsCount }} / {{ client.projects?.length || 0 }}</span>
+        </div>
+      </div>
+
+      <div class="stat-chip">
+        <div class="stat-chip-icon icon-contact">
+          <svg lucideUserCheck size="18"></svg>
+        </div>
+        <div class="stat-chip-body">
+          <span class="chip-label">Primary Contact</span>
+          <span class="chip-value" *ngIf="primaryContact">{{ primaryContact.firstName }} {{ primaryContact.lastName }}</span>
+          <span class="chip-value text-subdued" *ngIf="!primaryContact">None assigned</span>
+        </div>
+      </div>
+
+      <div class="stat-chip">
+        <div class="stat-chip-icon icon-since">
+          <svg lucideCalendar size="18"></svg>
+        </div>
+        <div class="stat-chip-body">
+          <span class="chip-label">Client Since</span>
+          <span class="chip-value">{{ client.createdAt | date:'mediumDate' }}</span>
         </div>
       </div>
     </div>
-    <div class="profile-actions">
-      <button class="btn btn-outline btn-sm" (click)="restoreClient()" *ngIf="client.status === 'ARCHIVED'">
-        Restore Client
-      </button>
-      <button class="btn btn-outline btn-sm" (click)="archiveClient()" *ngIf="client.status !== 'ARCHIVED'">
-        Archive Client
-      </button>
-      <button class="btn btn-danger btn-sm" (click)="deleteClient()">
-        Delete Client
-      </button>
-    </div>
   </div>
 
-  <!-- Navigation Tabs -->
-  <div class="tabs-nav">
-    <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="setTab('overview')">Overview</button>
-    <button class="tab-btn" [class.active]="activeTab === 'financials'" (click)="setTab('financials')">Financials</button>
-    <button class="tab-btn" [class.active]="activeTab === 'contacts'" (click)="setTab('contacts')">Contacts</button>
-    <button class="tab-btn" [class.active]="activeTab === 'projects'" (click)="setTab('projects')">Projects</button>
+  <!-- Segmented Pill Navigation Tabs -->
+  <div class="segmented-nav">
+    <button class="nav-pill-btn" [class.active]="activeTab === 'overview'" (click)="setTab('overview')">
+      <svg lucideLayoutList size="16"></svg> Overview
+    </button>
+    <button class="nav-pill-btn" [class.active]="activeTab === 'financials'" (click)="setTab('financials')">
+      <svg lucideDollarSign size="16"></svg> Financials
+    </button>
+    <button class="nav-pill-btn" [class.active]="activeTab === 'contacts'" (click)="setTab('contacts')">
+      <svg lucideUserCheck size="16"></svg> Contacts
+      <span class="count-badge">{{ client.contacts?.length || 0 }}</span>
+    </button>
+    <button class="nav-pill-btn" [class.active]="activeTab === 'projects'" (click)="setTab('projects')">
+      <svg lucideBriefcase size="16"></svg> Projects
+      <span class="count-badge">{{ client.projects?.length || 0 }}</span>
+    </button>
   </div>
 
-  <div class="tab-content">
+  <!-- Tab Content Body -->
+  <div class="tab-body">
     
     <!-- Overview Tab -->
     <div class="tab-pane" *ngIf="activeTab === 'overview'">
-      <div class="grid-2-col">
-        <!-- About -->
-        <div class="card p-24">
-          <h3 class="card-title">Company Info</h3>
-          <div class="info-list">
-            <div class="info-row">
-              <span class="info-label">Website</span>
-              <span class="info-value">
-                <a [href]="client.website" target="_blank" *ngIf="client.website">{{ client.website }}</a>
-                <span *ngIf="!client.website" class="text-muted">Not provided</span>
+      <div class="overview-grid">
+        
+        <!-- Company Info Card -->
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-orange-light text-orange">
+                <svg lucideBuilding size="18"></svg>
               </span>
+              <h3>Company Information</h3>
             </div>
-            <div class="info-row">
-              <span class="info-label">Industry</span>
-              <span class="info-value">{{ client.industry || 'Not provided' }}</span>
+          </div>
+
+          <div class="info-tiles-grid">
+            <div class="info-tile">
+              <div class="tile-icon"><svg lucideGlobe size="16"></svg></div>
+              <div class="tile-content">
+                <span class="tile-label">Website</span>
+                <span class="tile-value">
+                  <a [href]="formattedWebsiteUrl" target="_blank" class="external-link" *ngIf="client.website">
+                    {{ client.website }} <svg lucideExternalLink size="12"></svg>
+                  </a>
+                  <span *ngIf="!client.website" class="text-subdued">Not provided</span>
+                </span>
+              </div>
             </div>
-            <div class="info-row">
-              <span class="info-label">Client Since</span>
-              <span class="info-value">{{ client.createdAt | date:'mediumDate' }}</span>
+
+            <div class="info-tile">
+              <div class="tile-icon"><svg lucideBriefcase size="16"></svg></div>
+              <div class="tile-content">
+                <span class="tile-label">Industry</span>
+                <span class="tile-value fw-600">{{ client.industry || 'Not provided' }}</span>
+              </div>
             </div>
-            <div class="info-row">
-              <span class="info-label">Portal Access</span>
-              <span class="info-value">
-                <span *ngIf="client.portalEnabled" class="text-success"><svg lucideCheckCircle2 size="14"></svg> Enabled</span>
-                <span *ngIf="!client.portalEnabled" class="text-muted">Disabled</span>
-              </span>
+
+            <div class="info-tile">
+              <div class="tile-icon"><svg lucideCalendar size="16"></svg></div>
+              <div class="tile-content">
+                <span class="tile-label">Client Since</span>
+                <span class="tile-value">{{ client.createdAt | date:'longDate' }}</span>
+              </div>
+            </div>
+
+            <div class="info-tile">
+              <div class="tile-icon"><svg lucideShieldCheck size="16"></svg></div>
+              <div class="tile-content">
+                <span class="tile-label">Client Portal Access</span>
+                <span class="tile-value">
+                  <span *ngIf="client.portalEnabled" class="portal-badge portal-enabled">
+                    <svg lucideCheckCircle2 size="14"></svg> Active Portal
+                  </span>
+                  <span *ngIf="!client.portalEnabled" class="portal-badge portal-disabled">
+                    <svg lucideShieldAlert size="14"></svg> Disabled
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Primary Contacts Snippet -->
-        <div class="card p-24">
-          <h3 class="card-title">Key Contacts</h3>
-          <div class="contacts-list" *ngIf="(client.contacts?.length ?? 0) > 0">
-            <div class="contact-item" *ngFor="let contact of client.contacts | slice:0:3">
-              <div class="contact-avatar">{{ contact.firstName.charAt(0) }}{{ contact.lastName ? contact.lastName.charAt(0) : '' }}</div>
-              <div class="contact-details">
-                <div class="contact-name">{{ contact.firstName }} {{ contact.lastName }} <span class="badge badge-sm badge-primary" *ngIf="contact.isPrimary">Primary</span></div>
-                <div class="contact-email"><svg lucideMail size="12"></svg> {{ contact.email }}</div>
-                <div class="contact-phone" *ngIf="contact.phone"><svg lucidePhone size="12"></svg> {{ contact.phone }}</div>
+        <!-- Key Contacts Snippet Card -->
+        <div class="content-card">
+          <div class="card-header-styled flex-between">
+            <div class="header-title-box">
+              <span class="header-icon bg-purple-light text-purple">
+                <svg lucideUserCheck size="18"></svg>
+              </span>
+              <h3>Key Contacts</h3>
+            </div>
+            <button class="btn btn-text-sm" (click)="setTab('contacts')">
+              View All ({{ client.contacts?.length || 0 }})
+            </button>
+          </div>
+
+          <div class="contacts-preview-list" *ngIf="(client.contacts?.length ?? 0) > 0">
+            <div class="contact-card-item" *ngFor="let contact of client.contacts | slice:0:3">
+              <div class="contact-avatar-badge">
+                {{ contact.firstName.charAt(0) }}{{ contact.lastName ? contact.lastName.charAt(0) : '' }}
+              </div>
+              <div class="contact-info-block">
+                <div class="contact-name-row">
+                  <span class="c-name">{{ contact.firstName }} {{ contact.lastName }}</span>
+                  <span class="role-pill role-primary" *ngIf="contact.isPrimary">Primary</span>
+                  <span class="role-pill role-billing" *ngIf="contact.isBilling">Billing</span>
+                </div>
+                <div class="contact-meta-row" *ngIf="contact.jobTitle">
+                  <span class="c-title">{{ contact.jobTitle }}</span>
+                </div>
+                <div class="contact-actions-row">
+                  <a href="mailto:{{contact.email}}" class="contact-action-btn" title="Send Email">
+                    <svg lucideMail size="13"></svg> {{ contact.email }}
+                  </a>
+                  <a href="tel:{{contact.phone || contact.mobile}}" class="contact-action-btn" *ngIf="contact.phone || contact.mobile" title="Call">
+                    <svg lucidePhone size="13"></svg> {{ contact.phone || contact.mobile }}
+                  </a>
+                </div>
               </div>
             </div>
           </div>
-          <p class="text-muted" *ngIf="client.contacts?.length === 0">No contacts added yet.</p>
-          <button class="btn btn-outline btn-sm mt-16" (click)="setTab('contacts')">View All Contacts</button>
+
+          <div class="empty-state-small" *ngIf="client.contacts?.length === 0">
+            <div class="empty-icon"><svg lucideUserCheck size="24"></svg></div>
+            <p>No contact persons registered for this client.</p>
+            <button class="btn btn-outline-pill btn-xs" (click)="openContactModal()">
+              <svg lucidePlus size="14"></svg> Add Primary Contact
+            </button>
+          </div>
         </div>
+
       </div>
     </div>
 
     <!-- Financials Tab -->
     <div class="tab-pane" *ngIf="activeTab === 'financials'">
-      <div class="grid-3-col mb-24">
-        <!-- Financial Metrics -->
-        <div class="stat-card">
-          <div class="stat-icon"><svg lucideDollarSign size="24"></svg></div>
-          <div class="stat-content">
-            <div class="stat-label">Outstanding Balance</div>
-            <div class="stat-value text-danger">{{ client.outstandingBalance | currency:client.currency }}</div>
+      <div class="tab-header-actions">
+        <button class="btn btn-outline-pill" (click)="openFinancialsModal()">
+          <svg lucideEdit size="16"></svg> Edit Financial Details
+        </button>
+      </div>
+      <!-- 3 Top Metric Cards -->
+      <div class="financial-metrics-grid">
+        <div class="f-metric-card border-amber">
+          <div class="f-metric-header">
+            <span class="f-icon bg-amber-light text-amber">
+              <svg lucideDollarSign size="20"></svg>
+            </span>
+            <span class="f-label">Outstanding Balance</span>
+          </div>
+          <div class="f-value" [class.text-danger]="(client.outstandingBalance || 0) > 0">
+            {{ client.outstandingBalance | currency:(client.currency || 'INR') }}
+          </div>
+          <div class="f-footer">
+            <span class="f-subtext" *ngIf="(client.outstandingBalance || 0) === 0">No pending invoices</span>
+            <span class="f-subtext text-danger" *ngIf="(client.outstandingBalance || 0) > 0">Pending payment execution</span>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon text-primary bg-primary-light"><svg lucideFileText size="24"></svg></div>
-          <div class="stat-content">
-            <div class="stat-label">Payment Terms</div>
-            <div class="stat-value">{{ client.paymentTerms || 'Not Set' }}</div>
+
+        <div class="f-metric-card border-blue">
+          <div class="f-metric-header">
+            <span class="f-icon bg-blue-light text-blue">
+              <svg lucideFileText size="20"></svg>
+            </span>
+            <span class="f-label">Payment Terms</span>
+          </div>
+          <div class="f-value">
+            {{ client.paymentTerms || 'Not Set' }}
+          </div>
+          <div class="f-footer">
+            <span class="f-subtext">Standard invoicing timeline</span>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon text-success bg-success-light"><svg lucideBriefcase size="24"></svg></div>
-          <div class="stat-content">
-            <div class="stat-label">Default Hourly Rate</div>
-            <div class="stat-value">{{ (client.defaultHourlyRate | currency:client.currency) || 'Project Default' }}</div>
+
+        <div class="f-metric-card border-emerald">
+          <div class="f-metric-header">
+            <span class="f-icon bg-emerald-light text-emerald">
+              <svg lucideClock size="20"></svg>
+            </span>
+            <span class="f-label">Default Hourly Rate</span>
+          </div>
+          <div class="f-value">
+            {{ client.defaultHourlyRate ? (client.defaultHourlyRate | currency:(client.currency || 'INR')) + '/hr' : 'Project Default' }}
+          </div>
+          <div class="f-footer">
+            <span class="f-subtext">Standard billing rate</span>
           </div>
         </div>
       </div>
 
-      <div class="grid-2-col">
-        <!-- Billing Details -->
-        <div class="card p-24">
-          <h3 class="card-title">Billing Information</h3>
-          <div class="info-list">
-            <div class="info-row">
-              <span class="info-label">Currency</span>
-              <span class="info-value font-mono">{{ client.currency }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Tax / VAT ID</span>
-              <span class="info-value font-mono">{{ client.taxId || 'Not provided' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Registration No.</span>
-              <span class="info-value font-mono">{{ client.registrationNo || 'Not provided' }}</span>
+      <div class="financial-details-grid">
+        <!-- Billing Information -->
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-blue-light text-blue">
+                <svg lucideCreditCard size="18"></svg>
+              </span>
+              <h3>Billing & Tax Information</h3>
             </div>
           </div>
-          
-          <h4 class="section-subtitle mt-24">Billing Address</h4>
-          <address class="address-block">
-            {{ client.billingAddressLine1 || 'No billing address provided' }}<br *ngIf="client.billingAddressLine1">
-            {{ client.billingAddressLine2 }}<br *ngIf="client.billingAddressLine2">
-            {{ client.billingCity }} {{ client.billingState }} {{ client.billingZipCode }}<br *ngIf="client.billingCity">
-            {{ client.billingCountry }}
-          </address>
+
+          <div class="info-tiles-grid">
+            <div class="info-tile">
+              <div class="tile-icon"><svg lucideDollarSign size="16"></svg></div>
+              <div class="tile-content">
+                <span class="tile-label">Currency</span>
+                <span class="tile-value font-mono fw-600">{{ client.currency || 'INR' }}</span>
+              </div>
+            </div>
+
+            <div class="info-tile">
+              <div class="tile-icon"><svg lucideFileText size="16"></svg></div>
+              <div class="tile-content">
+                <span class="tile-label">Tax / VAT ID</span>
+                <span class="tile-value font-mono">{{ client.taxId || 'Not provided' }}</span>
+              </div>
+            </div>
+
+            <div class="info-tile">
+              <div class="tile-icon"><svg lucideCreditCard size="16"></svg></div>
+              <div class="tile-content">
+                <span class="tile-label">Registration No.</span>
+                <span class="tile-value font-mono">{{ client.registrationNo || 'Not provided' }}</span>
+              </div>
+            </div>
+
+            <div class="info-tile">
+              <div class="tile-icon"><svg lucideAlertCircle size="16"></svg></div>
+              <div class="tile-content">
+                <span class="tile-label">Credit Limit</span>
+                <span class="tile-value font-mono">
+                  {{ client.creditLimit ? (client.creditLimit | currency:(client.currency || 'INR')) : 'Unlimited' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Billing Address -->
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-orange-light text-orange">
+                <svg lucideMapPin size="18"></svg>
+              </span>
+              <h3>Billing Address</h3>
+            </div>
+          </div>
+
+          <div class="address-card-body">
+            <div class="address-pin-icon">
+              <svg lucideMapPin size="20"></svg>
+            </div>
+            <div class="address-text-block">
+              <p class="address-line-main" *ngIf="client.billingAddressLine1">{{ client.billingAddressLine1 }}</p>
+              <p class="address-line-sub" *ngIf="client.billingAddressLine2">{{ client.billingAddressLine2 }}</p>
+              <p class="address-line-city" *ngIf="client.billingCity">
+                {{ client.billingCity }}<span *ngIf="client.billingState">, {{ client.billingState }}</span> {{ client.billingZipCode }}
+              </p>
+              <p class="address-line-country" *ngIf="client.billingCountry">{{ client.billingCountry }}</p>
+              <p class="text-subdued" *ngIf="!client.billingAddressLine1 && !client.billingCity">
+                No billing address details specified for this client profile.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Contacts Tab -->
     <div class="tab-pane" *ngIf="activeTab === 'contacts'">
-      <div class="card">
-        <div class="card-header border-bottom p-24 flex-between">
-          <h3 class="card-title m-0">All Contacts</h3>
-          <button class="btn btn-primary btn-sm">Add Contact</button>
+      <div class="content-card">
+        <div class="card-header-styled flex-between">
+          <div class="header-title-box">
+            <span class="header-icon bg-purple-light text-purple">
+              <svg lucideUserCheck size="18"></svg>
+            </span>
+            <h3>Registered Contacts ({{ client.contacts?.length || 0 }})</h3>
+          </div>
+          <button class="btn btn-primary-pill" (click)="openContactModal()">
+            <svg lucidePlus size="16"></svg> Add Contact
+          </button>
         </div>
-        <div class="table-responsive">
-          <table class="data-table">
+
+        <div class="table-responsive" *ngIf="(client.contacts?.length ?? 0) > 0">
+          <table class="modern-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Title</th>
-                <th>Contact Info</th>
-                <th>Roles</th>
-                <th>Actions</th>
+                <th>Contact Name</th>
+                <th>Job Title</th>
+                <th>Email & Phone</th>
+                <th>Role Tags</th>
+                <th class="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let contact of client.contacts">
                 <td>
-                  <div class="flex-align-center gap-12">
-                    <div class="contact-avatar-sm">{{ contact.firstName.charAt(0) }}</div>
-                    <strong>{{ contact.firstName }} {{ contact.lastName }}</strong>
+                  <div class="contact-table-cell">
+                    <div class="table-avatar">
+                      {{ contact.firstName.charAt(0) }}{{ contact.lastName ? contact.lastName.charAt(0) : '' }}
+                    </div>
+                    <div>
+                      <div class="table-c-name">{{ contact.firstName }} {{ contact.lastName }}</div>
+                    </div>
                   </div>
                 </td>
-                <td>{{ contact.jobTitle || '-' }}</td>
                 <td>
-                  <div class="text-sm"><a href="mailto:{{contact.email}}">{{ contact.email }}</a></div>
-                  <div class="text-sm text-muted">{{ contact.phone || contact.mobile || '-' }}</div>
+                  <span class="job-title-pill">{{ contact.jobTitle || '-' }}</span>
                 </td>
                 <td>
-                  <div class="badges">
-                    <span class="badge badge-sm badge-primary" *ngIf="contact.isPrimary">Primary</span>
-                    <span class="badge badge-sm badge-warning" *ngIf="contact.isBilling">Billing</span>
+                  <div class="contact-info-stack">
+                    <a href="mailto:{{contact.email}}" class="link-email">
+                      <svg lucideMail size="12"></svg> {{ contact.email }}
+                    </a>
+                    <span class="phone-sub" *ngIf="contact.phone || contact.mobile">
+                      <svg lucidePhone size="12"></svg> {{ contact.phone || contact.mobile }}
+                    </span>
                   </div>
                 </td>
-                <td><button class="btn-icon">Edit</button></td>
-              </tr>
-              <tr *ngIf="client.contacts?.length === 0">
-                <td colspan="5" class="text-center p-24 text-muted">No contacts found.</td>
+                <td>
+                  <div class="badges-flex">
+                    <span class="role-pill role-primary" *ngIf="contact.isPrimary">Primary</span>
+                    <span class="role-pill role-billing" *ngIf="contact.isBilling">Billing</span>
+                    <span class="role-pill role-general" *ngIf="!contact.isPrimary && !contact.isBilling">Standard</span>
+                  </div>
+                </td>
+                <td class="text-right">
+                  <button class="btn-action-icon" title="Edit Contact" (click)="openContactModal(contact)">
+                    Edit
+                  </button>
+                  <button class="btn-action-icon danger-action" title="Delete Contact" (click)="deleteContact(contact.id!)">
+                    Delete
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="empty-state-large" *ngIf="client.contacts?.length === 0">
+          <div class="empty-icon-lg bg-purple-light text-purple">
+            <svg lucideUserCheck size="32"></svg>
+          </div>
+          <h3>No Contacts Registered</h3>
+          <p>Add key contact persons for {{ client.name }} to manage communications and invoicing.</p>
+          <button class="btn btn-primary-pill mt-3" (click)="openContactModal()">
+            <svg lucidePlus size="16"></svg> Add First Contact
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Projects Tab -->
     <div class="tab-pane" *ngIf="activeTab === 'projects'">
-      <div class="card">
-        <div class="card-header border-bottom p-24 flex-between">
-          <h3 class="card-title m-0">Associated Projects</h3>
-          <button class="btn btn-primary btn-sm" (click)="openLinkProjectModal()">
-            <svg lucidePlus size="14"></svg> Link Project
+      <div class="content-card">
+        <div class="card-header-styled flex-between">
+          <div class="header-title-box">
+            <span class="header-icon bg-orange-light text-orange">
+              <svg lucideBriefcase size="18"></svg>
+            </span>
+            <h3>Associated Projects</h3>
+          </div>
+          <button class="btn btn-primary-pill" (click)="openLinkProjectModal()">
+            <svg lucidePlus size="16"></svg> Link Project
           </button>
         </div>
-        <div class="project-toolbar">
-          <div class="project-search">
+
+        <div class="toolbar-box">
+          <div class="search-input-wrapper">
+            <svg lucideSearch size="16" class="search-icon"></svg>
             <input
               type="text"
-              class="form-control"
+              class="modern-form-control"
               placeholder="Search by project name..."
               [(ngModel)]="projectSearchQuery">
           </div>
-          <div class="project-status-filter">
-            <select class="form-control" [(ngModel)]="projectStatusFilter">
+          <div class="filter-select-wrapper">
+            <select class="modern-form-control" [(ngModel)]="projectStatusFilter">
               <option value="">All Statuses</option>
               <option value="ACTIVE">Active</option>
               <option value="ARCHIVED">Archived</option>
             </select>
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="data-table">
+
+        <div class="table-responsive" *ngIf="filteredProjects.length > 0">
+          <table class="modern-table">
             <thead>
               <tr>
                 <th>Project Name</th>
                 <th>Status</th>
-                <th>Created</th>
+                <th>Created Date</th>
+                <th class="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let project of filteredProjects">
-                <td><a [routerLink]="['/projects', project.id]" class="fw-500">{{ project.name }}</a></td>
-                <td><span class="badge">{{ project.status }}</span></td>
-                <td>{{ project.createdAt | date:'mediumDate' }}</td>
-              </tr>
-              <tr *ngIf="client.projects?.length === 0">
-                <td colspan="3" class="text-center p-24 text-muted">No projects associated with this client.</td>
-              </tr>
-              <tr *ngIf="(client.projects?.length ?? 0) > 0 && filteredProjects.length === 0">
-                <td colspan="3" class="text-center p-24 text-muted">No projects match your filters.</td>
+                <td>
+                  <div class="project-title-cell">
+                    <div class="p-icon-box"><svg lucideBriefcase size="16"></svg></div>
+                    <a [routerLink]="['/projects', project.id]" class="project-link-name">{{ project.name }}</a>
+                  </div>
+                </td>
+                <td>
+                  <span class="status-pill" [class.status-active]="project.status === 'ACTIVE'" [class.status-archived]="project.status === 'ARCHIVED'">
+                    <span class="status-dot"></span>
+                    {{ project.status }}
+                  </span>
+                </td>
+                <td>
+                  <span class="date-text">{{ project.createdAt | date:'mediumDate' }}</span>
+                </td>
+                <td class="text-right">
+                  <a [routerLink]="['/projects', project.id]" class="btn-action-icon">
+                    View Project &rarr;
+                  </a>
+                  <button class="btn-action-icon danger-action" (click)="unlinkProject(project.id)">
+                    Unlink
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="empty-state-large" *ngIf="client.projects?.length === 0">
+          <div class="empty-icon-lg bg-orange-light text-orange">
+            <svg lucideBriefcase size="32"></svg>
+          </div>
+          <h3>No Associated Projects</h3>
+          <p>Link an existing project or create a new project under {{ client.name }}.</p>
+          <button class="btn btn-primary-pill mt-3" (click)="openLinkProjectModal()">
+            <svg lucidePlus size="16"></svg> Link Project Now
+          </button>
+        </div>
+
+        <div class="empty-state-small mt-3" *ngIf="(client.projects?.length ?? 0) > 0 && filteredProjects.length === 0">
+          <p class="text-subdued">No projects match your search query or filter.</p>
         </div>
       </div>
     </div>
@@ -248,36 +546,417 @@
   </div>
 </div>
 
-<div class="page-container" *ngIf="isLoading">
-  <!-- Skeleton loader could go here -->
-  <p>Loading client profile...</p>
+<!-- Loading Skeleton State -->
+<div class="client-profile-wrapper" *ngIf="isLoading">
+  <div class="hero-card skeleton-card">
+    <div class="skeleton-hero-header">
+      <div class="skeleton-avatar"></div>
+      <div class="skeleton-text-group">
+        <div class="skeleton-line title-sk"></div>
+        <div class="skeleton-line meta-sk"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Link Existing Project Modal -->
 <div class="modal-overlay" *ngIf="linkModalOpen">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>Link Existing Project</h2>
+  <div class="modal-card">
+    <div class="modal-header-styled">
+      <h3>Link Existing Project</h3>
       <button class="close-btn" (click)="linkModalOpen = false"><svg lucideX size="18"></svg></button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body-styled">
       <div class="form-group" *ngIf="linkableProjects.length > 0">
-        <label>Select Project</label>
-        <select class="form-control" [(ngModel)]="selectedLinkProjectId">
+        <label class="form-label">Select Project</label>
+        <select class="modern-form-control" [(ngModel)]="selectedLinkProjectId">
           <option [ngValue]="null" disabled>Choose a project...</option>
           <option *ngFor="let p of linkableProjects" [ngValue]="p.id">{{ p.name }}</option>
         </select>
       </div>
-      <p class="text-muted m-0" *ngIf="linkableProjects.length === 0">No projects available to link.</p>
+      <p class="text-subdued m-0" *ngIf="linkableProjects.length === 0">No available unlinked projects found.</p>
 
-      <div class="error-msg" *ngIf="linkError">{{ linkError }}</div>
+      <div class="error-alert" *ngIf="linkError">{{ linkError }}</div>
 
-      <div class="modal-footer">
-        <button class="btn btn-outline btn-sm" (click)="linkModalOpen = false" [disabled]="isSavingLink">Cancel</button>
-        <button class="btn btn-primary btn-sm" (click)="linkProjectToClient()" [disabled]="isSavingLink || !selectedLinkProjectId">
+      <div class="modal-footer-styled">
+        <button class="btn btn-outline-pill" (click)="linkModalOpen = false" [disabled]="isSavingLink">Cancel</button>
+        <button class="btn btn-primary-pill" (click)="linkProjectToClient()" [disabled]="isSavingLink || !selectedLinkProjectId">
           {{ isSavingLink ? 'Linking...' : 'Link Project' }}
         </button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Financials Modal -->
+<div class="modal-overlay" *ngIf="financialsModalOpen">
+  <div class="modal-card modal-card-lg">
+    <div class="modal-header-styled">
+      <div class="modal-header-text">
+        <h3>Edit Financial Details</h3>
+        <p>Configure currency, billing terms, tax IDs, and default rates.</p>
+      </div>
+      <button class="close-btn" (click)="financialsModalOpen = false"><svg lucideX size="18"></svg></button>
+    </div>
+
+    <form #finForm="ngForm" (ngSubmit)="saveFinancials(finForm)">
+      <div class="modal-body-styled modal-body-scroll">
+        <div class="form-section-title">
+          <svg lucideDollarSign size="16" class="text-orange"></svg> Billing & Currency Configuration
+        </div>
+
+      <div class="form-grid-2col">
+        <div class="form-group">
+          <label class="form-label">Currency <span class="text-danger">*</span></label>
+          <select class="modern-form-control" name="currency" [(ngModel)]="financialsForm.currency" #currencyField="ngModel" required [class.is-invalid]="currencyField.invalid && (currencyField.dirty || currencyField.touched)">
+            <option value="USD">USD ($) - US Dollar</option>
+            <option value="EUR">EUR (€) - Euro</option>
+            <option value="GBP">GBP (£) - British Pound</option>
+            <option value="INR">INR (₹) - Indian Rupee</option>
+          </select>
+          <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="currencyField.invalid && (currencyField.dirty || currencyField.touched)">Currency is required</div>
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Payment Terms</label>
+          <select class="modern-form-control" name="paymentTerms" [(ngModel)]="financialsForm.paymentTerms">
+            <option value="">Not Set</option>
+            <option value="Due on Receipt">Due on Receipt</option>
+            <option value="Net 15">Net 15</option>
+            <option value="Net 30">Net 30</option>
+            <option value="Net 45">Net 45</option>
+            <option value="Net 60">Net 60</option>
+          </select>
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Default Hourly Rate</label>
+          <input type="number" class="modern-form-control" name="defaultHourlyRate" [(ngModel)]="financialsForm.defaultHourlyRate" placeholder="e.g. 75">
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Credit Limit</label>
+          <input type="number" class="modern-form-control" name="creditLimit" [(ngModel)]="financialsForm.creditLimit" placeholder="e.g. 50000">
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Tax / VAT ID</label>
+          <input type="text" class="modern-form-control" name="taxId" [(ngModel)]="financialsForm.taxId" placeholder="e.g. US12345678">
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Registration No.</label>
+          <input type="text" class="modern-form-control" name="registrationNo" [(ngModel)]="financialsForm.registrationNo" placeholder="e.g. REG-98765">
+        </div>
+      </div>
+      
+      <div class="form-section-title mt-sm">
+        <svg lucideMapPin size="16" class="text-orange"></svg> Billing Address
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Address Line 1 <span class="text-danger">*</span></label>
+        <input type="text" class="modern-form-control" name="billingAddressLine1" [(ngModel)]="financialsForm.billingAddressLine1" #finAddr1Field="ngModel" required [class.is-invalid]="finAddr1Field.invalid && (finAddr1Field.dirty || finAddr1Field.touched)" placeholder="Street address or P.O. Box">
+        <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="finAddr1Field.invalid && (finAddr1Field.dirty || finAddr1Field.touched)">Address Line 1 is required</div>
+      </div>
+      <div class="form-group mb-3">
+        <label class="form-label">Address Line 2</label>
+        <input type="text" class="modern-form-control" name="billingAddressLine2" [(ngModel)]="financialsForm.billingAddressLine2" placeholder="Suite, unit, building, floor, etc.">
+      </div>
+
+      <div class="form-grid-2col mb-3">
+        <div class="form-group">
+          <label class="form-label">City <span class="text-danger">*</span></label>
+          <input type="text" class="modern-form-control" name="billingCity" [(ngModel)]="financialsForm.billingCity" #finCityField="ngModel" required [class.is-invalid]="finCityField.invalid && (finCityField.dirty || finCityField.touched)" placeholder="City">
+          <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="finCityField.invalid && (finCityField.dirty || finCityField.touched)">City is required</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">State / Province <span class="text-danger">*</span></label>
+          <input type="text" class="modern-form-control" name="billingState" [(ngModel)]="financialsForm.billingState" #finStateField="ngModel" required [class.is-invalid]="finStateField.invalid && (finStateField.dirty || finStateField.touched)" placeholder="State/Province">
+          <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="finStateField.invalid && (finStateField.dirty || finStateField.touched)">State is required</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zip / Postal Code</label>
+          <input type="text" class="modern-form-control" name="billingZipCode" [(ngModel)]="financialsForm.billingZipCode" placeholder="ZIP code">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Country <span class="text-danger">*</span></label>
+          <input type="text" class="modern-form-control" name="billingCountry" [(ngModel)]="financialsForm.billingCountry" #finCountryField="ngModel" required [class.is-invalid]="finCountryField.invalid && (finCountryField.dirty || finCountryField.touched)" placeholder="Country">
+          <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="finCountryField.invalid && (finCountryField.dirty || finCountryField.touched)">Country is required</div>
+        </div>
+      </div>
+    </div>
+
+      <div class="modal-footer-styled">
+        <button type="button" class="btn btn-outline-pill" (click)="financialsModalOpen = false" [disabled]="isSavingFinancials">Cancel</button>
+        <button type="submit" class="btn btn-primary-pill" [disabled]="isSavingFinancials">
+          {{ isSavingFinancials ? 'Saving...' : 'Save Changes' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Contact Modal -->
+<div class="modal-overlay" *ngIf="contactModalOpen">
+  <div class="modal-card modal-card-md">
+    <div class="modal-header-styled">
+      <div class="modal-header-text">
+        <h3>{{ isEditingContact ? 'Edit Contact' : 'Add New Contact' }}</h3>
+        <p>Specify key contact information for client communication.</p>
+      </div>
+      <button class="close-btn" (click)="contactModalOpen = false"><svg lucideX size="18"></svg></button>
+    </div>
+
+    <form #contactNgForm="ngForm" (ngSubmit)="saveContact(contactNgForm)">
+      <div class="modal-body-styled">
+      <div class="form-grid-2col">
+        <div class="form-group">
+          <label class="form-label">First Name *</label>
+          <input type="text" class="modern-form-control" name="firstName" [(ngModel)]="contactForm.firstName" #cFirstName="ngModel" required [class.is-invalid]="cFirstName.invalid && (cFirstName.dirty || cFirstName.touched)" placeholder="e.g. John">
+          <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="cFirstName.invalid && (cFirstName.dirty || cFirstName.touched)">First Name is required</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name</label>
+          <input type="text" class="modern-form-control" name="lastName" [(ngModel)]="contactForm.lastName" placeholder="e.g. Doe">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email Address *</label>
+        <input type="email" class="modern-form-control" name="email" [(ngModel)]="contactForm.email" #cEmail="ngModel" required [class.is-invalid]="cEmail.invalid && (cEmail.dirty || cEmail.touched)" placeholder="john.doe@company.com">
+        <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="cEmail.invalid && (cEmail.dirty || cEmail.touched)">Email Address is required</div>
+      </div>
+
+      <div class="form-grid-2col">
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input type="text" class="modern-form-control" name="phone" [(ngModel)]="contactForm.phone" placeholder="+1 (555) 000-0000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mobile</label>
+          <input type="text" class="modern-form-control" name="mobile" [(ngModel)]="contactForm.mobile" placeholder="+1 (555) 000-0000">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Job Title</label>
+        <input type="text" class="modern-form-control" name="jobTitle" [(ngModel)]="contactForm.jobTitle" placeholder="e.g. Head of Procurement">
+      </div>
+      
+      <!-- Modern Toggle Switches for Role Tags -->
+      <div class="toggle-grid-2col">
+        <div class="toggle-switch-container">
+          <div class="toggle-switch-label">
+            <span class="toggle-title">Primary Contact</span>
+            <span class="toggle-subtitle">Main point of contact</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" name="isPrimary" [(ngModel)]="contactForm.isPrimary">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-switch-container">
+          <div class="toggle-switch-label">
+            <span class="toggle-title">Billing Contact</span>
+            <span class="toggle-subtitle">Receives invoices</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" name="isBilling" [(ngModel)]="contactForm.isBilling">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+      <div class="modal-footer-styled">
+        <button type="button" class="btn btn-outline-pill" (click)="contactModalOpen = false" [disabled]="isSavingContact">Cancel</button>
+        <button type="submit" class="btn btn-primary-pill" [disabled]="isSavingContact">
+          {{ isSavingContact ? 'Saving...' : 'Save Contact' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Client General Info Modal -->
+<div class="modal-overlay" *ngIf="editClientModalOpen">
+  <div class="modal-card modal-card-lg">
+    <div class="modal-header-styled">
+      <div class="modal-header-text">
+        <h3>Edit Client Details</h3>
+        <p>Update company information, financials, and billing address.</p>
+      </div>
+      <button class="close-btn" (click)="editClientModalOpen = false"><svg lucideX size="18"></svg></button>
+    </div>
+
+    <form #editForm="ngForm" (ngSubmit)="saveClientDetails(editForm)">
+      <div class="modal-body-styled modal-body-scroll">
+      <div class="form-section-title">
+        <svg lucideBuilding size="16" class="text-orange"></svg> Company Details & Logo
+      </div>
+
+      <!-- Drag and Drop Logo Dropzone -->
+      <div class="form-group mb-3 mt-3">
+        <label class="form-label">Client Logo</label>
+        <input type="file" #editLogoInput (change)="onLogoFileSelected($event)" accept="image/*" class="hidden-file-input" style="display: none;">
+        
+        <div class="logo-dropzone" 
+             [class.dragging]="isDraggingLogo"
+             (click)="editLogoInput.click()"
+             (dragover)="onLogoDragOver($event)"
+             (dragleave)="onLogoDragLeave($event)"
+             (drop)="onLogoDrop($event)">
+             
+          <div *ngIf="!logoPreview" class="dropzone-empty">
+            <div class="upload-icon-circle">
+              <svg lucideUploadCloud size="20"></svg>
+            </div>
+            <div class="upload-text">
+              <span class="primary-text">Drag & drop company logo here, or <strong>browse</strong></span>
+              <span class="sub-text">PNG, JPG, WebP or SVG (Max 2MB)</span>
+            </div>
+          </div>
+
+          <div *ngIf="logoPreview" class="logo-preview-wrapper" (click)="$event.stopPropagation()">
+            <img [src]="logoPreview" alt="Client Logo Preview" class="logo-preview-img">
+            <div class="logo-actions">
+              <button type="button" class="btn-change-logo" (click)="editLogoInput.click()">Change Logo</button>
+              <button type="button" class="btn-remove-logo" (click)="removeLogo($event)">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Client / Company Name <span class="text-danger">*</span></label>
+        <input type="text" class="modern-form-control" name="name" [(ngModel)]="editClientForm.name" #nameField="ngModel" required [class.is-invalid]="nameField.invalid && (nameField.dirty || nameField.touched)" placeholder="e.g. Acme Corporation">
+        <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="nameField.invalid && (nameField.dirty || nameField.touched)">
+          Company name is required
+        </div>
+      </div>
+
+      <div class="form-grid-2col mb-3">
+        <div class="form-group">
+          <label class="form-label">Industry</label>
+          <input type="text" class="modern-form-control" name="industry" [(ngModel)]="editClientForm.industry" placeholder="e.g. Software & Technology">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="modern-form-control" name="status" [(ngModel)]="editClientForm.status">
+            <option value="ACTIVE">Active</option>
+            <option value="LEAD">Lead</option>
+            <option value="ARCHIVED">Archived</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-grid-2col mb-3">
+        <div class="form-group">
+          <label class="form-label">Website URL</label>
+          <input type="text" class="modern-form-control" name="website" [(ngModel)]="editClientForm.website" placeholder="https://acme.com">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Client Portal</label>
+          <div class="toggle-switch-container">
+            <div class="toggle-switch-label">
+              <span class="toggle-title">Portal Access</span>
+              <span class="toggle-subtitle">Allow client login</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" name="portalEnabled" [(ngModel)]="editClientForm.portalEnabled">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section-title mt-sm">
+        <svg lucideDollarSign size="16" class="text-orange"></svg> Billing & Currency Configuration
+      </div>
+
+      <div class="form-grid-2col mb-3">
+        <div class="form-group">
+          <label class="form-label">Currency</label>
+          <select class="modern-form-control" name="currency" [(ngModel)]="editClientForm.currency">
+            <option value="USD">USD ($) - US Dollar</option>
+            <option value="EUR">EUR (€) - Euro</option>
+            <option value="GBP">GBP (£) - British Pound</option>
+            <option value="INR">INR (₹) - Indian Rupee</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Payment Terms</label>
+          <select class="modern-form-control" name="paymentTerms" [(ngModel)]="editClientForm.paymentTerms">
+            <option value="">Not Set</option>
+            <option value="Due on Receipt">Due on Receipt</option>
+            <option value="Net 15">Net 15</option>
+            <option value="Net 30">Net 30</option>
+            <option value="Net 45">Net 45</option>
+            <option value="Net 60">Net 60</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Default Hourly Rate</label>
+          <input type="number" class="modern-form-control" name="defaultHourlyRate" [(ngModel)]="editClientForm.defaultHourlyRate" placeholder="e.g. 75">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Credit Limit</label>
+          <input type="number" class="modern-form-control" name="creditLimit" [(ngModel)]="editClientForm.creditLimit" placeholder="e.g. 50000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tax / VAT ID</label>
+          <input type="text" class="modern-form-control" name="taxId" [(ngModel)]="editClientForm.taxId" placeholder="e.g. US12345678">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Registration No.</label>
+          <input type="text" class="modern-form-control" name="registrationNo" [(ngModel)]="editClientForm.registrationNo" placeholder="e.g. REG-98765">
+        </div>
+      </div>
+      
+      <div class="form-section-title mt-sm">
+        <svg lucideMapPin size="16" class="text-orange"></svg> Billing Address
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">Address Line 1 <span class="text-danger">*</span></label>
+        <input type="text" class="modern-form-control" name="billingAddressLine1" [(ngModel)]="editClientForm.billingAddressLine1" #addr1Field="ngModel" required [class.is-invalid]="addr1Field.invalid && (addr1Field.dirty || addr1Field.touched)" placeholder="Street address or P.O. Box">
+        <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="addr1Field.invalid && (addr1Field.dirty || addr1Field.touched)">
+          Address Line 1 is required
+        </div>
+      </div>
+      <div class="form-group mb-3">
+        <label class="form-label">Address Line 2</label>
+        <input type="text" class="modern-form-control" name="billingAddressLine2" [(ngModel)]="editClientForm.billingAddressLine2" placeholder="Suite, unit, building, floor, etc.">
+      </div>
+
+      <div class="form-grid-2col mb-3">
+        <div class="form-group">
+          <label class="form-label">City <span class="text-danger">*</span></label>
+          <input type="text" class="modern-form-control" name="billingCity" [(ngModel)]="editClientForm.billingCity" #cityField="ngModel" required [class.is-invalid]="cityField.invalid && (cityField.dirty || cityField.touched)" placeholder="City">
+          <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="cityField.invalid && (cityField.dirty || cityField.touched)">City is required</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">State / Province <span class="text-danger">*</span></label>
+          <input type="text" class="modern-form-control" name="billingState" [(ngModel)]="editClientForm.billingState" #stateField="ngModel" required [class.is-invalid]="stateField.invalid && (stateField.dirty || stateField.touched)" placeholder="State/Province">
+          <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="stateField.invalid && (stateField.dirty || stateField.touched)">State is required</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zip / Postal Code</label>
+          <input type="text" class="modern-form-control" name="billingZipCode" [(ngModel)]="editClientForm.billingZipCode" placeholder="ZIP code">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Country <span class="text-danger">*</span></label>
+          <input type="text" class="modern-form-control" name="billingCountry" [(ngModel)]="editClientForm.billingCountry" #countryField="ngModel" required [class.is-invalid]="countryField.invalid && (countryField.dirty || countryField.touched)" placeholder="Country">
+          <div class="text-danger" style="font-size: 11px; margin-top: 4px;" *ngIf="countryField.invalid && (countryField.dirty || countryField.touched)">Country is required</div>
+        </div>
+      </div>
+      </div>
+  
+      <div class="modal-footer-styled">
+        <button type="button" class="btn btn-outline-pill" (click)="editClientModalOpen = false" [disabled]="isSavingClientDetails">Cancel</button>
+        <button type="submit" class="btn btn-primary-pill" [disabled]="isSavingClientDetails">
+          {{ isSavingClientDetails ? 'Saving...' : 'Save Client' }}
+        </button>
+      </div>
+    </form>
   </div>
 </div>

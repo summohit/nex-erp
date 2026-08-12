@@ -143,12 +143,12 @@ export class ClientsListComponent implements OnInit {
       creditLimit: [null, Validators.pattern(/^\d+(\.\d{1,2})?$/)],
       
       // Billing Address
-      billingAddressLine1: [''],
+      billingAddressLine1: ['', Validators.required],
       billingAddressLine2: [''],
-      billingCity: [''],
-      billingState: [''],
+      billingCity: ['', Validators.required],
+      billingState: ['', Validators.required],
       billingZipCode: [''],
-      billingCountry: [''],
+      billingCountry: ['', Validators.required],
       
       // Primary Contact
       contactFirstName: ['', Validators.required],
@@ -284,7 +284,17 @@ export class ClientsListComponent implements OnInit {
   }
 
   onSubmit() {
-    if (this.clientForm.invalid) return;
+    if (this.clientForm.invalid) {
+      this.clientForm.markAllAsTouched();
+      setTimeout(() => {
+        const firstInvalid = document.querySelector('.is-invalid, .ng-invalid') as HTMLElement;
+        if (firstInvalid) {
+          firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstInvalid.focus();
+        }
+      }, 0);
+      return;
+    }
 
     this.isSubmitting = true;
     const formValue = this.clientForm.value;
