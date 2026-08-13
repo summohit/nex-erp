@@ -183,7 +183,12 @@ export class AuthService {
       throw new UnauthorizedException('Account is blocked connect administration');
     }
 
-    const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId };
+    const employee = await this.prisma.employee.findUnique({
+      where: { userId: user.id },
+      select: { id: true }
+    });
+
+    const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId, employeeId: employee?.id ?? null };
     
     const access_token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
     const refresh_token = await this.jwtService.signAsync(payload, { 
@@ -200,7 +205,7 @@ export class AuthService {
         secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh'
       });
 
-      const newPayload = { sub: payload.sub, email: payload.email, role: payload.role, companyId: payload.companyId };
+      const newPayload = { sub: payload.sub, email: payload.email, role: payload.role, companyId: payload.companyId, employeeId: payload.employeeId ?? null };
       
       const new_access_token = await this.jwtService.signAsync(newPayload, { expiresIn: '1h' });
       const new_refresh_token = await this.jwtService.signAsync(newPayload, { 

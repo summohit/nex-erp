@@ -31,6 +31,7 @@ export class UsersController {
     });
     if (user) {
       delete (user as any).password;
+      (user as any).employeeId = (user as any).employee?.id ?? null;
     }
     return user;
   }
