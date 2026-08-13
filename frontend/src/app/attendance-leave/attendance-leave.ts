@@ -1854,7 +1854,15 @@ export class AttendanceLeaveComponent implements OnInit {
 
   // --- Team Timeline Logic ---
   loadTeamTimeline() {
-    this.attendanceService.getTeamTimeline(this.timelineStartDate(), this.timelineEndDate())
+    const start = this.timelineStartDate();
+    const end = this.timelineEndDate();
+
+    if (start && end && start > end) {
+      this.toast.error('Start date cannot be after end date');
+      return;
+    }
+
+    this.attendanceService.getTeamTimeline(start, end)
       .subscribe({
         next: (data) => {
           this.teamTimelineData.set(data);
@@ -1928,10 +1936,11 @@ export class AttendanceLeaveComponent implements OnInit {
     );
     
     if (record) {
+      if (record.isLate) return { type: 'late', label: `Late (In: ${new Date(record.clockIn).toLocaleTimeString()})` };
       if (record.status === 'PRESENT') return { type: 'present', label: `Present (In: ${new Date(record.clockIn).toLocaleTimeString()}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
+      if (record.status === 'HALF_DAY') return { type: 'half-day', label: `Half Day (In: ${record.clockIn ? new Date(record.clockIn).toLocaleTimeString() : 'N/A'}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
       if (record.status === 'ABSENT') return { type: 'absent', label: 'Absent' };
       if (record.status === 'LEAVE') return { type: 'leave', label: 'On Leave' };
-      if (record.isLate) return { type: 'late', label: `Late (In: ${new Date(record.clockIn).toLocaleTimeString()})` };
       if (record.isHoliday) return { type: 'holiday', label: 'Holiday' };
     }
     return null;

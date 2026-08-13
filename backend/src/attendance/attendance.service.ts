@@ -265,6 +265,14 @@ export class AttendanceService {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
 
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new BadRequestException('Invalid start or end date');
+    }
+
+    if (startDate > endDate) {
+      throw new BadRequestException('Start date cannot be after end date');
+    }
+
     const employees = await this.prisma.employee.findMany({
       where: { companyId },
       include: {

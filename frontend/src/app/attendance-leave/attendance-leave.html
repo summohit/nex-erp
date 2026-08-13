@@ -649,8 +649,8 @@
       <div class="widget-header grid-header" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
         <h3 class="widget-title">Team Timeline</h3>
         <div class="period-selectors" style="display: flex; gap: 8px;">
-           <input type="date" class="search-input" style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; font-weight: normal; background: #fff;" [ngModel]="timelineStartDate()" (ngModelChange)="timelineStartDate.set($event); loadTeamTimeline()">
-           <input type="date" class="search-input" style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; font-weight: normal; background: #fff;" [ngModel]="timelineEndDate()" (ngModelChange)="timelineEndDate.set($event); loadTeamTimeline()">
+           <input type="date" class="search-input" style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; font-weight: normal; background: #fff;" [ngModel]="timelineStartDate()" [max]="timelineEndDate()" (ngModelChange)="timelineStartDate.set($event); loadTeamTimeline()">
+           <input type="date" class="search-input" style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; font-weight: normal; background: #fff;" [ngModel]="timelineEndDate()" [min]="timelineStartDate()" (ngModelChange)="timelineEndDate.set($event); loadTeamTimeline()">
         </div>
       </div>
 

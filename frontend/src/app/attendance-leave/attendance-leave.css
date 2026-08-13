@@ -1591,6 +1591,7 @@
 .timeline-status-block.present { background: #10b981; opacity: 0.8; }
 .timeline-status-block.absent { background: #ef4444; opacity: 0.8; }
 .timeline-status-block.late { background: #f59e0b; opacity: 0.8; }
+.timeline-status-block.half-day { background: #f97316; opacity: 0.8; }
 .timeline-status-block.leave { background: #3b82f6; opacity: 0.8; }
 .timeline-status-block.holiday { background: #8b5cf6; opacity: 0.8; }
 
