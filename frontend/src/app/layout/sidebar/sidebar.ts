@@ -4,7 +4,6 @@ import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { MenusService } from '../../services/menus.service';
-import { PermissionsService, RolePermission } from '../../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen } from '@lucide/angular';
 
@@ -18,13 +17,11 @@ import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarCloc
 export class SidebarComponent implements OnInit {
   private authService = inject(AuthService);
   private menusService = inject(MenusService);
-  private permissionsService = inject(PermissionsService);
   public router = inject(Router);
   private toast = inject(HotToastService);
 
   user = signal<any>(null);
   expandedMenu = signal<string | null>(null);
-  allowedModules = signal<Set<string>>(new Set(['overview']));
   isCollapsed = signal<boolean>(false);
   logoFailed = signal<boolean>(false);
   isLoading = signal<boolean>(true);
@@ -39,7 +36,7 @@ export class SidebarComponent implements OnInit {
     this.authService.getMe().subscribe({
       next: (user) => {
         this.user.set(user);
-        this.loadPermissions(user.role);
+        this.loadMenus();
       },
       error: () => {
         this.isLoading.set(false);
@@ -47,88 +44,22 @@ export class SidebarComponent implements OnInit {
     });
   }
 
-  loadPermissions(role: string) {
-    if (role === 'SUPERADMIN') {
-      // Superadmin sees everything, we can just allow everything
-      const allAllowed = new Set<string>();
-      allAllowed.add('overview');
-      this.menuSections.forEach(sec => {
-        sec.items.forEach((item: any) => {
-          allAllowed.add(item.id);
-          if (item.subItems) {
-            item.subItems.forEach((sub: any) => allAllowed.add(sub.id));
-          }
-        });
-      });
-      this.allowedModules.set(allAllowed);
-      this.isLoading.set(false);
-      return;
-    }
-
-    this.permissionsService.getAllPermissions(role).subscribe({
-      next: (perms) => {
-        const allowed = new Set<string>(['overview', 'employees/me/profile']);
-        
-        if (perms && perms.length > 0) {
-          perms.forEach(p => {
-            if (p.action === 'VIEW') {
-              allowed.add(p.module);
-            }
-          });
-        } else {
-          // Fallback defaults based on RBAC role
-          if (role === 'ADMIN' || role === 'HR' || role === 'FINANCE') {
-            allowed.add('assets');
-            allowed.add('assets/inventory');
-            allowed.add('assets/assignments');
-            allowed.add('assets/requests');
-            allowed.add('clients');
-          } else {
-            // Standard Employee / Other roles: Only Hardware Requests
-            allowed.add('assets');
-            allowed.add('assets/requests');
-          }
-        }
-        
-        allowed.add('careers');
-
-        // Auto-add parent module ID if any sub-item is allowed
-        this.menuSections.forEach(sec => {
-          sec.items.forEach((item: any) => {
-            if (item.subItems && item.subItems.some((sub: any) => allowed.has(sub.id))) {
-              allowed.add(item.id);
-            }
-          });
-        });
-
-        this.allowedModules.set(allowed);
+  loadMenus() {
+    this.menusService.getSidebarMenus().subscribe({
+      next: (menus) => {
+        this.menuSections = menus;
+        this.checkExpandedMenu(this.router.url);
         this.isLoading.set(false);
       },
       error: () => {
+        this.toast.error('Failed to load menu');
         this.isLoading.set(false);
       }
     });
-  }
-
-  hasAccess(moduleId: string): boolean {
-    const item = this.findMenuItem(moduleId);
-    if (item && item.subItems) {
-      return item.subItems.some((sub: any) => this.allowedModules().has(sub.id));
-    }
-    return this.allowedModules().has(moduleId);
-  }
-
-  private findMenuItem(id: string): any {
-    for (const sec of this.menuSections) {
-      for (const item of sec.items) {
-        if (item.id === id) return item;
-      }
-    }
-    return null;
   }
 
   hasVisibleItems(section: any): boolean {
-    return section.items.some((item: any) => this.hasAccess(item.id));
+    return section.items && section.items.length > 0;
   }
 
   isMainItemActive(item: any): boolean {
@@ -148,11 +79,6 @@ export class SidebarComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.menusService.getSidebarMenus().subscribe(menus => {
-      this.menuSections = menus;
-      this.checkExpandedMenu(this.router.url);
-    });
-
     const savedState = localStorage.getItem('sidebar_collapsed');
     if (savedState === 'true') {
       this.isCollapsed.set(true);
@@ -235,7 +161,7 @@ export class SidebarComponent implements OnInit {
     });
   }
 
-  toggleMenu(menuId: string, event: Event, hasSubItems: boolean) {
+  toggleMenu(menuItem: any, event: Event) {
     event.preventDefault();
 
     // If sidebar is collapsed, auto-expand it so submenus and labels are accessible
@@ -245,49 +171,21 @@ export class SidebarComponent implements OnInit {
       document.body.classList.remove('sidebar-collapsed');
     }
 
+    const hasSubItems = menuItem.subItems && menuItem.subItems.length > 0;
+
     if (!hasSubItems) {
-      if (menuId === 'overview') {
-        this.router.navigate(['/dashboard']);
-      } else if (menuId === 'appreciation') {
-        if (this.hasAccess('appreciation')) {
-          this.router.navigate(['/appreciation']);
-        } else {
-          this.toast.error('You do not have permission to access Appreciation.');
-        }
-      } else if (menuId === 'projects') {
-        if (this.hasAccess('projects')) {
-          this.router.navigate(['/projects']);
-        } else {
-          this.toast.error('You do not have permission to access Projects.');
-        }
-      } else if (menuId === 'clients') {
-        if (this.hasAccess('clients')) {
-          this.router.navigate(['/clients']);
-        } else {
-          this.toast.error('You do not have permission to access Clients.');
-        }
-      } else if (menuId === 'offboarding') {
-        if (this.hasAccess('offboarding')) {
-          this.router.navigate(['/offboarding']);
-        } else {
-          this.toast.error('You do not have permission to access Offboarding.');
-        }
-      } else if (menuId === 'performance') {
-        if (this.hasAccess('performance')) {
-          this.router.navigate(['/performance']);
-        } else {
-          this.toast.error('You do not have permission to access Performance.');
-        }
+      if (menuItem.route) {
+        this.router.navigate([menuItem.route]);
       } else {
         this.comingSoon(event);
       }
       return;
     }
     
-    if (this.expandedMenu() === menuId) {
+    if (this.expandedMenu() === menuItem.id) {
       this.expandedMenu.set(null); // collapse
     } else {
-      this.expandedMenu.set(menuId); // expand
+      this.expandedMenu.set(menuItem.id); // expand
     }
   }
 
@@ -305,15 +203,8 @@ export class SidebarComponent implements OnInit {
       window.open(route, '_blank');
       return;
     }
-    if (
-      subItem.route.startsWith('/assets') ||
-      subItem.route.startsWith('/employees/') ||
-      subItem.route.startsWith('/attendance/') ||
-      subItem.route.startsWith('/payroll/') ||
-      subItem.route.startsWith('/settings/') ||
-      subItem.route.startsWith('/recruitment/') ||
-      subItem.route.startsWith('/projects')
-    ) {
+    
+    if (subItem.route) {
       this.router.navigate([subItem.route]);
     } else {
       this.comingSoon(event);

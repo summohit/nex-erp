@@ -1,9 +1,90 @@
 <div class="org-chart-container" *ngIf="!isLoading">
   
   <div class="org-chart-wrapper" *ngIf="rootNodes.length > 0; else noData">
-    <ng-container *ngFor="let root of rootNodes">
-      <ng-container *ngTemplateOutlet="orgNodeTemplate; context: { $implicit: root }"></ng-container>
-    </ng-container>
+    
+    <!-- Toolbar -->
+    <div class="graph-toolbar">
+      <button class="toolbar-btn" (click)="zoomIn()" title="Zoom In">
+        <svg lucideZoomIn size="18"></svg>
+      </button>
+      <button class="toolbar-btn" (click)="zoomOut()" title="Zoom Out">
+        <svg lucideZoomOut size="18"></svg>
+      </button>
+      <button class="toolbar-btn" (click)="centerGraph()" title="Fit to Screen">
+        <svg lucideMaximize size="18"></svg>
+      </button>
+    </div>
+
+    <ngx-graph
+      class="chart-container"
+      [links]="links"
+      [nodes]="nodes"
+      [layout]="layout"
+      [layoutSettings]="layoutSettings"
+      [nodeWidth]="260"
+      [nodeHeight]="140"
+      [enableDrag]="true"
+      [enablePan]="true"
+      [zoomLevel]="zoomLevel"
+      [minZoomLevel]="0.1"
+      [maxZoomLevel]="2.0"
+      [panOnZoom]="true"
+      [autoZoom]="false"
+      [autoCenter]="true"
+      [zoomToFit$]="zoomToFit$"
+      [center$]="center$"
+      [panToNode$]="panToNode$"
+      (zoomChange)="onZoomChange($event)">
+
+      <!-- TEMPLATE FOR LINKS (SVG Paths) -->
+      <ng-template #linkTemplate let-link>
+        <svg:g class="edge">
+          <svg:path class="line" stroke-width="2" marker-end="url(#arrow)" />
+          <svg:path
+            class="edge-path"
+            fill="none"
+            stroke="#cbd5e1"
+            stroke-width="2"
+            [attr.d]="link.line"
+          ></svg:path>
+        </svg:g>
+      </ng-template>
+
+      <!-- TEMPLATE FOR NODES -->
+      <ng-template #nodeTemplate let-node>
+        <svg:g class="node">
+          <!-- Width 280, Height 140 -> Need to wrap HTML carefully -->
+          <svg:foreignObject width="260" height="130" x="0" y="0">
+            <!-- Ensure xmlns namespace is present in foreignObject -->
+            <div xmlns="http://www.w3.org/1999/xhtml" class="org-node-container" style="width: 100%; height: 100%; padding: 4px;">
+              <div class="org-node-card">
+                <div class="node-avatar">
+                  <img *ngIf="node.data.avatarUrl" [src]="node.data.avatarUrl" alt="Avatar">
+                  <div *ngIf="!node.data.avatarUrl" class="avatar-placeholder">
+                    {{ node.data.firstName.charAt(0) }}{{ node.data.lastName.charAt(0) }}
+                  </div>
+                </div>
+                <div class="node-details">
+                  <div class="node-name">{{ node.data.firstName }} {{ node.data.lastName }}</div>
+                  <div class="node-designation" *ngIf="node.data.designation">{{ node.data.designation.name }}</div>
+                  <div class="node-department" *ngIf="node.data.department">{{ node.data.department.name }}</div>
+                </div>
+                
+                <!-- Expand/Collapse Button (only if children exist) -->
+                <div 
+                  class="node-expand-btn" 
+                  *ngIf="node.data.children.length > 0" 
+                  (click)="toggleExpand(node.data, $event)"
+                  style="cursor: pointer;">
+                  <svg *ngIf="!node.data.isExpanded" lucideChevronDown size="16"></svg>
+                  <svg *ngIf="node.data.isExpanded" lucideChevronUp size="16"></svg>
+                </div>
+              </div>
+            </div>
+          </svg:foreignObject>
+        </svg:g>
+      </ng-template>
+    </ngx-graph>
   </div>
 
   <ng-template #noData>
@@ -11,45 +92,6 @@
       <svg lucideUser size="48" style="color: #94a3b8; margin-bottom: 16px;"></svg>
       <h3>No Organization Chart Data</h3>
       <p>Assign managers to employees to build the chart.</p>
-    </div>
-  </ng-template>
-
-  <!-- Recursive Node Template -->
-  <ng-template #orgNodeTemplate let-node>
-    <div class="org-node-container">
-      <div class="org-node-card" (click)="toggleExpand(node, $event)">
-        <div class="node-avatar">
-          <img *ngIf="node.avatarUrl" [src]="node.avatarUrl" alt="Avatar">
-          <div *ngIf="!node.avatarUrl" class="avatar-placeholder">
-            {{ node.firstName.charAt(0) }}{{ node.lastName.charAt(0) }}
-          </div>
-        </div>
-        <div class="node-details">
-          <div class="node-name">{{ node.firstName }} {{ node.lastName }}</div>
-          <div class="node-designation" *ngIf="node.designation">{{ node.designation.name }}</div>
-          <div class="node-department" *ngIf="node.department">{{ node.department.name }}</div>
-        </div>
-        
-        <div class="node-expand-btn" *ngIf="node.children.length > 0">
-          <svg *ngIf="!node.isExpanded" lucideChevronDown size="16"></svg>
-          <svg *ngIf="node.isExpanded" lucideChevronUp size="16"></svg>
-        </div>
-      </div>
-
-      <!-- Children Container -->
-      <div class="org-children-container" *ngIf="node.children.length > 0 && node.isExpanded">
-        <!-- Connecting Line from Parent -->
-        <div class="vertical-line"></div>
-        <div class="children-wrapper">
-          <ng-container *ngFor="let child of node.children; let isFirst=first; let isLast=last">
-            <div class="child-node-wrapper">
-              <!-- Horizontal connector -->
-              <div class="horizontal-line" [class.first-child]="isFirst" [class.last-child]="isLast"></div>
-              <ng-container *ngTemplateOutlet="orgNodeTemplate; context: { $implicit: child }"></ng-container>
-            </div>
-          </ng-container>
-        </div>
-      </div>
     </div>
   </ng-template>
 

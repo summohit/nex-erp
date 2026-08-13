@@ -39,12 +39,12 @@
         <span class="nav-section-title" [class.mt-4]="!first">{{ section.title }}</span>
         <nav class="sidebar-nav">
         <ng-container *ngFor="let item of section.items">
-          <div class="nav-section" *ngIf="hasAccess(item.id)">
+          <div class="nav-section">
             <a href="#" 
                class="nav-item" 
                [class.active]="isMainItemActive(item)"
                [class.expanded]="expandedMenu() === item.id"
-               (click)="toggleMenu(item.id, $event, !!item.subItems)">
+               (click)="toggleMenu(item, $event)">
               <div class="active-indicator" *ngIf="isMainItemActive(item)"></div>
               <div class="nav-item-content">
                 <ng-container [ngSwitch]="item.icon">
@@ -78,7 +78,7 @@
             <div class="sub-nav" [class.open]="expandedMenu() === item.id" *ngIf="item.subItems">
               <div class="tree-line-container">
                 <ng-container *ngFor="let sub of item.subItems; let last = last">
-                  <div class="sub-nav-item-wrapper" *ngIf="!sub.id || hasAccess(sub.id)">
+                  <div class="sub-nav-item-wrapper">
                     <div class="tree-line" [class.last]="last"></div>
                     <a href="#" class="sub-nav-item" [class.active]="router.url === sub.route" (click)="handleSubMenuClick(sub, $event)">
                       {{ sub.title }}

@@ -105,11 +105,10 @@ export class MenusService implements OnModuleInit {
       orderBy: { displayOrder: 'asc' }
     });
 
-    // 2. Filter top-level sections
+    // 2. Format to JSON structure
     const tree = menus.filter(m => m.parentId === null);
     
-    // 3. Format it to match the JSON structure expected by frontend
-    return tree.map(section => ({
+    let formattedMenus = tree.map(section => ({
       title: section.title,
       items: section.children.map(item => ({
         id: item.route ? item.route.replace('/', '') : item.title.toLowerCase().replace(/ /g, '-'),
@@ -124,5 +123,52 @@ export class MenusService implements OnModuleInit {
         })) : undefined
       }))
     }));
+
+    // 3. Superadmin gets everything
+    if (roleName === 'SUPERADMIN') {
+      // Add 'overview' implicitly as it's the dashboard
+      return formattedMenus;
+    }
+
+    // 4. Fetch RolePermissions for standard roles
+    const rolePermissions = await this.prisma.rolePermission.findMany({
+      where: { companyId, role: roleName, action: 'VIEW' }
+    });
+    
+    const allowedModules = new Set(rolePermissions.map(p => p.module));
+    
+    // Always allow overview (dashboard) and profile
+    allowedModules.add('overview');
+    allowedModules.add('employees/me/profile');
+
+    // If role has NO permissions defined yet, apply a safe default fallback
+    if (allowedModules.size === 2) {
+      if (['ADMIN', 'HR', 'FINANCE'].includes(roleName)) {
+        ['assets', 'assets/inventory', 'assets/assignments', 'assets/requests', 'clients', 'careers'].forEach(m => allowedModules.add(m));
+      } else {
+        ['assets', 'assets/requests', 'careers'].forEach(m => allowedModules.add(m));
+      }
+    }
+
+    // 5. Filter the formatted menus
+    const filteredMenus = formattedMenus.map(section => {
+      // Filter items in section
+      const validItems = section.items.filter(item => {
+        // If it has subitems, keep it if AT LEAST ONE subitem is allowed
+        if (item.subItems && item.subItems.length > 0) {
+          item.subItems = item.subItems.filter(sub => allowedModules.has(sub.id));
+          return item.subItems.length > 0;
+        }
+        // If no subitems, check if parent itself is allowed
+        return allowedModules.has(item.id) || item.id === 'overview';
+      });
+
+      return {
+        ...section,
+        items: validItems
+      };
+    }).filter(section => section.items.length > 0);
+
+    return filteredMenus;
   }
 }
