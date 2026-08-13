@@ -55,6 +55,42 @@ export class MenusService implements OnModuleInit {
           });
           this.logger.log('Clients menu auto-seeded successfully.');
         }
+        const crmMenu = await this.prisma.menu.findFirst({ where: { title: 'CRM', parentId: parent.id } });
+        if (!crmMenu) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'CRM',
+              icon: 'funnel', 
+              route: '/crm/leads',
+              displayOrder: 7,
+              parentId: parent.id,
+              isActive: true
+            }
+          });
+          this.logger.log('CRM menu auto-seeded successfully.');
+        }
+
+        const salesMenu = await this.prisma.menu.findFirst({ where: { title: 'Sales', parentId: parent.id } });
+        if (!salesMenu) {
+          const salesParent = await this.prisma.menu.create({
+            data: {
+              title: 'Sales',
+              icon: 'shopping-cart',
+              displayOrder: 8,
+              parentId: parent.id,
+              isActive: true
+            }
+          });
+          
+          await this.prisma.menu.createMany({
+            data: [
+              { title: 'Quotations', route: '/sales/quotations', displayOrder: 1, parentId: salesParent.id, isActive: true },
+              { title: 'Sales Orders', route: '/sales/orders', displayOrder: 2, parentId: salesParent.id, isActive: true },
+              { title: 'Point of Sale', route: '/sales/pos', displayOrder: 3, parentId: salesParent.id, isActive: true }
+            ]
+          });
+          this.logger.log('Sales menu auto-seeded successfully.');
+        }
       }
 
       // Also ensure Payroll Rules is under Settings

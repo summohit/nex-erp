@@ -61,8 +61,12 @@
                   <ng-container *ngSwitchCase="'lucideBuilding'"><svg lucideBuilding class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'target'"><svg lucideTarget class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'door-open'"><svg lucideDoorOpen class="nav-icon" size="20"></svg></ng-container>
+                  <ng-container *ngSwitchCase="'funnel'"><svg lucideFunnel class="nav-icon" size="20"></svg></ng-container>
+                  <ng-container *ngSwitchCase="'shopping-cart'"><svg lucideShoppingCart class="nav-icon" size="20"></svg></ng-container>
                 </ng-container>
                 <span class="nav-label">{{ item.title }}</span>
+                <span class="module-status-badge badge-done" *ngIf="getModuleStatus(item.title) === 'DONE'">Done</span>
+                <span class="module-status-badge badge-wip" *ngIf="getModuleStatus(item.title) === 'WIP'">WIP</span>
               </div>
               <div *ngIf="item.subItems" class="chevron-icon">
                 <ng-container *ngIf="expandedMenu() === item.id; else rightChevron">

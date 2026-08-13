@@ -201,6 +201,33 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  flex: 1;
+}
+
+.module-status-badge {
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  margin-left: auto;
+}
+
+.badge-done {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-wip {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.sidebar.collapsed .module-status-badge {
+  display: none !important;
 }
 
 .nav-item:hover {

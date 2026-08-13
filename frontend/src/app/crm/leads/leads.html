@@ -1,0 +1,474 @@
+<div class="leads-container page-container">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-title">
+      <h2>CRM Leads Board</h2>
+      <p>Track, manage and convert sales opportunities through your pipeline stages.</p>
+    </div>
+    
+    <div class="header-actions-group">
+      <div class="pipeline-stat-card">
+        <span class="stat-label">Total Pipeline Value</span>
+        <span class="stat-value">{{getTotalPipelineValue() | currency:'INR'}}</span>
+      </div>
+      <button class="btn-primary" (click)="openModal()">
+        <svg lucidePlus size="16"></svg> New Lead
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter & Search Bar -->
+  <div class="filter-bar-card">
+    <div class="search-input-wrapper">
+      <svg lucideSearch size="16" class="search-icon"></svg>
+      <input 
+        type="text" 
+        [(ngModel)]="searchQuery" 
+        (ngModelChange)="onFilterChange()" 
+        placeholder="Search leads by title, company, contact or email..." 
+      />
+      <button class="btn-clear" *ngIf="searchQuery" (click)="searchQuery = ''; onFilterChange()">
+        <svg lucideX size="14"></svg>
+      </button>
+    </div>
+
+    <div class="filter-controls">
+      <div class="filter-dropdown">
+        <svg lucideFilter size="14" class="filter-icon"></svg>
+        <select [(ngModel)]="selectedStage" (change)="onFilterChange()">
+          <option value="ALL">All Stages</option>
+          <option value="NEW">New</option>
+          <option value="QUALIFIED">Qualified</option>
+          <option value="PROPOSAL">Proposal</option>
+          <option value="WON">Won</option>
+          <option value="LOST">Lost</option>
+        </select>
+      </div>
+
+      <button class="btn-reset-filters" *ngIf="searchQuery || selectedStage !== 'ALL'" (click)="clearFilters()">
+        Reset Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Skeleton Card Template -->
+  <ng-template #skeletonLoader>
+    <div class="skeleton-card" *ngFor="let i of [1, 2]">
+      <div class="skeleton-title skeleton-anim"></div>
+      <div class="skeleton-pill skeleton-anim"></div>
+      <div class="skeleton-details">
+        <div class="skeleton-line skeleton-anim"></div>
+        <div class="skeleton-line skeleton-anim" style="width: 70%"></div>
+      </div>
+      <div class="skeleton-footer">
+        <div class="skeleton-badge skeleton-anim"></div>
+        <div class="skeleton-date skeleton-anim"></div>
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- Kanban Board -->
+  <div class="kanban-board">
+    
+    <!-- NEW -->
+    <div class="kanban-column">
+      <div class="column-header new-header">
+        <div class="column-header-left">
+          <span class="status-dot dot-new"></span>
+          <span class="column-title">NEW</span>
+        </div>
+        <span class="column-count-badge">{{newLeads.length}}</span>
+      </div>
+      <div 
+        class="kanban-list" 
+        id="NEW"
+        cdkDropList 
+        [cdkDropListData]="newLeads" 
+        [cdkDropListConnectedTo]="['QUALIFIED', 'PROPOSAL', 'WON', 'LOST']" 
+        (cdkDropListDropped)="drop($event)">
+        
+        <ng-container *ngIf="isLoading">
+          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
+        </ng-container>
+        <ng-container *ngIf="!isLoading">
+          <div class="kanban-card card-accent-new" *ngFor="let lead of newLeads" cdkDrag>
+            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+              <svg lucideGripVertical size="14"></svg>
+            </div>
+            
+            <div class="card-body">
+              <div class="card-header-row">
+                <h4 class="lead-title">{{lead.title}}</h4>
+                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
+              </div>
+
+              <div class="card-company-pill" *ngIf="lead.companyName">
+                <svg lucideBuilding size="12"></svg>
+                <span>{{lead.companyName}}</span>
+              </div>
+
+              <div class="card-details">
+                <div class="detail-item" *ngIf="lead.contactName">
+                  <svg lucideUser size="12"></svg>
+                  <span>{{lead.contactName}}</span>
+                </div>
+                <div class="detail-item" *ngIf="lead.email">
+                  <svg lucideMail size="12"></svg>
+                  <span>{{lead.email}}</span>
+                </div>
+                <div class="detail-item" *ngIf="lead.phone">
+                  <svg lucidePhone size="12"></svg>
+                  <span>{{lead.phone}}</span>
+                </div>
+              </div>
+
+              <div class="card-footer-row">
+                <span class="value-badge">{{lead.value | currency:lead.currency||'INR'}}</span>
+                <span class="date-tag" *ngIf="lead.createdAt">{{lead.createdAt | date:'shortDate'}}</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- QUALIFIED -->
+    <div class="kanban-column">
+      <div class="column-header qual-header">
+        <div class="column-header-left">
+          <span class="status-dot dot-qual"></span>
+          <span class="column-title">QUALIFIED</span>
+        </div>
+        <span class="column-count-badge">{{qualifiedLeads.length}}</span>
+      </div>
+      <div 
+        class="kanban-list" 
+        id="QUALIFIED"
+        cdkDropList 
+        [cdkDropListData]="qualifiedLeads" 
+        [cdkDropListConnectedTo]="['NEW', 'PROPOSAL', 'WON', 'LOST']" 
+        (cdkDropListDropped)="drop($event)">
+        
+        <ng-container *ngIf="isLoading">
+          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
+        </ng-container>
+        <ng-container *ngIf="!isLoading">
+          <div class="kanban-card card-accent-qual" *ngFor="let lead of qualifiedLeads" cdkDrag>
+            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+              <svg lucideGripVertical size="14"></svg>
+            </div>
+            
+            <div class="card-body">
+              <div class="card-header-row">
+                <h4 class="lead-title">{{lead.title}}</h4>
+                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
+              </div>
+
+              <div class="card-company-pill" *ngIf="lead.companyName">
+                <svg lucideBuilding size="12"></svg>
+                <span>{{lead.companyName}}</span>
+              </div>
+
+              <div class="card-details">
+                <div class="detail-item" *ngIf="lead.contactName">
+                  <svg lucideUser size="12"></svg>
+                  <span>{{lead.contactName}}</span>
+                </div>
+                <div class="detail-item" *ngIf="lead.email">
+                  <svg lucideMail size="12"></svg>
+                  <span>{{lead.email}}</span>
+                </div>
+                <div class="detail-item" *ngIf="lead.phone">
+                  <svg lucidePhone size="12"></svg>
+                  <span>{{lead.phone}}</span>
+                </div>
+              </div>
+
+              <div class="card-footer-row">
+                <span class="value-badge">{{lead.value | currency:lead.currency||'INR'}}</span>
+                <span class="date-tag" *ngIf="lead.createdAt">{{lead.createdAt | date:'shortDate'}}</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- PROPOSAL -->
+    <div class="kanban-column">
+      <div class="column-header prop-header">
+        <div class="column-header-left">
+          <span class="status-dot dot-prop"></span>
+          <span class="column-title">PROPOSAL</span>
+        </div>
+        <span class="column-count-badge">{{proposalLeads.length}}</span>
+      </div>
+      <div 
+        class="kanban-list" 
+        id="PROPOSAL"
+        cdkDropList 
+        [cdkDropListData]="proposalLeads" 
+        [cdkDropListConnectedTo]="['NEW', 'QUALIFIED', 'WON', 'LOST']" 
+        (cdkDropListDropped)="drop($event)">
+        
+        <ng-container *ngIf="isLoading">
+          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
+        </ng-container>
+        <ng-container *ngIf="!isLoading">
+          <div class="kanban-card card-accent-prop" *ngFor="let lead of proposalLeads" cdkDrag>
+            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+              <svg lucideGripVertical size="14"></svg>
+            </div>
+            
+            <div class="card-body">
+              <div class="card-header-row">
+                <h4 class="lead-title">{{lead.title}}</h4>
+                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
+              </div>
+
+              <div class="card-company-pill" *ngIf="lead.companyName">
+                <svg lucideBuilding size="12"></svg>
+                <span>{{lead.companyName}}</span>
+              </div>
+
+              <div class="card-details">
+                <div class="detail-item" *ngIf="lead.contactName">
+                  <svg lucideUser size="12"></svg>
+                  <span>{{lead.contactName}}</span>
+                </div>
+                <div class="detail-item" *ngIf="lead.email">
+                  <svg lucideMail size="12"></svg>
+                  <span>{{lead.email}}</span>
+                </div>
+                <div class="detail-item" *ngIf="lead.phone">
+                  <svg lucidePhone size="12"></svg>
+                  <span>{{lead.phone}}</span>
+                </div>
+              </div>
+
+              <div class="card-footer-row">
+                <span class="value-badge prop-value">{{lead.value | currency:lead.currency||'INR'}}</span>
+                <span class="date-tag" *ngIf="lead.createdAt">{{lead.createdAt | date:'shortDate'}}</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- WON -->
+    <div class="kanban-column">
+      <div class="column-header won-header">
+        <div class="column-header-left">
+          <span class="status-dot dot-won"></span>
+          <span class="column-title">WON</span>
+        </div>
+        <span class="column-count-badge">{{wonLeads.length}}</span>
+      </div>
+      <div 
+        class="kanban-list" 
+        id="WON"
+        cdkDropList 
+        [cdkDropListData]="wonLeads" 
+        [cdkDropListConnectedTo]="['NEW', 'QUALIFIED', 'PROPOSAL', 'LOST']" 
+        (cdkDropListDropped)="drop($event)">
+        
+        <ng-container *ngIf="isLoading">
+          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
+        </ng-container>
+        <ng-container *ngIf="!isLoading">
+          <div class="kanban-card card-accent-won" *ngFor="let lead of wonLeads" cdkDrag>
+            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+              <svg lucideCheckCircle size="14" class="text-success"></svg>
+            </div>
+            
+            <div class="card-body">
+              <div class="card-header-row">
+                <h4 class="lead-title">{{lead.title}}</h4>
+                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
+              </div>
+
+              <div class="card-company-pill" *ngIf="lead.companyName">
+                <svg lucideBuilding size="12"></svg>
+                <span>{{lead.companyName}}</span>
+              </div>
+
+              <div class="card-details">
+                <div class="detail-item" *ngIf="lead.contactName">
+                  <svg lucideUser size="12"></svg>
+                  <span>{{lead.contactName}}</span>
+                </div>
+              </div>
+
+              <div class="card-footer-row">
+                <span class="value-badge won-value">{{lead.value | currency:lead.currency||'INR'}}</span>
+                <span class="won-tag">Converted to Client</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- LOST -->
+    <div class="kanban-column">
+      <div class="column-header lost-header">
+        <div class="column-header-left">
+          <span class="status-dot dot-lost"></span>
+          <span class="column-title">LOST</span>
+        </div>
+        <span class="column-count-badge">{{lostLeads.length}}</span>
+      </div>
+      <div 
+        class="kanban-list" 
+        id="LOST"
+        cdkDropList 
+        [cdkDropListData]="lostLeads" 
+        [cdkDropListConnectedTo]="['NEW', 'QUALIFIED', 'PROPOSAL', 'WON']" 
+        (cdkDropListDropped)="drop($event)">
+        
+        <ng-container *ngIf="isLoading">
+          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
+        </ng-container>
+        <ng-container *ngIf="!isLoading">
+          <div class="kanban-card card-accent-lost" *ngFor="let lead of lostLeads" cdkDrag>
+            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+              <svg lucideGripVertical size="14"></svg>
+            </div>
+            
+            <div class="card-body">
+              <div class="card-header-row">
+                <h4 class="lead-title strike-through">{{lead.title}}</h4>
+                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
+              </div>
+
+              <div class="card-company-pill" *ngIf="lead.companyName">
+                <svg lucideBuilding size="12"></svg>
+                <span>{{lead.companyName}}</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Refined Glassmorphic Create Modal -->
+<div class="modal-backdrop" *ngIf="showCreateModal" (click)="closeModal()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3>Add New Lead</h3>
+        <p class="modal-subtitle">Enter details to add a new opportunity to your pipeline.</p>
+      </div>
+      <button class="btn-icon-close" (click)="closeModal()" [disabled]="isSaving">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.title.trim()">
+        <label>Opportunity Title <span class="required-asterisk">*</span></label>
+        <input 
+          type="text" 
+          [(ngModel)]="newLeadData.title" 
+          placeholder="e.g., 50 Licenses for Acme Corp" 
+          [disabled]="isSaving"
+        />
+        <span class="error-msg" *ngIf="isSubmitted && !newLeadData.title.trim()">
+          Opportunity Title is required.
+        </span>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.companyName.trim()">
+          <label>Company Name <span class="required-asterisk">*</span></label>
+          <input 
+            type="text" 
+            [(ngModel)]="newLeadData.companyName" 
+            placeholder="e.g., Acme Corp"
+            [disabled]="isSaving"
+          />
+          <span class="error-msg" *ngIf="isSubmitted && !newLeadData.companyName.trim()">
+            Company Name is required.
+          </span>
+        </div>
+        <div class="form-group">
+          <label>Contact Name</label>
+          <input 
+            type="text" 
+            [(ngModel)]="newLeadData.contactName" 
+            placeholder="e.g., John Doe"
+            [disabled]="isSaving"
+          />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.email.trim()">
+          <label>Email <span class="required-asterisk">*</span></label>
+          <input 
+            type="email" 
+            [(ngModel)]="newLeadData.email" 
+            placeholder="john@acme.com"
+            [disabled]="isSaving"
+          />
+          <span class="error-msg" *ngIf="isSubmitted && !newLeadData.email.trim()">
+            Email is required.
+          </span>
+        </div>
+        <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.phone.trim()">
+          <label>Phone <span class="required-asterisk">*</span></label>
+          <input 
+            type="text" 
+            [(ngModel)]="newLeadData.phone" 
+            placeholder="+1 (555) 000-0000"
+            [disabled]="isSaving"
+          />
+          <span class="error-msg" *ngIf="isSubmitted && !newLeadData.phone.trim()">
+            Phone is required.
+          </span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Estimated Value</label>
+        <div class="input-with-prefix">
+          <select class="currency-select" [(ngModel)]="newLeadData.currency" [disabled]="isSaving">
+            <option value="INR">₹</option>
+            <option value="USD">$</option>
+            <option value="EUR">€</option>
+            <option value="GBP">£</option>
+          </select>
+          <input 
+            type="number" 
+            [(ngModel)]="newLeadData.value" 
+            placeholder="0.00"
+            [disabled]="isSaving"
+            class="currency-input"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeModal()" [disabled]="isSaving">Cancel</button>
+      <button class="btn-primary" (click)="createLead()" [disabled]="isSaving">
+        <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving"></svg>
+        <span>{{ isSaving ? 'Saving...' : 'Save Lead' }}</span>
+      </button>
+    </div>
+  </div>
+</div>

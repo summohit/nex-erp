@@ -1148,12 +1148,7 @@ export class AttendanceLeaveComponent implements OnInit {
   };
 
   gridOptions: GridOptions = {
-    theme: 'legacy' as const,
-    rowSelection: {
-      mode: 'multiRow' as const,
-      headerCheckbox: true,
-      enableClickSelection: false
-    }
+    theme: 'legacy' as const
   };
 
   // Grid / UI State

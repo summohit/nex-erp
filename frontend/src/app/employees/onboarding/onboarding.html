@@ -37,9 +37,22 @@
            [cdkDropListData]="boardData().pending"
            (cdkDropListDropped)="drop($event)">
            
-        <div class="empty-column-state" *ngIf="!boardData().pending.length">
+        <div class="empty-column-state" *ngIf="!isLoading() && !boardData().pending.length">
           Drop cards here
         </div>
+
+        <ng-container *ngIf="isLoading()">
+          <div class="skeleton-card" *ngFor="let i of [1,2]">
+            <div class="skeleton-avatar skeleton-anim"></div>
+            <div class="skeleton-details">
+              <div class="skeleton-line skeleton-anim" style="width: 70%;"></div>
+              <div class="skeleton-line skeleton-anim" style="width: 40%; margin-bottom: 8px;"></div>
+              <div class="skeleton-line skeleton-anim" style="width: 100%;"></div>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="!isLoading()">
 
         <div class="kanban-card" *ngFor="let emp of boardData().pending" cdkDrag (click)="openChecklist(emp)">
           <div class="card-drag-handle" cdkDragHandle>
@@ -63,7 +76,8 @@
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </ng-container>
       </div>
     </div>
 
@@ -83,9 +97,22 @@
            [cdkDropListData]="boardData().inProgress"
            (cdkDropListDropped)="drop($event)">
            
-        <div class="empty-column-state" *ngIf="!boardData().inProgress.length">
+        <div class="empty-column-state" *ngIf="!isLoading() && !boardData().inProgress.length">
           Drop cards here
         </div>
+
+        <ng-container *ngIf="isLoading()">
+          <div class="skeleton-card" *ngFor="let i of [1,2]">
+            <div class="skeleton-avatar skeleton-anim"></div>
+            <div class="skeleton-details">
+              <div class="skeleton-line skeleton-anim" style="width: 70%;"></div>
+              <div class="skeleton-line skeleton-anim" style="width: 40%; margin-bottom: 8px;"></div>
+              <div class="skeleton-line skeleton-anim" style="width: 100%;"></div>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="!isLoading()">
 
         <div class="kanban-card" *ngFor="let emp of boardData().inProgress" cdkDrag (click)="openChecklist(emp)">
           <div class="card-drag-handle" cdkDragHandle>
@@ -109,7 +136,8 @@
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </ng-container>
       </div>
     </div>
 
@@ -129,9 +157,22 @@
            [cdkDropListData]="boardData().completed"
            (cdkDropListDropped)="drop($event)">
            
-        <div class="empty-column-state" *ngIf="!boardData().completed.length">
+        <div class="empty-column-state" *ngIf="!isLoading() && !boardData().completed.length">
           Drop cards here
         </div>
+
+        <ng-container *ngIf="isLoading()">
+          <div class="skeleton-card" *ngFor="let i of [1,2]">
+            <div class="skeleton-avatar skeleton-anim"></div>
+            <div class="skeleton-details">
+              <div class="skeleton-line skeleton-anim" style="width: 70%;"></div>
+              <div class="skeleton-line skeleton-anim" style="width: 40%; margin-bottom: 8px;"></div>
+              <div class="skeleton-line skeleton-anim" style="width: 100%;"></div>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="!isLoading()">
 
         <div class="kanban-card" *ngFor="let emp of boardData().completed" cdkDrag (click)="openChecklist(emp)">
           <div class="card-drag-handle" cdkDragHandle>
@@ -155,7 +196,8 @@
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </ng-container>
       </div>
     </div>
   </div>

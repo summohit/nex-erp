@@ -1647,8 +1647,16 @@
              [cdkDropListData]="getColumnIssues(col.id)"
              [cdkDropListConnectedTo]="getConnectedListIds()"
              (cdkDropListDropped)="drop($event, col.id)">
-          
+          <!-- Skeleton Loaders -->
+          <ng-container *ngIf="isLoading()">
+            <div class="trello-card" style="padding: 12px;" *ngFor="let i of [1,2]">
+              <div class="shimmer" style="width: 80%; height: 14px; border-radius: 4px; margin-bottom: 8px; background-color: #f1f2f4;"></div>
+              <div class="shimmer" style="width: 40%; height: 12px; border-radius: 4px; background-color: #f1f2f4;"></div>
+            </div>
+          </ng-container>
+
           <!-- Existing Cards -->
+          <ng-container *ngIf="!isLoading()">
           <div class="trello-card" 
                [class.is-updating]="isIssueUpdating(issue.id)"
                *ngFor="let issue of getColumnIssues(col.id)" 
@@ -1724,9 +1732,10 @@
             <button type="button" class="card-hover-edit-btn" (click)="$event.stopPropagation(); openIssueDetails(issue)">
               <svg lucideEdit2 size="14"></svg>
             </button>
-          </div>
+            </div>
+          </ng-container>
 
-          <!-- Inline Add Card Form -->
+          <!-- Inline Add Card Template -->
           <div class="inline-add-card-form" *ngIf="addingCardColumnId() === col.id">
             <textarea 
               rows="3" 

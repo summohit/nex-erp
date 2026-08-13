@@ -23,6 +23,7 @@ export class OnboardingComponent implements OnInit {
 
   boardData = signal<OnboardingBoardData>({ pending: [], inProgress: [], completed: [] });
   templates = signal<OnboardingTemplate[]>([]);
+  isLoading = signal<boolean>(true);
 
   viewMode = signal<'KANBAN' | 'TABLE'>('KANBAN');
 
@@ -146,9 +147,16 @@ export class OnboardingComponent implements OnInit {
   }
 
   loadBoard() {
+    this.isLoading.set(true);
     this.onboardingService.getOnboardingBoard().subscribe({
-      next: (data) => this.boardData.set(data),
-      error: () => this.toast.error('Failed to load onboarding board')
+      next: (data) => {
+        this.boardData.set(data);
+        this.isLoading.set(false);
+      },
+      error: () => {
+        this.toast.error('Failed to load onboarding board');
+        this.isLoading.set(false);
+      }
     });
   }
 

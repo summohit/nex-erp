@@ -1,0 +1,172 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-title">
+      <h2>Quotations & Proposals</h2>
+      <p>Manage quotes, send proposals, and convert them to sales orders.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-primary" (click)="openModal()">
+        <svg lucidePlus size="16"></svg> Create Quote
+      </button>
+    </div>
+  </div>
+
+  <div class="table-container glass-panel">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Quote #</th>
+          <th>Client</th>
+          <th>Date</th>
+          <th>Total</th>
+          <th>Approval</th>
+          <th>Status</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="quotations.length === 0">
+          <td colspan="7" class="text-center text-muted">No quotations found. Create one to get started.</td>
+        </tr>
+        <tr *ngFor="let q of quotations">
+          <td><span class="fw-semibold">{{q.quoteNumber}}</span></td>
+          <td>{{q.client?.name}}</td>
+          <td>{{q.date | date}}</td>
+          <td>{{q.total | currency:q.currency}}</td>
+          <td>
+            <span class="badge" [ngClass]="{
+              'badge-warning': q.approvalStatus === 'PENDING',
+              'badge-success': q.approvalStatus === 'APPROVED',
+              'badge-danger': q.approvalStatus === 'REJECTED'
+            }">{{q.approvalStatus}}</span>
+          </td>
+          <td>
+            <span class="badge" [ngClass]="{
+              'badge-secondary': q.status === 'DRAFT',
+              'badge-info': q.status === 'SENT',
+              'badge-success': q.status === 'ACCEPTED'
+            }">{{q.status}}</span>
+          </td>
+          <td class="actions-cell text-right">
+            <button class="btn-icon" *ngIf="q.approvalStatus === 'PENDING'" (click)="approveQuote(q.id)" title="Approve">
+              <svg lucideCheck size="16" class="text-success"></svg>
+            </button>
+            <button class="btn-action" *ngIf="q.approvalStatus === 'APPROVED' && q.status !== 'ACCEPTED'" (click)="convertToOrder(q.id)">
+              Convert to Order <svg lucideArrowRight size="14"></svg>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Refined Create Quote Modal -->
+<div class="modal-backdrop" *ngIf="showCreateModal" (click)="closeModal()">
+  <div class="modal-card modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3>New Quotation</h3>
+        <p class="modal-subtitle">Create a formal proposal and send line items to your prospective client.</p>
+      </div>
+      <button class="btn-icon-close" (click)="closeModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group" [class.has-error]="isSubmitted && !newQuoteData.clientId">
+          <label>Client <span class="required-asterisk">*</span></label>
+          <select [(ngModel)]="newQuoteData.clientId">
+            <option [ngValue]="null">Select Client...</option>
+            <option *ngFor="let c of clients" [ngValue]="c.id">{{c.name}}</option>
+          </select>
+          <span class="error-msg" *ngIf="isSubmitted && !newQuoteData.clientId">
+            Please select a Client.
+          </span>
+        </div>
+        <div class="form-group">
+          <label>Related Lead (Optional)</label>
+          <select [(ngModel)]="newQuoteData.leadId">
+            <option [ngValue]="null">Select Lead...</option>
+            <option *ngFor="let l of leads" [ngValue]="l.id">{{l.title}}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" [(ngModel)]="newQuoteData.date" />
+        </div>
+        <div class="form-group">
+          <label>Valid Until</label>
+          <input type="date" [(ngModel)]="newQuoteData.validUntil" />
+        </div>
+        <div class="form-group">
+          <label>Currency</label>
+          <select [(ngModel)]="newQuoteData.currency">
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="INR">INR</option>
+          </select>
+        </div>
+      </div>
+
+      <h4 class="section-title">Line Items</h4>
+      <div class="line-items">
+        <div class="line-item-row header-row">
+          <div class="col-desc">Description</div>
+          <div class="col-qty">Qty</div>
+          <div class="col-price">Unit Price</div>
+          <div class="col-total">Total</div>
+          <div class="col-action"></div>
+        </div>
+        
+        <div class="line-item-row" *ngFor="let item of newQuoteData.items; let i = index">
+          <div class="col-desc">
+            <input type="text" [(ngModel)]="item.description" placeholder="Item description" />
+          </div>
+          <div class="col-qty">
+            <input type="number" [(ngModel)]="item.quantity" min="1" />
+          </div>
+          <div class="col-price">
+            <input type="number" [(ngModel)]="item.unitPrice" min="0" step="0.01" />
+          </div>
+          <div class="col-total font-medium">
+            {{(item.quantity * item.unitPrice) | currency:newQuoteData.currency}}
+          </div>
+          <div class="col-action">
+            <button class="btn-icon text-danger" (click)="removeItem(i)" *ngIf="newQuoteData.items.length > 1">
+              <svg lucideTrash2 size="16"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="line-items-actions">
+        <button class="btn-secondary btn-sm" (click)="addItem()">
+          <svg lucidePlus size="14"></svg> Add Line Item
+        </button>
+      </div>
+
+      <div class="quote-summary">
+        <div class="summary-row">
+          <span>Subtotal (excl. Tax):</span>
+          <span>{{calculateTotal() / 1.1 | currency:newQuoteData.currency}}</span>
+        </div>
+        <div class="summary-row total-row">
+          <span>Total (incl. 10% Tax):</span>
+          <span>{{calculateTotal() | currency:newQuoteData.currency}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeModal()">Cancel</button>
+      <button class="btn-primary" (click)="createQuotation()">Save Quotation</button>
+    </div>
+  </div>
+</div>

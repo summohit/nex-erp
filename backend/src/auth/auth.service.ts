@@ -168,7 +168,8 @@ export class AuthService {
     const user = await this.prisma.user.findFirst({
       where: {
         email: { equals: email, mode: 'insensitive' }
-      }
+      },
+      include: { employee: true }
     });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
@@ -183,12 +184,22 @@ export class AuthService {
       throw new UnauthorizedException('Account is blocked connect administration');
     }
 
+<<<<<<< Updated upstream
     const employee = await this.prisma.employee.findUnique({
       where: { userId: user.id },
       select: { id: true }
     });
 
     const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId, employeeId: employee?.id ?? null };
+=======
+    const payload = { 
+      sub: user.id, 
+      email: user.email, 
+      role: user.role, 
+      companyId: user.companyId,
+      employeeId: user.employee?.id 
+    };
+>>>>>>> Stashed changes
     
     const access_token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
     const refresh_token = await this.jwtService.signAsync(payload, { 

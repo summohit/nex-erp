@@ -45,6 +45,9 @@ model Company {
   approvalWorkflows   ApprovalWorkflow[]
   performanceGoals    PerformanceGoal[]
   performanceReviews  PerformanceReview[]
+  companyOKRs         CompanyOKR[]
+  appraisalCycles     AppraisalCycle[]
+  peerFeedbacks       PeerFeedback[]
   resignations        Resignation[]
   exitInterviews      ExitInterview[]
   offboardingTasks    OffboardingTask[]
@@ -53,6 +56,10 @@ model Company {
   clients             Client[]
   kioskEnabled        Boolean              @default(false)
   payrollSetting      PayrollSetting?
+  baseCurrency        String               @default("USD")
+  leads               Lead[]
+  quotations          Quotation[]
+  salesOrders         SalesOrder[]
 }
 
 // Authentication & RBAC
@@ -78,6 +85,7 @@ model User {
   conductedExitInterviews  ExitInterview[]            @relation("ExitInterviewer")
   clearedOffboardingTasks  OffboardingTask[]          @relation("TaskClearer")
   approvedRegularizations  AttendanceRegularization[]
+  approvedQuotations       Quotation[]                @relation("QuotationApprover")
 }
 
 model VerificationToken {
@@ -253,6 +261,9 @@ model Employee {
   regularizations          AttendanceRegularization[]
   shiftRotations           ShiftRotation[]
   uploadedProjectDocuments ProjectDocument[]
+  assignedLeads            Lead[]                     @relation("LeadAssignee")
+  peerReviewsGiven         PeerFeedback[]             @relation("PeerReviewer")
+  peerReviewsReceived      PeerFeedback[]             @relation("PeerReviewee")
 }
 
 model EmergencyContact {
@@ -669,8 +680,6 @@ model JobApplication {
   fullName        String
   email           String
   phone           String
-
-  @@unique([jobId, email])
   resumeUrl       String?
   linkedinUrl     String?
   portfolioUrl    String?
@@ -686,6 +695,8 @@ model JobApplication {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   interviews      Interview[]
+
+  @@unique([jobId, email])
 }
 
 model Interview {
@@ -787,11 +798,11 @@ model ProjectAnalysisRun {
   estimatedRevenue   Float?
   estimatedMarginPct Float?
   marginDisplay      String?
-  
-  readinessScore     Int?
-  healthStatus       String?
-  healthBreakdown    Json?
-  
+
+  readinessScore  Int?
+  healthStatus    String?
+  healthBreakdown Json?
+
   validationWarnings Json?
   isReadyForKickoff  Boolean?
   kickoffBlockers    Json?
@@ -880,7 +891,7 @@ model ProjectWbsTask {
   feature         String
   task            String
   subtask         String?
-  description     String? @db.Text
+  description     String?   @db.Text
   estimatedEffort Float?
   quantity        Int?
   engineer        String?
@@ -890,8 +901,8 @@ model ProjectWbsTask {
   endDate         DateTime?
   endTime         String?
   sourceReference String?
-  remarks         String? @db.Text
-  dependencies    String? @db.Text
+  remarks         String?   @db.Text
+  dependencies    String?   @db.Text
   requiredSkill   String?
   requiredLevel   String?
   priority        String
@@ -1489,33 +1500,117 @@ model EmployeeResume {
 // ═══════════════════════════════════════════
 
 model PerformanceGoal {
-  id          Int       @id @default(autoincrement())
-  employeeId  Int
-  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  title       String
-  description String?   @db.Text
-  status      String    @default("IN_PROGRESS") // IN_PROGRESS, ACHIEVED, MISSED
-  dueDate     DateTime?
-  companyId   Int
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           Int         @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?     @db.Text
+  status       String      @default("IN_PROGRESS") // IN_PROGRESS, ACHIEVED, MISSED
+  dueDate      DateTime?
+  progress     Int         @default(0)        // 0-100 percentage
+  targetValue  Float?                         // e.g. 100000 (₹1L target)
+  currentValue Float?      @default(0)        // e.g. 75000 (₹75K current)
+  unit         String?                        // "₹", "%", "units", "deals", "projects"
+  okrId        Int?
+  okr          CompanyOKR? @relation(fields: [okrId], references: [id], onDelete: SetNull)
+  companyId    Int
+  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
 model PerformanceReview {
-  id         Int       @id @default(autoincrement())
-  employeeId Int
-  employee   Employee  @relation("Reviewee", fields: [employeeId], references: [id], onDelete: Cascade)
-  reviewerId Int?
-  reviewer   Employee? @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
-  cycleName  String // e.g. "Q1 2027", "Annual Review 2026"
-  rating     Int? // 1 to 5
-  feedback   String?   @db.Text
-  status     String    @default("DRAFT") // DRAFT, SUBMITTED, ACKNOWLEDGED
-  companyId  Int
-  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id           Int                @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee           @relation("Reviewee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewerId   Int?
+  reviewer     Employee?          @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  cycleId      Int?
+  cycle        AppraisalCycle?    @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  cycleName    String
+  type         String             @default("MANAGER") // MANAGER, SELF, PEER
+  rating       Int?
+  feedback     String?            @db.Text
+  selfRating   Int?               // Employee's self-rating (1-5)
+  selfFeedback String?            @db.Text          // Employee's self-assessment
+  status       String             @default("PENDING_SELF_REVIEW")
+  // Status flow: PENDING_SELF_REVIEW → SELF_REVIEWED → MANAGER_REVIEWED → ACKNOWLEDGED → HR_APPROVED
+  signoffs     AppraisalSignoff[]
+  companyId    Int
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model CompanyOKR {
+  id          Int               @id @default(autoincrement())
+  title       String            // "Increase Revenue by 40%"
+  description String?           @db.Text
+  period      String            // "Q1 2026", "H1 2026", "FY 2026-27"
+  status      String            @default("ACTIVE")   // ACTIVE, COMPLETED, CANCELLED
+  progress    Int               @default(0)          // 0-100 auto-calculated from key results
+  companyId   Int
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdById Int?
+  keyResults  OKRKeyResult[]
+  linkedGoals PerformanceGoal[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model OKRKeyResult {
+  id           Int        @id @default(autoincrement())
+  okrId        Int
+  okr          CompanyOKR @relation(fields: [okrId], references: [id], onDelete: Cascade)
+  title        String     // "Close 50 enterprise deals"
+  targetValue  Float      // 50
+  currentValue Float      @default(0)       // 32
+  unit         String     @default("units") // "₹", "%", "units", "deals"
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model AppraisalCycle {
+  id        Int                 @id @default(autoincrement())
+  name      String              // "H1 2026 Performance Review"
+  startDate DateTime
+  endDate   DateTime
+  status    String              @default("ACTIVE")   // ACTIVE, COMPLETED, CLOSED
+  companyId Int
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reviews   PerformanceReview[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}
+
+model AppraisalSignoff {
+  id         Int               @id @default(autoincrement())
+  reviewId   Int
+  review     PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  signedById Int               // Employee ID who signed
+  role       String            // EMPLOYEE, MANAGER, HR
+  action     String            // APPROVED, ACKNOWLEDGED, REJECTED
+  comments   String?           @db.Text
+  signedAt   DateTime          @default(now())
+}
+
+model PeerFeedback {
+  id           Int      @id @default(autoincrement())
+  employeeId   Int      // Employee being reviewed
+  employee     Employee @relation("PeerReviewee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewerId   Int      // Peer who gives feedback
+  reviewer     Employee @relation("PeerReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  cycleId      Int?
+  cycleName    String
+  rating       Int?     // 1-5
+  strengths    String?  @db.Text
+  improvements String?  @db.Text
+  comments     String?  @db.Text
+  status       String   @default("PENDING")   // PENDING, SUBMITTED
+  companyId    Int
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 // Offboarding & Exit Management
@@ -1629,8 +1724,11 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contacts ClientContact[]
-  projects Project[]
+  contacts    ClientContact[]
+  projects    Project[]
+  leads       Lead[]
+  quotations  Quotation[]
+  salesOrders SalesOrder[]
 
   @@unique([name, companyId])
 }
@@ -1667,4 +1765,101 @@ model PayrollSetting {
   gratuityPercent Float    @default(4.81) // 4.81% of Basic
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ═══════════════════════════════════════════
+// SALES & CRM MODULE
+// ═══════════════════════════════════════════
+
+model Lead {
+  id           Int         @id @default(autoincrement())
+  title        String
+  companyName  String?
+  contactName  String?
+  email        String?
+  phone        String?
+  value        Float?
+  currency     String?
+  source       String?
+  status       String      @default("NEW") // NEW, QUALIFIED, PROPOSAL, WON, LOST
+  assignedToId Int?
+  assignedTo   Employee?   @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  companyId    Int
+  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  clientId     Int?
+  client       Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  quotations   Quotation[]
+}
+
+model Quotation {
+  id             Int             @id @default(autoincrement())
+  quoteNumber    String
+  clientId       Int
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  leadId         Int?
+  lead           Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  date           DateTime
+  validUntil     DateTime
+  subtotal       Float
+  tax            Float
+  total          Float
+  currency       String
+  status         String          @default("DRAFT") // DRAFT, PENDING_APPROVAL, SENT, ACCEPTED, REJECTED
+  approvalStatus String          @default("APPROVED") // PENDING, APPROVED, REJECTED
+  approvedById   Int?
+  approvedBy     User?           @relation("QuotationApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  companyId      Int
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items          QuotationItem[]
+  salesOrders    SalesOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model QuotationItem {
+  id          Int       @id @default(autoincrement())
+  quotationId Int
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float
+  unitPrice   Float
+  total       Float
+}
+
+model SalesOrder {
+  id              Int              @id @default(autoincrement())
+  orderNumber     String
+  quotationId     Int?
+  quotation       Quotation?       @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  clientId        Int
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  date            DateTime
+  total           Float
+  currency        String
+  status          String           @default("DRAFT") // DRAFT, CONFIRMED, DELIVERED, CANCELLED
+  isRental        Boolean          @default(false)
+  rentalStartDate DateTime?
+  rentalEndDate   DateTime?
+  rentalStatus    String? // ACTIVE, OVERDUE, RETURNED
+  companyId       Int
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items           SalesOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SalesOrderItem {
+  id               Int        @id @default(autoincrement())
+  salesOrderId     Int
+  salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  description      String
+  quantity         Float
+  unitPrice        Float
+  total            Float
+  isRentalItem     Boolean    @default(false)
+  returnedQuantity Float      @default(0)
 }

@@ -72,6 +72,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   allIssues = signal<any[]>([]);
   activeIssues = computed(() => this.allIssues().filter(i => !i.isArchived));
   archivedIssues = computed(() => this.allIssues().filter(i => i.isArchived));
+  isLoading = signal<boolean>(true);
 
   // Attachments Tab Filters
   attSearchQuery = signal<string>('');
@@ -1217,6 +1218,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   loadBoardAndIssues() {
+    this.isLoading.set(true);
     this.projectsService.getBoard(this.projectId).subscribe({
       next: (board) => {
         this.board.set(board);
@@ -1235,8 +1237,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
               }
             });
             this.issuesByColumn.set(map);
+            this.isLoading.set(false);
+          },
+          error: () => {
+            this.isLoading.set(false);
           }
         });
+      },
+      error: () => {
+        this.isLoading.set(false);
       }
     });
   }

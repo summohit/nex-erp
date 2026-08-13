@@ -82,7 +82,7 @@ deploy_backend() {
   log "Dependencies installed."
 
   info "Running Prisma migrations..."
-  remote "cd $REMOTE_DIR/backend && npx prisma db push --accept-data-loss && npx prisma generate"
+  remote "cd $REMOTE_DIR/backend && export DIRECT_URL=\$(grep DATABASE_URL .env | cut -d'\"' -f2 | sed 's/6543/5432/' | sed 's/?pgbouncer=true//') && DATABASE_URL=\"\$DIRECT_URL\" npx prisma db push --accept-data-loss && npx prisma generate"
   log "Database synced."
 
   info "Building backend on server..."

@@ -1,0 +1,47 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-title">
+      <h2>Sales Orders</h2>
+      <p>View confirmed sales orders generated from accepted quotations or POS.</p>
+    </div>
+  </div>
+
+  <div class="table-container glass-panel">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Client</th>
+          <th>Date</th>
+          <th>Total Value</th>
+          <th>Status</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="orders.length === 0">
+          <td colspan="6" class="text-center text-muted">No sales orders found.</td>
+        </tr>
+        <tr *ngFor="let o of orders">
+          <td><span class="fw-semibold">{{o.orderNumber}}</span></td>
+          <td>{{o.client?.name}}</td>
+          <td>{{o.date | date}}</td>
+          <td>{{o.total | currency:o.currency}}</td>
+          <td>
+            <span class="badge" [ngClass]="{
+              'badge-secondary': o.status === 'DRAFT',
+              'badge-info': o.status === 'CONFIRMED',
+              'badge-success': o.status === 'DELIVERED',
+              'badge-danger': o.status === 'CANCELLED'
+            }">{{o.status}}</span>
+          </td>
+          <td class="actions-cell text-right">
+            <button class="btn-icon" title="View Order">
+              <svg lucidePackage size="18" class="text-secondary"></svg>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

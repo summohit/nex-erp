@@ -23,7 +23,7 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('User is not authenticated');
     }
 
-    if (user.role === 'SUPER_ADMIN') {
+    if (user.role === 'SUPER_ADMIN' || user.role === 'SUPERADMIN' || user.role === 'ADMIN') {
       return true;
     }
 

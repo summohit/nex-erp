@@ -192,6 +192,30 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'clients' },
         loadComponent: () => import('./clients/client-profile/client-profile.component').then(m => m.ClientProfileComponent)
+      },
+      {
+        path: 'crm/leads',
+        canActivate: [permissionGuard],
+        data: { module: 'crm/leads' },
+        loadComponent: () => import('./crm/leads/leads').then(m => m.LeadsComponent)
+      },
+      {
+        path: 'sales/quotations',
+        canActivate: [permissionGuard],
+        data: { module: 'sales/quotations' },
+        loadComponent: () => import('./sales/quotations/quotations').then(m => m.QuotationsComponent)
+      },
+      {
+        path: 'sales/orders',
+        canActivate: [permissionGuard],
+        data: { module: 'sales/orders' },
+        loadComponent: () => import('./sales/orders/orders').then(m => m.OrdersComponent)
+      },
+      {
+        path: 'sales/pos',
+        canActivate: [permissionGuard],
+        data: { module: 'sales/pos' },
+        loadComponent: () => import('./sales/pos/pos').then(m => m.PosComponent)
       }
     ]
   },

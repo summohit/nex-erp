@@ -4,20 +4,34 @@
       <h1>Performance & Appraisals</h1>
       <p>Set goals, track progress, and review performance</p>
     </div>
-    <button class="btn-primary" (click)="activeTab() === 'goals' ? openGoalModal() : openReviewModal()" *ngIf="activeTab() === 'goals' || isManager()">
-      <svg lucidePlus size="20"></svg>
-      {{ activeTab() === 'goals' ? 'New Goal' : 'New Appraisal' }}
-    </button>
+    <div class="header-actions">
+      <button class="btn-primary" *ngIf="activeTab() === 'goals'" (click)="openGoalModal()">
+        <svg lucidePlus size="20"></svg> New Goal
+      </button>
+      <button class="btn-primary" *ngIf="activeTab() === 'reviews' && isManager()" (click)="openReviewModal()">
+        <svg lucidePlus size="20"></svg> New Appraisal
+      </button>
+      <button class="btn-primary" *ngIf="activeTab() === 'okrs' && isHR()" (click)="openOkrModal()">
+        <svg lucidePlus size="20"></svg> New OKR
+      </button>
+      <button class="btn-primary" *ngIf="activeTab() === 'cycles' && isHR()" (click)="openCycleModal()">
+        <svg lucidePlus size="20"></svg> New Cycle
+      </button>
+    </div>
   </div>
 
   <div class="tabs-container">
     <button class="tab-btn" [class.active]="activeTab() === 'goals'" (click)="setTab('goals')">
-      <svg lucideTarget size="18"></svg>
-      My Goals
+      <svg lucideTarget size="18"></svg> My Goals
     </button>
     <button class="tab-btn" [class.active]="activeTab() === 'reviews'" (click)="setTab('reviews')">
-      <svg lucideAward size="18"></svg>
-      Appraisals & Reviews
+      <svg lucideAward size="18"></svg> Appraisals & Reviews
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'okrs'" (click)="setTab('okrs')">
+      <svg lucideTrendingUp size="18"></svg> Company OKRs
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'cycles'" *ngIf="isHR() || isManager()" (click)="setTab('cycles')">
+      <svg lucideCalendar size="18"></svg> Appraisal Cycles
     </button>
   </div>
 
@@ -25,44 +39,60 @@
   <div *ngIf="activeTab() === 'goals'">
     <div class="goals-grid" *ngIf="myGoals().length > 0; else noGoals">
       <div class="goal-card" *ngFor="let goal of myGoals()">
-        <div class="goal-meta">
+        <div class="goal-card-header">
           <span class="status-badge" [ngClass]="goal.status.toLowerCase()">
             {{ goal.status.replace('_', ' ') }}
           </span>
-          <span *ngIf="goal.dueDate" style="display: flex; align-items: center; gap: 4px;">
-            <svg lucideClock size="14"></svg>
-            {{ goal.dueDate | date:'mediumDate' }}
-          </span>
+          <div class="header-actions">
+            <span *ngIf="goal.okr" class="okr-badge" title="Linked to OKR">
+               <svg lucideTrendingUp size="12"></svg> {{ goal.okr.title }}
+            </span>
+            <span *ngIf="goal.dueDate" class="due-badge">
+              <svg lucideClock size="13"></svg> {{ goal.dueDate | date:'mediumDate' }}
+            </span>
+            <button class="delete-btn" title="Delete Goal" (click)="deleteGoal(goal.id)">
+              <svg lucideTrash size="15"></svg>
+            </button>
+          </div>
         </div>
-        <div class="goal-title">{{ goal.title }}</div>
-        <div class="goal-desc">{{ goal.description || 'No description provided.' }}</div>
+
+        <div class="goal-card-body">
+          <h3 class="goal-title">{{ goal.title }}</h3>
+          <p class="goal-desc">{{ goal.description || 'No description provided.' }}</p>
+          
+          <div class="progress-section">
+            <div class="progress-header">
+              <span>Progress: {{ goal.progress }}%</span>
+              <span *ngIf="goal.targetValue">{{ goal.unit }}{{ goal.currentValue }} / {{ goal.unit }}{{ goal.targetValue }}</span>
+            </div>
+            <div class="progress-bar-container">
+               <input type="range" class="progress-slider" min="0" max="100" [value]="goal.progress" 
+                      (change)="updateGoalProgress(goal.id, $any($event.target).value, goal.currentValue || 0)">
+            </div>
+          </div>
+        </div>
         
         <div class="goal-actions" *ngIf="goal.status !== 'ACHIEVED' && goal.status !== 'MISSED'">
-          <button (click)="updateGoalStatus(goal.id, 'ACHIEVED')" style="color: #16A34A; border-color: #BBF7D0;">
-            Mark Achieved
+          <button class="btn-achieve" (click)="updateGoalStatus(goal.id, 'ACHIEVED')">
+            <svg lucideCheck size="16"></svg> Mark Achieved
           </button>
-          <button (click)="updateGoalStatus(goal.id, 'MISSED')" style="color: #DC2626; border-color: #FECACA;">
-            Mark Missed
+          <button class="btn-miss" (click)="updateGoalStatus(goal.id, 'MISSED')">
+            <svg lucideXCircle size="16"></svg> Mark Missed
           </button>
         </div>
-        
-        <button style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #94A3B8; cursor: pointer;" (click)="deleteGoal(goal.id)">
-          <svg lucideTrash size="16"></svg>
-        </button>
       </div>
     </div>
     <ng-template #noGoals>
-      <div style="text-align: center; padding: 60px; background: white; border-radius: 16px; border: 1px dashed #CBD5E1;">
-        <svg lucideTarget size="48" style="color: #94A3B8; margin-bottom: 16px;"></svg>
-        <h3 style="margin: 0 0 8px 0; color: #334155;">No Goals Yet</h3>
-        <p style="margin: 0; color: #64748B;">Set your first performance goal to start tracking progress.</p>
+      <div class="empty-state">
+        <svg lucideTarget size="48"></svg>
+        <h3>No Goals Yet</h3>
+        <p>Set your first performance goal to start tracking progress.</p>
       </div>
     </ng-template>
   </div>
 
   <!-- Reviews Tab -->
   <div *ngIf="activeTab() === 'reviews'" class="reviews-section">
-    
     <!-- My Reviews (Received) -->
     <div class="reviews-table-container">
       <h2>My Appraisals</h2>
@@ -72,8 +102,8 @@
             <th>Cycle</th>
             <th>Reviewer</th>
             <th>Rating</th>
-            <th>Status</th>
-            <th>Date</th>
+            <th>Status / Workflow</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -87,14 +117,25 @@
               <span *ngIf="!rev.rating">-</span>
             </td>
             <td>
-              <span class="status-badge" [ngClass]="{'achieved': rev.status === 'SUBMITTED', 'in_progress': rev.status === 'DRAFT'}">{{ rev.status }}</span>
+               <!-- Workflow Stepper visualization could go here, or just a detailed badge -->
+              <span class="workflow-badge" [ngClass]="rev.status.toLowerCase()">
+                 {{ rev.status.replace(/_/g, ' ') }}
+              </span>
             </td>
-            <td>{{ rev.createdAt | date:'mediumDate' }}</td>
+            <td>
+               <button *ngIf="rev.status === 'PENDING_SELF_REVIEW'" class="btn-primary btn-sm" (click)="openSelfAppraisal(rev)">
+                 Complete Self Review
+               </button>
+               <button *ngIf="rev.status === 'MANAGER_REVIEWED'" class="btn-primary btn-sm" (click)="signoff(rev.id, 'EMPLOYEE', 'ACKNOWLEDGED')">
+                 Acknowledge
+               </button>
+               <button class="btn-secondary btn-sm" (click)="openReviewModal(rev)">View</button>
+            </td>
           </tr>
         </tbody>
       </table>
       <ng-template #noMyReviews>
-        <div style="padding: 32px; text-align: center; color: #64748B;">No appraisals received yet.</div>
+        <div class="empty-state">No appraisals received yet.</div>
       </ng-template>
     </div>
 
@@ -114,25 +155,94 @@
         <tbody>
           <tr *ngFor="let rev of teamReviews()">
             <td style="display: flex; align-items: center; gap: 12px;">
-              <img [src]="rev.employee?.avatarUrl || 'assets/default-avatar.png'" style="width: 32px; height: 32px; border-radius: 50%;" />
+              <img [src]="rev.employee?.avatarUrl || 'assets/default-avatar.png'" class="avatar-sm" />
               <span style="font-weight: 600;">{{ rev.employee?.firstName }} {{ rev.employee?.lastName }}</span>
             </td>
             <td>{{ rev.cycleName }}</td>
             <td>{{ rev.rating || '-' }} / 5</td>
             <td>
-              <span class="status-badge" [ngClass]="{'achieved': rev.status === 'SUBMITTED', 'in_progress': rev.status === 'DRAFT'}">{{ rev.status }}</span>
+              <span class="workflow-badge" [ngClass]="rev.status.toLowerCase()">{{ rev.status.replace(/_/g, ' ') }}</span>
             </td>
             <td>
-              <button (click)="openReviewModal(rev)" style="background: none; border: none; color: #2563EB; font-weight: 600; cursor: pointer;">Edit</button>
+              <button *ngIf="rev.status === 'SELF_REVIEWED'" class="btn-primary btn-sm" (click)="openReviewModal(rev)">Give Feedback</button>
+              <button *ngIf="rev.status !== 'SELF_REVIEWED'" class="btn-secondary btn-sm" (click)="openReviewModal(rev)">View/Edit</button>
+              
+              <!-- HR Approval if Manager is also HR -->
+              <button *ngIf="isHR() && rev.status === 'ACKNOWLEDGED'" class="btn-primary btn-sm ml-2" (click)="signoff(rev.id, 'HR', 'APPROVED')">
+                HR Approve
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
       <ng-template #noTeamReviews>
-        <div style="padding: 32px; text-align: center; color: #64748B;">You haven't submitted any appraisals for your team yet.</div>
+        <div class="empty-state">No team appraisals created yet.</div>
       </ng-template>
     </div>
   </div>
+
+  <!-- OKRs Tab -->
+  <div *ngIf="activeTab() === 'okrs'">
+    <div class="okr-grid" *ngIf="companyOKRs().length > 0; else noOkrs">
+       <div class="okr-card" *ngFor="let okr of companyOKRs()">
+          <div class="okr-header">
+            <h3>{{ okr.title }}</h3>
+            <span class="status-badge" [ngClass]="okr.status.toLowerCase()">{{ okr.status }}</span>
+          </div>
+          <p class="okr-period">Period: {{ okr.period }}</p>
+          <p class="okr-desc">{{ okr.description }}</p>
+          
+          <div class="key-results">
+            <h4>Key Results</h4>
+            <div class="kr-item" *ngFor="let kr of okr.keyResults">
+              <div class="kr-info">
+                 <span>{{ kr.title }}</span>
+                 <span>{{ kr.unit }}{{ kr.currentValue }} / {{ kr.unit }}{{ kr.targetValue }}</span>
+              </div>
+              <div class="kr-progress-bar">
+                 <div class="kr-progress-fill" [style.width.%]="(kr.currentValue / kr.targetValue) * 100"></div>
+              </div>
+            </div>
+          </div>
+       </div>
+    </div>
+    <ng-template #noOkrs>
+      <div class="empty-state">
+        <svg lucideTrendingUp size="48"></svg>
+        <h3>No Company OKRs</h3>
+        <p>Align the company by setting overarching objectives.</p>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- Cycles Tab -->
+  <div *ngIf="activeTab() === 'cycles'">
+    <div class="reviews-table-container">
+       <h2>Appraisal Cycles</h2>
+       <table class="table" *ngIf="appraisalCycles().length > 0; else noCycles">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let cycle of appraisalCycles()">
+               <td style="font-weight:600">{{ cycle.name }}</td>
+               <td>{{ cycle.startDate | date }}</td>
+               <td>{{ cycle.endDate | date }}</td>
+               <td><span class="status-badge" [ngClass]="cycle.status.toLowerCase()">{{ cycle.status }}</span></td>
+            </tr>
+          </tbody>
+       </table>
+       <ng-template #noCycles>
+          <div class="empty-state">No appraisal cycles found.</div>
+       </ng-template>
+    </div>
+  </div>
+
 </div>
 
 <!-- Goal Modal -->
@@ -140,78 +250,219 @@
   <div class="modal-content">
     <div class="modal-header">
       <h2>New Performance Goal</h2>
-      <button style="background: none; border: none; cursor: pointer;" (click)="closeGoalModal()">
-        <svg lucideX size="20"></svg>
-      </button>
+      <button class="close-btn" (click)="closeGoalModal()"><svg lucideX size="20"></svg></button>
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label>Goal Title</label>
-        <input type="text" class="form-control" [(ngModel)]="goalForm.title" placeholder="e.g. Complete AWS Certification">
+        <label>Goal Title <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" [class.is-invalid]="showGoalErrors() && !goalForm.title" [(ngModel)]="goalForm.title">
+      </div>
+      <div class="form-row">
+         <div class="form-group flex-1">
+           <label>Target Date <span class="text-danger">*</span></label>
+           <input type="date" class="form-control" [class.is-invalid]="showGoalErrors() && !goalForm.dueDate" [(ngModel)]="goalForm.dueDate" [min]="minDate">
+         </div>
+         <div class="form-group flex-1">
+           <label>Link to Company OKR</label>
+           <select class="form-control" [(ngModel)]="goalForm.okrId">
+             <option [ngValue]="null">-- None --</option>
+             <option *ngFor="let okr of companyOKRs()" [ngValue]="okr.id">{{ okr.title }}</option>
+           </select>
+         </div>
+      </div>
+      <div class="form-row">
+         <div class="form-group flex-1">
+           <label>Numeric Target</label>
+           <input type="number" class="form-control" [(ngModel)]="goalForm.targetValue" placeholder="e.g. 100000">
+         </div>
+         <div class="form-group flex-1">
+           <label>Unit</label>
+           <input type="text" class="form-control" [(ngModel)]="goalForm.unit" placeholder="₹, %, units">
+         </div>
       </div>
       <div class="form-group">
-        <label>Target Date</label>
-        <input type="date" class="form-control" [(ngModel)]="goalForm.dueDate">
-      </div>
-      <div class="form-group">
-        <label>Description</label>
-        <textarea class="form-control" [(ngModel)]="goalForm.description" rows="3" placeholder="Define the success metrics..."></textarea>
+        <label>Description <span class="text-danger">*</span></label>
+        <textarea class="form-control" [class.is-invalid]="showGoalErrors() && !goalForm.description" [(ngModel)]="goalForm.description" rows="3"></textarea>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-secondary" (click)="closeGoalModal()">Cancel</button>
-      <button class="btn-primary" (click)="saveGoal()">Save Goal</button>
+      <button class="btn-secondary" (click)="closeGoalModal()" [disabled]="isSavingGoal()">Cancel</button>
+      <button class="btn-primary" (click)="saveGoal()" [disabled]="isSavingGoal()">
+        {{ isSavingGoal() ? 'Saving...' : 'Save Goal' }}
+      </button>
     </div>
   </div>
 </div>
 
 <!-- Review Modal -->
 <div class="modal-overlay" *ngIf="isReviewModalOpen()">
-  <div class="modal-content">
+  <div class="modal-content modal-lg">
     <div class="modal-header">
-      <h2>{{ reviewForm.id ? 'Edit Appraisal' : 'New Appraisal' }}</h2>
-      <button style="background: none; border: none; cursor: pointer;" (click)="closeReviewModal()">
-        <svg lucideX size="20"></svg>
-      </button>
+      <h2>{{ reviewForm.id ? 'Appraisal Details' : 'New Appraisal' }}</h2>
+      <button class="close-btn" (click)="closeReviewModal()"><svg lucideX size="20"></svg></button>
     </div>
     <div class="modal-body">
-      <div class="form-group">
-        <label>Employee</label>
-        <select class="form-control" [(ngModel)]="reviewForm.employeeId" [disabled]="!!reviewForm.id">
-          <option value="">Select direct report</option>
-          <option *ngFor="let emp of mySubordinates()" [value]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
-        </select>
+      
+      <!-- Workflow Tracker -->
+      <div class="workflow-stepper" *ngIf="reviewForm.id">
+         <div class="step" [class.active]="reviewForm.status === 'PENDING_SELF_REVIEW' || reviewForm.status === 'SELF_REVIEWED' || reviewForm.status === 'MANAGER_REVIEWED' || reviewForm.status === 'ACKNOWLEDGED' || reviewForm.status === 'HR_APPROVED'">
+            <div class="step-circle">1</div>
+            <div class="step-label">Pending Self Review</div>
+         </div>
+         <div class="step" [class.active]="reviewForm.status === 'SELF_REVIEWED' || reviewForm.status === 'MANAGER_REVIEWED' || reviewForm.status === 'ACKNOWLEDGED' || reviewForm.status === 'HR_APPROVED'">
+            <div class="step-circle">2</div>
+            <div class="step-label">Self Reviewed</div>
+         </div>
+         <div class="step" [class.active]="reviewForm.status === 'MANAGER_REVIEWED' || reviewForm.status === 'ACKNOWLEDGED' || reviewForm.status === 'HR_APPROVED'">
+            <div class="step-circle">3</div>
+            <div class="step-label">Manager Reviewed</div>
+         </div>
+         <div class="step" [class.active]="reviewForm.status === 'ACKNOWLEDGED' || reviewForm.status === 'HR_APPROVED'">
+            <div class="step-circle">4</div>
+            <div class="step-label">Employee Acknowledged</div>
+         </div>
+         <div class="step" [class.active]="reviewForm.status === 'HR_APPROVED'">
+            <div class="step-circle">5</div>
+            <div class="step-label">HR Approved</div>
+         </div>
       </div>
-      <div class="form-group">
-        <label>Review Cycle</label>
-        <input type="text" class="form-control" [(ngModel)]="reviewForm.cycleName" placeholder="e.g. Q3 2026 Review">
+
+      <div class="form-row">
+         <div class="form-group flex-1">
+           <label>Employee</label>
+           <select class="form-control" [(ngModel)]="reviewForm.employeeId" [disabled]="!!reviewForm.id">
+             <option value="">Select direct report</option>
+             <option *ngFor="let emp of mySubordinates()" [value]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
+           </select>
+         </div>
+         <div class="form-group flex-1">
+           <label>Review Cycle</label>
+           <select class="form-control" [(ngModel)]="reviewForm.cycleName" [disabled]="!!reviewForm.id">
+             <option value="">Select cycle</option>
+             <option *ngFor="let cycle of appraisalCycles()" [value]="cycle.name">{{ cycle.name }}</option>
+           </select>
+         </div>
       </div>
-      <div class="form-group">
-        <label>Rating (1-5)</label>
-        <select class="form-control" [(ngModel)]="reviewForm.rating">
-          <option [value]="0">Unrated</option>
-          <option [value]="1">1 - Needs Improvement</option>
-          <option [value]="2">2 - Below Expectations</option>
-          <option [value]="3">3 - Meets Expectations</option>
-          <option [value]="4">4 - Exceeds Expectations</option>
-          <option [value]="5">5 - Outstanding</option>
-        </select>
+
+      <div class="appraisal-section" *ngIf="reviewForm.id">
+         <h4>Manager Assessment</h4>
+         <div class="form-group">
+           <label>Rating (1-5)</label>
+           <select class="form-control" [(ngModel)]="reviewForm.rating" [disabled]="!isManager() || reviewForm.status === 'ACKNOWLEDGED' || reviewForm.status === 'HR_APPROVED'">
+             <option [value]="0">Unrated</option>
+             <option [value]="1">1 - Needs Improvement</option>
+             <option [value]="2">2 - Below Expectations</option>
+             <option [value]="3">3 - Meets Expectations</option>
+             <option [value]="4">4 - Exceeds Expectations</option>
+             <option [value]="5">5 - Outstanding</option>
+           </select>
+         </div>
+         <div class="form-group">
+           <label>Manager Feedback</label>
+           <textarea class="form-control" [(ngModel)]="reviewForm.feedback" rows="4" [disabled]="!isManager() || reviewForm.status === 'ACKNOWLEDGED' || reviewForm.status === 'HR_APPROVED'"></textarea>
+         </div>
       </div>
-      <div class="form-group">
-        <label>Manager Feedback</label>
-        <textarea class="form-control" [(ngModel)]="reviewForm.feedback" rows="4" placeholder="Provide constructive feedback..."></textarea>
-      </div>
-      <div class="form-group">
-        <label>Status</label>
-        <select class="form-control" [(ngModel)]="reviewForm.status">
-          <option value="DRAFT">Draft</option>
-          <option value="SUBMITTED">Submitted to HR</option>
-        </select>
-      </div>
+      
     </div>
     <div class="modal-footer">
-      <button class="btn-secondary" (click)="closeReviewModal()">Cancel</button>
-      <button class="btn-primary" (click)="saveReview()">Save Appraisal</button>
+      <button class="btn-secondary" (click)="closeReviewModal()">Close</button>
+      <button class="btn-primary" *ngIf="(!reviewForm.id) || (isManager() && (reviewForm.status === 'SELF_REVIEWED' || reviewForm.status === 'MANAGER_REVIEWED'))" (click)="saveReview()">Save Appraisal</button>
     </div>
   </div>
+</div>
+
+<!-- Self Appraisal Modal -->
+<div class="modal-overlay" *ngIf="isSelfAppraisalModalOpen()">
+   <div class="modal-content">
+      <div class="modal-header">
+         <h2>Self Appraisal</h2>
+         <button class="close-btn" (click)="closeSelfAppraisalModal()"><svg lucideX size="20"></svg></button>
+      </div>
+      <div class="modal-body">
+         <div class="form-group">
+           <label>Self Rating (1-5)</label>
+           <select class="form-control" [(ngModel)]="selfAppraisalForm.selfRating">
+             <option [value]="1">1 - Needs Improvement</option>
+             <option [value]="3">3 - Meets Expectations</option>
+             <option [value]="5">5 - Outstanding</option>
+           </select>
+         </div>
+         <div class="form-group">
+           <label>Self Feedback / Achievements</label>
+           <textarea class="form-control" [(ngModel)]="selfAppraisalForm.selfFeedback" rows="4" placeholder="Describe your achievements this cycle..."></textarea>
+         </div>
+      </div>
+      <div class="modal-footer">
+         <button class="btn-secondary" (click)="closeSelfAppraisalModal()">Cancel</button>
+         <button class="btn-primary" (click)="saveSelfAppraisal()">Submit Self Appraisal</button>
+      </div>
+   </div>
+</div>
+
+<!-- OKR Modal -->
+<div class="modal-overlay" *ngIf="isOkrModalOpen()">
+   <div class="modal-content modal-lg">
+      <div class="modal-header">
+         <h2>New Company OKR</h2>
+         <button class="close-btn" (click)="closeOkrModal()"><svg lucideX size="20"></svg></button>
+      </div>
+      <div class="modal-body">
+         <div class="form-group">
+           <label>Objective Title</label>
+           <input type="text" class="form-control" [(ngModel)]="okrForm.title">
+         </div>
+         <div class="form-row">
+            <div class="form-group flex-1">
+               <label>Period</label>
+               <input type="text" class="form-control" [(ngModel)]="okrForm.period" placeholder="e.g. Q3 2026">
+            </div>
+         </div>
+         <div class="form-group">
+           <label>Description</label>
+           <textarea class="form-control" [(ngModel)]="okrForm.description" rows="2"></textarea>
+         </div>
+
+         <h4>Key Results <button class="btn-secondary btn-sm ml-2" (click)="addKeyResult()">+ Add KR</button></h4>
+         <div class="kr-form-row" *ngFor="let kr of okrForm.keyResults; let i = index">
+            <input type="text" class="form-control" [(ngModel)]="kr.title" placeholder="KR Title">
+            <input type="number" class="form-control" [(ngModel)]="kr.targetValue" placeholder="Target">
+            <input type="text" class="form-control" [(ngModel)]="kr.unit" placeholder="Unit">
+            <button class="delete-btn" (click)="removeKeyResult(i)"><svg lucideTrash size="16"></svg></button>
+         </div>
+      </div>
+      <div class="modal-footer">
+         <button class="btn-secondary" (click)="closeOkrModal()">Cancel</button>
+         <button class="btn-primary" (click)="saveOKR()">Save OKR</button>
+      </div>
+   </div>
+</div>
+
+<!-- Cycle Modal -->
+<div class="modal-overlay" *ngIf="isCycleModalOpen()">
+   <div class="modal-content">
+      <div class="modal-header">
+         <h2>New Appraisal Cycle</h2>
+         <button class="close-btn" (click)="closeCycleModal()"><svg lucideX size="20"></svg></button>
+      </div>
+      <div class="modal-body">
+         <div class="form-group">
+           <label>Cycle Name</label>
+           <input type="text" class="form-control" [(ngModel)]="cycleForm.name" placeholder="e.g. Annual Review 2026">
+         </div>
+         <div class="form-row">
+            <div class="form-group flex-1">
+               <label>Start Date</label>
+               <input type="date" class="form-control" [(ngModel)]="cycleForm.startDate">
+            </div>
+            <div class="form-group flex-1">
+               <label>End Date</label>
+               <input type="date" class="form-control" [(ngModel)]="cycleForm.endDate">
+            </div>
+         </div>
+      </div>
+      <div class="modal-footer">
+         <button class="btn-secondary" (click)="closeCycleModal()">Cancel</button>
+         <button class="btn-primary" (click)="saveCycle()">Save Cycle</button>
+      </div>
+   </div>
 </div>

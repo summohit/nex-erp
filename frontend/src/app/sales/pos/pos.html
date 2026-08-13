@@ -1,0 +1,78 @@
+<div class="pos-container">
+  <!-- Left Side: Items / Search -->
+  <div class="pos-main glass-panel">
+    <div class="main-header">
+      <h2>Point of Sale</h2>
+      <p>Quickly ring up sales for walk-in or existing clients.</p>
+    </div>
+
+    <div class="quick-add-form">
+      <h3>Quick Add Item</h3>
+      <div class="form-row">
+        <div class="form-group flex-2">
+          <label>Description / Product Name</label>
+          <input type="text" [(ngModel)]="newItem.description" placeholder="e.g. Consulting Hour" (keyup.enter)="addToCart()"/>
+        </div>
+        <div class="form-group flex-1">
+          <label>Unit Price</label>
+          <input type="number" [(ngModel)]="newItem.unitPrice" min="0" step="0.01" (keyup.enter)="addToCart()"/>
+        </div>
+        <div class="form-group flex-1">
+          <label>Qty</label>
+          <input type="number" [(ngModel)]="newItem.quantity" min="1" (keyup.enter)="addToCart()"/>
+        </div>
+        <div class="form-action">
+          <button class="btn-primary" (click)="addToCart()" [disabled]="!newItem.description || newItem.unitPrice <= 0">
+            <svg lucidePlus size="20"></svg> Add
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Cart -->
+  <div class="pos-cart glass-panel">
+    <div class="cart-header">
+      <h3><svg lucideShoppingCart size="20"></svg> Current Order</h3>
+    </div>
+
+    <div class="cart-client">
+      <label>Select Client *</label>
+      <select [(ngModel)]="selectedClientId">
+        <option [ngValue]="null">-- Select a Client --</option>
+        <option *ngFor="let c of clients" [ngValue]="c.id">{{c.name}}</option>
+      </select>
+    </div>
+
+    <div class="cart-items">
+      <div class="empty-cart" *ngIf="cart.length === 0">
+        <svg lucideShoppingCart size="40" class="text-muted"></svg>
+        <p>Cart is empty</p>
+      </div>
+
+      <div class="cart-item" *ngFor="let item of cart; let i = index">
+        <div class="item-info">
+          <h4>{{item.description}}</h4>
+          <p>{{item.quantity}} x {{item.unitPrice | currency:'USD'}}</p>
+        </div>
+        <div class="item-total">
+          <span class="fw-semibold">{{item.total | currency:'USD'}}</span>
+          <button class="btn-icon text-danger" (click)="removeFromCart(i)">
+            <svg lucideTrash2 size="16"></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cart-footer">
+      <div class="summary-row total-row">
+        <span>Total Due</span>
+        <span>{{getCartTotal() | currency:'USD'}}</span>
+      </div>
+      
+      <button class="btn-checkout" [disabled]="cart.length === 0 || !selectedClientId" (click)="checkout()">
+        <svg lucideCreditCard size="20"></svg> Checkout
+      </button>
+    </div>
+  </div>
+</div>
