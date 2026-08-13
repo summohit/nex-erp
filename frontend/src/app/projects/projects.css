@@ -461,6 +461,51 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+.star-btn-table:hover svg {
+  transform: scale(1.1);
+}
+
+.boards-table-wrapper {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(9, 30, 66, 0.1);
+  padding: 24px;
+}
+
+.nes-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.nes-table th {
+  text-align: left;
+  padding: 12px 16px;
+  color: #44546f;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 2px solid #dfe1e6;
+}
+
+.nes-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #dfe1e6;
+  font-size: 14px;
+  color: #172b4d;
+}
+
+.nes-table tr:hover td {
+  background-color: #f8f9fa;
+}
+
+.badge {
+  background: #f1f2f4;
+  color: #44546f;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .bg-thumb-item:hover {
   transform: scale(1.04);
 }

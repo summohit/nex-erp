@@ -5,7 +5,8 @@ import { Router, RouterModule } from '@angular/router';
 import { 
   LucidePlus, LucideKanban, 
   LucideX, LucideUser, LucideChevronLeft, LucideCheck, LucideMoreHorizontal, 
-  LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw, LucideBrainCircuit
+  LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw, LucideBrainCircuit,
+  LucideLayoutGrid, LucideList
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
@@ -18,7 +19,8 @@ import { HotToastService } from '@ngneat/hot-toast';
   imports: [
     CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban, 
     LucideX, LucideUser, LucideChevronLeft, LucideBrainCircuit,
-    LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw
+    LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw,
+    LucideLayoutGrid, LucideList
   ],
   templateUrl: './projects.html',
   styleUrls: ['./projects.css']
@@ -41,6 +43,7 @@ export class ProjectsComponent implements OnInit {
   clients = signal<any[]>([]);
   searchQuery = signal<string>('');
   activeTab = signal<'all' | 'starred' | 'recent' | 'archived'>('all');
+  viewMode = signal<'card' | 'table'>('card');
   
   // Local persistence for Starred & Recently Viewed
   starredBoardIds = signal<number[]>([]);
@@ -49,6 +52,10 @@ export class ProjectsComponent implements OnInit {
   isCreateModalOpen = signal(false);
   isSubmitted = signal(false);
   editingProjectId = signal<number | null>(null);
+
+  setViewMode(mode: 'card' | 'table') {
+    this.viewMode.set(mode);
+  }
 
   // Background Options (Images & Color gradients matching Trello style)
   imageBackgrounds = [
