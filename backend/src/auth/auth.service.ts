@@ -184,22 +184,13 @@ export class AuthService {
       throw new UnauthorizedException('Account is blocked connect administration');
     }
 
-<<<<<<< Updated upstream
-    const employee = await this.prisma.employee.findUnique({
-      where: { userId: user.id },
-      select: { id: true }
-    });
-
-    const payload = { sub: user.id, email: user.email, role: user.role, companyId: user.companyId, employeeId: employee?.id ?? null };
-=======
     const payload = { 
       sub: user.id, 
       email: user.email, 
       role: user.role, 
       companyId: user.companyId,
-      employeeId: user.employee?.id 
+      employeeId: user.employee?.id ?? null
     };
->>>>>>> Stashed changes
     
     const access_token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
     const refresh_token = await this.jwtService.signAsync(payload, { 
