@@ -30,6 +30,7 @@ export class EmployeeListComponent implements OnInit {
   public authService = inject(AuthService);
 
   employees = signal<Employee[]>([]);
+  isLoading = signal<boolean>(true);
   departments = signal<Department[]>([]);
   designations = signal<Designation[]>([]);
   
@@ -295,11 +296,16 @@ export class EmployeeListComponent implements OnInit {
   }
 
   loadEmployees() {
+    this.isLoading.set(true);
     this.employeeService.getEmployees().subscribe({
-      next: (data) => this.employees.set(data),
+      next: (data) => {
+        this.employees.set(data);
+        this.isLoading.set(false);
+      },
       error: (err) => {
         this.toast.error('Failed to load employees');
         console.error(err);
+        this.isLoading.set(false);
       }
     });
   }
