@@ -123,8 +123,10 @@ export class ClientProfileComponent implements OnInit {
   }
 
   get formattedWebsiteUrl(): string {
-    const url = this.client?.website?.trim();
+    const url = this.client?.website?.trim() || '';
     if (!url) return '';
+    const scheme = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/)?.[1]?.toLowerCase();
+    if (scheme && scheme !== 'http' && scheme !== 'https') return '';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
     return `https://${url}`;
   }
@@ -255,6 +257,7 @@ export class ClientProfileComponent implements OnInit {
       error: (err) => {
         this.isSavingClientDetails = false;
         console.error('Error updating client details', err);
+        alert(err?.error?.message || 'Failed to update client details.');
       }
     });
   }

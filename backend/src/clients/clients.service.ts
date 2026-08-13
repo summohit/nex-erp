@@ -1,25 +1,75 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ClientsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(companyId: number, createClientDto: any) {
-    const { contacts, ...clientData } = createClientDto;
-    
-    return this.prisma.client.create({
-      data: {
-        ...clientData,
+  private async ensureUniqueClientName(companyId: number, name: string, excludeId?: number) {
+    if (!name) return;
+    const existing = await this.prisma.client.findFirst({
+      where: {
         companyId,
-        contacts: contacts && contacts.length > 0 ? {
-          create: contacts
-        } : undefined
+        name,
+        ...(excludeId ? { id: { not: excludeId } } : {})
       },
-      include: {
-        contacts: true
-      }
+      select: { id: true }
     });
+    if (existing) {
+      throw new ConflictException('A client with this name already exists.');
+    }
+  }
+
+  private isUniqueViolation(err: any): boolean {
+    return err?.code === 'P2002';
+  }
+
+  private rethrowUniqueViolation(err: any): never {
+    if (this.isUniqueViolation(err)) {
+      throw new ConflictException('A client with this name already exists.');
+    }
+    throw err;
+  }
+
+  private sanitizeWebsite(website: string | undefined): string | undefined {
+    if (!website) return website;
+    const url = website.trim();
+    if (!url) return undefined;
+    const scheme = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/)?.[1]?.toLowerCase();
+    if (scheme && scheme !== 'http' && scheme !== 'https') {
+      throw new BadRequestException('Website URL must use http:// or https://');
+    }
+    return url;
+  }
+
+  private sanitizeClientData(data: any): any {
+    const { website, ...rest } = data;
+    return {
+      ...rest,
+      ...(website !== undefined ? { website: this.sanitizeWebsite(website) } : {})
+    };
+  }
+
+  async create(companyId: number, createClientDto: any) {
+    const { contacts, ...clientData } = this.sanitizeClientData(createClientDto);
+    await this.ensureUniqueClientName(companyId, clientData.name);
+
+    try {
+      return await this.prisma.client.create({
+        data: {
+          ...clientData,
+          companyId,
+          contacts: contacts && contacts.length > 0 ? {
+            create: contacts
+          } : undefined
+        },
+        include: {
+          contacts: true
+        }
+      });
+    } catch (err) {
+      this.rethrowUniqueViolation(err);
+    }
   }
 
   async findAll(companyId: number, status?: string) {
@@ -63,11 +113,20 @@ export class ClientsService {
   async update(companyId: number, id: number, updateClientDto: any) {
     // We check existence and company ownership first
     const client = await this.findOne(companyId, id);
-    
-    return this.prisma.client.update({
-      where: { id: client.id },
-      data: updateClientDto,
-    });
+    const data = this.sanitizeClientData(updateClientDto);
+
+    if (data.name) {
+      await this.ensureUniqueClientName(companyId, data.name, id);
+    }
+
+    try {
+      return await this.prisma.client.update({
+        where: { id: client.id },
+        data,
+      });
+    } catch (err) {
+      this.rethrowUniqueViolation(err);
+    }
   }
 
   async archive(companyId: number, id: number) {

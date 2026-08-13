@@ -7,6 +7,7 @@ import { ClientsService } from '../../services/clients';
 import { ClientActionCellRendererComponent } from '../../shared/components/client-action-cell-renderer.component';
 import { LucidePlus, LucideUploadCloud, LucideX } from '@lucide/angular';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { HotToastService } from '@ngneat/hot-toast';
 
 @Component({
   selector: 'app-clients-list',
@@ -19,6 +20,7 @@ export class ClientsListComponent implements OnInit {
   private clientsService = inject(ClientsService);
   private router = inject(Router);
   private fb = inject(FormBuilder);
+  private toast = inject(HotToastService);
 
   clients: any[] = [];
   isLoading = true;
@@ -341,6 +343,7 @@ export class ClientsListComponent implements OnInit {
       error: (err) => {
         console.error('Error creating client', err);
         this.isSubmitting = false;
+        this.toast.error(err?.error?.message || 'Failed to create client');
       }
     });
   }
