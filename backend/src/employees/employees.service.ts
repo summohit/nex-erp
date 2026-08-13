@@ -29,6 +29,38 @@ export class EmployeesService {
     });
   }
 
+  async findCeo(companyId: number) {
+    // 1. Prefer an employee with the "CEO" designation
+    const ceo = await this.prisma.employee.findFirst({
+      where: {
+        companyId,
+        designation: { name: { equals: 'CEO', mode: 'insensitive' } },
+        user: { status: { not: 'SUSPENDED' } }
+      },
+      include: {
+        user: { select: { email: true, role: true } },
+        designation: { select: { name: true } }
+      }
+    });
+    if (ceo) return ceo;
+
+    // 2. Fallback: the earliest SUPERADMIN (company founder)
+    const founder = await this.prisma.user.findFirst({
+      where: { companyId, role: 'SUPERADMIN', status: { not: 'SUSPENDED' } },
+      orderBy: { id: 'asc' },
+      select: {
+        employee: {
+          include: {
+            user: { select: { email: true, role: true } },
+            designation: { select: { name: true } }
+          }
+        }
+      }
+    });
+
+    return founder?.employee || null;
+  }
+
   async getOrgChart(companyId: number) {
     const employees = await this.prisma.employee.findMany({
       where: { companyId },
@@ -73,6 +105,13 @@ export class EmployeesService {
       }
     }
 
+    // 5. Default reporting line: CEO of the organization when no manager specified
+    let managerId = data.managerId || null;
+    if (!managerId) {
+      const ceo = await this.findCeo(companyId);
+      managerId = ceo?.id ?? null;
+    }
+
     // 4. Create User and Employee in one transaction
     return this.prisma.$transaction(async (prisma) => {
       const newUser = await prisma.user.create({
@@ -92,7 +131,7 @@ export class EmployeesService {
           departmentId: data.departmentId || null,
           designationId: data.designationId || null,
           branchId: data.branchId || null,
-          managerId: data.managerId || null,
+          managerId: managerId,
           shiftId: data.shiftId ? (typeof data.shiftId === 'string' ? parseInt(data.shiftId, 10) : data.shiftId) : null,
           companyId: companyId,
           userId: newUser.id,

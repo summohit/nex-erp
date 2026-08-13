@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmployeesService } from './employees.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
@@ -17,7 +18,8 @@ export interface BulkUploadResult {
 export class EmployeesImportService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly mailService: MailService
+    private readonly mailService: MailService,
+    private readonly employeesService: EmployeesService
   ) {}
 
   async processCsv(
@@ -66,6 +68,9 @@ export class EmployeesImportService {
 
     // Default password for all imports
     const defaultPasswordHash = await bcrypt.hash('Welcome@123', 10);
+
+    // Default reporting line: CEO of the organization
+    const ceoId = (await this.employeesService.findCeo(companyId))?.id ?? null;
 
     let rowNum = 1; // 1-indexed for headers, so data starts at 2. We'll track data row.
     for (const row of results) {
@@ -128,6 +133,7 @@ export class EmployeesImportService {
               designationId,
               companyId,
               userId: newUser.id,
+              managerId: ceoId,
               onboardingStatus: 'PENDING'
             }
           });

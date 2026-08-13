@@ -101,6 +101,12 @@ export class EmployeeDrawerComponent implements OnInit {
       } else {
         this.form.reset({ role: 'EMPLOYEE' });
         this.form.get('email')?.enable();
+        // Default reporting line: CEO of the organization
+        this.employeeService.getCeo().subscribe(ceo => {
+          if (ceo && !this.employeeData) {
+            this.form.patchValue({ managerId: ceo.id });
+          }
+        });
       }
     }
   }

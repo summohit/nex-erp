@@ -46,6 +46,11 @@ export class EmployeesController {
     return this.employeesService.getOrgChart(req.user.companyId);
   }
 
+  @Get('ceo')
+  getCeo(@Request() req) {
+    return this.employeesService.findCeo(req.user.companyId);
+  }
+
   @Post()
   create(@Request() req, @Body() data: any) {
     return this.employeesService.create(req.user.companyId, data);

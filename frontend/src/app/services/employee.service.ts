@@ -33,6 +33,13 @@ export class EmployeeService {
     });
   }
 
+  getCeo(): Observable<Employee | null> {
+    const token = localStorage.getItem('access_token');
+    return this.http.get<Employee | null>(`${this.apiUrl}/ceo`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   createEmployee(data: any): Observable<Employee> {
     const token = localStorage.getItem('access_token');
     return this.http.post<Employee>(this.apiUrl, data, {
