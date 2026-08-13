@@ -13,7 +13,11 @@ export class UsersController {
       where: { id: req.user.sub },
       include: { 
         company: true, 
-        employee: true,
+        employee: {
+          include: {
+            _count: { select: { subordinates: true } }
+          }
+        },
         userRoles: {
           include: {
             role: {
@@ -32,6 +36,7 @@ export class UsersController {
     if (user) {
       delete (user as any).password;
       (user as any).employeeId = (user as any).employee?.id ?? null;
+      (user as any).isManager = ((user as any).employee?._count?.subordinates ?? 0) > 0;
     }
     return user;
   }

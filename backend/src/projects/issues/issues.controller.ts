@@ -14,7 +14,8 @@ export class IssuesController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() data: any
   ) {
-    return this.issuesService.createIssue(req.user.companyId, req.user.sub, projectId, data);
+    const actorEmployeeId = req.user.employeeId ?? req.user.sub;
+    return this.issuesService.createIssue(req.user.companyId, actorEmployeeId, projectId, data);
   }
 
   @Get()
@@ -32,7 +33,8 @@ export class IssuesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() data: any
   ) {
-    return this.issuesService.updateIssue(req.user.companyId, req.user.sub, projectId, id, data);
+    const actorEmployeeId = req.user.employeeId ?? req.user.sub;
+    return this.issuesService.updateIssue(req.user.companyId, actorEmployeeId, projectId, id, data);
   }
 
   @Put(':id/archive')
@@ -41,7 +43,8 @@ export class IssuesController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('id', ParseIntPipe) id: number
   ) {
-    return this.issuesService.toggleArchive(req.user.companyId, req.user.sub, projectId, id);
+    const actorEmployeeId = req.user.employeeId ?? req.user.sub;
+    return this.issuesService.toggleArchive(req.user.companyId, actorEmployeeId, projectId, id);
   }
 
   @Post(':id/time-start')

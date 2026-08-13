@@ -1564,9 +1564,50 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Only the assignee's manager chain (upper hierarchy) may move a task to a Done/Archived column
+  currentEmployeeId(): number | null {
+    const u = this.currentUser();
+    return u?.employeeId ?? u?.employee?.id ?? null;
+  }
+
+  isRestrictedColumn(columnId: number | null | undefined): boolean {
+    const col = this.columns().find(c => c.id === columnId);
+    if (!col) return false;
+    const name = (col.name || '').toLowerCase();
+    return name.includes('done') || name.includes('complete') || name.includes('archive');
+  }
+
+  canCompleteIssue(issue: any): boolean {
+    if (!issue) return true;
+    if (issue.assigneeId) {
+      const myEmpId = this.currentEmployeeId();
+      if (!myEmpId) return true;
+      return Array.isArray(issue.assigneeApproverIds) && issue.assigneeApproverIds.includes(myEmpId);
+    }
+    // Unassigned tasks: only managers (employees with subordinates) may complete/archive
+    const u = this.currentUser();
+    if (u && u.isManager === false) return false;
+    return true;
+  }
+
+  canDropOnColumn(drag: any, columnId: number): boolean {
+    if (!this.isRestrictedColumn(columnId)) return true;
+    return this.canCompleteIssue(drag?.data);
+  }
+
+  isStatusMoveBlocked(columnId: number): boolean {
+    const issue = this.selectedIssue();
+    return !!issue && this.isRestrictedColumn(columnId) && !this.canCompleteIssue(issue);
+  }
+
   drop(event: CdkDragDrop<any[]>, targetColumnId: number) {
     const issue = event.previousContainer.data[event.previousIndex];
     if (!issue) return;
+
+    if (event.previousContainer !== event.container && this.isRestrictedColumn(targetColumnId) && !this.canCompleteIssue(issue)) {
+      this.toast.error('Only the assignee\'s manager (or above) can move this task to Done');
+      return;
+    }
 
     if (event.previousContainer === event.container) {
       const map = new Map(this.issuesByColumn());
@@ -1615,7 +1656,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.issueForm.columnId = columnId;
     this.closePopover();
     if (this.selectedIssue()) {
-      const issueId = this.selectedIssue().id;
+      const issue = this.selectedIssue();
+      if (this.isRestrictedColumn(columnId) && !this.canCompleteIssue(issue)) {
+        this.toast.error('Only the assignee\'s manager (or above) can move this task to Done');
+        return;
+      }
+      const issueId = issue.id;
       this.optimisticallyUpdateIssueColumn(issueId, columnId);
       this.setIssueUpdating(issueId, true);
 
@@ -3359,6 +3405,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   toggleIssueArchive(issueId: number) {
+    const issue = this.allIssues().find(i => i.id === issueId);
+    if (issue && !issue.isArchived && !this.canCompleteIssue(issue)) {
+      this.toast.error('Only the assignee\'s manager (or above) can archive this task');
+      return;
+    }
     this.projectsService.toggleIssueArchive(this.projectId, issueId).subscribe({
       next: (res) => {
         // Find if the issue is in the selected state and update it

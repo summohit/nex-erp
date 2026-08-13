@@ -2571,6 +2571,22 @@ svg[lucide], svg[class*=lucide] {
   color: #0c66e4;
 }
 
+.popover-item.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: transparent;
+  color: inherit;
+}
+
+.popover-item.disabled:hover {
+  background: transparent;
+  color: inherit;
+}
+
+.popover-item.disabled:hover svg {
+  color: #64748b;
+}
+
 .popover-item svg {
   color: #64748b;
 }

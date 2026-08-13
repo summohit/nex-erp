@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpException, HttpStatus, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import axios from 'axios';
 import * as path from 'path';
@@ -30,6 +30,13 @@ export class IssuesService {
       });
       if (board && board.columns.length > 0) {
         columnId = board.columns[0].id;
+      }
+    }
+
+    if (columnId) {
+      const targetCol = await this.prisma.boardColumn.findUnique({ where: { id: Number(columnId) } });
+      if (targetCol && this.isRestrictedColumnName(targetCol.name)) {
+        await this.assertCanCompleteOrArchive(companyId, reporterId, { assigneeId: data.assigneeId ? Number(data.assigneeId) : null });
       }
     }
 
@@ -73,7 +80,7 @@ export class IssuesService {
   }
 
   async getIssues(companyId: number, projectId: number) {
-    return this.prisma.issue.findMany({
+    const issues = await this.prisma.issue.findMany({
       where: { projectId, companyId },
       include: {
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -88,6 +95,73 @@ export class IssuesService {
       },
       orderBy: { position: 'asc' }
     });
+
+    const employees = await this.prisma.employee.findMany({
+      where: { companyId },
+      select: { id: true, managerId: true }
+    });
+    const managerById = new Map<number, number | null>(employees.map(e => [e.id, e.managerId]));
+
+    const chainFor = (empId: number | null): number[] => {
+      if (!empId) return [];
+      const chain: number[] = [];
+      const visited = new Set<number>();
+      let current: number | null = empId;
+      while (current != null && !visited.has(current)) {
+        visited.add(current);
+        current = managerById.get(current) ?? null;
+        if (current != null) chain.push(current);
+      }
+      return chain;
+    };
+
+    return issues.map(issue => ({
+      ...issue,
+      assigneeApproverIds: chainFor(issue.assigneeId)
+    }));
+  }
+
+  private async getAssigneeUpperHierarchy(companyId: number, assigneeId: number): Promise<number[]> {
+    const chain: number[] = [];
+    const visited = new Set<number>();
+    let current: number | null = assigneeId;
+    while (current != null && !visited.has(current)) {
+      visited.add(current);
+      const emp = await this.prisma.employee.findUnique({
+        where: { id: current },
+        select: { id: true, managerId: true },
+      });
+      if (!emp || emp.managerId == null) break;
+      chain.push(emp.managerId);
+      current = emp.managerId;
+    }
+    return chain;
+  }
+
+  private isRestrictedColumnName(name: string): boolean {
+    const n = name.toLowerCase();
+    return n.includes('done') || n.includes('complete') || n.includes('archive');
+  }
+
+  private async assertCanCompleteOrArchive(companyId: number, actorEmployeeId: number, issue: any) {
+    if (!issue.assigneeId) {
+      const subordinateCount = await this.prisma.employee.count({
+        where: { companyId, managerId: actorEmployeeId }
+      });
+      if (subordinateCount === 0) {
+        throw new ForbiddenException('Only managers (or the assignee\'s upper hierarchy) can move a task to Done or archive it.');
+      }
+      return;
+    }
+
+    if (actorEmployeeId === issue.assigneeId) {
+      throw new ForbiddenException('The assignee cannot move this task to Done. Only their manager (or above) can.');
+    }
+
+    const hierarchy = await this.getAssigneeUpperHierarchy(companyId, issue.assigneeId);
+    if (!hierarchy.includes(actorEmployeeId)) {
+      throw new ForbiddenException('Only the assignee\'s manager (or above) can move this task to Done or archive it.');
+    }
   }
 
   async updateIssue(companyId: number, employeeId: number, projectId: number, issueId: number, data: any) {
@@ -100,11 +174,16 @@ export class IssuesService {
     if (data.type !== undefined) updateData.type = data.type;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.priority !== undefined) updateData.priority = data.priority;
+    let isRestrictedTarget = data.status === 'DONE';
+
     if (data.columnId !== undefined) {
       updateData.columnId = Number(data.columnId);
-      if (data.status === undefined) {
-        const targetCol = await this.prisma.boardColumn.findUnique({ where: { id: updateData.columnId } });
-        if (targetCol) {
+      const targetCol = await this.prisma.boardColumn.findUnique({ where: { id: updateData.columnId } });
+      if (targetCol) {
+        if (this.isRestrictedColumnName(targetCol.name)) {
+          isRestrictedTarget = true;
+        }
+        if (data.status === undefined) {
           const colName = targetCol.name.toLowerCase();
           if (colName.includes('done') || colName.includes('complete')) updateData.status = 'DONE';
           else if (colName.includes('progress') || colName.includes('doing')) updateData.status = 'IN_PROGRESS';
@@ -112,6 +191,10 @@ export class IssuesService {
           else if (colName.includes('to do') || colName.includes('todo')) updateData.status = 'TODO';
         }
       }
+    }
+
+    if (isRestrictedTarget) {
+      await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue);
     }
     if (data.assigneeId !== undefined) updateData.assigneeId = data.assigneeId ? Number(data.assigneeId) : null;
     if (data.parentId !== undefined) updateData.parentId = data.parentId ? Number(data.parentId) : null;
@@ -155,6 +238,10 @@ export class IssuesService {
   async toggleArchive(companyId: number, employeeId: number, projectId: number, issueId: number) {
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
+
+    if (!oldIssue.isArchived) {
+      await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue);
+    }
 
     const issue = await this.prisma.issue.update({
       where: { id: issueId },

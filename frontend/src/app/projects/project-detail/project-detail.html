@@ -1646,6 +1646,7 @@
              [id]="'column-' + col.id"
              [cdkDropListData]="getColumnIssues(col.id)"
              [cdkDropListConnectedTo]="getConnectedListIds()"
+             [cdkDropListEnterPredicate]="(drag, drop) => canDropOnColumn(drag, col.id)"
              (cdkDropListDropped)="drop($event, col.id)">
           <!-- Skeleton Loaders -->
           <ng-container *ngIf="isLoading()">
@@ -1848,7 +1849,7 @@
           <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
         </div>
         <div class="popover-body">
-          <button class="popover-item" *ngFor="let col of columns()" [class.selected]="issueForm.columnId === col.id" (click)="updateStatus(col.id)">
+          <button class="popover-item" *ngFor="let col of columns()" [class.selected]="issueForm.columnId === col.id" [class.disabled]="isStatusMoveBlocked(col.id)" [disabled]="isStatusMoveBlocked(col.id)" [title]="isStatusMoveBlocked(col.id) ? 'Only the assignee\'s manager (or above) can move this task to Done' : ''" (click)="updateStatus(col.id)">
             <span class="status-dot" [ngClass]="getStatusDotClass(col.id)"></span>
             <div class="item-text" style="flex: 1;"><strong>{{ col.name }}</strong></div>
             <svg *ngIf="issueForm.columnId === col.id" lucideCheck size="16" style="color: #0c66e4;"></svg>
