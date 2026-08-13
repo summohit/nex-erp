@@ -48,6 +48,10 @@ export interface DayStatus {
   isFuture: boolean;
   clockInStr?: string;
   clockOutStr?: string;
+  clockInLat?: number | null;
+  clockInLng?: number | null;
+  clockOutLat?: number | null;
+  clockOutLng?: number | null;
 }
 
 @Component({
@@ -151,6 +155,18 @@ export class AttendanceLeaveComponent implements OnInit {
       headerName: 'Clock Out', 
       flex: 1,
       valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-'
+    },
+    {
+      headerName: 'Clock-In Location',
+      flex: 1.2,
+      minWidth: 180,
+      cellRenderer: (params: any) => {
+        const lat = params.data?.clockInLat;
+        const lng = params.data?.clockInLng;
+        if (!lat || !lng) return '<span style="color: #94A3B8;">-</span>';
+        const coords = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        return `<a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" title="Open in Google Maps" style="color: #2563EB; text-decoration: underline; font-size: 12px;">📍 ${coords}</a>`;
+      }
     },
     {
       field: 'status',
@@ -1277,9 +1293,44 @@ export class AttendanceLeaveComponent implements OnInit {
       clockInLat,
       clockInLng,
       clockOutLat,
-      clockOutLng
+      clockOutLng,
+      clockInAddress: '',
+      clockOutAddress: ''
     });
     this.isDayDetailsModalOpen.set(true);
+
+    if (clockInLat && clockInLng) {
+      this.reverseGeocode(clockInLat, clockInLng).then(address => {
+        const current = this.selectedDayDetails();
+        if (current && address) {
+          this.selectedDayDetails.set({ ...current, clockInAddress: address });
+        }
+      });
+    }
+    if (clockOutLat && clockOutLng) {
+      this.reverseGeocode(clockOutLat, clockOutLng).then(address => {
+        const current = this.selectedDayDetails();
+        if (current && address) {
+          this.selectedDayDetails.set({ ...current, clockOutAddress: address });
+        }
+      });
+    }
+  }
+
+  private async reverseGeocode(lat: number, lng: number): Promise<string> {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return data.display_name || '';
+      }
+    } catch (err) {
+      // ignore, fall back to raw coordinates
+    }
+    return '';
   }
 
   closeDayDetailsModal() {
@@ -1441,6 +1492,10 @@ export class AttendanceLeaveComponent implements OnInit {
       let tooltip = '';
       let clockInStr = '';
       let clockOutStr = '';
+      let clockInLat: number | null = null;
+      let clockInLng: number | null = null;
+      let clockOutLat: number | null = null;
+      let clockOutLng: number | null = null;
 
       if (isFuture) {
         status = 'Empty';
@@ -1487,10 +1542,18 @@ export class AttendanceLeaveComponent implements OnInit {
 
           const inStr = clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
           const outStr = log.clockOut ? new Date(log.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '...';
-          tooltip = `In: ${inStr} - Out: ${outStr} (Click for details)`;
+          let locText = '';
+          if (log.clockInLat && log.clockInLng) {
+            locText = ` 📍 ${log.clockInLat.toFixed(5)}, ${log.clockInLng.toFixed(5)}`;
+          }
+          tooltip = `In: ${inStr} - Out: ${outStr}${locText} (Click for details)`;
           
           clockInStr = inStr;
           clockOutStr = log.clockOut ? outStr : '';
+          clockInLat = log.clockInLat;
+          clockInLng = log.clockInLng;
+          clockOutLat = log.clockOutLat;
+          clockOutLng = log.clockOutLng;
 
           if (!isWeekend && !holiday) workingDaysCount++; // if they worked on weekend, does it increase working days? yes, they worked.
         } 
@@ -1529,7 +1592,11 @@ export class AttendanceLeaveComponent implements OnInit {
         tooltip,
         isFuture,
         clockInStr,
-        clockOutStr
+        clockOutStr,
+        clockInLat,
+        clockInLng,
+        clockOutLat,
+        clockOutLng
       });
     }
 

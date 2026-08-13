@@ -116,29 +116,41 @@ export class HeaderComponent implements OnInit, OnDestroy {
     if (this.isClocking()) return;
     this.isClocking.set(true);
     if (this.isClockedIn()) {
-      this.attendanceService.clockOut().subscribe({
-        next: () => {
-          this.toast.success('Clocked out successfully');
-          this.checkTodayAttendance();
-          this.isClocking.set(false);
-        },
-        error: (err) => {
-          this.toast.error(err.error?.message || 'Failed to clock out');
-          this.isClocking.set(false);
-        }
-      });
+      this.executeClock('clockOut');
     } else {
-      this.attendanceService.clockIn().subscribe({
+      this.executeClock('clockIn');
+    }
+  }
+
+  private executeClock(action: 'clockIn' | 'clockOut') {
+    const proceed = (lat?: number, lng?: number) => {
+      const sub = action === 'clockIn'
+        ? this.attendanceService.clockIn(lat, lng)
+        : this.attendanceService.clockOut(lat, lng);
+
+      sub.subscribe({
         next: () => {
-          this.toast.success('Clocked in successfully');
+          this.toast.success(action === 'clockIn' ? 'Clocked in successfully' : 'Clocked out successfully');
           this.checkTodayAttendance();
           this.isClocking.set(false);
         },
         error: (err) => {
-          this.toast.error(err.error?.message || 'Failed to clock in');
+          this.toast.error(err.error?.message || `Failed to ${action === 'clockIn' ? 'clock in' : 'clock out'}`);
           this.isClocking.set(false);
         }
       });
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => proceed(position.coords.latitude, position.coords.longitude),
+        (error) => {
+          this.toast.error('Location access denied. Clocking without location.');
+          proceed();
+        }
+      );
+    } else {
+      proceed();
     }
   }
 

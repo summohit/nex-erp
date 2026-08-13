@@ -640,6 +640,15 @@
   stroke-width: 2.5px;
 }
 
+.day-location-pin {
+  font-size: 11px;
+  line-height: 1;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  opacity: 0.75;
+}
+
 /* Present */
 .status-present { color: #22A06B; }
 .bg-present { background-color: rgba(34, 160, 107, 0.15); }

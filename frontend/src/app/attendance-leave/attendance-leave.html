@@ -198,6 +198,7 @@
                     <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
                     <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                     <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
+                    <span *ngIf="day.clockInLat && day.clockInLng" class="day-location-pin" title="GPS location logged">📍</span>
                   </ng-container>
                 </div>
               </div>
@@ -987,6 +988,9 @@
               {{ selectedDayDetails()?.clockIn12 }}
             </div>
             <div *ngIf="selectedDayDetails()?.clockInLat" style="font-size: 11px; color: #1E40AF; line-height: 1.5;">
+              <div *ngIf="selectedDayDetails()?.clockInAddress" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+                📍 {{ selectedDayDetails()?.clockInAddress }}
+              </div>
               <div><strong>Lat:</strong> {{ selectedDayDetails()?.clockInLat }}</div>
               <div><strong>Lng:</strong> {{ selectedDayDetails()?.clockInLng }}</div>
               <a [href]="'https://www.google.com/maps?q=' + selectedDayDetails()?.clockInLat + ',' + selectedDayDetails()?.clockInLng" target="_blank" style="display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: #2563EB; text-decoration: underline; margin-top: 4px;">
@@ -1008,6 +1012,9 @@
               {{ selectedDayDetails()?.clockOut12 }}
             </div>
             <div *ngIf="selectedDayDetails()?.clockOutLat" style="font-size: 11px; color: #166534; line-height: 1.5;">
+              <div *ngIf="selectedDayDetails()?.clockOutAddress" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+                📍 {{ selectedDayDetails()?.clockOutAddress }}
+              </div>
               <div><strong>Lat:</strong> {{ selectedDayDetails()?.clockOutLat }}</div>
               <div><strong>Lng:</strong> {{ selectedDayDetails()?.clockOutLng }}</div>
               <a [href]="'https://www.google.com/maps?q=' + selectedDayDetails()?.clockOutLat + ',' + selectedDayDetails()?.clockOutLng" target="_blank" style="display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: #16A34A; text-decoration: underline; margin-top: 4px;">

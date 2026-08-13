@@ -9,7 +9,7 @@ export class KioskService {
     private attendanceService: AttendanceService
   ) {}
 
-  async clockIn(pin: string, companyId: number) {
+  async clockIn(pin: string, companyId: number, lat?: number, lng?: number) {
     const employee = await this.prisma.employee.findFirst({
       where: {
         kioskPin: pin,
@@ -21,14 +21,14 @@ export class KioskService {
       throw new UnauthorizedException('Invalid PIN');
     }
 
-    const record = await this.attendanceService.clockIn(employee.userId, {});
+    const record = await this.attendanceService.clockIn(employee.userId, { lat, lng });
     return {
       message: `Clocked in successfully. Welcome, ${employee.firstName}!`,
       record
     };
   }
 
-  async clockOut(pin: string, companyId: number) {
+  async clockOut(pin: string, companyId: number, lat?: number, lng?: number) {
     const employee = await this.prisma.employee.findFirst({
       where: {
         kioskPin: pin,
@@ -40,7 +40,7 @@ export class KioskService {
       throw new UnauthorizedException('Invalid PIN');
     }
 
-    const record = await this.attendanceService.clockOut(employee.userId, {});
+    const record = await this.attendanceService.clockOut(employee.userId, { lat, lng });
     return {
       message: `Clocked out successfully. Goodbye, ${employee.firstName}!`,
       record

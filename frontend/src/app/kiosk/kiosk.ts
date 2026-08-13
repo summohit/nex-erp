@@ -140,6 +140,10 @@ export class Kiosk implements OnInit {
   pin = signal<string>('');
   isProcessing = signal(false);
 
+  // Device location (captured on load)
+  currentLat = signal<number | null>(null);
+  currentLng = signal<number | null>(null);
+
   // Time display
   currentTime = signal<Date>(new Date());
 
@@ -156,6 +160,16 @@ export class Kiosk implements OnInit {
         this.companyId.set(+id);
       }
     });
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          this.currentLat.set(position.coords.latitude);
+          this.currentLng.set(position.coords.longitude);
+        },
+        () => {}
+      );
+    }
 
     setInterval(() => {
       this.currentTime.set(new Date());
@@ -182,7 +196,9 @@ export class Kiosk implements OnInit {
     
     this.http.post(`${environment.apiUrl}/kiosk/clock-in`, {
       pin: this.pin(),
-      companyId: this.companyId()
+      companyId: this.companyId(),
+      lat: this.currentLat(),
+      lng: this.currentLng()
     }).subscribe({
       next: (res: any) => {
         this.toast.success(res.message, { duration: 4000 });
@@ -203,7 +219,9 @@ export class Kiosk implements OnInit {
 
     this.http.post(`${environment.apiUrl}/kiosk/clock-out`, {
       pin: this.pin(),
-      companyId: this.companyId()
+      companyId: this.companyId(),
+      lat: this.currentLat(),
+      lng: this.currentLng()
     }).subscribe({
       next: (res: any) => {
         this.toast.success(res.message, { duration: 4000 });
