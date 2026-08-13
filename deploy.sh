@@ -50,21 +50,19 @@ deploy_frontend() {
   echo "  🖥️  Deploying Frontend"
   echo "══════════════════════════════════════"
 
-  info "Building Angular app for production..."
-  cd "$FRONTEND_DIR"
-  NODE_OPTIONS="--max_old_space_size=4096" npm run build
-
-  if [ ! -d "$FRONTEND_DIR/dist/frontend/browser" ]; then
-    err "Build failed — dist/frontend/browser not found!"
-    exit 1
-  fi
-  log "Frontend built successfully."
-
-  info "Cleaning remote frontend directory..."
+  info "Syncing frontend source code to server..."
+  sync_to_remote "$FRONTEND_DIR/" "$REMOTE_DIR/frontend_src/"
+  
+  info "Installing frontend dependencies on server..."
+  remote "cd $REMOTE_DIR/frontend_src && npm install --legacy-peer-deps"
+  
+  info "Building Angular app for production on server..."
+  remote "cd $REMOTE_DIR/frontend_src && npm run build"
+  
+  info "Deploying frontend to web directory..."
   remote "rm -rf $REMOTE_DIR/frontend/*"
-
-  info "Uploading frontend to server..."
-  sync_to_remote "$FRONTEND_DIR/dist/frontend/browser/" "$REMOTE_DIR/frontend/"
+  remote "mkdir -p $REMOTE_DIR/frontend"
+  remote "cp -r $REMOTE_DIR/frontend_src/dist/frontend/browser/* $REMOTE_DIR/frontend/ 2>/dev/null || mv $REMOTE_DIR/frontend_src/dist/frontend/browser/* $REMOTE_DIR/frontend/"
   log "Frontend deployed!"
 }
 
@@ -80,7 +78,7 @@ deploy_backend() {
   log "Code synced."
 
   info "Installing dependencies on server..."
-  remote "cd $REMOTE_DIR/backend && npm install"
+  remote "cd $REMOTE_DIR/backend && npm install --legacy-peer-deps"
   log "Dependencies installed."
 
   info "Running Prisma migrations..."

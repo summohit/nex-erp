@@ -1,7 +1,8 @@
-import { Component, signal, inject, OnInit } from '@angular/core';
+import { Component, signal, inject, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ProjectsService } from '../../services/projects';
+import { EmployeeService } from '../../services/employee.service';
 import { FormsModule } from '@angular/forms';
 import { 
   LucideUploadCloud, LucideBrainCircuit, LucideCheckCircle2, 
@@ -13,7 +14,7 @@ import {
   LucideCalendar, LucideHelpCircle, LucideAward, LucideInfo,
   LucideSparkles, LucideClock, LucidePieChart, LucideTrendingUp,
   LucideShield, LucideLock, LucideZap, LucideAlertOctagon, LucideCheckCircle,
-  LucideUser, LucideLink, LucideRotateCcw
+  LucideUser, LucideLink, LucideRotateCcw, LucideSearch
 } from '@lucide/angular';
 
 export interface ValidationWarning {
@@ -52,15 +53,15 @@ export interface AnalysisData {
   imports: [
     CommonModule, FormsModule, RouterModule,
     LucideUploadCloud, LucideBrainCircuit, 
-    LucideCheckCircle2, LucideFileText, LucideLayoutList, LucideAlertTriangle,
+    LucideCheckCircle2, LucideFileText, LucideAlertTriangle,
     LucideCheck, LucideChevronRight, LucideChevronLeft,
-    LucideTrash2, LucideFile, LucidePlus, LucideX, LucideAlertCircle,
+    LucideTrash2, LucidePlus, LucideX, LucideAlertCircle,
     LucideLayers, LucideListChecks, LucideUsers, LucideDollarSign,
     LucideShieldAlert, LucideCheckSquare, LucideTarget, LucideActivity,
     LucideCalendar, LucideHelpCircle, LucideAward, LucideInfo,
-    LucideSparkles, LucideClock, LucidePieChart, LucideTrendingUp,
-    LucideShield, LucideLock, LucideZap, LucideAlertOctagon, LucideCheckCircle,
-    LucideUser, LucideLink, LucideRotateCcw
+    LucideSparkles, LucideClock,
+    LucideZap, LucideAlertOctagon, LucideCheckCircle,
+    LucideLink, LucideRotateCcw, LucideSearch
   ],
   templateUrl: './project-wizard.html',
   styleUrls: ['./project-wizard.css']
@@ -70,6 +71,7 @@ export class ProjectWizardComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private projectsService = inject(ProjectsService);
+  private employeeService = inject(EmployeeService);
 
   projectId = signal<number | null>(null);
   currentStep = signal<number>(1);
@@ -87,6 +89,7 @@ export class ProjectWizardComponent implements OnInit {
 
   // Kickoff Approval Modal state
   showKickoffModal = signal(false);
+  isKickingOff = signal(false);
 
   // Multiple files tracking (max 8)
   readonly MAX_FILES = 8;
@@ -95,13 +98,98 @@ export class ProjectWizardComponent implements OnInit {
   // AI Output
   analysisData = signal<AnalysisData | null>(null);
   
+  executiveSummaryHtml = computed(() => {
+    return this.convertMarkdownToHtml(this.analysisData()?.summary?.executiveSummary || '');
+  });
+
+  // Employees for assignment & Search Filter
+  availableEmployees = signal<any[]>([]);
+  teamSearchQuery = signal<string>('');
+
+  filteredEmployees = computed(() => {
+    const query = this.teamSearchQuery().toLowerCase().trim();
+    const all = this.availableEmployees();
+    if (!query) return all;
+    return all.filter(emp => {
+      const name = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase();
+      const email = (emp.email || emp.user?.email || '').toLowerCase();
+      const role = this.getMemberDesignation(emp).toLowerCase();
+      return name.includes(query) || email.includes(query) || role.includes(query);
+    });
+  });
+
   // Resource Constraints State
   resourceConfig = signal({
-    engineerCount: 3,
+    teamMembers: [] as any[],
+    methodology: 'Agile' as 'Agile' | 'Waterfall',
+    targetBudget: null as string | number | null,
     maxHoursPerDay: 8,
     daysOff: { Saturday: true, Sunday: true, Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false } as Record<string, boolean>,
-    startDate: new Date().toISOString().split('T')[0]
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: null as string | null,
+    aiModel: 'llama-3.3-70b-versatile'
   });
+
+  getPhaseBadgeClass(phase?: string): string {
+    if (!phase) return 'phase-badge-default';
+    const p = phase.toLowerCase();
+    if (p.includes('plan') || p.includes('design') || p.includes('architecture')) return 'phase-badge-planning';
+    if (p.includes('execut') || p.includes('develop') || p.includes('implement') || p.includes('build')) return 'phase-badge-execution';
+    if (p.includes('test') || p.includes('qa') || p.includes('audit') || p.includes('verify')) return 'phase-badge-testing';
+    if (p.includes('deploy') || p.includes('release') || p.includes('launch') || p.includes('kickoff')) return 'phase-badge-deployment';
+    return 'phase-badge-default';
+  }
+
+  getEngineerInitials(name?: string): string {
+    if (!name) return 'TM';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  getEngineerImage(name?: string): string | null {
+    if (!name) return null;
+    const employees = this.availableEmployees();
+    const employee = employees.find(e => 
+      `${e.firstName} ${e.lastName}`.toLowerCase() === name.toLowerCase().trim()
+    );
+    return employee ? this.getMemberAvatar(employee) : null;
+  }
+
+  getMemberDesignation(emp: any): string {
+    if (emp?.designation?.name) return emp.designation.name;
+    if (emp?.designationName) return emp.designationName;
+    if (emp?.jobTitle) return emp.jobTitle;
+    if (emp?.user?.role) return emp.user.role;
+    return 'Team Member';
+  }
+
+  getMemberAvatar(emp: any): string | null {
+    return emp?.avatarUrl || emp?.user?.avatarUrl || emp?.avatar || emp?.profilePicture || null;
+  }
+
+  getInitials(firstName: string, lastName?: string): string {
+    const f = firstName ? firstName.charAt(0).toUpperCase() : '';
+    const l = lastName ? lastName.charAt(0).toUpperCase() : '';
+    return (f + l) || 'U';
+  }
+
+  toggleTeamMember(emp: any) {
+    const config = this.resourceConfig();
+    const members = config.teamMembers;
+    const exists = members.find(m => m.id === emp.id);
+    let updatedMembers = [];
+    if (exists) {
+      updatedMembers = members.filter(m => m.id !== emp.id);
+    } else {
+      updatedMembers = [...members, emp];
+    }
+    this.resourceConfig.set({ ...config, teamMembers: updatedMembers });
+  }
+
+  isMemberSelected(emp: any): boolean {
+    return !!this.resourceConfig().teamMembers.find(m => m.id === emp.id);
+  }
 
   toggleDayOff(day: string) {
     const current = this.resourceConfig();
@@ -139,6 +227,16 @@ export class ProjectWizardComponent implements OnInit {
   ];
 
   ngOnInit() {
+    // Fetch available employees
+    this.employeeService.getEmployees().subscribe({
+      next: (res: any) => {
+        // API might return array directly or wrapped in data
+        const emps = Array.isArray(res) ? res : (res.data || []);
+        this.availableEmployees.set(emps);
+      },
+      error: (err) => console.error('Failed to fetch employees', err)
+    });
+
     this.route.paramMap.subscribe(params => {
       const id = params.get('id');
       if (id && id !== 'new') {
@@ -337,11 +435,15 @@ export class ProjectWizardComponent implements OnInit {
       
       const payload = {
         resourceConstraints: {
-          engineerCount: config.engineerCount,
+          teamMembers: config.teamMembers,
+          methodology: config.methodology,
+          targetBudget: config.targetBudget,
           maxHoursPerDay: config.maxHoursPerDay,
           startDate: config.startDate,
+          endDate: config.endDate,
           daysOff: daysOffArray
-        }
+        },
+        aiModel: config.aiModel
       };
 
       await this.projectsService.analyzeProjectDocuments(id, payload).toPromise();
@@ -351,6 +453,11 @@ export class ProjectWizardComponent implements OnInit {
       let message = 'We encountered an issue while processing your documents.';
       if (err?.error?.message) {
         message = err.error.message;
+        if (message.includes('429') || message.toLowerCase().includes('rate limit') || message.toLowerCase().includes('high demand')) {
+          message = 'The selected AI model is currently experiencing high demand or rate limits. Please try again in a few minutes, or switch to a different model in the previous step.';
+        }
+      } else if (err?.status === 503 || err?.status === 429) {
+        message = 'The selected AI model is currently experiencing high demand or rate limits. Please try again in a few minutes, or switch to a different model in the previous step.';
       } else if (err?.status === 500) {
         message = 'The document engine encountered an unreadable section. Please verify your uploaded files and try again.';
       } else if (err?.status === 400) {
@@ -359,7 +466,9 @@ export class ProjectWizardComponent implements OnInit {
       this.analysisError.set(message);
     } finally {
       this.isAnalyzing.set(false);
-      this.currentStep.set(4);
+      if (!this.analysisError()) {
+        this.currentStep.set(4);
+      }
     }
   }
 
@@ -381,12 +490,40 @@ export class ProjectWizardComponent implements OnInit {
     this.showKickoffModal.set(false);
   }
 
-  confirmKickoff() {
+  async confirmKickoff() {
     this.showKickoffModal.set(false);
-    this.router.navigate(['/projects', this.projectId()]);
+    const id = this.projectId();
+    if (!id) return;
+    
+    try {
+      this.isKickingOff.set(true);
+      await this.projectsService.kickoffProject(id).toPromise();
+      this.router.navigate(['/projects', id]);
+    } catch (e) {
+      console.error('Kickoff failed:', e);
+      // Fallback navigation in case of error (so user isn't stuck forever)
+      this.router.navigate(['/projects', id]);
+    } finally {
+      this.isKickingOff.set(false);
+    }
   }
 
   // --- UI Enhancement Helpers ---
+
+  private convertMarkdownToHtml(md: string): string {
+    if (!md) return '';
+    let html = md
+      .replace(/^### (.*$)/gim, '<h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 16px; margin-bottom: 6px;">$1</h3>')
+      .replace(/^#### (.*$)/gim, '<h4 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 12px; margin-bottom: 4px;">$1</h4>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/^\* (.*$)/gim, '<li>$1</li>')
+      .replace(/^- (.*$)/gim, '<li>$1</li>')
+      .replace(/^• (.*$)/gim, '<li>$1</li>');
+
+    html = html.replace(/\n\n/g, '<br>').replace(/\n/g, '<br>');
+    return html;
+  }
 
   getParsedInScope(): string[] {
     const text = this.analysisData()?.scope?.inScope;

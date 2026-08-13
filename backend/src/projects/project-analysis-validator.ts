@@ -5,6 +5,30 @@
  * Never trusts LLM arithmetic or classification labels directly —
  * recalculates, cross-checks, and flags inconsistencies instead of
  * silently passing them through.
+ *
+ * CONFIRMED FIELD NAMES (from the actual Groq/Gemini system prompt schema):
+ * - ai.costEstimate: { resourceCost, infrastructureCost, hardwareCost,
+ *     licenseCost, vendorCost, cloudCost, implementationCost, travelCost,
+ *     otherCost, contingency, totalCost, estimatedRevenue, estimatedProfit,
+ *     estimatedMargin, currency, confidence, type }
+ *     NOTE: `estimatedRevenue` IS the contract-value field — there is no
+ *     separate `contractValue` key in the schema.
+ * - ai.health: { breakdown: { requirementCompleteness, scopeClarity,
+ *     resourceAvailability, timelineFeasibility, budgetConfidence,
+ *     riskLevel, documentationCompleteness } }
+ *     NOTE: the schema does NOT define readinessScore/healthStatus as fields.
+ *     This validator computes both from the breakdown instead of trusting
+ *     any AI-reported score — intentional, see normalizeHealth() below.
+ * - ai.resourcePlans: Array<{ role, seniority, quantity, allocationPercent,
+ *     estimatedHours, requiredSkills, responsibilities, reason, confidence, type }>
+ * - ai.wbsTasks: Array<{ wbsId, phase, module, feature, task, subtask,
+ *     description, estimatedEffort, quantity, engineer, workingDays,
+ *     startDate, startTime, endDate, endTime, sourceReference, remarks,
+ *     dependencies, requiredSkill, requiredLevel, priority }>
+ * - ai.requirements, ai.risks, ai.openQuestions, ai.missingInfo: arrays per schema
+ *
+ * If your field names differ, only the `extract*` helpers below need editing —
+ * everything downstream operates on the normalized shape.
  */
 
 // ---------- Types ----------
@@ -36,12 +60,10 @@ export interface NormalizedCostEstimate {
   marginNote: string | null;
 }
 
-export type HealthStatus =
-  | 'EXCELLENT'
-  | 'HEALTHY'
-  | 'AT_RISK'
-  | 'HIGH_RISK'
-  | 'CRITICAL';
+// Matches the Groq/Gemini prompt's directive #4 exactly (3-tier, not 5-tier).
+// If you ever widen the prompt's tiers, widen this too — the whole point of
+// this file is that the validator and the prompt must never disagree.
+export type HealthStatus = 'HEALTHY' | 'AT_RISK' | 'CRITICAL';
 
 export interface HealthFactorBreakdown {
   requirementCompleteness: number;
@@ -91,6 +113,9 @@ export function formatCurrency(amount: number, currency: 'INR' | 'USD' = DEFAULT
 // ---------- Cost normalization (fixes: total mismatch, margin=0%, currency) ----------
 
 export function normalizeCostEstimate(raw: any): NormalizedCostEstimate {
+  // IMPORTANT: never trust raw.currency blindly if it's missing — default to INR
+  // for this business context. If your Groq prompt doesn't specify currency,
+  // fix that at the prompt level too (see note at bottom of file).
   const currency: 'INR' | 'USD' = raw?.currency === 'USD' ? 'USD' : DEFAULT_CURRENCY;
 
   const componentDefs: Array<{ key: string; label: string }> = [
@@ -120,6 +145,9 @@ export function normalizeCostEstimate(raw: any): NormalizedCostEstimate {
   const mismatchAmount = aiReportedTotal !== null ? Math.abs(aiReportedTotal - componentSum) : 0;
   const totalMismatch = aiReportedTotal !== null && mismatchAmount > 1; // >1 unit tolerance for rounding
 
+  // If AI's total doesn't reconcile with its own components, and no components
+  // were broken out at all, surface the raw total as a single "Unallocated" line
+  // rather than silently discarding it or silently trusting it.
   let finalComponents = components;
   let totalCost = componentSum;
 
@@ -129,6 +157,8 @@ export function normalizeCostEstimate(raw: any): NormalizedCostEstimate {
     ];
     totalCost = aiReportedTotal;
   } else if (totalMismatch && aiReportedTotal !== null && aiReportedTotal > componentSum) {
+    // AI total exceeds sum of known components — the gap is real cost that
+    // wasn't itemized. Surface it explicitly instead of hiding ₹350,000 like before.
     finalComponents = [
       ...components,
       {
@@ -139,8 +169,18 @@ export function normalizeCostEstimate(raw: any): NormalizedCostEstimate {
     ];
     totalCost = aiReportedTotal;
   }
+  // If AI total is LESS than component sum, componentSum is authoritative —
+  // the itemized numbers are more trustworthy than a single opaque total.
 
-  const contractValue = typeof raw?.estimatedRevenue === 'number' ? raw.estimatedRevenue : null;
+  // Margin — only compute if we actually have a contract value. Never default to 0.
+  // Actual schema field is `estimatedRevenue`, not `contractValue`.
+  // Fallback kept in case older records used the other key.
+  const contractValue =
+    typeof raw?.estimatedRevenue === 'number'
+      ? raw.estimatedRevenue
+      : typeof raw?.contractValue === 'number'
+      ? raw.contractValue
+      : null;
   let estimatedProfit: number | null = null;
   let estimatedMarginPct: number | null = null;
   let marginDisplay = 'Not Available';
@@ -184,13 +224,17 @@ const HEALTH_WEIGHTS: Record<keyof HealthFactorBreakdown, number> = {
 };
 
 export function deriveHealthStatus(score: number): HealthStatus {
-  if (score >= 90) return 'EXCELLENT';
-  if (score >= 75) return 'HEALTHY';
-  if (score >= 60) return 'AT_RISK';
-  if (score >= 40) return 'HIGH_RISK';
+  // Directive #4, verbatim: >=80 HEALTHY, 50-79 AT_RISK, <50 CRITICAL.
+  if (score >= 80) return 'HEALTHY';
+  if (score >= 50) return 'AT_RISK';
   return 'CRITICAL';
 }
 
+/**
+ * Builds a heuristic breakdown when the AI doesn't provide factor-level
+ * scores — derived from actual counts (requirements, risks, missing info),
+ * not invented. This is intentionally conservative: thin data => lower score.
+ */
 function heuristicHealthBreakdown(ai: any): HealthFactorBreakdown {
   const reqCount = ai?.requirements?.length ?? 0;
   const wbsCount = (ai?.wbsTasks ?? ai?.milestones ?? []).length;
@@ -199,14 +243,16 @@ function heuristicHealthBreakdown(ai: any): HealthFactorBreakdown {
   const blockingMissing = (ai?.missingInfo ?? []).filter((m: any) => m?.isBlocking).length;
   const resourceCount = ai?.resourcePlans?.length ?? 0;
 
+  // Thin outputs (2 requirements, 2 tasks, etc. for a 1000-seat HQ project)
+  // should NOT score as healthy. Scale toward a realistic minimum expected count.
   const scaleTo100 = (count: number, expectedMin: number) => Math.min(100, Math.round((count / expectedMin) * 100));
 
   return {
-    requirementCompleteness: scaleTo100(reqCount, 15), 
+    requirementCompleteness: scaleTo100(reqCount, 15), // expect 15+ granular requirements
     scopeClarity: reqCount > 0 ? 60 : 20,
     resourceAvailability: scaleTo100(resourceCount, 5),
     timelineFeasibility: wbsCount > 0 ? scaleTo100(wbsCount, 20) : 20,
-    budgetConfidence: 50, 
+    budgetConfidence: 50, // neutral until cost validation above confirms no mismatch
     riskLevel: Math.max(0, 100 - highRisks * 20 - blockingMissing * 15),
     documentationCompleteness: scaleTo100(reqCount + wbsCount, 30),
   };
@@ -228,6 +274,8 @@ export function normalizeHealth(ai: any, costEstimate: NormalizedCostEstimate): 
       }
     : heuristicHealthBreakdown(ai);
 
+  // Penalize budget confidence directly if the cost totals didn't reconcile —
+  // this is what makes the score and status actually mean something.
   if (costEstimate.totalMismatch) {
     breakdown.budgetConfidence = Math.min(breakdown.budgetConfidence, 30);
   }
@@ -237,16 +285,20 @@ export function normalizeHealth(ai: any, costEstimate: NormalizedCostEstimate): 
     0,
   );
   const score = Math.round(rawScore);
-  const status = deriveHealthStatus(score); 
+  const status = deriveHealthStatus(score); // status is ALWAYS derived from score — never independently set
 
   return { score, status, breakdown, breakdownSource };
 }
 
 // ---------- Array depth check (flags suspiciously thin AI output) ----------
 
+// Aligned to the actual floor values stated in prompt directive #1
+// (requirements 6-12, wbsTasks 8-15, resourcePlans 3-6, risks 4-8).
+// If the prompt's minimums change, update these too — otherwise fully
+// prompt-compliant output gets flagged as "thin" for no real reason.
 const MIN_EXPECTED: Record<string, number> = {
-  requirements: 8,
-  wbsTasks: 15,
+  requirements: 6,
+  wbsTasks: 8,
   resourcePlans: 3,
   risks: 4,
 };
@@ -280,8 +332,16 @@ export function checkWbsResourceConsistency(ai: any): ValidationWarning[] {
   const wbsTasks = ai?.wbsTasks ?? ai?.milestones ?? [];
   const resourcePlans = ai?.resourcePlans ?? [];
 
-  const totalWbsHours = wbsTasks.reduce((sum: number, t: any) => sum + (t?.estimatedEffort ?? t?.effortHours ?? t?.estimatedHours ?? 0), 0);
-  const totalResourceHours = resourcePlans.reduce((sum: number, r: any) => sum + (r?.estimatedHours ?? r?.estHours ?? 0), 0);
+  // Field names match the real schema: wbsTasks use "estimatedEffort",
+  // resourcePlans use "estimatedHours". Fallbacks kept for safety only.
+  const totalWbsHours = wbsTasks.reduce(
+    (sum: number, t: any) => sum + (t?.estimatedEffort ?? t?.effortHours ?? 0),
+    0,
+  );
+  const totalResourceHours = resourcePlans.reduce(
+    (sum: number, r: any) => sum + (r?.estimatedHours ?? r?.estHours ?? 0),
+    0,
+  );
 
   if (totalWbsHours === 0 || totalResourceHours === 0) {
     warnings.push({
@@ -292,10 +352,7 @@ export function checkWbsResourceConsistency(ai: any): ValidationWarning[] {
     return warnings;
   }
 
-  const MathAbs = Math.abs(totalWbsHours - totalResourceHours);
-  const MathMax = Math.max(totalWbsHours, totalResourceHours);
-  const variance = MathAbs / MathMax;
-  
+  const variance = Math.abs(totalWbsHours - totalResourceHours) / Math.max(totalWbsHours, totalResourceHours);
   if (variance > 0.25) {
     warnings.push({
       code: 'WBS_RESOURCE_HOUR_MISMATCH',

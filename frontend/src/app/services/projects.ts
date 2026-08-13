@@ -63,6 +63,10 @@ export class ProjectsService {
     return this.http.get<any>(`${this.apiUrl}/${projectId}/analysis`);
   }
 
+  kickoffProject(projectId: number) {
+    return this.http.post<any>(`${this.apiUrl}/${projectId}/kickoff`, {});
+  }
+
   archiveProject(id: number, force: boolean = false) {
     return this.http.patch(`${this.apiUrl}/${id}/archive`, { force });
   }

@@ -1,20 +1,35 @@
 import { Injectable, BadRequestException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoogleGenAI } from '@google/genai';
 import Groq from 'groq-sdk';
 import { normalizeAndValidateAnalysis } from './project-analysis-validator';
 
 @Injectable()
 export class ProjectAiService {
-  private groq: Groq;
+  private geminiAi: GoogleGenAI;
+  private groqAi: Groq;
 
   constructor(private prisma: PrismaService) {
-    this.groq = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
+    if (process.env.GEMINI_API_KEY) {
+      this.geminiAi = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+      });
+    }
+    if (process.env.GROQ_API_KEY) {
+      this.groqAi = new Groq({
+        apiKey: process.env.GROQ_API_KEY,
+      });
+    }
   }
 
-  async analyzeProjectDocuments(companyId: number, projectId: number, constraints?: any) {
-    if (!process.env.GROQ_API_KEY) {
+  async analyzeProjectDocuments(companyId: number, projectId: number, constraints?: any, requestedModel?: string) {
+    const aiModel = requestedModel || 'llama-3.3-70b-versatile';
+    const isGemini = aiModel.startsWith('gemini') || aiModel.startsWith('gemma');
+
+    if (isGemini && !process.env.GEMINI_API_KEY) {
+      throw new HttpException('Gemini API Key not configured', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    if (!isGemini && !process.env.GROQ_API_KEY) {
       throw new HttpException('Groq API Key not configured', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -50,7 +65,7 @@ export class ProjectAiService {
         projectId,
         version: newVersion,
         status: 'PROCESSING',
-        aiModel: 'llama-3.3-70b-versatile',
+        aiModel: aiModel,
         documentsAnalyzed: extractedDocs.length,
         resourceConstraints: constraints || null
       }
@@ -69,12 +84,52 @@ export class ProjectAiService {
     }
 
     let constraintsPrompt = '';
-    if (constraints && constraints.engineerCount) {
-      constraintsPrompt = `
-5. SCHEDULING CONSTRAINTS (STRICT):
-   - You must act as a precise Project Scheduler. You have ${constraints.engineerCount} engineers available, working a maximum of ${constraints.maxHoursPerDay} hours per day, starting on ${constraints.startDate || 'a realistic date'}, with ${constraints.daysOff?.join(', ') || 'weekends'} off.
-   - For every WBS task, you MUST calculate the 'workingDays', 'startDate', 'startTime', 'endDate', and 'endTime' respecting these constraints and respecting task 'dependencies'.
-   - Assign 'quantity' of engineers and the specific 'engineer' role to each WBS task.`;
+    if (constraints) {
+      constraintsPrompt = `\n5. SCHEDULING CONSTRAINTS (STRICT):\n`;
+      
+      if (constraints.teamMembers && constraints.teamMembers.length > 0) {
+        const memberIds = constraints.teamMembers.map((m: any) => m.id);
+        const detailedMembers = await this.prisma.employee.findMany({
+          where: { id: { in: memberIds } },
+          include: {
+            designation: true,
+            department: true,
+            skills: true,
+          }
+        });
+
+        let teamProfiles = '';
+        detailedMembers.forEach(m => {
+          const role = m.designation?.name || 'Team Member';
+          const dept = m.department?.name || 'Unassigned';
+          const skillsList = m.skills.map(s => `${s.name} (${s.level})`).join(', ');
+          const skillsText = skillsList ? `Skills: ${skillsList}` : 'Skills: Not specified';
+          const aboutText = m.about ? `Bio: ${m.about}` : '';
+          
+          teamProfiles += `\n      - ${m.firstName} ${m.lastName} | Role: ${role} | Dept: ${dept} | ${skillsText} | ${aboutText}`;
+        });
+
+        constraintsPrompt += `   - Available Team Members and their Profiles:${teamProfiles}\n     You MUST exclusively assign these specific named individuals to the Resource Plan and WBS Tasks, making sure to assign tasks that match their specific skills and roles.\n`;
+      } else if (constraints.engineerCount) {
+        constraintsPrompt += `   - You have ${constraints.engineerCount} engineers available.\n`;
+      }
+
+      if (constraints.maxHoursPerDay || constraints.startDate || constraints.daysOff) {
+        constraintsPrompt += `   - Schedule limits: max ${constraints.maxHoursPerDay || 8} hours per day, starting on ${constraints.startDate || 'a realistic date'}, with ${constraints.daysOff?.join(', ') || 'weekends'} off.\n   - For every WBS task, you MUST calculate the 'workingDays', 'startDate', 'startTime', 'endDate', and 'endTime' respecting these constraints and task 'dependencies'.\n`;
+      }
+
+      if (constraints.methodology) {
+        constraintsPrompt += `\n6. METHODOLOGY (STRICT):\n   - Use the **${constraints.methodology}** project management methodology. `;
+        if (constraints.methodology === 'Agile') {
+          constraintsPrompt += `Break the WBS into Epics, Sprints, and User Stories/Tasks.\n`;
+        } else {
+          constraintsPrompt += `Break the WBS into sequential logical Phases (e.g., Planning, Design, Execution, Testing, Deployment).\n`;
+        }
+      }
+
+      if (constraints.targetBudget) {
+        constraintsPrompt += `\n7. BUDGET CONSTRAINTS:\n   - The target budget ceiling is ${constraints.targetBudget}. Try to align estimated effort/costs within this budget. If it is mathematically impossible to meet the scope requirements within this budget, flag a 'Financial' risk and add a 'isReadyForKickoff: false' validation blocker.\n`;
+      }
     }
 
     const systemPrompt = `You are an expert Senior Project Manager. Analyze the provided project documents to generate a comprehensive, highly thorough project intelligence payload.
@@ -89,7 +144,7 @@ STRICT COMPREHENSIVENESS & RECONCILIATION DIRECTIVES:
 
 2. FINANCIAL & COST MATHEMATICS (STRICT):
    - CRITICAL REQUIREMENT: For Indian-context projects, calculate all financial metrics (hourly rates, material costs, totals) in Indian Rupees (INR). Set currency to 'INR'. Do NOT assume USD magnitude for Indian resources.
-   - totalCost MUST equal the EXACT sum of: resourceCost + infrastructureCost + vendorCost + licenseCost + otherCost + contingency. If this math is wrong, the entire object is invalid.
+   - totalCost MUST equal the EXACT sum of all cost component fields you populate (e.g. resourceCost + infrastructureCost + hardwareCost + licenseCost + vendorCost + cloudCost + implementationCost + travelCost + otherCost + contingency). If this math is wrong, the entire object is invalid.
    - If contract revenue or price is missing from the source documents, estimatedRevenue and estimatedMargin MUST be null or omitted (do NOT guess a margin if there is no revenue data).
 
 3. WBS vs RESOURCE RECONCILIATION:
@@ -101,6 +156,20 @@ STRICT COMPREHENSIVENESS & RECONCILIATION DIRECTIVES:
    - If readinessScore is between 50 and 79: healthStatus MUST be "AT_RISK".
    - If readinessScore < 50: healthStatus MUST be "CRITICAL".
    - DO NOT provide contradictory readinessScore and healthStatus!
+
+5. ENTERPRISE LEVEL SUMMARY:
+   - "executiveSummary": MUST be a highly detailed, comprehensive, multi-paragraph enterprise-grade executive briefing (minimum 400-500 words). It MUST include the following specific sections formatted with Markdown headers:
+     ### 1. Executive Overview
+     (A high-level summary of the project's purpose, background, and strategic value)
+     ### 2. Scope & Objectives
+     (Detailed explanation of key deliverables, out-of-scope items, and primary goals)
+     ### 3. Financial & Resource Implications
+     (Detailed budget overview, key resource requirements, margin expectations, and cost drivers)
+     ### 4. Key Risks & Mitigation
+     (Major technical, financial, or operational risks identified and their mitigation strategies)
+     ### 5. Strategic Alignment & Next Steps
+     (How this project aligns with overarching business goals and immediate recommended next actions)
+   Ensure the summary is rich with specific details, facts, numbers, and data extracted directly from the uploaded documents. Do not use generic boilerplate text.
 ${constraintsPrompt}
 
 JSON SCHEMA:
@@ -128,26 +197,42 @@ JSON SCHEMA:
   "missingInfo": [{ "missingItem": "string", "whyRequired": "string", "impact": "string", "priority": "string", "isBlocking": boolean }],
   "recommendations": [{ "recommendation": "string", "category": "string", "reason": "string", "expectedImpact": "string", "confidence": number, "source": "string" }],
   "aiConfidence": { "scope": number, "requirements": number, "timeline": number, "resourcePlan": number, "cost": number, "riskAnalysis": number, "overall": number },
-  "health": { "breakdown": { "requirementCompleteness": number, "scopeClarity": number, "resourceAvailability": number, "timelineFeasibility": number, "budgetConfidence": number, "riskLevel": number, "documentationCompleteness": number } },
+  "health": { "readinessScore": number, "healthStatus": "HEALTHY|AT_RISK|CRITICAL", "breakdown": { "requirementCompleteness": number, "scopeClarity": number, "resourceAvailability": number, "timelineFeasibility": number, "budgetConfidence": number, "riskLevel": number, "documentationCompleteness": number } },
   "kickoffReadiness": { "reqsApproved": boolean, "scopeApproved": boolean, "budgetApproved": boolean, "resourcesAvailable": boolean, "timelineFeasible": boolean, "stakeholdersIded": boolean, "dependenciesIded": boolean, "risksReviewed": boolean, "docsAvailable": boolean, "clientApprovals": boolean, "overallStatus": "READY|READY_WITH_CONDITIONS|NOT_READY" }
 }`;
 
     const startTime = Date.now();
 
     try {
-      const completion = await this.groq.chat.completions.create({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Here are the project documents:\n\n${combinedText}` }
-        ],
-        model: 'llama-3.3-70b-versatile',
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      });
+      let rawJson = '';
 
+      if (isGemini) {
+        const completion = await this.geminiAi.models.generateContent({
+          model: aiModel,
+          contents: `Here are the project documents:\n\n${combinedText}`,
+          config: {
+            systemInstruction: systemPrompt,
+            responseMimeType: 'application/json',
+            temperature: 0.2
+          }
+        });
+        rawJson = completion.text || '';
+      } else {
+        const completion = await this.groqAi.chat.completions.create({
+          model: aiModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Here are the project documents:\n\n${combinedText}` }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.2
+        });
+        rawJson = completion.choices[0]?.message?.content || '';
+      }
+
+      // Parse the JSON output
+      const ai = JSON.parse(rawJson);
       const processingDuration = Date.now() - startTime;
-      const responseText = completion.choices[0]?.message?.content || '{}';
-      const ai = JSON.parse(responseText);
 
       const normalized = normalizeAndValidateAnalysis(ai);
 
@@ -499,8 +584,32 @@ JSON SCHEMA:
         // Finalize project
         await tx.project.update({
           where: { id: projectId },
-          data: { onboardingStatus: normalized.isReadyForKickoff ? 'ANALYZED' : 'ANALYZED_WITH_WARNINGS' }
+          data: { 
+            onboardingStatus: normalized.isReadyForKickoff ? 'ANALYZED' : 'ANALYZED_WITH_WARNINGS',
+            ...(constraints?.startDate && { startDate: new Date(constraints.startDate) }),
+            ...(constraints?.endDate && { endDate: new Date(constraints.endDate) })
+          }
         });
+
+        if (constraints?.teamMembers?.length > 0) {
+          const memberIds = constraints.teamMembers.map((m: any) => m.id);
+          for (const memberId of memberIds) {
+            await tx.projectMember.upsert({
+              where: {
+                projectId_employeeId: {
+                  projectId: projectId,
+                  employeeId: memberId
+                }
+              },
+              create: {
+                projectId: projectId,
+                employeeId: memberId,
+                role: 'MEMBER'
+              },
+              update: {}
+            });
+          }
+        }
       });
 
       return {
@@ -545,7 +654,8 @@ JSON SCHEMA:
         data: { onboardingStatus: 'ERROR' }
       });
       
-      throw new HttpException('AI Analysis failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      console.error('AI Error:', error);
+      throw new HttpException(error.message || 'AI Analysis failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

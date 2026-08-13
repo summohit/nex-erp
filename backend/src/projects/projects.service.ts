@@ -105,6 +105,14 @@ export class ProjectsService {
     }
 
     try {
+      // Create a client automatically using the project name
+      const autoClient = await this.prisma.client.create({
+        data: {
+          name: data.name,
+          companyId
+        }
+      });
+
       const newProject = await this.prisma.project.create({
         data: {
           name: data.name,
@@ -117,7 +125,28 @@ export class ProjectsService {
           budgetAmount: data.budgetAmount ? parseFloat(data.budgetAmount) : null,
           startDate: data.startDate ? new Date(data.startDate) : null,
           endDate: data.endDate ? new Date(data.endDate) : null,
-          clientId: data.clientId ? parseInt(data.clientId) : null,
+          clientId: autoClient.id,
+
+          members: {
+            create: {
+              employeeId: leadId,
+              role: 'ADMIN'
+            }
+          },
+          boards: {
+            create: {
+              name: 'Main Board',
+              columns: {
+                create: [
+                  { name: 'To Do', color: '#6b7280', position: 0, isSystem: true },
+                  { name: 'In Progress', color: '#3b82f6', position: 1, isSystem: true },
+                  { name: 'In Review', color: '#8b5cf6', position: 2, isSystem: true },
+                  { name: 'Done', color: '#22c55e', position: 3, isSystem: true },
+                  { name: 'Archived', color: '#9ca3af', position: 4, isSystem: true }
+                ]
+              }
+            }
+          }
         }
       });
 
@@ -159,6 +188,60 @@ export class ProjectsService {
       throw new NotFoundException('No analysis run found for this project');
     }
     return run;
+  }
+
+  async kickoffProject(companyId: number, projectId: number) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, companyId },
+      include: { boards: { include: { columns: true } } }
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    const analysis = await this.getProjectAnalysis(companyId, projectId);
+    if (!analysis || !analysis.wbsTasks) throw new BadRequestException('No WBS tasks to kickoff');
+
+    const mainBoard = project.boards[0];
+    if (!mainBoard) throw new BadRequestException('Project has no board setup');
+
+    const todoColumn = mainBoard.columns.find(c => c.name.toLowerCase() === 'to do' || c.position === 0);
+    if (!todoColumn) throw new BadRequestException('Board has no To Do column');
+
+    // Make sure we don't duplicate if already kicked off
+    if (project.onboardingStatus === 'COMPLETED') {
+      return project;
+    }
+
+    let position = 0;
+    const issues = analysis.wbsTasks.map((task, idx) => {
+      return {
+        title: task.task,
+        description: task.description || '',
+        projectId: project.id,
+        columnId: todoColumn.id,
+        type: 'TASK',
+        status: 'TODO',
+        key: `${project.key}-${idx + 1}`,
+        position: position++,
+        startDate: task.startDate ? new Date(task.startDate) : null,
+        dueDate: task.endDate ? new Date(task.endDate) : null,
+        estimatedHours: task.estimatedEffort || null,
+        companyId
+      };
+    });
+
+    if (issues.length > 0) {
+      await this.prisma.issue.createMany({
+        data: issues
+      });
+    }
+
+    return this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        onboardingStatus: 'COMPLETED',
+        status: 'ACTIVE'
+      }
+    });
   }
 
   async uploadProjectDocument(companyId: number, projectId: number, uploadedBy: number, file: Express.Multer.File) {

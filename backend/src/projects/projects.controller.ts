@@ -38,12 +38,22 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: any
   ) {
-    return this.projectAiService.analyzeProjectDocuments(req.user.companyId, id, body?.resourceConstraints);
+    return this.projectAiService.analyzeProjectDocuments(
+      req.user.companyId, 
+      id, 
+      body?.resourceConstraints, 
+      body?.aiModel
+    );
   }
 
   @Get(':id/analysis')
   getProjectAnalysis(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.projectsService.getProjectAnalysis(req.user.companyId, id);
+  }
+
+  @Post(':id/kickoff')
+  kickoffProject(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.kickoffProject(req.user.companyId, id);
   }
 
   @Get('timesheets/my-week')

@@ -11,7 +11,7 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 @Component({
   selector: 'app-clients-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, AgGridModule, ClientActionCellRendererComponent, LucidePlus, LucideUploadCloud, LucideX, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, RouterModule, AgGridModule, LucidePlus, LucideUploadCloud, LucideX, FormsModule, ReactiveFormsModule],
   templateUrl: './clients-list.html',
   styleUrls: ['./clients-list.css']
 })

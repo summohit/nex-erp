@@ -59,7 +59,7 @@ interface Client {
     LucideBuilding, LucideMail, LucidePhone, LucideMapPin, LucideBriefcase, 
     LucideDollarSign, LucideCheckCircle2, LucideFileText, LucidePlus, LucideX,
     LucideGlobe, LucideCalendar, LucideShieldCheck, LucideShieldAlert, 
-    LucideExternalLink, LucideTrash2, LucideArchive, LucideRotateCcw, 
+    LucideExternalLink, LucideArchive, LucideRotateCcw, 
     LucideLayoutList, LucideUserCheck, LucideSearch, LucideCreditCard, 
     LucideClock, LucideAlertCircle, LucideEdit, LucideUploadCloud
   ],

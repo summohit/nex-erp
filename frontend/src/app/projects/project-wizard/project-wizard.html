@@ -155,26 +155,144 @@
       <!-- Main Form Grid -->
       <div class="resource-form-grid">
         
-        <!-- Field 1: Available Engineers -->
+        <!-- Field 1: Project Methodology -->
         <div class="config-field-card">
           <div class="field-header">
-            <label class="field-label">Available Engineers</label>
-            <span class="field-badge">Capacity</span>
+            <label class="field-label">Project Methodology</label>
+            <span class="field-badge">Framework</span>
           </div>
-          <div class="custom-input-group">
-            <div class="input-icon-wrapper">
-              <svg lucideUsers class="input-icon"></svg>
+          <div class="custom-select-wrapper mt-3">
+            <select class="custom-form-input w-100" [(ngModel)]="resourceConfig().methodology">
+              <option value="Agile">Agile / Scrum (Sprints)</option>
+              <option value="Waterfall">Waterfall (Phases)</option>
+            </select>
+          </div>
+          <span class="field-help-text d-block mt-2">Determines how the WBS structure is generated.</span>
+        </div>
+
+        <!-- Field 1.5: AI Engine Model -->
+        <div class="config-field-card">
+          <div class="field-header">
+            <label class="field-label">AI Engine Model</label>
+            <span class="field-badge bg-indigo-50 text-indigo-600">Gemini</span>
+          </div>
+          <div class="custom-select-wrapper mt-3">
+            <select class="custom-form-input w-100" [(ngModel)]="resourceConfig().aiModel">
+              <optgroup label="Groq Models (Fast)">
+                <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (Recommended)</option>
+                <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+                <option value="llama3-8b-8192">llama3-8b-8192</option>
+              </optgroup>
+              <optgroup label="Google Gemini Models">
+                <option value="gemini-flash-latest">gemini-flash-latest</option>
+                <option value="gemini-3.6-flash">gemini-3.6-flash</option>
+                <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+                <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
+                <option value="gemma-4-31b-it">gemma-4-31b-it</option>
+              </optgroup>
+            </select>
+          </div>
+          <span class="field-help-text d-block mt-2">Select the underlying AI model. If one is experiencing high demand, try another.</span>
+        </div>
+
+        <!-- Field 2: Target Budget -->
+        <div class="config-field-card">
+          <div class="field-header">
+            <label class="field-label">Target Budget Limit</label>
+            <span class="field-badge">Optional</span>
+          </div>
+          <div class="custom-input-group mt-3">
+            <div class="input-icon-wrapper font-bold text-slate-500">
+              ₹
             </div>
             <input 
-              type="number" 
+              type="text" 
               class="custom-form-input" 
-              [(ngModel)]="resourceConfig().engineerCount" 
-              min="1" 
-              max="100" 
+              [(ngModel)]="resourceConfig().targetBudget" 
+              placeholder="e.g. 5 Lakhs, 50,000, $150k"
             />
-            <span class="input-suffix">FTEs</span>
+            <span class="input-suffix">INR / USD</span>
           </div>
-          <span class="field-help-text">Number of full-time equivalents available for this project.</span>
+          <span class="field-help-text d-block mt-2">AI will flag if the required scope exceeds this limit. Accepts numeric or descriptive amounts.</span>
+        </div>
+
+        <!-- Field 3: Team Members (Full Width) -->
+        <div class="config-field-card full-width">
+          <div class="field-header">
+            <div>
+              <label class="field-label">Assign Team Members</label>
+              <span class="field-help-text d-block mt-05">Select specific people from your team to be explicitly assigned to WBS tasks.</span>
+            </div>
+            <span class="field-badge bg-indigo-50 text-indigo-600" *ngIf="resourceConfig().teamMembers.length > 0">
+              {{ resourceConfig().teamMembers.length }} Selected
+            </span>
+          </div>
+
+          <!-- Real-Time Search Bar -->
+          <div class="member-search-bar mt-3">
+            <div class="custom-input-group member-search-group">
+              <div class="input-icon-wrapper">
+                <svg lucideSearch class="input-icon"></svg>
+              </div>
+              <input 
+                type="text" 
+                class="custom-form-input member-search-input" 
+                [ngModel]="teamSearchQuery()"
+                (ngModelChange)="teamSearchQuery.set($event)"
+                placeholder="Search team by name, email, or role..."
+              />
+              <button 
+                type="button" 
+                class="clear-search-btn" 
+                *ngIf="teamSearchQuery()" 
+                (click)="teamSearchQuery.set('')"
+                title="Clear search">
+                <svg lucideX class="icon-xs"></svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="team-member-grid-wrapper mt-3">
+            <div class="team-member-grid" *ngIf="filteredEmployees().length > 0">
+              <div 
+                class="team-member-card"
+                *ngFor="let emp of filteredEmployees()"
+                [class.selected]="isMemberSelected(emp)"
+                (click)="toggleTeamMember(emp)"
+              >
+                <!-- Avatar Image if Available -->
+                <img 
+                  *ngIf="getMemberAvatar(emp)" 
+                  [src]="getMemberAvatar(emp)" 
+                  class="member-avatar-img" 
+                  [alt]="emp.firstName"
+                />
+
+                <!-- Fallback Initials Avatar -->
+                <div class="member-avatar" *ngIf="!getMemberAvatar(emp)">
+                  {{ getInitials(emp.firstName, emp.lastName) }}
+                </div>
+
+                <div class="member-info">
+                  <span class="member-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                  <span class="member-role">{{ getMemberDesignation(emp) }}</span>
+                </div>
+                <div class="member-check-icon" *ngIf="isMemberSelected(emp)">
+                  <svg lucideCheck class="icon-xs"></svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Empty state when no employees at all -->
+            <div *ngIf="availableEmployees().length === 0" class="text-center p-4 text-muted small">
+              No active team members found in your company directory.
+            </div>
+
+            <!-- Empty state when search produces no results -->
+            <div *ngIf="availableEmployees().length > 0 && filteredEmployees().length === 0" class="text-center p-4 text-muted small">
+              No team members match "<strong>{{ teamSearchQuery() }}</strong>".
+            </div>
+          </div>
         </div>
 
         <!-- Field 2: Max Hours Per Day -->
@@ -199,23 +317,39 @@
           <span class="field-help-text">Maximum working hours per engineer per day.</span>
         </div>
 
-        <!-- Field 3: Project Start Date -->
+        <!-- Field 3: Project Start & End Date -->
         <div class="config-field-card">
           <div class="field-header">
-            <label class="field-label">Project Start Date</label>
+            <label class="field-label">Project Dates</label>
             <span class="field-badge">Baseline</span>
           </div>
-          <div class="custom-input-group">
-            <div class="input-icon-wrapper">
-              <svg lucideCalendar class="input-icon"></svg>
+          <div class="flex gap-2">
+            <div class="custom-input-group flex-1">
+              <div class="input-icon-wrapper">
+                <svg lucideCalendar class="input-icon"></svg>
+              </div>
+              <input 
+                type="date" 
+                class="custom-form-input" 
+                title="Start Date"
+                [(ngModel)]="resourceConfig().startDate" 
+              />
             </div>
-            <input 
-              type="date" 
-              class="custom-form-input" 
-              [(ngModel)]="resourceConfig().startDate" 
-            />
+            <div class="custom-input-group flex-1">
+              <div class="input-icon-wrapper">
+                <svg lucideCalendar class="input-icon"></svg>
+              </div>
+              <input 
+                type="date" 
+                class="custom-form-input" 
+                title="End Date"
+                placeholder="End Date (Optional)"
+                [min]="resourceConfig().startDate"
+                [(ngModel)]="resourceConfig().endDate" 
+              />
+            </div>
           </div>
-          <span class="field-help-text">The baseline start date for WBS schedule calculation.</span>
+          <span class="field-help-text">Baseline start and optional target end date for WBS calculation.</span>
         </div>
 
         <!-- Field 4: Days Off (Full Width) -->
@@ -267,24 +401,68 @@
 
   <!-- Step 3: Processing -->
   <div class="wizard-content text-center" *ngIf="currentStep() === 3">
-    <div class="processing-container">
-      <div class="processing-animation">
-        <div class="pulse-ring"></div>
-        <div class="pulse-ring delay"></div>
-        <svg lucideBrainCircuit class="icon-xxl text-primary"></svg>
-      </div>
-      <h3 class="mt-4">Analyzing Project Intelligence</h3>
-      <p class="text-muted">Engine is scanning <strong>{{ selectedFiles().length }} uploaded documents</strong> to build requirements, WBS, risk logs, and resource allocation...</p>
+    <div class="processing-container-enhanced">
       
-      <div class="processing-steps-status mt-4" *ngIf="!analysisError()">
-        <div class="status-item active">
-          <span class="dot"></span> Extracting document text & structures
+      <!-- Top Status Badge -->
+      <div class="ai-processing-header-badge">
+        <span class="pulse-dot-green"></span>
+        <span>AI ENGINE V2.4 • SCANNING ACTIVE</span>
+      </div>
+
+      <!-- Futuristic Orb & Rings -->
+      <div class="processing-animation-enhanced mt-4">
+        <div class="glow-orb"></div>
+        <div class="pulse-ring-outer"></div>
+        <div class="pulse-ring-inner"></div>
+        <div class="ai-icon-center">
+          <svg lucideBrainCircuit class="icon-xl text-indigo-600"></svg>
         </div>
-        <div class="status-item active">
-          <span class="dot"></span> Identifying business objectives & scope limits
+      </div>
+
+      <!-- Main Title & Document Counter -->
+      <h3 class="processing-main-title mt-4">Analyzing Project Intelligence</h3>
+      <p class="processing-subtitle text-muted">
+        Engine is scanning <strong class="text-indigo-600 font-semibold">{{ selectedFiles().length }} uploaded document(s)</strong> to build requirements, WBS, risk logs, and resource allocation...
+      </p>
+
+      <!-- Processing Progress Bar -->
+      <div class="ai-progress-track mt-4 mb-4" *ngIf="!analysisError()">
+        <div class="ai-progress-bar-animated"></div>
+      </div>
+
+      <!-- Sleek Interactive Step Cards -->
+      <div class="processing-steps-grid mt-4" *ngIf="!analysisError()">
+        <div class="processing-step-card step-done">
+          <div class="step-icon-wrap bg-emerald-100 text-emerald-600">
+            <svg lucideCheckCircle2 class="icon-xs"></svg>
+          </div>
+          <div class="step-info">
+            <span class="step-title">Document Parsing & Ingestion</span>
+            <span class="step-desc">Text & structure extracted from {{ selectedFiles().length }} uploaded file(s)</span>
+          </div>
+          <span class="step-status-tag tag-done">Completed</span>
         </div>
-        <div class="status-item active">
-          <span class="dot"></span> Generating Work Breakdown Structure & estimate
+
+        <div class="processing-step-card step-active">
+          <div class="step-icon-wrap bg-indigo-100 text-indigo-600">
+            <span class="spinner-border spinner-border-sm"></span>
+          </div>
+          <div class="step-info">
+            <span class="step-title">Scope & Constraint Alignment</span>
+            <span class="step-desc">Identifying business objectives, constraints & target budget</span>
+          </div>
+          <span class="step-status-tag tag-active">Analyzing...</span>
+        </div>
+
+        <div class="processing-step-card step-pending">
+          <div class="step-icon-wrap bg-slate-100 text-slate-400">
+            <svg lucideZap class="icon-xs"></svg>
+          </div>
+          <div class="step-info">
+            <span class="step-title">WBS & Resource Synthesis</span>
+            <span class="step-desc">Generating Work Breakdown Structure & effort allocation</span>
+          </div>
+          <span class="step-status-tag tag-pending">Queued</span>
         </div>
       </div>
 
@@ -309,7 +487,7 @@
   </div>
 
   <!-- Step 4: Executive Review -->
-  <div class="wizard-content" *ngIf="currentStep() === 4 && analysisData()">
+  <div class="wizard-content review-container" *ngIf="currentStep() === 4 && analysisData()">
     
     <!-- Sidebar Navigation -->
     <aside class="review-sidebar">
@@ -502,7 +680,7 @@
           <span class="icon-badge bg-indigo-light text-indigo"><svg lucideFileText class="icon-sm"></svg></span>
           <h3>Executive Summary</h3>
         </div>
-        <p class="lead-text">{{ analysisData()?.summary?.executiveSummary }}</p>
+        <div class="lead-text" [innerHTML]="executiveSummaryHtml()"></div>
         
         <div class="grid-2 mt-4">
           <div class="detail-box objective-box">
@@ -607,37 +785,57 @@
           <span class="section-count-badge">{{analysisData()?.wbsTasks?.length || 0}} Tasks</span>
         </div>
 
-        <!-- VISUAL RECONCILIATION METER -->
-        <div class="workload-reconciliation-card mt-3 mb-3">
-          <div class="d-flex align-items-center justify-between mb-2">
+        <!-- VISUAL RECONCILIATION METER ENHANCED -->
+        <div class="workload-reconciliation-card-enhanced mt-3 mb-4">
+          <div class="reconcile-header-row">
             <div class="d-flex align-items-center gap-2">
-              <svg lucideClock class="icon-xs text-blue"></svg>
-              <strong class="reconcile-title">Workload Capacity Meter</strong>
+              <div class="meter-icon-glow">
+                <svg lucideTarget class="icon-sm text-indigo-600"></svg>
+              </div>
+              <div>
+                <strong class="reconcile-title-enhanced">Workload Capacity Meter</strong>
+                <span class="reconcile-subtitle d-block text-muted text-xs">Real-time reconciliation of task effort against total team capacity</span>
+              </div>
             </div>
-            <span class="capacity-status-badge" [class.badge-emerald]="getTotalResourceHours() >= getTotalWbsHours()" [class.badge-rose]="getTotalResourceHours() < getTotalWbsHours()">
+            <div class="capacity-status-badge-enhanced" [class.badge-emerald-glow]="getTotalResourceHours() >= getTotalWbsHours()" [class.badge-rose-glow]="getTotalResourceHours() < getTotalWbsHours()">
+              <span class="pulse-dot"></span>
               {{ getTotalResourceHours() >= getTotalWbsHours() ? (getTotalResourceHours() - getTotalWbsHours()) + ' hrs buffer capacity' : 'Workload Deficit' }}
-            </span>
+            </div>
           </div>
 
-          <div class="workload-bar-track">
+          <!-- Bar Track -->
+          <div class="workload-bar-track-enhanced mt-3">
             <div 
-              class="workload-bar-fill" 
+              class="workload-bar-fill-enhanced" 
               [style.width.%]="getWbsCapacityPercentage()">
             </div>
           </div>
 
-          <div class="d-flex justify-between align-items-center mt-2 reconcile-stats">
-            <span>WBS Effort: <strong>{{ getTotalWbsHours() }} hrs</strong></span>
-            <span>Allocated Capacity: <strong>{{ getTotalResourceHours() }} hrs</strong></span>
+          <!-- Stats Grid -->
+          <div class="reconcile-stats-grid mt-3">
+            <div class="reconcile-stat-item">
+              <span class="stat-lbl">WBS Effort</span>
+              <strong class="stat-val text-slate-800">{{ getTotalWbsHours() }} hrs</strong>
+            </div>
+            <div class="reconcile-stat-divider"></div>
+            <div class="reconcile-stat-item">
+              <span class="stat-lbl">Allocated Capacity</span>
+              <strong class="stat-val text-indigo-600">{{ getTotalResourceHours() }} hrs</strong>
+            </div>
+            <div class="reconcile-stat-divider"></div>
+            <div class="reconcile-stat-item">
+              <span class="stat-lbl">Capacity Utilization</span>
+              <strong class="stat-val text-emerald-600">{{ getWbsCapacityPercentage() | number:'1.0-0' }}%</strong>
+            </div>
           </div>
         </div>
 
-        <div class="table-container">
-          <table class="table">
+        <!-- Enhanced Datatable -->
+        <div class="table-container-enhanced">
+          <table class="table table-enhanced">
             <thead>
               <tr>
-                <th>WBS ID</th>
-                <th>Phase</th>
+                <th>Phase / WBS ID</th>
                 <th>Task Description</th>
                 <th>Qty</th>
                 <th>Engineer</th>
@@ -650,21 +848,38 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let task of analysisData()?.wbsTasks">
-                <td><span class="badge wbs-badge">{{ task.wbsId || '-' }}</span></td>
-                <td><span class="badge phase-badge">{{ task.phase }}</span></td>
+              <tr *ngFor="let task of analysisData()?.wbsTasks" class="wbs-row-enhanced">
                 <td>
-                  <strong class="cell-title">{{ task.task }}</strong>
-                  <div class="text-muted text-sm mt-1" *ngIf="task.module">{{ task.module }}</div>
+                  <span class="phase-badge-enhanced" [ngClass]="getPhaseBadgeClass(task.phase)">
+                    {{ task.phase }}
+                  </span>
+                  <div class="mt-1"><span class="badge wbs-badge-enhanced text-xs">{{ task.wbsId || '-' }}</span></div>
                 </td>
-                <td>{{ task.quantity || '-' }}</td>
-                <td><span class="engineer-tag" *ngIf="task.engineer"><svg lucideUser class="icon-xs mr-1"></svg>{{ task.engineer }}</span></td>
-                <td><span class="effort-pill"><svg lucideClock class="icon-xs mr-1"></svg>{{ task.estimatedEffort }}h</span></td>
-                <td><span class="days-pill">{{ task.workingDays || '-' }}d</span></td>
-                <td><span class="date-pill" *ngIf="task.startDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.startDate | date:'mediumDate' }}</span></td>
-                <td><span class="date-pill" *ngIf="task.endDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.endDate | date:'mediumDate' }}</span></td>
-                <td><span class="dependency-tag" *ngIf="task.dependencies"><svg lucideLink class="icon-xs mr-1"></svg>{{ task.dependencies }}</span></td>
-                <td><span class="text-sm text-muted">{{ task.remarks || '-' }}</span></td>
+                <td>
+                  <strong class="cell-title-enhanced">{{ task.task }}</strong>
+                  <div class="cell-sub-module mt-1" *ngIf="task.module">
+                    <span class="module-chip">{{ task.module }}</span>
+                  </div>
+                </td>
+                <td><span class="qty-badge">{{ task.quantity || '1' }}</span></td>
+                <td>
+                  <div class="engineer-tag-enhanced" *ngIf="task.engineer">
+                    <ng-container *ngIf="getEngineerImage(task.engineer); else noImgTpl">
+                      <img [src]="getEngineerImage(task.engineer)" class="engineer-avatar-img-mini" alt="avatar" />
+                    </ng-container>
+                    <ng-template #noImgTpl>
+                      <span class="engineer-avatar-mini">{{ getEngineerInitials(task.engineer) }}</span>
+                    </ng-template>
+                    <span class="engineer-name">{{ task.engineer }}</span>
+                  </div>
+                  <span *ngIf="!task.engineer" class="text-muted text-xs">Unassigned</span>
+                </td>
+                <td><span class="effort-pill-enhanced"><svg lucideClock class="icon-xs mr-1"></svg>{{ task.estimatedEffort }}h</span></td>
+                <td><span class="days-pill-enhanced">{{ task.workingDays || '-' }}d</span></td>
+                <td><span class="date-pill-enhanced" *ngIf="task.startDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.startDate | date:'mediumDate' }}</span></td>
+                <td><span class="date-pill-enhanced" *ngIf="task.endDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.endDate | date:'mediumDate' }}</span></td>
+                <td><span class="dependency-tag-enhanced" *ngIf="task.dependencies"><svg lucideLink class="icon-xs mr-1"></svg>{{ task.dependencies }}</span><span *ngIf="!task.dependencies" class="text-muted text-xs">-</span></td>
+                <td><span class="text-xs text-muted remarks-cell" title="{{ task.remarks }}">{{ task.remarks || '-' }}</span></td>
               </tr>
             </tbody>
           </table>
