@@ -46,15 +46,13 @@
       <button 
         class="tab-pill" 
         [class.active]="viewMode() === 'card'" 
-        (click)="setViewMode('card')" 
-        title="Card View">
+        (click)="setViewMode('card')">
         <svg lucideLayoutGrid size="14" class="tab-icon" style="margin-right:0"></svg>
       </button>
       <button 
         class="tab-pill" 
         [class.active]="viewMode() === 'table'" 
-        (click)="setViewMode('table')" 
-        title="Table View">
+        (click)="setViewMode('table')">
         <svg lucideList size="14" class="tab-icon" style="margin-right:0"></svg>
       </button>
     </div>
