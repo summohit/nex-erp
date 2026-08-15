@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
@@ -90,9 +90,9 @@ export class EmployeesService {
 
     // 3. Validate phone number if provided
     if (data.phone) {
-      const phoneRegex = /^\+?[0-9]{10,15}$/;
+      const phoneRegex = /^\+?[0-9\s\-()]{10,20}$/;
       if (!phoneRegex.test(data.phone)) {
-        throw new BadRequestException('Invalid phone number format. Must be 10-15 digits, optionally starting with +');
+        throw new BadRequestException('Invalid phone number format. Must be 10-20 characters, optionally starting with +');
       }
     }
 
@@ -184,9 +184,9 @@ export class EmployeesService {
     if (data.lastName) updateData.lastName = data.lastName;
     if (data.nextAppraisalDate !== undefined) updateData.nextAppraisalDate = data.nextAppraisalDate ? new Date(data.nextAppraisalDate) : null;
     if (data.phone) {
-      const phoneRegex = /^\+?[0-9]{10,15}$/;
+      const phoneRegex = /^\+?[0-9\s\-()]{10,20}$/;
       if (!phoneRegex.test(data.phone)) {
-        throw new BadRequestException('Invalid phone number format. Must be 10-15 digits, optionally starting with +');
+        throw new BadRequestException('Invalid phone number format. Must be 10-20 characters, optionally starting with +');
       }
       updateData.phone = data.phone;
     }
@@ -227,22 +227,29 @@ export class EmployeesService {
   }
 
   async delete(id: number, companyId: number) {
-    const employee = await this.prisma.employee.findFirst({ where: { id, companyId }, select: { id: true, userId: true } });
+    const employee = await this.prisma.employee.findFirst({
+      where: { id, companyId },
+      include: { user: { select: { status: true } } }
+    });
     if (!employee) throw new NotFoundException('Employee not found');
 
-    // Soft delete / deactivate instead of hard delete
+    const currentStatus = employee.user.status;
+    const newStatus = currentStatus === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+
     await this.prisma.user.update({
       where: { id: employee.userId },
-      data: { status: 'SUSPENDED' }
+      data: { status: newStatus }
     });
 
-    // Set subordinates' managerId to null
-    await this.prisma.employee.updateMany({
-      where: { managerId: employee.id, companyId },
-      data: { managerId: null }
-    });
-    
-    return { success: true };
+    if (newStatus === 'SUSPENDED') {
+      // Set subordinates' managerId to null
+      await this.prisma.employee.updateMany({
+        where: { managerId: employee.id, companyId },
+        data: { managerId: null }
+      });
+    }
+
+    return { success: true, newStatus };
   }
 
   // --- Profile Features ---
@@ -299,7 +306,7 @@ export class EmployeesService {
     const employee = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId } });
     if (!employee) throw new NotFoundException('Employee not found');
     
-    if (employee.userId === currentUserId) return employee; // Self edit
+    if (employee.userId === currentUserId || role === 'SUPERADMIN' || role === 'HR') return employee; // Self edit, Super Admin, HR
 
     // Check Designation-level permissions
     const requestor = await this.prisma.employee.findFirst({
@@ -312,9 +319,9 @@ export class EmployeesService {
     }
     
     // Fallback to System Role-level permissions
-    const hasPermission = await this.permissions.hasPermission(companyId, role, 'EMPLOYEE_PROFILES', 'EDIT_ANY');
+    const hasPermission = await this.permissions.hasPermission(companyId, role, 'employees/directory', 'VIEW');
     if (!hasPermission) {
-      throw new UnauthorizedException('You do not have permission to edit other employee profiles');
+      throw new ForbiddenException('You do not have permission to edit other employee profiles');
     }
     
     return employee;

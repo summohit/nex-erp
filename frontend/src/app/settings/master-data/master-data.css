@@ -95,6 +95,9 @@
   border-radius: 12px;
   width: 100%;
   max-width: 550px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   border: none;
@@ -106,6 +109,7 @@
   align-items: flex-start;
   padding: 24px 24px 0 24px;
   border-bottom: none;
+  flex-shrink: 0;
 }
 
 .header-titles h2 {
@@ -138,6 +142,8 @@
 
 .modal-body {
   padding: 24px;
+  overflow-y: auto;
+  flex-grow: 1;
 }
 
 .form-grid {
@@ -188,6 +194,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 /* Modal specific button overrides */

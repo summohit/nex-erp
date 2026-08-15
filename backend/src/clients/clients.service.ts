@@ -43,9 +43,19 @@ export class ClientsService {
   }
 
   private sanitizeClientData(data: any): any {
-    const { website, ...rest } = data;
+    const { website, name, ...rest } = data;
+    
+    let sanitizedName = name;
+    if (typeof name === 'string') {
+      sanitizedName = name.trim().replace(/\s+/g, ' ');
+      if (sanitizedName === '') {
+        throw new BadRequestException('Client name cannot be empty or just spaces');
+      }
+    }
+
     return {
       ...rest,
+      ...(sanitizedName !== undefined ? { name: sanitizedName } : {}),
       ...(website !== undefined ? { website: this.sanitizeWebsite(website) } : {})
     };
   }

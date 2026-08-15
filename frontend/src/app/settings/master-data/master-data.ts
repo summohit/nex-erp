@@ -457,8 +457,19 @@ export class MasterDataComponent implements OnInit {
       if (mode === 'create') this.masterDataService.createLeaveType(this.formData).subscribe({ next: () => onSuccess('Leave Type created'), error: onError });
       else this.masterDataService.updateLeaveType(id, this.formData).subscribe({ next: () => onSuccess('Leave Type updated'), error: onError });
     } else if (tab === 'holidays') {
-      if (this.formData.name.trim().length > 100) {
+      if (!this.formData.name || this.formData.name.trim().length === 0) {
+        this.toast.error('Holiday name is required');
+        this.isSaving.set(false);
+        return;
+      }
+      if (this.formData.name.length > 100) {
         this.toast.error('Holiday name must be 100 characters or less');
+        this.isSaving.set(false);
+        return;
+      }
+      if (!this.formData.date) {
+        this.toast.error('Holiday date is required');
+        this.isSaving.set(false);
         return;
       }
       if (mode === 'create') this.masterDataService.createHoliday(this.formData).subscribe({ next: () => onSuccess('Holiday created'), error: onError });

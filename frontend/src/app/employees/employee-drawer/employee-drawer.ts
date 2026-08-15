@@ -43,7 +43,7 @@ export class EmployeeDrawerComponent implements OnInit {
       firstName: ['', Validators.required],
       lastName: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
-      phone: ['', [Validators.pattern(/^\+?[0-9]{10,15}$/)]],
+      phone: ['', [Validators.pattern(/^\+?[0-9\s\-()]{10,20}$/)]],
       departmentId: [null, Validators.required],
       designationId: [null, Validators.required],
       branchId: [null, Validators.required],
@@ -144,6 +144,16 @@ export class EmployeeDrawerComponent implements OnInit {
   save() {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.toast.error('Please fill all required fields correctly.');
+      
+      // Scroll to the first invalid input field after Angular change detection applies classes
+      setTimeout(() => {
+        const firstInvalidControl = document.querySelector('input.ng-invalid, select.ng-invalid, textarea.ng-invalid, .error');
+        if (firstInvalidControl) {
+          firstInvalidControl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 0);
+      
       return;
     }
 

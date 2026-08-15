@@ -169,8 +169,20 @@
           </div>
         </div>
         
+        <!-- Skeleton Loader -->
+        <div class="skeleton-grid-container" *ngIf="isLoadingTimesheet()">
+          <div class="skeleton-scroll-area">
+            <div class="skeleton-monthly-grid">
+              <div class="skeleton-day-col" *ngFor="let i of [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30]">
+                <div class="skeleton-header"></div>
+                <div class="skeleton-cell"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Grid View -->
-        <div class="monthly-grid-container" *ngIf="viewMode() === 'grid'">
+        <div class="monthly-grid-container" *ngIf="viewMode() === 'grid' && !isLoadingTimesheet()">
           <div class="grid-scroll-area">
             <div class="monthly-grid">
               <div class="day-col" *ngFor="let day of monthlyGrid()" [class.is-weekend]="day.status === 'Day Off' || day.weekdayStr === 'Sat' || day.weekdayStr === 'Sun'">
@@ -219,7 +231,7 @@
         </div>
 
         <!-- List View (Legacy) -->
-        <div class="table-container" *ngIf="viewMode() === 'list'">
+        <div class="table-container" *ngIf="viewMode() === 'list' && !isLoadingTimesheet()">
           <ag-grid-angular
             class="ag-theme-quartz"
             [theme]="'legacy'"

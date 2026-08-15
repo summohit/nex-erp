@@ -41,10 +41,20 @@ export class DocumentsTabComponent implements OnInit {
 
   ngOnInit() {}
 
+  get availableDocumentTypes(): string[] {
+    const existingTypes = (this.employeeData?.documents || []).map((d: any) => d.documentType);
+    return this.documentTypes.filter(type => !existingTypes.includes(type) || type === 'Other');
+  }
+
   openModal() {
+    const available = this.availableDocumentTypes;
+    if (available.length === 0) {
+      this.toast.info('You have already uploaded all available document types.');
+      return;
+    }
     this.showModal = true;
     this.fileName = '';
-    this.selectedDocumentType = 'PAN Card';
+    this.selectedDocumentType = available[0];
     this.selectedFile = null;
     this.selectedFileUrl = null;
   }

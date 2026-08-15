@@ -148,7 +148,7 @@ export class LeavesService implements OnModuleInit {
       }
     }
 
-    const overlappingLeaves = await this.prisma.leaveRequest.findMany({
+    const potentialOverlaps = await this.prisma.leaveRequest.findMany({
       where: {
         employeeId: employee.id,
         status: { in: ['PENDING', 'APPROVED'] },
@@ -157,8 +157,17 @@ export class LeavesService implements OnModuleInit {
       }
     });
 
-    if (overlappingLeaves.length > 0) {
-      throw new BadRequestException('Leave overlaps with existing request');
+    const overlapping = potentialOverlaps.find(overlap => {
+      // If either is a full day, it's a conflict
+      if (!isHalfDay || !overlap.isHalfDay) return true;
+      // If both are half days, they conflict only if they are the same period
+      return data.halfDayPeriod === overlap.halfDayPeriod;
+    });
+
+    if (overlapping) {
+      const from = new Date(overlapping.startDate).toISOString().split('T')[0];
+      const to = new Date(overlapping.endDate).toISOString().split('T')[0];
+      throw new BadRequestException(`Leave already applied for ${from} to ${to}`);
     }
 
     const workingDays = this.calculateWorkingDays(startDate, endDate, employee.branch?.weeklyOffs || '0', data.isHalfDay || false, await this.getHolidayDates(employee.companyId, startDate, endDate));
@@ -184,9 +193,6 @@ export class LeavesService implements OnModuleInit {
   }
 
   private async notifyManager(employee: any, request: any) {
-    const manager = employee.manager;
-    if (!manager?.user) return;
-
     const name = employee.firstName && employee.lastName
       ? `${employee.firstName} ${employee.lastName}`
       : employee.user?.email || 'An employee';
@@ -194,15 +200,49 @@ export class LeavesService implements OnModuleInit {
     const start = new Date(request.startDate).toISOString().split('T')[0];
     const end = new Date(request.endDate).toISOString().split('T')[0];
     const dates = start === end ? start : `${start} to ${end}`;
+    const message = `${name} has requested leave from ${dates}.`;
 
-    await this.notificationsService.createNotification(
-      manager.user.id,
-      'New Leave Request',
-      `${name} has requested leave from ${dates}.`,
-      'LEAVE',
-      '/attendance-leave?tab=team-approvals',
-      employee.companyId
-    );
+    // Track notified user IDs to avoid duplicates
+    const notifiedUserIds = new Set<number>();
+
+    // 1. Notify the Reporting Manager (if assigned)
+    const manager = employee.manager;
+    if (manager?.user && manager.user.id !== employee.userId) {
+      notifiedUserIds.add(manager.user.id);
+      await this.notificationsService.createNotification(
+        manager.user.id,
+        'New Leave Request',
+        message,
+        'LEAVE',
+        '/attendance/leave-approvals',
+        employee.companyId
+      );
+    }
+
+    // 2. Notify all SUPERADMIN and HR users in the same company (excluding the requester)
+    const adminHrUsers = await this.prisma.user.findMany({
+      where: {
+        companyId: employee.companyId,
+        role: { in: ['SUPERADMIN', 'HR'] },
+        id: { not: employee.userId },
+        status: 'ACTIVE'
+      },
+      select: { id: true }
+    });
+
+    for (const adminUser of adminHrUsers) {
+      if (!notifiedUserIds.has(adminUser.id)) {
+        notifiedUserIds.add(adminUser.id);
+        await this.notificationsService.createNotification(
+          adminUser.id,
+          'New Leave Request',
+          message,
+          'LEAVE',
+          '/attendance/leave-approvals',
+          employee.companyId
+        );
+      }
+    }
   }
 
   async getRequests(companyId: number, filter: any) {
@@ -273,6 +313,28 @@ export class LeavesService implements OnModuleInit {
       if (leaveType && !leaveType.allowHalfDay) {
         throw new BadRequestException(`Half-day leave is not allowed for "${leaveType.name}".`);
       }
+    }
+
+    const potentialOverlaps = await this.prisma.leaveRequest.findMany({
+      where: {
+        id: { not: requestId },
+        employeeId: employee.id,
+        status: { in: ['PENDING', 'APPROVED'] },
+        startDate: { lte: newEnd },
+        endDate: { gte: newStart }
+      }
+    });
+
+    const overlapping = potentialOverlaps.find(overlap => {
+      if (!newIsHalfDay || !overlap.isHalfDay) return true;
+      const newPeriod = updateData.halfDayPeriod !== undefined ? updateData.halfDayPeriod : request.halfDayPeriod;
+      return newPeriod === overlap.halfDayPeriod;
+    });
+
+    if (overlapping) {
+      const from = new Date(overlapping.startDate).toISOString().split('T')[0];
+      const to = new Date(overlapping.endDate).toISOString().split('T')[0];
+      throw new BadRequestException(`Leave already applied for ${from} to ${to}`);
     }
 
     return this.prisma.leaveRequest.update({

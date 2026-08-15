@@ -205,7 +205,7 @@ export class CompanySeederService implements OnModuleInit {
     const rolePermissions: Record<string, string[]> = {
       ADMIN: [
         'employees', 'employees/directory', 'employees/org-chart', 'employees/onboarding', 'employees/documents',
-        'recruitment', 'recruitment/jobs', 'recruitment/candidates', 'recruitment/interviews',
+        'recruitment', 'recruitment/jobs', 'recruitment/candidates', 'recruitment/interviews', 'recruitment/careers-page',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/shifts', 'attendance/holidays',
         'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
         'assets', 'assets/inventory', 'assets/assignments', 'assets/requests',
@@ -214,13 +214,14 @@ export class CompanySeederService implements OnModuleInit {
       ],
       HR: [
         'employees', 'employees/directory', 'employees/org-chart', 'employees/onboarding', 'employees/documents',
-        'recruitment', 'recruitment/jobs', 'recruitment/candidates', 'recruitment/interviews',
+        'recruitment', 'recruitment/jobs', 'recruitment/candidates', 'recruitment/interviews', 'recruitment/careers-page',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/shifts', 'attendance/holidays',
         'payroll', 'payroll/processing', 'payroll/payslips',
         'projects'
       ],
       FINANCE: [
         'employees', 'employees/directory', 'employees/org-chart',
+        'recruitment', 'recruitment/careers-page',
         'attendance', 'attendance/timesheets',
         'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
         'assets', 'assets/inventory', 'assets/assignments',
@@ -228,13 +229,14 @@ export class CompanySeederService implements OnModuleInit {
       ],
       SALES: [
         'employees', 'employees/org-chart',
+        'recruitment', 'recruitment/careers-page',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
         'payroll', 'payroll/payslips', 'payroll/expenses',
         'projects'
       ],
       EMPLOYEE: [
         'employees', 'employees/org-chart',
-        'recruitment', 'recruitment/interviews',
+        'recruitment', 'recruitment/interviews', 'recruitment/careers-page',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
         'payroll', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
         'assets', 'assets/requests',

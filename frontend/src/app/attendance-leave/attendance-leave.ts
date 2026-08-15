@@ -991,6 +991,7 @@ export class AttendanceLeaveComponent implements OnInit {
         },
         error: (err: any) => {
           this.toast.error(err.error?.message || 'Failed to submit leave request');
+          this.isSubmittingRequest.set(false);
         },
         complete: () => {
           this.isSubmittingRequest.set(false);
@@ -1169,7 +1170,8 @@ export class AttendanceLeaveComponent implements OnInit {
 
   // HR Target Employee Selection & Day Log Modal State
   selectedAttendanceEmployeeId = signal<number | null>(null);
-  isEmpDropdownOpen = signal<boolean>(false);
+  isEmpDropdownOpen = signal(false);
+  isLoadingTimesheet = signal(false);
   empSearchQuery = signal<string>('');
 
   isDayDetailsModalOpen = signal<boolean>(false);
@@ -1202,17 +1204,26 @@ export class AttendanceLeaveComponent implements OnInit {
   });
 
   selectAttendanceEmp(empId: number | null) {
+    this.isLoadingTimesheet.set(true);
     if (empId === null) {
       this.selectedAttendanceEmployeeId.set(null);
-      this.attendanceService.getMyHistory().subscribe((res: any) => {
-        this.myHistory.set(res);
-        this.generateGrid();
+      this.attendanceService.getMyHistory().subscribe({
+        next: (res: any) => {
+          this.myHistory.set(res);
+          this.generateGrid();
+          this.isLoadingTimesheet.set(false);
+        },
+        error: () => this.isLoadingTimesheet.set(false)
       });
     } else {
       this.selectedAttendanceEmployeeId.set(empId);
-      this.attendanceService.getEmployeeHistory(empId).subscribe((res: any) => {
-        this.myHistory.set(res);
-        this.generateGrid();
+      this.attendanceService.getEmployeeHistory(empId).subscribe({
+        next: (res: any) => {
+          this.myHistory.set(res);
+          this.generateGrid();
+          this.isLoadingTimesheet.set(false);
+        },
+        error: () => this.isLoadingTimesheet.set(false)
       });
     }
     this.closeEmpDropdown();

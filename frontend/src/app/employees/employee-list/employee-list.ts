@@ -213,8 +213,8 @@ export class EmployeeListComponent implements OnInit {
       cellRenderer: ActionCellRendererComponent,
       cellRendererParams: {
         onEdit: (data: any) => this.openDrawer(data),
-        onDelete: (data: any) => this.deleteEmployee(data.id),
-        deleteLabel: 'Deactivate',
+        onDelete: (data: any) => this.deleteEmployee(data),
+        deleteLabel: (data: any) => data?.user?.status === 'SUSPENDED' ? 'Activate' : 'Deactivate',
         onViewProfile: (data: any) => this.router.navigate(['/employees', data.id, 'profile']),
         onResendVerification: (data: any) => {
           if (!data.user?.email) return;
@@ -323,15 +323,18 @@ export class EmployeeListComponent implements OnInit {
     this.loadEmployees();
   }
 
-  deleteEmployee(id: number) {
-    if (!confirm('Are you sure you want to deactivate this employee? Their account will be blocked and they will not be able to login.')) return;
+  deleteEmployee(employee: any) {
+    const isSuspended = employee.user?.status === 'SUSPENDED';
+    const action = isSuspended ? 'activate' : 'deactivate';
+    
+    if (!confirm(`Are you sure you want to ${action} ${employee.firstName} ${employee.lastName}?`)) return;
 
-    this.employeeService.deleteEmployee(id).subscribe({
-      next: () => {
-        this.toast.success('Employee deactivated successfully');
+    this.employeeService.deleteEmployee(employee.id).subscribe({
+      next: (res: any) => {
+        this.toast.success(`Employee ${res.newStatus === 'SUSPENDED' ? 'deactivated' : 'activated'} successfully`);
         this.loadEmployees();
       },
-      error: () => this.toast.error('Failed to deactivate employee')
+      error: () => this.toast.error(`Failed to ${action} employee`)
     });
   }
 }

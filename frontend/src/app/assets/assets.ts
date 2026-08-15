@@ -526,7 +526,7 @@ export class AssetsComponent implements OnInit {
         editLabel: 'Edit Request',
         canEdit: (data: HardwareRequest) => data.status === 'PENDING' && (this.isSelfRequest(data) || this.isSuperAdmin()),
         onEdit: (data: HardwareRequest) => this.openEditRequestDrawer(data),
-        canCancel: (data: HardwareRequest) => data.status === 'PENDING' && (this.isSelfRequest(data) || this.isSuperAdmin()),
+        canCancel: (data: HardwareRequest) => data.status === 'PENDING' && this.isSelfRequest(data),
         onCancel: (data: HardwareRequest) => this.cancelRequest(data.id),
         canApprove: (data: HardwareRequest) => data.status === 'PENDING' && this.isAdmin() && (!this.isSelfRequest(data) || this.isSuperAdmin()),
         onApprove: (data: HardwareRequest) => {

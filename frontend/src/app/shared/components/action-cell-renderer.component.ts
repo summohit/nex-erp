@@ -9,7 +9,7 @@ export interface ActionCellParams extends ICellRendererParams {
   onEdit?: (data: any) => void;
   editLabel?: string;
   onDelete?: (data: any) => void;
-  deleteLabel?: string;
+  deleteLabel?: string | ((data: any) => string);
   onViewProfile?: (data: any) => void;
   onView?: (data: any) => void;
   viewLabel?: string;
@@ -48,8 +48,8 @@ export interface ActionCellParams extends ICellRendererParams {
         <button mat-menu-item class="menu-item" (click)="resendVerification()" *ngIf="params.onResendVerification && params.data?.user?.status === 'PENDING_VERIFICATION'">
           <span class="menu-text text-primary">Resend Verification</span>
         </button>
-        <button mat-menu-item class="menu-item text-danger" (click)="delete()" *ngIf="params.onDelete">
-          <span class="menu-text">{{ params.deleteLabel || 'Delete' }}</span>
+        <button mat-menu-item class="menu-item" [ngClass]="{'text-danger': getDeleteLabel() === 'Deactivate' || getDeleteLabel() === 'Delete', 'text-success': getDeleteLabel() === 'Activate'}" (click)="delete()" *ngIf="params.onDelete">
+          <span class="menu-text">{{ getDeleteLabel() }}</span>
         </button>
       </mat-menu>
     </div>
@@ -142,6 +142,13 @@ export class ActionCellRendererComponent implements ICellRendererAngularComp {
     if (this.params.onDelete) {
       this.params.onDelete(this.params.data);
     }
+  }
+
+  getDeleteLabel(): string {
+    if (typeof this.params.deleteLabel === 'function') {
+      return this.params.deleteLabel(this.params.data);
+    }
+    return this.params.deleteLabel || 'Delete';
   }
 
   viewProfile() {

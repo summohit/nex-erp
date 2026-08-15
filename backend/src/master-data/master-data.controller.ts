@@ -226,8 +226,14 @@ export class MasterDataController {
 
   @Post('holidays')
   async createHoliday(@Request() req, @Body() data: any) {
-    if (data.name && data.name.length > 100) {
+    if (!data.name || data.name.trim().length === 0) {
+      throw new BadRequestException('Holiday name is required');
+    }
+    if (data.name.length > 100) {
       throw new BadRequestException('Holiday name cannot exceed 100 characters');
+    }
+    if (!data.date || isNaN(Date.parse(data.date))) {
+      throw new BadRequestException('Holiday date is required and must be valid');
     }
     return this.prisma.holiday.create({
       data: {
@@ -255,8 +261,15 @@ export class MasterDataController {
   @Put('holidays/:id')
   async updateHoliday(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { name?: string, date?: string }) {
     const updateData: any = {};
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.date !== undefined) updateData.date = new Date(data.date);
+    if (data.name !== undefined) {
+      if (data.name.trim().length === 0) throw new BadRequestException('Holiday name cannot be empty');
+      if (data.name.length > 100) throw new BadRequestException('Holiday name cannot exceed 100 characters');
+      updateData.name = data.name;
+    }
+    if (data.date !== undefined) {
+      if (isNaN(Date.parse(data.date))) throw new BadRequestException('Invalid date provided');
+      updateData.date = new Date(data.date);
+    }
 
     return this.prisma.holiday.update({
       where: { id, companyId: req.user.companyId },

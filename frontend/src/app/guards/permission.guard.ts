@@ -26,6 +26,12 @@ export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot) =>
 
     const userRole = user?.role || 'EMPLOYEE';
 
+    // Universal access: every logged-in user can view their own profile and basic self-service routes
+    const universalModules = ['employees/me/profile', 'attendance', 'attendance/my-attendance'];
+    if (universalModules.includes(targetModule)) {
+      return of(true);
+    }
+
     return permissionsService.getAllPermissions(userRole).pipe(
       map(perms => {
         // Check if user role has explicit VIEW or requested action permission for targetModule
@@ -54,12 +60,12 @@ export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot) =>
 
         // Access Denied
         toast.error('Access Denied: You do not have permission to view this page.');
-        router.navigate(['/overview']);
+        router.navigate(['/dashboard']);
         return false;
       }),
       catchError(() => {
         toast.error('Permission check failed');
-        router.navigate(['/overview']);
+        router.navigate(['/dashboard']);
         return of(false);
       })
     );

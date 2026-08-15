@@ -54,7 +54,7 @@
       <div class="form-group">
         <label>Document Type <span class="required">*</span></label>
         <select class="form-control" [(ngModel)]="selectedDocumentType">
-          <option *ngFor="let type of documentTypes" [value]="type">{{ type }}</option>
+          <option *ngFor="let type of availableDocumentTypes" [value]="type">{{ type }}</option>
         </select>
       </div>
 

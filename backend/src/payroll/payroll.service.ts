@@ -593,6 +593,14 @@ export class PayrollService {
     return this.prisma.expenseClaim.findMany({
       where: { employeeId: employee.id, companyId },
       include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            department: { select: { name: true } }
+          }
+        },
         approvedBy: {
           select: { employee: { select: { firstName: true, lastName: true } } }
         }
