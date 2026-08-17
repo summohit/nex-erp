@@ -6,7 +6,7 @@ import {
   LucidePlus, LucideKanban, 
   LucideX, LucideUser, LucideChevronLeft, LucideCheck, LucideMoreHorizontal, 
   LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw, LucideBrainCircuit,
-  LucideLayoutGrid, LucideList
+  LucideLayoutGrid, LucideList, LucideChevronDown
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
@@ -21,7 +21,7 @@ import { HotToastService } from '@ngneat/hot-toast';
     CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban, 
     LucideX, LucideUser, LucideChevronLeft, LucideBrainCircuit,
     LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw,
-    LucideLayoutGrid, LucideList
+    LucideLayoutGrid, LucideList, LucideChevronDown
   ],
   templateUrl: './projects.html',
   styleUrls: ['./projects.css']
@@ -47,6 +47,48 @@ export class ProjectsComponent implements OnInit {
   searchQuery = signal<string>('');
   activeTab = signal<'all' | 'starred' | 'recent' | 'archived'>('all');
   viewMode = signal<'card' | 'table'>('card');
+  pmDropdownOpen = signal(false);
+  pmSearchQuery = '';
+
+  filteredPmEmployees = computed(() => {
+    const q = this.pmSearchQuery.toLowerCase().trim();
+    const list = this.employees();
+    if (!q) return list;
+    return list.filter((e: any) =>
+      `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(q) ||
+      (e.user?.email || '').toLowerCase().includes(q)
+    );
+  });
+
+  getPmName(id: number): string {
+    const emp = this.employees().find((e: any) => e.id === id);
+    return emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() : '';
+  }
+
+  getPmInitial(id: number): string {
+    const emp = this.employees().find((e: any) => e.id === id);
+    if (!emp) return '?';
+    return ((emp.firstName || '')[0] || '').toUpperCase();
+  }
+
+  getPmColor(id: number): string {
+    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
+    return colors[id % colors.length];
+  }
+
+  togglePm(id: number) {
+    const idx = this.projectForm.pmIds.indexOf(id);
+    if (idx >= 0) {
+      this.projectForm.pmIds.splice(idx, 1);
+    } else {
+      this.projectForm.pmIds.push(id);
+    }
+  }
+
+  removePm(id: number) {
+    const idx = this.projectForm.pmIds.indexOf(id);
+    if (idx >= 0) this.projectForm.pmIds.splice(idx, 1);
+  }
   
   // Local persistence for Starred & Recently Viewed
   starredBoardIds = signal<number[]>([]);
@@ -280,6 +322,8 @@ export class ProjectsComponent implements OnInit {
 
   closeCreateModal() {
     this.isCreateModalOpen.set(false);
+    this.pmDropdownOpen.set(false);
+    this.pmSearchQuery = '';
   }
 
   saveProject() {

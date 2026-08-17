@@ -1209,7 +1209,6 @@ model Issue {
   coverUrl       String?
   position       Int       @default(0) // Sort order within column/backlog
   isArchived     Boolean   @default(false)
-  isLate         Boolean   @default(false) // Set when task passes its due date while still open
 
   // Time Tracking Markers
   workStartedAt   DateTime? // When work actually started
@@ -1254,7 +1253,7 @@ model IssueReminder {
   id        Int      @id @default(autoincrement())
   issueId   Int
   issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  threshold String   // "DAY_7", "DAY_3", "DAY_2", "DAY_1", "HOUR_4", "HOUR_3", "HOUR_90MIN", "DUE"
+  threshold String // "DAY_7", "DAY_3", "DAY_2", "DAY_1", "HOUR_4", "HOUR_3", "HOUR_90MIN", "DUE"
   companyId Int
   sentAt    DateTime @default(now())
 
@@ -1541,10 +1540,10 @@ model PerformanceGoal {
   description  String?     @db.Text
   status       String      @default("IN_PROGRESS") // IN_PROGRESS, ACHIEVED, MISSED
   dueDate      DateTime?
-  progress     Int         @default(0)        // 0-100 percentage
-  targetValue  Float?                         // e.g. 100000 (₹1L target)
-  currentValue Float?      @default(0)        // e.g. 75000 (₹75K current)
-  unit         String?                        // "₹", "%", "units", "deals", "projects"
+  progress     Int         @default(0) // 0-100 percentage
+  targetValue  Float? // e.g. 100000 (₹1L target)
+  currentValue Float?      @default(0) // e.g. 75000 (₹75K current)
+  unit         String? // "₹", "%", "units", "deals", "projects"
   okrId        Int?
   okr          CompanyOKR? @relation(fields: [okrId], references: [id], onDelete: SetNull)
   companyId    Int
@@ -1565,8 +1564,8 @@ model PerformanceReview {
   type         String             @default("MANAGER") // MANAGER, SELF, PEER
   rating       Int?
   feedback     String?            @db.Text
-  selfRating   Int?               // Employee's self-rating (1-5)
-  selfFeedback String?            @db.Text          // Employee's self-assessment
+  selfRating   Int? // Employee's self-rating (1-5)
+  selfFeedback String?            @db.Text // Employee's self-assessment
   status       String             @default("PENDING_SELF_REVIEW")
   // Status flow: PENDING_SELF_REVIEW → SELF_REVIEWED → MANAGER_REVIEWED → ACKNOWLEDGED → HR_APPROVED
   signoffs     AppraisalSignoff[]
@@ -1578,11 +1577,11 @@ model PerformanceReview {
 
 model CompanyOKR {
   id          Int               @id @default(autoincrement())
-  title       String            // "Increase Revenue by 40%"
+  title       String // "Increase Revenue by 40%"
   description String?           @db.Text
-  period      String            // "Q1 2026", "H1 2026", "FY 2026-27"
-  status      String            @default("ACTIVE")   // ACTIVE, COMPLETED, CANCELLED
-  progress    Int               @default(0)          // 0-100 auto-calculated from key results
+  period      String // "Q1 2026", "H1 2026", "FY 2026-27"
+  status      String            @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  progress    Int               @default(0) // 0-100 auto-calculated from key results
   companyId   Int
   company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdById Int?
@@ -1596,9 +1595,9 @@ model OKRKeyResult {
   id           Int        @id @default(autoincrement())
   okrId        Int
   okr          CompanyOKR @relation(fields: [okrId], references: [id], onDelete: Cascade)
-  title        String     // "Close 50 enterprise deals"
-  targetValue  Float      // 50
-  currentValue Float      @default(0)       // 32
+  title        String // "Close 50 enterprise deals"
+  targetValue  Float // 50
+  currentValue Float      @default(0) // 32
   unit         String     @default("units") // "₹", "%", "units", "deals"
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -1606,10 +1605,10 @@ model OKRKeyResult {
 
 model AppraisalCycle {
   id        Int                 @id @default(autoincrement())
-  name      String              // "H1 2026 Performance Review"
+  name      String // "H1 2026 Performance Review"
   startDate DateTime
   endDate   DateTime
-  status    String              @default("ACTIVE")   // ACTIVE, COMPLETED, CLOSED
+  status    String              @default("ACTIVE") // ACTIVE, COMPLETED, CLOSED
   companyId Int
   company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   reviews   PerformanceReview[]
@@ -1621,26 +1620,26 @@ model AppraisalSignoff {
   id         Int               @id @default(autoincrement())
   reviewId   Int
   review     PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  signedById Int               // Employee ID who signed
-  role       String            // EMPLOYEE, MANAGER, HR
-  action     String            // APPROVED, ACKNOWLEDGED, REJECTED
+  signedById Int // Employee ID who signed
+  role       String // EMPLOYEE, MANAGER, HR
+  action     String // APPROVED, ACKNOWLEDGED, REJECTED
   comments   String?           @db.Text
   signedAt   DateTime          @default(now())
 }
 
 model PeerFeedback {
   id           Int      @id @default(autoincrement())
-  employeeId   Int      // Employee being reviewed
+  employeeId   Int // Employee being reviewed
   employee     Employee @relation("PeerReviewee", fields: [employeeId], references: [id], onDelete: Cascade)
-  reviewerId   Int      // Peer who gives feedback
+  reviewerId   Int // Peer who gives feedback
   reviewer     Employee @relation("PeerReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
   cycleId      Int?
   cycleName    String
-  rating       Int?     // 1-5
+  rating       Int? // 1-5
   strengths    String?  @db.Text
   improvements String?  @db.Text
   comments     String?  @db.Text
-  status       String   @default("PENDING")   // PENDING, SUBMITTED
+  status       String   @default("PENDING") // PENDING, SUBMITTED
   companyId    Int
   company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())

@@ -325,7 +325,7 @@
     </button>
   </div>
 
-  <div class="modal-body">
+  <div class="modal-body" (click)="pmDropdownOpen.set(false)">
     <!-- Live Board Preview -->
     <div class="board-preview-container" [style.background]="selectedBg().startsWith('http') ? 'url(' + selectedBg() + ') center/cover' : selectedBg()">
       <div class="preview-mini-board">
@@ -392,7 +392,7 @@
         <label class="section-label">Start Date</label>
         <input type="date" class="trello-input" [(ngModel)]="projectForm.startDate">
       </div>
-      <div class="col" style="margin-left: 12px;">
+      <div class="col" style="margin-left: 10px;">
         <label class="section-label">End Date</label>
         <input type="date" class="trello-input" [(ngModel)]="projectForm.endDate">
       </div>
@@ -433,10 +433,44 @@
     <!-- Project Managers Selection -->
     <div class="form-section">
       <label class="section-label">Project Managers</label>
-      <select class="trello-select" multiple [(ngModel)]="projectForm.pmIds" style="height: 100px;">
-        <option *ngFor="let emp of employees()" [ngValue]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
-      </select>
-      <small style="color: #6b7280; font-size: 12px; margin-top: 4px; display: block;">Hold Cmd/Ctrl to select multiple. These users will be able to review and approve tasks.</small>
+      <div class="pm-select-wrapper" (click)="$event.stopPropagation()">
+        <!-- Trigger -->
+        <div class="pm-select-trigger" (click)="pmDropdownOpen.set(!pmDropdownOpen())">
+          <div class="pm-selected-chips" *ngIf="projectForm.pmIds.length > 0">
+            <span class="pm-chip" *ngFor="let pmId of projectForm.pmIds">
+              <span class="pm-chip-avatar" [style.background]="getPmColor(pmId)">{{ getPmInitial(pmId) }}</span>
+              {{ getPmName(pmId) }}
+              <button class="pm-chip-remove" (click)="removePm(pmId); $event.stopPropagation()">
+                <svg lucideX size="11"></svg>
+              </button>
+            </span>
+          </div>
+          <span class="pm-placeholder" *ngIf="projectForm.pmIds.length === 0">Select project managers...</span>
+          <svg lucideChevronDown size="15" class="pm-chevron" [class.open]="pmDropdownOpen()"></svg>
+        </div>
+
+        <!-- Dropdown -->
+        <div class="pm-dropdown" *ngIf="pmDropdownOpen()">
+          <div class="pm-dropdown-search">
+            <svg lucideSearch size="14" style="color: #94a3b8; flex-shrink: 0;"></svg>
+            <input type="text" placeholder="Search employees..." [(ngModel)]="pmSearchQuery" class="pm-search-input">
+          </div>
+          <div class="pm-dropdown-list">
+            <div class="pm-dropdown-item" *ngFor="let emp of filteredPmEmployees()" (click)="togglePm(emp.id)">
+              <div class="pm-item-check" [class.checked]="projectForm.pmIds.includes(emp.id)">
+                <svg lucideCheck size="12" *ngIf="projectForm.pmIds.includes(emp.id)"></svg>
+              </div>
+              <div class="pm-item-avatar" [style.background]="getPmColor(emp.id)">{{ getPmInitial(emp.id) }}</div>
+              <div class="pm-item-info">
+                <div class="pm-item-name">{{ emp.firstName }} {{ emp.lastName }}</div>
+                <div class="pm-item-email" *ngIf="emp.user?.email">{{ emp.user.email }}</div>
+              </div>
+            </div>
+            <div class="pm-dropdown-empty" *ngIf="filteredPmEmployees().length === 0">No employees found</div>
+          </div>
+        </div>
+      </div>
+      <small style="color: #6b7280; font-size: 12px; margin-top: 6px; display: block;">These users will be able to review and approve tasks.</small>
     </div>
 
     <!-- Action Button -->

@@ -367,16 +367,25 @@
                       <svg lucideCheck size="12"></svg>
                       Member
                     </span>
+
+                    <!-- PM Badge -->
+                    <span *ngIf="getProjectMemberRole(m.id) === 'PROJECT_MANAGER'" class="badge-pm-pill" style="margin-left: 0;">PM</span>
   
                     <!-- Remove Button -->
-                    <button *ngIf="canManageMembers && canRemoveMember(m)" 
-                            class="btn-remove-member-pill" 
-                            type="button" 
-                            (click)="removeProjectMember(m)" 
-                            title="Remove member from board">
-                      <svg lucideX size="13"></svg>
-                      <span>Remove</span>
-                    </button>
+                    <div *ngIf="canManageMembers && canRemoveMember(m)" class="relative">
+                      <button class="btn-remove-member-pill" 
+                              type="button" 
+                              (click)="toggleMemberActionMenu(m.id); $event.stopPropagation()"
+                              title="Member actions">
+                        <svg lucideMoreHorizontal size="15"></svg>
+                      </button>
+                      <div *ngIf="activeMemberActionMenu() === m.id" class="member-action-popover" (click)="$event.stopPropagation()">
+                        <button class="member-action-item danger" (click)="removeProjectMember(m)">
+                          <svg lucideX size="13"></svg>
+                          Remove from board
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div *ngIf="filteredProjectMembers.length === 0" class="no-members-empty">
@@ -396,7 +405,7 @@
                       <div class="member-share-name" style="display: flex; align-items: center; gap: 6px;">
                         {{ m.firstName }} {{ m.lastName }}
                         <span *ngIf="isSelf(m.id)" class="text-xs text-slate-500 font-normal">(You)</span>
-                        <span *ngIf="m.isProjectManager" style="background: #E0E7FF; color: #4338CA; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid #C7D2FE;">PM</span>
+                        <span *ngIf="m.isProjectManager" class="badge-pm-pill">PM</span>
                       </div>
                       <div class="member-share-email" *ngIf="m.user?.email">{{ m.user?.email }}</div>
                     </div>
@@ -2938,6 +2947,83 @@
     <div style="display: flex; justify-content: flex-end; gap: 12px;">
       <button class="trello-btn-secondary" (click)="closeRejectModal()">Cancel</button>
       <button class="trello-btn-primary" style="background: #dc2626;" (click)="confirmRejectIssue()" [disabled]="!rejectReason().trim()">Confirm Reject</button>
+    </div>
+  </div>
+</div>
+
+<!-- Proof Upload Modal -->
+<div class="modal-overlay" *ngIf="isProofModalOpen()" (click)="closeProofModal()"></div>
+<div class="trello-modal proof-modal" *ngIf="isProofModalOpen()" (click)="$event.stopPropagation()">
+  <div class="trello-modal-header">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div class="proof-modal-header-icon">
+        <svg lucideFileUp size="20" style="color: #2563eb;"></svg>
+      </div>
+      <div>
+        <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #0f172a;">Upload Proof of Completion</h3>
+        <p style="margin: 2px 0 0 0; font-size: 12.5px; color: #94a3b8;">
+          Required before moving to
+          <span class="proof-target-badge">{{ getColumnById(proofTargetColumnId())?.name }}</span>
+        </p>
+      </div>
+    </div>
+    <button class="modal-icon-btn" (click)="closeProofModal()"><svg lucideX size="18"></svg></button>
+  </div>
+
+  <div class="trello-modal-body">
+    <div style="width: 100%;">
+      <p class="proof-modal-desc">
+        Please upload supporting documents such as screenshots, deliverables, or relevant files to confirm this task is complete.
+      </p>
+
+      <!-- Dropzone -->
+      <div class="proof-dropzone" (click)="proofFileInput.click()" (dragover)="$event.preventDefault(); $event.stopPropagation()" (drop)="$event.preventDefault(); $event.stopPropagation()">
+        <div class="proof-dropzone-icon">
+          <svg lucideUpload size="22"></svg>
+        </div>
+        <div class="proof-dropzone-text">Drag & drop files here</div>
+        <div class="proof-dropzone-hint">
+          or <span class="proof-dropzone-browse">browse</span> to choose files
+        </div>
+        <div class="proof-dropzone-hint" style="margin-top: 6px;">Images, PDFs, Documents &middot; Max 25 MB each</div>
+        <input #proofFileInput type="file" multiple (change)="onProofFileSelected($event)" style="display: none;" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip">
+      </div>
+
+      <!-- File List -->
+      <div class="proof-file-list" *ngIf="proofFiles().length > 0">
+        <div class="proof-file-item" *ngFor="let file of proofFiles(); let i = index">
+          <div class="proof-file-icon-box" [class.img]="file.type?.startsWith('image/')" [class.pdf]="file.type === 'application/pdf'" [class.doc]="file.name?.match('\\.(doc|docx|xls|xlsx|txt)$')">
+            <svg lucideFile size="16"></svg>
+          </div>
+          <div class="proof-file-details">
+            <div class="proof-file-name">{{ file.name }}</div>
+            <div class="proof-file-size">{{ (file.size / 1024) | number:'1.0-0' }} KB</div>
+          </div>
+          <button class="proof-file-remove" (click)="removeProofFile(i)" title="Remove file">
+            <svg lucideX size="14"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Upload Progress -->
+      <div class="proof-progress-section" *ngIf="isUploadingProof()">
+        <div class="proof-progress-label">
+          <span>Uploading files...</span>
+          <span>{{ proofUploadProgress() }}%</span>
+        </div>
+        <div class="proof-progress-track">
+          <div class="proof-progress-fill" [style.width.%]="proofUploadProgress()"></div>
+        </div>
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="proof-modal-footer">
+        <button class="proof-btn-cancel" (click)="closeProofModal()" [disabled]="isUploadingProof()">Cancel</button>
+        <button class="proof-btn-submit" (click)="confirmProofUpload()" [disabled]="isUploadingProof() || proofFiles().length === 0">
+          <svg lucideUpload size="14" *ngIf="!isUploadingProof()"></svg>
+          {{ isUploadingProof() ? 'Uploading...' : 'Upload & Move' }}
+        </button>
+      </div>
     </div>
   </div>
 </div>

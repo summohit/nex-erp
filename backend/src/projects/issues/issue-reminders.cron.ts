@@ -65,7 +65,7 @@ export class IssueRemindersCron implements OnModuleInit, OnModuleDestroy {
         },
         select: {
           id: true, key: true, title: true, dueDate: true, status: true,
-          companyId: true, assigneeId: true, projectId: true, isLate: true
+          companyId: true, assigneeId: true, projectId: true
         }
       });
 
@@ -92,14 +92,8 @@ export class IssueRemindersCron implements OnModuleInit, OnModuleDestroy {
         const r = dueMs - nowMs; // ms remaining until due
         const isOpen = issue.status === 'TODO' || issue.status === 'IN_PROGRESS';
 
-        // Keep the persisted "late" flag in sync with reality
+        // Compute late status dynamically (column removed from DB)
         const shouldBeLate = r <= 0 && isOpen;
-        if (issue.isLate !== shouldBeLate) {
-          await this.prisma.issue.update({
-            where: { id: issue.id },
-            data: { isLate: shouldBeLate }
-          });
-        }
 
         let thresholdKey: string | null = null;
         let label: string | null = null;

@@ -15,7 +15,8 @@ import {
   LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
   LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
-  LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree
+  LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
+  LucideFileUp, LucideUpload
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { SocketService } from '../../services/socket.service';
@@ -44,6 +45,7 @@ declare var Quill: any;
     LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive,
     LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
     LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
+    LucideFileUp, LucideUpload,
     AgGridAngular
   ],
   templateUrl: './project-detail.html',
@@ -1605,68 +1607,89 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   canDropOnColumn(drag: any, columnId: number): boolean {
-    if (!this.isRestrictedColumn(columnId)) return true;
-    return this.canCompleteIssue(drag?.data);
+    return this.isAdjacentColumnMove(drag?.data, columnId);
+  }
+
+  private isAdjacentColumnMove(issue: any, targetColumnId: number): boolean {
+    if (!issue || !issue.columnId) return true;
+    const cols = this.columns();
+    if (!cols || cols.length < 2) return true;
+    const fromIndex = cols.findIndex((c: any) => c.id === issue.columnId);
+    const toIndex = cols.findIndex((c: any) => c.id === targetColumnId);
+    if (fromIndex === -1 || toIndex === -1) return true;
+    return Math.abs(toIndex - fromIndex) === 1;
+  }
+
+  private isReviewColumn(columnId: number | null | undefined): boolean {
+    const col = this.getColumnById(columnId);
+    if (!col) return false;
+    if (col.type === 'REVIEW') return true;
+    const name = (col.name || '').toLowerCase();
+    return name.includes('review');
+  }
+
+  private isDoneOrArchiveColumn(columnId: number | null | undefined): boolean {
+    const col = this.getColumnById(columnId);
+    if (!col) return false;
+    if (col.type === 'DONE') return true;
+    const name = (col.name || '').toLowerCase();
+    return name.includes('done') || name.includes('complete') || name.includes('archive');
+  }
+
+  private needsProofUpload(columnId: number | null | undefined): boolean {
+    return this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId);
   }
 
   isStatusMoveBlocked(columnId: number): boolean {
     const issue = this.selectedIssue();
-    return !!issue && this.isRestrictedColumn(columnId) && !this.canCompleteIssue(issue);
+    if (!issue) return false;
+    if (this.isDoneOrArchiveColumn(columnId) && !this.isCurrentUserPM()) return true;
+    if (this.isRestrictedColumn(columnId) && !this.canCompleteIssue(issue)) return true;
+    if (!this.isAdjacentColumnMove(issue, columnId)) return true;
+    return false;
   }
 
   drop(event: CdkDragDrop<any[]>, targetColumnId: number) {
     const issue = event.previousContainer.data[event.previousIndex];
     if (!issue) return;
-    
-    let finalTargetColumnId = targetColumnId;
-    if (event.previousContainer !== event.container && this.isRestrictedColumn(targetColumnId) && !this.canCompleteIssue(issue)) {
-      const reviewCol = this.columns().find(c => c.name.toLowerCase().includes('review'));
-      if (reviewCol) {
-        this.toast.warning('You cannot move to completed, need PM approval. Please upload documents to support this task for review.');
-        finalTargetColumnId = reviewCol.id;
-        
-        // If the item was optimistically moved into targetColumnId in the UI by CdkDragDrop,
-        // it's tricky because the UI dropped it into `event.container`.
-        // The optimistic update handles the UI data model, but CdkDropList might need a reset.
-        // It's safest to just let optimistic update handle it with finalTargetColumnId,
-        // but `event.currentIndex` might be wrong for the new column.
-        // `optimisticallyUpdateIssueColumn` handles inserting it.
-      } else {
-        this.toast.error('Only Project Managers can move a task to Done. Please assign to In Review instead.');
-        return;
-      }
-    }
 
+    // Same column reorder
     if (event.previousContainer === event.container) {
       const map = new Map(this.issuesByColumn());
-      const colIssues = [...(map.get(finalTargetColumnId) || [])];
+      const colIssues = [...(map.get(targetColumnId) || [])];
       moveItemInArray(colIssues, event.previousIndex, event.currentIndex);
-      map.set(finalTargetColumnId, colIssues);
+      map.set(targetColumnId, colIssues);
       this.issuesByColumn.set(map);
-    } else {
-      // Instant Optimistic Update
-      // If we bounced to Review, the currentIndex is 0 (top of the column)
-      const insertIndex = (finalTargetColumnId !== targetColumnId) ? 0 : event.currentIndex;
-      this.optimisticallyUpdateIssueColumn(issue.id, finalTargetColumnId, insertIndex);
-
-      // Show small loader on card while API call is in flight
-      this.setIssueUpdating(issue.id, true);
-
-      // Async Backend update
-      this.projectsService.updateIssue(this.projectId, issue.id, { 
-        columnId: finalTargetColumnId
-      }).subscribe({
-        next: () => {
-          this.setIssueUpdating(issue.id, false);
-          this.loadBoardAndIssues();
-        },
-        error: (err) => {
-          this.setIssueUpdating(issue.id, false);
-          this.toast.error('Failed to move issue');
-          this.loadBoardAndIssues(); // Revert on failure
-        }
-      });
+      return;
     }
+
+    // Non-PM trying to move to Done — block entirely
+    if (this.isDoneOrArchiveColumn(targetColumnId) && !this.isCurrentUserPM()) {
+      this.toast.error('Permission Denied: Only Project Managers are authorized to move tasks to Done.');
+      this.loadBoardAndIssues();
+      return;
+    }
+
+    // Review or Done column → open proof upload modal
+    if (this.needsProofUpload(targetColumnId)) {
+      this.openProofModal(issue, targetColumnId, event.currentIndex);
+      return;
+    }
+
+    // Normal adjacent move (e.g., To Do → In Progress)
+    this.optimisticallyUpdateIssueColumn(issue.id, targetColumnId, event.currentIndex);
+    this.setIssueUpdating(issue.id, true);
+    this.projectsService.updateIssue(this.projectId, issue.id, { columnId: targetColumnId }).subscribe({
+      next: () => {
+        this.setIssueUpdating(issue.id, false);
+        this.loadBoardAndIssues();
+      },
+      error: () => {
+        this.setIssueUpdating(issue.id, false);
+        this.toast.error('Failed to move issue');
+        this.loadBoardAndIssues();
+      }
+    });
   }
 
   dropColumn(event: CdkDragDrop<any[]>) {
@@ -1688,8 +1711,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.closePopover();
     if (this.selectedIssue()) {
       const issue = this.selectedIssue();
-      if (this.isRestrictedColumn(columnId) && !this.canCompleteIssue(issue)) {
-        this.toast.error('Only the assignee\'s manager (or above) can move this task to Done');
+      if (this.isDoneOrArchiveColumn(columnId) && !this.isCurrentUserPM()) {
+        this.toast.error('Permission Denied: Only Project Managers are authorized to move tasks to Done.');
+        return;
+      }
+      if (!this.isAdjacentColumnMove(issue, columnId)) {
+        this.toast.warning('Cannot skip columns. Please move the card one column at a time.');
+        return;
+      }
+      // Review or Done → open proof upload modal
+      if (this.needsProofUpload(columnId)) {
+        this.openProofModal(issue, columnId, 0);
         return;
       }
       const issueId = issue.id;
@@ -2469,6 +2501,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return 'Member';
   }
 
+  getProjectMemberRole(employeeId: number): string {
+    const p = this.project();
+    if (!p || !p.members) return '';
+    const member = p.members.find((m: any) => m.employeeId === employeeId || m.employee?.id === employeeId);
+    return member?.role || '';
+  }
+
   addProjectMember(employee: any) {
     if (!this.canManageMembers) {
       this.toast.error('Only Admins or Project Lead can add members');
@@ -2548,6 +2587,115 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   rejectReason = signal<string>('');
   isRejectModalOpen = signal<boolean>(false);
   rejectingIssueId = signal<number | null>(null);
+
+  // Proof Upload Modal State
+  isProofModalOpen = signal<boolean>(false);
+  proofIssue = signal<any | null>(null);
+  proofTargetColumnId = signal<number | null>(null);
+  proofInsertIndex = signal<number>(0);
+  proofFiles = signal<File[]>([]);
+  proofNotes = signal<string>('');
+  isUploadingProof = signal(false);
+  proofUploadProgress = signal<number>(0);
+  private proofUploadInterval: any = null;
+
+  openProofModal(issue: any, targetColumnId: number, insertIndex: number) {
+    this.proofIssue.set(issue);
+    this.proofTargetColumnId.set(targetColumnId);
+    this.proofInsertIndex.set(insertIndex);
+    this.proofFiles.set([]);
+    this.proofNotes.set('');
+    this.isProofModalOpen.set(true);
+  }
+
+  closeProofModal() {
+    this.isProofModalOpen.set(false);
+    this.proofIssue.set(null);
+    this.proofTargetColumnId.set(null);
+    this.proofFiles.set([]);
+    this.proofNotes.set('');
+    this.isUploadingProof.set(false);
+    if (this.proofUploadInterval) {
+      clearInterval(this.proofUploadInterval);
+      this.proofUploadInterval = null;
+    }
+  }
+
+  onProofFileSelected(event: any) {
+    const files = Array.from(event.target.files || []) as File[];
+    this.proofFiles.update(prev => [...prev, ...files]);
+  }
+
+  removeProofFile(index: number) {
+    this.proofFiles.update(prev => prev.filter((_, i) => i !== index));
+  }
+
+  confirmProofUpload() {
+    const issue = this.proofIssue();
+    const targetColId = this.proofTargetColumnId();
+    if (!issue || !targetColId) return;
+
+    const files = this.proofFiles();
+    if (files.length === 0) {
+      this.toast.error('Please upload at least one proof document.');
+      return;
+    }
+
+    this.isUploadingProof.set(true);
+    this.proofUploadProgress.set(10);
+
+    const colName = this.getColumnById(targetColId)?.name || '';
+    this.toast.info(`Moving to "${colName}"... Uploading ${files.length} file(s).`);
+
+    let uploadedCount = 0;
+    const totalFiles = files.length;
+
+    const uploadNext = (index: number) => {
+      if (index >= files.length) {
+        // All files uploaded — now move the issue
+        clearInterval(this.proofUploadInterval);
+        this.proofUploadProgress.set(100);
+        this.isUploadingProof.set(false);
+
+        this.optimisticallyUpdateIssueColumn(issue.id, targetColId, this.proofInsertIndex());
+        this.setIssueUpdating(issue.id, true);
+        this.closeProofModal();
+
+        this.projectsService.updateIssue(this.projectId, issue.id, { columnId: targetColId }).subscribe({
+          next: () => {
+            this.setIssueUpdating(issue.id, false);
+            this.toast.success('Task moved and proof uploaded successfully.');
+            this.loadBoardAndIssues();
+          },
+          error: () => {
+            this.setIssueUpdating(issue.id, false);
+            this.toast.error('Proof uploaded but failed to move task. Please try again.');
+            this.loadBoardAndIssues();
+          }
+        });
+        return;
+      }
+
+      this.projectsService.uploadAttachment(this.projectId, issue.id, files[index]).subscribe({
+        next: () => {
+          uploadedCount++;
+          this.proofUploadProgress.set(Math.round((uploadedCount / totalFiles) * 90));
+          uploadNext(index + 1);
+        },
+        error: () => {
+          clearInterval(this.proofUploadInterval);
+          this.isUploadingProof.set(false);
+          this.toast.error(`Failed to upload file: ${files[index].name}`);
+        }
+      });
+    };
+
+    this.proofUploadInterval = setInterval(() => {
+      this.proofUploadProgress.update(p => (p < 80 ? p + 10 : p));
+    }, 500);
+
+    uploadNext(0);
+  }
 
   openRejectModal(issueId: number) {
     if (!this.isCurrentUserPM()) {
@@ -2633,6 +2781,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   closePopover() {
     this.activePopover.set(null);
+    this.activeMemberActionMenu.set(null);
     this.labelPopoverMode.set('list');
     this.activeEditLabel.set(null);
     this.showTimeDropdown.set(false);
@@ -3170,6 +3319,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   companyMembers = signal<any[]>([]);
   memberSearchQuery = '';
   shareTab = signal<'members'|'invite'>('members');
+  activeMemberActionMenu = signal<number | null>(null);
+
+  toggleMemberActionMenu(employeeId: number) {
+    this.activeMemberActionMenu.set(this.activeMemberActionMenu() === employeeId ? null : employeeId);
+  }
 
   copyBoardLink() {
     navigator.clipboard.writeText(window.location.href);

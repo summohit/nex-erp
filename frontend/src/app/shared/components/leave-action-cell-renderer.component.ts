@@ -20,9 +20,7 @@ export interface LeaveActionCellParams extends ICellRendererParams {
   imports: [CommonModule, LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, MatMenuModule],
   template: `
     <div class="action-container" (click)="$event.stopPropagation()">
-      <button class="btn-icon" [matMenuTriggerFor]="menu" 
-              [disabled]="isPastStartDate(params.data.startDate) && !params.data.attachmentUrl && !params.onApprove && params.data.status !== 'REJECTED'"
-              [class.disabled-btn]="isPastStartDate(params.data.startDate) && !params.data.attachmentUrl && !params.onApprove && params.data.status !== 'REJECTED'">
+      <button class="btn-icon" [matMenuTriggerFor]="menu" *ngIf="hasMenuItems()">
         <svg lucideMoreHorizontal size="16"></svg>
       </button>
 
@@ -43,12 +41,11 @@ export interface LeaveActionCellParams extends ICellRendererParams {
           <svg lucideX size="18" class="menu-icon"></svg>
           <span class="menu-text">Cancel Request</span>
         </button>
-        
         <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove && params.data.status === 'PENDING'">
           <svg lucideCheckCircle size="18" class="menu-icon"></svg>
           <span class="menu-text">Approve</span>
         </button>
-        <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject && !isPastStartDate(params.data.startDate) && params.data.status !== 'REJECTED' && params.data.status !== 'CANCELLED'">
+        <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject && params.data.status === 'PENDING'">
           <svg lucideXCircle size="18" class="menu-icon"></svg>
           <span class="menu-text">Reject</span>
         </button>
@@ -160,5 +157,16 @@ export class LeaveActionCellRendererComponent implements ICellRendererAngularCom
     if (this.params.onViewReason && this.params.data.rejectionReason) {
       this.params.onViewReason(this.params.data);
     }
+  }
+
+  hasMenuItems(): boolean {
+    const d = this.params.data;
+    if (d.status === 'REJECTED' && d.rejectionReason) return true;
+    if (this.params.onViewAttachment && d.attachmentUrl) return true;
+    if (this.params.onEdit && d.status === 'PENDING') return true;
+    if (this.params.onCancel && !this.isPastStartDate(d.startDate) && d.status !== 'CANCELLED' && d.status !== 'REJECTED') return true;
+    if (this.params.onApprove && d.status === 'PENDING') return true;
+    if (this.params.onReject && d.status === 'PENDING') return true;
+    return false;
   }
 }

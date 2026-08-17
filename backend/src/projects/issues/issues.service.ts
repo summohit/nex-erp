@@ -138,6 +138,26 @@ export class IssuesService {
     return chain;
   }
 
+  private async getDescendantAndAncestorUserIds(companyId: number, employeeId: number): Promise<number[]> {
+    const userIds: number[] = [];
+    const visited = new Set<number>();
+
+    // Walk UP the manager chain (ancestors)
+    let current: number | null = employeeId;
+    while (current != null && !visited.has(current)) {
+      visited.add(current);
+      const emp = await this.prisma.employee.findUnique({
+        where: { id: current },
+        select: { managerId: true, userId: true },
+      });
+      if (!emp) break;
+      if (emp.userId) userIds.push(emp.userId);
+      current = emp.managerId;
+    }
+
+    return userIds;
+  }
+
   private isRestrictedColumn(col: any): boolean {
     if (col.type === 'DONE') return true;
     const n = col.name.toLowerCase();
@@ -193,6 +213,18 @@ export class IssuesService {
         if (this.isRestrictedColumn(targetCol)) {
           isRestrictedTarget = true;
         }
+        // Enforce adjacent-column-only moves on the backend
+        if (oldIssue.columnId && oldIssue.columnId !== updateData.columnId) {
+          const columns = await this.prisma.boardColumn.findMany({
+            where: { board: { projectId }, isArchived: false },
+            orderBy: { position: 'asc' }
+          });
+          const fromIdx = columns.findIndex(c => c.id === oldIssue.columnId);
+          const toIdx = columns.findIndex(c => c.id === updateData.columnId);
+          if (fromIdx !== -1 && toIdx !== -1 && Math.abs(toIdx - fromIdx) !== 1) {
+            throw new ForbiddenException('Cannot skip columns. Move one column at a time.');
+          }
+        }
         if (data.status === undefined) {
           const colName = targetCol.name.toLowerCase();
           if (colName.includes('done') || colName.includes('complete')) updateData.status = 'DONE';
@@ -220,14 +252,14 @@ export class IssuesService {
       data: updateData
     });
 
-    // Auto time tracking: starting the timer when a task moves into an "In Progress"
-    // column, and stopping it when it leaves progress (e.g. moved to Review or Done).
+    // Auto time tracking: start timer when card moves to IN_PROGRESS,
+    // stop timer when card moves to IN_REVIEW.
     const targetStatus = updateData.status;
     if (targetStatus === 'IN_PROGRESS' && prevStatus !== 'IN_PROGRESS') {
       if (!oldIssue.workStartedAt || oldIssue.workCompletedAt) {
         await this.startTimeTracking(companyId, employeeId, projectId, issueId);
       }
-    } else if (prevStatus === 'IN_PROGRESS' && targetStatus && targetStatus !== 'IN_PROGRESS') {
+    } else if (targetStatus === 'IN_REVIEW' && prevStatus !== 'IN_REVIEW') {
       if (oldIssue.workStartedAt && !oldIssue.workCompletedAt) {
         await this.stopTimeTracking(companyId, employeeId, projectId, issueId);
       }
@@ -251,6 +283,59 @@ export class IssuesService {
         }
       });
       this.tasksGateway.emitActivityAdded(issueId, activity);
+    }
+
+    // Notify project lead + all upper hierarchy when task moves to DONE
+    const newStatus = updateData.status;
+    if (newStatus === 'DONE' && prevStatus !== 'DONE') {
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { leadId: true, name: true }
+      });
+
+      const actor = await this.prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { firstName: true, lastName: true }
+      });
+      const actorName = actor ? `${actor.firstName} ${actor.lastName}` : 'Someone';
+
+      const assignee = oldIssue.assigneeId
+        ? await this.prisma.employee.findUnique({
+            where: { id: oldIssue.assigneeId },
+            select: { firstName: true, lastName: true }
+          })
+        : null;
+      const assigneeName = assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Unassigned';
+
+      const notifyUserIds = new Set<number>();
+
+      // 1. Notify project lead (if different from actor)
+      if (project?.leadId && project.leadId !== employeeId) {
+        const lead = await this.prisma.employee.findUnique({
+          where: { id: project.leadId },
+          select: { userId: true }
+        });
+        if (lead) notifyUserIds.add(lead.userId);
+      }
+
+      // 2. Walk up the actor's manager chain and notify every upper hierarchy person
+      const hierarchy = await this.getDescendantAndAncestorUserIds(companyId, employeeId);
+      for (const uid of hierarchy) {
+        if (uid !== employeeId) notifyUserIds.add(uid);
+      }
+
+      const message = `${actorName} marked "${oldIssue.title}" (${oldIssue.key}) assigned to ${assigneeName} as Done in ${project?.name || 'the project'}. Kindly review.`;
+
+      for (const uid of notifyUserIds) {
+        await this.notificationsService.createNotification(
+          uid,
+          'Task Completed – Review Requested',
+          message,
+          'SUCCESS',
+          `/projects/${projectId}`,
+          companyId
+        );
+      }
     }
 
     this.tasksGateway.emitIssueUpdated(issueId, projectId, issue);

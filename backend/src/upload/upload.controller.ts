@@ -10,7 +10,7 @@ const ALLOWED_MIME_TYPES = ['application/pdf'];
 const ALLOWED_EXTENSIONS = ['.pdf'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-function resumeFileFilter(req: any, file: Express.Multer.File, cb: (error: Error | null, accept?: boolean) => void) {
+function resumeFileFilter(req: any, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) {
   const ext = path.extname(file.originalname).toLowerCase();
   if (!ALLOWED_MIME_TYPES.includes(file.mimetype) && !ALLOWED_EXTENSIONS.includes(ext)) {
     return cb(new HttpException('Only PDF files are allowed', HttpStatus.BAD_REQUEST), false);

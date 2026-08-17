@@ -263,21 +263,47 @@ export class LeavesService implements OnModuleInit {
     });
     if (!employee) throw new BadRequestException('Employee not found');
 
-    const subordinates = await this.prisma.employee.findMany({
-      where: { managerId: employee.id },
-      select: { id: true }
-    });
-    const subordinateIds = subordinates.map(s => s.id);
-    if (subordinateIds.length === 0) return [];
+    const descendantIds = await this.getDescendantEmployeeIds(employee.id);
+    if (descendantIds.length === 0) return [];
 
     return this.prisma.leaveRequest.findMany({
-      where: { employeeId: { in: subordinateIds }, status: 'PENDING' },
+      where: { employeeId: { in: descendantIds }, status: 'PENDING' },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
         leaveType: true
       },
       orderBy: { createdAt: 'desc' }
     });
+  }
+
+  private async isEmployeeInHierarchy(managerEmployeeId: number, targetEmployeeId: number): Promise<boolean> {
+    let currentId: number | null = targetEmployeeId;
+    while (currentId !== null) {
+      if (currentId === managerEmployeeId) return true;
+      const emp = await this.prisma.employee.findUnique({
+        where: { id: currentId },
+        select: { managerId: true }
+      });
+      currentId = emp?.managerId ?? null;
+    }
+    return false;
+  }
+
+  private async getDescendantEmployeeIds(employeeId: number): Promise<number[]> {
+    const result: number[] = [];
+    const queue = [employeeId];
+    while (queue.length > 0) {
+      const parentId = queue.shift()!;
+      const children = await this.prisma.employee.findMany({
+        where: { managerId: parentId },
+        select: { id: true }
+      });
+      for (const child of children) {
+        result.push(child.id);
+        queue.push(child.id);
+      }
+    }
+    return result;
   }
 
   async updateRequest(userId: number, requestId: number, data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
@@ -413,8 +439,10 @@ export class LeavesService implements OnModuleInit {
     if (status === 'REJECTED' && !rejectionReason) throw new BadRequestException('Rejection reason is required');
 
     const isAdminOrHr = ['SUPERADMIN', 'ADMIN', 'HR'].includes(actor.role);
-    const isManager = request.employee.managerId === actor.employee?.id;
-    if (!isAdminOrHr && !isManager) {
+    const isInHierarchy = actor.employee?.id
+      ? await this.isEmployeeInHierarchy(actor.employee.id, request.employeeId)
+      : false;
+    if (!isAdminOrHr && !isInHierarchy) {
       throw new BadRequestException('Not authorized to update this leave request');
     }
 
