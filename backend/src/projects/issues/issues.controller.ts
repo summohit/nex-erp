@@ -47,6 +47,17 @@ export class IssuesController {
     return this.issuesService.toggleArchive(req.user.companyId, actorEmployeeId, projectId, id);
   }
 
+  @Post(':id/review')
+  reviewIssue(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { action: 'APPROVE' | 'REJECT', reason?: string }
+  ) {
+    const actorEmployeeId = req.user.employeeId ?? req.user.sub;
+    return this.issuesService.reviewIssue(req.user.companyId, actorEmployeeId, projectId, id, data);
+  }
+
   @Post(':id/time-start')
   startTimeTracking(
     @Req() req,

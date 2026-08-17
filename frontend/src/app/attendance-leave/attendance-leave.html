@@ -955,12 +955,13 @@
   <!-- DETAILED ATTENDANCE LOG MODAL -->
   <!-- ========================================== -->
   <div class="viewer-overlay" *ngIf="isDayDetailsModalOpen() && selectedDayDetails()" (click)="closeDayDetailsModal()">
-    <div class="widget-card" (click)="$event.stopPropagation()" style="width: 520px; max-width: 92vw; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4);">
+    <div class="widget-card" (click)="$event.stopPropagation()" style="width: 520px; max-width: 92vw; max-height: 90vh; overflow-y: auto; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4);">
       <div class="widget-header" style="border-bottom: 1px solid #E2E8F0; padding-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <div class="avatar-circle-md" style="width: 44px; height: 44px; font-size: 18px; font-weight: bold; background: linear-gradient(135deg, #2563EB, #1D4ED8); color: #FFF; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div *ngIf="!selectedDayDetails()?.employeeAvatarUrl" class="avatar-circle-md" style="width: 44px; height: 44px; font-size: 18px; font-weight: bold; background: linear-gradient(135deg, #2563EB, #1D4ED8); color: #FFF; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
             {{ (selectedDayDetails()?.employeeName || 'E').charAt(0) }}
           </div>
+          <img *ngIf="selectedDayDetails()?.employeeAvatarUrl" [src]="selectedDayDetails()?.employeeAvatarUrl" [alt]="selectedDayDetails()?.employeeName" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #E2E8F0;">
           <div>
             <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">{{ selectedDayDetails()?.employeeName }}</h3>
             <span style="font-size: 12px; color: #64748B;">{{ selectedDayDetails()?.employeeDept }}</span>
@@ -988,55 +989,57 @@
           </span>
         </div>
 
-        <!-- Clock In & Clock Out Details -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-          <!-- Clock In -->
-          <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 14px;">
-            <div style="display: flex; align-items: center; gap: 6px; color: #1E40AF; font-size: 12px; font-weight: 700; margin-bottom: 6px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              CLOCK IN
-            </div>
-            <div style="font-size: 16px; font-weight: 800; color: #1E293B; margin-bottom: 8px;">
-              {{ selectedDayDetails()?.clockIn12 }}
-            </div>
-            <div *ngIf="selectedDayDetails()?.clockInLat" style="font-size: 11px; color: #1E40AF; line-height: 1.5;">
-              <div *ngIf="selectedDayDetails()?.clockInAddress" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
-                📍 {{ selectedDayDetails()?.clockInAddress }}
+        <!-- Punch History Timeline -->
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; overflow-y: visible;">
+          <ng-container *ngIf="selectedDayDetails()?.log?.logs?.length > 0; else noPunches">
+            <div *ngFor="let punch of selectedDayDetails()?.log?.logs; let i = index" style="background: #FFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
+              <div style="background: #F1F5F9; padding: 8px 12px; font-size: 11px; font-weight: 700; color: #475569; border-bottom: 1px solid #E2E8F0;">
+                SESSION {{ i + 1 }}
               </div>
-              <div><strong>Lat:</strong> {{ selectedDayDetails()?.clockInLat }}</div>
-              <div><strong>Lng:</strong> {{ selectedDayDetails()?.clockInLng }}</div>
-              <a [href]="'https://www.google.com/maps?q=' + selectedDayDetails()?.clockInLat + ',' + selectedDayDetails()?.clockInLng" target="_blank" style="display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: #2563EB; text-decoration: underline; margin-top: 4px;">
-                📍 View on Google Maps
-              </a>
-            </div>
-            <div *ngIf="!selectedDayDetails()?.clockInLat" style="font-size: 11px; color: #94A3B8;">
-              No GPS coordinates logged
-            </div>
-          </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #E2E8F0;">
+                <!-- Clock In -->
+                <div style="background: #FFF; padding: 12px;">
+                  <div style="display: flex; align-items: center; gap: 6px; color: #1E40AF; font-size: 11px; font-weight: 700; margin-bottom: 4px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    CLOCK IN
+                  </div>
+                  <div style="font-size: 15px; font-weight: 700; color: #1E293B;">
+                    {{ punch.clockIn ? (punch.clockIn | date:'shortTime') : '--' }}
+                  </div>
+                  <div *ngIf="punch.clockInLat" style="margin-top: 8px; font-size: 10px; color: #475569; display: flex; flex-direction: column; gap: 4px; background: #F8FAFC; padding: 6px; border-radius: 6px; border: 1px solid #E2E8F0;">
+                    <span style="color: #64748B;">Lat: {{ punch.clockInLat | number:'1.4-4' }}<br>Lng: {{ punch.clockInLng | number:'1.4-4' }}</span>
+                    <a [href]="'https://www.google.com/maps?q=' + punch.clockInLat + ',' + punch.clockInLng" target="_blank" style="color: #2563EB; font-size: 10px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; margin-top: 2px;">
+                      View on Map
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                    </a>
+                  </div>
+                </div>
 
-          <!-- Clock Out -->
-          <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 14px;">
-            <div style="display: flex; align-items: center; gap: 6px; color: #166534; font-size: 12px; font-weight: 700; margin-bottom: 6px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              CLOCK OUT
-            </div>
-            <div style="font-size: 16px; font-weight: 800; color: #1E293B; margin-bottom: 8px;">
-              {{ selectedDayDetails()?.clockOut12 }}
-            </div>
-            <div *ngIf="selectedDayDetails()?.clockOutLat" style="font-size: 11px; color: #166534; line-height: 1.5;">
-              <div *ngIf="selectedDayDetails()?.clockOutAddress" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
-                📍 {{ selectedDayDetails()?.clockOutAddress }}
+                <!-- Clock Out -->
+                <div style="background: #FFF; padding: 12px;">
+                  <div style="display: flex; align-items: center; gap: 6px; color: #166534; font-size: 11px; font-weight: 700; margin-bottom: 4px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    CLOCK OUT
+                  </div>
+                  <div style="font-size: 15px; font-weight: 700; color: #1E293B;">
+                    {{ punch.clockOut ? (punch.clockOut | date:'shortTime') : 'Ongoing...' }}
+                  </div>
+                  <div *ngIf="punch.clockOutLat" style="margin-top: 8px; font-size: 10px; color: #475569; display: flex; flex-direction: column; gap: 4px; background: #F8FAFC; padding: 6px; border-radius: 6px; border: 1px solid #E2E8F0;">
+                    <span style="color: #64748B;">Lat: {{ punch.clockOutLat | number:'1.4-4' }}<br>Lng: {{ punch.clockOutLng | number:'1.4-4' }}</span>
+                    <a [href]="'https://www.google.com/maps?q=' + punch.clockOutLat + ',' + punch.clockOutLng" target="_blank" style="color: #2563EB; font-size: 10px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; margin-top: 2px;">
+                      View on Map
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                    </a>
+                  </div>
+                </div>
               </div>
-              <div><strong>Lat:</strong> {{ selectedDayDetails()?.clockOutLat }}</div>
-              <div><strong>Lng:</strong> {{ selectedDayDetails()?.clockOutLng }}</div>
-              <a [href]="'https://www.google.com/maps?q=' + selectedDayDetails()?.clockOutLat + ',' + selectedDayDetails()?.clockOutLng" target="_blank" style="display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: #16A34A; text-decoration: underline; margin-top: 4px;">
-                📍 View on Google Maps
-              </a>
             </div>
-            <div *ngIf="!selectedDayDetails()?.clockOutLat" style="font-size: 11px; color: #94A3B8;">
-              No GPS coordinates logged
+          </ng-container>
+          <ng-template #noPunches>
+            <div style="text-align: center; padding: 20px; font-size: 13px; color: #64748B; background: #F8FAFC; border-radius: 12px;">
+              No punch records found for this date.
             </div>
-          </div>
+          </ng-template>
         </div>
 
         <!-- Summary Duration -->

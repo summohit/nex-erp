@@ -59,21 +59,21 @@ export class ProjectsService {
         companyId,
         leadId,
         members: {
-          create: {
-            employeeId: leadId,
-            role: 'ADMIN'
-          }
+          create: [
+            { employeeId: leadId, role: 'ADMIN' },
+            ...(data.pmIds ? data.pmIds.map((id: number) => ({ employeeId: id, role: 'PROJECT_MANAGER' })) : [])
+          ]
         },
         boards: {
           create: {
             name: 'Main Board',
             columns: {
               create: [
-                { name: 'To Do', color: '#6b7280', position: 0, isSystem: true },
-                { name: 'In Progress', color: '#3b82f6', position: 1, isSystem: true },
-                { name: 'In Review', color: '#8b5cf6', position: 2, isSystem: true },
-                { name: 'Done', color: '#22c55e', position: 3, isSystem: true },
-                { name: 'Archived', color: '#9ca3af', position: 4, isSystem: true }
+                { name: 'To Do', color: '#6b7280', position: 0, isSystem: true, type: 'TODO' },
+                { name: 'In Progress', color: '#3b82f6', position: 1, isSystem: true, type: 'IN_PROGRESS' },
+                { name: 'In Review', color: '#8b5cf6', position: 2, isSystem: true, type: 'REVIEW' },
+                { name: 'Done', color: '#22c55e', position: 3, isSystem: true, type: 'DONE' },
+                { name: 'Archived', color: '#9ca3af', position: 4, isSystem: true, type: 'DONE' }
               ]
             }
           }
@@ -128,21 +128,21 @@ export class ProjectsService {
           clientId: autoClient.id,
 
           members: {
-            create: {
-              employeeId: leadId,
-              role: 'ADMIN'
-            }
+            create: [
+              { employeeId: leadId, role: 'ADMIN' },
+              ...(data.pmIds ? data.pmIds.map((id: number) => ({ employeeId: id, role: 'PROJECT_MANAGER' })) : [])
+            ]
           },
           boards: {
             create: {
               name: 'Main Board',
               columns: {
                 create: [
-                  { name: 'To Do', color: '#6b7280', position: 0, isSystem: true },
-                  { name: 'In Progress', color: '#3b82f6', position: 1, isSystem: true },
-                  { name: 'In Review', color: '#8b5cf6', position: 2, isSystem: true },
-                  { name: 'Done', color: '#22c55e', position: 3, isSystem: true },
-                  { name: 'Archived', color: '#9ca3af', position: 4, isSystem: true }
+                  { name: 'To Do', color: '#6b7280', position: 0, isSystem: true, type: 'TODO' },
+                  { name: 'In Progress', color: '#3b82f6', position: 1, isSystem: true, type: 'IN_PROGRESS' },
+                  { name: 'In Review', color: '#8b5cf6', position: 2, isSystem: true, type: 'REVIEW' },
+                  { name: 'Done', color: '#22c55e', position: 3, isSystem: true, type: 'DONE' },
+                  { name: 'Archived', color: '#9ca3af', position: 4, isSystem: true, type: 'DONE' }
                 ]
               }
             }

@@ -18,14 +18,20 @@ export class AttendanceService {
           employeeId: employee.id,
           date: today
         }
-      }
+      },
+      include: { logs: true }
     }).then(r => this.withTotalHours(r));
   }
 
   private withTotalHours(record: any) {
     if (!record) return record;
     let totalHours = 0;
-    if (record.clockIn) {
+    if (record.logs && record.logs.length > 0) {
+      for (const log of record.logs) {
+        const end = log.clockOut || new Date();
+        totalHours += Math.max(0, (end.getTime() - log.clockIn.getTime()) / 3600000);
+      }
+    } else if (record.clockIn) {
       const end = record.clockOut || new Date();
       totalHours = Math.max(0, (end.getTime() - record.clockIn.getTime()) / 3600000);
     }
@@ -38,7 +44,7 @@ export class AttendanceService {
 
     return this.prisma.attendance.findMany({
       where: { employeeId: employee.id },
-      include: { employee: { include: { department: true } } },
+      include: { employee: { include: { department: true } }, logs: true },
       orderBy: { date: 'desc' }
     }).then(rows => rows.map(r => this.withTotalHours(r)));
   }
@@ -46,7 +52,7 @@ export class AttendanceService {
   async getEmployeeHistory(employeeId: number) {
     return this.prisma.attendance.findMany({
       where: { employeeId },
-      include: { employee: { include: { department: true } } },
+      include: { employee: { include: { department: true } }, logs: true },
       orderBy: { date: 'desc' }
     }).then(rows => rows.map(r => this.withTotalHours(r)));
   }
@@ -77,12 +83,16 @@ export class AttendanceService {
     const nowLocal = new Date();
     const today = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()));
 
-    const existing = await this.prisma.attendance.findUnique({
-      where: { employeeId_date: { employeeId: employee.id, date: today } }
+    let existing = await this.prisma.attendance.findUnique({
+      where: { employeeId_date: { employeeId: employee.id, date: today } },
+      include: { logs: true }
     });
 
-    if (existing && existing.clockIn) {
-      throw new BadRequestException('Already clocked in today');
+    if (existing) {
+      const activeLog = existing.logs.find(l => !l.clockOut);
+      if (activeLog) {
+        throw new BadRequestException('Already clocked in');
+      }
     }
 
     const now = new Date();
@@ -96,7 +106,6 @@ export class AttendanceService {
       const expectedStart = new Date(now);
       expectedStart.setHours(shiftStartHour, shiftStartMinute, 0, 0);
       
-      // Add buffer time
       const maxStartTime = new Date(expectedStart.getTime() + (employee.shift.bufferTimeMinutes * 60000));
       
       if (now > maxStartTime) {
@@ -104,27 +113,36 @@ export class AttendanceService {
       }
     }
 
-    if (existing) {
-      return this.prisma.attendance.update({
-        where: { id: existing.id },
+    if (!existing) {
+      existing = await this.prisma.attendance.create({
         data: {
+          employeeId: employee.id,
+          date: today,
           clockIn: now,
           clockInLat: data.lat,
           clockInLng: data.lng,
           isLate
-        }
-      }).then(r => this.withTotalHours(r));
+        },
+        include: { logs: true }
+      });
     }
 
-    return this.prisma.attendance.create({
+    await this.prisma.attendanceLog.create({
       data: {
-        employeeId: employee.id,
-        date: today,
+        attendanceId: existing.id,
         clockIn: now,
         clockInLat: data.lat,
-        clockInLng: data.lng,
-        isLate
+        clockInLng: data.lng
       }
+    });
+
+    return this.prisma.attendance.update({
+      where: { id: existing.id },
+      data: {
+        clockOut: null, // Reset clockOut on parent since they are active
+        clockIn: existing.clockIn || now
+      },
+      include: { logs: true }
     }).then(r => this.withTotalHours(r));
   }
 
@@ -139,15 +157,17 @@ export class AttendanceService {
     const today = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()));
 
     const existing = await this.prisma.attendance.findUnique({
-      where: { employeeId_date: { employeeId: employee.id, date: today } }
+      where: { employeeId_date: { employeeId: employee.id, date: today } },
+      include: { logs: true }
     });
 
     if (!existing || !existing.clockIn) {
       throw new BadRequestException('You must clock in first');
     }
 
-    if (existing.clockOut) {
-      throw new BadRequestException('Already clocked out today');
+    const activeLog = existing.logs.find(l => !l.clockOut);
+    if (!activeLog) {
+      throw new BadRequestException('Already clocked out');
     }
 
     const now = new Date();
@@ -174,16 +194,26 @@ export class AttendanceService {
       }
     }
 
+    await this.prisma.attendanceLog.update({
+      where: { id: activeLog.id },
+      data: {
+        clockOut: now,
+        clockOutLat: data.lat,
+        clockOutLng: data.lng
+      }
+    });
+
     return this.prisma.attendance.update({
       where: { id: existing.id },
       data: {
         clockOut: now,
-        clockOutLat: data.lat,
+        clockOutLat: data.lat, // We can track the latest clock out coords here too
         clockOutLng: data.lng,
         isEarlyLeave,
         status,
         overtimeHours
-      }
+      },
+      include: { logs: true }
     }).then(r => this.withTotalHours(r));
   }
 

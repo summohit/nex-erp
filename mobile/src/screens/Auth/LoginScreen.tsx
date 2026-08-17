@@ -5,18 +5,19 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
+  Modal,
+  Animated,
 } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../api/apiClient';
 import { theme } from '../../theme/theme';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, X } from 'lucide-react-native';
 
 export default function LoginScreen() {
   const { login } = useAuthStore();
@@ -26,10 +27,19 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [errorVisible, setErrorVisible] = useState(false);
+  const [errorTitle, setErrorTitle] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const showError = (title: string, message: string) => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setErrorVisible(true);
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Required Fields', 'Please enter both email address and password.');
+      showError('Required Fields', 'Please enter both email address and password.');
       return;
     }
 
@@ -40,11 +50,52 @@ export default function LoginScreen() {
         password,
       });
 
-      const { user, backendTokens } = response.data;
-      await login(user, backendTokens.accessToken);
+      const { access_token, refresh_token } = response.data;
+      
+      // Simple base64 decode for JWT
+      const decodeBase64 = (str: string) => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+        let output = '';
+        str = String(str).replace(/=+$/, '');
+        for (
+          let bc = 0, bs, buffer, idx = 0;
+          (buffer = str.charAt(idx++));
+          ~buffer && ((bs = bc % 4 ? bs! * 64 + buffer : buffer), bc++ % 4) ? (output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)))) : 0
+        ) {
+          buffer = chars.indexOf(buffer);
+        }
+        return output;
+      };
+      
+      const tokenParts = access_token.split('.');
+      const payload = JSON.parse(decodeBase64(tokenParts[1]));
+      
+      const user = {
+        id: payload.sub,
+        email: payload.email,
+        role: payload.role,
+        companyId: payload.companyId,
+        employeeId: payload.employeeId,
+      };
+      
+      await login(user, access_token);
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Invalid credentials or network connection error.';
-      Alert.alert('Login Failed', message);
+      console.error('Login RAW error:', error?.message, 'Code:', error?.code, 'BaseURL:', error?.config?.baseURL);
+      const status = error?.response?.status;
+      const serverMsg = error?.response?.data?.message;
+      let message = '';
+      if (serverMsg) {
+        message = serverMsg;
+      } else if (status === 401) {
+        message = 'Invalid email or password. Please try again.';
+      } else if (status === 404) {
+        message = 'Login endpoint not found. Please contact support.';
+      } else if (!error?.response) {
+        message = `Network error: ${error?.message || 'Unknown'}\nCode: ${error?.code || 'N/A'}`;
+      } else {
+        message = `Server error (${status}). Please try again later.`;
+      }
+      showError('Login Failed', message);
     } finally {
       setLoading(false);
     }
@@ -55,7 +106,7 @@ export default function LoginScreen() {
       style={styles.keyboardContainer}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <StatusBar barStyle="dark-content" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -166,6 +217,47 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Custom Error Modal */}
+      <Modal
+        transparent
+        visible={errorVisible}
+        animationType="fade"
+        onRequestClose={() => setErrorVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {/* Close button */}
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setErrorVisible(false)}
+              activeOpacity={0.7}
+            >
+              <X size={20} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {/* Error Icon */}
+            <View style={styles.modalIconContainer}>
+              <AlertCircle size={32} color="#FFFFFF" />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.modalTitle}>{errorTitle}</Text>
+
+            {/* Message */}
+            <Text style={styles.modalMessage}>{errorMessage}</Text>
+
+            {/* Action Button */}
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setErrorVisible(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -306,5 +398,81 @@ const styles = StyleSheet.create({
   footerLink: {
     color: theme.colors.primary,
     fontWeight: '500',
+  },
+
+  // ─── Custom Error Modal Styles ───
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    padding: 4,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  modalButton: {
+    backgroundColor: theme.colors.primary,
+    width: '100%',
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

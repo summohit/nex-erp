@@ -111,6 +111,10 @@ export class ProjectsService {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/time-stop`, {});
   }
 
+  reviewIssue(projectId: number, issueId: number, data: { action: 'APPROVE' | 'REJECT', reason?: string }) {
+    return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/review`, data);
+  }
+
   getBoard(projectId: number) {
     return this.http.get<any>(`${this.apiUrl}/${projectId}/boards`);
   }

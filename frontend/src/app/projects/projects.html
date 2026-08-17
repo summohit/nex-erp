@@ -430,6 +430,15 @@
       </select>
     </div>
 
+    <!-- Project Managers Selection -->
+    <div class="form-section">
+      <label class="section-label">Project Managers</label>
+      <select class="trello-select" multiple [(ngModel)]="projectForm.pmIds" style="height: 100px;">
+        <option *ngFor="let emp of employees()" [ngValue]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
+      </select>
+      <small style="color: #6b7280; font-size: 12px; margin-top: 4px; display: block;">Hold Cmd/Ctrl to select multiple. These users will be able to review and approve tasks.</small>
+    </div>
+
     <!-- Action Button -->
     <button 
       type="button" 

@@ -393,9 +393,10 @@
                       <span *ngIf="!m.avatarUrl">{{ getMemberInitials(m) }}</span>
                     </div>
                     <div class="member-share-details">
-                      <div class="member-share-name">
+                      <div class="member-share-name" style="display: flex; align-items: center; gap: 6px;">
                         {{ m.firstName }} {{ m.lastName }}
-                        <span *ngIf="isSelf(m.id)" class="text-xs text-slate-500 font-normal ml-1">(You)</span>
+                        <span *ngIf="isSelf(m.id)" class="text-xs text-slate-500 font-normal">(You)</span>
+                        <span *ngIf="m.isProjectManager" style="background: #E0E7FF; color: #4338CA; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid #C7D2FE;">PM</span>
                       </div>
                       <div class="member-share-email" *ngIf="m.user?.email">{{ m.user?.email }}</div>
                     </div>
@@ -1688,8 +1689,11 @@
                 <svg lucideCornerDownLeft size="10"></svg> {{ issue.parent.key }}
               </div>
 
-              <div class="card-labels" *ngIf="issue.type && issue.type !== 'TASK'">
-                <span class="type-pill" [ngClass]="issue.type.toLowerCase()">{{ issue.type }}</span>
+              <div class="card-labels" *ngIf="(issue.type && issue.type !== 'TASK') || issue.rejectionReason">
+                <span class="type-pill" *ngIf="issue.type && issue.type !== 'TASK'" [ngClass]="issue.type.toLowerCase()">{{ issue.type }}</span>
+                <span class="type-pill" *ngIf="issue.rejectionReason" style="background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5;" [title]="issue.rejectionReason">
+                  Rejected
+                </span>
               </div>
 
               <div class="card-title">{{ issue.title }}</div>
@@ -1735,25 +1739,24 @@
             </button>
             </div>
           </ng-container>
+        </div>
 
-          <!-- Inline Add Card Template -->
-          <div class="inline-add-card-form" *ngIf="addingCardColumnId() === col.id">
-            <textarea 
-              rows="3" 
-              class="inline-card-input" 
-              placeholder="Enter a title or paste a link" 
-              [ngModel]="inlineCardTitle()"
-              (ngModelChange)="inlineCardTitle.set($event)"
-              (keydown.enter)="$event.preventDefault(); submitInlineCard(col.id)">
-            </textarea>
-            <div class="inline-add-actions">
-              <button type="button" class="btn-add-card-submit" (click)="submitInlineCard(col.id)">Add card</button>
-              <button type="button" class="btn-cancel-inline" (click)="cancelInlineAdd()">
-                <svg lucideX size="20"></svg>
-              </button>
-            </div>
+        <!-- Inline Add Card Template (Now outside scrollable list) -->
+        <div class="inline-add-card-form" *ngIf="addingCardColumnId() === col.id" style="padding: 0 12px 12px 12px;">
+          <textarea 
+            rows="3" 
+            class="inline-card-input" 
+            placeholder="Enter a title or paste a link" 
+            [ngModel]="inlineCardTitle()"
+            (ngModelChange)="inlineCardTitle.set($event)"
+            (keydown.enter)="$event.preventDefault(); submitInlineCard(col.id)">
+          </textarea>
+          <div class="inline-add-actions">
+            <button type="button" class="btn-add-card-submit" (click)="submitInlineCard(col.id)">Add card</button>
+            <button type="button" class="btn-cancel-inline" (click)="cancelInlineAdd()">
+              <svg lucideX size="20"></svg>
+            </button>
           </div>
-
         </div>
 
         <!-- Column Footer (Trigger Inline Add) -->
@@ -1880,6 +1883,18 @@
       <!-- Action Buttons Row -->
       <div class="modal-action-buttons">
 
+        <!-- Review Actions (Only visible to PMs in REVIEW column) -->
+        <ng-container *ngIf="isCurrentUserPM() && getColumnById(selectedIssue()?.columnId)?.type === 'REVIEW'">
+          <button class="modal-action-btn" style="background-color: #ecfdf5; color: #10b981; border: 1px solid #10b981;" (click)="approveIssue(selectedIssue()?.id)">
+            <svg lucideCheck size="14" class="btn-icon-svg"></svg>
+            <span>Approve Task</span>
+          </button>
+          
+          <button class="modal-action-btn" style="background-color: #fef2f2; color: #ef4444; border: 1px solid #ef4444;" (click)="openRejectModal(selectedIssue()?.id)">
+            <svg lucideX size="14" class="btn-icon-svg"></svg>
+            <span>Reject Task</span>
+          </button>
+        </ng-container>
 
         <!-- Priority -->
         <div class="popover-container">
@@ -2904,5 +2919,25 @@
   </div>
   <div style="border-top: 1px solid #dfe1e6; padding: 12px 16px;">
     <button (click)="attFilterAddedBy.set([]); closePopover()" style="background: transparent; border: none; font-size: 14px; font-weight: 600; color: #a1a1aa; cursor: pointer;" [style.color]="attFilterAddedBy().length > 0 ? '#172b4d' : '#a1a1aa'">Clear selection</button>
+  </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal-overlay" *ngIf="isRejectModalOpen()" (click)="closeRejectModal()"></div>
+<div class="trello-modal" *ngIf="isRejectModalOpen()" style="max-width: 500px;">
+  <div class="trello-modal-header" style="background: white; border-bottom: none; padding-bottom: 0;">
+    <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #172b4d; display: flex; align-items: center; gap: 8px;">
+      <svg lucideX size="20" style="color: #dc2626;"></svg> Reject Task
+    </h3>
+    <button class="modal-icon-btn" (click)="closeRejectModal()"><svg lucideX size="18"></svg></button>
+  </div>
+  <div class="trello-modal-body" style="padding-top: 16px;">
+    <p style="margin-top: 0; color: #5e6c84; font-size: 14px;">Please provide a reason for rejecting this task so the assignee knows what to fix.</p>
+    <textarea class="trello-textarea" rows="4" [(ngModel)]="rejectReason" placeholder="e.g. The design does not match the mocks. Please fix the padding." style="width: 100%; resize: none; margin-bottom: 16px;"></textarea>
+    
+    <div style="display: flex; justify-content: flex-end; gap: 12px;">
+      <button class="trello-btn-secondary" (click)="closeRejectModal()">Cancel</button>
+      <button class="trello-btn-primary" style="background: #dc2626;" (click)="confirmRejectIssue()" [disabled]="!rejectReason().trim()">Confirm Reject</button>
+    </div>
   </div>
 </div>

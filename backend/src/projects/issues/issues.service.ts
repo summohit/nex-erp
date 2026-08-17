@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, HttpException, HttpStatus, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpException, HttpStatus, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import axios from 'axios';
 import * as path from 'path';
@@ -35,8 +35,8 @@ export class IssuesService {
 
     if (columnId) {
       const targetCol = await this.prisma.boardColumn.findUnique({ where: { id: Number(columnId) } });
-      if (targetCol && this.isRestrictedColumnName(targetCol.name)) {
-        await this.assertCanCompleteOrArchive(companyId, reporterId, { assigneeId: data.assigneeId ? Number(data.assigneeId) : null });
+      if (targetCol && this.isRestrictedColumn(targetCol)) {
+        await this.assertCanCompleteOrArchive(companyId, reporterId, { projectId, assigneeId: data.assigneeId ? Number(data.assigneeId) : null });
       }
     }
 
@@ -138,12 +138,20 @@ export class IssuesService {
     return chain;
   }
 
-  private isRestrictedColumnName(name: string): boolean {
-    const n = name.toLowerCase();
+  private isRestrictedColumn(col: any): boolean {
+    if (col.type === 'DONE') return true;
+    const n = col.name.toLowerCase();
     return n.includes('done') || n.includes('complete') || n.includes('archive');
   }
 
   private async assertCanCompleteOrArchive(companyId: number, actorEmployeeId: number, issue: any) {
+    if (issue.projectId) {
+      const pm = await this.prisma.projectMember.findFirst({
+        where: { projectId: issue.projectId, employeeId: actorEmployeeId, role: 'PROJECT_MANAGER' }
+      });
+      if (pm) return;
+    }
+
     if (!issue.assigneeId) {
       const subordinateCount = await this.prisma.employee.count({
         where: { companyId, managerId: actorEmployeeId }
@@ -182,7 +190,7 @@ export class IssuesService {
       updateData.columnId = Number(data.columnId);
       const targetCol = await this.prisma.boardColumn.findUnique({ where: { id: updateData.columnId } });
       if (targetCol) {
-        if (this.isRestrictedColumnName(targetCol.name)) {
+        if (this.isRestrictedColumn(targetCol)) {
           isRestrictedTarget = true;
         }
         if (data.status === undefined) {
@@ -795,5 +803,64 @@ export class IssuesService {
     });
 
     return { isCover: newCoverState, coverUrl: updatedIssue.coverUrl, attachmentId };
+  }
+
+  async reviewIssue(companyId: number, actorEmployeeId: number, projectId: number, issueId: number, data: { action: 'APPROVE' | 'REJECT', reason?: string }) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    const pm = await this.prisma.projectMember.findFirst({
+      where: { projectId, employeeId: actorEmployeeId, role: 'PROJECT_MANAGER' }
+    });
+    if (!pm) {
+      throw new ForbiddenException('Only Project Managers can review tasks.');
+    }
+
+    const board = await this.prisma.board.findFirst({
+      where: { projectId },
+      include: { columns: true }
+    });
+    if (!board) throw new BadRequestException('Project board not found');
+
+    let targetColumn;
+    let newStatus = '';
+    
+    if (data.action === 'APPROVE') {
+      targetColumn = board.columns.find((c: any) => c.type === 'DONE');
+      newStatus = 'DONE';
+    } else {
+      targetColumn = board.columns.find((c: any) => c.type === 'IN_PROGRESS');
+      if (!targetColumn) targetColumn = board.columns.find((c: any) => c.type === 'TODO');
+      newStatus = 'IN_PROGRESS';
+    }
+
+    if (!targetColumn) {
+      throw new BadRequestException(`Could not find a target column for ${data.action} action`);
+    }
+
+    const updatedIssue = await this.prisma.issue.update({
+      where: { id: issueId },
+      data: {
+        columnId: targetColumn.id,
+        status: newStatus,
+        rejectionReason: data.action === 'REJECT' ? data.reason : null
+      }
+    });
+
+    const activity = await this.prisma.issueActivity.create({
+      data: {
+        action: data.action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
+        issueId,
+        actorId: actorEmployeeId
+      },
+      include: {
+        actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
+      }
+    });
+
+    this.tasksGateway.emitIssueUpdated(issueId, projectId, updatedIssue);
+    this.tasksGateway.emitActivityAdded(issueId, activity);
+
+    return updatedIssue;
   }
 }

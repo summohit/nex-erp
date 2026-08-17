@@ -49,6 +49,7 @@ export class EmployeeDrawerComponent implements OnInit {
       branchId: [null, Validators.required],
       shiftId: [null, Validators.required],
       managerId: [null],
+      isProjectManager: [false],
       role: ['EMPLOYEE', Validators.required]
     });
   }
@@ -92,6 +93,7 @@ export class EmployeeDrawerComponent implements OnInit {
           branchId: this.employeeData.branchId,
           shiftId: this.employeeData.shiftId,
           managerId: this.employeeData.managerId,
+          isProjectManager: this.employeeData.isProjectManager || false,
           role: this.employeeData.user?.role || 'EMPLOYEE'
         });
         if (this.employeeData.id) {
@@ -99,7 +101,7 @@ export class EmployeeDrawerComponent implements OnInit {
           this.form.get('email')?.disable();
         }
       } else {
-        this.form.reset({ role: 'EMPLOYEE' });
+        this.form.reset({ role: 'EMPLOYEE', isProjectManager: false });
         this.form.get('email')?.enable();
         // Default reporting line: CEO of the organization
         this.employeeService.getCeo().subscribe(ceo => {

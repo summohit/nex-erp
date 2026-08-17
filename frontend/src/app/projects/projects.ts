@@ -10,6 +10,7 @@ import {
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
+import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
 
@@ -28,6 +29,7 @@ import { HotToastService } from '@ngneat/hot-toast';
 export class ProjectsComponent implements OnInit {
   private projectsService = inject(ProjectsService);
   private clientsService = inject(ClientsService);
+  private employeeService = inject(EmployeeService);
   private router = inject(Router);
   private authService = inject(AuthService);
   private toast = inject(HotToastService);
@@ -41,6 +43,7 @@ export class ProjectsComponent implements OnInit {
   projects = signal<any[]>([]);
   archivedProjects = signal<any[]>([]);
   clients = signal<any[]>([]);
+  employees = signal<any[]>([]);
   searchQuery = signal<string>('');
   activeTab = signal<'all' | 'starred' | 'recent' | 'archived'>('all');
   viewMode = signal<'card' | 'table'>('card');
@@ -85,7 +88,8 @@ export class ProjectsComponent implements OnInit {
     billingType: 'NON_BILLABLE',
     budgetAmount: null as number | null,
     hourlyRate: null as number | null,
-    clientId: null as number | null
+    clientId: null as number | null,
+    pmIds: [] as number[]
   };
 
   gradients = [
@@ -139,6 +143,14 @@ export class ProjectsComponent implements OnInit {
     this.loadProjects();
     this.loadArchivedProjects();
     this.loadClients();
+    this.loadEmployees();
+  }
+
+  loadEmployees() {
+    this.employeeService.getEmployees().subscribe({
+      next: (res) => this.employees.set(res || []),
+      error: (err) => console.error('Error loading employees', err)
+    });
   }
 
   loadClients() {
@@ -231,7 +243,8 @@ export class ProjectsComponent implements OnInit {
       billingType: 'NON_BILLABLE',
       budgetAmount: null as number | null,
       hourlyRate: null as number | null,
-      clientId: null as number | null
+      clientId: null as number | null,
+      pmIds: [] as number[]
     };
     this.selectedBg.set(this.colorBackgrounds[1]);
     this.isSubmitted.set(false);
@@ -250,7 +263,8 @@ export class ProjectsComponent implements OnInit {
       billingType: project.billingType || 'NON_BILLABLE',
       budgetAmount: project.budgetAmount,
       hourlyRate: project.hourlyRate,
-      clientId: project.clientId
+      clientId: project.clientId,
+      pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || []
     };
     
     // Set the selected background (match it or use gradient as fallback)

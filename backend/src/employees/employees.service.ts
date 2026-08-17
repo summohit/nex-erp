@@ -211,6 +211,10 @@ export class EmployeesService {
       else updateData.shift = { disconnect: true };
     }
 
+    if (data.isProjectManager !== undefined) {
+      updateData.isProjectManager = Boolean(data.isProjectManager);
+    }
+
     if (data.role) {
       updateData.user = { update: { role: data.role } };
     }

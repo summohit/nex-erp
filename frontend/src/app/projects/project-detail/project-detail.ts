@@ -1571,19 +1571,33 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   isRestrictedColumn(columnId: number | null | undefined): boolean {
-    const col = this.columns().find(c => c.id === columnId);
+    const col = this.getColumnById(columnId);
     if (!col) return false;
+    if (col.type === 'DONE') return true;
     const name = (col.name || '').toLowerCase();
     return name.includes('done') || name.includes('complete') || name.includes('archive');
   }
 
+  getColumnById(columnId: number | null | undefined): any {
+    return this.columns().find(c => c.id === columnId) || null;
+  }
+
   canCompleteIssue(issue: any): boolean {
     if (!issue) return true;
+    
+    const myEmpId = this.currentEmployeeId();
+    if (!myEmpId) return true;
+
+    // Check if the current user is a PM for this project
+    const pmMembers = this.project()?.members?.filter((m: any) => m.role === 'PROJECT_MANAGER');
+    if (pmMembers && pmMembers.some((m: any) => m.employeeId === myEmpId)) {
+      return true; 
+    }
+
     if (issue.assigneeId) {
-      const myEmpId = this.currentEmployeeId();
-      if (!myEmpId) return true;
       return Array.isArray(issue.assigneeApproverIds) && issue.assigneeApproverIds.includes(myEmpId);
     }
+    
     // Unassigned tasks: only managers (employees with subordinates) may complete/archive
     const u = this.currentUser();
     if (u && u.isManager === false) return false;
@@ -1603,28 +1617,44 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   drop(event: CdkDragDrop<any[]>, targetColumnId: number) {
     const issue = event.previousContainer.data[event.previousIndex];
     if (!issue) return;
-
+    
+    let finalTargetColumnId = targetColumnId;
     if (event.previousContainer !== event.container && this.isRestrictedColumn(targetColumnId) && !this.canCompleteIssue(issue)) {
-      this.toast.error('Only the assignee\'s manager (or above) can move this task to Done');
-      return;
+      const reviewCol = this.columns().find(c => c.name.toLowerCase().includes('review'));
+      if (reviewCol) {
+        this.toast.warning('You cannot move to completed, need PM approval. Please upload documents to support this task for review.');
+        finalTargetColumnId = reviewCol.id;
+        
+        // If the item was optimistically moved into targetColumnId in the UI by CdkDragDrop,
+        // it's tricky because the UI dropped it into `event.container`.
+        // The optimistic update handles the UI data model, but CdkDropList might need a reset.
+        // It's safest to just let optimistic update handle it with finalTargetColumnId,
+        // but `event.currentIndex` might be wrong for the new column.
+        // `optimisticallyUpdateIssueColumn` handles inserting it.
+      } else {
+        this.toast.error('Only Project Managers can move a task to Done. Please assign to In Review instead.');
+        return;
+      }
     }
 
     if (event.previousContainer === event.container) {
       const map = new Map(this.issuesByColumn());
-      const colIssues = [...(map.get(targetColumnId) || [])];
+      const colIssues = [...(map.get(finalTargetColumnId) || [])];
       moveItemInArray(colIssues, event.previousIndex, event.currentIndex);
-      map.set(targetColumnId, colIssues);
+      map.set(finalTargetColumnId, colIssues);
       this.issuesByColumn.set(map);
     } else {
       // Instant Optimistic Update
-      this.optimisticallyUpdateIssueColumn(issue.id, targetColumnId, event.currentIndex);
+      // If we bounced to Review, the currentIndex is 0 (top of the column)
+      const insertIndex = (finalTargetColumnId !== targetColumnId) ? 0 : event.currentIndex;
+      this.optimisticallyUpdateIssueColumn(issue.id, finalTargetColumnId, insertIndex);
 
       // Show small loader on card while API call is in flight
       this.setIssueUpdating(issue.id, true);
 
       // Async Backend update
       this.projectsService.updateIssue(this.projectId, issue.id, { 
-        columnId: targetColumnId
+        columnId: finalTargetColumnId
       }).subscribe({
         next: () => {
           this.setIssueUpdating(issue.id, false);
@@ -2444,7 +2474,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       this.toast.error('Only Admins or Project Lead can add members');
       return;
     }
-    this.projectsService.addProjectMember(this.projectId, employee.id).subscribe({
+    const role = employee.isProjectManager ? 'PROJECT_MANAGER' : 'MEMBER';
+    this.projectsService.addProjectMember(this.projectId, employee.id, role).subscribe({
       next: () => {
         this.loadProjectDetails(); // Reload to get updated roles/state from server
         this.toast.success(`${employee.firstName || 'Member'} added to project`);
@@ -2489,6 +2520,67 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     } else {
       this.filterSelectedLabels.set([...current, labelId]);
     }
+  }
+
+  isCurrentUserPM(): boolean {
+    const myEmpId = this.currentEmployeeId();
+    if (!myEmpId) return false;
+    const pmMembers = this.project()?.members?.filter((m: any) => m.role === 'PROJECT_MANAGER');
+    return pmMembers && pmMembers.some((m: any) => m.employeeId === myEmpId);
+  }
+
+  approveIssue(issueId: number) {
+    if (!this.isCurrentUserPM()) {
+      this.toast.error('Only Project Managers can approve tasks.');
+      return;
+    }
+    this.projectsService.reviewIssue(this.projectId, issueId, { action: 'APPROVE' }).subscribe({
+      next: (updatedIssue) => {
+        this.toast.success('Task approved and moved to Done');
+        this.loadBoardAndIssues();
+      },
+      error: (err) => {
+        this.toast.error(err.error?.message || 'Failed to approve task');
+      }
+    });
+  }
+
+  rejectReason = signal<string>('');
+  isRejectModalOpen = signal<boolean>(false);
+  rejectingIssueId = signal<number | null>(null);
+
+  openRejectModal(issueId: number) {
+    if (!this.isCurrentUserPM()) {
+      this.toast.error('Only Project Managers can reject tasks.');
+      return;
+    }
+    this.rejectingIssueId.set(issueId);
+    this.rejectReason.set('');
+    this.isRejectModalOpen.set(true);
+  }
+
+  closeRejectModal() {
+    this.isRejectModalOpen.set(false);
+    this.rejectingIssueId.set(null);
+  }
+
+  confirmRejectIssue() {
+    const id = this.rejectingIssueId();
+    if (!id) return;
+    if (!this.rejectReason().trim()) {
+      this.toast.error('Reason is required to reject a task.');
+      return;
+    }
+    this.projectsService.reviewIssue(this.projectId, id, { action: 'REJECT', reason: this.rejectReason().trim() }).subscribe({
+      next: (updatedIssue) => {
+        this.toast.success('Task rejected and moved back');
+        this.closeRejectModal();
+        this.loadBoardAndIssues();
+      },
+      error: (err) => {
+        this.toast.error(err.error?.message || 'Failed to reject task');
+      }
+    });
   }
 
   get isProjectStarred(): boolean {

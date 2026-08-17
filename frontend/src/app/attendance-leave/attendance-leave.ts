@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -93,6 +94,7 @@ export class AttendanceLeaveComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
   private shiftsService = inject(ShiftsService);
+  private sanitizer = inject(DomSanitizer);
   public authService = inject(AuthService);
   private toast = inject(HotToastService);
   private datePipe = inject(DatePipe);
@@ -182,11 +184,14 @@ export class AttendanceLeaveComponent implements OnInit {
       headerName: 'Action',
       flex: 1,
       cellRenderer: (params: any) => {
-        // Only show if absent, late, or early leave
-        if (params.data.status === 'ABSENT' || params.data.isLate || params.data.isEarlyLeave) {
-          return `<button style="background:none; border:none; color:#3B82F6; cursor:pointer; text-decoration:underline; font-size:12px; padding:0;" onclick="window.dispatchEvent(new CustomEvent('regularize-attendance', {detail: '${params.data.date}'}))">Regularize</button>`;
+        let buttons = '';
+        if (params.data.logs && params.data.logs.length > 0) {
+          buttons += `<button style="background:none; border:none; color:#1E40AF; cursor:pointer; text-decoration:underline; font-size:12px; padding:0; margin-right: 12px;" onclick="window.dispatchEvent(new CustomEvent('view-punches', {detail: '${params.data.date}'}))">View Punches</button>`;
         }
-        return '';
+        if (params.data.status === 'ABSENT' || params.data.isLate || params.data.isEarlyLeave) {
+          buttons += `<button style="background:none; border:none; color:#3B82F6; cursor:pointer; text-decoration:underline; font-size:12px; padding:0;" onclick="window.dispatchEvent(new CustomEvent('regularize-attendance', {detail: '${params.data.date}'}))">Regularize</button>`;
+        }
+        return buttons;
       }
     }
   ];
@@ -852,6 +857,26 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   // Regularization Methods
+  @HostListener('window:view-punches', ['$event'])
+  onViewPunches(event: Event) {
+    const dateStr = (event as CustomEvent).detail; // This is the date string
+    // Find the corresponding day from monthlyGrid or generate a dummy day to pass to openDayDetailsModal
+    const targetDay = this.monthlyGrid().find(d => this.getBackendDateString(d.date) === dateStr);
+    if (targetDay) {
+      this.openDayDetailsModal(targetDay);
+    } else {
+      // Fallback if not in grid
+      const d = new Date(dateStr);
+      this.openDayDetailsModal({
+        date: d,
+        dayNumber: d.getDate(),
+        weekdayStr: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        status: 'Present',
+        isFuture: false
+      } as any);
+    }
+  }
+
   @HostListener('window:regularize-attendance', ['$event'])
   onRegularizeAttendance(event: Event) {
     this.openRegularizationModal((event as CustomEvent).detail);
@@ -1175,6 +1200,20 @@ export class AttendanceLeaveComponent implements OnInit {
   empSearchQuery = signal<string>('');
 
   isDayDetailsModalOpen = signal<boolean>(false);
+  isGpsModalOpen = signal<boolean>(false);
+  gpsModalData = signal<{title: string, lat: number, lng: number} | null>(null);
+
+  openGpsModal(title: string, lat: number, lng: number) {
+    this.gpsModalData.set({ title, lat, lng });
+    this.isGpsModalOpen.set(true);
+  }
+
+  getMapUrl(lat: number | undefined, lng: number | undefined): SafeResourceUrl {
+    if (!lat || !lng) return this.sanitizer.bypassSecurityTrustResourceUrl('');
+    // Use OpenStreetMap via Leaflet or simple embed for coordinates
+    const url = `https://maps.google.com/maps?q=${lat},${lng}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
   selectedDayDetails = signal<any | null>(null);
 
   toggleEmpDropdown() {
@@ -1243,17 +1282,20 @@ export class AttendanceLeaveComponent implements OnInit {
 
     let targetEmpName = 'My Attendance Log';
     let targetEmpDept = 'Employee Profile';
+    let targetAvatarUrl = null;
     if (this.selectedAttendanceEmployeeId()) {
       const emp = this.employees().find(e => e.id === this.selectedAttendanceEmployeeId());
       if (emp) {
         targetEmpName = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
         targetEmpDept = emp.department?.name || 'Department';
+        targetAvatarUrl = emp.avatarUrl;
       }
     } else {
       const currentUser = this.authService.currentUser();
       if (currentUser) {
         targetEmpName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email;
         targetEmpDept = currentUser.role;
+        targetAvatarUrl = currentUser.employee?.avatarUrl || null;
       }
     }
 
@@ -1293,6 +1335,7 @@ export class AttendanceLeaveComponent implements OnInit {
       holiday,
       employeeName: targetEmpName,
       employeeDept: targetEmpDept,
+      employeeAvatarUrl: targetAvatarUrl,
       clockIn12,
       clockOut12,
       durationStr,
