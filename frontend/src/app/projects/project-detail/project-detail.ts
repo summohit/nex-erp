@@ -1628,6 +1628,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       }).subscribe({
         next: () => {
           this.setIssueUpdating(issue.id, false);
+          this.loadBoardAndIssues();
         },
         error: (err) => {
           this.setIssueUpdating(issue.id, false);
@@ -1669,6 +1670,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         next: () => {
           this.setIssueUpdating(issueId, false);
           this.toast.success('Status updated');
+          this.loadBoardAndIssues();
         },
         error: (err) => {
           this.setIssueUpdating(issueId, false);

@@ -168,6 +168,8 @@ export class IssuesService {
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
 
+    const prevStatus = oldIssue.status;
+
     const updateData: any = {};
     if (data.title !== undefined) updateData.title = data.title;
     if (data.description !== undefined) updateData.description = data.description;
@@ -209,6 +211,19 @@ export class IssuesService {
       where: { id: issueId },
       data: updateData
     });
+
+    // Auto time tracking: starting the timer when a task moves into an "In Progress"
+    // column, and stopping it when it leaves progress (e.g. moved to Review or Done).
+    const targetStatus = updateData.status;
+    if (targetStatus === 'IN_PROGRESS' && prevStatus !== 'IN_PROGRESS') {
+      if (!oldIssue.workStartedAt || oldIssue.workCompletedAt) {
+        await this.startTimeTracking(companyId, employeeId, projectId, issueId);
+      }
+    } else if (prevStatus === 'IN_PROGRESS' && targetStatus && targetStatus !== 'IN_PROGRESS') {
+      if (oldIssue.workStartedAt && !oldIssue.workCompletedAt) {
+        await this.stopTimeTracking(companyId, employeeId, projectId, issueId);
+      }
+    }
 
     // Simple activity logging for column change
     if (data.columnId && Number(data.columnId) !== oldIssue.columnId) {
@@ -286,9 +301,9 @@ export class IssuesService {
 
     const now = new Date();
     
-    // Close the latest open time log
+    // Close the latest open time log for the issue (timer is issue-level, not per-user)
     const openLog = await this.prisma.issueTimeLog.findFirst({
-      where: { issueId, employeeId, endedAt: null },
+      where: { issueId, endedAt: null },
       orderBy: { startedAt: 'desc' }
     });
 

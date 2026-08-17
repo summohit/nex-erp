@@ -1942,12 +1942,14 @@ export class AttendanceLeaveComponent implements OnInit {
     );
     
     if (record) {
-      if (record.isLate) return { type: 'late', label: `Late (In: ${new Date(record.clockIn).toLocaleTimeString()})` };
-      if (record.status === 'PRESENT') return { type: 'present', label: `Present (In: ${new Date(record.clockIn).toLocaleTimeString()}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
-      if (record.status === 'HALF_DAY') return { type: 'half-day', label: `Half Day (In: ${record.clockIn ? new Date(record.clockIn).toLocaleTimeString() : 'N/A'}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
-      if (record.status === 'ABSENT') return { type: 'absent', label: 'Absent' };
       if (record.status === 'LEAVE') return { type: 'leave', label: 'On Leave' };
       if (record.isHoliday) return { type: 'holiday', label: 'Holiday' };
+      if (record.status === 'ABSENT') return { type: 'absent', label: 'Absent' };
+      if (record.status === 'HALF_DAY') return { type: 'half-day', label: `Half Day (In: ${record.clockIn ? new Date(record.clockIn).toLocaleTimeString() : 'N/A'}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
+      if (record.status === 'PRESENT') {
+        if (record.isLate) return { type: 'late', label: `Late (In: ${new Date(record.clockIn).toLocaleTimeString()})` };
+        return { type: 'present', label: `Present (In: ${new Date(record.clockIn).toLocaleTimeString()}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
+      }
     }
     return null;
   }

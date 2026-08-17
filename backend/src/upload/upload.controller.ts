@@ -6,6 +6,18 @@ import * as crypto from 'crypto';
 import axios from 'axios';
 import FormData from 'form-data';
 
+const ALLOWED_MIME_TYPES = ['application/pdf'];
+const ALLOWED_EXTENSIONS = ['.pdf'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+function resumeFileFilter(req: any, file: Express.Multer.File, cb: (error: Error | null, accept?: boolean) => void) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!ALLOWED_MIME_TYPES.includes(file.mimetype) && !ALLOWED_EXTENSIONS.includes(ext)) {
+    return cb(new HttpException('Only PDF files are allowed', HttpStatus.BAD_REQUEST), false);
+  }
+  cb(null, true);
+}
+
 @Controller('upload')
 export class UploadController {
   
@@ -17,7 +29,10 @@ export class UploadController {
   }
 
   @Post('resume')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    fileFilter: resumeFileFilter,
+    limits: { fileSize: MAX_FILE_SIZE }
+  }))
   async uploadResume(@UploadedFile() file: Express.Multer.File) {
     return this.processUpload(file, '/resumes');
   }

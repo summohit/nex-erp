@@ -204,7 +204,8 @@
                 </div>
                 <input #fileInput type="file" (change)="onFileSelected($event)" accept=".pdf" style="display: none;">
               </div>
-              <span class="error-text" *ngIf="showValidationErrors() && !candidateForm.resumeUrl">Resume is required</span>
+              <span class="error-text" *ngIf="uploadError()">{{ uploadError() }}</span>
+              <span class="error-text" *ngIf="!uploadError() && showValidationErrors() && !candidateForm.resumeUrl">Resume is required</span>
             </div>
 
             <!-- Dynamic Screening Questions -->

@@ -1192,6 +1192,7 @@ model Issue {
   coverUrl       String?
   position       Int       @default(0) // Sort order within column/backlog
   isArchived     Boolean   @default(false)
+  isLate         Boolean   @default(false) // Set when task passes its due date while still open
 
   // Time Tracking Markers
   workStartedAt   DateTime? // When work actually started
@@ -1219,6 +1220,7 @@ model Issue {
   activities  IssueActivity[]
   timeLogs    IssueTimeLog[] // Detailed time entries if multiple sessions
   checklists  Checklist[]
+  reminders   IssueReminder[] // Sent due-date reminder markers (dedupe)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1227,6 +1229,18 @@ model Issue {
 }
 
 // Support multiple work sessions if a user stops and starts
+// Tracks which due-date reminders have already been sent for an issue (prevents duplicates)
+model IssueReminder {
+  id        Int      @id @default(autoincrement())
+  issueId   Int
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  threshold String   // "DAY_7", "DAY_3", "DAY_2", "DAY_1", "HOUR_4", "HOUR_3", "HOUR_90MIN", "DUE"
+  companyId Int
+  sentAt    DateTime @default(now())
+
+  @@unique([issueId, threshold])
+}
+
 model IssueTimeLog {
   id          Int       @id @default(autoincrement())
   issueId     Int

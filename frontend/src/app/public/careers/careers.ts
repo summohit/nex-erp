@@ -56,6 +56,7 @@ export class CareersComponent implements OnInit {
   selectedJob = signal<PublicJob | null>(null);
   isApplyDrawerOpen = signal(false);
   uploadFileName = signal<string>('');
+  uploadError = signal<string>('');
   isUploading = signal<boolean>(false);
   isSubmitting = signal<boolean>(false);
   isSubmittedSuccess = signal<boolean>(false);
@@ -153,6 +154,23 @@ export class CareersComponent implements OnInit {
     const file = event.target.files[0];
     if (!file) return;
 
+    this.uploadError.set('');
+
+    const allowedTypes = ['application/pdf'];
+    const maxSize = 10 * 1024 * 1024;
+
+    if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.pdf')) {
+      this.uploadError.set('Only PDF files are allowed.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > maxSize) {
+      this.uploadError.set('File size must be under 10MB.');
+      event.target.value = '';
+      return;
+    }
+
     this.isUploading.set(true);
     this.uploadFileName.set(file.name);
 
@@ -165,8 +183,8 @@ export class CareersComponent implements OnInit {
       );
       this.candidateForm.resumeUrl = res.url || res.filename || file.name;
     } catch (err) {
-      console.warn('Backend resume upload fallback, using file name');
-      this.candidateForm.resumeUrl = `/uploads/${file.name}`;
+      this.uploadError.set('Failed to upload file. Please try again.');
+      this.uploadFileName.set('');
     } finally {
       this.isUploading.set(false);
     }

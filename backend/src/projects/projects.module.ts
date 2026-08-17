@@ -8,6 +8,7 @@ import { BoardsController } from './boards/boards.controller';
 import { BoardsService } from './boards/boards.service';
 import { LabelsController } from './labels/labels.controller';
 import { LabelsService } from './labels/labels.service';
+import { IssueRemindersCron } from './issues/issue-reminders.cron';
 
 import { PrismaModule } from '../prisma/prisma.module';
 import { EventsModule } from '../events/events.module';
@@ -16,6 +17,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [PrismaModule, EventsModule, NotificationsModule],
   controllers: [ProjectsController, IssuesController, BoardsController, LabelsController],
-  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService]
+  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, IssueRemindersCron]
 })
 export class ProjectsModule {}
