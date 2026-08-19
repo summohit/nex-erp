@@ -13,6 +13,7 @@ export interface Employee {
   departmentId?: number;
   designationId?: number;
   role: string;
+  isProjectManager?: boolean;
   department?: { name: string };
   designation?: { name: string };
   user?: { email: string, role: string, avatarUrl?: string };

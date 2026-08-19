@@ -171,17 +171,22 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'user.role',
       headerName: 'Role',
-      width: 140,
+      width: 180,
       cellRenderer: (params: any) => {
-        if (!params.value) return '';
-        const roleStr = params.value;
-        let bg = '#F1F5F9'; let color = '#64748B';
-        if (roleStr === 'EMPLOYEE') { bg = '#EFF6FF'; color = '#3B82F6'; }
-        else if (roleStr === 'HR') { bg = '#FCE7F3'; color = '#EC4899'; }
-        else if (roleStr === 'SUPERADMIN' || roleStr === 'ADMIN') { bg = '#F1F5F9'; color = '#64748B'; }
-        else if (roleStr === 'FINANCE') { bg = '#FEF9C3'; color = '#CA8A04'; }
-
-        return `<span style="background: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.2px;">${roleStr}</span>`;
+        let badges = '';
+        if (params.value) {
+          const roleStr = params.value;
+          let bg = '#F1F5F9'; let color = '#64748B';
+          if (roleStr === 'EMPLOYEE') { bg = '#EFF6FF'; color = '#3B82F6'; }
+          else if (roleStr === 'HR') { bg = '#FCE7F3'; color = '#EC4899'; }
+          else if (roleStr === 'SUPERADMIN' || roleStr === 'ADMIN') { bg = '#F1F5F9'; color = '#64748B'; }
+          else if (roleStr === 'FINANCE') { bg = '#FEF9C3'; color = '#CA8A04'; }
+          badges += `<span style="background: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.2px;">${roleStr}</span>`;
+        }
+        if (params.data?.isProjectManager) {
+          badges += ` <span style="background: #EDE9FE; color: #6D28D9; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.2px; border: 1px solid #DDD6FE;">PM</span>`;
+        }
+        return badges;
       }
     },
     {

@@ -10,6 +10,33 @@
     </div>
 
     <div class="top-bar-right">
+      <!-- Project Owner -->
+      <div class="role-avatar-group" *ngIf="projectOwner()">
+        <span class="role-avatar-label">Owner:</span>
+        <div class="user-avatar-bubble cursor-pointer hover:scale-110 transition-transform"
+             [title]="projectOwner()!.firstName + ' ' + projectOwner()!.lastName"
+             (click)="openMemberProfile({employee: projectOwner(), role: 'OWNER'})">
+          <img *ngIf="projectOwner()!.avatarUrl" [src]="projectOwner()!.avatarUrl" class="avatar-img" [alt]="projectOwner()!.firstName">
+          <span *ngIf="!projectOwner()!.avatarUrl">{{ getMemberInitials({employee: projectOwner()}) }}</span>
+        </div>
+      </div>
+
+      <!-- Project Managers -->
+      <div class="role-avatar-group" *ngIf="projectManagers().length > 0">
+        <span class="role-avatar-label">Project Manager:</span>
+        <div class="role-avatar-stack flex items-center -space-x-1">
+          <div class="user-avatar-bubble cursor-pointer hover:scale-110 transition-transform" *ngFor="let pm of projectManagers()"
+               [title]="pm.employee?.firstName + ' ' + pm.employee?.lastName"
+               (click)="openMemberProfile(pm)">
+            <img *ngIf="pm.employee?.avatarUrl" [src]="pm.employee?.avatarUrl" class="avatar-img" [alt]="pm.employee?.firstName">
+            <span *ngIf="!pm.employee?.avatarUrl">{{ getMemberInitials(pm) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Separator between roles and members -->
+      <div class="role-separator" *ngIf="(projectOwner() || projectManagers().length > 0) && (project()?.members?.length || 0) > 0"></div>
+
       <div class="user-avatar-bubble-group flex items-center -space-x-1 relative">
         <div class="user-avatar-bubble cursor-pointer hover:scale-110 transition-transform" *ngFor="let m of project()?.members | slice:0:5" 
              [title]="$any(m).employee?.firstName + ' ' + $any(m).employee?.lastName"

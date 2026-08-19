@@ -76,6 +76,26 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   archivedIssues = computed(() => this.allIssues().filter(i => i.isArchived));
   isLoading = signal<boolean>(true);
 
+  // Owner & Project Manager computed signals
+  projectOwner = computed(() => {
+    const p = this.project();
+    if (!p) return null;
+    // Prefer the lead relation if populated
+    if (p.lead) return p.lead;
+    // Fallback: find owner from members
+    if (p.leadId && p.members) {
+      const ownerMember = p.members.find((m: any) => m.employeeId === p.leadId || m.employee?.id === p.leadId);
+      return ownerMember?.employee || null;
+    }
+    return null;
+  });
+
+  projectManagers = computed(() => {
+    const p = this.project();
+    if (!p || !p.members) return [];
+    return p.members.filter((m: any) => m.role === 'PROJECT_MANAGER');
+  });
+
   // Attachments Tab Filters
   attSearchQuery = signal<string>('');
   attFilterAddedBy = signal<number[]>([]);

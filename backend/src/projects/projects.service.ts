@@ -437,6 +437,9 @@ export class ProjectsService {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId, companyId },
       include: {
+        lead: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } } }
+        },
         members: {
           include: {
             employee: {
