@@ -161,10 +161,66 @@ export class PermissionsComponent implements OnInit {
         dept.defaultRole = newRole;
         this.toast.success(`Role updated for ${dept.name}`);
         this.savingDeptId = null;
+        this.checkDepartmentRoleMismatches(dept, newRole);
       },
       error: () => {
         this.toast.error('Failed to update role');
         this.savingDeptId = null;
+      }
+    });
+  }
+
+  // --- Existing-Employee Role Sync Modal ---
+  isSyncModalOpen = false;
+  syncModalDept: Department | null = null;
+  syncModalNewRole = '';
+  syncModalCandidates: { employeeId: number, firstName: string, lastName: string, email: string, currentRole: string, selected: boolean }[] = [];
+  isSyncing = false;
+
+  private checkDepartmentRoleMismatches(dept: Department, newRole: string) {
+    this.masterDataService.getDepartmentRoleMismatches(dept.id, newRole).subscribe({
+      next: (mismatches) => {
+        if (mismatches.length === 0) return;
+        this.syncModalDept = dept;
+        this.syncModalNewRole = newRole;
+        this.syncModalCandidates = mismatches.map(m => ({ ...m, selected: false }));
+        this.isSyncModalOpen = true;
+      }
+    });
+  }
+
+  toggleSyncCandidate(candidate: { selected: boolean }) {
+    candidate.selected = !candidate.selected;
+  }
+
+  selectAllSyncCandidates(checked: boolean) {
+    this.syncModalCandidates.forEach(c => c.selected = checked);
+  }
+
+  get selectedSyncCount(): number {
+    return this.syncModalCandidates.filter(c => c.selected).length;
+  }
+
+  closeSyncModal() {
+    this.isSyncModalOpen = false;
+    this.syncModalDept = null;
+    this.syncModalCandidates = [];
+  }
+
+  confirmSyncRoles() {
+    const selectedIds = this.syncModalCandidates.filter(c => c.selected).map(c => c.employeeId);
+    if (selectedIds.length === 0 || !this.syncModalDept) return;
+
+    this.isSyncing = true;
+    this.masterDataService.syncDepartmentRoles(this.syncModalDept.id, this.syncModalNewRole, selectedIds).subscribe({
+      next: (res) => {
+        this.toast.success(`Updated ${res.updatedCount} employee(s) to ${this.syncModalNewRole}`);
+        this.isSyncing = false;
+        this.closeSyncModal();
+      },
+      error: () => {
+        this.toast.error('Failed to sync roles');
+        this.isSyncing = false;
       }
     });
   }

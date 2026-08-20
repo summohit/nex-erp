@@ -76,6 +76,48 @@ export class MasterDataController {
     return result;
   }
 
+  @Get('departments/:id/role-mismatches')
+  async getDepartmentRoleMismatches(@Request() req, @Param('id', ParseIntPipe) id: number, @Query('role') role: string) {
+    if (!role) throw new BadRequestException('role query param is required');
+
+    const employees = await this.prisma.employee.findMany({
+      where: { departmentId: id, companyId: req.user.companyId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        user: { select: { id: true, email: true, role: true } }
+      }
+    });
+
+    return employees
+      .filter(e => e.user.role !== role)
+      .map(e => ({ employeeId: e.id, firstName: e.firstName, lastName: e.lastName, email: e.user.email, currentRole: e.user.role }));
+  }
+
+  @Post('departments/:id/sync-roles')
+  async syncDepartmentRoles(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { role: string, employeeIds: number[] }) {
+    if (!data.role || !Array.isArray(data.employeeIds) || data.employeeIds.length === 0) {
+      throw new BadRequestException('role and a non-empty employeeIds array are required');
+    }
+
+    const employees = await this.prisma.employee.findMany({
+      where: { id: { in: data.employeeIds }, departmentId: id, companyId: req.user.companyId },
+      select: { userId: true }
+    });
+
+    if (employees.length === 0) {
+      return { updatedCount: 0 };
+    }
+
+    const result = await this.prisma.user.updateMany({
+      where: { id: { in: employees.map(e => e.userId) } },
+      data: { role: data.role }
+    });
+
+    return { updatedCount: result.count };
+  }
+
   @Delete('departments/:id')
   async deleteDepartment(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.prisma.department.delete({

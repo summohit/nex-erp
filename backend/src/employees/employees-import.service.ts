@@ -61,7 +61,11 @@ export class EmployeesImportService {
 
     // Case-insensitive maps for fast lookup
     const deptMap = new Map<string, number>();
-    departments.forEach(d => deptMap.set(d.name.toLowerCase().trim(), d.id));
+    const deptDefaultRoleMap = new Map<number, string>();
+    departments.forEach(d => {
+      deptMap.set(d.name.toLowerCase().trim(), d.id);
+      if (d.defaultRole) deptDefaultRoleMap.set(d.id, d.defaultRole);
+    });
 
     const desigMap = new Map<string, number>();
     designations.forEach(d => desigMap.set(d.name.toLowerCase().trim(), d.id));
@@ -79,7 +83,7 @@ export class EmployeesImportService {
       const firstName = row['FirstName']?.trim();
       const lastName = row['LastName']?.trim();
       const email = row['Email']?.trim();
-      const role = row['Role']?.trim()?.toUpperCase() || 'EMPLOYEE';
+      const csvRole = row['Role']?.trim()?.toUpperCase() || null;
       const departmentName = row['Department']?.trim();
       const designationName = row['Designation']?.trim();
       const phone = row['Phone']?.trim() || null;
@@ -108,7 +112,7 @@ export class EmployeesImportService {
         designationId = desigMap.get(designationName.toLowerCase())!;
       }
 
-      const finalRole = overrideRole || role;
+      const finalRole = overrideRole || csvRole || (departmentId ? deptDefaultRoleMap.get(departmentId) : null) || 'EMPLOYEE';
 
       try {
         await this.prisma.$transaction(async (prisma) => {

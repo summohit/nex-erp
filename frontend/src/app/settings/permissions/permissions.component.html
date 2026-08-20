@@ -21,7 +21,11 @@
       <h2>Department ➔ Role Mapping</h2>
       <p>When a new employee is assigned to a department, they will automatically inherit its Default Role.</p>
     </div>
-    
+
+    <div class="dept-role-warning">
+      <strong>Heads up:</strong> changing a Default Role here only applies to employees added <em>after</em> the change. It does not update anyone already in that department — edit them individually in the Employee Directory if they need the new role.
+    </div>
+
     <div class="loading-state" *ngIf="isLoadingDepartments">
       <div class="spinner"></div> Loading departments...
     </div>
@@ -131,6 +135,48 @@
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- Sync Existing Employees Modal -->
+<div class="sync-modal-overlay" *ngIf="isSyncModalOpen" (click)="closeSyncModal()">
+  <div class="sync-modal-box" (click)="$event.stopPropagation()">
+    <div class="sync-modal-header">
+      <h2>Update Existing Employees?</h2>
+      <button type="button" class="sync-modal-close" (click)="closeSyncModal()">&times;</button>
+    </div>
+
+    <div class="sync-modal-body">
+      <p class="sync-modal-intro">
+        <strong>{{ syncModalCandidates.length }}</strong> employee(s) already in <strong>{{ syncModalDept?.name }}</strong>
+        have a different role than the new default (<strong>{{ syncModalNewRole }}</strong>). Select who should be updated to match — anyone left unchecked keeps their current role.
+      </p>
+
+      <div class="sync-select-all">
+        <label class="sync-checkbox-row">
+          <input type="checkbox" [checked]="selectedSyncCount === syncModalCandidates.length" (change)="selectAllSyncCandidates($any($event.target).checked)">
+          <span>Select all</span>
+        </label>
+      </div>
+
+      <div class="sync-candidate-list">
+        <label class="sync-checkbox-row sync-candidate" *ngFor="let c of syncModalCandidates">
+          <input type="checkbox" [checked]="c.selected" (change)="toggleSyncCandidate(c)">
+          <div class="sync-candidate-info">
+            <span class="sync-candidate-name">{{ c.firstName }} {{ c.lastName }}</span>
+            <span class="sync-candidate-email">{{ c.email }}</span>
+          </div>
+          <span class="sync-candidate-role">{{ c.currentRole }} <span class="sync-arrow">&rarr;</span> {{ syncModalNewRole }}</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="sync-modal-footer">
+      <button type="button" class="sync-btn-skip" (click)="closeSyncModal()">Skip, keep as-is</button>
+      <button type="button" class="sync-btn-confirm" [disabled]="selectedSyncCount === 0 || isSyncing" (click)="confirmSyncRoles()">
+        {{ isSyncing ? 'Updating...' : 'Update ' + selectedSyncCount + ' Selected' }}
+      </button>
     </div>
   </div>
 </div>

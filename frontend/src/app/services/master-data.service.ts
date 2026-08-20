@@ -84,6 +84,14 @@ export class MasterDataService {
     return this.http.delete(`${this.apiUrl}/departments/${id}`);
   }
 
+  getDepartmentRoleMismatches(id: number, role: string): Observable<{ employeeId: number, firstName: string, lastName: string, email: string, currentRole: string }[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/departments/${id}/role-mismatches`, { params: { role } });
+  }
+
+  syncDepartmentRoles(id: number, role: string, employeeIds: number[]): Observable<{ updatedCount: number }> {
+    return this.http.post<{ updatedCount: number }>(`${this.apiUrl}/departments/${id}/sync-roles`, { role, employeeIds });
+  }
+
   // --- Designations ---
   getDesignations(activeOnly: boolean = false): Observable<Designation[]> {
     const url = activeOnly ? `${this.apiUrl}/designations?activeOnly=true` : `${this.apiUrl}/designations`;
