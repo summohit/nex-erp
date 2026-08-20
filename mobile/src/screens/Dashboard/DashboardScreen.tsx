@@ -232,23 +232,34 @@ export default function DashboardScreen() {
           <Menu size={22} color="#0F172A" />
         </TouchableOpacity>
 
-        <View style={styles.headerCenter}>
-          <Text style={styles.greetingText}>{greeting}</Text>
-          <Text style={styles.nameText}>{displayName}</Text>
-        </View>
+        {isLoading && !refreshing ? (
+          <View style={styles.headerCenter}>
+            <PulseSkeleton style={{ width: 80, height: 10, borderRadius: 4, marginBottom: 6 }} />
+            <PulseSkeleton style={{ width: 140, height: 18, borderRadius: 6 }} />
+          </View>
+        ) : (
+          <View style={styles.headerCenter}>
+            <Text style={styles.greetingText}>{greeting}</Text>
+            <Text style={styles.nameText}>{displayName}</Text>
+          </View>
+        )}
         
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
             <Bell size={20} color="#0F172A" />
             {unreadCount > 0 && <View style={styles.notificationDot} />}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.avatarButton} onPress={logout} activeOpacity={0.8}>
-            {profile?.avatarUrl ? (
-              <Image source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
-            ) : (
-              <Text style={styles.avatarText}>{getInitials(profile?.firstName, profile?.lastName, user?.email)}</Text>
-            )}
-          </TouchableOpacity>
+          {isLoading && !refreshing ? (
+            <PulseSkeleton style={{ width: 44, height: 44, borderRadius: 14 }} />
+          ) : (
+            <TouchableOpacity style={styles.avatarButton} onPress={logout} activeOpacity={0.8}>
+              {profile?.avatarUrl ? (
+                <Image source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+              ) : (
+                <Text style={styles.avatarText}>{getInitials(profile?.firstName, profile?.lastName, user?.email)}</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

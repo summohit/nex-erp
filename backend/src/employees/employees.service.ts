@@ -14,7 +14,16 @@ export class EmployeesService {
     private mailService: MailService
   ) {}
 
-  async findAll(companyId: number) {
+  private async assertDirectoryAccess(companyId: number, role: string) {
+    if (role === 'SUPERADMIN') return;
+    const hasAccess = await this.permissions.hasPermission(companyId, role, 'employees/directory', 'VIEW');
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have permission to view the employee directory.');
+    }
+  }
+
+  async findAll(companyId: number, role: string) {
+    await this.assertDirectoryAccess(companyId, role);
     return this.prisma.employee.findMany({
       where: { companyId },
       include: {
@@ -27,6 +36,24 @@ export class EmployeesService {
       },
       orderBy: { createdAt: 'desc' }
     });
+  }
+
+  async getHeadcountSummary(companyId: number) {
+    const employees = await this.prisma.employee.findMany({
+      where: { companyId },
+      select: { department: { select: { name: true } } }
+    });
+
+    const map = new Map<string, number>();
+    for (const emp of employees) {
+      const dept = emp.department?.name || 'Unassigned';
+      map.set(dept, (map.get(dept) || 0) + 1);
+    }
+
+    return {
+      total: employees.length,
+      byDepartment: Array.from(map.entries()).map(([name, count]) => ({ name, count }))
+    };
   }
 
   async findCeo(companyId: number) {
@@ -61,7 +88,8 @@ export class EmployeesService {
     return founder?.employee || null;
   }
 
-  async getOrgChart(companyId: number) {
+  async getOrgChart(companyId: number, role: string) {
+    await this.assertDirectoryAccess(companyId, role);
     const employees = await this.prisma.employee.findMany({
       where: { companyId },
       select: {
@@ -76,6 +104,31 @@ export class EmployeesService {
     });
 
     return employees;
+  }
+
+  async generateEmployeeCode(prisma: any, companyId: number, employmentCategory: string): Promise<string> {
+    const prefix = employmentCategory === 'TRAINEE' ? 'T' : employmentCategory === 'CONTRACT' ? 'C' : '';
+    const defaultWidth = prefix === 'C' ? 3 : prefix === 'T' ? 4 : 5;
+
+    const existing = await prisma.employee.findMany({
+      where: { companyId, employeeCode: { startsWith: prefix || undefined, not: null } },
+      select: { employeeCode: true }
+    });
+
+    let maxNumber = 0;
+    let maxWidth = defaultWidth;
+    for (const e of existing) {
+      const suffix = prefix ? e.employeeCode.slice(prefix.length) : e.employeeCode;
+      if (!/^\d+$/.test(suffix)) continue;
+      const num = parseInt(suffix, 10);
+      if (num > maxNumber) {
+        maxNumber = num;
+        maxWidth = suffix.length;
+      }
+    }
+
+    const nextNumber = (maxNumber + 1).toString().padStart(maxWidth, '0');
+    return `${prefix}${nextNumber}`;
   }
 
   async create(companyId: number, data: any) {
@@ -112,6 +165,8 @@ export class EmployeesService {
       managerId = ceo?.id ?? null;
     }
 
+    const employmentCategory = data.employmentCategory || 'PERMANENT';
+
     // 4. Create User and Employee in one transaction
     return this.prisma.$transaction(async (prisma) => {
       const newUser = await prisma.user.create({
@@ -122,6 +177,8 @@ export class EmployeesService {
           companyId: companyId
         }
       });
+
+      const employeeCode = await this.generateEmployeeCode(prisma, companyId, employmentCategory);
 
       const newEmployee = await prisma.employee.create({
         data: {
@@ -135,7 +192,9 @@ export class EmployeesService {
           shiftId: data.shiftId ? (typeof data.shiftId === 'string' ? parseInt(data.shiftId, 10) : data.shiftId) : null,
           companyId: companyId,
           userId: newUser.id,
-          onboardingStatus: 'PENDING'
+          onboardingStatus: 'PENDING',
+          employeeCode,
+          employmentCategory
         },
         include: {
           user: { select: { email: true, role: true } },
@@ -278,7 +337,7 @@ export class EmployeesService {
     return { ...employee, isOwner: true };
   }
 
-  async getProfile(id: number, companyId: number, currentUserId: number) {
+  async getProfile(id: number, companyId: number, currentUserId: number, role: string) {
     const employee = await this.prisma.employee.findFirst({
       where: { id, companyId },
       include: {
@@ -297,6 +356,9 @@ export class EmployeesService {
     if (!employee) throw new NotFoundException('Employee not found');
 
     const isOwner = employee.userId === currentUserId;
+    if (!isOwner) {
+      await this.assertDirectoryAccess(companyId, role);
+    }
 
     // Filter documents if not owner
     if (!isOwner) {
@@ -500,5 +562,43 @@ export class EmployeesService {
     return this.prisma.employeeDocument.delete({
       where: { id: documentId }
     });
+  }
+
+  async sendWelcomeEmails(companyId: number, employeeIds: number[]) {
+    const result = { successCount: 0, failedCount: 0, errors: [] as { employeeId: number; reason: string }[] };
+
+    const employees = await this.prisma.employee.findMany({
+      where: { id: { in: employeeIds }, companyId },
+      include: { user: { select: { id: true, email: true, status: true } } }
+    });
+    const foundIds = new Set(employees.map(e => e.id));
+
+    for (const employeeId of employeeIds) {
+      if (!foundIds.has(employeeId)) {
+        result.failedCount++;
+        result.errors.push({ employeeId, reason: 'Employee not found' });
+        continue;
+      }
+    }
+
+    for (const employee of employees) {
+      try {
+        const tempPassword = crypto.randomBytes(9).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 12);
+        const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+        await this.prisma.user.update({
+          where: { id: employee.user.id },
+          data: { password: passwordHash, status: 'ACTIVE' }
+        });
+
+        await this.mailService.sendCredentialsEmail(employee.user.email, tempPassword);
+        result.successCount++;
+      } catch (err) {
+        result.failedCount++;
+        result.errors.push({ employeeId: employee.id, reason: err.message || 'Failed to send email' });
+      }
+    }
+
+    return result;
   }
 }

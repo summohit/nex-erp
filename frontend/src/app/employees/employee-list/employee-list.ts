@@ -12,13 +12,14 @@ import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
 import { EmployeeDrawerComponent } from '../employee-drawer/employee-drawer';
 import { BulkUploadModalComponent } from '../components/bulk-upload-modal/bulk-upload-modal';
+import { SearchableSelectComponent } from '../../shared/components/searchable-select/searchable-select.component';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 @Component({
   selector: 'app-employee-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucidePlus, LucideSearch, LucideX, LucideChevronRight, AgGridAngular, EmployeeDrawerComponent, BulkUploadModalComponent],
+  imports: [CommonModule, FormsModule, LucidePlus, LucideSearch, LucideX, LucideChevronRight, AgGridAngular, EmployeeDrawerComponent, BulkUploadModalComponent, SearchableSelectComponent],
   templateUrl: './employee-list.html',
   styleUrls: ['./employee-list.css']
 })
@@ -33,7 +34,22 @@ export class EmployeeListComponent implements OnInit {
   isLoading = signal<boolean>(true);
   departments = signal<Department[]>([]);
   designations = signal<Designation[]>([]);
-  
+
+  departmentOptions = computed(() => this.departments().map(d => ({ id: d.id, name: d.name })));
+  designationOptions = computed(() => this.designations().map(d => ({ id: d.id, name: d.name })));
+  roleOptions = [
+    { id: 'ADMIN', name: 'Admin' },
+    { id: 'HR', name: 'HR' },
+    { id: 'FINANCE', name: 'Finance' },
+    { id: 'EMPLOYEE', name: 'Employee' },
+    { id: 'OFFICE_STAFF', name: 'Office Staff' }
+  ];
+  onboardingStatusOptions = [
+    { id: 'PENDING', name: 'Pending' },
+    { id: 'IN_PROGRESS', name: 'In Progress' },
+    { id: 'COMPLETED', name: 'Completed' }
+  ];
+
   isDrawerOpen = false;
   isBulkUploadOpen = false;
   selectedEmployee: Employee | null = null;
@@ -156,8 +172,14 @@ export class EmployeeListComponent implements OnInit {
         `;
       }
     },
-    { 
-      field: 'department.name', 
+    {
+      field: 'employeeCode',
+      headerName: 'Employee ID',
+      width: 130,
+      valueFormatter: (params) => params.value || '—'
+    },
+    {
+      field: 'department.name',
       headerName: 'Department',
       flex: 1.2,
       valueFormatter: (params) => params.value || 'Unassigned'
@@ -187,6 +209,25 @@ export class EmployeeListComponent implements OnInit {
           badges += ` <span style="background: #EDE9FE; color: #6D28D9; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.2px; border: 1px solid #DDD6FE;">PM</span>`;
         }
         return badges;
+      }
+    },
+    {
+      field: 'user.status',
+      headerName: 'Status',
+      width: 140,
+      cellRenderer: (params: any) => {
+        if (!params.value) return '';
+        const statusStr = params.value;
+        let color = '#64748B'; let bg = '#F1F5F9'; let label = statusStr;
+        if (statusStr === 'ACTIVE') {
+          color = '#16A34A'; bg = '#DCFCE7'; label = 'Active';
+        } else if (statusStr === 'PENDING_VERIFICATION') {
+          color = '#CA8A04'; bg = '#FEF9C3'; label = 'Pending Verification';
+        } else if (statusStr === 'SUSPENDED' || statusStr === 'INACTIVE' || statusStr === 'BLOCKED') {
+          color = '#DC2626'; bg = '#FEE2E2'; label = 'Deactivated';
+        }
+
+        return `<span style="background: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;">${label}</span>`;
       }
     },
     {

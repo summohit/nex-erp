@@ -80,4 +80,23 @@ export class CrmService {
       where: { id: leadId },
     });
   }
+
+  async getDashboardSummary(companyId: number) {
+    const [byStatus, recentLeads] = await Promise.all([
+      this.prisma.lead.groupBy({
+        by: ['status'],
+        where: { companyId },
+        _count: true,
+        _sum: { value: true }
+      }),
+      this.prisma.lead.findMany({
+        where: { companyId },
+        select: { id: true, companyName: true, contactName: true, status: true, value: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      })
+    ]);
+
+    return { byStatus, recentLeads };
+  }
 }

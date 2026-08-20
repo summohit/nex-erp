@@ -1,0 +1,18 @@
+<div class="searchable-select" [class.open]="isOpen">
+  <button type="button" class="select-trigger form-control" (click)="toggle()">
+    <span [class.placeholder]="isPlaceholder">{{ selectedLabel }}</span>
+    <svg lucideChevronDown size="16"></svg>
+  </button>
+
+  <div class="select-dropdown" *ngIf="isOpen">
+    <div class="select-search">
+      <svg lucideSearch size="14"></svg>
+      <input type="text" [(ngModel)]="searchText" placeholder="Search..." autocomplete="off">
+    </div>
+    <div class="select-options">
+      <div class="select-option" [class.active]="isPlaceholder" (click)="select(null)">{{ placeholder }}</div>
+      <div class="select-option" *ngFor="let opt of filteredOptions" [class.active]="opt.id === value" (click)="select(opt)">{{ opt.name }}</div>
+      <div class="select-empty" *ngIf="filteredOptions.length === 0">No matches</div>
+    </div>
+  </div>
+</div>

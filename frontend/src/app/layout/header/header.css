@@ -575,3 +575,124 @@
 .logout-btn:hover {
   background: #fef2f2;
 }
+
+button.menu-link {
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Change Password Modal */
+.header-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-modal-box {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  margin: 16px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
+}
+
+.header-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.header-modal-header h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.header-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header-modal-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.header-modal-field .compound-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.header-modal-field .form-control {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.header-modal-field .icon-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.header-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.header-modal-footer .btn-discard {
+  background: #f1f5f9;
+  border: none;
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.header-modal-footer .btn-primary-purple {
+  background: #7c3aed;
+  border: none;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.header-modal-footer .btn-primary-purple:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { EmployeeService } from '../../../services/employee.service';
 import { ProjectsService } from '../../../services/projects';
-import { 
+import { MenusService } from '../../../services/menus.service';
+import {
   LucideSearch, LucideArrowRight
 } from '@lucide/angular';
 
@@ -15,6 +16,8 @@ export interface SearchResultItem {
   subtitle?: string;
   iconName: string;
   action: () => void;
+  /** Permission module key (or prefix) required to show this item. Omit for always-visible items. */
+  requiresModule?: string;
 }
 
 @Component({
@@ -32,6 +35,7 @@ export class SpotlightSearchComponent {
   private router = inject(Router);
   private employeeService = inject(EmployeeService);
   private projectsService = inject(ProjectsService);
+  private menusService = inject(MenusService);
 
   @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
 
@@ -41,33 +45,66 @@ export class SpotlightSearchComponent {
 
   employeesList = signal<any[]>([]);
   projectsList = signal<any[]>([]);
+  private allowedModules = new Set<string>();
 
-  // Navigation Items
-  private navItems: SearchResultItem[] = [
+  // Navigation Items. `requiresModule` gates visibility against the user's actual sidebar permissions.
+  private allNavItems: SearchResultItem[] = [
     { id: 'nav-dash', category: 'Navigation', title: 'Dashboard', subtitle: 'Executive overview & quick stats', iconName: 'layers', action: () => this.navigate('/dashboard') },
-    { id: 'nav-emp', category: 'Navigation', title: 'Employee Directory', subtitle: 'View all staff and team profiles', iconName: 'user', action: () => this.navigate('/employees/directory') },
-    { id: 'nav-org', category: 'Navigation', title: 'Organization Chart', subtitle: 'Interactive visual org hierarchy', iconName: 'building', action: () => this.navigate('/employees/org-chart') },
-    { id: 'nav-docs', category: 'Navigation', title: 'Employee Documents Center', subtitle: 'Company policies & verification files', iconName: 'file-text', action: () => this.navigate('/employees/documents') },
-    { id: 'nav-att', category: 'Navigation', title: 'Attendance & Leave Management', subtitle: 'Clock-in logs & leave requests', iconName: 'calendar', action: () => this.navigate('/attendance') },
-    { id: 'nav-prj', category: 'Navigation', title: 'Projects & Kanban Board', subtitle: 'Jira-style task management', iconName: 'briefcase', action: () => this.navigate('/projects') },
-    { id: 'nav-pay', category: 'Navigation', title: 'Payroll & Compensation', subtitle: 'Salary slips & salary structures', iconName: 'dollar-sign', action: () => this.navigate('/payroll') },
-    { id: 'nav-ast', category: 'Navigation', title: 'Asset Management', subtitle: 'Company hardware & laptops', iconName: 'briefcase', action: () => this.navigate('/assets') },
-    { id: 'nav-awa', category: 'Navigation', title: 'Appreciation & Awards', subtitle: 'Employee recognition badges', iconName: 'award', action: () => this.navigate('/appreciation') },
-    { id: 'nav-master', category: 'Settings', title: 'Master Data Settings', subtitle: 'Manage Branches, Departments & Designations', iconName: 'settings', action: () => this.navigate('/settings/master-data') },
-    { id: 'nav-perm', category: 'Settings', title: 'Roles & Permissions', subtitle: 'RBAC module access matrix', iconName: 'shield-check', action: () => this.navigate('/settings/permissions') },
+    { id: 'nav-emp', category: 'Navigation', title: 'Employee Directory', subtitle: 'View all staff and team profiles', iconName: 'user', action: () => this.navigate('/employees/directory'), requiresModule: 'employees/directory' },
+    { id: 'nav-org', category: 'Navigation', title: 'Organization Chart', subtitle: 'Interactive visual org hierarchy', iconName: 'building', action: () => this.navigate('/employees/org-chart'), requiresModule: 'employees/org-chart' },
+    { id: 'nav-docs', category: 'Navigation', title: 'Employee Documents Center', subtitle: 'Company policies & verification files', iconName: 'file-text', action: () => this.navigate('/employees/documents'), requiresModule: 'employees/documents' },
+    { id: 'nav-att', category: 'Navigation', title: 'Attendance & Leave Management', subtitle: 'Clock-in logs & leave requests', iconName: 'calendar', action: () => this.navigate('/attendance'), requiresModule: 'attendance/' },
+    { id: 'nav-prj', category: 'Navigation', title: 'Projects & Kanban Board', subtitle: 'Jira-style task management', iconName: 'briefcase', action: () => this.navigate('/projects'), requiresModule: 'projects' },
+    { id: 'nav-pay', category: 'Navigation', title: 'Payroll & Compensation', subtitle: 'Salary slips & salary structures', iconName: 'dollar-sign', action: () => this.navigate('/payroll'), requiresModule: 'payroll/' },
+    { id: 'nav-ast', category: 'Navigation', title: 'Asset Management', subtitle: 'Company hardware & laptops', iconName: 'briefcase', action: () => this.navigate('/assets'), requiresModule: 'assets/' },
+    { id: 'nav-awa', category: 'Navigation', title: 'Appreciation & Awards', subtitle: 'Employee recognition badges', iconName: 'award', action: () => this.navigate('/appreciation'), requiresModule: 'appreciation' },
+    { id: 'nav-master', category: 'Settings', title: 'Master Data Settings', subtitle: 'Manage Branches, Departments & Designations', iconName: 'settings', action: () => this.navigate('/settings/master-data'), requiresModule: 'settings/master-data' },
+    { id: 'nav-perm', category: 'Settings', title: 'Roles & Permissions', subtitle: 'RBAC module access matrix', iconName: 'shield-check', action: () => this.navigate('/settings/permissions'), requiresModule: 'settings/permissions' },
   ];
+
+  get navItems(): SearchResultItem[] {
+    return this.allNavItems.filter(item => {
+      if (!item.requiresModule) return true;
+      if (item.requiresModule.endsWith('/')) {
+        return [...this.allowedModules].some(m => m.startsWith(item.requiresModule!));
+      }
+      return this.allowedModules.has(item.requiresModule);
+    });
+  }
 
   constructor() {
     this.loadData();
   }
 
   private loadData() {
-    this.employeeService.getEmployees().subscribe({
-      next: (res: any) => this.employeesList.set(res.data || res || [])
-    });
+    this.menusService.getSidebarMenus().subscribe({
+      next: (sections: any[]) => {
+        const ids = new Set<string>();
+        for (const section of sections || []) {
+          for (const item of section.items || []) {
+            ids.add(item.id);
+            for (const sub of item.subItems || []) {
+              ids.add(sub.id);
+            }
+          }
+        }
+        this.allowedModules = ids;
 
-    this.projectsService.getProjects().subscribe({
-      next: (res: any) => this.projectsList.set(res.data || res || [])
+        // Only fetch the full employee/project lists once we know the user is allowed to see them
+        if (this.allowedModules.has('employees/directory')) {
+          this.employeeService.getEmployees().subscribe({
+            next: (res: any) => this.employeesList.set(res.data || res || []),
+            error: () => this.employeesList.set([])
+          });
+        }
+        if (this.allowedModules.has('projects')) {
+          this.projectsService.getProjects().subscribe({
+            next: (res: any) => this.projectsList.set(res.data || res || []),
+            error: () => this.projectsList.set([])
+          });
+        }
+      },
+      error: () => { this.allowedModules = new Set<string>(); }
     });
   }
 

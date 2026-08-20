@@ -183,7 +183,7 @@ export class AuthService {
     }
     
     if (user.status === 'SUSPENDED' || user.status === 'INACTIVE' || user.status === 'BLOCKED') {
-      throw new UnauthorizedException('Account is blocked connect administration');
+      throw new UnauthorizedException('Your account has been deactivated. Please contact your administrator.');
     }
 
     const payload = { 

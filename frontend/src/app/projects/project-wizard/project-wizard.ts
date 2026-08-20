@@ -127,7 +127,7 @@ export class ProjectWizardComponent implements OnInit {
     daysOff: { Saturday: true, Sunday: true, Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false } as Record<string, boolean>,
     startDate: new Date().toISOString().split('T')[0],
     endDate: null as string | null,
-    aiModel: 'llama-3.3-70b-versatile'
+    aiModel: 'openai/gpt-oss-120b'
   });
 
   getPhaseBadgeClass(phase?: string): string {

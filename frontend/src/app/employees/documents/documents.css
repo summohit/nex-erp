@@ -278,6 +278,12 @@
   color: #ffffff;
 }
 
+button.btn-view-doc {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
 /* Buttons */
 .btn-primary {
   display: inline-flex;

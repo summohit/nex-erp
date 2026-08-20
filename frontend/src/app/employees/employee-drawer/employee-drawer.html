@@ -104,6 +104,21 @@
           </select>
         </div>
 
+        <div class="form-group" *ngIf="!employeeData">
+          <label>Employment Category <span class="required">*</span></label>
+          <select class="form-control" formControlName="employmentCategory">
+            <option value="PERMANENT">Permanent</option>
+            <option value="TRAINEE">Trainee</option>
+            <option value="CONTRACT">Contract</option>
+          </select>
+          <small class="help-text">Determines the Employee ID format (e.g. T-prefix for trainees)</small>
+        </div>
+
+        <div class="form-group" *ngIf="employeeData">
+          <label>Employee ID</label>
+          <input type="text" class="form-control" [value]="employeeData.employeeCode || 'Not assigned'" disabled>
+        </div>
+
         <div class="form-group full-width">
           <label>System Role <span class="required">*</span></label>
           <select class="form-control" formControlName="role">

@@ -20,80 +20,78 @@ import ESSScreen from '../screens/ESS/ESSScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Custom Floating Pill Bottom Tab Bar
+// Custom Sleek Modern Bottom Tab Bar
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const bottomMargin = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : insets.bottom || 12;
+  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 8) : insets.bottom || 8;
 
   return (
-    <View style={[styles.floatingTabBarContainer, { bottom: bottomMargin }]}>
-      <View style={styles.floatingTabBar}>
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const isFocused = state.index === index;
+    <View style={[styles.bottomTabBar, { paddingBottom: bottomPadding }]}>
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const isFocused = state.index === index;
 
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
 
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
-
-          let Icon = Home;
-          let label = route.name;
-
-          if (route.name === 'Home') {
-            Icon = Home;
-            label = 'Home';
-          } else if (route.name === 'Attendance') {
-            Icon = Clock;
-            label = 'Attendance';
-          } else if (route.name === 'Projects') {
-            Icon = Briefcase;
-            label = 'Projects';
-          } else if (route.name === 'Leaves') {
-            Icon = Calendar;
-            label = 'Leaves';
-          } else if (route.name === 'Profile') {
-            Icon = UserCircle;
-            label = 'Profile';
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
           }
+        };
 
-          return (
-            <TouchableOpacity
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarButtonTestID}
-              onPress={onPress}
-              activeOpacity={0.8}
+        let Icon = Home;
+        let label = route.name;
+
+        if (route.name === 'Home') {
+          Icon = Home;
+          label = 'Home';
+        } else if (route.name === 'Attendance') {
+          Icon = Clock;
+          label = 'Attendance';
+        } else if (route.name === 'Projects') {
+          Icon = Briefcase;
+          label = 'Projects';
+        } else if (route.name === 'Leaves') {
+          Icon = Calendar;
+          label = 'Leaves';
+        } else if (route.name === 'Profile') {
+          Icon = UserCircle;
+          label = 'Profile';
+        }
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={options.tabBarAccessibilityLabel}
+            testID={options.tabBarButtonTestID}
+            onPress={onPress}
+            activeOpacity={0.7}
+            style={styles.tabItem}
+          >
+            <View style={[styles.iconWrapper, isFocused && styles.iconWrapperActive]}>
+              <Icon
+                size={21}
+                color={isFocused ? '#E25E3E' : '#64748B'}
+                strokeWidth={isFocused ? 2.3 : 1.8}
+              />
+            </View>
+            <Text
               style={[
-                styles.tabItem,
-                isFocused && styles.tabItemActive,
+                styles.tabLabel,
+                isFocused ? styles.tabLabelActive : styles.tabLabelInactive,
               ]}
             >
-              <Icon
-                size={20}
-                color={isFocused ? '#E25E3E' : '#94A3B8'}
-              />
-              <Text
-                style={[
-                  styles.tabLabel,
-                  isFocused ? styles.tabLabelActive : styles.tabLabelInactive,
-                ]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
@@ -107,10 +105,18 @@ function MainTabNavigator() {
       }}
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
-      <Tab.Screen name="Attendance" component={CRMScreen} />
+      <Tab.Screen 
+        name="Attendance" 
+        component={ESSScreen} 
+        initialParams={{ initialTab: 'timesheets' }} 
+      />
       <Tab.Screen name="Projects" component={ProjectsScreen} />
-      <Tab.Screen name="Leaves" component={ESSScreen} />
-      <Tab.Screen name="Profile" component={ESSScreen} />
+      <Tab.Screen 
+        name="Leaves" 
+        component={ESSScreen} 
+        initialParams={{ initialTab: 'leaves' }} 
+      />
+      <Tab.Screen name="Profile" component={CRMScreen} />
     </Tab.Navigator>
   );
 }
@@ -147,46 +153,42 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  floatingTabBarContainer: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  floatingTabBar: {
+  bottomTabBar: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 32,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 8,
+    paddingHorizontal: 8,
     width: '100%',
     justifyContent: 'space-around',
     alignItems: 'center',
-    shadowColor: '#94A3B8',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 8,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 26,
-    marginHorizontal: 2,
+    paddingVertical: 3,
   },
-  tabItemActive: {
+  iconWrapper: {
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  iconWrapperActive: {
     backgroundColor: '#FFF1EC',
-    paddingVertical: 12,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 3,
+    fontSize: 11,
+    fontWeight: '500',
     letterSpacing: 0.1,
   },
   tabLabelActive: {
@@ -194,7 +196,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   tabLabelInactive: {
-    color: '#94A3B8',
+    color: '#64748B',
   },
 });
 

@@ -11,6 +11,7 @@
   width: 260px;
   background-color: #fff;
   border-right: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -115,15 +116,29 @@
 }
 
 .btn-collapse {
-  background: none;
+  background: var(--bg-alt);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 4px;
+  border-radius: var(--radius-full);
+  width: 28px;
+  height: 28px;
+  padding: 0;
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-collapse:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn-collapse:active {
+  transform: scale(0.92);
 }
 
 .sidebar-scroll {
@@ -193,8 +208,13 @@
 .sidebar.collapsed .nav-section-title,
 .sidebar.collapsed .chevron-icon,
 .sidebar.collapsed .sub-nav,
-.sidebar.collapsed .workspace-info {
+.sidebar.collapsed .workspace-info,
+.sidebar.collapsed .active-indicator {
   display: none !important;
+}
+
+.sidebar.collapsed .nav-item-content {
+  justify-content: center;
 }
 
 .nav-item-content {
@@ -208,10 +228,17 @@
   font-size: 8px;
   font-weight: 800;
   text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
   letter-spacing: 0.5px;
   margin-left: auto;
+  flex-shrink: 0;
+}
+
+.nav-item.active .module-status-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-color: transparent;
 }
 
 .badge-done {
@@ -235,18 +262,33 @@
   color: var(--text-dark);
 }
 
+.nav-item:hover .nav-icon {
+  color: var(--color-primary);
+}
+
 .nav-item.active {
   background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 4px 10px -2px var(--color-primary-light);
+}
+
+.nav-item.active .nav-icon {
   color: #fff;
 }
 
 .nav-item.expanded {
-  background: #F8FAFC;
+  background: var(--bg-alt);
   color: var(--text-dark);
 }
 
 .nav-icon {
   flex-shrink: 0;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.sidebar.collapsed .nav-item.active {
+  box-shadow: 0 4px 10px -2px var(--color-primary-light);
 }
 
 .chevron-icon {
@@ -336,12 +378,22 @@
 /* Sidebar Footer */
 .sidebar-footer {
   margin-top: auto;
-  padding-top: var(--space-md);
+  padding: var(--space-md) var(--space-xs) 1rem;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding-bottom: 1rem;
+}
+
+.user-profile-btn {
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  margin: 0 -8px;
+  transition: background 0.2s ease;
+}
+
+.user-profile-btn:hover {
+  background: var(--surface-hover);
 }
 
 .user-avatar {

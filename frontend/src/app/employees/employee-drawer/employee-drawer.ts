@@ -50,7 +50,8 @@ export class EmployeeDrawerComponent implements OnInit {
       shiftId: [null, Validators.required],
       managerId: [null],
       isProjectManager: [false],
-      role: ['EMPLOYEE', Validators.required]
+      role: ['EMPLOYEE', Validators.required],
+      employmentCategory: ['PERMANENT', Validators.required]
     });
   }
 
@@ -70,6 +71,17 @@ export class EmployeeDrawerComponent implements OnInit {
         this.form.patchValue({ designationId: null });
       }
     });
+
+    this.form.get('designationId')?.valueChanges.subscribe(designationId => {
+      if (this.isProjectManagerDesignation(designationId)) {
+        this.form.patchValue({ isProjectManager: true });
+      }
+    });
+  }
+
+  isProjectManagerDesignation(designationId: number | null): boolean {
+    const designation = this.designations.find(d => d.id === designationId);
+    return !!designation && designation.name.toLowerCase().includes('project manager');
   }
 
   ngOnChanges() {
@@ -93,16 +105,20 @@ export class EmployeeDrawerComponent implements OnInit {
           branchId: this.employeeData.branchId,
           shiftId: this.employeeData.shiftId,
           managerId: this.employeeData.managerId,
-          isProjectManager: this.employeeData.isProjectManager || false,
-          role: this.employeeData.user?.role || 'EMPLOYEE'
+          isProjectManager: this.employeeData.isProjectManager || this.isProjectManagerDesignation(this.employeeData.designationId),
+          role: this.employeeData.user?.role || 'EMPLOYEE',
+          employmentCategory: this.employeeData.employmentCategory || 'PERMANENT'
         });
         if (this.employeeData.id) {
           // Disable email field on edit since we don't want to change User email easily right now
           this.form.get('email')?.disable();
+          // Employment category + employee ID are fixed at creation time
+          this.form.get('employmentCategory')?.disable();
         }
       } else {
-        this.form.reset({ role: 'EMPLOYEE', isProjectManager: false });
+        this.form.reset({ role: 'EMPLOYEE', isProjectManager: false, employmentCategory: 'PERMANENT' });
         this.form.get('email')?.enable();
+        this.form.get('employmentCategory')?.enable();
         // Default reporting line: CEO of the organization
         this.employeeService.getCeo().subscribe(ceo => {
           if (ceo && !this.employeeData) {
@@ -123,6 +139,11 @@ export class EmployeeDrawerComponent implements OnInit {
       const currentDept = this.form.get('departmentId')?.value;
       if (currentDept) {
         this.filteredDesignations = this.designations.filter(d => d.departmentId === Number(currentDept));
+      }
+      // Re-check PM auto-check in case the drawer opened before designations finished loading
+      const currentDesig = this.form.get('designationId')?.value;
+      if (this.isProjectManagerDesignation(currentDesig)) {
+        this.form.patchValue({ isProjectManager: true });
       }
     });
     this.masterDataService.getBranches().subscribe(data => {

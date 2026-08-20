@@ -6,10 +6,16 @@
       <p class="page-subtitle">Manage, audit, and organize legal documents, contracts, and compliance files for all employees.</p>
     </div>
 
-    <button class="btn-primary" (click)="openUploadModal()">
-      <svg lucideUploadCloud size="16"></svg>
-      <span>Upload Document</span>
-    </button>
+    <div class="flex items-center gap-2">
+      <button class="btn-secondary" (click)="downloadAllAsZip()" [disabled]="isZipping() || filteredDocuments().length === 0">
+        <svg lucideArchive size="16" *ngIf="!isZipping()"></svg>
+        <span>{{ isZipping() ? 'Zipping...' : 'Download All (ZIP)' }}</span>
+      </button>
+      <button class="btn-primary" (click)="openUploadModal()">
+        <svg lucideUploadCloud size="16"></svg>
+        <span>Upload Document</span>
+      </button>
+    </div>
   </div>
 
   <!-- Stats Grid -->
@@ -62,6 +68,13 @@
         <option *ngFor="let dept of departments()" [value]="dept">{{ dept }}</option>
       </select>
     </div>
+
+    <app-searchable-select
+      [options]="employeeFilterOptions()"
+      placeholder="All Employees"
+      [value]="selectedEmployeeFilterId()"
+      (valueChange)="selectedEmployeeFilterId.set($event)">
+    </app-searchable-select>
   </div>
 
   <!-- Loading State -->
@@ -102,11 +115,17 @@
 
         <div class="doc-footer">
           <span class="doc-date" *ngIf="doc.createdAt">Uploaded {{ doc.createdAt | date:'mediumDate' }}</span>
-          
-          <a [href]="doc.fileUrl" target="_blank" class="btn-view-doc" title="Open / Download file">
-            <svg lucideExternalLink size="13"></svg>
-            <span>View</span>
-          </a>
+
+          <div class="flex items-center gap-2">
+            <a [href]="doc.fileUrl" target="_blank" class="btn-view-doc" title="Open file in a new tab">
+              <svg lucideExternalLink size="13"></svg>
+              <span>View</span>
+            </a>
+            <button type="button" class="btn-view-doc" (click)="downloadDocument(doc)" title="Download file">
+              <svg lucideDownload size="13"></svg>
+              <span>Download</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

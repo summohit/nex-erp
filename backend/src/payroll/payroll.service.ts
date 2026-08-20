@@ -609,6 +609,47 @@ export class PayrollService {
     });
   }
 
+  async getDashboardSummary(companyId: number) {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    const [payrollAgg, pendingCount, pendingSum, recentPending] = await Promise.all([
+      this.prisma.payslip.aggregate({
+        where: { companyId, month, year },
+        _sum: { netPay: true, totalEarnings: true, totalDeductions: true },
+        _count: true
+      }),
+      this.prisma.expenseClaim.count({ where: { companyId, status: 'PENDING' } }),
+      this.prisma.expenseClaim.aggregate({
+        where: { companyId, status: 'PENDING' },
+        _sum: { amount: true }
+      }),
+      this.prisma.expenseClaim.findMany({
+        where: { companyId, status: 'PENDING' },
+        include: { employee: { select: { id: true, firstName: true, lastName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      })
+    ]);
+
+    return {
+      payrollSummary: {
+        month,
+        year,
+        payslipCount: payrollAgg._count,
+        totalNetPay: payrollAgg._sum.netPay || 0,
+        totalEarnings: payrollAgg._sum.totalEarnings || 0,
+        totalDeductions: payrollAgg._sum.totalDeductions || 0
+      },
+      pendingExpenseClaims: {
+        count: pendingCount,
+        totalAmount: pendingSum._sum.amount || 0,
+        recent: recentPending
+      }
+    };
+  }
+
   async getAllExpenseClaims(companyId: number) {
     return this.prisma.expenseClaim.findMany({
       where: { companyId },

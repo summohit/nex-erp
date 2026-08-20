@@ -166,6 +166,12 @@ model Employee {
   shift         Shift?       @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   isProjectManager Boolean  @default(false)
 
+  employmentType String?
+  joiningDate    DateTime?
+
+  employeeCode       String? // Human-readable ID: plain number for permanent staff, T-prefixed for trainees, C-prefixed for contractors
+  employmentCategory String  @default("PERMANENT") // PERMANENT, TRAINEE, CONTRACT
+
   onboardingStatus String                   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
   onboardingTasks  EmployeeOnboardingTask[]
   kioskPin         String? // 4-digit PIN for Kiosk Mode
@@ -265,6 +271,8 @@ model Employee {
   assignedLeads            Lead[]                     @relation("LeadAssignee")
   peerReviewsGiven         PeerFeedback[]             @relation("PeerReviewer")
   peerReviewsReceived      PeerFeedback[]             @relation("PeerReviewee")
+
+  @@unique([companyId, employeeCode])
 }
 
 model EmergencyContact {
@@ -1209,6 +1217,7 @@ model Issue {
   coverUrl       String?
   position       Int       @default(0) // Sort order within column/backlog
   isArchived     Boolean   @default(false)
+  isLate         Boolean   @default(false)
 
   // Time Tracking Markers
   workStartedAt   DateTime? // When work actually started

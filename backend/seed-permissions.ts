@@ -1,12 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 const pool = new Pool({
-  host: '/tmp',
-  port: 5432,
-  user: 'mohitsingh',
-  database: 'erp_db'
+  connectionString: process.env.DATABASE_URL,
 });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -53,6 +52,13 @@ async function main() {
       'payroll', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
       'assets', 'assets/requests',
       'projects', 'projects/all', 'projects/my-work'
+    ],
+    'OFFICE_STAFF': [
+      'employees/me/profile',
+      'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
+      'appreciation', 'appreciation/list', 'appreciation/types',
+      'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses',
+      'assets', 'assets/inventory', 'assets/assignments', 'assets/requests'
     ]
   };
 

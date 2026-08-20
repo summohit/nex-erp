@@ -36,7 +36,7 @@ export class PermissionsComponent implements OnInit {
   isLoadingDepartments = false;
   savingDeptId: number | null = null;
   
-  roles = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE', 'SALES', 'EMPLOYEE'];
+  roles = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE', 'SALES', 'EMPLOYEE', 'OFFICE_STAFF'];
 
   // Tab 2: Matrix
   selectedRole = 'HR';

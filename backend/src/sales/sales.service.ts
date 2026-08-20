@@ -155,4 +155,32 @@ export class SalesService {
       include: { items: true }
     });
   }
+
+  // ================= DASHBOARD =================
+
+  async getDashboardSummary(companyId: number) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const [pendingQuotationApprovals, ordersAgg, quotationsByStatus] = await Promise.all([
+      this.prisma.quotation.count({ where: { companyId, approvalStatus: 'PENDING' } }),
+      this.prisma.salesOrder.aggregate({
+        where: { companyId, date: { gte: startOfMonth, lt: startOfNextMonth } },
+        _sum: { total: true },
+        _count: true
+      }),
+      this.prisma.quotation.groupBy({
+        by: ['status'],
+        where: { companyId },
+        _count: true
+      })
+    ]);
+
+    return {
+      pendingQuotationApprovals,
+      ordersThisMonth: { count: ordersAgg._count, totalValue: ordersAgg._sum.total || 0 },
+      quotationsByStatus
+    };
+  }
 }

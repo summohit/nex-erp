@@ -1,0 +1,7 @@
+<div class="kpi-card" [ngClass]="colorClass">
+  <div class="kpi-icon"><ng-content select="[icon]"></ng-content></div>
+  <div class="kpi-data">
+    <span class="kpi-label">{{ label }}</span>
+    <span class="kpi-value">{{ value }}</span>
+  </div>
+</div>

@@ -3,12 +3,13 @@ import { AttendanceService } from './attendance.service';
 import { AttendanceController } from './attendance.controller';
 import { ShiftsService } from './shifts.service';
 import { ShiftsController } from './shifts.controller';
+import { AutoClockoutCron } from './auto-clockout.cron';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
   controllers: [AttendanceController, ShiftsController],
-  providers: [AttendanceService, ShiftsService],
+  providers: [AttendanceService, ShiftsService, AutoClockoutCron],
   exports: [AttendanceService, ShiftsService]
 })
 export class AttendanceModule {}

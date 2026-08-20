@@ -1,5 +1,5 @@
 <div class="dashboard-container">
-  
+
   <!-- Welcome Banner -->
   <div class="welcome-banner" *ngIf="user()">
     <div class="welcome-left">
@@ -14,141 +14,374 @@
     </div>
 
     <div class="role-badge" [ngClass]="userRole().toLowerCase()">
-      <svg lucideShield size="14" *ngIf="isExecutive()"></svg>
-      <svg lucideUsers size="14" *ngIf="isManager()"></svg>
+      <svg lucideShield size="14" *ngIf="showOrgWidgets()"></svg>
+      <svg lucideBanknote size="14" *ngIf="isFinance()"></svg>
+      <svg lucideShoppingCart size="14" *ngIf="isSales()"></svg>
       <svg lucideUserCheck size="14" *ngIf="isEmployee()"></svg>
-      <span>{{ isExecutive() ? 'Executive Command Center' : (isManager() ? 'Team Manager View' : 'Employee Self-Service') }}</span>
+      <span>
+        {{ isHR() ? 'HR Command Center' : (showOrgWidgets() ? 'Executive Command Center' : (isFinance() ? 'Finance Overview' : (isSales() ? 'Sales Overview' : 'Employee Self-Service'))) }}
+      </span>
     </div>
   </div>
 
   <!-- KPI METRICS GRID -->
   <div class="kpi-grid" *ngIf="user()">
-    
-    <!-- Executive KPIs -->
-    <ng-container *ngIf="isExecutive() || isManager()">
-      <div class="kpi-card bg-blue">
-        <div class="kpi-icon"><svg lucideUsers size="20"></svg></div>
-        <div class="kpi-data">
-          <span class="kpi-label">Active Employees</span>
-          <span class="kpi-value">{{ totalEmployeesCount() }}</span>
-        </div>
-      </div>
 
-      <div class="kpi-card bg-indigo">
-        <div class="kpi-icon"><svg lucideBriefcase size="20"></svg></div>
-        <div class="kpi-data">
-          <span class="kpi-label">Active Projects</span>
-          <span class="kpi-value">{{ totalProjectsCount() }}</span>
-        </div>
-      </div>
-
-      <div class="kpi-card bg-amber">
-        <div class="kpi-icon"><svg lucideAlertCircle size="20"></svg></div>
-        <div class="kpi-data">
-          <span class="kpi-label">Pending Approvals</span>
-          <span class="kpi-value">{{ pendingApprovalsCount() }}</span>
-        </div>
-      </div>
-
-      <div class="kpi-card bg-emerald">
-        <div class="kpi-icon"><svg lucideLayers size="20"></svg></div>
-        <div class="kpi-data">
-          <span class="kpi-label">Departments</span>
-          <span class="kpi-value">{{ departmentBreakdown().length }}</span>
-        </div>
-      </div>
+    <ng-container *ngIf="showOrgWidgets()">
+      <app-stat-card label="Active Employees" [value]="dashboard()?.org?.headcount?.total || 0" colorClass="bg-blue">
+        <svg icon lucideUsers size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Pending Approvals" [value]="pendingApprovals().length" colorClass="bg-amber">
+        <svg icon lucideAlertCircle size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Present Today" [value]="(dashboard()?.org?.todayAttendance?.present || 0) + ' / ' + (dashboard()?.org?.todayAttendance?.totalEmployees || 0)" colorClass="bg-emerald">
+        <svg icon lucideUserCheck size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Job Applications" [value]="dashboard()?.org?.recruitmentAnalytics?.totalApplications || 0" colorClass="bg-indigo">
+        <svg icon lucideBriefcase size="20"></svg>
+      </app-stat-card>
     </ng-container>
 
-    <!-- Employee / Personal KPIs -->
+    <ng-container *ngIf="isFinance()">
+      <app-stat-card label="Net Pay (This Month)" [value]="(dashboard()?.finance?.payrollSummary?.totalNetPay || 0) | currency" colorClass="bg-emerald">
+        <svg icon lucideBanknote size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Payslips Processed" [value]="dashboard()?.finance?.payrollSummary?.payslipCount || 0" colorClass="bg-blue">
+        <svg icon lucideFileText size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Pending Expense Claims" [value]="dashboard()?.finance?.pendingExpenseClaims?.count || 0" colorClass="bg-amber">
+        <svg icon lucideReceipt size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Pending Claims Value" [value]="(dashboard()?.finance?.pendingExpenseClaims?.totalAmount || 0) | currency" colorClass="bg-purple">
+        <svg icon lucideTrendingUp size="20"></svg>
+      </app-stat-card>
+    </ng-container>
+
+    <ng-container *ngIf="isSales()">
+      <app-stat-card label="Pending Quotation Approvals" [value]="dashboard()?.sales?.pendingQuotationApprovals || 0" colorClass="bg-amber">
+        <svg icon lucideFileText size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Orders This Month" [value]="dashboard()?.sales?.ordersThisMonth?.count || 0" colorClass="bg-blue">
+        <svg icon lucideShoppingCart size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Order Value This Month" [value]="(dashboard()?.sales?.ordersThisMonth?.totalValue || 0) | currency" colorClass="bg-emerald">
+        <svg icon lucideTrendingUp size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Leads in Pipeline" [value]="dashboard()?.sales?.leadsPipeline?.recentLeads?.length || 0" colorClass="bg-purple">
+        <svg icon lucideTarget size="20"></svg>
+      </app-stat-card>
+    </ng-container>
+
     <ng-container *ngIf="isEmployee()">
-      <div class="kpi-card bg-blue">
-        <div class="kpi-icon"><svg lucideCheckSquare size="20"></svg></div>
-        <div class="kpi-data">
-          <span class="kpi-label">Pending Tasks</span>
-          <span class="kpi-value">{{ myPendingTasksCount() }}</span>
-        </div>
-      </div>
-
-      <div class="kpi-card bg-emerald">
-        <div class="kpi-icon"><svg lucideCheckCircle2 size="20"></svg></div>
-        <div class="kpi-data">
-          <span class="kpi-label">Completed Tasks</span>
-          <span class="kpi-value">{{ myCompletedTasksCount() }}</span>
-        </div>
-      </div>
-
-      <div class="kpi-card bg-purple">
-        <div class="kpi-icon"><svg lucideCalendar size="20"></svg></div>
-        <div class="kpi-data">
-          <span class="kpi-label">Leave Balances</span>
-          <span class="kpi-value">{{ myLeaveBalances().length }} Types</span>
-        </div>
-      </div>
+      <app-stat-card label="Pending Tasks" [value]="myPendingTasksCount()" colorClass="bg-blue">
+        <svg icon lucideCheckSquare size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Completed Tasks" [value]="myCompletedTasksCount()" colorClass="bg-emerald">
+        <svg icon lucideCheckCircle2 size="20"></svg>
+      </app-stat-card>
+      <app-stat-card label="Leave Balances" [value]="(dashboard()?.common?.myLeaveBalance?.length || 0) + ' Types'" colorClass="bg-purple">
+        <svg icon lucideCalendar size="20"></svg>
+      </app-stat-card>
     </ng-container>
   </div>
 
   <!-- MAIN DASHBOARD CONTENT GRID -->
   <div class="dashboard-main-grid" *ngIf="user()">
-    
-    <!-- LEFT COLUMN: Charts & Task Lists -->
+
+    <!-- LEFT COLUMN -->
     <div class="main-left-col">
-      
-      <!-- Executive: Department Breakdown & Pending Approvals -->
-      <div class="dashboard-card" *ngIf="isExecutive() || isManager()">
-        <div class="card-header">
-          <div class="flex items-center gap-2">
-            <svg lucideBuilding size="18" class="text-blue-600"></svg>
-            <h3>Department Headcount Breakdown</h3>
+
+      <!-- Org: Headcount Trend + Department Split -->
+      <div class="chart-row-2" *ngIf="showOrgWidgets()">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideTrendingUp size="18" class="text-blue-600"></svg>
+              <h3>Headcount Growth (6 Months)</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="area" [series]="headcountTrendSeries()" [categories]="headcountTrendCategories()" [colors]="['#2563eb']" [showLegend]="false" emptyHint="Chart fills in as employees join over time."></app-chart-card>
           </div>
         </div>
 
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideBuilding size="18" class="text-indigo-600"></svg>
+              <h3>Department Split</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="donut" [series]="deptDonutSeries()" [labels]="deptDonutLabels()" [height]="240"></app-chart-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- Org: Today's Attendance + 30-Day Trend -->
+      <div class="chart-row-2" *ngIf="showOrgWidgets()">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideUserCheck size="18" class="text-emerald-600"></svg>
+              <h3>Today's Attendance</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="radialBar" [series]="todayAttendanceSeries()" [labels]="todayAttendanceLabels" [colors]="['#059669', '#d97706', '#7c3aed', '#94a3b8']" [height]="260" emptyHint="No one has clocked in yet today."></app-chart-card>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideClock size="18" class="text-blue-600"></svg>
+              <h3>Attendance Trend (30 Days)</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="line" [series]="attendanceTrendSeries()" [categories]="attendanceTrendCategories()" [colors]="['#2563eb']" [showLegend]="false" emptyHint="Fills in as your team clocks in daily."></app-chart-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- Org: Project Status + Recruitment Funnel -->
+      <div class="chart-row-2" *ngIf="showOrgWidgets()">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideLayers size="18" class="text-purple-600"></svg>
+              <h3>Project Task Status</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="donut" [series]="projectStatusSeries()" [labels]="projectStatusLabels()" [height]="240" emptyHint="Create a project and add tasks to see this chart."></app-chart-card>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideBriefcase size="18" class="text-amber-600"></svg>
+              <h3>Recruitment Funnel</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="bar" [horizontal]="true" [series]="recruitmentSeries()" [categories]="recruitmentCategories()" [colors]="['#d97706']" [showLegend]="false" emptyHint="Post a job and receive applications to see this chart."></app-chart-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- HR: Onboarding Pipeline + Leave by Type -->
+      <div class="chart-row-2" *ngIf="isHR()">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideUserCheck size="18" class="text-indigo-600"></svg>
+              <h3>Onboarding Pipeline</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="bar" [series]="onboardingPipelineSeries()" [categories]="onboardingPipelineCategories()" [colors]="['#4f46e5']" [showLegend]="false"></app-chart-card>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideCalendar size="18" class="text-emerald-600"></svg>
+              <h3>Leave Requests by Type</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="bar" [series]="leaveByTypeSeries()" [categories]="leaveByTypeCategories()" [colors]="['#059669']" [showLegend]="false" emptyHint="Fills in as employees request leave."></app-chart-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- HR: Celebrations -->
+      <div class="dashboard-card" *ngIf="isHR() && ((dashboard()?.org?.celebrations?.birthdays?.length || 0) + (dashboard()?.org?.celebrations?.anniversaries?.length || 0)) > 0">
+        <div class="card-header">
+          <div class="flex items-center gap-2">
+            <svg lucidePartyPopper size="18" class="text-pink-600"></svg>
+            <h3>Upcoming Celebrations</h3>
+          </div>
+        </div>
         <div class="card-body">
-          <div class="dept-list">
-            <div class="dept-item" *ngFor="let dept of departmentBreakdown()">
-              <div class="dept-info">
-                <span class="dept-name">{{ dept.name }}</span>
-                <span class="dept-count">{{ dept.count }} Employees</span>
-              </div>
-              <div class="dept-bar-bg">
-                <div class="dept-bar-fill" [style.width.%]="(dept.count / (totalEmployeesCount() || 1)) * 100"></div>
-              </div>
+          <div class="celebration-list">
+            <div class="celebration-item" *ngFor="let b of dashboard()?.org?.celebrations?.birthdays">
+              <svg lucideCake size="16" class="text-pink-500"></svg>
+              <span class="celeb-name">{{ b.firstName }} {{ b.lastName }}</span>
+              <span class="celeb-when">{{ b.inDays === 0 ? 'Today' : 'in ' + b.inDays + ' days' }}</span>
+            </div>
+            <div class="celebration-item" *ngFor="let a of dashboard()?.org?.celebrations?.anniversaries">
+              <svg lucideGift size="16" class="text-purple-500"></svg>
+              <span class="celeb-name">{{ a.firstName }} {{ a.lastName }}</span>
+              <span class="celeb-when">{{ a.years }}-year anniversary {{ a.inDays === 0 ? 'today' : 'in ' + a.inDays + ' days' }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Executive: Pending Approvals Queue -->
-      <div class="dashboard-card" *ngIf="(isExecutive() || isManager()) && leaveRequests().length > 0">
+      <!-- Finance: Payroll Trend + Dept Salary Cost -->
+      <div class="chart-row-2" *ngIf="showPayrollCharts()">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideBanknote size="18" class="text-emerald-600"></svg>
+              <h3>Payroll Trend (6 Months)</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="bar" [stacked]="true" [series]="payrollTrendSeries()" [categories]="payrollTrendCategories()" [colors]="['#059669', '#dc2626']" [currency]="true"></app-chart-card>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideBuilding size="18" class="text-blue-600"></svg>
+              <h3>Salary Cost by Department (This Month)</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="bar" [horizontal]="true" [series]="deptSalaryCostSeries()" [categories]="deptSalaryCostCategories()" [colors]="['#2563eb']" [showLegend]="false" [currency]="true"></app-chart-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- Finance: Expenses by Category + Pending Claims -->
+      <div class="chart-row-2" *ngIf="isFinance()">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideReceipt size="18" class="text-amber-600"></svg>
+              <h3>Expenses by Category</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="donut" [series]="expensesByCategorySeries()" [labels]="expensesByCategoryLabels()" [height]="240" emptyHint="Fills in as employees submit expense claims."></app-chart-card>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideReceipt size="18" class="text-amber-500"></svg>
+              <h3>Pending Expense Claims</h3>
+            </div>
+            <a routerLink="/payroll/expenses" class="btn-table-action">
+              <span>View All</span>
+              <svg lucideArrowRight size="12"></svg>
+            </a>
+          </div>
+          <div class="card-body p-0" *ngIf="(dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) > 0">
+            <table class="dashboard-table">
+              <thead><tr><th>Employee</th><th>Category</th><th>Amount</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let claim of dashboard()?.finance?.pendingExpenseClaims?.recent">
+                  <td><span class="font-semibold">{{ claim.employee?.firstName }} {{ claim.employee?.lastName }}</span></td>
+                  <td>{{ claim.category }}</td>
+                  <td>{{ claim.amount | currency }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) === 0">
+            <svg lucideCheckCircle2 size="32" class="text-emerald-500 mb-2"></svg>
+            <p style="font-size: 13px; font-weight: 600; color: #1e293b;">No pending claims</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sales/Finance: Revenue Trend -->
+      <div class="dashboard-card" *ngIf="showRevenueWidgets()">
+        <div class="card-header">
+          <div class="flex items-center gap-2">
+            <svg lucideTrendingUp size="18" class="text-emerald-600"></svg>
+            <h3>Revenue Trend (6 Months)</h3>
+          </div>
+        </div>
+        <div class="card-body">
+          <app-chart-card type="area" [series]="revenueTrendSeries()" [categories]="revenueTrendCategories()" [colors]="['#059669']" [showLegend]="false" [currency]="true" emptyHint="Fills in as sales orders are recorded."></app-chart-card>
+        </div>
+      </div>
+
+      <!-- Sales: Leads Pipeline + Quotations -->
+      <div class="chart-row-2" *ngIf="isSales()">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideTarget size="18" class="text-purple-600"></svg>
+              <h3>Leads Pipeline</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="bar" [horizontal]="true" [series]="leadsPipelineSeries()" [categories]="leadsPipelineCategories()" [colors]="['#9333ea']" [showLegend]="false" emptyHint="Fills in as leads are added to your CRM."></app-chart-card>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideFileText size="18" class="text-blue-600"></svg>
+              <h3>Quotations by Status</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="donut" [series]="quotationsByStatusSeries()" [labels]="quotationsByStatusLabels()" [height]="240" emptyHint="Fills in as quotations are created."></app-chart-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sales: Recent Orders -->
+      <div class="dashboard-card" *ngIf="isSales() && (dashboard()?.sales?.recentOrders?.length || 0) > 0">
+        <div class="card-header">
+          <div class="flex items-center gap-2">
+            <svg lucideShoppingCart size="18" class="text-blue-600"></svg>
+            <h3>Recent Orders</h3>
+          </div>
+          <a routerLink="/sales/orders" class="btn-table-action">
+            <span>View All</span>
+            <svg lucideArrowRight size="12"></svg>
+          </a>
+        </div>
+        <div class="card-body p-0">
+          <table class="dashboard-table">
+            <thead><tr><th>Order #</th><th>Client</th><th>Value</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let order of dashboard()?.sales?.recentOrders">
+                <td><span class="font-semibold">{{ order.orderNumber }}</span></td>
+                <td>{{ order.client?.name || '—' }}</td>
+                <td>{{ order.total | currency }}</td>
+                <td><span class="status-pill" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Org: Pending Leave Approvals Queue -->
+      <div class="dashboard-card" *ngIf="showOrgWidgets() && pendingApprovals().length > 0">
         <div class="card-header">
           <div class="flex items-center gap-2">
             <svg lucideAlertCircle size="18" class="text-amber-500"></svg>
             <h3>Pending Leave Approvals Queue</h3>
           </div>
         </div>
-
         <div class="card-body p-0">
           <table class="dashboard-table">
             <thead>
-              <tr>
-                <th>Employee</th>
-                <th>Leave Type</th>
-                <th>Dates</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
+              <tr><th>Employee</th><th>Leave Type</th><th>Dates</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              <tr *ngFor="let req of leaveRequests()">
-                <td>
-                  <span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span>
-                </td>
+              <tr *ngFor="let req of pendingApprovals()">
+                <td><span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span></td>
                 <td>{{ req.leaveType?.name }}</td>
                 <td>{{ req.startDate | date:'shortDate' }} - {{ req.endDate | date:'shortDate' }}</td>
+                <td><span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span></td>
                 <td>
-                  <span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span>
-                </td>
-                <td>
-                  <div class="flex gap-2" *ngIf="req.status === 'PENDING'">
+                  <div class="flex gap-2">
                     <button class="btn-approve-sm" (click)="approveLeave(req.id)">Approve</button>
                     <button class="btn-reject-sm" (click)="rejectLeave(req.id)">Reject</button>
                   </div>
@@ -159,59 +392,61 @@
         </div>
       </div>
 
-      <!-- My Tasks & Priorities -->
-      <div class="dashboard-card">
-        <div class="card-header">
-          <div class="flex items-center gap-2">
-            <svg lucideCheckSquare size="18" class="text-indigo-600"></svg>
-            <h3>My Priority Tasks & Assignments</h3>
+      <!-- My Tasks: table + status donut -->
+      <div class="chart-row-2-uneven">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideCheckSquare size="18" class="text-indigo-600"></svg>
+              <h3>My Priority Tasks & Assignments</h3>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <table class="dashboard-table" *ngIf="(dashboard()?.common?.myTasks?.length || 0) > 0">
+              <thead>
+                <tr><th>Task Title</th><th>Project</th><th>Priority</th><th>Status</th><th>Action</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let t of dashboard()?.common?.myTasks">
+                  <td class="font-medium">{{ t.title }}</td>
+                  <td><span class="project-tag">{{ t.project?.key }}</span></td>
+                  <td><span class="priority-pill" [ngClass]="t.priority.toLowerCase()">{{ t.priority }}</span></td>
+                  <td><span class="status-pill" [ngClass]="t.status.toLowerCase()">{{ t.status }}</span></td>
+                  <td>
+                    <a [routerLink]="['/projects', t.project?.id || 1]" class="btn-table-action">
+                      <span>View Board</span>
+                      <svg lucideArrowRight size="12"></svg>
+                    </a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.common?.myTasks?.length || 0) === 0">
+              <svg lucideCheckCircle2 size="36" class="text-emerald-500 mb-2"></svg>
+              <p style="font-size: 14px; font-weight: 600; color: #1e293b;">You are all caught up!</p>
+              <p style="font-size: 12px; color: #64748b;">No active tasks currently assigned to you.</p>
+            </div>
           </div>
         </div>
 
-        <div class="card-body p-0">
-          <table class="dashboard-table" *ngIf="myTasks().length > 0">
-            <thead>
-              <tr>
-                <th>Task Title</th>
-                <th>Project</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let t of myTasks()">
-                <td class="font-medium">{{ t.title }}</td>
-                <td><span class="project-tag">{{ t.projectKey }}</span></td>
-                <td>
-                  <span class="priority-pill" [ngClass]="t.priority.toLowerCase()">{{ t.priority }}</span>
-                </td>
-                <td>
-                  <span class="status-pill" [ngClass]="t.status.toLowerCase()">{{ t.status }}</span>
-                </td>
-                <td>
-                  <a [routerLink]="['/projects', t.projectId || 1]" class="btn-table-action">
-                    <span>View Board</span>
-                    <svg lucideArrowRight size="12"></svg>
-                  </a>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div class="empty-box p-6 text-center" *ngIf="myTasks().length === 0">
-            <svg lucideCheckCircle2 size="36" class="text-emerald-500 mb-2"></svg>
-            <p style="font-size: 14px; font-weight: 600; color: #1e293b;">You are all caught up!</p>
-            <p style="font-size: 12px; color: #64748b;">No active tasks currently assigned to you.</p>
+        <div class="dashboard-card">
+          <div class="card-header">
+            <div class="flex items-center gap-2">
+              <svg lucideCheckCircle2 size="18" class="text-emerald-600"></svg>
+              <h3>My Tasks by Status</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <app-chart-card type="donut" [series]="myTasksByStatusSeries()" [labels]="myTasksByStatusLabels()" [height]="220" emptyHint="Assigned tasks will appear here."></app-chart-card>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- RIGHT COLUMN: Clock-In & Shortcuts -->
+    <!-- RIGHT COLUMN -->
     <div class="main-right-col">
-      
-      <!-- Redesigned Attendance Clock-In Card -->
+
+      <!-- Attendance Clock-In Card -->
       <div class="dashboard-card attendance-card-enhanced">
         <div class="card-header flex items-center justify-between">
           <div class="flex items-center gap-2">
@@ -220,58 +455,44 @@
           </div>
           <span class="today-date-badge">{{ todayDate | date:'EEE, MMM d' }}</span>
         </div>
-        
+
         <div class="card-body">
-          <!-- State 1: Not Clocked In -->
           <div class="clock-state-box not-clocked" *ngIf="!todayAttendance()?.clockIn">
             <div class="clock-status-pill offline">
               <span class="status-dot"></span>
               <span>Offline / Shift Pending</span>
             </div>
-
             <div class="clock-prompt">
               <span>Ready to start your work shift today?</span>
             </div>
-
-            <button class="btn-clock-hero clock-in" 
-                    [disabled]="isClocking()" 
-                    (click)="clockInOut()" 
-                    type="button">
+            <button class="btn-clock-hero clock-in" [disabled]="isClocking()" (click)="clockInOut()" type="button">
               <svg lucideClock size="16"></svg>
               <span>{{ isClocking() ? 'Locating & Clocking In...' : 'Clock In Now' }}</span>
             </button>
           </div>
 
-          <!-- State 2: Currently Clocked In -->
           <div class="clock-state-box clocked-in" *ngIf="todayAttendance()?.clockIn && !todayAttendance()?.clockOut">
             <div class="clock-status-pill active">
               <span class="status-dot green-pulse"></span>
               <span>Shift Active</span>
             </div>
-
             <div class="clock-stats-row">
               <div class="clock-stat-item">
                 <span class="stat-lbl">Clocked In At</span>
                 <span class="stat-val text-blue-600">{{ todayAttendance()?.clockIn | date:'shortTime' }}</span>
               </div>
             </div>
-
-            <button class="btn-clock-hero clock-out" 
-                    [disabled]="isClocking()" 
-                    (click)="clockInOut()" 
-                    type="button">
+            <button class="btn-clock-hero clock-out" [disabled]="isClocking()" (click)="clockInOut()" type="button">
               <svg lucideClock size="16"></svg>
               <span>{{ isClocking() ? 'Saving & Clocking Out...' : 'Clock Out' }}</span>
             </button>
           </div>
 
-          <!-- State 3: Clocked Out for the day -->
           <div class="clock-state-box clocked-out" *ngIf="todayAttendance()?.clockOut">
             <div class="clock-status-pill completed">
               <svg lucideCheckCircle2 size="14" class="text-emerald-600"></svg>
               <span>Shift Completed Today</span>
             </div>
-
             <div class="clock-summary-grid">
               <div class="summary-col">
                 <span class="sum-lbl">In</span>
@@ -283,11 +504,68 @@
                 <span class="sum-val">{{ todayAttendance()?.clockOut | date:'shortTime' }}</span>
               </div>
             </div>
-
             <button class="btn-clock-hero disabled" disabled type="button">
               <svg lucideCheckCircle2 size="16"></svg>
               <span>Done For Today</span>
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Attendance This Month -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h3>My Attendance This Month</h3>
+        </div>
+        <div class="card-body">
+          <div class="mini-stat-row">
+            <div class="mini-stat present">
+              <span class="mini-stat-value">{{ dashboard()?.common?.myAttendanceThisMonth?.presentCount || 0 }}</span>
+              <span class="mini-stat-label">Present</span>
+            </div>
+            <div class="mini-stat late">
+              <span class="mini-stat-value">{{ dashboard()?.common?.myAttendanceThisMonth?.lateCount || 0 }}</span>
+              <span class="mini-stat-label">Late</span>
+            </div>
+            <div class="mini-stat absent">
+              <span class="mini-stat-value">{{ dashboard()?.common?.myAttendanceThisMonth?.absentCount || 0 }}</span>
+              <span class="mini-stat-label">Absent</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Leave Balance -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h3>My Leave Balance</h3>
+        </div>
+        <div class="card-body">
+          <app-chart-card type="bar" [horizontal]="true" [series]="myLeaveBalanceSeries()" [categories]="myLeaveBalanceCategories()" [colors]="['#7c3aed']" [showLegend]="false" [height]="200" emptyHint="Your leave balance will appear once allocated."></app-chart-card>
+        </div>
+      </div>
+
+      <!-- My Hours Logged (Employee only) -->
+      <div class="dashboard-card" *ngIf="isEmployee()">
+        <div class="card-header">
+          <h3>My Hours Logged (7 Days)</h3>
+        </div>
+        <div class="card-body">
+          <app-chart-card type="bar" [series]="myHoursLoggedSeries()" [categories]="myHoursLoggedCategories()" [colors]="['#2563eb']" [showLegend]="false" [height]="200" emptyHint="Log time on tasks to see this chart."></app-chart-card>
+        </div>
+      </div>
+
+      <!-- Upcoming Holidays -->
+      <div class="dashboard-card" *ngIf="(dashboard()?.common?.upcomingHolidays?.length || 0) > 0">
+        <div class="card-header">
+          <h3>Upcoming Holidays</h3>
+        </div>
+        <div class="card-body">
+          <div class="holiday-list">
+            <div class="holiday-item" *ngFor="let h of dashboard()?.common?.upcomingHolidays">
+              <span class="holiday-name">{{ h.name }}</span>
+              <span class="holiday-date">{{ h.date | date:'MMM d' }}</span>
+            </div>
           </div>
         </div>
       </div>

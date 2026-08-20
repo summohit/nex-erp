@@ -11,7 +11,14 @@
         <div class="field-section">
           <h3 class="section-title">WORK</h3>
           <div class="form-grid-stack">
-            
+
+            <div class="form-row-item">
+              <label class="item-label">Employee ID</label>
+              <div class="item-value">
+                <input type="text" class="form-control" [value]="employeeData?.employeeCode || 'Not assigned'" disabled>
+              </div>
+            </div>
+
             <div class="form-row-item">
               <label class="item-label">Department</label>
               <div class="item-value">
@@ -340,9 +347,9 @@
     <div class="field-section">
       <div class="form-group profile-pic-group">
         <label>Profile Picture <span class="help-icon" title="Upload a clear photo">?</span></label>
-        <div class="profile-pic-upload" [class.has-image]="formData.avatarUrl">
-          <input type="file" (change)="handleAvatarUpload($event)" accept="image/*" [disabled]="!canEditPersonalDetails" class="file-input">
-          
+        <div class="profile-pic-upload" [class.has-image]="formData.avatarUrl" [class.readonly]="!isOwner">
+          <input type="file" (change)="handleAvatarUpload($event)" accept="image/*" *ngIf="isOwner" [disabled]="!canEditPersonalDetails" class="file-input">
+
           <div class="avatar-preview">
             <img [src]="formData.avatarUrl || 'assets/default-avatar.png'" alt="Avatar" *ngIf="formData.avatarUrl">
             <div class="avatar-placeholder" *ngIf="!formData.avatarUrl">
@@ -356,6 +363,11 @@
             </div>
             <p><strong>Click to upload</strong> or drag and drop</p>
             <span>SVG, PNG, JPG or GIF (max. 800x400px)</span>
+          </div>
+
+          <div class="readonly-label" *ngIf="!isOwner">
+            <p>{{ employeeData?.firstName }}'s profile photo</p>
+            <span>Only they can update this</span>
           </div>
         </div>
       </div>
@@ -455,23 +467,12 @@
 
           <div class="form-group" *ngIf="isOwner">
             <label>Account Password</label>
-            <div class="compound-input password-input">
-              <input [type]="showPassword ? 'text' : 'password'" class="form-control" [(ngModel)]="formData.password" placeholder="Must have at least 8 characters">
-              <button type="button" class="icon-btn" (click)="togglePassword()">
-                <svg lucideEye size="16" *ngIf="!showPassword"></svg>
-                <svg lucideEyeOff size="16" *ngIf="showPassword"></svg>
-              </button>
-              <button type="button" class="icon-btn" (click)="generatePassword()" title="Generate Random Password">
-                <svg lucideShuffle size="16"></svg>
-              </button>
-            </div>
-            <small class="hint-text">Leave blank to keep current password.</small>
             <button type="button" class="reset-email-btn" (click)="sendPasswordResetEmail()" [disabled]="isSendingResetEmail">
               <svg lucideMail size="15" *ngIf="!isSendingResetEmail"></svg>
               <span *ngIf="!isSendingResetEmail">Send Password Reset Email</span>
               <span *ngIf="isSendingResetEmail" class="btn-spinner"></span>
             </button>
-            <small class="hint-text" *ngIf="isOwner">A verification code will be emailed to you to reset your password.</small>
+            <small class="hint-text" *ngIf="isOwner">A verification code will be emailed to you to reset your password. You can also change your password directly from the profile menu in the top-right corner.</small>
           </div>
 
           <div class="form-group">
@@ -797,12 +798,12 @@
       <div class="modal-field-group">
         <label class="modal-label">Skill</label>
         <div class="chips-wrap">
-          <button 
-            type="button" 
-            class="chip-btn" 
-            *ngFor="let sk of skillsByCategory[selectedSkillCategory]" 
-            [class.active]="selectedSkillName === sk"
-            (click)="selectSkillName(sk)">
+          <button
+            type="button"
+            class="chip-btn"
+            *ngFor="let sk of skillsByCategory[selectedSkillCategory]"
+            [class.active]="selectedSkillNames.has(sk)"
+            (click)="toggleSkillName(sk)">
             {{ sk }}
           </button>
         </div>

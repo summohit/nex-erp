@@ -281,4 +281,50 @@ export class MailService {
       this.logger.error(`Failed to send welcome email to ${email}: ${this.errorDetail(error)}`);
     }
   }
+
+  async sendCredentialsEmail(email: string, password: string) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const loginLink = `${baseUrl}/auth/login`;
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #1e3a8a; text-align: center;">Welcome to NEX ERP 🚀</h2>
+        <p style="color: #475569; font-size: 16px;">Your account has been created. Here are your login credentials:</p>
+        <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 4px 0; color: #1e293b;"><strong>Email:</strong> ${email}</p>
+          <p style="margin: 4px 0; color: #1e293b;"><strong>Password:</strong> ${password}</p>
+        </div>
+        <p style="color: #475569; font-size: 14px;">Please log in and change your password as soon as possible.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${loginLink}" style="background-color: #FF5200; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">Go to Login</a>
+        </div>
+      </div>
+    `;
+
+    try {
+      if (this.brevoApiKey) {
+        this.logger.log(`Sending credentials email to ${email} via Brevo HTTP API.`);
+        await this.sendBrevoEmail({
+          to: email,
+          subject: 'Your NEX ERP Login Credentials',
+          html: htmlContent,
+        });
+        this.logger.log(`Credentials email sent to ${email}`);
+        return;
+      }
+
+      this.logger.log(`Sending credentials email to ${email} via SMTP transport.`);
+      await this.sendWithRetry({
+        from: `"NEX ERP" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        subject: 'Your NEX ERP Login Credentials',
+        html: htmlContent,
+      });
+      this.logger.log(`Credentials email sent to ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send credentials email to ${email}: ${this.errorDetail(error)}`);
+      throw error;
+    }
+  }
 }

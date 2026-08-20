@@ -659,7 +659,7 @@ export class IssuesService {
       const response = await axios.post(
         'https://api.groq.com/openai/v1/chat/completions',
         {
-          model: 'gpt-oss-20b',
+          model: 'openai/gpt-oss-20b',
           messages: [
             {
               role: 'system',

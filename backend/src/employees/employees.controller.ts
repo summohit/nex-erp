@@ -38,12 +38,20 @@ export class EmployeesController {
 
   @Get()
   findAll(@Request() req) {
-    return this.employeesService.findAll(req.user.companyId);
+    return this.employeesService.findAll(req.user.companyId, req.user.role);
+  }
+
+  @Post('send-welcome-emails')
+  sendWelcomeEmails(@Request() req, @Body('employeeIds') employeeIds: number[]) {
+    if (!Array.isArray(employeeIds) || employeeIds.length === 0) {
+      throw new BadRequestException('employeeIds must be a non-empty array.');
+    }
+    return this.employeesService.sendWelcomeEmails(req.user.companyId, employeeIds);
   }
 
   @Get('org-chart')
   getOrgChart(@Request() req) {
-    return this.employeesService.getOrgChart(req.user.companyId);
+    return this.employeesService.getOrgChart(req.user.companyId, req.user.role);
   }
 
   @Get('ceo')
@@ -73,7 +81,7 @@ export class EmployeesController {
 
   @Get(':id/profile')
   getProfile(@Request() req, @Param('id') id: string) {
-    return this.employeesService.getProfile(+id, req.user.companyId, req.user.sub);
+    return this.employeesService.getProfile(+id, req.user.companyId, req.user.sub, req.user.role);
   }
 
   @Put(':id/profile')

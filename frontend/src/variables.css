@@ -26,9 +26,13 @@
   
   /* Typography Colors */
   --text-dark: #0F172A; /* Requested Slate Navy */
+  --text-secondary: #475569;
   --text-muted: #64748b;
   --text-light: #FFFFFF;
   --text-error: #FF2D55; /* Using the brand red for errors */
+
+  /* Surfaces */
+  --surface-hover: #F1F5F9;
 
   /* Font Weights */
   --fw-light: 300;

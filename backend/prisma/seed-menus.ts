@@ -10,7 +10,27 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const menuSections = [
+interface MenuSubItem {
+  id: string;
+  title: string;
+  route?: string;
+  external?: boolean;
+}
+
+interface MenuItem {
+  id: string;
+  title: string;
+  icon?: string;
+  route?: string;
+  subItems?: MenuSubItem[];
+}
+
+interface MenuSection {
+  title: string;
+  items: MenuItem[];
+}
+
+const menuSections: MenuSection[] = [
   {
     title: 'MAIN',
     items: [
@@ -109,7 +129,7 @@ const menuSections = [
           { id: 'settings/company', title: 'Company Profile', route: '/settings/company' },
           { id: 'settings/master-data', title: 'Master Data', route: '/settings/master-data' },
           { id: 'settings/permissions', title: 'Roles & Permissions', route: '/settings/permissions' },
-          { id: 'settings/integrations', title: 'Integrations', route: '/settings/integrations' }
+          { id: 'settings/integrations', title: 'Integrations' }
         ]
       }
     ]

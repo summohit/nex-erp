@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  TextInput, ActivityIndicator, RefreshControl, Alert, StatusBar, Platform, Animated
+  TextInput, ActivityIndicator, RefreshControl, Alert, StatusBar, Platform, Animated, Modal
 } from 'react-native';
 
 const PulseSkeleton = ({ style }: { style: any }) => {
@@ -16,6 +16,7 @@ const PulseSkeleton = ({ style }: { style: any }) => {
   }, [pulseAnim]);
   return <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: '#E2E8F0' }]} />;
 };
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   Home, ChevronRight, Calendar, Clock, CheckCircle, XCircle, 
@@ -26,13 +27,21 @@ import { useLeaveStore } from '../../store/leaveStore';
 import { leaveService } from '../../api/leaveService';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar as RNCalendar } from 'react-native-calendars';
-import { Modal } from 'react-native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-
-export default function ESSScreen() {
+import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
+import TimesheetTab from './tabs/TimesheetTab';
+import HolidaysTab from './tabs/HolidaysTab';
+export default function ESSScreen({ route }: any) {
   const navigation = useNavigation<any>();
   const { balances, requests, isLoading, isSubmitting, fetchLeaveData, submitLeaveRequest, cancelLeaveRequest } = useLeaveStore();
+  const [mainTab, setMainTab] = useState<'timesheets' | 'leaves' | 'holidays'>((route?.params?.initialTab as any) || 'timesheets');
   const [activeTab, setActiveTab] = useState<'requests' | 'apply'>('requests');
+
+  useEffect(() => {
+    if (route?.params?.initialTab) {
+      setMainTab(route.params.initialTab);
+    }
+  }, [route?.params?.initialTab]);
   
   // Form State
   const [leaveTypeId, setLeaveTypeId] = useState<number | null>(null);
@@ -43,6 +52,28 @@ export default function ESSScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [openStartPicker, setOpenStartPicker] = useState(false);
   const [openEndPicker, setOpenEndPicker] = useState(false);
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    title: string;
+    message: string;
+    type: ModalType;
+    onConfirm?: () => void;
+    confirmText?: string;
+    showCancel?: boolean;
+  }>({ title: '', message: '', type: 'error' });
+
+  const showModal = (title: string, message: string, type: ModalType = 'error', onConfirm?: () => void, confirmText?: string, showCancel = false) => {
+    setModalConfig({
+      title,
+      message,
+      type,
+      onConfirm,
+      confirmText: confirmText || (type === 'success' ? 'OK' : 'Try Again'),
+      showCancel
+    });
+    setModalVisible(true);
+  };
 
   useEffect(() => {
     fetchLeaveData();
@@ -116,7 +147,7 @@ export default function ESSScreen() {
       const sizeStr = asset.fileSize ? (asset.fileSize / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown size';
       setAttachedFile({ name: asset.fileName, size: sizeStr, url });
     } catch (error) {
-      Alert.alert('Upload Failed', 'There was an error uploading the image.');
+      showModal('Upload Failed', 'There was an error uploading the image.', 'error');
       console.error(error);
     } finally {
       setIsUploading(false);
@@ -125,15 +156,15 @@ export default function ESSScreen() {
 
   const handleSubmit = async () => {
     if (!leaveTypeId) {
-      Alert.alert('Leave Type Required', 'Please select a leave type before submitting.');
+      showModal('Leave Type Required', 'Please select a leave type before submitting.', 'error');
       return;
     }
     if (!startDate.trim() || !endDate.trim()) {
-      Alert.alert('Dates Required', 'Please provide both Start Date and End Date.');
+      showModal('Dates Required', 'Please provide both Start Date and End Date.', 'error');
       return;
     }
     if (isDateRangeInvalid) {
-      Alert.alert('Invalid Date Range', 'End Date cannot be earlier than Start Date.');
+      showModal('Invalid Date Range', 'End Date cannot be earlier than Start Date.', 'error');
       return;
     }
 
@@ -146,33 +177,38 @@ export default function ESSScreen() {
     });
 
     if (success) {
-      Alert.alert('Request Submitted', 'Your leave request has been sent for approval.');
+      showModal('Request Submitted', 'Your leave request has been sent for approval.', 'success');
       setActiveTab('requests');
       setStartDate('');
       setEndDate('');
       setReason('');
       setLeaveTypeId(null);
       setAttachedFile(null);
+    } else {
+      const errorMsg = useLeaveStore.getState().error;
+      showModal('Request Failed', errorMsg || 'There was an error submitting your request.', 'error');
     }
   };
 
   const handleCancel = (requestId: number) => {
-    Alert.alert(
+    showModal(
       'Cancel Leave Request',
       'Are you sure you want to cancel this pending leave request?',
-      [
-        { text: 'Keep It', style: 'cancel' },
-        { 
-          text: 'Cancel Request', 
-          style: 'destructive',
-          onPress: async () => {
-            const success = await cancelLeaveRequest(requestId);
-            if (success) {
-              Alert.alert('Request Cancelled', 'Your leave request has been successfully cancelled.');
-            }
-          } 
-        }
-      ]
+      'error',
+      async () => {
+        setModalVisible(false);
+        setTimeout(async () => {
+          const success = await cancelLeaveRequest(requestId);
+          if (success) {
+            showModal('Request Cancelled', 'Your leave request has been successfully cancelled.', 'success');
+          } else {
+            const errorMsg = useLeaveStore.getState().error;
+            showModal('Cancellation Failed', errorMsg || 'Could not cancel the request.', 'error');
+          }
+        }, 400);
+      },
+      'Cancel Request',
+      true
     );
   };
 
@@ -254,15 +290,17 @@ export default function ESSScreen() {
           
           <View style={[styles.breadcrumbItem, styles.breadcrumbActiveChip]}>
             <Sparkles size={11} color="#E25E3E" />
-            <Text style={styles.breadcrumbActiveText}>Leave Portal</Text>
+            <Text style={styles.breadcrumbActiveText}>
+              {mainTab === 'timesheets' ? 'Timesheets' : mainTab === 'holidays' ? 'Holidays' : 'Leave Portal'}
+            </Text>
           </View>
         </View>
 
         {/* Title Area */}
         <View style={styles.headerTitleRow}>
           <View>
-            <Text style={styles.headerTitle}>Leave & Time Off</Text>
-            <Text style={styles.headerSubtitle}>Track balances & submit leave applications</Text>
+            <Text style={styles.headerTitle}>Attendance & Leave</Text>
+            <Text style={styles.headerSubtitle}>Manage your time, view logs, and request leaves</Text>
           </View>
         </View>
       </View>
@@ -273,6 +311,38 @@ export default function ESSScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchLeaveData} colors={['#E25E3E']} />}
       >
+        {/* --- Main Navigation Tabs --- */}
+        <View style={styles.mainTabsContainer}>
+          <TouchableOpacity 
+            style={[styles.mainTabButton, mainTab === 'timesheets' && styles.mainTabActive]}
+            onPress={() => setMainTab('timesheets')}
+          >
+            <Text style={[styles.mainTabText, mainTab === 'timesheets' && styles.mainTabTextActive]}>Timesheets</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.mainTabButton, mainTab === 'leaves' && styles.mainTabActive]}
+            onPress={() => setMainTab('leaves')}
+          >
+            <Text style={[styles.mainTabText, mainTab === 'leaves' && styles.mainTabTextActive]}>My Leaves</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.mainTabButton, mainTab === 'holidays' && styles.mainTabActive]}
+            onPress={() => setMainTab('holidays')}
+          >
+            <Text style={[styles.mainTabText, mainTab === 'holidays' && styles.mainTabTextActive]}>Holidays</Text>
+          </TouchableOpacity>
+        </View>
+
+        {mainTab === 'timesheets' && (
+          <TimesheetTab />
+        )}
+
+        {mainTab === 'holidays' && (
+          <HolidaysTab />
+        )}
+
+        {mainTab === 'leaves' && (
+          <View>
         {/* --- Leave Balances Section --- */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Leave Balances</Text>
@@ -286,13 +356,13 @@ export default function ESSScreen() {
         >
           {isLoading && balances.length === 0 ? (
             <>
-              <PulseSkeleton style={[styles.balanceCard, { height: 160, width: 220, borderColor: 'transparent' }]} />
-              <PulseSkeleton style={[styles.balanceCard, { height: 160, width: 220, marginLeft: 16, borderColor: 'transparent' }]} />
+              <PulseSkeleton style={[styles.balanceCard, { height: 130, width: 155, borderColor: 'transparent' }]} />
+              <PulseSkeleton style={[styles.balanceCard, { height: 130, width: 155, marginLeft: 10, borderColor: 'transparent' }]} />
             </>
           ) : balances.length === 0 ? (
             <View style={styles.emptyBalanceCard}>
-              <Info size={24} color="#94A3B8" />
-              <Text style={styles.emptyText}>No leave balances found</Text>
+              <Info size={20} color="#94A3B8" />
+              <Text style={styles.emptyText}>No balances</Text>
             </View>
           ) : (
             balances.map((balance) => {
@@ -305,18 +375,18 @@ export default function ESSScreen() {
                 <View key={balance.id} style={[styles.balanceCard, { backgroundColor: theme.gradientStart }]}>
                   <View style={styles.balanceCardHeader}>
                     <View style={[styles.balanceIconBox, { backgroundColor: theme.bg }]}>
-                      <IconComp size={18} color={theme.accent} />
+                      <IconComp size={15} color={theme.accent} />
                     </View>
                     <View style={[styles.leaveBadgePill, { backgroundColor: theme.badgeBg }]}>
-                      <Text style={[styles.leaveBadgeText, { color: theme.accent }]}>{balance.allocated} Allocated</Text>
+                      <Text style={[styles.leaveBadgeText, { color: theme.accent }]}>{balance.allocated} Alloc</Text>
                     </View>
                   </View>
 
-                  <Text style={styles.balanceTypeName}>{balance.leaveType.name}</Text>
+                  <Text style={styles.balanceTypeName} numberOfLines={1}>{balance.leaveType.name}</Text>
                   
                   <View style={styles.balanceCountRow}>
                     <Text style={styles.balanceRemaining}>{remaining}</Text>
-                    <Text style={styles.balanceSubtext}>days remaining</Text>
+                    <Text style={styles.balanceSubtext}>days left</Text>
                   </View>
 
                   {/* Custom Progress Bar */}
@@ -326,7 +396,7 @@ export default function ESSScreen() {
 
                   <View style={styles.balanceFooter}>
                     <Text style={styles.balanceFooterText}><Text style={{ fontWeight: '700', color: '#334155' }}>{balance.used}</Text> used</Text>
-                    <Text style={styles.balanceFooterText}><Text style={{ fontWeight: '700', color: '#334155' }}>{remaining}</Text> available</Text>
+                    <Text style={styles.balanceFooterText}><Text style={{ fontWeight: '700', color: '#334155' }}>{remaining}</Text> avail</Text>
                   </View>
                 </View>
               );
@@ -675,7 +745,20 @@ export default function ESSScreen() {
             </TouchableOpacity>
           </View>
         )}
+        </View>
+        )}
       </ScrollView>
+      {/* Custom Error/Success Modal */}
+      <FeedbackModal
+        visible={modalVisible}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onClose={() => setModalVisible(false)}
+        onConfirm={modalConfig.onConfirm}
+        confirmText={modalConfig.confirmText}
+        showCancel={modalConfig.showCancel}
+      />
     </SafeAreaView>
   );
 }
@@ -749,6 +832,34 @@ const styles = StyleSheet.create({
     paddingBottom: 120, // Generous padding so elements aren't cut off by floating bottom bar
   },
 
+  /* --- Main Tabs --- */
+  mainTabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  mainTabButton: {
+    paddingVertical: 14,
+    marginRight: 24,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  mainTabActive: {
+    borderBottomColor: '#E25E3E',
+  },
+  mainTabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  mainTabTextActive: {
+    color: '#E25E3E',
+    fontWeight: '700',
+  },
+
   /* --- Balances Section --- */
   sectionHeader: {
     flexDirection: 'row',
@@ -774,34 +885,35 @@ const styles = StyleSheet.create({
   },
   balancesScroll: {
     paddingHorizontal: 20,
-    gap: 14,
+    gap: 12,
+    paddingBottom: 4,
   },
   balanceCard: {
-    width: 220,
-    padding: 16,
-    borderRadius: 20,
+    width: 155,
+    padding: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   emptyBalanceCard: {
-    width: 220,
-    padding: 24,
-    borderRadius: 20,
+    width: 155,
+    padding: 16,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   emptyText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#94A3B8',
   },
@@ -809,67 +921,67 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   balanceIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   leaveBadgePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   leaveBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   balanceTypeName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 2,
   },
   balanceCountRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 6,
-    marginTop: 2,
-    marginBottom: 12,
+    gap: 4,
+    marginBottom: 8,
   },
   balanceRemaining: {
-    fontSize: 30,
+    fontSize: 22,
     fontWeight: '800',
     color: '#0F172A',
   },
   balanceSubtext: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#94A3B8',
   },
   progressTrack: {
-    height: 6,
+    height: 4,
     backgroundColor: '#E2E8F0',
-    borderRadius: 3,
+    borderRadius: 2,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 2,
   },
   balanceFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 8,
+    paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(226, 232, 240, 0.6)',
+    borderTopColor: 'rgba(226, 232, 240, 0.7)',
   },
   balanceFooterText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748B',
   },
 
@@ -1348,5 +1460,86 @@ const styles = StyleSheet.create({
     padding: 4,
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    padding: 4,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+  },
+  modalCancelButtonText: {
+    color: '#64748B',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

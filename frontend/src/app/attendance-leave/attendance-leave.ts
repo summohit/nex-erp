@@ -506,6 +506,7 @@ export class AttendanceLeaveComponent implements OnInit {
   allRequests = signal<LeaveRequest[]>([]);
   managerRequests = signal<LeaveRequest[]>([]);
   employees = signal<Employee[]>([]);
+  isLoadingEmployees = signal<boolean>(false);
   leaveTypes = signal<LeaveType[]>([]);
   
   // Whether the currently selected leave type allows half-day
@@ -1449,7 +1450,11 @@ export class AttendanceLeaveComponent implements OnInit {
     this.leavesService.getAllBalances(year).subscribe((res: any) => this.allBalances.set(res));
     this.leavesService.getRequests().subscribe((res: any) => this.allRequests.set(res));
     this.attendanceService.getPendingRegularizations().subscribe((res: any) => this.pendingRegularizations.set(res));
-    this.employeeService.getEmployees().subscribe((res: any) => this.employees.set(res));
+    this.isLoadingEmployees.set(true);
+    this.employeeService.getEmployees().subscribe({
+      next: (res: any) => this.employees.set(res),
+      complete: () => this.isLoadingEmployees.set(false)
+    });
     this.masterDataService.getLeaveTypes().subscribe((res: any) => this.leaveTypes.set(res));
   }
 

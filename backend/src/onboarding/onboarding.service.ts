@@ -154,7 +154,15 @@ export class OnboardingService {
       where: { id: employeeId },
       data: { onboardingStatus: status }
     });
-    
+
     return { success: true, status };
+  }
+
+  async getCompanyPipelineSummary(companyId: number) {
+    return this.prisma.employee.groupBy({
+      by: ['onboardingStatus'],
+      where: { companyId },
+      _count: true
+    });
   }
 }

@@ -149,6 +149,10 @@
           <svg lucideKanban size="15"></svg>
           <span>Projects</span>
         </a>
+        <button type="button" class="menu-link" (click)="openChangePasswordModal()">
+          <svg lucideLock size="15"></svg>
+          <span>Change Password</span>
+        </button>
       </div>
 
       <div class="profile-menu-footer">
@@ -160,3 +164,43 @@
     </div>
   </div>
 </header>
+
+<!-- Change Password Modal -->
+<div class="header-modal-overlay" *ngIf="isChangePasswordModalOpen()" (click)="closeChangePasswordModal()">
+  <div class="header-modal-box" (click)="$event.stopPropagation()">
+    <div class="header-modal-header">
+      <h2>Change Password</h2>
+      <button type="button" class="btn-close-popover" (click)="closeChangePasswordModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+    <div class="header-modal-body">
+      <div class="header-modal-field">
+        <label>New Password</label>
+        <div class="compound-input">
+          <input [type]="showNewPassword() ? 'text' : 'password'" [(ngModel)]="newPassword" placeholder="Must have at least 8 characters" class="form-control" (keyup.enter)="submitChangePassword()">
+          <button type="button" class="icon-btn" (click)="showNewPassword.set(!showNewPassword())">
+            <svg lucideEye size="16" *ngIf="!showNewPassword()"></svg>
+            <svg lucideEyeOff size="16" *ngIf="showNewPassword()"></svg>
+          </button>
+        </div>
+      </div>
+      <div class="header-modal-field">
+        <label>Confirm Password</label>
+        <div class="compound-input">
+          <input [type]="showConfirmPassword() ? 'text' : 'password'" [(ngModel)]="confirmPassword" placeholder="Re-enter new password" class="form-control" (keyup.enter)="submitChangePassword()">
+          <button type="button" class="icon-btn" (click)="showConfirmPassword.set(!showConfirmPassword())">
+            <svg lucideEye size="16" *ngIf="!showConfirmPassword()"></svg>
+            <svg lucideEyeOff size="16" *ngIf="showConfirmPassword()"></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="header-modal-footer">
+      <button type="button" class="btn-discard" (click)="closeChangePasswordModal()">Cancel</button>
+      <button type="button" class="btn-primary-purple" [disabled]="isChangingPassword()" (click)="submitChangePassword()">
+        {{ isChangingPassword() ? 'Saving...' : 'Reset Password' }}
+      </button>
+    </div>
+  </div>
+</div>

@@ -3,21 +3,24 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EmployeeService } from '../../services/employee.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { 
+import JSZip from 'jszip';
+import { SearchableSelectComponent } from '../../shared/components/searchable-select/searchable-select.component';
+import {
   LucideFileText, LucideSearch, LucideUploadCloud,
   LucideTrash2, LucideFilter, LucideFileCheck, LucideFolder,
-  LucideX, LucideExternalLink, LucidePaperclip
+  LucideX, LucideExternalLink, LucidePaperclip, LucideDownload, LucideArchive
 } from '@lucide/angular';
 
 @Component({
   selector: 'app-employee-documents',
   standalone: true,
   imports: [
-    CommonModule, 
+    CommonModule,
     FormsModule,
+    SearchableSelectComponent,
     LucideFileText, LucideSearch, LucideUploadCloud,
     LucideTrash2, LucideFilter, LucideFileCheck, LucideFolder,
-    LucideX, LucideExternalLink, LucidePaperclip
+    LucideX, LucideExternalLink, LucidePaperclip, LucideDownload, LucideArchive
   ],
   templateUrl: './documents.html',
   styleUrls: ['./documents.css']
@@ -31,7 +34,9 @@ export class EmployeeDocumentsComponent implements OnInit {
   
   searchQuery = signal<string>('');
   selectedDepartment = signal<string>('ALL');
-  
+  selectedEmployeeFilterId = signal<number | null>(null);
+  isZipping = signal<boolean>(false);
+
   isUploadModalOpen = signal<boolean>(false);
   uploadEmployeeId = signal<number | null>(null);
   selectedFiles = signal<{ name: string; url: string }[]>([]);
@@ -82,15 +87,23 @@ export class EmployeeDocumentsComponent implements OnInit {
   filteredDocuments = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
     const dept = this.selectedDepartment();
-    
+    const empFilterId = this.selectedEmployeeFilterId();
+
     return this.allDocuments().filter(doc => {
       const empName = `${doc.employee?.firstName || ''} ${doc.employee?.lastName || ''}`.toLowerCase();
       const docName = (doc.fileName || '').toLowerCase();
       const matchesSearch = !q || empName.includes(q) || docName.includes(q);
       const matchesDept = dept === 'ALL' || doc.employee?.department?.name === dept;
-      return matchesSearch && matchesDept;
+      const matchesEmployee = !empFilterId || doc.employee?.id === empFilterId;
+      return matchesSearch && matchesDept && matchesEmployee;
     });
   });
+
+  employeeFilterOptions = computed(() =>
+    this.employees()
+      .filter(e => e.documents && e.documents.length > 0)
+      .map(e => ({ id: e.id, name: `${e.firstName} ${e.lastName}` }))
+  );
 
   totalDocsCount = computed(() => this.allDocuments().length);
   employeesWithDocsCount = computed(() => {
@@ -213,5 +226,82 @@ export class EmployeeDocumentsComponent implements OnInit {
     if (!fileName) return 'FILE';
     const parts = fileName.split('.');
     return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'DOC';
+  }
+
+  private triggerBlobDownload(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async downloadDocument(doc: any) {
+    try {
+      const res = await fetch(doc.fileUrl);
+      if (!res.ok) throw new Error('Fetch failed');
+      const blob = await res.blob();
+      this.triggerBlobDownload(blob, doc.fileName || 'document');
+    } catch {
+      this.toast.error(`Failed to download "${doc.fileName}"`);
+    }
+  }
+
+  async downloadAllAsZip() {
+    const docs = this.filteredDocuments();
+    if (docs.length === 0) {
+      this.toast.error('No documents to download');
+      return;
+    }
+
+    this.isZipping.set(true);
+    const zip = new JSZip();
+    const usedNames = new Set<string>();
+    let failedCount = 0;
+
+    for (const doc of docs) {
+      try {
+        const res = await fetch(doc.fileUrl);
+        if (!res.ok) throw new Error('Fetch failed');
+        const blob = await res.blob();
+
+        const empName = `${doc.employee?.firstName || 'Unknown'}_${doc.employee?.lastName || ''}`.trim().replace(/\s+/g, '_');
+        let fileName = `${empName}/${doc.fileName || 'document'}`;
+        let suffix = 1;
+        while (usedNames.has(fileName)) {
+          const dotIdx = (doc.fileName || 'document').lastIndexOf('.');
+          const base = dotIdx > -1 ? doc.fileName.slice(0, dotIdx) : doc.fileName;
+          const ext = dotIdx > -1 ? doc.fileName.slice(dotIdx) : '';
+          fileName = `${empName}/${base} (${suffix})${ext}`;
+          suffix++;
+        }
+        usedNames.add(fileName);
+        zip.file(fileName, blob);
+      } catch {
+        failedCount++;
+      }
+    }
+
+    if (usedNames.size === 0) {
+      this.isZipping.set(false);
+      this.toast.error('Failed to download any documents');
+      return;
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const filterLabel = this.selectedEmployeeFilterId()
+      ? (this.employees().find(e => e.id === this.selectedEmployeeFilterId())?.firstName || 'employee')
+      : 'all-employees';
+    this.triggerBlobDownload(zipBlob, `documents-${filterLabel}-${new Date().toISOString().slice(0, 10)}.zip`);
+    this.isZipping.set(false);
+
+    if (failedCount > 0) {
+      this.toast.error(`${failedCount} document(s) could not be included in the ZIP`);
+    } else {
+      this.toast.success(`Downloaded ${usedNames.size} document(s) as ZIP`);
+    }
   }
 }

@@ -6,11 +6,12 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { AttendanceService } from '../../services/attendance';
+import { EmployeeService } from '../../services/employee.service';
 import { SpotlightSearchComponent } from '../../shared/components/spotlight-search/spotlight-search.component';
-import { 
-  LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
+import {
+  LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut,
   LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
-  LucidePlay, LucideSquare, LucideLoader2
+  LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
@@ -18,13 +19,13 @@ import { HotToastService } from '@ngneat/hot-toast';
   selector: 'app-header',
   standalone: true,
   imports: [
-    CommonModule, 
+    CommonModule,
     FormsModule,
     RouterModule,
     SpotlightSearchComponent,
-    LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut, 
+    LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut,
     LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
-    LucidePlay, LucideSquare, LucideLoader2
+    LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff
   ],
   templateUrl: './header.html',
   styleUrls: ['./header.css']
@@ -33,8 +34,17 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);
+  private employeeService = inject(EmployeeService);
   private toast = inject(HotToastService);
   notificationsService = inject(NotificationsService);
+
+  // Change Password Modal
+  isChangePasswordModalOpen = signal<boolean>(false);
+  isChangingPassword = signal<boolean>(false);
+  showNewPassword = signal<boolean>(false);
+  showConfirmPassword = signal<boolean>(false);
+  newPassword = '';
+  confirmPassword = '';
 
   @ViewChild(SpotlightSearchComponent) spotlightSearch!: SpotlightSearchComponent;
 
@@ -226,18 +236,63 @@ export class HeaderComponent implements OnInit, OnDestroy {
     const u = this.currentUser();
     if (!u) return 'Employee';
     const r = u.role || 'EMPLOYEE';
-    if (r === 'SUPER_ADMIN' || r === 'ADMIN') return 'Administrator';
-    if (r === 'HR_MANAGER') return 'HR Manager';
+    if (r === 'SUPERADMIN' || r === 'ADMIN') return 'Administrator';
+    if (r === 'HR') return 'HR Manager';
+    if (r === 'FINANCE') return 'Finance';
+    if (r === 'SALES') return 'Sales';
     return 'Team Member';
   }
 
   hasAccessToDirectory(): boolean {
     const role = this.currentUser()?.role || '';
-    return ['ADMIN', 'SUPER_ADMIN', 'HR_MANAGER'].includes(role);
+    return ['ADMIN', 'SUPERADMIN', 'HR'].includes(role);
   }
 
   logout() {
     this.authService.logout();
     this.router.navigate(['/']);
+  }
+
+  openChangePasswordModal() {
+    this.newPassword = '';
+    this.confirmPassword = '';
+    this.showNewPassword.set(false);
+    this.showConfirmPassword.set(false);
+    this.isChangePasswordModalOpen.set(true);
+    this.isProfileMenuOpen.set(false);
+  }
+
+  closeChangePasswordModal() {
+    this.isChangePasswordModalOpen.set(false);
+  }
+
+  submitChangePassword() {
+    if (!this.newPassword || this.newPassword.length < 8) {
+      this.toast.error('Password must be at least 8 characters');
+      return;
+    }
+    if (this.newPassword !== this.confirmPassword) {
+      this.toast.error('Passwords do not match');
+      return;
+    }
+
+    const employeeId = this.currentUser()?.employee?.id;
+    if (!employeeId) {
+      this.toast.error('Could not determine your employee profile');
+      return;
+    }
+
+    this.isChangingPassword.set(true);
+    this.employeeService.updateProfile(employeeId, { password: this.newPassword }).subscribe({
+      next: () => {
+        this.toast.success('Password reset successfully');
+        this.isChangingPassword.set(false);
+        this.closeChangePasswordModal();
+      },
+      error: (err) => {
+        this.toast.error(err.error?.message || 'Failed to reset password');
+        this.isChangingPassword.set(false);
+      }
+    });
   }
 }

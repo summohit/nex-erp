@@ -59,7 +59,10 @@
                 </div>
                 <ng-template #selectMyAttendance>
                   <div class="trigger-emp-info">
-                    <div class="emp-avatar-circle" style="background: #2563EB;">ME</div>
+                    <img [src]="authService.currentUser()?.employee?.avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="authService.currentUser()?.employee?.avatarUrl">
+                    <div class="emp-avatar-circle" style="background: #2563EB;" *ngIf="!authService.currentUser()?.employee?.avatarUrl">
+                      {{ authService.currentUser()?.firstName ? authService.currentUser()!.firstName!.charAt(0) : '' }}{{ authService.currentUser()?.lastName ? authService.currentUser()!.lastName!.charAt(0) : '' }}
+                    </div>
                     <div class="emp-text-details">
                       <span class="emp-name">My Attendance</span>
                       <span class="emp-subtext">Logged-in User Profile</span>
@@ -85,7 +88,10 @@
 
                 <div class="emp-options-list">
                   <div class="emp-option-item" [class.selected]="!selectedAttendanceEmployeeId()" (click)="selectAttendanceEmp(null)">
-                    <div class="option-avatar-circle" style="background: #2563EB;">ME</div>
+                    <img [src]="authService.currentUser()?.employee?.avatarUrl" alt="Avatar" class="option-avatar-img" *ngIf="authService.currentUser()?.employee?.avatarUrl">
+                    <div class="option-avatar-circle" style="background: #2563EB;" *ngIf="!authService.currentUser()?.employee?.avatarUrl">
+                      {{ authService.currentUser()?.firstName ? authService.currentUser()!.firstName!.charAt(0) : '' }}{{ authService.currentUser()?.lastName ? authService.currentUser()!.lastName!.charAt(0) : '' }}
+                    </div>
                     <div class="option-text-details">
                       <span class="option-name">My Attendance</span>
                       <span class="option-dept">Logged-in User Profile</span>
@@ -93,25 +99,37 @@
                     <svg *ngIf="!selectedAttendanceEmployeeId()" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
 
-                  <div 
-                    class="emp-option-item" 
-                    *ngFor="let e of filteredAttendanceEmployees()" 
-                    [class.selected]="e.id === selectedAttendanceEmployeeId()"
-                    (click)="selectAttendanceEmp(e.id)">
-                    <img [src]="e.avatarUrl" alt="Avatar" class="option-avatar-img" *ngIf="e.avatarUrl">
-                    <div class="option-avatar-circle" *ngIf="!e.avatarUrl">
-                      {{ e.firstName ? e.firstName.charAt(0) : '' }}{{ e.lastName ? e.lastName.charAt(0) : '' }}
+                  <ng-container *ngIf="isLoadingEmployees(); else loadedEmpOptions">
+                    <div class="emp-option-item skeleton-option" *ngFor="let i of [1,2,3,4]">
+                      <div class="option-avatar-circle skeleton-block"></div>
+                      <div class="option-text-details">
+                        <span class="skeleton-block skeleton-line" [style.width]="i % 2 === 0 ? '55%' : '70%'"></span>
+                        <span class="skeleton-block skeleton-line" style="width: 40%; height: 10px;"></span>
+                      </div>
                     </div>
-                    <div class="option-text-details">
-                      <span class="option-name">{{ e.firstName }} {{ e.lastName }}</span>
-                      <span class="option-dept">{{ e.department?.name || 'General' }} &bull; {{ e.designation?.name || 'Staff' }}</span>
-                    </div>
-                    <svg *ngIf="e.id === selectedAttendanceEmployeeId()" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  </div>
+                  </ng-container>
 
-                  <div class="no-results-item" *ngIf="filteredAttendanceEmployees().length === 0">
-                    No employees found
-                  </div>
+                  <ng-template #loadedEmpOptions>
+                    <div
+                      class="emp-option-item"
+                      *ngFor="let e of filteredAttendanceEmployees()"
+                      [class.selected]="e.id === selectedAttendanceEmployeeId()"
+                      (click)="selectAttendanceEmp(e.id)">
+                      <img [src]="e.avatarUrl" alt="Avatar" class="option-avatar-img" *ngIf="e.avatarUrl">
+                      <div class="option-avatar-circle" *ngIf="!e.avatarUrl">
+                        {{ e.firstName ? e.firstName.charAt(0) : '' }}{{ e.lastName ? e.lastName.charAt(0) : '' }}
+                      </div>
+                      <div class="option-text-details">
+                        <span class="option-name">{{ e.firstName }} {{ e.lastName }}</span>
+                        <span class="option-dept">{{ e.department?.name || 'General' }} &bull; {{ e.designation?.name || 'Staff' }}</span>
+                      </div>
+                      <svg *ngIf="e.id === selectedAttendanceEmployeeId()" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>
+
+                    <div class="no-results-item" *ngIf="filteredAttendanceEmployees().length === 0">
+                      No employees found
+                    </div>
+                  </ng-template>
                 </div>
               </div>
             </div>

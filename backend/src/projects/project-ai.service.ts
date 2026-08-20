@@ -23,7 +23,7 @@ export class ProjectAiService {
   }
 
   async analyzeProjectDocuments(companyId: number, projectId: number, constraints?: any, requestedModel?: string) {
-    const aiModel = requestedModel || 'llama-3.3-70b-versatile';
+    const aiModel = requestedModel || 'openai/gpt-oss-120b';
     const isGemini = aiModel.startsWith('gemini') || aiModel.startsWith('gemma');
 
     if (isGemini && !process.env.GEMINI_API_KEY) {

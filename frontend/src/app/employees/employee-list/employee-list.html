@@ -35,36 +35,39 @@
     </div>
     
     <div class="filter-group">
-      <select class="form-control" [(ngModel)]="filterDepartmentId" (change)="applyFilters()">
-        <option [ngValue]="null">All Departments</option>
-        <option *ngFor="let dept of departments()" [ngValue]="dept.id">{{ dept.name }}</option>
-      </select>
+      <app-searchable-select
+        [options]="departmentOptions()"
+        placeholder="All Departments"
+        [value]="filterDepartmentId"
+        (valueChange)="filterDepartmentId = $event; applyFilters()">
+      </app-searchable-select>
     </div>
 
     <div class="filter-group">
-      <select class="form-control" [(ngModel)]="filterDesignationId" (change)="applyFilters()">
-        <option [ngValue]="null">All Designations</option>
-        <option *ngFor="let desig of designations()" [ngValue]="desig.id">{{ desig.name }}</option>
-      </select>
+      <app-searchable-select
+        [options]="designationOptions()"
+        placeholder="All Designations"
+        [value]="filterDesignationId"
+        (valueChange)="filterDesignationId = $event; applyFilters()">
+      </app-searchable-select>
     </div>
 
     <div class="filter-group">
-      <select class="form-control" [(ngModel)]="filterRole" (change)="applyFilters()">
-        <option [ngValue]="null">All Roles</option>
-        <option value="ADMIN">Admin</option>
-        <option value="HR">HR</option>
-        <option value="FINANCE">Finance</option>
-        <option value="EMPLOYEE">Employee</option>
-      </select>
+      <app-searchable-select
+        [options]="roleOptions"
+        placeholder="All Roles"
+        [value]="filterRole"
+        (valueChange)="filterRole = $event; applyFilters()">
+      </app-searchable-select>
     </div>
 
     <div class="filter-group">
-      <select class="form-control" [(ngModel)]="filterOnboardingStatus" (change)="applyFilters()">
-        <option [ngValue]="null">All Onboarding Statuses</option>
-        <option value="PENDING">Pending</option>
-        <option value="IN_PROGRESS">In Progress</option>
-        <option value="COMPLETED">Completed</option>
-      </select>
+      <app-searchable-select
+        [options]="onboardingStatusOptions"
+        placeholder="All Onboarding Statuses"
+        [value]="filterOnboardingStatus"
+        (valueChange)="filterOnboardingStatus = $event; applyFilters()">
+      </app-searchable-select>
     </div>
 
     <button class="btn-clear-filters" (click)="clearFilters()" *ngIf="searchText || filterDepartmentId || filterDesignationId || filterRole || filterOnboardingStatus">

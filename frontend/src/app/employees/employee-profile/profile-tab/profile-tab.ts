@@ -2,8 +2,8 @@ import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { 
-  LucideEye, LucideEyeOff, LucideShuffle, LucidePlus, LucideX, 
+import {
+  LucidePlus, LucideX,
   LucideTrash2, LucideLayoutGrid,
   LucideCreditCard, LucideUser, LucideShieldCheck, LucideGraduationCap,
   LucidePlane, LucideUsers, LucideSettings, LucideEdit2, LucidePaperclip, LucideMapPin,
@@ -37,12 +37,9 @@ export interface SkillItem {
   selector: 'app-profile-tab',
   standalone: true,
   imports: [
-    CommonModule, 
-    FormsModule, 
-    LucideEye, 
-    LucideEyeOff, 
-    LucideShuffle, 
-    LucidePlus, 
+    CommonModule,
+    FormsModule,
+    LucidePlus,
     LucideX, 
     LucideTrash2,
     LucideMapPin,
@@ -71,7 +68,6 @@ export class ProfileTabComponent implements OnInit {
   @Output() refreshProfile = new EventEmitter<void>();
 
   formData: any = {};
-  showPassword = false;
   personalSubTab: 'all' | 'contact_bank' | 'personal' | 'citizenship_visa' | 'location' | 'family_edu' | 'bio' = 'all';
 
   setPersonalSubTab(tab: 'all' | 'contact_bank' | 'personal' | 'citizenship_visa' | 'location' | 'family_edu' | 'bio') {
@@ -105,7 +101,7 @@ export class ProfileTabComponent implements OnInit {
   // Skills Modal State
   isUpdateSkillsModalOpen = false;
   selectedSkillCategory = 'Languages';
-  selectedSkillName = '';
+  selectedSkillNames = new Set<string>();
   selectedSkillLevel = 'A1';
 
   skillCategories = ['Languages', 'Soft Skills', 'Technical Skills', 'Management'];
@@ -307,7 +303,7 @@ export class ProfileTabComponent implements OnInit {
   // --- Skills Modal Handlers ---
   openUpdateSkillsModal() {
     this.selectedSkillCategory = 'Languages';
-    this.selectedSkillName = this.skillsByCategory['Languages'][0];
+    this.selectedSkillNames = new Set<string>();
     this.selectedSkillLevel = this.levelsByCategory['Languages'][0];
     this.isUpdateSkillsModalOpen = true;
   }
@@ -318,14 +314,17 @@ export class ProfileTabComponent implements OnInit {
 
   onCategoryChange(cat: string) {
     this.selectedSkillCategory = cat;
-    const skills = this.skillsByCategory[cat] || [];
-    this.selectedSkillName = skills[0] || '';
+    this.selectedSkillNames = new Set<string>();
     const levels = this.levelsByCategory[cat] || [];
     this.selectedSkillLevel = levels[0] || '';
   }
 
-  selectSkillName(skill: string) {
-    this.selectedSkillName = skill;
+  toggleSkillName(skill: string) {
+    if (this.selectedSkillNames.has(skill)) {
+      this.selectedSkillNames.delete(skill);
+    } else {
+      this.selectedSkillNames.add(skill);
+    }
   }
 
   selectSkillLevel(lvl: string) {
@@ -333,25 +332,28 @@ export class ProfileTabComponent implements OnInit {
   }
 
   saveSkill(andNew: boolean = false) {
-    if (!this.selectedSkillName) return;
+    if (this.selectedSkillNames.size === 0) return;
 
-    const existingIdx = this.formData.skills.findIndex(
-      (s: any) => s.category === this.selectedSkillCategory && s.name === this.selectedSkillName
-    );
+    for (const skillName of this.selectedSkillNames) {
+      const existingIdx = this.formData.skills.findIndex(
+        (s: any) => s.category === this.selectedSkillCategory && s.name === skillName
+      );
 
-    if (existingIdx > -1) {
-      this.formData.skills[existingIdx].level = this.selectedSkillLevel;
-    } else {
-      this.formData.skills.push({
-        id: Date.now(),
-        category: this.selectedSkillCategory,
-        name: this.selectedSkillName,
-        level: this.selectedSkillLevel
-      });
+      if (existingIdx > -1) {
+        this.formData.skills[existingIdx].level = this.selectedSkillLevel;
+      } else {
+        this.formData.skills.push({
+          id: Date.now() + Math.random(),
+          category: this.selectedSkillCategory,
+          name: skillName,
+          level: this.selectedSkillLevel
+        });
+      }
     }
 
-    this.toast.success(`Skill "${this.selectedSkillName}" updated`);
+    this.toast.success(`${this.selectedSkillNames.size} skill(s) updated`);
     this.saveProfile();
+    this.selectedSkillNames = new Set<string>();
 
     if (!andNew) {
       this.closeUpdateSkillsModal();
@@ -512,19 +514,6 @@ export class ProfileTabComponent implements OnInit {
       this.cities = [];
       this.formData.city = '';
     }
-  }
-
-  togglePassword() {
-    this.showPassword = !this.showPassword;
-  }
-
-  generatePassword() {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
-    let pass = '';
-    for (let i = 0; i < 12; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    this.formData.password = pass;
   }
 
   isSendingResetEmail = false;

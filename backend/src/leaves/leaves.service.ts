@@ -248,11 +248,23 @@ export class LeavesService implements OnModuleInit {
   async getRequests(companyId: number, filter: any) {
     return this.prisma.leaveRequest.findMany({
       where: { employee: { companyId } },
-      include: { 
+      include: {
         employee: { select: { id: true, firstName: true, lastName: true } },
         leaveType: true
       },
       orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async getPendingApprovalsForCompany(companyId: number, take: number = 8) {
+    return this.prisma.leaveRequest.findMany({
+      where: { employee: { companyId }, status: 'PENDING' },
+      include: {
+        employee: { select: { id: true, firstName: true, lastName: true } },
+        leaveType: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take
     });
   }
 

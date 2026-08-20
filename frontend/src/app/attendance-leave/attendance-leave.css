@@ -1894,3 +1894,31 @@
   50% { opacity: 1; }
   100% { opacity: 0.5; }
 }
+
+.emp-option-item.skeleton-option {
+  cursor: default;
+}
+
+.emp-option-item.skeleton-option:hover {
+  background: transparent;
+}
+
+.skeleton-block {
+  background: #F1F5F9;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.option-avatar-circle.skeleton-block {
+  background: #F1F5F9;
+}
+
+.skeleton-line {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+.skeleton-line:last-child {
+  margin-bottom: 0;
+}

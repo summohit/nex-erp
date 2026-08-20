@@ -40,10 +40,11 @@
         <nav class="sidebar-nav">
         <ng-container *ngFor="let item of section.items">
           <div class="nav-section">
-            <a href="#" 
-               class="nav-item" 
+            <a href="#"
+               class="nav-item"
                [class.active]="isMainItemActive(item)"
                [class.expanded]="expandedMenu() === item.id"
+               [attr.title]="isCollapsed() ? item.title : null"
                (click)="toggleMenu(item, $event)">
               <div class="active-indicator" *ngIf="isMainItemActive(item)"></div>
               <div class="nav-item-content">

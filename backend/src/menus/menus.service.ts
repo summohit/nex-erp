@@ -152,7 +152,7 @@ export class MenusService implements OnModuleInit {
         icon: item.icon,
         route: item.route,
         subItems: item.children.length > 0 ? item.children.map(sub => ({
-          id: sub.route ? sub.route.replace('/', '') : sub.title.toLowerCase().replace(/ /g, '-'),
+          id: sub.route === '/careers' ? 'recruitment/careers-page' : (sub.route ? sub.route.replace('/', '') : sub.title.toLowerCase().replace(/ /g, '-')),
           title: sub.title,
           route: sub.route,
           external: sub.openInNewTab

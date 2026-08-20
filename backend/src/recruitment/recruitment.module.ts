@@ -10,6 +10,7 @@ import { PayrollModule } from '../payroll/payroll.module';
 @Module({
   imports: [PrismaModule, PayrollModule],
   controllers: [JobsController, ApplicationsController],
-  providers: [JobsService, ApplicationsService]
+  providers: [JobsService, ApplicationsService],
+  exports: [ApplicationsService]
 })
 export class RecruitmentModule {}

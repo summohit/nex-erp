@@ -47,7 +47,7 @@ export default function LoginScreen() {
     try {
       const response = await apiClient.post('/auth/login', {
         email: email.trim(),
-        password,
+        password: password.trim(),
       });
 
       const { access_token, refresh_token } = response.data;
