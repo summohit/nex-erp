@@ -92,8 +92,8 @@ export const projectService = {
     await apiClient.post(`/projects/${projectId}/issues/${issueId}/time-stop`);
   },
 
-  logIssueTime: async (projectId: number, issueId: number, hours: number, description?: string): Promise<void> => {
-    await apiClient.post(`/projects/${projectId}/issues/${issueId}/time-log`, { hours, description });
+  logIssueTime: async (projectId: number, issueId: number, durationMin: number): Promise<void> => {
+    await apiClient.post(`/projects/${projectId}/issues/${issueId}/time-log`, { durationMin });
   },
 
   // --- Checklists ---
@@ -177,6 +177,22 @@ export const projectService = {
 
   deleteAttachment: async (projectId: number, issueId: number, attachmentId: number): Promise<void> => {
     await apiClient.delete(`/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}`);
+  },
+
+  // --- Review (Approve / Reject) ---
+  reviewIssue: async (projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string): Promise<any> => {
+    const response = await apiClient.post(`/projects/${projectId}/issues/${issueId}/review`, { action, reason });
+    return response.data;
+  },
+
+  // --- Project Members ---
+  addProjectMember: async (projectId: number, employeeId: number, role: string = 'MEMBER'): Promise<any> => {
+    const response = await apiClient.post(`/projects/${projectId}/members`, { employeeId, role });
+    return response.data;
+  },
+
+  removeProjectMember: async (projectId: number, employeeId: number): Promise<void> => {
+    await apiClient.delete(`/projects/${projectId}/members/${employeeId}`);
   },
 };
 

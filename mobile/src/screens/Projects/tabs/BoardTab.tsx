@@ -1,12 +1,23 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, FlatList, RefreshControl, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, FlatList, RefreshControl, Animated, Image } from 'react-native';
 import { useProjectStore } from '../../../store/projectStore';
-import { AlertCircle, CheckCircle, Clock, Plus, ArrowDown, Minus, ArrowUp, Flame } from 'lucide-react-native';
+import { AlertCircle, CheckCircle, Clock, Plus, ArrowDown, Minus, ArrowUp, Flame, MessageSquare } from 'lucide-react-native';
 import IssueFormModal from '../modals/IssueFormModal';
 import IssueDetailModal from '../modals/IssueDetailModal';
+import { useProjectPermissions } from '../../../hooks/useProjectPermissions';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = width * 0.85;
+const MAX_CARD_AVATARS = 3;
+
+// Matches web's getMemberColor() palette exactly (project-detail.ts)
+const MEMBER_COLORS = ['#0c66e4', '#1f845a', '#c25100', '#c9372c', '#6e5dc6', '#943d73', '#206a83', '#505f79'];
+const getMemberColor = (employeeId: number) => MEMBER_COLORS[employeeId % MEMBER_COLORS.length];
+const getMemberInitials = (emp: any) => {
+  const fn = (emp?.firstName || '').charAt(0).toUpperCase();
+  const ln = (emp?.lastName || '').charAt(0).toUpperCase();
+  return (fn + ln) || 'M';
+};
 
 export default function BoardTab() {
   const { currentProject, currentBoard, currentIssues, createIssue, fetchProjectDetails, isLoading } = useProjectStore();
@@ -40,6 +51,8 @@ export default function BoardTab() {
       { id: 'done', name: 'Done', type: 'DONE', color: '#10b981' },
     ];
   }, [currentBoard]);
+
+  const perms = useProjectPermissions(currentProject, columns);
 
   const issuesByColumnId = useMemo(() => {
     const map: Record<string, any[]> = {};
@@ -144,9 +157,37 @@ export default function BoardTab() {
     }
   };
 
+  const formatTimeSummary = (min: number) => (min < 60 ? `${Math.round(min)}m` : `${(min / 60).toFixed(1)}h`);
+
+  const getIssueTimeSummary = (issue: any): { display: string; isRunning: boolean; isOver: boolean } | null => {
+    const isRunning = !!(issue.workStartedAt && !issue.workCompletedAt);
+    let loggedMin = 0;
+    if (Array.isArray(issue.timeLogs) && issue.timeLogs.length > 0) {
+      loggedMin = issue.timeLogs.reduce((acc: number, log: any) => acc + (log.durationMin || 0), 0);
+    }
+    const estHours = issue.estimatedHours || 0;
+    const estMin = estHours * 60;
+
+    if (!isRunning && loggedMin === 0 && estHours === 0) return null;
+
+    if (isRunning) {
+      return { display: 'Timer Active', isRunning: true, isOver: false };
+    }
+    if (estHours > 0) {
+      return {
+        display: `${formatTimeSummary(loggedMin)} / ${formatTimeSummary(estMin)}`,
+        isRunning: false,
+        isOver: loggedMin > estMin,
+      };
+    }
+    return { display: formatTimeSummary(loggedMin), isRunning: false, isOver: false };
+  };
+
   const renderIssue = ({ item }: { item: any }) => {
     const priorityConfig = getPriorityConfig(item.priority);
     const PriorityIconComp = priorityConfig.icon;
+    const timeSummary = getIssueTimeSummary(item);
+    const commentCount = item._count?.comments || 0;
 
     return (
       <TouchableOpacity
@@ -160,8 +201,15 @@ export default function BoardTab() {
               <PriorityIconComp size={11} color={priorityConfig.color} strokeWidth={2.5} />
             </View>
           </View>
+
+          {item.rejectionReason && (
+            <View style={styles.rejectedPill}>
+              <Text style={styles.rejectedPillText}>REJECTED</Text>
+            </View>
+          )}
+
           <Text style={styles.issueTitle} numberOfLines={2}>{item.title}</Text>
-          
+
           {item.labels && item.labels.length > 0 && (
             <View style={styles.cardLabelsRow}>
               {item.labels.slice(0, 3).map((l: any) => (
@@ -176,17 +224,68 @@ export default function BoardTab() {
             </View>
           )}
 
+          {(timeSummary || commentCount > 0) && (
+            <View style={styles.cardMetaRow}>
+              {timeSummary && (
+                <View style={[styles.timeBadge, timeSummary.isRunning && styles.timeBadgeRunning, timeSummary.isOver && styles.timeBadgeOver]}>
+                  {timeSummary.isRunning && <View style={styles.pulseDot} />}
+                  <Clock size={11} color={timeSummary.isRunning ? '#16A34A' : timeSummary.isOver ? '#DC2626' : '#64748B'} />
+                  <Text style={[styles.timeBadgeText, timeSummary.isRunning && { color: '#16A34A' }, timeSummary.isOver && { color: '#DC2626' }]}>
+                    {timeSummary.display}
+                  </Text>
+                </View>
+              )}
+              {commentCount > 0 && (
+                <View style={styles.commentBadge}>
+                  <MessageSquare size={11} color="#64748B" />
+                  <Text style={styles.commentBadgeText}>{commentCount}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           <View style={styles.issueFooter}>
             <View style={styles.issueTypeBadge}>
               <Text style={styles.issueTypeText}>{item.type || 'TASK'}</Text>
             </View>
-            {item.assignee && (
-              <View style={styles.assigneeAvatar}>
-                <Text style={styles.assigneeInitial}>
-                  {(item.assignee.firstName?.[0] || 'U').toUpperCase()}
-                </Text>
-              </View>
-            )}
+            {(() => {
+              const members: any[] = Array.isArray(item.members) && item.members.length > 0
+                ? item.members
+                : item.assignee
+                ? [{ employeeId: item.assignee.id, employee: item.assignee }]
+                : [];
+              if (members.length === 0) return null;
+              const visible = members.slice(0, MAX_CARD_AVATARS);
+              const overflow = members.length - visible.length;
+              return (
+                <View style={styles.memberAvatarsRow}>
+                  {visible.map((m, mi) => {
+                    const emp = m.employee || m;
+                    return (
+                      <View
+                        key={m.employeeId || mi}
+                        style={[
+                          styles.assigneeAvatar,
+                          { marginLeft: mi === 0 ? 0 : -8, zIndex: visible.length - mi },
+                          !emp.avatarUrl && { backgroundColor: getMemberColor(m.employeeId || emp.id || mi) },
+                        ]}
+                      >
+                        {emp.avatarUrl ? (
+                          <Image source={{ uri: emp.avatarUrl }} style={styles.assigneeAvatarImg} />
+                        ) : (
+                          <Text style={styles.assigneeInitial}>{getMemberInitials(emp)}</Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                  {overflow > 0 && (
+                    <View style={[styles.assigneeAvatar, styles.assigneeAvatarOverflow, { marginLeft: -8 }]}>
+                      <Text style={styles.assigneeOverflowText}>+{overflow}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
           </View>
         </TouchableOpacity>
     );
@@ -212,15 +311,17 @@ export default function BoardTab() {
                 <View style={styles.issueCountBadge}>
                   <Text style={styles.issueCountText}>{colIssues.length}</Text>
                 </View>
-                <TouchableOpacity 
-                  style={styles.addBtn}
-                  onPress={() => {
-                    setCreateColumnId(col.id !== 'todo' && col.id !== 'in_progress' && col.id !== 'done' ? col.id : undefined);
-                    setCreateModalVisible(true);
-                  }}
-                >
-                  <Plus size={20} color="#64748B" />
-                </TouchableOpacity>
+                {perms.canCreateIssue && (
+                  <TouchableOpacity
+                    style={styles.addBtn}
+                    onPress={() => {
+                      setCreateColumnId(col.id !== 'todo' && col.id !== 'in_progress' && col.id !== 'done' ? col.id : undefined);
+                      setCreateModalVisible(true);
+                    }}
+                  >
+                    <Plus size={20} color="#64748B" />
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.listContainer}>
@@ -427,6 +528,69 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#94A3B8',
   },
+  rejectedPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  rejectedPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#DC2626',
+    letterSpacing: 0.3,
+  },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  timeBadgeRunning: {
+    backgroundColor: '#ECFDF5',
+  },
+  timeBadgeOver: {
+    backgroundColor: '#FEF2F2',
+  },
+  timeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16A34A',
+  },
+  commentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  commentBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
   issueFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -443,6 +607,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
   },
+  memberAvatarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   assigneeAvatar: {
     width: 24,
     height: 24,
@@ -450,6 +618,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#E25E3E',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  assigneeAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  assigneeAvatarOverflow: {
+    backgroundColor: '#475569',
+  },
+  assigneeOverflowText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   assigneeInitial: {
     color: '#FFFFFF',

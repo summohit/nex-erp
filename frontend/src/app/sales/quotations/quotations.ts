@@ -1,15 +1,19 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { LucidePlus, LucideFileText, LucideCheck, LucideTrash2, LucideArrowRight, LucideX } from '@lucide/angular';
+import { LucidePlus, LucideFileText, LucideCheck, LucideTrash2, LucideArrowRight, LucideX, LucideIndianRupee } from '@lucide/angular';
+import { ClientsService } from '../../services/clients';
+import { SearchableSelectComponent } from '../../shared/components/searchable-select/searchable-select.component';
+import { DialogHostComponent } from '../../shared/components/dialog-host/dialog-host.component';
+import { DialogService } from '../../shared/services/dialog.service';
 
 interface QuotationItem {
   description: string;
   quantity: number;
+  unit: string;
   unitPrice: number;
-  total?: number;
 }
 
 interface Quotation {
@@ -21,34 +25,57 @@ interface Quotation {
   currency: string;
   status: string;
   approvalStatus: string;
-  approvedBy?: { firstName: string, lastName: string };
 }
 
 @Component({
   selector: 'app-quotations',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucidePlus, LucideFileText, LucideCheck, LucideTrash2, LucideArrowRight, LucideX],
+  imports: [
+    CommonModule, FormsModule,
+    LucidePlus, LucideFileText, LucideCheck, LucideTrash2, LucideArrowRight, LucideX, LucideIndianRupee,
+    SearchableSelectComponent, DialogHostComponent
+  ],
   templateUrl: './quotations.html',
   styleUrls: ['./quotations.css']
 })
 export class QuotationsComponent implements OnInit {
+  private clientsService = inject(ClientsService);
+  private dialog = inject(DialogService);
+  constructor(private http: HttpClient) {}
+
   quotations: Quotation[] = [];
   clients: any[] = [];
   leads: any[] = [];
-
   showCreateModal = false;
   isSubmitted = false;
+  isSaving = false;
 
-  newQuoteData = {
-    clientId: null as number | null,
-    leadId: null as number | null,
-    date: new Date().toISOString().split('T')[0],
-    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    currency: 'USD',
-    items: [{ description: '', quantity: 1, unitPrice: 0 }] as QuotationItem[]
-  };
+  readonly unitOptions = ['number', 'piece', 'hour', 'day', 'kg', 'litre', 'meter', 'roll', 'box', 'bundle'];
+  readonly taxOptions = [0, 5, 12, 18, 28];
 
-  constructor(private http: HttpClient) {}
+  newQuoteData: {
+    clientId: number | null;
+    leadId: number | null;
+    date: string;
+    validUntil: string;
+    currency: string;
+    taxRate: number;
+    notes: string;
+    items: QuotationItem[];
+  } = this.freshForm();
+
+  private freshForm() {
+    return {
+      clientId: null as number | null,
+      leadId: null as number | null,
+      date: new Date().toISOString().split('T')[0],
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      currency: 'INR',
+      taxRate: 18,
+      notes: '',
+      items: [{ description: '', quantity: 1, unit: 'number', unitPrice: 0 }] as QuotationItem[]
+    };
+  }
 
   ngOnInit() {
     this.loadQuotations();
@@ -63,7 +90,7 @@ export class QuotationsComponent implements OnInit {
   }
 
   loadClients() {
-    this.http.get<any[]>(`${environment.apiUrl}/clients`).subscribe(data => {
+    this.clientsService.getClients('ACTIVE').subscribe((data: any[]) => {
       this.clients = data;
     });
   }
@@ -77,14 +104,7 @@ export class QuotationsComponent implements OnInit {
   openModal() {
     this.showCreateModal = true;
     this.isSubmitted = false;
-    this.newQuoteData = {
-      clientId: null,
-      leadId: null,
-      date: new Date().toISOString().split('T')[0],
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      currency: 'USD',
-      items: [{ description: '', quantity: 1, unitPrice: 0 }]
-    };
+    this.newQuoteData = this.freshForm();
   }
 
   closeModal() {
@@ -93,7 +113,7 @@ export class QuotationsComponent implements OnInit {
   }
 
   addItem() {
-    this.newQuoteData.items.push({ description: '', quantity: 1, unitPrice: 0 });
+    this.newQuoteData.items.push({ description: '', quantity: 1, unit: 'number', unitPrice: 0 });
   }
 
   removeItem(index: number) {
@@ -102,44 +122,45 @@ export class QuotationsComponent implements OnInit {
     }
   }
 
-  calculateTotal() {
-    let subtotal = 0;
-    this.newQuoteData.items.forEach(item => {
-      subtotal += (item.quantity * item.unitPrice);
-    });
-    const tax = subtotal * 0.10;
-    return subtotal + tax;
+  getSubtotal() {
+    return this.newQuoteData.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+  }
+
+  getTax() {
+    return this.getSubtotal() * (this.newQuoteData.taxRate / 100);
+  }
+
+  getTotal() {
+    return this.getSubtotal() + this.getTax();
+  }
+
+  currencySymbol() {
+    const map: Record<string, string> = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+    return map[this.newQuoteData.currency] || '₹';
   }
 
   createQuotation() {
     this.isSubmitted = true;
-    if (!this.newQuoteData.clientId || this.newQuoteData.items.length === 0) {
-      return;
-    }
+    if (!this.newQuoteData.clientId || this.newQuoteData.items.length === 0) return;
 
+    this.isSaving = true;
     this.http.post(`${environment.apiUrl}/sales/quotations`, this.newQuoteData).subscribe({
-      next: () => {
-        this.closeModal();
-        this.loadQuotations();
-      },
-      error: (err) => {
-        console.error('Failed to create quotation', err);
-      }
+      next: () => { this.isSaving = false; this.closeModal(); this.loadQuotations(); },
+      error: (err) => { this.isSaving = false; this.dialog.error(err?.error?.message || 'Failed to save quotation'); }
     });
   }
 
   approveQuote(id: number) {
-    this.http.put(`${environment.apiUrl}/sales/quotations/${id}/approve`, {}).subscribe(() => {
-      this.loadQuotations();
-    });
+    this.http.put(`${environment.apiUrl}/sales/quotations/${id}/approve`, {}).subscribe(() => this.loadQuotations());
   }
 
-  convertToOrder(id: number) {
-    this.http.post(`${environment.apiUrl}/sales/quotations/${id}/convert`, {}).subscribe(() => {
-      this.loadQuotations();
-      alert('Quotation successfully converted to Sales Order!');
-    }, error => {
-      alert(error.error.message || 'Failed to convert quote');
+  async convertToOrder(id: number) {
+    const ok = await this.dialog.confirm('Convert this quotation into a confirmed sales order?', 'Convert to Order', 'Convert');
+    if (!ok) return;
+
+    this.http.post(`${environment.apiUrl}/sales/quotations/${id}/convert`, {}).subscribe({
+      next: () => { this.loadQuotations(); this.dialog.success('Quotation converted to a sales order.'); },
+      error: (err) => this.dialog.error(err?.error?.message || 'Failed to convert')
     });
   }
 }

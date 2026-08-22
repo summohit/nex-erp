@@ -3,9 +3,9 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { 
-  LucidePlus, LucideBriefcase, LucideMapPin, LucideClock, LucideSparkles, 
-  LucideX, LucideMoreVertical, LucideSearch, LucideBold, LucideItalic, 
+import {
+  LucidePlus, LucideBriefcase, LucideMapPin, LucideClock, LucideSparkles,
+  LucideX, LucideMoreVertical, LucideSearch, LucideBold, LucideItalic,
   LucideList, LucideListOrdered, LucideHelpCircle, LucideTrash2, LucideBuilding,
   LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff
 } from '@lucide/angular';
@@ -25,8 +25,8 @@ declare var Quill: any;
   selector: 'app-job-postings',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, LucidePlus, 
-    LucideSparkles, LucideX, LucideSearch, 
+    CommonModule, FormsModule, LucidePlus,
+    LucideSparkles, LucideX, LucideSearch,
     LucideHelpCircle, LucideTrash2, LucideBuilding,
     LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff,
     AgGridAngular, DatePipe
@@ -47,6 +47,7 @@ export class JobPostingsComponent implements OnInit {
   departments = signal<Department[]>([]);
   designations = signal<Designation[]>([]);
   filteredDesignations = signal<Designation[]>([]);
+  allDesignations = signal<Designation[]>([]);
   branches = signal<Branch[]>([]);
   hrEmployees = signal<Employee[]>([]);
 
@@ -58,6 +59,7 @@ export class JobPostingsComponent implements OnInit {
     });
     this.masterDataService.getDesignations(true).subscribe(res => {
       this.designations.set(res);
+      this.allDesignations.set(res);
     });
     this.masterDataService.getBranches().subscribe(res => {
       this.branches.set(res);
@@ -97,6 +99,11 @@ export class JobPostingsComponent implements OnInit {
     });
   }
 
+  onDesignationInput() {
+    const match = this.allDesignations().find(d => d.name.toLowerCase() === (this.jobForm.designationName || '').toLowerCase());
+    this.jobForm.designationId = match ? String(match.id) : '';
+  }
+
   onDepartmentChange() {
     const dept = this.departments().find(d => d.name === this.jobForm.departmentName);
     this.jobForm.departmentId = dept ? String(dept.id) : '';
@@ -120,7 +127,7 @@ export class JobPostingsComponent implements OnInit {
   // Grid State
   gridApi: any;
   searchText = '';
-  filterStatus = '';
+  filterStatus = 'Open';
   filterDepartment = '';
 
   defaultColDef: ColDef = {
@@ -159,11 +166,25 @@ export class JobPostingsComponent implements OnInit {
     { field: 'experienceYears', headerName: 'Experience', width: 140, flex: 0 },
     { field: 'location', headerName: 'Location' },
     { field: 'type', headerName: 'Type', width: 120, flex: 0 },
-    { 
+    {
       headerName: 'Recruiter',
-      width: 140, 
+      width: 200,
       flex: 0,
-      valueGetter: (params: any) => params.data.recruiter ? `${params.data.recruiter.firstName} ${params.data.recruiter.lastName}` : 'Unassigned'
+      valueGetter: (params: any) => params.data.recruiter ? `${params.data.recruiter.firstName} ${params.data.recruiter.lastName}` : 'Unassigned',
+      cellRenderer: (params: any) => {
+        const r = params.data.recruiter;
+        if (!r) return '<span style="color:#94a3b8;font-size:13px;">Unassigned</span>';
+        const name = `${r.firstName} ${r.lastName}`;
+        const initials = (r.firstName?.[0] || '') + (r.lastName?.[0] || '');
+        const colors = ['#6366f1','#8b5cf6','#ec4899','#f43f5e','#10b981','#06b6d4','#3b82f6','#f59e0b'];
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        const bg = colors[Math.abs(hash) % colors.length];
+        const avatar = r.avatarUrl
+          ? `<img src="${r.avatarUrl}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+          : `<div style="width:28px;height:28px;border-radius:50%;background:${bg};color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initials.toUpperCase()}</div>`;
+        return `<div style="display:flex;align-items:center;gap:8px;height:100%;">${avatar}<span style="font-size:13px;color:#0f172a;">${name}</span></div>`;
+      }
     },
     {
       headerName: 'Openings',
@@ -217,6 +238,8 @@ export class JobPostingsComponent implements OnInit {
 
   onGridReady(params: any) {
     this.gridApi = params.api;
+    // Apply default Open filter after grid is ready
+    setTimeout(() => this.applyFilters(), 0);
   }
 
   onSearch() {
@@ -257,6 +280,7 @@ export class JobPostingsComponent implements OnInit {
     departmentId: '',
     departmentName: '',
     designationId: '',
+    designationName: '',
     branchId: '',
     experienceYears: '3-5 Years',
     type: 'Full-time',
@@ -366,10 +390,11 @@ export class JobPostingsComponent implements OnInit {
       title: '', 
       departmentId: '', 
       departmentName: '',
-      designationId: '', 
+      designationId: '',
+      designationName: '',
       branchId: '',
       experienceYears: '3-5 Years',
-      type: 'Full-time', 
+      type: 'Full-time',
       typeOther: '',
       workLocationType: 'On-site',
       recruiterId: '',
@@ -379,12 +404,12 @@ export class JobPostingsComponent implements OnInit {
       endDate: '',
       discloseSalary: false,
       status: 'Open',
-      location: '', 
+      location: '',
       address: '',
-      descriptionHtml: '', 
+      descriptionHtml: '',
       minSalary: '',
       maxSalary: '',
-      aiPrompt: '' 
+      aiPrompt: ''
     };
     this.filteredDesignations.set([]);
     this.isCreateModalOpen.set(true);
@@ -412,12 +437,13 @@ export class JobPostingsComponent implements OnInit {
     const branch = this.branches().find(b => b.name.toLowerCase() === (job.location || '').toLowerCase());
     const hr = this.hrEmployees().find(e => e.id === (job as any).recruiterId);
     this.selectedRecruiterEmployee = hr || null;
-    
+
     this.jobForm = {
       title: job.title,
       departmentId: deptId,
       departmentName: dept ? dept.name : '',
       designationId: desig ? String(desig.id) : '',
+      designationName: desig ? desig.name : (job.designation || ''),
       branchId: branch ? String(branch.id) : '',
       experienceYears: job.experienceYears || '3-5 Years',
       type: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Temporary', 'Freelance'].includes(job.type) ? job.type : 'Other',
@@ -463,7 +489,9 @@ export class JobPostingsComponent implements OnInit {
     const dept = this.departments().find(d => d.name === this.jobForm.departmentName);
     const deptId = dept ? dept.id : null;
     const hr = this.hrEmployees().find(e => `${e.firstName} ${e.lastName}` === this.jobForm.recruiterName);
-    const desigId = Number(this.jobForm.designationId) || null;
+    // Resolve designation: prefer typed name match over stored ID
+    const desigByName = this.allDesignations().find(d => d.name.toLowerCase() === (this.jobForm.designationName || '').toLowerCase());
+    const desigId = desigByName ? desigByName.id : (Number(this.jobForm.designationId) || null);
     const branchId = Number(this.jobForm.branchId) || null;
     
     const payload = {

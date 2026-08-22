@@ -85,7 +85,7 @@ export class PayrollComponent implements OnInit {
   }
 
   isExpenseModalOpen = signal<boolean>(false);
-  expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '', receipts: [] as string[], purchaseDate: '', purchasedFrom: '' };
+  expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '', receipts: [] as string[], purchaseDate: '', purchasedFrom: '', projectCode: '' };
   
   // Image Lightbox Viewer states
   previewImages = signal<string[]>([]);
@@ -885,14 +885,15 @@ export class PayrollComponent implements OnInit {
   // Expense Claims
   openExpenseModal() {
     this.expenseForm = { 
-      title: '', 
-      description: '', 
-      amount: 0, 
-      category: 'OTHER', 
-      receiptUrl: '', 
-      receipts: [], 
-      purchaseDate: new Date().toISOString().split('T')[0], 
-      purchasedFrom: '' 
+      title: '',
+      description: '',
+      amount: 0,
+      category: 'OTHER',
+      receiptUrl: '',
+      receipts: [],
+      purchaseDate: new Date().toISOString().split('T')[0],
+      purchasedFrom: '',
+      projectCode: ''
     };
     this.selectedFile.set(null);
     this.isExpenseModalOpen.set(true);
@@ -927,6 +928,7 @@ export class PayrollComponent implements OnInit {
       category: this.expenseForm.category,
       purchaseDate: this.expenseForm.purchaseDate,
       purchasedFrom: this.expenseForm.purchasedFrom,
+      projectCode: this.expenseForm.projectCode || undefined,
       receiptUrl: this.expenseForm.receipts.length > 0 ? JSON.stringify(this.expenseForm.receipts) : ''
     };
 

@@ -413,16 +413,13 @@
 
           <div class="form-group">
             <label>Mobile Phone</label>
-            <div class="compound-input mobile-input" [class.error]="phoneInput.invalid && phoneInput.touched">
+            <div class="compound-input mobile-input" [class.error]="errors.phone">
               <div class="country-code">
                 <span class="flag">🇮🇳</span> +91
               </div>
-              <input type="text" class="form-control" name="phone" [(ngModel)]="formData.phone" [disabled]="!canEditPersonalDetails" #phoneInput="ngModel" pattern="^\+?[0-9]{10,15}$">
+              <input type="text" id="field-phone" name="phone" class="form-control" [class.is-invalid]="errors.phone" [(ngModel)]="formData.phone" (ngModelChange)="clearError('phone')" [disabled]="!canEditPersonalDetails">
             </div>
-            <div class="error-text" *ngIf="phoneInput.invalid && phoneInput.touched" style="color: #dc3545; font-size: 0.85rem; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
-              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-              Valid Mobile number is required
-            </div>
+            <small class="error-msg" *ngIf="errors.phone">{{ errors.phone }}</small>
           </div>
 
           <div class="form-group">
@@ -460,9 +457,11 @@
                 <option value="Ms">Ms</option>
                 <option value="Dr">Dr</option>
               </select>
-              <input type="text" class="form-control" [(ngModel)]="formData.firstName" [disabled]="!canEditPersonalDetails" placeholder="First Name">
-              <input type="text" class="form-control" [(ngModel)]="formData.lastName" [disabled]="!canEditPersonalDetails" placeholder="Last Name">
+              <input type="text" id="field-firstName" class="form-control" [class.is-invalid]="errors.firstName" [(ngModel)]="formData.firstName" (ngModelChange)="clearError('firstName')" [disabled]="!canEditPersonalDetails" placeholder="First Name">
+              <input type="text" id="field-lastName" class="form-control" [class.is-invalid]="errors.lastName" [(ngModel)]="formData.lastName" (ngModelChange)="clearError('lastName')" [disabled]="!canEditPersonalDetails" placeholder="Last Name">
             </div>
+            <small class="error-msg" *ngIf="errors.firstName">{{ errors.firstName }}</small>
+            <small class="error-msg" *ngIf="errors.lastName">{{ errors.lastName }}</small>
           </div>
 
           <div class="form-group" *ngIf="isOwner">
@@ -486,7 +485,8 @@
 
           <div class="form-group">
             <label>Birthday / Date of Birth</label>
-            <input type="date" class="form-control" [(ngModel)]="formData.dateOfBirth" [disabled]="!canEditPersonalDetails">
+            <input type="date" id="field-dateOfBirth" class="form-control" [class.is-invalid]="errors.dateOfBirth" [(ngModel)]="formData.dateOfBirth" (ngModelChange)="clearError('dateOfBirth')" [disabled]="!canEditPersonalDetails">
+            <small class="error-msg" *ngIf="errors.dateOfBirth">{{ errors.dateOfBirth }}</small>
           </div>
 
           <div class="form-group">
@@ -594,7 +594,8 @@
 
           <div class="form-group">
             <label>Home-Work Distance (km)</label>
-            <input type="number" class="form-control" [(ngModel)]="formData.homeWorkDistanceKm" [disabled]="!canEditPersonalDetails" placeholder="0">
+            <input type="number" min="0" id="field-homeWorkDistanceKm" class="form-control" [class.is-invalid]="errors.homeWorkDistanceKm" [(ngModel)]="formData.homeWorkDistanceKm" (ngModelChange)="clearError('homeWorkDistanceKm')" [disabled]="!canEditPersonalDetails" placeholder="0">
+            <small class="error-msg" *ngIf="errors.homeWorkDistanceKm">{{ errors.homeWorkDistanceKm }}</small>
           </div>
 
           <div class="form-group full-width">
@@ -635,7 +636,8 @@
 
           <div class="form-group">
             <label>Dependent Children Count</label>
-            <input type="number" min="0" class="form-control" [(ngModel)]="formData.childrenCount" [disabled]="!canEditPersonalDetails" placeholder="0">
+            <input type="number" min="0" id="field-childrenCount" class="form-control" [class.is-invalid]="errors.childrenCount" [(ngModel)]="formData.childrenCount" (ngModelChange)="clearError('childrenCount')" [disabled]="!canEditPersonalDetails" placeholder="0">
+            <small class="error-msg" *ngIf="errors.childrenCount">{{ errors.childrenCount }}</small>
           </div>
         </div>
       </div>
@@ -764,9 +766,11 @@
       <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
       Go Back
     </button>
-    <button class="btn-primary" (click)="saveProfile()" *ngIf="isOwner">
-      <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-      Save Profile
+    <button class="btn-primary" (click)="saveProfile()" *ngIf="canSaveProfile" [disabled]="isSaving">
+      <svg *ngIf="!isSaving" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      <span *ngIf="!isSaving">Save Profile</span>
+      <span *ngIf="isSaving" class="btn-spinner btn-spinner-light"></span>
+      <span *ngIf="isSaving">Saving...</span>
     </button>
   </div>
 </div>

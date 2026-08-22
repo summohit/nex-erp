@@ -20,7 +20,7 @@ import { theme } from '../../theme/theme';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, X } from 'lucide-react-native';
 
 export default function LoginScreen() {
-  const { login } = useAuthStore();
+  const { login, refreshUserProfile } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,6 +79,7 @@ export default function LoginScreen() {
       };
       
       await login(user, access_token);
+      refreshUserProfile().catch(() => {});
     } catch (error: any) {
       console.error('Login RAW error:', error?.message, 'Code:', error?.code, 'BaseURL:', error?.config?.baseURL);
       const status = error?.response?.status;

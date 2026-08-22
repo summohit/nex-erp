@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, XCircle, AlertCircle, Calendar, Plane, Star } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTimesheetStore } from '../../../store/timesheetStore';
 
 import RegularizationFormModal from '../modals/RegularizationFormModal';
@@ -21,10 +22,13 @@ export default function TimesheetTab() {
   const [showModal, setShowModal] = useState(false);
   const [selectedDayData, setSelectedDayData] = useState<any>(null);
   const [showDayDetailModal, setShowDayDetailModal] = useState(false);
+  const listRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const handlePrevMonth = () => {
     const prev = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
@@ -112,6 +116,22 @@ export default function TimesheetTab() {
 
   const days = getDaysInMonth(currentMonth);
 
+  // Auto-scroll to today when viewing the current month
+  useEffect(() => {
+    if (isLoading || days.length === 0) return;
+    const now = new Date();
+    const isCurrentMonth =
+      currentMonth.getFullYear() === now.getFullYear() &&
+      currentMonth.getMonth() === now.getMonth();
+    if (!isCurrentMonth) return;
+    const todayIndex = days.findIndex(d => d.isoDate === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
+    if (todayIndex >= 0) {
+      setTimeout(() => {
+        listRef.current?.scrollToIndex({ index: todayIndex, animated: true, viewPosition: 0.5 });
+      }, 100);
+    }
+  }, [isLoading, currentMonth]);
+
   // Accurate working days calculation matching CRM logic
   let totalWorkingDays = 0;
   let totalPresent = 0;
@@ -181,11 +201,14 @@ export default function TimesheetTab() {
           </View>
         ) : (
           <FlatList
+            ref={listRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             data={days}
             keyExtractor={item => item.isoDate}
             contentContainerStyle={styles.calendarStrip}
+            getItemLayout={(_, index) => ({ length: 44, offset: 16 + index * 44, index })}
+            onScrollToIndexFailed={() => {}}
             renderItem={({ item }) => {
               const legend = getLegendItem(item.status);
               const Icon = legend?.icon;

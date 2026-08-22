@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "/private/tmp/claude-501/-Users-mohitsingh-Documents-nex-erp/d06fdbe6-6deb-4d32-b784-53a1e29c3999/scratchpad/start-backend.sh",
+      "runtimeArgs": [],
+      "port": 3000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "start"],
+      "port": 4200
+    }
+  ]
+}

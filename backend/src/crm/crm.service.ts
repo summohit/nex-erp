@@ -5,10 +5,18 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CrmService {
   constructor(private prisma: PrismaService) {}
 
+  private sanitizeLead(data: any) {
+    const out = { ...data };
+    if (out.proposalDate === '' || out.proposalDate === null) delete out.proposalDate;
+    else if (out.proposalDate) out.proposalDate = new Date(out.proposalDate);
+    if (out.value !== undefined) out.value = out.value ? parseFloat(out.value) : null;
+    return out;
+  }
+
   async createLead(companyId: number, data: any) {
     return this.prisma.lead.create({
       data: {
-        ...data,
+        ...this.sanitizeLead(data),
         companyId,
       },
     });
@@ -68,7 +76,7 @@ export class CrmService {
 
     return this.prisma.lead.update({
       where: { id: leadId },
-      data,
+      data: this.sanitizeLead(data),
     });
   }
 

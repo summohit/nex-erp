@@ -15,7 +15,7 @@ export class IssuesController {
     @Body() data: any
   ) {
     const actorEmployeeId = req.user.employeeId ?? req.user.sub;
-    return this.issuesService.createIssue(req.user.companyId, actorEmployeeId, projectId, data);
+    return this.issuesService.createIssue(req.user.companyId, actorEmployeeId, projectId, data, req.user.role);
   }
 
   @Get()
@@ -34,7 +34,7 @@ export class IssuesController {
     @Body() data: any
   ) {
     const actorEmployeeId = req.user.employeeId ?? req.user.sub;
-    return this.issuesService.updateIssue(req.user.companyId, actorEmployeeId, projectId, id, data);
+    return this.issuesService.updateIssue(req.user.companyId, actorEmployeeId, projectId, id, data, req.user.role);
   }
 
   @Put(':id/archive')
@@ -219,7 +219,8 @@ export class IssuesController {
     @Param('id', ParseIntPipe) id: number,
     @Body('employeeId', ParseIntPipe) employeeId: number
   ) {
-    return this.issuesService.toggleIssueMember(req.user.companyId, projectId, id, employeeId);
+    const actorEmployeeId = req.user.employeeId ?? req.user.sub;
+    return this.issuesService.toggleIssueMember(req.user.companyId, projectId, id, employeeId, actorEmployeeId, req.user.role);
   }
 
   @Post(':id/attachments/upload')

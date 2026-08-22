@@ -13,7 +13,7 @@ export class JobsService {
         designation: true,
         branch: true,
         recruiter: {
-          select: { firstName: true, lastName: true }
+          select: { firstName: true, lastName: true, avatarUrl: true }
         },
         _count: {
           select: { applications: true }

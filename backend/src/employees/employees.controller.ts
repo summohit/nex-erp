@@ -41,6 +41,11 @@ export class EmployeesController {
     return this.employeesService.findAll(req.user.companyId, req.user.role);
   }
 
+  @Get('basic-list')
+  findBasicList(@Request() req) {
+    return this.employeesService.findBasicList(req.user.companyId);
+  }
+
   @Post('send-welcome-emails')
   sendWelcomeEmails(@Request() req, @Body('employeeIds') employeeIds: number[]) {
     if (!Array.isArray(employeeIds) || employeeIds.length === 0) {

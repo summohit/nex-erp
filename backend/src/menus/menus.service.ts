@@ -176,9 +176,12 @@ export class MenusService implements OnModuleInit {
     // Always allow overview (dashboard) and profile
     allowedModules.add('overview');
     allowedModules.add('employees/me/profile');
+    // The Dashboard menu item's id is derived from its route ('/dashboard' -> 'dashboard'),
+    // so it must be allowed explicitly for every role.
+    allowedModules.add('dashboard');
 
     // If role has NO permissions defined yet, apply a safe default fallback
-    if (allowedModules.size === 2) {
+    if (rolePermissions.length === 0) {
       if (['ADMIN', 'HR', 'FINANCE'].includes(roleName)) {
         ['assets', 'assets/inventory', 'assets/assignments', 'assets/requests', 'clients', 'careers'].forEach(m => allowedModules.add(m));
       } else {

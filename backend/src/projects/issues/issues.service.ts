@@ -15,9 +15,13 @@ export class IssuesService {
     private notificationsService: NotificationsService
   ) {}
 
-  async createIssue(companyId: number, reporterId: number, projectId: number, data: any) {
+  async createIssue(companyId: number, reporterId: number, projectId: number, data: any, role?: string) {
     const project = await this.prisma.project.findUnique({ where: { id: projectId, companyId } });
     if (!project) throw new NotFoundException('Project not found');
+
+    if (!(role === 'SUPERADMIN' || role === 'ADMIN') && project.leadId !== reporterId) {
+      throw new ForbiddenException('Only the project owner can create tasks');
+    }
 
     const count = await this.prisma.issue.count({ where: { projectId, companyId } });
     const key = `${project.key}-${count + 1}`;
@@ -165,6 +169,24 @@ export class IssuesService {
   }
 
   private async assertCanCompleteOrArchive(companyId: number, actorEmployeeId: number, issue: any) {
+    const project = issue.projectId
+      ? await this.prisma.project.findUnique({ where: { id: issue.projectId }, select: { leadId: true } })
+      : null;
+
+    // The project Owner can always move a task to Done/Archive.
+    if (project?.leadId === actorEmployeeId) return;
+
+    // A task assigned to a Project Manager can only be advanced by the Owner — blocks
+    // other PMs and the assignee's manager-hierarchy too.
+    if (issue.assigneeId && issue.projectId) {
+      const assigneeIsPM = await this.prisma.projectMember.findFirst({
+        where: { projectId: issue.projectId, employeeId: issue.assigneeId, role: 'PROJECT_MANAGER' }
+      });
+      if (assigneeIsPM) {
+        throw new ForbiddenException('Only the project owner can move a task assigned to a Project Manager into this stage.');
+      }
+    }
+
     if (issue.projectId) {
       const pm = await this.prisma.projectMember.findFirst({
         where: { projectId: issue.projectId, employeeId: actorEmployeeId, role: 'PROJECT_MANAGER' }
@@ -192,9 +214,21 @@ export class IssuesService {
     }
   }
 
-  async updateIssue(companyId: number, employeeId: number, projectId: number, issueId: number, data: any) {
+  async updateIssue(companyId: number, employeeId: number, projectId: number, issueId: number, data: any, role?: string) {
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
+
+    // Editing task content (title/description/priority) is restricted to the project owner.
+    // Moving cards between columns / changing status remains open to all members.
+    if (data.title !== undefined || data.description !== undefined || data.priority !== undefined) {
+      if (!(role === 'SUPERADMIN' || role === 'ADMIN')) {
+        const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { leadId: true } });
+        if (!project) throw new NotFoundException('Project not found');
+        if (project.leadId !== employeeId) {
+          throw new ForbiddenException('Only the project owner can edit task content');
+        }
+      }
+    }
 
     const prevStatus = oldIssue.status;
 
@@ -247,7 +281,7 @@ export class IssuesService {
     if (data.dueReminder !== undefined) updateData.dueReminder = data.dueReminder;
     if (data.estimatedHours !== undefined) updateData.estimatedHours = data.estimatedHours ? Number(data.estimatedHours) : null;
 
-    const issue = await this.prisma.issue.update({
+    let issue = await this.prisma.issue.update({
       where: { id: issueId },
       data: updateData
     });
@@ -255,14 +289,24 @@ export class IssuesService {
     // Auto time tracking: start timer when card moves to IN_PROGRESS,
     // stop timer when card moves to IN_REVIEW.
     const targetStatus = updateData.status;
+    let timerSideEffectApplied = false;
     if (targetStatus === 'IN_PROGRESS' && prevStatus !== 'IN_PROGRESS') {
       if (!oldIssue.workStartedAt || oldIssue.workCompletedAt) {
         await this.startTimeTracking(companyId, employeeId, projectId, issueId);
+        timerSideEffectApplied = true;
       }
     } else if (targetStatus === 'IN_REVIEW' && prevStatus !== 'IN_REVIEW') {
       if (oldIssue.workStartedAt && !oldIssue.workCompletedAt) {
         await this.stopTimeTracking(companyId, employeeId, projectId, issueId);
+        timerSideEffectApplied = true;
       }
+    }
+
+    // startTimeTracking/stopTimeTracking update workStartedAt/workCompletedAt
+    // on their own separate write — reflect that in the response we return below,
+    // otherwise callers get a stale snapshot from before the side effect ran.
+    if (timerSideEffectApplied) {
+      issue = await this.prisma.issue.findUniqueOrThrow({ where: { id: issueId } });
     }
 
     // Simple activity logging for column change
@@ -737,9 +781,16 @@ export class IssuesService {
     });
   }
 
-  async toggleIssueMember(companyId: number, projectId: number, issueId: number, employeeId: number) {
+  async toggleIssueMember(companyId: number, projectId: number, issueId: number, employeeId: number, actorEmployeeId?: number, actorRole?: string) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
+
+    if (actorEmployeeId !== undefined && !(actorRole === 'SUPERADMIN' || actorRole === 'ADMIN')) {
+      const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { leadId: true } });
+      if (project && project.leadId !== actorEmployeeId) {
+        throw new ForbiddenException('Only the project owner can assign members to a task');
+      }
+    }
 
     const existing = await this.prisma.issueMember.findUnique({
       where: {

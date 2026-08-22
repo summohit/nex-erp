@@ -152,8 +152,9 @@ export class EmployeeListComponent implements OnInit {
         if (!params.data) return '';
         const fn = params.data.firstName || '';
         const ln = params.data.lastName || '';
-        const initials = `${fn.charAt(0)}${ln.charAt(0)}`.toLowerCase();
-        const fullName = `${fn} ${ln}`.trim().toLowerCase();
+        const toTitle = (s: string) => s.replace(/\b\w/g, c => c.toUpperCase());
+        const initials = `${fn.charAt(0)}${ln.charAt(0)}`.toUpperCase();
+        const fullName = toTitle(`${fn} ${ln}`.trim());
         const email = params.data.user?.email || '';
         const avatarUrl = params.data.avatarUrl || params.data.user?.avatarUrl;
 

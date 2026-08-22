@@ -1879,12 +1879,13 @@ export class AttendanceLeaveComponent implements OnInit {
           this.executeClockAction(action, position.coords.latitude, position.coords.longitude);
         },
         (error) => {
-          this.toast.error('Location access denied. Clocking in without location.');
-          this.executeClockAction(action);
+          this.toast.error('Location access is required to clock in/out. Please enable location access and try again.');
+          this.isClocking.set(false);
         }
       );
     } else {
-      this.executeClockAction(action);
+      this.toast.error('Location access is required to clock in/out. Your browser does not support location access.');
+      this.isClocking.set(false);
     }
   }
 

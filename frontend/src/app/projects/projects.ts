@@ -2,26 +2,45 @@ import { Component, signal, inject, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { 
-  LucidePlus, LucideKanban, 
-  LucideX, LucideUser, LucideChevronLeft, LucideCheck, LucideMoreHorizontal, 
+import { AgGridModule } from 'ag-grid-angular';
+import { ColDef } from 'ag-grid-community';
+import {
+  LucidePlus, LucideKanban,
+  LucideX, LucideUser, LucideChevronLeft, LucideCheck, LucideMoreHorizontal,
   LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw, LucideBrainCircuit,
-  LucideLayoutGrid, LucideList, LucideChevronDown
+  LucideLayoutGrid, LucideList, LucideChevronDown, LucideAlertTriangle, LucideUsers
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { ProjectStarCellRendererComponent } from '../shared/components/project-star-cell-renderer.component';
+import { ProjectActionCellRendererComponent } from '../shared/components/project-action-cell-renderer.component';
+
+const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  FINISHED: { bg: '#dcfce7', color: '#15803d' },
+  COMPLETED: { bg: '#dcfce7', color: '#15803d' },
+  IN_PROGRESS: { bg: '#dbeafe', color: '#1d4ed8' },
+  NOT_STARTED: { bg: '#f1f2f4', color: '#6b7280' },
+  ACTIVE: { bg: '#dbeafe', color: '#1d4ed8' },
+  ARCHIVED: { bg: '#fee2e2', color: '#b91c1c' },
+  ON_HOLD: { bg: '#fef3c7', color: '#b45309' },
+  BLOCKED: { bg: '#fee2e2', color: '#b91c1c' }
+};
+
+function getStatusColors(status: string): { bg: string; color: string } {
+  return STATUS_COLORS[(status || '').toUpperCase()] || { bg: '#f1f2f4', color: '#44546f' };
+}
 
 @Component({
   selector: 'app-projects',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban, 
+    CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban,
     LucideX, LucideUser, LucideChevronLeft, LucideBrainCircuit,
     LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw,
-    LucideLayoutGrid, LucideList, LucideChevronDown
+    LucideLayoutGrid, LucideList, LucideChevronDown, LucideAlertTriangle, LucideUsers, AgGridModule
   ],
   templateUrl: './projects.html',
   styleUrls: ['./projects.css']
@@ -46,19 +65,32 @@ export class ProjectsComponent implements OnInit {
   employees = signal<any[]>([]);
   searchQuery = signal<string>('');
   activeTab = signal<'all' | 'starred' | 'recent' | 'archived'>('all');
-  viewMode = signal<'card' | 'table'>('card');
+  viewMode = signal<'card' | 'table'>((localStorage.getItem('projects-view-mode') as 'card' | 'table') || 'card');
+  quickFilter = signal<'none' | 'overdue' | 'due-week' | 'led-by-me'>('none');
   pmDropdownOpen = signal(false);
   pmSearchQuery = '';
 
+  projectManagerEmployees = computed(() => {
+    return this.employees().filter((e: any) =>
+      e.isProjectManager === true || /project.*manager|manager.*project/i.test(e.designation?.name || '')
+    );
+  });
+
   filteredPmEmployees = computed(() => {
     const q = this.pmSearchQuery.toLowerCase().trim();
-    const list = this.employees();
+    const list = this.projectManagerEmployees();
     if (!q) return list;
     return list.filter((e: any) =>
       `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(q) ||
       (e.user?.email || '').toLowerCase().includes(q)
     );
   });
+
+  get isProjectManager(): boolean {
+    const empId = this.currentUser()?.employeeId;
+    if (!empId) return false;
+    return this.projectManagerEmployees().some((e: any) => e.id === empId);
+  }
 
   getPmName(id: number): string {
     const emp = this.employees().find((e: any) => e.id === id);
@@ -71,9 +103,75 @@ export class ProjectsComponent implements OnInit {
     return ((emp.firstName || '')[0] || '').toUpperCase();
   }
 
+  getPmAvatarUrl(id: number): string | null {
+    const emp = this.employees().find((e: any) => e.id === id);
+    return emp?.avatarUrl || null;
+  }
+
   getPmColor(id: number): string {
     const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
     return colors[id % colors.length];
+  }
+
+  // --- Avatar stack (team members) ---
+  readonly maxStackAvatars = 4;
+
+  private memberDisplayName(m: any): string {
+    const emp = m?.employee || m;
+    return `${emp?.firstName || ''} ${emp?.lastName || ''}`.trim() || 'Unknown';
+  }
+
+  private memberInitial(m: any): string {
+    const emp = m?.employee || m;
+    return ((emp?.firstName || '?')[0] || '?').toUpperCase();
+  }
+
+  private memberAvatarUrl(m: any): string | null {
+    return m?.employee?.avatarUrl || m?.avatarUrl || null;
+  }
+
+  getTeamStack(project: any): { visible: any[]; overflow: number } {
+    const members: any[] = project?.members || [];
+    const visible = members.slice(0, this.maxStackAvatars);
+    const overflow = Math.max(0, members.length - visible.length);
+    return { visible, overflow };
+  }
+
+  private readonly avatarBase = `width:28px;height:28px;border-radius:50%;border:2px solid #fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;box-shadow:0 1px 3px rgba(9,30,66,.2);flex-shrink:0;`;
+
+  /** Builds a raw-HTML avatar stack for use in ag-Grid cellRenderers (inline styles — no component CSS available). */
+  buildTeamStackHtml(project: any): string {
+    const members: any[] = project?.members || [];
+    const total = members.length;
+    if (total === 0) return '<span style="color:#94a3b8;font-size:12px;">—</span>';
+
+    const visible = members.slice(0, this.maxStackAvatars);
+    const overflow = Math.max(0, total - visible.length);
+
+    const circles = visible.map((m, i) => {
+      const url = this.memberAvatarUrl(m);
+      const name = this.memberDisplayName(m);
+      const ml = i === 0 ? '0' : '-8px';
+      const z = visible.length - i;
+      if (url) {
+        return `<span style="${this.avatarBase}margin-left:${ml};z-index:${z};background:url('${url}') center/cover no-repeat;" title="${name}"></span>`;
+      }
+      const color = this.getPmColor(m.employeeId || m.id || i);
+      return `<span style="${this.avatarBase}margin-left:${ml};z-index:${z};background:${color};" title="${name}">${this.memberInitial(m)}</span>`;
+    }).join('');
+
+    const overflowCircle = overflow > 0
+      ? `<span style="${this.avatarBase}margin-left:-8px;background:#44546f;font-size:9px;">+${overflow}</span>`
+      : '';
+
+    const countBtn = `<button
+        data-team-project-id="${project.id}"
+        style="margin-left:8px;border:none;background:none;padding:2px 6px;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;color:#44546f;background:#f1f2f4;"
+        title="View all members">
+        ${total}
+      </button>`;
+
+    return `<div style="display:flex;align-items:center;height:100%;">${circles}${overflowCircle}${countBtn}</div>`;
   }
 
   togglePm(id: number) {
@@ -97,9 +195,252 @@ export class ProjectsComponent implements OnInit {
   isCreateModalOpen = signal(false);
   isSubmitted = signal(false);
   editingProjectId = signal<number | null>(null);
+  teamModalProject = signal<any | null>(null);
+
+  openTeamModal(project: any, event?: Event) {
+    if (event) event.stopPropagation();
+    this.teamModalProject.set(project);
+  }
+
+  closeTeamModal() {
+    this.teamModalProject.set(null);
+  }
 
   setViewMode(mode: 'card' | 'table') {
     this.viewMode.set(mode);
+    localStorage.setItem('projects-view-mode', mode);
+  }
+
+  setQuickFilter(filter: 'none' | 'overdue' | 'due-week' | 'led-by-me') {
+    this.quickFilter.set(this.quickFilter() === filter ? 'none' : filter);
+  }
+
+  private isProjectClosed(p: any): boolean {
+    return p.workStatus === 'FINISHED' || p.status === 'ARCHIVED';
+  }
+
+  private applyQuickFilter(list: any[]): any[] {
+    const filter = this.quickFilter();
+    if (filter === 'none') return list;
+
+    if (filter === 'led-by-me') {
+      const empId = this.currentUser()?.employeeId;
+      return list.filter(p => p.lead?.id === empId);
+    }
+
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return list.filter(p => {
+      if (!p.endDate || this.isProjectClosed(p)) return false;
+      const end = new Date(p.endDate);
+      if (filter === 'overdue') return end < now;
+      if (filter === 'due-week') return end >= now && end <= weekFromNow;
+      return true;
+    });
+  }
+
+  quickFilterCounts = computed(() => {
+    const base = this.myProjects();
+    const empId = this.currentUser()?.employeeId;
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    let overdue = 0, dueWeek = 0, ledByMe = 0;
+    for (const p of base) {
+      if (p.lead?.id === empId) ledByMe++;
+      if (!p.endDate || this.isProjectClosed(p)) continue;
+      const end = new Date(p.endDate);
+      if (end < now) overdue++;
+      else if (end <= weekFromNow) dueWeek++;
+    }
+    return { overdue, dueWeek, ledByMe };
+  });
+
+  // AG Grid: Table View
+  paginationPageSize = 20;
+  paginationPageSizeOptions = [10, 20, 50, 100];
+  gridApi: any;
+  selectedProjects = signal<any[]>([]);
+
+  gridOptions = {
+    rowSelection: {
+      mode: 'multiRow' as const,
+      checkboxes: true,
+      headerCheckbox: true,
+      enableClickSelection: false
+    }
+  };
+
+  defaultColDef: ColDef = {
+    sortable: true,
+    filter: true,
+    resizable: true
+  };
+
+  onBoardsGridReady(params: any) {
+    this.gridApi = params.api;
+  }
+
+  onBoardsSelectionChanged() {
+    if (this.gridApi) this.selectedProjects.set(this.gridApi.getSelectedRows());
+  }
+
+  clearSelection() {
+    this.gridApi?.deselectAll();
+    this.selectedProjects.set([]);
+  }
+
+  bulkArchiveSelected() {
+    const selected = this.selectedProjects();
+    if (selected.length === 0) return;
+    if (!confirm(`Archive ${selected.length} selected board(s)?`)) return;
+
+    let remaining = selected.length;
+    selected.forEach((p) => {
+      this.projectsService.archiveProject(p.id, false).subscribe({
+        next: () => {
+          remaining--;
+          if (remaining === 0) {
+            this.clearSelection();
+            this.loadProjects();
+            this.loadArchivedProjects();
+            this.toast.success(`${selected.length} board(s) archived`);
+          }
+        },
+        error: (err) => {
+          remaining--;
+          this.toast.error(err?.error?.message || `Failed to archive "${p.name}"`);
+          if (remaining === 0) {
+            this.clearSelection();
+            this.loadProjects();
+            this.loadArchivedProjects();
+          }
+        }
+      });
+    });
+  }
+
+  boardsColDefs: ColDef[] = [
+    {
+      headerName: '',
+      field: 'star',
+      width: 56,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      cellRenderer: ProjectStarCellRendererComponent,
+      cellRendererParams: {
+        isStarred: (data: any) => this.isStarred(data.id),
+        onToggle: (data: any) => this.toggleStar(data.id)
+      }
+    },
+    {
+      headerName: 'Name',
+      field: 'name',
+      flex: 1.8,
+      minWidth: 220,
+      cellRenderer: (params: any) => {
+        if (!params.data) return '';
+        const color = this.getGradient(params.data.color, params.node?.rowIndex || 0);
+        return `
+          <div class="table-name-cell">
+            <span class="table-color-dot" style="background:${color}"></span>
+            <span class="board-title">${params.data.name}</span>
+          </div>
+        `;
+      }
+    },
+    {
+      headerName: 'Key',
+      field: 'key',
+      flex: 0.8,
+      minWidth: 100,
+      cellRenderer: (params: any) => params.value ? `<span class="badge">${params.value}</span>` : '—'
+    },
+    {
+      headerName: 'Lead',
+      field: 'lead',
+      flex: 1.1,
+      minWidth: 140,
+      valueGetter: (params: any) => {
+        const lead = params.data?.lead;
+        return lead ? `${lead.firstName || ''} ${lead.lastName || ''}`.trim() : '—';
+      }
+    },
+    {
+      headerName: 'Status',
+      field: 'workStatus',
+      flex: 1,
+      minWidth: 130,
+      cellRenderer: (params: any) => {
+        const s = params.data?.workStatus || params.data?.status || '';
+        if (!s) return '—';
+        const { bg, color } = getStatusColors(s);
+        return `<span class="pstatus-pill" style="background:${bg};color:${color}">${s.replace(/_/g, ' ')}</span>`;
+      }
+    },
+    {
+      headerName: 'Team',
+      field: 'members',
+      flex: 1,
+      minWidth: 160,
+      sortable: false,
+      filter: false,
+      cellRenderer: (params: any) => this.buildTeamStackHtml(params.data),
+      onCellClicked: (params: any) => {
+        const btn = (params.event?.target as HTMLElement)?.closest('[data-team-project-id]');
+        if (btn) this.openTeamModal(params.data);
+      }
+    },
+    {
+      headerName: 'Tasks',
+      field: '_count.issues',
+      flex: 0.6,
+      minWidth: 80,
+      valueGetter: (params: any) => params.data?._count?.issues ?? 0
+    },
+    {
+      headerName: 'Members',
+      field: '_count.members',
+      flex: 0.7,
+      minWidth: 90,
+      valueGetter: (params: any) => params.data?._count?.members ?? 0
+    },
+    {
+      headerName: 'Start date',
+      field: 'startDate',
+      flex: 1,
+      minWidth: 120,
+      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+    },
+    {
+      headerName: 'End date',
+      field: 'endDate',
+      flex: 1,
+      minWidth: 120,
+      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+    },
+    {
+      headerName: '',
+      field: 'actions',
+      width: 70,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'right',
+      cellRenderer: ProjectActionCellRendererComponent,
+      cellRendererParams: {
+        showActions: () => this.isManagementAdmin,
+        onEdit: (data: any) => this.openEditModal(data, new Event('click')),
+        onArchive: (data: any) => this.archiveBoard(data, false, new Event('click'))
+      }
+    }
+  ];
+
+  onBoardRowClicked(event: any) {
+    const target = event.event?.target as HTMLElement | null;
+    // Don't navigate when clicking the team count button, checkbox, or action menu
+    if (target?.closest('[data-team-project-id], input[type=checkbox], .ag-checkbox, button')) return;
+    if (event.data) this.goToProject(event.data.id);
   }
 
   // Background Options (Images & Color gradients matching Trello style)
@@ -148,32 +489,52 @@ export class ProjectsComponent implements OnInit {
     return user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
   }
 
+  // Management-level administrator: system admin role, or CEO/CTO by designation.
+  get isManagementAdmin(): boolean {
+    if (this.isAdmin) return true;
+    const empId = this.currentUser()?.employeeId;
+    if (!empId) return false;
+    const emp = this.employees().find((e: any) => e.id === empId);
+    const title = (emp?.designation?.name || '').toLowerCase();
+    return title.includes('ceo') || title.includes('cto');
+  }
+
+  private myMemberOf(p: any): any {
+    const empId = this.currentUser()?.employeeId;
+    return p?.members?.find((m: any) => m.employeeId === empId) || null;
+  }
+
   myProjects = computed(() => {
-    return this.projects().filter(p => p.members && p.members.length > 0);
+    // Admins get all projects from backend (no membership filter on server); non-admins are already filtered
+    if (this.isAdmin) return this.projects();
+    return this.projects().filter(p => !!this.myMemberOf(p));
   });
 
   // Filtered lists
   filteredProjects = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
-    
+
     if (this.activeTab() === 'archived') {
       return this.archivedProjects();
     }
-    
+
     let list = this.myProjects();
 
     if (this.activeTab() === 'starred') {
-      list = list.filter(p => p.members && p.members.length > 0 && p.members[0].isStarred);
+      list = list.filter(p => this.myMemberOf(p)?.isStarred);
     } else if (this.activeTab() === 'recent') {
       list = list.filter(p => this.recentlyViewedIds().includes(p.id));
     }
+
+    list = this.applyQuickFilter(list);
 
     if (!q) return list;
     return list.filter(p => p.name.toLowerCase().includes(q) || p.key?.toLowerCase().includes(q));
   });
 
   starredProjects = computed(() => {
-    return this.myProjects().filter(p => p.members && p.members.length > 0 && p.members[0].isStarred);
+    if (this.isAdmin) return this.myProjects().filter(p => p.members?.some((m: any) => m.employeeId === this.currentUser()?.employeeId && m.isStarred));
+    return this.myProjects().filter(p => this.myMemberOf(p)?.isStarred);
   });
 
   recentlyViewedProjects = computed(() => {
@@ -234,17 +595,18 @@ export class ProjectsComponent implements OnInit {
 
   toggleStar(projectId: number, event?: Event) {
     if (event) event.stopPropagation();
-    
+    const empId = this.currentUser()?.employeeId;
+
     // Call the backend service
     this.projectsService.toggleProjectStar(projectId).subscribe({
       next: () => {
         // Optimistically update local project state or reload projects
         this.projects.update(list => list.map(p => {
           if (p.id === projectId) {
-            const isCurrentlyStarred = p.members && p.members.length > 0 && p.members[0].isStarred;
-            const updatedMembers = p.members && p.members.length > 0 
-              ? [{ ...p.members[0], isStarred: !isCurrentlyStarred }]
-              : [{ isStarred: true }];
+            const myMember = this.myMemberOf(p);
+            const updatedMembers = myMember
+              ? p.members.map((m: any) => m.employeeId === empId ? { ...m, isStarred: !myMember.isStarred } : m)
+              : [...(p.members || []), { employeeId: empId, isStarred: true }];
             return { ...p, members: updatedMembers };
           }
           return p;
@@ -256,10 +618,7 @@ export class ProjectsComponent implements OnInit {
 
   isStarred(projectId: number): boolean {
     const p = this.projects().find(proj => proj.id === projectId);
-    if (p && p.members && p.members.length > 0) {
-      return !!p.members[0].isStarred;
-    }
-    return false;
+    return !!this.myMemberOf(p)?.isStarred;
   }
 
   getGradient(color: string, index: number): string {
@@ -343,7 +702,8 @@ export class ProjectsComponent implements OnInit {
       billingType: this.projectForm.billingType,
       budgetAmount: this.projectForm.budgetAmount || null,
       hourlyRate: this.projectForm.hourlyRate || null,
-      clientId: this.projectForm.clientId || null
+      clientId: this.projectForm.clientId || null,
+      pmIds: this.projectForm.pmIds
     };
 
     if (this.editingProjectId()) {

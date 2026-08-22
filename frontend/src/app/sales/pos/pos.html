@@ -1,78 +1,224 @@
 <div class="pos-container">
-  <!-- Left Side: Items / Search -->
-  <div class="pos-main glass-panel">
-    <div class="main-header">
-      <h2>Point of Sale</h2>
-      <p>Quickly ring up sales for walk-in or existing clients.</p>
+
+  <!-- Left: Add Item Panel -->
+  <div class="pos-main">
+
+    <div class="pos-main-header">
+      <div>
+        <h2 class="pos-title">Point of Sale</h2>
+        <p class="pos-subtitle">Quickly ring up sales for walk-in or existing clients.</p>
+      </div>
     </div>
 
-    <div class="quick-add-form">
-      <h3>Quick Add Item</h3>
-      <div class="form-row">
-        <div class="form-group flex-2">
-          <label>Description / Product Name</label>
-          <input type="text" [(ngModel)]="newItem.description" placeholder="e.g. Consulting Hour" (keyup.enter)="addToCart()"/>
+    <!-- Quick Add Item -->
+    <div class="add-item-card">
+      <div class="add-item-card-title">
+        <svg lucidePackage size="15"></svg>
+        Add Item to Cart
+      </div>
+
+      <!-- Row 1: Description -->
+      <div class="ai-row ai-row-top">
+        <div class="ai-field ai-desc">
+          <label class="ai-label">Description / Product Name <span class="req">*</span></label>
+          <input type="text" [(ngModel)]="newItem.description" placeholder="e.g. Consulting Hour, PVC Pipe 20mm, Labour — Plumbing" (keyup.enter)="addToCart()" class="ai-input" />
         </div>
-        <div class="form-group flex-1">
-          <label>Unit Price</label>
-          <input type="number" [(ngModel)]="newItem.unitPrice" min="0" step="0.01" (keyup.enter)="addToCart()"/>
+      </div>
+
+      <!-- Row 2: Controls + Add -->
+      <div class="ai-row ai-row-bottom">
+        <div class="ai-field ai-unit">
+          <label class="ai-label">Unit</label>
+          <div class="sel-wrap">
+            <select [(ngModel)]="newItem.unit" class="ai-select">
+              <option *ngFor="let u of unitOptions" [value]="u">{{u}}</option>
+            </select>
+          </div>
         </div>
-        <div class="form-group flex-1">
-          <label>Qty</label>
-          <input type="number" [(ngModel)]="newItem.quantity" min="1" (keyup.enter)="addToCart()"/>
+        <div class="ai-field ai-price">
+          <label class="ai-label">Unit Price (₹) <span class="req">*</span></label>
+          <div class="price-wrap">
+            <span class="price-sym">₹</span>
+            <input type="number" [(ngModel)]="newItem.unitPrice" min="0" step="0.01" (keyup.enter)="addToCart()" class="ai-input ai-input-price" />
+          </div>
         </div>
-        <div class="form-action">
-          <button class="btn-primary" (click)="addToCart()" [disabled]="!newItem.description || newItem.unitPrice <= 0">
-            <svg lucidePlus size="20"></svg> Add
+        <div class="ai-field ai-qty">
+          <label class="ai-label">Qty</label>
+          <input type="number" [(ngModel)]="newItem.quantity" min="1" (keyup.enter)="addToCart()" class="ai-input ai-input-center" />
+        </div>
+        <div class="ai-field ai-disc">
+          <label class="ai-label">Disc %</label>
+          <input type="number" [(ngModel)]="newItem.discount" min="0" max="100" (keyup.enter)="addToCart()" class="ai-input ai-input-center" />
+        </div>
+        <div class="ai-field ai-add">
+          <label class="ai-label ai-label-spacer">&nbsp;</label>
+          <button class="btn-add" (click)="addToCart()" [disabled]="!newItem.description || newItem.unitPrice <= 0">
+            <svg lucidePlus size="16"></svg>
+            Add to Cart
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Cart Items (main area) -->
+    <div class="cart-items-panel">
+      <div class="cart-items-header">
+        <span class="cart-items-label">
+          <svg lucideShoppingCart size="15"></svg>
+          Order Items
+          <span class="cart-count-chip" *ngIf="cart.length > 0">{{getItemCount()}} items</span>
+        </span>
+        <button class="btn-clear-cart" *ngIf="cart.length > 0" (click)="clearCart()">
+          <svg lucideX size="13"></svg> Clear
+        </button>
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-cart" *ngIf="cart.length === 0">
+        <div class="empty-icon-wrap">
+          <svg lucideShoppingCart size="32"></svg>
+        </div>
+        <p class="empty-title">No items yet</p>
+        <p class="empty-sub">Add items using the form above to build the order.</p>
+      </div>
+
+      <!-- Items table -->
+      <div class="cart-table" *ngIf="cart.length > 0">
+        <div class="ct-head">
+          <div class="ct-col-desc">Item</div>
+          <div class="ct-col-qty">Qty</div>
+          <div class="ct-col-price">Price</div>
+          <div class="ct-col-disc">Disc</div>
+          <div class="ct-col-total">Total</div>
+          <div class="ct-col-del"></div>
+        </div>
+
+        <div class="ct-row" *ngFor="let item of cart; let i = index">
+          <div class="ct-col-desc">
+            <div class="ct-item-name">{{item.description}}</div>
+            <div class="ct-item-unit">{{item.unit}}</div>
+          </div>
+          <div class="ct-col-qty">
+            <div class="qty-stepper">
+              <button class="qty-btn" (click)="decrementQty(i)"><svg lucideCircleMinus size="16"></svg></button>
+              <input type="number" [(ngModel)]="item.quantity" min="1" (ngModelChange)="updateCartItem(i)" class="qty-input" />
+              <button class="qty-btn" (click)="incrementQty(i)"><svg lucideCirclePlus size="16"></svg></button>
+            </div>
+          </div>
+          <div class="ct-col-price">₹{{item.unitPrice | number:'1.0-2'}}</div>
+          <div class="ct-col-disc">
+            <span class="disc-chip" *ngIf="item.discount > 0">-{{item.discount}}%</span>
+            <span class="no-disc" *ngIf="item.discount === 0">—</span>
+          </div>
+          <div class="ct-col-total">₹{{item.total | number:'1.0-2'}}</div>
+          <div class="ct-col-del">
+            <button class="btn-del-item" (click)="removeFromCart(i)" title="Remove">
+              <svg lucideTrash2 size="14"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="order-notes-card">
+      <label class="notes-label">
+        <svg lucideFileText size="14"></svg>
+        Order Notes (optional)
+      </label>
+      <textarea [(ngModel)]="orderNotes" rows="2" placeholder="Any special instructions, delivery notes, etc."></textarea>
     </div>
   </div>
 
-  <!-- Right Side: Cart -->
-  <div class="pos-cart glass-panel">
-    <div class="cart-header">
-      <h3><svg lucideShoppingCart size="20"></svg> Current Order</h3>
-    </div>
+  <!-- Right: Order Summary / Checkout -->
+  <div class="pos-sidebar">
 
-    <div class="cart-client">
-      <label>Select Client *</label>
-      <select [(ngModel)]="selectedClientId">
-        <option [ngValue]="null">-- Select a Client --</option>
-        <option *ngFor="let c of clients" [ngValue]="c.id">{{c.name}}</option>
-      </select>
-    </div>
-
-    <div class="cart-items">
-      <div class="empty-cart" *ngIf="cart.length === 0">
-        <svg lucideShoppingCart size="40" class="text-muted"></svg>
-        <p>Cart is empty</p>
+    <!-- Client -->
+    <div class="sidebar-section client-section">
+      <div class="ss-label">
+        <svg lucideUser size="14"></svg>
+        Client
+        <span class="req">*</span>
       </div>
+      <div class="sel-wrap">
+        <select [(ngModel)]="selectedClientId" class="client-select" [class.no-client]="!selectedClientId">
+          <option [ngValue]="null" disabled>-- Select Client --</option>
+          <option *ngFor="let c of clients" [ngValue]="c.id">{{c.name}}</option>
+        </select>
+      </div>
+      <span class="hint-text" *ngIf="clients.length === 0">No active clients. Add a client first.</span>
+    </div>
 
-      <div class="cart-item" *ngFor="let item of cart; let i = index">
-        <div class="item-info">
-          <h4>{{item.description}}</h4>
-          <p>{{item.quantity}} x {{item.unitPrice | currency:'USD'}}</p>
-        </div>
-        <div class="item-total">
-          <span class="fw-semibold">{{item.total | currency:'USD'}}</span>
-          <button class="btn-icon text-danger" (click)="removeFromCart(i)">
-            <svg lucideTrash2 size="16"></svg>
-          </button>
-        </div>
+    <!-- Payment Method -->
+    <div class="sidebar-section">
+      <div class="ss-label">
+        <svg lucideCreditCard size="14"></svg>
+        Payment Method
+      </div>
+      <div class="payment-methods">
+        <button
+          class="pm-btn"
+          *ngFor="let pm of paymentMethods"
+          [class.pm-active]="paymentMethod === pm.value"
+          (click)="paymentMethod = pm.value">
+          {{pm.label}}
+        </button>
       </div>
     </div>
 
-    <div class="cart-footer">
-      <div class="summary-row total-row">
+    <!-- Tax -->
+    <div class="sidebar-section">
+      <div class="ss-label">
+        <svg lucidePercent size="14"></svg>
+        Tax / GST Rate
+      </div>
+      <div class="tax-options">
+        <button class="tax-btn" *ngFor="let t of [0, 5, 12, 18, 28]" [class.tax-active]="taxRate === t" (click)="taxRate = t">
+          {{t}}%
+        </button>
+      </div>
+    </div>
+
+    <!-- Order Summary -->
+    <div class="sidebar-section order-summary">
+      <div class="ss-label">Order Summary</div>
+      <div class="os-row">
+        <span>Subtotal</span>
+        <span>₹{{getSubtotal() | number:'1.0-2'}}</span>
+      </div>
+      <div class="os-row" *ngIf="taxRate > 0">
+        <span>GST ({{taxRate}}%)</span>
+        <span>₹{{getTax() | number:'1.0-2'}}</span>
+      </div>
+      <div class="os-divider"></div>
+      <div class="os-total-row">
         <span>Total Due</span>
-        <span>{{getCartTotal() | currency:'USD'}}</span>
+        <span class="os-total-amount">₹{{getTotal() | number:'1.0-2'}}</span>
       </div>
-      
-      <button class="btn-checkout" [disabled]="cart.length === 0 || !selectedClientId" (click)="checkout()">
-        <svg lucideCreditCard size="20"></svg> Checkout
-      </button>
     </div>
+
+    <!-- Checkout Button -->
+    <div class="checkout-wrap">
+      <button
+        class="btn-checkout"
+        [class.checkout-success]="checkoutSuccess"
+        [disabled]="cart.length === 0 || !selectedClientId || isCheckingOut"
+        (click)="checkout()">
+        <ng-container *ngIf="!isCheckingOut && !checkoutSuccess">
+          <svg lucideCreditCard size="20"></svg>
+          Checkout &nbsp;·&nbsp; ₹{{getTotal() | number:'1.0-0'}}
+        </ng-container>
+        <ng-container *ngIf="isCheckingOut">Processing...</ng-container>
+        <ng-container *ngIf="checkoutSuccess">
+          <svg lucideCheck size="20"></svg>
+          Order Placed!
+        </ng-container>
+      </button>
+      <p class="checkout-hint" *ngIf="!selectedClientId">Select a client to checkout</p>
+      <p class="checkout-hint" *ngIf="selectedClientId && cart.length === 0">Add items to checkout</p>
+    </div>
+
   </div>
 </div>
+
+<app-dialog-host></app-dialog-host>

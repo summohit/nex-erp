@@ -15,6 +15,11 @@ export class AssetsController {
     return this.assetsService.getAllAssets(req.user.companyId);
   }
 
+  @Get('categories')
+  getCategories(@Request() req) {
+    return this.assetsService.getCategories(req.user.companyId);
+  }
+
   @Post()
   createAsset(@Request() req, @Body() data: any) {
     return this.assetsService.createAsset(req.user.companyId, data);

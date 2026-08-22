@@ -245,6 +245,21 @@ export class ClientsListComponent implements OnInit {
     }
   }
 
+  onLogoPaste(event: ClipboardEvent) {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          event.preventDefault();
+          this.processLogoFile(file);
+          return;
+        }
+      }
+    }
+  }
+
   onLogoDragOver(event: DragEvent) {
     event.preventDefault();
     event.stopPropagation();

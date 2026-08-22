@@ -1,0 +1,681 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;500;600;700;800&family=Overpass+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+<title>CES Portfolio Audit</title>
+
+<style>
+  :root {
+    --bg: #F4F6F9;
+    --surface: #FFFFFF;
+    --surface-2: #EDF1F6;
+    --border: #DCE2EA;
+    --ink: #10161F;
+    --ink-2: #4B5567;
+    --ink-muted: #8891A0;
+    --accent: #2557D6;
+    --accent-ink: #1A3F9E;
+    --accent-soft: #E7EEFC;
+    --good: #15803D;
+    --good-soft: #E6F4EA;
+    --warn: #B45309;
+    --warn-soft: #FBF0DF;
+    --crit: #B91C1C;
+    --crit-soft: #FBE7E7;
+    --grid-line: #E4E9EF;
+    --shadow: 0 1px 2px rgba(16, 22, 31, 0.04), 0 8px 24px rgba(16, 22, 31, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B0F15;
+      --surface: #131A22;
+      --surface-2: #1A222C;
+      --border: #262F3B;
+      --ink: #ECF0F5;
+      --ink-2: #ADB6C6;
+      --ink-muted: #6E7889;
+      --accent: #5C8FF2;
+      --accent-ink: #9AB7F7;
+      --accent-soft: #16233D;
+      --good: #35C176;
+      --good-soft: #12291C;
+      --warn: #E8A33D;
+      --warn-soft: #2E2313;
+      --crit: #F0625E;
+      --crit-soft: #341414;
+      --grid-line: #212A35;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0B0F15;
+    --surface: #131A22;
+    --surface-2: #1A222C;
+    --border: #262F3B;
+    --ink: #ECF0F5;
+    --ink-2: #ADB6C6;
+    --ink-muted: #6E7889;
+    --accent: #5C8FF2;
+    --accent-ink: #9AB7F7;
+    --accent-soft: #16233D;
+    --good: #35C176;
+    --good-soft: #12291C;
+    --warn: #E8A33D;
+    --warn-soft: #2E2313;
+    --crit: #F0625E;
+    --crit-soft: #341414;
+    --grid-line: #212A35;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 28px 80px;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Overpass', sans-serif;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .num, .tabular { font-variant-numeric: tabular-nums; }
+  .mono { font-family: 'Overpass Mono', ui-monospace, monospace; }
+
+  /* ---------- Header ---------- */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    padding-bottom: 28px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .eyebrow {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .header h1 {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .header .sub {
+    margin-top: 8px;
+    color: var(--ink-2);
+    font-size: 15px;
+    max-width: 60ch;
+  }
+
+  .header .meta {
+    text-align: right;
+    color: var(--ink-muted);
+    font-size: 12.5px;
+    font-family: 'Overpass Mono', monospace;
+    line-height: 1.7;
+    white-space: nowrap;
+  }
+
+  .header .meta strong { color: var(--ink-2); font-weight: 600; }
+
+  /* ---------- KPI strip ---------- */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 36px;
+  }
+
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 18px 16px;
+    box-shadow: var(--shadow);
+  }
+
+  .kpi .label {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+  }
+
+  .kpi .value {
+    font-family: 'Overpass', sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+
+  .kpi .value.accent { color: var(--accent); }
+  .kpi .value.crit { color: var(--crit); }
+  .kpi .value.good { color: var(--good); }
+
+  .kpi .foot {
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: var(--ink-muted);
+  }
+
+  /* ---------- Section shell ---------- */
+  .section {
+    margin-bottom: 36px;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .section-head h2 {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .section-head .note {
+    font-size: 12.5px;
+    color: var(--ink-muted);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ---------- Bar chart rows ---------- */
+  .bar-list { display: flex; flex-direction: column; gap: 13px; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 152px 1fr 78px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bar-row .rlabel {
+    font-size: 13px;
+    color: var(--ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bar-track {
+    position: relative;
+    height: 16px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    border-radius: 4px;
+    min-width: 4px;
+  }
+
+  .bar-row .rval {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    text-align: right;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 7px;
+    flex: none;
+  }
+
+  .legend-row .rlabel { display: flex; align-items: center; }
+
+  /* ---------- Overdue table ---------- */
+  .table-wrap {
+    max-height: 520px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 760px;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-2);
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    z-index: 1;
+  }
+
+  th.num-col, td.num-col { text-align: right; }
+
+  tbody tr { border-bottom: 1px solid var(--grid-line); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+
+  td {
+    padding: 9px 14px;
+    color: var(--ink-2);
+    vertical-align: middle;
+  }
+
+  td.proj { color: var(--ink); font-weight: 500; }
+  td.code { color: var(--ink-muted); font-size: 12px; }
+
+  .sev-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sev-stripe {
+    width: 4px;
+    height: 22px;
+    border-radius: 2px;
+    flex: none;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 100px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pill.crit { background: var(--crit-soft); color: var(--crit); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.good { background: var(--good-soft); color: var(--good); }
+  .pill.neutral { background: var(--surface-2); color: var(--ink-muted); }
+
+  /* ---------- Findings ---------- */
+  .findings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--warn);
+    border-radius: 10px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+
+  .finding .fnum {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--warn);
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+
+  .finding h3 {
+    font-size: 14.5px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .finding p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+
+  .finding p .num { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Footer ---------- */
+  .footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+
+  @media (max-width: 860px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .two-col, .findings-grid { grid-template-columns: 1fr; }
+    .header { flex-direction: column; align-items: flex-start; }
+    .header .meta { text-align: left; }
+    .bar-row { grid-template-columns: 110px 1fr 60px; }
+  }
+</style>
+
+<div class="page">
+
+  <div class="header">
+    <div>
+      <div class="eyebrow">Portfolio Health Review</div>
+      <h1>CES Project Portfolio Audit</h1>
+      <div class="sub">81 projects from the "Ces All Project" tracker — implementation &amp; deployment, DC/DR migrations, F5&nbsp;uDNS rollouts, SD-WAN, and website work spanning Dec&nbsp;2024 to Oct&nbsp;2026.</div>
+    </div>
+    <div class="meta">
+      <div>Source: <strong>CES_All_projects.xlsx</strong></div>
+      <div>Reviewed as of <strong>20 Aug 2026</strong></div>
+      <div>81 rows · 1 sheet · 10 columns</div>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="label">Total Projects</div>
+      <div class="value num">81</div>
+      <div class="foot">Dec 2024 → Oct 2026</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Overdue</div>
+      <div class="value crit num">31</div>
+      <div class="foot">38% · deadline passed, &lt;100% done</div>
+    </div>
+    <div class="kpi">
+      <div class="label">100% Complete</div>
+      <div class="value good num">41</div>
+      <div class="foot">51% of all projects</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Avg. Completion</div>
+      <div class="value accent num">71%</div>
+      <div class="foot">across all 81 rows</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Zero Progress</div>
+      <div class="value num">12</div>
+      <div class="foot">still at 0% complete</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="two-col">
+
+      <div class="card">
+        <div class="section-head">
+          <h2>Status breakdown</h2>
+          <span class="note">81 projects</span>
+        </div>
+        <div class="bar-list">
+          <div class="bar-row legend-row">
+            <span class="rlabel"><span class="status-dot" style="background:var(--accent)"></span>In Progress</span>
+            <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--accent)"></div></div>
+            <span class="rval">45 · 56%</span>
+          </div>
+          <div class="bar-row legend-row">
+            <span class="rlabel"><span class="status-dot" style="background:var(--good)"></span>Finished</span>
+            <div class="bar-track"><div class="bar-fill" style="width:37.8%;background:var(--good)"></div></div>
+            <span class="rval">17 · 21%</span>
+          </div>
+          <div class="bar-row legend-row">
+            <span class="rlabel"><span class="status-dot" style="background:var(--warn)"></span>Not Started</span>
+            <div class="bar-track"><div class="bar-fill" style="width:33.3%;background:var(--warn)"></div></div>
+            <span class="rval">15 · 19%</span>
+          </div>
+          <div class="bar-row legend-row">
+            <span class="rlabel"><span class="status-dot" style="background:var(--ink-muted)"></span>Unspecified</span>
+            <div class="bar-track"><div class="bar-fill" style="width:8.9%;background:var(--ink-muted)"></div></div>
+            <span class="rval">4 · 5%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-head">
+          <h2>Category breakdown</h2>
+          <span class="note">as labeled in sheet</span>
+        </div>
+        <div class="bar-list">
+          <div class="bar-row">
+            <span class="rlabel">Implementation &amp; Deployment</span>
+            <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--accent)"></div></div>
+            <span class="rval">56</span>
+          </div>
+          <div class="bar-row">
+            <span class="rlabel">"Implentation &amp; Migration"</span>
+            <div class="bar-track"><div class="bar-fill" style="width:19.6%;background:var(--accent)"></div></div>
+            <span class="rval">11</span>
+          </div>
+          <div class="bar-row">
+            <span class="rlabel">Website Development</span>
+            <div class="bar-track"><div class="bar-fill" style="width:8.9%;background:var(--accent)"></div></div>
+            <span class="rval">5</span>
+          </div>
+          <div class="bar-row">
+            <span class="rlabel">Uncategorized ("--")</span>
+            <div class="bar-track"><div class="bar-fill" style="width:5.4%;background:var(--ink-muted)"></div></div>
+            <span class="rval">3</span>
+          </div>
+          <div class="bar-row">
+            <span class="rlabel">Business Expansion</span>
+            <div class="bar-track"><div class="bar-fill" style="width:5.4%;background:var(--accent)"></div></div>
+            <span class="rval">3</span>
+          </div>
+          <div class="bar-row">
+            <span class="rlabel">Passive Work</span>
+            <div class="bar-track"><div class="bar-fill" style="width:1.8%;background:var(--accent)"></div></div>
+            <span class="rval">1</span>
+          </div>
+          <div class="bar-row">
+            <span class="rlabel">POC</span>
+            <div class="bar-track"><div class="bar-fill" style="width:1.8%;background:var(--accent)"></div></div>
+            <span class="rval">1</span>
+          </div>
+          <div class="bar-row">
+            <span class="rlabel">IT Infra Deployment</span>
+            <div class="bar-track"><div class="bar-fill" style="width:1.8%;background:var(--accent)"></div></div>
+            <span class="rval">1</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <div class="section-head">
+        <h2>Workload by team member</h2>
+        <span class="note">top 10 of 30+ named contributors, by project count</span>
+      </div>
+      <div class="bar-list">
+        <div class="bar-row"><span class="rlabel">Gaurav Nogia</span><div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--accent)"></div></div><span class="rval">40</span></div>
+        <div class="bar-row"><span class="rlabel">Sudeep Jain</span><div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--accent)"></div></div><span class="rval">30</span></div>
+        <div class="bar-row"><span class="rlabel">Ajay Sagar</span><div class="bar-track"><div class="bar-fill" style="width:70%;background:var(--accent)"></div></div><span class="rval">28</span></div>
+        <div class="bar-row"><span class="rlabel">Shiv Kumar</span><div class="bar-track"><div class="bar-fill" style="width:67.5%;background:var(--accent)"></div></div><span class="rval">27</span></div>
+        <div class="bar-row"><span class="rlabel">Karan Virmani</span><div class="bar-track"><div class="bar-fill" style="width:47.5%;background:var(--accent)"></div></div><span class="rval">19</span></div>
+        <div class="bar-row"><span class="rlabel">Mohammad Saleem</span><div class="bar-track"><div class="bar-fill" style="width:47.5%;background:var(--accent)"></div></div><span class="rval">19</span></div>
+        <div class="bar-row"><span class="rlabel">Afnan Ali</span><div class="bar-track"><div class="bar-fill" style="width:40%;background:var(--accent)"></div></div><span class="rval">16</span></div>
+        <div class="bar-row"><span class="rlabel">Mohit Kumar Solanki</span><div class="bar-track"><div class="bar-fill" style="width:27.5%;background:var(--accent)"></div></div><span class="rval">11</span></div>
+        <div class="bar-row"><span class="rlabel">Jatin Saluja</span><div class="bar-track"><div class="bar-fill" style="width:22.5%;background:var(--accent)"></div></div><span class="rval">9</span></div>
+        <div class="bar-row"><span class="rlabel">Amit Kumar</span><div class="bar-track"><div class="bar-fill" style="width:22.5%;background:var(--accent)"></div></div><span class="rval">9</span></div>
+      </div>
+      <div class="section-head" style="margin-top:14px; margin-bottom:0;">
+        <span class="note">Sunil Sharma also sits at 9 projects, tied for 9th–10th. Members are listed comma-separated per row and counted per mention, so a lead on many small sites (e.g. the 10 "F5 uDNS_Phase-13" rows) accrues quickly.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>Overdue projects</h2>
+      <span class="note">31 of 81 · sorted by days past deadline</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Project</th>
+            <th>Code</th>
+            <th class="num-col">Deadline</th>
+            <th class="num-col">Days overdue</th>
+            <th class="num-col">Completion</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="overdue-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>Data quality findings</h2>
+      <span class="note">issues in the underlying sheet, not in project execution</span>
+    </div>
+    <div class="findings-grid">
+      <div class="finding">
+        <div class="fnum">01</div>
+        <h3>Status contradicts logged progress</h3>
+        <p><span class="num">12</span> rows are flagged "Not Started" while carrying real completion percentages — three of them ("Pan 2.0 DR Mumbai", "F5 uDNS_Phase-12 Exp_ Hosar Road-", "PNB DC-Dwarka") are logged at <span class="num">100%</span> complete but still show as not started.</p>
+      </div>
+      <div class="finding">
+        <div class="fnum">02</div>
+        <h3>Department field is effectively unused</h3>
+        <p><span class="num">26</span> rows are blank ("--") and <span class="num">46</span> carry an identical ~1,250-character "select every department" blob (3 near-duplicate copies). Only <span class="num">9</span> rows carry a real, specific tag.</p>
+      </div>
+      <div class="finding">
+        <div class="fnum">03</div>
+        <h3>Category split by a typo</h3>
+        <p>"Implementation and Deployment" (<span class="num">56</span>) and a misspelled "Implentation and&nbsp;&nbsp;Migration" (<span class="num">11</span>) read as a typo fork of one taxonomy; <span class="num">3</span> more rows carry no category at all.</p>
+      </div>
+      <div class="finding">
+        <div class="fnum">04</div>
+        <h3>Missing status on finished-looking work</h3>
+        <p><span class="num">4</span> rows have no Project Status set at all — all four are logged at <span class="num">100%</span> completion, so they're likely done and simply never marked.</p>
+      </div>
+      <div class="finding">
+        <div class="fnum">05</div>
+        <h3>Project Code inconsistent</h3>
+        <p><span class="num">26</span> of 81 rows (19 blank, 7 placeholder text like "On&nbsp;Premises-1") don't follow the <span class="mono">CES/MMYY/###</span> numbering the other 55 use.</p>
+      </div>
+      <div class="finding">
+        <div class="fnum">06</div>
+        <h3>Concentration risk on one lead</h3>
+        <p>Gaurav Nogia appears on <span class="num">40</span> of 81 projects (49%) — nearly every F5&nbsp;uDNS rollout and half the DC/DR migrations name him, with no clear backup lead visible in the sheet.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Percentages rounded to the nearest whole point. "Overdue" = deadline date earlier than 20&nbsp;Aug&nbsp;2026 with completion under 100%.</span>
+    <span>Generated from CES_All_projects.xlsx</span>
+  </div>
+
+</div>
+
+<script>
+  const rows = [
+    {sev:"crit", proj:"TNGB CISCO VXLAN", code:"CES/0725/078", deadline:"30 Sep 2025", days:324, comp:14, status:"In Progress"},
+    {sev:"crit", proj:"POC- SD-Wan (Mumbai)", code:"—", deadline:"10 Nov 2025", days:283, comp:0, status:"In Progress"},
+    {sev:"crit", proj:"Bank Of America", code:"—", deadline:"10 Nov 2025", days:283, comp:0, status:"In Progress"},
+    {sev:"crit", proj:"F5 uDNS Deployment (Mangalore)", code:"CES/0625/068", deadline:"28 Nov 2025", days:265, comp:0, status:"In Progress"},
+    {sev:"crit", proj:"F5 uDNS Deployment (Manesar-2)", code:"CES/0625/067", deadline:"28 Nov 2025", days:265, comp:13, status:"In Progress"},
+    {sev:"crit", proj:"CES Tech_New_Website", code:"On Premises", deadline:"10 Apr 2026", days:132, comp:52, status:"Not Started"},
+    {sev:"crit", proj:"HP SNOC Solan", code:"CES/0725/079", deadline:"15 Apr 2026", days:127, comp:75, status:"In Progress"},
+    {sev:"crit", proj:"CES Tech_Software_Tool", code:"On Premises-1", deadline:"30 Apr 2026", days:112, comp:0, status:"Not Started"},
+    {sev:"crit", proj:"Net Expert Solutions_Existing_Website_Modification", code:"On Premises-2", deadline:"30 Apr 2026", days:112, comp:0, status:"Not Started"},
+    {sev:"warn", proj:"F5 uDNS Expenses", code:"F5 uDNS Expenses", deadline:"06 Jul 2026", days:45, comp:0, status:"In Progress"},
+    {sev:"warn", proj:"Airport Authority Cisco SD-Wan DC_Delhi", code:"CES/1225/104.1", deadline:"10 Jul 2026", days:41, comp:89, status:"In Progress"},
+    {sev:"warn", proj:"NES_Website_Modification", code:"OnPremises-", deadline:"10 Jul 2026", days:41, comp:10, status:"In Progress"},
+    {sev:"warn", proj:"MPGB- SD-Wan Implementation", code:"CES/0326/116", deadline:"10 Jul 2026", days:41, comp:94, status:"In Progress"},
+    {sev:"warn", proj:"Eicher (VE Commercial) Indore", code:"CES/0325/056", deadline:"14 Jul 2026", days:37, comp:75, status:"In Progress"},
+    {sev:"warn", proj:"Pan 2.0_DC_Delhi", code:"—", deadline:"15 Jul 2026", days:36, comp:78, status:"In Progress"},
+    {sev:"warn", proj:"www.devnet-expert.com", code:"OnPremises_03", deadline:"15 Jul 2026", days:36, comp:33, status:"In Progress"},
+    {sev:"warn", proj:"F5 uDNS_Phase-13_Vijaywada-TG", code:"CES/0326/....", deadline:"15 Jul 2026", days:36, comp:20, status:"Not Started"},
+    {sev:"warn", proj:"F5 uDNS_Phase-13_Kharadi-3-MAH", code:"CES/0326/..", deadline:"15 Jul 2026", days:36, comp:75, status:"Not Started"},
+    {sev:"warn", proj:"F5 uDNS_Phase-13_Patna-BR", code:"CES/0326/119A", deadline:"15 Jul 2026", days:36, comp:75, status:"In Progress"},
+    {sev:"warn", proj:"F5 uDNS_Phase-13_Ambala-HR", code:"CES/0326/119", deadline:"15 Jul 2026", days:36, comp:41, status:"Not Started"},
+    {sev:"warn", proj:"F5 uDNS_Phase-13_Mangalore-KK", code:"CES/0326/118", deadline:"15 Jul 2026", days:36, comp:78, status:"Not Started"},
+    {sev:"warn", proj:"F5 uDNS_Phase-13_BSV-Kolkatta", code:"CES/0326/117", deadline:"15 Jul 2026", days:36, comp:23, status:"In Progress"},
+    {sev:"warn", proj:"CMS Jammu SDC Migration and Integration", code:"—", deadline:"15 Jul 2026", days:36, comp:88, status:"Not Started"},
+    {sev:"warn", proj:"ZTNA DC Kolkata & DR Bangalore", code:"CES/1224/050", deadline:"22 Jul 2026", days:29, comp:25, status:"In Progress"},
+    {sev:"warn", proj:"UCO Bank Firewall Migration Kolkata & Bangalore", code:"CES/1224/044", deadline:"27 Jul 2026", days:24, comp:0, status:"In Progress"},
+    {sev:"warn", proj:"GDC DC Mumbai DC5", code:"CES/0825/087", deadline:"30 Jul 2026", days:21, comp:88, status:"In Progress"},
+    {sev:"warn", proj:"Optum Cisco Switch & AP Implementation (Hyderabad)", code:"CES/0426/121", deadline:"31 Jul 2026", days:20, comp:96, status:"In Progress"},
+    {sev:"warn", proj:"F5 uDNS_Phase-13_Rajkot-GJ", code:"CES/0326/.....", deadline:"31 Jul 2026", days:20, comp:78, status:"In Progress"},
+    {sev:"warn", proj:"F5 uDNS_Phase-12 Exp_Jorahat-NESA", code:"CES/1225/111", deadline:"31 Jul 2026", days:20, comp:94, status:"In Progress"},
+    {sev:"warn", proj:"FCBS DC/DR (BOI Implementation)", code:"—", deadline:"31 Jul 2026", days:20, comp:54, status:"In Progress"},
+    {sev:"warn", proj:"IIM POC & Implementation (Kolkata)", code:"PP-01", deadline:"31 Jul 2026", days:20, comp:96, status:"In Progress"}
+  ];
+
+  const sevMeta = {
+    crit: { label: "Critical", cls: "crit" },
+    warn: { label: "Watch", cls: "warn" }
+  };
+
+  const tbody = document.getElementById('overdue-body');
+  tbody.innerHTML = rows.map(r => {
+    const m = sevMeta[r.sev];
+    return `<tr>
+      <td><div class="sev-cell"><div class="sev-stripe" style="background:var(--${r.sev})"></div><span class="pill ${m.cls}">${m.label}</span></div></td>
+      <td class="proj">${r.proj}</td>
+      <td class="code mono">${r.code}</td>
+      <td class="num-col tabular">${r.deadline}</td>
+      <td class="num-col tabular"><strong>${r.days}d</strong></td>
+      <td class="num-col tabular">${r.comp}%</td>
+      <td>${r.status}</td>
+    </tr>`;
+  }).join('');
+</script>

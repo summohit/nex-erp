@@ -8,6 +8,7 @@ export interface Asset {
   assetTag: string;
   name: string;
   category: string;
+  quantity?: number;
   brand?: string;
   model?: string;
   serialNumber?: string;
@@ -15,7 +16,13 @@ export interface Asset {
   cost?: number;
   warrantyExpiry?: string;
   images?: string[];
+  location?: string;
+  notes?: string;
+  tags?: string[];
   status: string;
+  ram?: string;
+  storage?: string;
+  processor?: string;
   assignments?: AssetAssignment[];
   createdAt: string;
 }
@@ -92,6 +99,10 @@ export class AssetService {
 
   deleteAsset(id: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${id}`);
+  }
+
+  getCategories(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/categories`);
   }
 
   // 2. Assignments

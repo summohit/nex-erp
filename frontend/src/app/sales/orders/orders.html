@@ -26,7 +26,7 @@
           <td><span class="fw-semibold">{{o.orderNumber}}</span></td>
           <td>{{o.client?.name}}</td>
           <td>{{o.date | date}}</td>
-          <td>{{o.total | currency:o.currency}}</td>
+          <td>₹{{o.total | number:'1.0-2'}}</td>
           <td>
             <span class="badge" [ngClass]="{
               'badge-secondary': o.status === 'DRAFT',
@@ -36,12 +36,77 @@
             }">{{o.status}}</span>
           </td>
           <td class="actions-cell text-right">
-            <button class="btn-icon" title="View Order">
+            <button class="btn-icon" title="View Order" (click)="viewOrder(o)">
               <svg lucidePackage size="18" class="text-secondary"></svg>
             </button>
           </td>
         </tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- View Order Modal -->
+<div class="modal-backdrop" *ngIf="showViewModal && selectedOrder" (click)="closeViewModal()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3>{{selectedOrder.orderNumber}}</h3>
+        <p class="modal-subtitle">Sales order details</p>
+      </div>
+      <button class="btn-icon-close" (click)="closeViewModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Client</label>
+          <div class="fw-semibold">{{selectedOrder.client?.name}}</div>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <div class="fw-semibold">{{selectedOrder.date | date}}</div>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <div>
+            <span class="badge" [ngClass]="{
+              'badge-secondary': selectedOrder.status === 'DRAFT',
+              'badge-info': selectedOrder.status === 'CONFIRMED',
+              'badge-success': selectedOrder.status === 'DELIVERED',
+              'badge-danger': selectedOrder.status === 'CANCELLED'
+            }">{{selectedOrder.status}}</span>
+          </div>
+        </div>
+      </div>
+
+      <h4 class="section-title">Line Items</h4>
+      <div class="line-items">
+        <div class="line-item-row header-row">
+          <div class="col-desc">Description</div>
+          <div class="col-qty">Qty</div>
+          <div class="col-price">Unit Price</div>
+          <div class="col-total">Total</div>
+        </div>
+        <div class="line-item-row" *ngFor="let item of selectedOrder.items">
+          <div class="col-desc">{{item.description}}</div>
+          <div class="col-qty">{{item.quantity}}</div>
+          <div class="col-price">₹{{item.unitPrice | number:'1.2-2'}}</div>
+          <div class="col-total font-medium">₹{{item.total | number:'1.2-2'}}</div>
+        </div>
+        <div class="text-center text-muted" *ngIf="!selectedOrder.items?.length" style="padding: 12px 0;">No line items.</div>
+      </div>
+
+      <div class="quote-summary">
+        <div class="summary-row total-row">
+          <span>Total</span>
+          <span>₹{{selectedOrder.total | number:'1.2-2'}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeViewModal()">Close</button>
+    </div>
   </div>
 </div>

@@ -155,12 +155,13 @@ export class HeaderComponent implements OnInit, OnDestroy {
       navigator.geolocation.getCurrentPosition(
         (position) => proceed(position.coords.latitude, position.coords.longitude),
         (error) => {
-          this.toast.error('Location access denied. Clocking without location.');
-          proceed();
+          this.toast.error('Location access is required to clock in/out. Please enable location access and try again.');
+          this.isClocking.set(false);
         }
       );
     } else {
-      proceed();
+      this.toast.error('Location access is required to clock in/out. Your browser does not support location access.');
+      this.isClocking.set(false);
     }
   }
 

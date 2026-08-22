@@ -1,9 +1,23 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class BoardsService {
   constructor(private prisma: PrismaService) {}
+
+  private async assertOwner(companyId: number, projectId: number, employeeId: number, role?: string) {
+    if (role === 'SUPERADMIN' || role === 'ADMIN') return;
+
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, companyId },
+      select: { leadId: true }
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    if (project.leadId !== employeeId) {
+      throw new ForbiddenException('Only the project owner can perform this action');
+    }
+  }
 
   async getBoard(companyId: number, projectId: number) {
     const board = await this.prisma.board.findFirst({
@@ -20,7 +34,9 @@ export class BoardsService {
     return board;
   }
 
-  async createColumn(companyId: number, projectId: number, data: { name: string, color?: string }) {
+  async createColumn(companyId: number, projectId: number, data: { name: string, color?: string }, employeeId: number, role?: string) {
+    await this.assertOwner(companyId, projectId, employeeId, role);
+
     const board = await this.prisma.board.findFirst({
       where: { projectId, project: { companyId } }
     });
@@ -43,7 +59,11 @@ export class BoardsService {
     });
   }
 
-  async updateColumn(companyId: number, projectId: number, columnId: number, data: { color?: string, name?: string, position?: number }) {
+  async updateColumn(companyId: number, projectId: number, columnId: number, data: { color?: string, name?: string, position?: number }, employeeId: number, role?: string) {
+    if (data.name !== undefined) {
+      await this.assertOwner(companyId, projectId, employeeId, role);
+    }
+
     const board = await this.prisma.board.findFirst({
       where: { projectId, project: { companyId } }
     });

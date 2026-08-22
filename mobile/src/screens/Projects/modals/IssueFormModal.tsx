@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, AlertCircle, ArrowDown, Minus, ArrowUp, Flame } from 'lucide-react-native';
 
 import { useProjectStore } from '../../../store/projectStore';
@@ -12,6 +13,7 @@ interface IssueFormModalProps {
 }
 
 export default function IssueFormModal({ visible, onClose, onSubmit, initialColumnId }: IssueFormModalProps) {
+  const insets = useSafeAreaInsets();
   const currentBoard = useProjectStore(state => state.currentBoard);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -70,30 +72,38 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={styles.modalOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { maxHeight: '92%' }]}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Create New Task</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X size={24} color="#64748B" />
+              <X size={22} color="#64748B" />
             </TouchableOpacity>
           </View>
 
           {/* Error Message */}
           {error && (
-            <View style={styles.errorBanner}>
-              <AlertCircle size={16} color="#EF4444" />
-              <Text style={styles.errorText}>{error}</Text>
+            <View style={styles.errorBannerWrapper}>
+              <View style={styles.errorBanner}>
+                <AlertCircle size={16} color="#EF4444" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
             </View>
           )}
 
-          {/* Form */}
-          <View style={styles.form}>
+          {/* Scrollable Form */}
+          <ScrollView
+            style={styles.formScroll}
+            contentContainerStyle={styles.formScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={styles.label}>Title <Text style={styles.required}>*</Text></Text>
             <TextInput
               style={styles.input}
@@ -145,30 +155,30 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
                 );
               })}
             </View>
-            
+
             <View style={styles.statusDisplay}>
               <Text style={styles.statusLabel}>Will be added to:</Text>
               <View style={styles.statusBadge}>
                 <Text style={styles.statusBadgeText}>{columnName}</Text>
               </View>
             </View>
-          </View>
+          </ScrollView>
 
           {/* Footer Actions */}
-          <View style={styles.footer}>
-            <TouchableOpacity 
-              style={styles.cancelBtn} 
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <TouchableOpacity
+              style={styles.cancelBtn}
               onPress={onClose}
               disabled={isSubmitting}
             >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[
                 styles.submitBtn,
                 (!title.trim() || isSubmitting) && styles.submitBtnDisabled
-              ]} 
+              ]}
               onPress={handleSubmit}
               disabled={!title.trim() || isSubmitting}
             >
@@ -192,17 +202,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
+    width: '100%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
-    maxHeight: '90%',
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
   headerTitle: {
     fontSize: 20,
@@ -213,6 +225,9 @@ const styles = StyleSheet.create({
     padding: 4,
     backgroundColor: '#F1F5F9',
     borderRadius: 20,
+  },
+  errorBannerWrapper: {
+    paddingHorizontal: 24,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -231,7 +246,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
   },
-  form: {
+  formScroll: {
+    flexGrow: 0,
+  },
+  formScrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 8,
     gap: 16,
   },
   label: {
@@ -305,7 +325,7 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 24,
+    paddingHorizontal: 24,
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',

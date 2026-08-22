@@ -18,7 +18,8 @@ export class BoardsController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() data: { name: string, color?: string }
   ) {
-    return this.boardsService.createColumn(req.user.companyId, projectId, data);
+    const employeeId = req.user.employeeId ?? req.user.sub;
+    return this.boardsService.createColumn(req.user.companyId, projectId, data, employeeId, req.user.role);
   }
 
   @Put('columns/reorder')
@@ -37,7 +38,8 @@ export class BoardsController {
     @Param('columnId', ParseIntPipe) columnId: number,
     @Body() data: { color?: string, name?: string, position?: number }
   ) {
-    return this.boardsService.updateColumn(req.user.companyId, projectId, columnId, data);
+    const employeeId = req.user.employeeId ?? req.user.sub;
+    return this.boardsService.updateColumn(req.user.companyId, projectId, columnId, data, employeeId, req.user.role);
   }
 
   @Delete('columns/:columnId')

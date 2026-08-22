@@ -36,6 +36,15 @@ export class EmployeeService {
     });
   }
 
+  // Minimal name/avatar list — usable by any authenticated employee, unlike
+  // getEmployees() which requires employee-directory view permission.
+  getEmployeesBasicList(): Observable<Employee[]> {
+    const token = localStorage.getItem('access_token');
+    return this.http.get<Employee[]>(`${this.apiUrl}/basic-list`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   getCeo(): Observable<Employee | null> {
     const token = localStorage.getItem('access_token');
     return this.http.get<Employee | null>(`${this.apiUrl}/ceo`, {

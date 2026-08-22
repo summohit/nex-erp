@@ -33,6 +33,15 @@ export interface SkillItem {
   level: string;
 }
 
+export interface ProfileFormErrors {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  homeWorkDistanceKm?: string;
+  childrenCount?: string;
+}
+
 @Component({
   selector: 'app-profile-tab',
   standalone: true,
@@ -62,13 +71,39 @@ export interface SkillItem {
   styleUrls: ['./profile-tab.css']
 })
 export class ProfileTabComponent implements OnInit {
-  @Input() employeeData: any;
+  private _employeeData: any;
+
+  // Re-builds the form whenever employeeData changes (initial load AND after
+  // a save triggers refreshProfile), so the form never shows stale values.
+  @Input() set employeeData(value: any) {
+    this._employeeData = value;
+    if (value) {
+      this.initForm();
+    }
+  }
+  get employeeData(): any {
+    return this._employeeData;
+  }
+
   @Input() isOwner: boolean = false;
   @Input() activeSubTab: string = 'work';
   @Output() refreshProfile = new EventEmitter<void>();
+  @Output() tabChange = new EventEmitter<'work' | 'resume' | 'personal'>();
 
   formData: any = {};
+  errors: ProfileFormErrors = {};
   personalSubTab: 'all' | 'contact_bank' | 'personal' | 'citizenship_visa' | 'location' | 'family_edu' | 'bio' = 'all';
+
+  // Maps each validated field to the tab/sub-tab that contains it, so validation
+  // errors can auto-navigate to the right section before scrolling to the field.
+  private fieldTabMap: Record<string, { parent: 'work' | 'resume' | 'personal'; subTab?: 'all' | 'contact_bank' | 'personal' | 'citizenship_visa' | 'location' | 'family_edu' | 'bio' }> = {
+    firstName: { parent: 'personal', subTab: 'personal' },
+    lastName: { parent: 'personal', subTab: 'personal' },
+    phone: { parent: 'personal', subTab: 'contact_bank' },
+    dateOfBirth: { parent: 'personal', subTab: 'personal' },
+    homeWorkDistanceKm: { parent: 'personal', subTab: 'location' },
+    childrenCount: { parent: 'personal', subTab: 'family_edu' }
+  };
 
   setPersonalSubTab(tab: 'all' | 'contact_bank' | 'personal' | 'citizenship_visa' | 'location' | 'family_edu' | 'bio') {
     this.personalSubTab = tab;
@@ -91,6 +126,12 @@ export class ProfileTabComponent implements OnInit {
   }
 
   get canEditPersonalDetails(): boolean {
+    return this.isOwner || this.canEditWorkDetails;
+  }
+
+  // HR/Admin/Superadmin can edit and save work details of other employees.
+  // This mirrors the backend checkProfileEditPermission (role-based + designation editors).
+  get canSaveProfile(): boolean {
     return this.isOwner || this.canEditWorkDetails;
   }
 
@@ -152,7 +193,6 @@ export class ProfileTabComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.initForm();
     this.loadAllEmployees();
     this.loadBranches();
     this.loadDepartments();
@@ -189,7 +229,10 @@ export class ProfileTabComponent implements OnInit {
   }
 
   loadAllEmployees() {
-    this.employeeService.getEmployees().subscribe({
+    // Use the minimal list endpoint so any authenticated employee (e.g. viewing
+    // their own profile) can populate the manager selector + org chart without
+    // needing full employee-directory permission.
+    this.employeeService.getEmployeesBasicList().subscribe({
       next: (list) => {
         this.allEmployees = list || [];
       },
@@ -545,17 +588,16 @@ export class ProfileTabComponent implements OnInit {
     }
   }
 
+  isSaving = false;
+
   saveProfile() {
-    if (!this.isOwner) return;
-    
-    // Validate phone number if present
-    if (this.formData.phone) {
-      const phoneRegex = /^\+?[0-9]{10,15}$/;
-      if (!phoneRegex.test(this.formData.phone)) {
-        this.toast.error('Invalid Mobile number. Must be 10-15 digits.');
-        return;
-      }
+    if (!this.canSaveProfile || this.isSaving) return;
+
+    if (!this.validateForm()) {
+      return;
     }
+
+    this.isSaving = true;
 
     // Construct payload for API
     const payload = {
@@ -574,14 +616,99 @@ export class ProfileTabComponent implements OnInit {
 
     this.employeeService.updateProfile(this.employeeData.id, payload).subscribe({
       next: () => {
+        this.isSaving = false;
         this.toast.success('Profile updated successfully');
+        this.errors = {};
         this.refreshProfile.emit();
       },
       error: (err: any) => {
+        this.isSaving = false;
         this.toast.error('Failed to update profile');
         console.error(err);
       }
     });
+  }
+
+  private validateForm(): boolean {
+    this.errors = {};
+    let valid = true;
+
+    if (!this.formData.firstName?.trim()) {
+      this.errors.firstName = 'First name is required.';
+      valid = false;
+    }
+
+    if (!this.formData.lastName?.trim()) {
+      this.errors.lastName = 'Last name is required.';
+      valid = false;
+    }
+
+    if (this.formData.phone) {
+      const phoneRegex = /^\+?[0-9]{10,15}$/;
+      if (!phoneRegex.test(this.formData.phone)) {
+        this.errors.phone = 'Enter a valid mobile number (10–15 digits).';
+        valid = false;
+      }
+    }
+
+    if (this.formData.dateOfBirth) {
+      const dob = new Date(this.formData.dateOfBirth + 'T00:00:00');
+      if (dob > new Date()) {
+        this.errors.dateOfBirth = 'Date of birth cannot be in the future.';
+        valid = false;
+      }
+    }
+
+    const distance = Number(this.formData.homeWorkDistanceKm);
+    if (this.formData.homeWorkDistanceKm !== '' && this.formData.homeWorkDistanceKm != null && !isNaN(distance) && distance < 0) {
+      this.errors.homeWorkDistanceKm = 'Distance cannot be negative.';
+      valid = false;
+    }
+
+    const children = Number(this.formData.childrenCount);
+    if (this.formData.childrenCount !== '' && this.formData.childrenCount != null && !isNaN(children) && children < 0) {
+      this.errors.childrenCount = 'Children count cannot be negative.';
+      valid = false;
+    }
+
+    if (!valid) {
+      this.toast.error('Please fix the highlighted fields below.');
+      this.focusFirstError();
+    }
+
+    return valid;
+  }
+
+  clearError(field: keyof ProfileFormErrors) {
+    if (this.errors[field]) {
+      delete this.errors[field];
+    }
+  }
+
+  private focusFirstError() {
+    const order: (keyof ProfileFormErrors)[] = ['firstName', 'lastName', 'phone', 'dateOfBirth', 'homeWorkDistanceKm', 'childrenCount'];
+    const first = order.find(k => !!this.errors[k]);
+    if (!first) return;
+
+    const target = this.fieldTabMap[first];
+
+    // Navigate to the tab/sub-tab that contains the errored field
+    if (this.activeSubTab !== target.parent) {
+      this.tabChange.emit(target.parent);
+    }
+    if (target.parent === 'personal' && target.subTab) {
+      this.personalSubTab = target.subTab;
+    }
+
+    // Wait a tick for the tab content to render, then scroll & focus the field
+    setTimeout(() => {
+      const el = document.getElementById(`field-${first}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input = el.querySelector('input, select, textarea') as HTMLElement | null;
+        input?.focus({ preventScroll: true });
+      }
+    }, 60);
   }
 
   goBack() {

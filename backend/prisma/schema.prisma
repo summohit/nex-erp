@@ -568,6 +568,7 @@ model ExpenseClaim {
   year            Int?
   purchaseDate    DateTime?
   purchasedFrom   String?
+  projectCode     String?
   projectId       Int?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -608,6 +609,7 @@ model Asset {
   assetTag          String
   name              String
   category          String            @default("LAPTOP") // LAPTOP, DESKTOP, MONITOR, PERIPHERAL, SOFTWARE, MOBILE, OTHER
+  quantity          Int               @default(1)
   brand             String?
   model             String?
   serialNumber      String?
@@ -615,7 +617,13 @@ model Asset {
   cost              Float?
   warrantyExpiry    DateTime?
   images            String?           @db.Text
+  location          String?
+  notes             String?           @db.Text
+  tags              String?           @db.Text
   status            String            @default("AVAILABLE") // AVAILABLE, ASSIGNED, IN_REPAIR, RETIRED
+  ram               String?           // e.g. "16GB", "32GB"
+  storage           String?           // e.g. "256GB SSD", "1TB NVMe"
+  processor         String?           // e.g. "Intel Core i7-1365U", "Apple M3 Max"
   companyId         Int
   company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignments       AssetAssignment[]
@@ -751,7 +759,10 @@ model Project {
   description String?
   color       String    @default("#2563eb") // Project accent color
   icon        String    @default("folder") // Lucide icon name
-  status      String    @default("ACTIVE") // ACTIVE, ARCHIVED
+  status      String    @default("ACTIVE") // ACTIVE, ARCHIVED (lifecycle status — unrelated to workStatus)
+  category    String? // free-text project category (e.g. "Implementation and Deployment")
+  progress    Int? // 0-100 completion percentage
+  workStatus  String? // NOT_STARTED, IN_PROGRESS, FINISHED (work status — distinct from ACTIVE/ARCHIVED)
   leadId      Int? // Project lead (Employee)
   lead        Employee? @relation("ProjectLead", fields: [leadId], references: [id])
   companyId   Int
@@ -1823,7 +1834,10 @@ model Lead {
   value        Float?
   currency     String?
   source       String?
-  status       String      @default("NEW") // NEW, QUALIFIED, PROPOSAL, WON, LOST
+  status               String      @default("NEW") // NEW, QUALIFIED, PROPOSAL, WON, LOST
+  description          String?     @db.Text
+  qualificationReason  String?
+  proposalDate         DateTime?
   assignedToId Int?
   assignedTo   Employee?   @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   companyId    Int
@@ -1846,8 +1860,10 @@ model Quotation {
   validUntil     DateTime
   subtotal       Float
   tax            Float
+  taxRate        Float           @default(18)
   total          Float
   currency       String
+  notes          String?
   status         String          @default("DRAFT") // DRAFT, PENDING_APPROVAL, SENT, ACCEPTED, REJECTED
   approvalStatus String          @default("APPROVED") // PENDING, APPROVED, REJECTED
   approvedById   Int?
@@ -1867,6 +1883,7 @@ model QuotationItem {
   quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   description String
   quantity    Float
+  unit        String?
   unitPrice   Float
   total       Float
 }
@@ -1881,6 +1898,9 @@ model SalesOrder {
   date            DateTime
   total           Float
   currency        String
+  taxRate         Float            @default(0)
+  paymentMethod   String?
+  notes           String?
   status          String           @default("DRAFT") // DRAFT, CONFIRMED, DELIVERED, CANCELLED
   isRental        Boolean          @default(false)
   rentalStartDate DateTime?
@@ -1900,7 +1920,9 @@ model SalesOrderItem {
   salesOrder       SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
   description      String
   quantity         Float
+  unit             String?
   unitPrice        Float
+  discount         Float      @default(0)
   total            Float
   isRentalItem     Boolean    @default(false)
   returnedQuantity Float      @default(0)

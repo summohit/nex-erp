@@ -61,7 +61,11 @@ export class ProjectsService {
         members: {
           create: [
             { employeeId: leadId, role: 'ADMIN' },
-            ...(data.pmIds ? data.pmIds.map((id: number) => ({ employeeId: id, role: 'PROJECT_MANAGER' })) : [])
+            ...(data.pmIds
+              ? data.pmIds
+                  .filter((id: number) => id !== leadId)
+                  .map((id: number) => ({ employeeId: id, role: 'PROJECT_MANAGER' }))
+              : [])
           ]
         },
         boards: {
@@ -389,8 +393,15 @@ export class ProjectsService {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true }
         },
         members: {
-          where: { employeeId: empId },
-          select: { isStarred: true }
+          orderBy: { joinedAt: 'asc' },
+          select: {
+            employeeId: true,
+            role: true,
+            isStarred: true,
+            employee: {
+              select: { id: true, firstName: true, lastName: true, avatarUrl: true }
+            }
+          }
         }
       }
     });
@@ -655,13 +666,17 @@ export class ProjectsService {
     return { isStarred: updated.isStarred };
   }
 
-  async addProjectMember(companyId: number, projectId: number, employeeId: number, role: string) {
+  async addProjectMember(companyId: number, projectId: number, employeeId: number, role: string, actorEmployeeId?: number, actorRole?: string) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId, companyId }
     });
-    
+
     if (!project) {
       throw new NotFoundException('Project not found');
+    }
+
+    if (actorEmployeeId !== undefined && !(actorRole === 'SUPERADMIN' || actorRole === 'ADMIN') && project.leadId !== actorEmployeeId) {
+      throw new ForbiddenException('Only the project owner can add members');
     }
 
     const existing = await this.prisma.projectMember.findUnique({
@@ -759,10 +774,49 @@ export class ProjectsService {
     if (data.hourlyRate !== undefined) updateData.hourlyRate = data.hourlyRate ? parseFloat(data.hourlyRate) : null;
     if (data.clientId !== undefined) updateData.clientId = data.clientId ? parseInt(data.clientId, 10) : null;
 
-    return this.prisma.project.update({
+    const updated = await this.prisma.project.update({
       where: { id },
       data: updateData
     });
+
+    if (data.pmIds !== undefined) {
+      await this.syncProjectManagers(id, data.pmIds || []);
+    }
+
+    return updated;
+  }
+
+  private async syncProjectManagers(projectId: number, pmIds: number[]) {
+    const members = await this.prisma.projectMember.findMany({ where: { projectId } });
+
+    const currentPmIds = members.filter(m => m.role === 'PROJECT_MANAGER').map(m => m.employeeId);
+    const toDowngrade = currentPmIds.filter(id => !pmIds.includes(id));
+    const toPromote = pmIds.filter(id => {
+      const existing = members.find(m => m.employeeId === id);
+      return !existing || existing.role === 'MEMBER' || existing.role === 'VIEWER';
+    });
+    const toAdd = pmIds.filter(id => !members.some(m => m.employeeId === id));
+    const toPromoteExisting = toPromote.filter(id => !toAdd.includes(id));
+
+    await this.prisma.$transaction([
+      ...(toDowngrade.length
+        ? [this.prisma.projectMember.updateMany({
+            where: { projectId, employeeId: { in: toDowngrade } },
+            data: { role: 'MEMBER' }
+          })]
+        : []),
+      ...(toPromoteExisting.length
+        ? [this.prisma.projectMember.updateMany({
+            where: { projectId, employeeId: { in: toPromoteExisting } },
+            data: { role: 'PROJECT_MANAGER' }
+          })]
+        : []),
+      ...(toAdd.length
+        ? [this.prisma.projectMember.createMany({
+            data: toAdd.map(employeeId => ({ projectId, employeeId, role: 'PROJECT_MANAGER' }))
+          })]
+        : [])
+    ]);
   }
 
   async archiveProject(companyId: number, projectId: number, force: boolean) {

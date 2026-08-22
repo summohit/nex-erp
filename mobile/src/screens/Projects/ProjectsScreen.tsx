@@ -1,28 +1,42 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  TextInput, ActivityIndicator, RefreshControl, Dimensions, Animated 
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  TextInput, ActivityIndicator, RefreshControl, Dimensions, Animated, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { 
-  Search, Star, Clock, Archive, User, Plus, Sparkles, 
-  ChevronRight, Kanban, Activity, LayoutGrid 
+import {
+  Search, Star, Clock, Archive, User, Plus, Sparkles,
+  ChevronRight, Kanban, Activity, LayoutGrid, Users
 } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useProjectStore } from '../../store/projectStore';
+import { useAuthStore } from '../../store/authStore';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
 import { GradientBanner, PulseSkeleton } from '../../components/SharedUI';
 
 const { width } = Dimensions.get('window');
 const HORIZONTAL_CARD_WIDTH = (width - 48) / 2; // 2 column width for horizontal scroll
 const VERTICAL_CARD_WIDTH = '100%'; // 1 column list
+const MAX_STACK_AVATARS = 4;
+
+const MEMBER_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
+const getMemberColor = (id: number) => MEMBER_COLORS[id % MEMBER_COLORS.length];
 
 // Shared components imported above
 
 export default function ProjectsScreen() {
   const navigation = useNavigation<any>();
   const { projects, archivedProjects, isLoading, fetchProjects, toggleStar, archiveProject, unarchiveProject } = useProjectStore();
+  const { user } = useAuthStore();
+  const canArchiveProjects = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
+
+  // Find the membership row belonging to the logged-in employee (not just members[0])
+  const myMemberOf = (p: any): any => {
+    const empId = user?.employeeId;
+    if (!empId) return null;
+    return p?.members?.find((m: any) => m.employeeId === empId) || null;
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'starred' | 'recent' | 'archived'>('all');
@@ -109,26 +123,29 @@ export default function ProjectsScreen() {
       if (!matchesSearch) return false;
                             
       if (activeTab === 'starred') {
-        return p.members && p.members.length > 0 && p.members[0].isStarred;
+        return !!myMemberOf(p)?.isStarred;
       }
       if (activeTab === 'recent') {
         return recentlyViewedIds.includes(p.id);
       }
       return true;
     });
-  }, [projects, archivedProjects, searchQuery, activeTab, recentlyViewedIds]);
+  }, [projects, archivedProjects, searchQuery, activeTab, recentlyViewedIds, user?.employeeId]);
 
   const starredProjects = useMemo(() => {
-    return projects.filter((p: any) => p.members && p.members.length > 0 && p.members[0].isStarred);
-  }, [projects]);
+    return projects.filter((p: any) => !!myMemberOf(p)?.isStarred);
+  }, [projects, user?.employeeId]);
 
   const recentlyViewedProjects = useMemo(() => {
     return projects.filter((p: any) => recentlyViewedIds.includes(p.id));
   }, [projects, recentlyViewedIds]);
 
   const renderCard = (p: any, index: number, isHorizontal: boolean = false) => {
-    const isStarred = p.members && p.members.length > 0 && p.members[0].isStarred;
+    const isStarred = !!myMemberOf(p)?.isStarred;
     const issueCount = p._count?.issues ?? 0;
+    const members: any[] = p.members || [];
+    const visibleMembers = members.slice(0, MAX_STACK_AVATARS);
+    const overflowCount = Math.max(0, members.length - visibleMembers.length);
 
     return (
       <TouchableOpacity
@@ -139,42 +156,83 @@ export default function ProjectsScreen() {
       >
         <GradientBanner colorStr={p.color} index={index} style={styles.cardBanner}>
           <View style={styles.bannerActions}>
-            <TouchableOpacity 
-              style={styles.actionBtn} 
-              onPress={(e) => handleArchive(p, e)}
-              activeOpacity={0.7}
-            >
-              <Archive size={14} color="#FFFFFF" />
-            </TouchableOpacity>
+            {canArchiveProjects && (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={(e) => handleArchive(p, e)}
+                activeOpacity={0.7}
+              >
+                <Archive size={14} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
 
-            <TouchableOpacity 
-              style={styles.actionBtn} 
+            <TouchableOpacity
+              style={styles.actionBtn}
               onPress={(e) => handleToggleStar(p.id, e)}
               activeOpacity={0.7}
             >
-              <Star 
-                size={14} 
-                color={isStarred ? "#EAB308" : "#FFFFFF"} 
-                fill={isStarred ? "#EAB308" : "none"} 
+              <Star
+                size={14}
+                color={isStarred ? "#EAB308" : "#FFFFFF"}
+                fill={isStarred ? "#EAB308" : "none"}
               />
             </TouchableOpacity>
           </View>
+
+          {/* Team avatar stack, overlapping circles bottom-left of the banner */}
+          {visibleMembers.length > 0 && (
+            <View style={styles.teamStackOverlay}>
+              {visibleMembers.map((m, mi) => {
+                const emp = m.employee || m;
+                const avatarUrl = emp?.avatarUrl;
+                const initial = (emp?.firstName || '?').charAt(0).toUpperCase();
+                const color = getMemberColor(m.employeeId || emp?.id || mi);
+                return (
+                  <View
+                    key={m.employeeId || mi}
+                    style={[
+                      styles.teamAvatarCircle,
+                      { marginLeft: mi === 0 ? 0 : -8, zIndex: visibleMembers.length - mi },
+                      !avatarUrl && { backgroundColor: color },
+                    ]}
+                  >
+                    {avatarUrl ? (
+                      <Image source={{ uri: avatarUrl }} style={styles.teamAvatarImg} />
+                    ) : (
+                      <Text style={styles.teamAvatarInitial}>{initial}</Text>
+                    )}
+                  </View>
+                );
+              })}
+              {overflowCount > 0 && (
+                <View style={[styles.teamAvatarCircle, styles.teamAvatarOverflow, { marginLeft: -8 }]}>
+                  <Text style={styles.teamAvatarOverflowText}>+{overflowCount}</Text>
+                </View>
+              )}
+            </View>
+          )}
         </GradientBanner>
 
         <View style={styles.cardFooter}>
-          <View style={styles.titleMeta}>
-            <Text style={styles.boardTitle} numberOfLines={1}>{p.name}</Text>
+          <Text style={styles.boardTitle} numberOfLines={1}>{p.name}</Text>
+          <View style={styles.cardMetaRow}>
             {p.key && (
               <View style={styles.keyBadge}>
                 <Text style={styles.keyText}>{p.key}</Text>
               </View>
             )}
+            {issueCount > 0 && (
+              <View style={styles.taskBadge}>
+                <Text style={styles.taskBadgeText}>{issueCount} tasks</Text>
+              </View>
+            )}
+            {members.length > 0 && (
+              <View style={styles.teamCountBadge}>
+                <Users size={11} color="#64748B" />
+                <Text style={styles.teamCountText}>{members.length}</Text>
+              </View>
+            )}
           </View>
-          {issueCount > 0 && (
-            <View style={styles.taskBadge}>
-              <Text style={styles.taskBadgeText}>{issueCount} tasks</Text>
-            </View>
-          )}
         </View>
       </TouchableOpacity>
     );
@@ -423,7 +481,6 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   boardCard: {
-    height: 120,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     overflow: 'hidden',
@@ -436,7 +493,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardBanner: {
-    height: 68,
+    height: 92,
     width: '100%',
     position: 'relative',
   },
@@ -455,28 +512,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardFooter: {
-    flex: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    justifyContent: 'center',
+  teamStackOverlay: {
+    position: 'absolute',
+    left: 12,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  titleMeta: {
+  teamAvatarCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  teamAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  teamAvatarInitial: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  teamAvatarOverflow: {
+    backgroundColor: '#334155',
+  },
+  teamAvatarOverflowText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  cardFooter: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  boardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  cardMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  boardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   keyBadge: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
   },
   keyText: {
     fontSize: 10,
@@ -484,17 +574,28 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   taskBadge: {
-    position: 'absolute',
-    right: 8,
-    bottom: 8,
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
   },
   taskBadgeText: {
     fontSize: 10,
     fontWeight: '600',
+    color: '#64748B',
+  },
+  teamCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
+  teamCountText: {
+    fontSize: 10,
+    fontWeight: '700',
     color: '#64748B',
   },
 

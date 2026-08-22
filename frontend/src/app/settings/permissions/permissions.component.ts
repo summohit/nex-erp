@@ -111,12 +111,16 @@ export class PermissionsComponent implements OnInit {
       subItems: []
     },
     {
-      id: 'crm', title: 'CRM', isExpanded: true, enabled: false,
+      id: 'crm/leads', title: 'CRM', isExpanded: true, enabled: false,
       subItems: []
     },
     {
       id: 'sales', title: 'Sales', isExpanded: true, enabled: false,
-      subItems: []
+      subItems: [
+        { id: 'sales/quotations', title: 'Quotations', enabled: false },
+        { id: 'sales/orders', title: 'Sales Orders', enabled: false },
+        { id: 'sales/pos', title: 'Point of Sale', enabled: false }
+      ]
     },
     {
       id: 'settings', title: 'Settings', isExpanded: true, enabled: false,

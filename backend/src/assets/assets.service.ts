@@ -31,8 +31,24 @@ export class AssetsService {
 
     return assets.map(a => ({
       ...a,
-      images: a.images ? (typeof a.images === 'string' && a.images.startsWith('[') ? JSON.parse(a.images) : [a.images]) : []
+      images: a.images ? (typeof a.images === 'string' && a.images.startsWith('[') ? JSON.parse(a.images) : [a.images]) : [],
+      tags: a.tags ? (a.tags.startsWith('[') ? JSON.parse(a.tags) : [a.tags]) : []
     }));
+  }
+
+  private readonly standardCategories = ['LAPTOP', 'DESKTOP', 'MONITOR', 'PERIPHERAL', 'SOFTWARE', 'MOBILE'];
+
+  async getCategories(companyId: number) {
+    const distinctRows = await this.prisma.asset.findMany({
+      where: { companyId },
+      select: { category: true },
+      distinct: ['category']
+    });
+    const custom = distinctRows
+      .map(r => r.category)
+      .filter(c => c && !this.standardCategories.includes(c));
+
+    return [...this.standardCategories, ...custom];
   }
 
   async createAsset(companyId: number, data: any) {
@@ -51,6 +67,7 @@ export class AssetsService {
     }
 
     const imagesStr = Array.isArray(data.images) ? JSON.stringify(data.images) : (data.images || null);
+    const tagsStr = Array.isArray(data.tags) ? JSON.stringify(data.tags) : (data.tags || null);
 
     const asset = await this.prisma.asset.create({
       data: {
@@ -58,6 +75,7 @@ export class AssetsService {
         assetTag,
         name: data.name,
         category: data.category || 'LAPTOP',
+        quantity: data.quantity ? parseInt(data.quantity, 10) : 1,
         brand: data.brand,
         model: data.model,
         serialNumber: data.serialNumber,
@@ -65,13 +83,20 @@ export class AssetsService {
         cost: data.cost ? parseFloat(data.cost) : null,
         warrantyExpiry: data.warrantyExpiry ? new Date(data.warrantyExpiry) : null,
         images: imagesStr,
-        status: data.status || 'AVAILABLE'
+        location: data.location || null,
+        notes: data.notes || null,
+        tags: tagsStr,
+        status: data.status || 'AVAILABLE',
+        ram: data.ram,
+        storage: data.storage,
+        processor: data.processor
       }
     });
 
     return {
       ...asset,
-      images: asset.images ? (asset.images.startsWith('[') ? JSON.parse(asset.images) : [asset.images]) : []
+      images: asset.images ? (asset.images.startsWith('[') ? JSON.parse(asset.images) : [asset.images]) : [],
+      tags: asset.tags ? (asset.tags.startsWith('[') ? JSON.parse(asset.tags) : [asset.tags]) : []
     };
   }
 
@@ -93,6 +118,7 @@ export class AssetsService {
     }
 
     const imagesStr = Array.isArray(data.images) ? JSON.stringify(data.images) : (data.images !== undefined ? data.images : undefined);
+    const tagsStr = Array.isArray(data.tags) ? JSON.stringify(data.tags) : (data.tags !== undefined ? data.tags : undefined);
 
     const updated = await this.prisma.asset.update({
       where: { id },
@@ -100,6 +126,7 @@ export class AssetsService {
         assetTag,
         name: data.name,
         category: data.category,
+        quantity: data.quantity !== undefined && data.quantity !== null && data.quantity !== '' ? parseInt(data.quantity, 10) : undefined,
         brand: data.brand,
         model: data.model,
         serialNumber: data.serialNumber,
@@ -107,13 +134,20 @@ export class AssetsService {
         cost: data.cost ? parseFloat(data.cost) : undefined,
         warrantyExpiry: data.warrantyExpiry ? new Date(data.warrantyExpiry) : undefined,
         images: imagesStr,
-        status: data.status
+        location: data.location !== undefined ? data.location : undefined,
+        notes: data.notes !== undefined ? data.notes : undefined,
+        tags: tagsStr,
+        status: data.status,
+        ram: data.ram,
+        storage: data.storage,
+        processor: data.processor
       }
     });
 
     return {
       ...updated,
-      images: updated.images ? (updated.images.startsWith('[') ? JSON.parse(updated.images) : [updated.images]) : []
+      images: updated.images ? (updated.images.startsWith('[') ? JSON.parse(updated.images) : [updated.images]) : [],
+      tags: updated.tags ? (updated.tags.startsWith('[') ? JSON.parse(updated.tags) : [updated.tags]) : []
     };
   }
 

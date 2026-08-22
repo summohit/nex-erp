@@ -4,20 +4,24 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
-import { 
-  LucidePlus, 
-  LucideGripVertical, 
-  LucideBuilding, 
-  LucidePhone, 
-  LucideMail, 
-  LucideDollarSign, 
-  LucideCheckCircle, 
-  LucideX, 
+import {
+  LucidePlus,
+  LucideGripVertical,
+  LucideBuilding,
+  LucidePhone,
+  LucideMail,
+  LucideDollarSign,
+  LucideCheckCircle,
+  LucideX,
   LucideLoader2,
   LucideSearch,
   LucideUser,
   LucideTrash2,
-  LucideFilter
+  LucideFilter,
+  LucideEye,
+  LucideCalendar,
+  LucideFileText,
+  LucideEdit2
 } from '@lucide/angular';
 
 interface Lead {
@@ -30,6 +34,9 @@ interface Lead {
   value: number;
   currency: string;
   status: string;
+  description?: string;
+  qualificationReason?: string;
+  proposalDate?: string;
   createdAt: string;
 }
 
@@ -52,7 +59,11 @@ interface Lead {
     LucideSearch,
     LucideUser,
     LucideTrash2,
-    LucideFilter
+    LucideFilter,
+    LucideEye,
+    LucideCalendar,
+    LucideFileText,
+    LucideEdit2
   ],
   templateUrl: './leads.html',
   styleUrls: ['./leads.css']
@@ -72,6 +83,8 @@ export class LeadsComponent implements OnInit {
   lostLeads: Lead[] = [];
 
   showCreateModal = false;
+  showDetailModal = false;
+  selectedLead: Lead | null = null;
   isSubmitted = false;
   isSaving = false;
   isLoading = true;
@@ -83,7 +96,10 @@ export class LeadsComponent implements OnInit {
     email: '',
     phone: '',
     value: 0,
-    currency: 'INR'
+    currency: 'INR',
+    description: '',
+    qualificationReason: '',
+    proposalDate: ''
   };
 
   constructor(private http: HttpClient) {}
@@ -170,7 +186,7 @@ export class LeadsComponent implements OnInit {
     this.showCreateModal = true;
     this.isSubmitted = false;
     this.isSaving = false;
-    this.newLeadData = { title: '', companyName: '', contactName: '', email: '', phone: '', value: 0, currency: 'INR' };
+    this.newLeadData = { title: '', companyName: '', contactName: '', email: '', phone: '', value: 0, currency: 'INR', description: '', qualificationReason: '', proposalDate: '' };
   }
 
   closeModal() {
@@ -205,6 +221,21 @@ export class LeadsComponent implements OnInit {
         alert(err?.error?.message || 'Failed to save lead.');
       }
     });
+  }
+
+  openDetailModal(lead: Lead) {
+    this.selectedLead = lead;
+    this.showDetailModal = true;
+  }
+
+  closeDetailModal() {
+    this.showDetailModal = false;
+    this.selectedLead = null;
+  }
+
+  getStatusLabel(status: string): string {
+    const map: Record<string, string> = { NEW: 'New', QUALIFIED: 'Qualified', PROPOSAL: 'Proposal', WON: 'Won', LOST: 'Lost' };
+    return map[status] || status;
   }
 
   deleteLead(id: number, event: Event) {

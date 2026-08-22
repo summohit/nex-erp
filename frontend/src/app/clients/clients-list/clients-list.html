@@ -65,19 +65,21 @@
             <label class="form-label">Client Logo</label>
             <input type="file" #logoInput (change)="onLogoFileSelected($event)" accept="image/*" class="hidden-file-input" style="display: none;">
             
-            <div class="logo-dropzone" 
+            <div class="logo-dropzone"
                  [class.dragging]="isDraggingLogo"
+                 tabindex="0"
                  (click)="logoInput.click()"
                  (dragover)="onLogoDragOver($event)"
                  (dragleave)="onLogoDragLeave($event)"
-                 (drop)="onLogoDrop($event)">
+                 (drop)="onLogoDrop($event)"
+                 (paste)="onLogoPaste($event)">
                  
               <div *ngIf="!logoPreview" class="dropzone-empty">
                 <div class="upload-icon-circle">
                   <svg lucideUploadCloud size="20"></svg>
                 </div>
                 <div class="upload-text">
-                  <span class="primary-text">Drag & drop company logo here, or <strong>browse</strong></span>
+                  <span class="primary-text">Drag & drop, paste (Ctrl+V), or <strong>browse</strong></span>
                   <span class="sub-text">PNG, JPG, WebP or SVG (Max 2MB)</span>
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { usersService } from '../api/usersService';
 
 interface User {
   id: number;
@@ -7,6 +8,7 @@ interface User {
   role: string;
   companyId: number;
   employeeId?: number;
+  isManager?: boolean;
 }
 
 interface AuthState {
@@ -16,9 +18,10 @@ interface AuthState {
   login: (user: User, token: string) => Promise<void>;
   logout: () => Promise<void>;
   restoreToken: () => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isLoading: true,
@@ -43,6 +46,18 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     } catch (e) {
       set({ isLoading: false });
+    }
+  },
+  refreshUserProfile: async () => {
+    try {
+      const data = await usersService.getMe();
+      const current = get().user;
+      if (!current) return;
+      const updated: User = { ...current, isManager: !!data?.isManager };
+      set({ user: updated });
+      await AsyncStorage.setItem('userData', JSON.stringify(updated));
+    } catch (e) {
+      // Non-fatal: permission checks fall back to safe defaults if isManager is undefined
     }
   },
 }));

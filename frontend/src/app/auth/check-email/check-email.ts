@@ -26,7 +26,27 @@ export class CheckEmailComponent implements OnInit {
     const savedEmail = sessionStorage.getItem('pendingVerificationEmail');
     if (savedEmail) {
       this.email.set(savedEmail);
+      this.autoSendEmail(savedEmail);
     }
+  }
+
+  private autoSendEmail(email: string) {
+    const autoSentKey = `autoSentVerification_${email}`;
+    if (sessionStorage.getItem(autoSentKey)) {
+      return; // Already auto-sent for this email in this session
+    }
+
+    this.http.post(`${environment.apiUrl}/auth/resend-verification`, { email })
+      .subscribe({
+        next: () => {
+          sessionStorage.setItem(autoSentKey, 'true');
+          this.toast.success('Verification email sent! Check your inbox.');
+          this.startCooldown();
+        },
+        error: (err) => {
+          this.toast.error(err.error?.message || 'Failed to send verification email.');
+        }
+      });
   }
 
   resendEmail() {

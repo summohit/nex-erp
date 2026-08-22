@@ -1076,6 +1076,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   hasAccess = signal<boolean>(true);
 
+  goToProjectsList() {
+    this.router.navigate(['/projects']);
+  }
+
   activeTimerString = signal<string>('');
   private timerInterval: any;
 
@@ -1604,6 +1608,23 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return this.columns().find(c => c.id === columnId) || null;
   }
 
+  // A task whose assignee is a Project Manager can only be moved into Review/Done by the project Owner.
+  isAssigneeProjectManager(issue: any): boolean {
+    if (!issue?.assigneeId) return false;
+    const pmMembers = this.project()?.members?.filter((m: any) => m.role === 'PROJECT_MANAGER');
+    return !!pmMembers?.some((m: any) => m.employeeId === issue.assigneeId);
+  }
+
+  canMoveIntoReviewOrDone(issue: any, columnId: number): boolean {
+    if (this.isAssigneeProjectManager(issue) && (this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId))) {
+      return this.isProjectOwner;
+    }
+    if (this.isDoneOrArchiveColumn(columnId)) {
+      return this.isProjectOwner || this.canCompleteIssue(issue);
+    }
+    return true;
+  }
+
   canCompleteIssue(issue: any): boolean {
     if (!issue) return true;
     
@@ -1663,8 +1684,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   isStatusMoveBlocked(columnId: number): boolean {
     const issue = this.selectedIssue();
     if (!issue) return false;
-    if (this.isDoneOrArchiveColumn(columnId) && !this.isCurrentUserPM()) return true;
-    if (this.isRestrictedColumn(columnId) && !this.canCompleteIssue(issue)) return true;
+    if ((this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId)) && !this.canMoveIntoReviewOrDone(issue, columnId)) return true;
     if (!this.isAdjacentColumnMove(issue, columnId)) return true;
     return false;
   }
@@ -1683,9 +1703,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Non-PM trying to move to Done — block entirely
-    if (this.isDoneOrArchiveColumn(targetColumnId) && !this.isCurrentUserPM()) {
-      this.toast.error('Permission Denied: Only Project Managers are authorized to move tasks to Done.');
+    // Review or Done column — check who's allowed to move the task in
+    if ((this.isReviewColumn(targetColumnId) || this.isDoneOrArchiveColumn(targetColumnId)) && !this.canMoveIntoReviewOrDone(issue, targetColumnId)) {
+      const msg = this.isAssigneeProjectManager(issue)
+        ? 'Permission Denied: Only the project owner can move a task assigned to a Project Manager into this stage.'
+        : 'Permission Denied: Only Project Managers, the project owner, or the assignee\'s manager are authorized to move tasks to Done.';
+      this.toast.error(msg);
       this.loadBoardAndIssues();
       return;
     }
@@ -1731,8 +1754,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.closePopover();
     if (this.selectedIssue()) {
       const issue = this.selectedIssue();
-      if (this.isDoneOrArchiveColumn(columnId) && !this.isCurrentUserPM()) {
-        this.toast.error('Permission Denied: Only Project Managers are authorized to move tasks to Done.');
+      if ((this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId)) && !this.canMoveIntoReviewOrDone(issue, columnId)) {
+        const msg = this.isAssigneeProjectManager(issue)
+          ? 'Permission Denied: Only the project owner can move a task assigned to a Project Manager into this stage.'
+          : 'Permission Denied: Only Project Managers, the project owner, or the assignee\'s manager are authorized to move tasks to Done.';
+        this.toast.error(msg);
         return;
       }
       if (!this.isAdjacentColumnMove(issue, columnId)) {
@@ -2475,6 +2501,26 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  get isProjectOwner(): boolean {
+    const user = this.currentUser();
+    if (!user) return false;
+    if (user.role === 'SUPERADMIN' || user.role === 'ADMIN') return true;
+
+    const p = this.project();
+    if (!p) return false;
+
+    const empId = user.employee?.id || user.id;
+    if (p.leadId && p.leadId === empId) return true;
+
+    // Fallback: first member treated as Owner if no leadId set on the project
+    if (!p.leadId && p.members && p.members.length > 0 &&
+        (p.members[0].employeeId === empId || p.members[0].employee?.id === empId)) {
+      return true;
+    }
+
+    return false;
+  }
+
   get canManageMembers(): boolean {
     const user = this.currentUser();
     if (!user) return false;
@@ -2648,6 +2694,35 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   removeProofFile(index: number) {
     this.proofFiles.update(prev => prev.filter((_, i) => i !== index));
+  }
+
+  // PMs and the project Owner can bypass the proof-of-completion requirement; regular
+  // employees must attach at least one supporting document before moving the task.
+  get canSkipProofUpload(): boolean {
+    return this.isProjectOwner || this.isCurrentUserPM();
+  }
+
+  skipProofUpload() {
+    const issue = this.proofIssue();
+    const targetColId = this.proofTargetColumnId();
+    if (!issue || !targetColId || !this.canSkipProofUpload) return;
+
+    this.optimisticallyUpdateIssueColumn(issue.id, targetColId, this.proofInsertIndex());
+    this.setIssueUpdating(issue.id, true);
+    this.closeProofModal();
+
+    this.projectsService.updateIssue(this.projectId, issue.id, { columnId: targetColId }).subscribe({
+      next: () => {
+        this.setIssueUpdating(issue.id, false);
+        this.toast.success('Task moved.');
+        this.loadBoardAndIssues();
+      },
+      error: () => {
+        this.setIssueUpdating(issue.id, false);
+        this.toast.error('Failed to move task. Please try again.');
+        this.loadBoardAndIssues();
+      }
+    });
   }
 
   confirmProofUpload() {
@@ -3337,6 +3412,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   // Members Popover State & Methods
   companyMembers = signal<any[]>([]);
+  isLoadingMembers = signal(false);
   memberSearchQuery = '';
   shareTab = signal<'members'|'invite'>('members');
   activeMemberActionMenu = signal<number | null>(null);
@@ -3351,9 +3427,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   loadCompanyMembers() {
+    this.isLoadingMembers.set(true);
     this.projectsService.getCompanyMembers(this.projectId).subscribe({
-      next: (res) => this.companyMembers.set(res || []),
-      error: () => this.companyMembers.set([])
+      next: (res) => { this.companyMembers.set(res || []); this.isLoadingMembers.set(false); },
+      error: () => { this.companyMembers.set([]); this.isLoadingMembers.set(false); }
     });
   }
 

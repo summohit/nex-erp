@@ -5265,4 +5265,181 @@ input[type=text], input[type=email], input[type=password] {
   box-shadow: none;
 }
 
+/* Access Denied */
+.access-denied-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: #f8fafc;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+.access-denied-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+  padding: 44px 40px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+}
+
+.access-denied-card .access-icon {
+  width: 56px;
+  height: 56px;
+  padding: 14px;
+  border-radius: 50%;
+  background: #fef2f2;
+  color: #dc2626;
+  margin-bottom: 20px;
+  box-sizing: content-box;
+}
+
+.access-denied-card h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.access-denied-card p {
+  margin: 0 0 24px 0;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.access-denied-card .btn-back-home {
+  background: linear-gradient(135deg, #ff5500 0%, #e04400 100%);
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 9px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(255, 85, 0, 0.25);
+  transition: all 0.2s ease;
+}
+
+.access-denied-card .btn-back-home:hover {
+  box-shadow: 0 4px 12px rgba(255, 85, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Member list skeleton loader */
+.member-skeleton-item {
+  cursor: default;
+  pointer-events: none;
+}
+
+.skeleton-circle,
+.skeleton-line {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+.skeleton-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.skeleton-line {
+  height: 10px;
+  border-radius: 4px;
+}
+
+.skeleton-line-name {
+  width: 55%;
+  margin-bottom: 6px;
+}
+
+.skeleton-line-email {
+  width: 75%;
+  height: 8px;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Generic modal overlay + form controls (Reject Task, Proof Upload) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(11, 23, 57, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  animation: fadeInOverlay 150ms ease-out forwards;
+}
+
+.trello-textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: #172b4d;
+  background: #ffffff;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.trello-textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.trello-btn-secondary {
+  padding: 8px 18px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.trello-btn-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.trello-btn-primary {
+  padding: 8px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.trello-btn-primary:hover:not(:disabled) {
+  filter: brightness(0.92);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.trello-btn-primary:disabled,
+.trello-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 

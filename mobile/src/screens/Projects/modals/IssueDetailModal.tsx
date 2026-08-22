@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Modal, 
-  TouchableOpacity, 
-  ScrollView, 
-  TextInput, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   StatusBar,
-  Animated
+  Animated,
+  Alert,
+  Image,
+  Linking,
+  Dimensions
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
@@ -39,11 +43,16 @@ import {
   ArrowLeft,
   Plus,
   Pencil,
-  Trash2
+  Trash2,
+  ThumbsUp,
+  ThumbsDown,
+  ShieldCheck,
+  Lock
 } from 'lucide-react-native';
 import { projectService } from '../../../api/projectService';
 import { useProjectStore } from '../../../store/projectStore';
 import { useAuthStore } from '../../../store/authStore';
+import { useProjectPermissions } from '../../../hooks/useProjectPermissions';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { launchImageLibrary } from 'react-native-image-picker';
 
@@ -110,7 +119,7 @@ const formatActivityText = (item: any) => {
 export default function IssueDetailModal({ visible, issue, onClose, projectId }: IssueDetailModalProps) {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const { currentProject, currentBoard, updateIssueStatus } = useProjectStore();
+  const { currentProject, currentBoard, updateIssueStatus, reviewIssue } = useProjectStore();
   
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState<any[]>([]);
@@ -129,6 +138,13 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   
   // Pickers & Modals
   const [timerActive, setTimerActive] = useState(false);
+  const [timerLoading, setTimerLoading] = useState(false);
+
+  // Log Work (manual time entry)
+  const [logWorkModalVisible, setLogWorkModalVisible] = useState(false);
+  const [logHours, setLogHours] = useState('');
+  const [logMinutes, setLogMinutes] = useState('');
+  const [logWorkSubmitting, setLogWorkSubmitting] = useState(false);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const [priorityPickerOpen, setPriorityPickerOpen] = useState(false);
   const [membersPickerOpen, setMembersPickerOpen] = useState(false);
@@ -136,6 +152,17 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [dateType, setDateType] = useState<'START' | 'DUE'>('START');
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+  // Proof-upload gate (shown when a manager-hierarchy approver, not owner/PM, moves a card to Review/Done)
+  const [proofPending, setProofPending] = useState<{ columnId: number; statusStr: string } | null>(null);
+  const [proofAttached, setProofAttached] = useState(false);
+  const [proofUploading, setProofUploading] = useState(false);
+
+  // Reject reason prompt
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   // Labels Picker States
   const [labelSearchQuery, setLabelSearchQuery] = useState('');
@@ -189,6 +216,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
     if (visible && issue) {
       setDescription(stripHtml(issue.description || ''));
       setIsEditingDesc(false);
+      setTimerActive(!!(issue.workStartedAt && !issue.workCompletedAt));
       loadDetails();
     }
   }, [visible, issue]);
@@ -239,7 +267,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   };
 
   const handleSaveDescription = async () => {
-    if (!issue) return;
+    if (!issue || !perms.canEditIssueContent) return;
     setSavingDesc(true);
     try {
       await projectService.updateIssue(projectId, issue.id, { description });
@@ -252,37 +280,121 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
     }
   };
 
+  // Re-pulls this issue from the server and patches the fields that other
+  // endpoints (timer, member assign, etc.) mutate as side effects, since
+  // `issue` is a plain object prop, not store state.
+  const refreshIssueFromServer = async () => {
+    const activeProjectId = projectId || issue?.projectId;
+    if (!activeProjectId || !issue) return;
+    try {
+      const freshIssues = await projectService.getIssues(activeProjectId);
+      const fresh = freshIssues.find((i: any) => i.id === issue.id);
+      if (fresh) {
+        issue.timeLogs = fresh.timeLogs;
+        issue.workStartedAt = fresh.workStartedAt;
+        issue.workCompletedAt = fresh.workCompletedAt;
+        issue.members = fresh.members;
+        setTimerActive(!!(fresh.workStartedAt && !fresh.workCompletedAt));
+        setRenderTrigger(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('Failed to refresh issue', error);
+    }
+    // Keep the board/list views (time badges, member avatars) in sync too
+    useProjectStore.getState().fetchProjectDetails(activeProjectId).catch(() => {});
+  };
+
+  const handleSubmitLogWork = async () => {
+    if (!issue) return;
+    const h = parseInt(logHours, 10) || 0;
+    const m = parseInt(logMinutes, 10) || 0;
+    const totalMin = h * 60 + m;
+    if (totalMin <= 0) {
+      Alert.alert('Invalid duration', 'Please enter a valid duration.');
+      return;
+    }
+    setLogWorkSubmitting(true);
+    try {
+      await projectService.logIssueTime(projectId, issue.id, totalMin);
+      setLogWorkModalVisible(false);
+      setLogHours('');
+      setLogMinutes('');
+      await refreshIssueFromServer();
+    } catch (error) {
+      console.error('Failed to log time', error);
+      Alert.alert('Error', 'Failed to log time.');
+    } finally {
+      setLogWorkSubmitting(false);
+    }
+  };
+
   const handleTimerToggle = async () => {
     if (!issue) return;
+    setTimerLoading(true);
     try {
       if (timerActive) {
         await projectService.stopIssueTimer(projectId, issue.id);
+        issue.workCompletedAt = new Date().toISOString();
         setTimerActive(false);
+        refreshIssueFromServer();
       } else {
         await projectService.startIssueTimer(projectId, issue.id);
+        issue.workStartedAt = new Date().toISOString();
+        issue.workCompletedAt = null;
         setTimerActive(true);
       }
     } catch (error) {
       console.error('Failed to toggle timer', error);
+      Alert.alert('Error', 'Failed to toggle the timer.');
+    } finally {
+      setTimerLoading(false);
     }
   };
 
-  const handleStatusSelect = async (columnId: number, statusStr: string) => {
-    setStatusPickerOpen(false);
-    if (!issue || issue.columnId === columnId) return;
+  const commitStatusMove = async (columnId: number, statusStr: string) => {
     try {
       issue.columnId = columnId;
       issue.status = statusStr;
       const { updateIssueColumn } = useProjectStore.getState();
       await updateIssueColumn(projectId, issue.id, columnId);
       loadDetails();
+      // Moving columns can auto start/stop the work timer as a server-side side
+      // effect — re-pull the issue so this modal and the board card both reflect
+      // it immediately, instead of only updating after a manual refresh.
+      refreshIssueFromServer();
     } catch (error) {
       console.error('Failed to update status', error);
     }
   };
 
+  const handleStatusSelect = async (columnId: number, statusStr: string) => {
+    setStatusPickerOpen(false);
+    if (!issue || issue.columnId === columnId) return;
+
+    // Re-validate here too — don't rely solely on the picker disabling the option
+    if (perms.isStatusMoveBlocked(issue, columnId)) {
+      Alert.alert(
+        'Permission Denied',
+        perms.isAssigneePM(issue)
+          ? 'Only the project owner can move a task assigned to a Project Manager into this stage.'
+          : 'Only Project Managers, the project owner, or the assignee\'s manager are authorized to move tasks to Done.'
+      );
+      return;
+    }
+
+    const needsProof = (perms.isReviewColumn(columnId) || perms.isDoneOrArchiveColumn(columnId)) && !perms.canSkipProof;
+    if (needsProof) {
+      setProofAttached(false);
+      setProofPending({ columnId, statusStr });
+      return;
+    }
+
+    await commitStatusMove(columnId, statusStr);
+  };
+
   const handlePrioritySelect = async (newPriority: string) => {
     setPriorityPickerOpen(false);
+    if (!perms.canEditIssueContent) return;
     if (!issue || issue.priority === newPriority) return;
     try {
       issue.priority = newPriority;
@@ -294,11 +406,60 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   };
 
   const handleToggleMember = async (employeeId: number) => {
+    if (!perms.canAssignMembers) return;
     try {
       await projectService.toggleIssueMember(projectId, issue.id, employeeId);
       loadDetails();
+      refreshIssueFromServer();
     } catch (error) {
       console.error('Failed to toggle member', error);
+    }
+  };
+
+  const handleProofConfirm = async () => {
+    if (!proofPending) return;
+    await commitStatusMove(proofPending.columnId, proofPending.statusStr);
+    setProofPending(null);
+    setProofAttached(false);
+  };
+
+  const handleProofPickImage = async () => {
+    setProofUploading(true);
+    try {
+      await handlePickImage();
+      setProofAttached(true);
+    } finally {
+      setProofUploading(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!issue) return;
+    setReviewSubmitting(true);
+    try {
+      await reviewIssue(projectId, issue.id, 'APPROVE');
+      loadDetails();
+    } catch (error) {
+      console.error('Failed to approve issue', error);
+      Alert.alert('Error', 'Failed to approve this task.');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!issue) return;
+    setReviewSubmitting(true);
+    try {
+      await reviewIssue(projectId, issue.id, 'REJECT', rejectReason.trim() || undefined);
+      setRejectModalVisible(false);
+      setRejectReason('');
+      loadDetails();
+    } catch (error) {
+      console.error('Failed to reject issue', error);
+      Alert.alert('Error', 'Failed to reject this task.');
+    } finally {
+      setReviewSubmitting(false);
     }
   };
 
@@ -493,6 +654,28 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
     }
   };
 
+  const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+
+  const isImageAttachment = (url?: string, fileName?: string): boolean => {
+    if (!url) return false;
+    const u = url.toLowerCase();
+    const n = (fileName || '').toLowerCase();
+    return IMAGE_EXTS.some((ext) => u.includes(ext) || n.endsWith(ext));
+  };
+
+  const handleOpenAttachment = (att: any) => {
+    const url = att.fileUrl || att.url;
+    if (!url) return;
+    const fileName = att.fileName || att.name || '';
+    if (isImageAttachment(url, fileName)) {
+      setLightboxImage(url);
+    } else {
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Error', 'Could not open this file.');
+      });
+    }
+  };
+
   const columns = useMemo(() => {
     if (currentBoard && Array.isArray(currentBoard.columns) && currentBoard.columns.length > 0) {
       return [...currentBoard.columns].sort((a: any, b: any) => a.position - b.position);
@@ -503,6 +686,8 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
       { id: 'done', name: 'Done', type: 'DONE', color: '#10b981' },
     ];
   }, [currentBoard]);
+
+  const perms = useProjectPermissions(currentProject, columns);
 
   const priorities = [
     {
@@ -554,8 +739,11 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                         columns[0];
   const currentPriorityObj = priorities.find(p => p.id === (issue.priority || 'MEDIUM')) || priorities[1];
   
+  const loggedMinutes = Array.isArray(issue.timeLogs)
+    ? issue.timeLogs.reduce((sum: number, log: any) => sum + (log.durationMin || 0), 0)
+    : 0;
   const estimated = issue.estimatedHours || 0;
-  const logged = issue.loggedHours || 0;
+  const logged = Math.round((loggedMinutes / 60) * 10) / 10;
   const progressPercent = estimated > 0 ? Math.min(100, Math.round((logged / estimated) * 100)) : 0;
 
   return (
@@ -596,22 +784,58 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
           >
             {/* Title */}
             <Text style={styles.title}>{issue.title}</Text>
-            
+
+            {/* Approve / Reject — PM reviewing a task in the Review column */}
+            {perms.canApprove && perms.isReviewColumn(issue.columnId) && (
+              <View style={styles.reviewBanner}>
+                <View style={styles.reviewBannerHeader}>
+                  <ShieldCheck size={15} color="#7C3AED" />
+                  <Text style={styles.reviewBannerText}>This task is awaiting your review</Text>
+                </View>
+                <View style={styles.reviewBannerActions}>
+                  <TouchableOpacity
+                    style={styles.rejectBtn}
+                    onPress={() => setRejectModalVisible(true)}
+                    disabled={reviewSubmitting}
+                  >
+                    <ThumbsDown size={14} color="#DC2626" />
+                    <Text style={styles.rejectBtnText}>Reject</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.approveBtn}
+                    onPress={handleApprove}
+                    disabled={reviewSubmitting}
+                  >
+                    {reviewSubmitting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <ThumbsUp size={14} color="#FFFFFF" />
+                        <Text style={styles.approveBtnText}>Approve</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {/* Action Badges Row */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.actionBadgesScroll} contentContainerStyle={styles.actionBadgesContainer}>
               {(() => {
                 const PriorityIconComp = currentPriorityObj.icon || AlertCircle;
                 return (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[
-                      styles.actionBadge, 
-                      { 
-                        backgroundColor: currentPriorityObj.bg, 
+                      styles.actionBadge,
+                      {
+                        backgroundColor: currentPriorityObj.bg,
                         borderColor: `${currentPriorityObj.color}35`,
-                        borderWidth: 1 
-                      }
+                        borderWidth: 1
+                      },
+                      !perms.canEditIssueContent && styles.actionBadgeDisabled
                     ]}
-                    onPress={() => setPriorityPickerOpen(true)}
+                    onPress={() => perms.canEditIssueContent && setPriorityPickerOpen(true)}
+                    disabled={!perms.canEditIssueContent}
                     activeOpacity={0.7}
                   >
                     <PriorityIconComp size={13} color={currentPriorityObj.color} strokeWidth={2.5} />
@@ -645,10 +869,12 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                 <Text style={styles.actionBadgeText}>Dates</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.actionBadge} onPress={() => setMembersPickerOpen(true)}>
-                <Users size={13} color="#64748B" />
-                <Text style={styles.actionBadgeText}>Members</Text>
-              </TouchableOpacity>
+              {perms.canAssignMembers && (
+                <TouchableOpacity style={styles.actionBadge} onPress={() => setMembersPickerOpen(true)}>
+                  <Users size={13} color="#64748B" />
+                  <Text style={styles.actionBadgeText}>Members</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity style={styles.actionBadge} onPress={handlePickImage}>
                 <Paperclip size={13} color="#64748B" />
@@ -801,16 +1027,31 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                 </View>
                 
                 <View style={styles.timeActionsRow}>
-                  <TouchableOpacity 
-                    style={[styles.timerBtn, timerActive ? styles.timerBtnActive : styles.timerBtnInactive]} 
+                  <TouchableOpacity
+                    style={[styles.timerBtn, timerActive ? styles.timerBtnActive : styles.timerBtnInactive]}
                     onPress={handleTimerToggle}
                     activeOpacity={0.8}
+                    disabled={timerLoading}
                   >
-                    {timerActive ? <Square size={14} color="#FFFFFF" /> : <Play size={14} color="#FFFFFF" />}
+                    {timerLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : timerActive ? (
+                      <Square size={14} color="#FFFFFF" />
+                    ) : (
+                      <Play size={14} color="#FFFFFF" />
+                    )}
                     <Text style={styles.timerBtnText}>{timerActive ? 'Stop Timer' : 'Start Timer'}</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.logWorkBtn} activeOpacity={0.8}>
+                  <TouchableOpacity
+                    style={styles.logWorkBtn}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setLogHours('');
+                      setLogMinutes('');
+                      setLogWorkModalVisible(true);
+                    }}
+                  >
                     <Clock size={14} color="#475569" />
                     <Text style={styles.logWorkText}>Log Work</Text>
                   </TouchableOpacity>
@@ -825,14 +1066,14 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                   <AlignLeft size={16} color="#0F172A" />
                   <Text style={styles.cardTitle}>Description</Text>
                 </View>
-                {!isEditingDesc && (
+                {!isEditingDesc && perms.canEditIssueContent && (
                   <TouchableOpacity onPress={() => setIsEditingDesc(true)} style={styles.editDescIconBtn}>
                     <Edit3 size={15} color="#3B82F6" />
                   </TouchableOpacity>
                 )}
               </View>
-              
-              {isEditingDesc ? (
+
+              {isEditingDesc && perms.canEditIssueContent ? (
                 <View style={styles.descEditor}>
                   <TextInput
                     style={styles.descInput}
@@ -841,21 +1082,22 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                     onChangeText={setDescription}
                     placeholder="Add a more detailed description..."
                     placeholderTextColor="#94A3B8"
+                    editable={perms.canEditIssueContent}
                     autoFocus
                   />
                   <View style={styles.descActions}>
-                    <TouchableOpacity 
-                      style={styles.saveDescBtn} 
+                    <TouchableOpacity
+                      style={styles.saveDescBtn}
                       onPress={handleSaveDescription}
                       disabled={savingDesc}
                     >
                       {savingDesc ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveDescText}>Save</Text>}
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.cancelDescBtn} 
-                      onPress={() => { 
-                        setIsEditingDesc(false); 
-                        setDescription(stripHtml(issue.description || '')); 
+                    <TouchableOpacity
+                      style={styles.cancelDescBtn}
+                      onPress={() => {
+                        setIsEditingDesc(false);
+                        setDescription(stripHtml(issue.description || ''));
                       }}
                     >
                       <Text style={styles.cancelDescText}>Cancel</Text>
@@ -863,10 +1105,11 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                   </View>
                 </View>
               ) : (
-                <TouchableOpacity 
-                  style={styles.descViewer} 
-                  onPress={() => setIsEditingDesc(true)}
-                  activeOpacity={0.7}
+                <TouchableOpacity
+                  style={styles.descViewer}
+                  onPress={() => perms.canEditIssueContent && setIsEditingDesc(true)}
+                  activeOpacity={perms.canEditIssueContent ? 0.7 : 1}
+                  disabled={!perms.canEditIssueContent}
                 >
                   {description ? (
                     <Text style={styles.descText}>{description}</Text>
@@ -887,14 +1130,30 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                   </View>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.attachmentsScroll} contentContainerStyle={styles.attachmentsContainer}>
-                  {attachments.map((att, idx) => (
-                    <View key={att.id || `att-${idx}`} style={styles.attachmentBox}>
-                      <View style={styles.attachmentPlaceholder}>
-                        <Text style={styles.attachmentExt} numberOfLines={1}>{(att.fileName || att.name || 'IMG').split('.').pop()?.toUpperCase()}</Text>
-                      </View>
-                      <Text style={styles.attachmentName} numberOfLines={1}>{att.fileName || att.name}</Text>
-                    </View>
-                  ))}
+                  {attachments.map((att, idx) => {
+                    const fileName = att.fileName || att.name || 'File';
+                    const url = att.fileUrl || att.url;
+                    const img = isImageAttachment(url, fileName);
+                    return (
+                      <TouchableOpacity
+                        key={att.id || `att-${idx}`}
+                        style={styles.attachmentBox}
+                        activeOpacity={0.7}
+                        onPress={() => handleOpenAttachment(att)}
+                      >
+                        {img && url ? (
+                          <Image source={{ uri: url }} style={styles.attachmentThumb} resizeMode="cover" />
+                        ) : (
+                          <View style={styles.attachmentPlaceholder}>
+                            <Text style={styles.attachmentExt} numberOfLines={1}>
+                              {fileName.split('.').pop()?.toUpperCase() || 'FILE'}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={styles.attachmentName} numberOfLines={1}>{fileName}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             )}
@@ -1104,17 +1363,20 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
               <Text style={styles.pickerTitle}>Select Status</Text>
               {columns.map((c: any) => {
                 const isSelected = c.id === currentColumn?.id;
+                const blocked = !isSelected && perms.isStatusMoveBlocked(issue, c.id);
                 return (
-                  <TouchableOpacity 
-                    key={c.id?.toString()} 
-                    style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                  <TouchableOpacity
+                    key={c.id?.toString()}
+                    style={[styles.pickerOption, isSelected && styles.pickerOptionSelected, blocked && styles.pickerOptionDisabled]}
                     onPress={() => handleStatusSelect(c.id, c.type)}
+                    disabled={blocked}
                   >
                     <View style={styles.pickerOptionLeft}>
                       <View style={[styles.statusDot, { backgroundColor: c.color || '#94A3B8' }]} />
                       <Text style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextSelected]}>{c.name}</Text>
                     </View>
                     {isSelected && <Check size={18} color="#3B82F6" />}
+                    {blocked && <Lock size={14} color="#CBD5E1" />}
                   </TouchableOpacity>
                 );
               })}
@@ -1197,6 +1459,133 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
             </View>
           </View>
         </Modal>
+
+        {/* Proof Upload Gate — required for manager-hierarchy approvers moving to Review/Done */}
+        <Modal visible={!!proofPending} transparent animationType="fade" onRequestClose={() => setProofPending(null)}>
+          <View style={styles.pickerOverlay}>
+            <TouchableOpacity style={styles.pickerBackdrop} onPress={() => setProofPending(null)} />
+            <View style={[styles.pickerCard, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+              <Text style={styles.pickerTitle}>Attach Proof to Continue</Text>
+              <Text style={styles.proofSubtitle}>
+                Moving this task to this stage requires at least one attachment as proof of completion.
+              </Text>
+              <TouchableOpacity style={styles.proofUploadBtn} onPress={handleProofPickImage} disabled={proofUploading}>
+                {proofUploading ? (
+                  <ActivityIndicator size="small" color="#3B82F6" />
+                ) : (
+                  <>
+                    <Paperclip size={16} color="#3B82F6" />
+                    <Text style={styles.proofUploadBtnText}>
+                      {proofAttached ? 'Attached ✓ — Add another' : 'Choose Photo'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <View style={styles.proofActionsRow}>
+                <TouchableOpacity style={styles.proofCancelBtn} onPress={() => setProofPending(null)}>
+                  <Text style={styles.proofCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.proofMoveBtn, !proofAttached && styles.proofMoveBtnDisabled]}
+                  onPress={handleProofConfirm}
+                  disabled={!proofAttached}
+                >
+                  <Text style={styles.proofMoveBtnText}>Move Task</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Reject Reason Modal */}
+        <Modal visible={rejectModalVisible} transparent animationType="fade" onRequestClose={() => setRejectModalVisible(false)}>
+          <View style={styles.pickerOverlay}>
+            <TouchableOpacity style={styles.pickerBackdrop} onPress={() => setRejectModalVisible(false)} />
+            <View style={[styles.pickerCard, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+              <Text style={styles.pickerTitle}>Reject Task</Text>
+              <TextInput
+                style={styles.rejectReasonInput}
+                placeholder="Reason (optional)"
+                placeholderTextColor="#94A3B8"
+                value={rejectReason}
+                onChangeText={setRejectReason}
+                multiline
+              />
+              <View style={styles.proofActionsRow}>
+                <TouchableOpacity style={styles.proofCancelBtn} onPress={() => setRejectModalVisible(false)}>
+                  <Text style={styles.proofCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.rejectConfirmBtn} onPress={handleReject} disabled={reviewSubmitting}>
+                  {reviewSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.rejectConfirmBtnText}>Reject Task</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Image Attachment Lightbox */}
+        <Modal visible={!!lightboxImage} transparent animationType="fade" onRequestClose={() => setLightboxImage(null)}>
+          <View style={styles.lightboxOverlay}>
+            <TouchableOpacity style={styles.lightboxCloseBtn} onPress={() => setLightboxImage(null)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <X size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            {lightboxImage && (
+              <Image source={{ uri: lightboxImage }} style={styles.lightboxImage} resizeMode="contain" />
+            )}
+          </View>
+        </Modal>
+
+        {/* Log Work — manual time entry */}
+        <Modal visible={logWorkModalVisible} transparent animationType="fade" onRequestClose={() => setLogWorkModalVisible(false)}>
+          <View style={styles.pickerOverlay}>
+            <TouchableOpacity style={styles.pickerBackdrop} onPress={() => setLogWorkModalVisible(false)} />
+            <View style={[styles.pickerCard, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+              <View style={styles.logWorkHeader}>
+                <Text style={styles.pickerTitle}>Log Time</Text>
+                <TouchableOpacity onPress={() => setLogWorkModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <X size={18} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.logWorkLabel}>Hours</Text>
+              <TextInput
+                style={styles.logWorkInput}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor="#94A3B8"
+                value={logHours}
+                onChangeText={setLogHours}
+              />
+
+              <Text style={styles.logWorkLabel}>Minutes</Text>
+              <TextInput
+                style={styles.logWorkInput}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor="#94A3B8"
+                value={logMinutes}
+                onChangeText={setLogMinutes}
+              />
+
+              <TouchableOpacity
+                style={[styles.saveLogBtn, logWorkSubmitting && { opacity: 0.7 }]}
+                onPress={handleSubmitLogWork}
+                disabled={logWorkSubmitting}
+              >
+                {logWorkSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveLogBtnText}>Save Log</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* Members Picker Bottom Sheet */}
         <Modal visible={membersPickerOpen} transparent animationType="fade" onRequestClose={() => setMembersPickerOpen(false)}>
           <View style={styles.pickerOverlay}>
@@ -1205,7 +1594,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
               <Text style={styles.pickerTitle}>Assign Members</Text>
               <ScrollView showsVerticalScrollIndicator={false}>
                 {companyMembers.map((m: any) => {
-                  const isAssigned = issue.assignees?.some((a: any) => a.id === m.id);
+                  const isAssigned = issue.members?.some((mem: any) => mem.employeeId === m.id);
                   return (
                     <TouchableOpacity 
                       key={m.id} 
@@ -1595,6 +1984,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     gap: 6,
+  },
+  actionBadgeDisabled: {
+    opacity: 0.5,
   },
   actionBadgeText: {
     fontSize: 12,
@@ -2460,6 +2852,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#BFDBFE',
   },
+  pickerOptionDisabled: {
+    opacity: 0.45,
+  },
   pickerOptionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2597,6 +2992,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 6,
   },
+  attachmentThumb: {
+    width: 100,
+    height: 80,
+    borderRadius: 8,
+    marginBottom: 6,
+    backgroundColor: '#F1F5F9',
+  },
   attachmentExt: {
     fontSize: 14,
     fontWeight: '700',
@@ -2606,5 +3008,207 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#334155',
     textAlign: 'center',
+  },
+
+  // Approve / Reject review banner
+  reviewBanner: {
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  reviewBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  reviewBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5B21B6',
+    flex: 1,
+  },
+  reviewBannerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  approveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  approveBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  rejectBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  rejectBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+
+  // Proof upload modal
+  proofSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 19,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  proofUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 10,
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  proofUploadBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+  proofActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  proofCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  proofCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  proofMoveBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#E25E3E',
+    alignItems: 'center',
+  },
+  proofMoveBtnDisabled: {
+    backgroundColor: '#FCA5A5',
+    opacity: 0.6,
+  },
+  proofMoveBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // Reject modal
+  rejectReasonInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 12,
+    minHeight: 80,
+    fontSize: 13,
+    color: '#0F172A',
+    marginBottom: 16,
+    textAlignVertical: 'top',
+  },
+  rejectConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+  },
+  rejectConfirmBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // Image attachment lightbox
+  lightboxOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lightboxCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lightboxImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.75,
+  },
+
+  // Log Work modal
+  logWorkHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  logWorkLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 6,
+  },
+  logWorkInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#0F172A',
+    marginBottom: 16,
+  },
+  saveLogBtn: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  saveLogBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

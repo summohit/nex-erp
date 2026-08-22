@@ -43,7 +43,7 @@
     </ng-container>
 
     <ng-container *ngIf="isFinance()">
-      <app-stat-card label="Net Pay (This Month)" [value]="(dashboard()?.finance?.payrollSummary?.totalNetPay || 0) | currency" colorClass="bg-emerald">
+      <app-stat-card label="Net Pay (This Month)" [value]="(dashboard()?.finance?.payrollSummary?.totalNetPay || 0) | currency:'INR':'symbol-narrow':'1.0-0'" colorClass="bg-emerald">
         <svg icon lucideBanknote size="20"></svg>
       </app-stat-card>
       <app-stat-card label="Payslips Processed" [value]="dashboard()?.finance?.payrollSummary?.payslipCount || 0" colorClass="bg-blue">
@@ -52,7 +52,7 @@
       <app-stat-card label="Pending Expense Claims" [value]="dashboard()?.finance?.pendingExpenseClaims?.count || 0" colorClass="bg-amber">
         <svg icon lucideReceipt size="20"></svg>
       </app-stat-card>
-      <app-stat-card label="Pending Claims Value" [value]="(dashboard()?.finance?.pendingExpenseClaims?.totalAmount || 0) | currency" colorClass="bg-purple">
+      <app-stat-card label="Pending Claims Value" [value]="(dashboard()?.finance?.pendingExpenseClaims?.totalAmount || 0) | currency:'INR':'symbol-narrow':'1.0-0'" colorClass="bg-purple">
         <svg icon lucideTrendingUp size="20"></svg>
       </app-stat-card>
     </ng-container>
@@ -64,7 +64,7 @@
       <app-stat-card label="Orders This Month" [value]="dashboard()?.sales?.ordersThisMonth?.count || 0" colorClass="bg-blue">
         <svg icon lucideShoppingCart size="20"></svg>
       </app-stat-card>
-      <app-stat-card label="Order Value This Month" [value]="(dashboard()?.sales?.ordersThisMonth?.totalValue || 0) | currency" colorClass="bg-emerald">
+      <app-stat-card label="Order Value This Month" [value]="(dashboard()?.sales?.ordersThisMonth?.totalValue || 0) | currency:'INR':'symbol-narrow':'1.0-0'" colorClass="bg-emerald">
         <svg icon lucideTrendingUp size="20"></svg>
       </app-stat-card>
       <app-stat-card label="Leads in Pipeline" [value]="dashboard()?.sales?.leadsPipeline?.recentLeads?.length || 0" colorClass="bg-purple">
@@ -282,7 +282,7 @@
                 <tr *ngFor="let claim of dashboard()?.finance?.pendingExpenseClaims?.recent">
                   <td><span class="font-semibold">{{ claim.employee?.firstName }} {{ claim.employee?.lastName }}</span></td>
                   <td>{{ claim.category }}</td>
-                  <td>{{ claim.amount | currency }}</td>
+                  <td>{{ claim.amount | currency:'INR':'symbol-narrow':'1.0-0' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -353,7 +353,7 @@
               <tr *ngFor="let order of dashboard()?.sales?.recentOrders">
                 <td><span class="font-semibold">{{ order.orderNumber }}</span></td>
                 <td>{{ order.client?.name || '—' }}</td>
-                <td>{{ order.total | currency }}</td>
+                <td>{{ order.total | currency:'INR':'symbol-narrow':'1.0-0' }}</td>
                 <td><span class="status-pill" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span></td>
               </tr>
             </tbody>

@@ -34,7 +34,8 @@
         [activeSubTab]="activeTab()"
         [employeeData]="employeeData()" 
         [isOwner]="isOwner()"
-        (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
+        (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')"
+        (tabChange)="setTab($event)">
       </app-profile-tab>
 
       <app-emergency-contacts-tab *ngIf="activeTab() === 'contacts'" 

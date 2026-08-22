@@ -14,12 +14,12 @@ export class ProjectsController {
 
   @Post()
   createProject(@Req() req, @Body() data: any) {
-    return this.projectsService.createProject(req.user.companyId, req.user.sub, data);
+    return this.projectsService.createProject(req.user.companyId, req.user.employeeId ?? req.user.sub, data);
   }
 
   @Post('ai-onboarding')
   createAiProject(@Req() req, @Body() data: any) {
-    return this.projectsService.createAiProject(req.user.companyId, req.user.sub, data);
+    return this.projectsService.createAiProject(req.user.companyId, req.user.employeeId ?? req.user.sub, data);
   }
 
   @Post(':id/documents')
@@ -111,7 +111,8 @@ export class ProjectsController {
 
   @Post(':id/members')
   addProjectMember(@Req() req, @Param('id', ParseIntPipe) id: number, @Body() data: { employeeId: number, role?: string }) {
-    return this.projectsService.addProjectMember(req.user.companyId, id, data.employeeId, data.role || 'MEMBER');
+    const actorEmployeeId = req.user.employeeId ?? req.user.sub;
+    return this.projectsService.addProjectMember(req.user.companyId, id, data.employeeId, data.role || 'MEMBER', actorEmployeeId, req.user.role);
   }
 
   @Delete(':id/members/:employeeId')

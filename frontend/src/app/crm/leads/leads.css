@@ -790,3 +790,219 @@
   justify-content: flex-end;
   gap: 10px;
 }
+
+.card-qual-reason {
+  margin: 4px 0;
+  padding: 4px 8px;
+  background: #F0FDF4;
+  border-radius: 6px;
+  border-left: 2px solid #22C55E;
+}
+
+.qual-reason-text {
+  font-size: 10.5px;
+  color: #15803D;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-proposal-date {
+  margin: 4px 0;
+  padding: 4px 8px;
+  background: #F5F3FF;
+  border-radius: 6px;
+  border-left: 2px solid #7C3AED;
+}
+
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #374151;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #F97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+/* ---- View Details button on cards ---- */
+.btn-view-details {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.btn-view-details:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+/* ---- Lead Detail Modal ---- */
+.lead-detail-modal {
+  background: #ffffff;
+  width: 100%;
+  max-width: 560px;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+  border: 1px solid #e2e8f0;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.ldm-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ldm-status-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-top: 3px;
+}
+.ldm-status-new { background: #dbeafe; color: #1d4ed8; }
+.ldm-status-qualified { background: #dcfce7; color: #166534; }
+.ldm-status-proposal { background: #ede9fe; color: #6d28d9; }
+.ldm-status-won { background: #ecfdf5; color: #065f46; }
+.ldm-status-lost { background: #fee2e2; color: #991b1b; }
+
+.ldm-title-block { flex: 1; min-width: 0; }
+.ldm-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+}
+.ldm-company {
+  font-size: 12px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ldm-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ldm-value-banner {
+  background: linear-gradient(135deg, #fff7ed, #fff3e6);
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ldm-value-label { font-size: 12px; color: #92400e; font-weight: 600; }
+.ldm-value-amount { font-size: 1.375rem; font-weight: 800; color: #c2410c; }
+
+.ldm-section {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.ldm-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ldm-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ldm-info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ldm-info-icon {
+  width: 28px;
+  height: 28px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ldm-info-label { font-size: 11px; color: #94a3b8; font-weight: 500; margin-bottom: 1px; }
+.ldm-info-value { font-size: 13px; color: #1e293b; font-weight: 600; }
+
+.ldm-description {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ldm-qual-section { border-color: #bbf7d0; background: #f0fdf4; }
+.ldm-qual-text {
+  font-size: 13px;
+  color: #166534;
+  line-height: 1.6;
+  margin: 0;
+  font-style: italic;
+}
+
+.ldm-footer {
+  padding: 14px 20px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lost-value { background: #fee2e2; color: #991b1b; }

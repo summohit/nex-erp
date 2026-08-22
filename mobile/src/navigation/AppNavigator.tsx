@@ -15,6 +15,7 @@ import DashboardScreen from '../screens/Dashboard/DashboardScreen';
 import CRMScreen from '../screens/CRM/CRMScreen';
 import ProjectsScreen from '../screens/Projects/ProjectsScreen';
 import ProjectDetailScreen from '../screens/Projects/ProjectDetailScreen';
+import TeamMembersScreen from '../screens/Projects/TeamMembersScreen';
 import ESSScreen from '../screens/ESS/ESSScreen';
 
 const Stack = createNativeStackNavigator();
@@ -122,10 +123,14 @@ function MainTabNavigator() {
 }
 
 export default function AppNavigator() {
-  const { isLoading, token, restoreToken } = useAuthStore();
+  const { isLoading, token, restoreToken, refreshUserProfile } = useAuthStore();
 
   useEffect(() => {
-    restoreToken();
+    restoreToken().then(() => {
+      if (useAuthStore.getState().token) {
+        refreshUserProfile().catch(() => {});
+      }
+    });
   }, []);
 
   if (isLoading) {
@@ -145,6 +150,7 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="MainTabs" component={MainTabNavigator} />
             <Stack.Screen name="ProjectDetail" component={ProjectDetailScreen} />
+            <Stack.Screen name="TeamMembers" component={TeamMembersScreen} />
           </>
         )}
       </Stack.Navigator>

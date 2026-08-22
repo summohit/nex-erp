@@ -359,8 +359,21 @@
 
             <!-- Members List -->
             <div class="members-share-list">
+              <!-- Loading Skeleton -->
+              <ng-container *ngIf="isLoadingMembers()">
+                <div class="member-share-item member-skeleton-item" *ngFor="let s of [1,2,3]">
+                  <div class="member-share-info">
+                    <div class="skeleton-circle"></div>
+                    <div class="member-share-details">
+                      <div class="skeleton-line skeleton-line-name"></div>
+                      <div class="skeleton-line skeleton-line-email"></div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
               <!-- Members Tab Content -->
-              <ng-container *ngIf="shareTab() === 'members'">
+              <ng-container *ngIf="!isLoadingMembers() && shareTab() === 'members'">
                 <div class="member-share-item" *ngFor="let m of filteredProjectMembers">
                   <div class="member-share-info">
                     <div class="member-share-avatar" [style.background-color]="getMemberColor(m)">
@@ -421,7 +434,7 @@
               </ng-container>
 
               <!-- Invite Tab Content -->
-              <ng-container *ngIf="shareTab() === 'invite'">
+              <ng-container *ngIf="!isLoadingMembers() && shareTab() === 'invite'">
                 <div class="member-share-item" *ngFor="let m of filteredAvailableMembers">
                   <div class="member-share-info">
                     <div class="member-share-avatar" [style.background-color]="getMemberColor(m)">
@@ -438,9 +451,9 @@
                     </div>
                   </div>
 
-                  <button *ngIf="canManageMembers" 
-                          class="btn-add-member-pill" 
-                          type="button" 
+                  <button *ngIf="isProjectOwner"
+                          class="btn-add-member-pill"
+                          type="button"
                           (click)="addProjectMember(m)">
                     <svg lucidePlus size="13"></svg>
                     <span>Add</span>
@@ -1094,7 +1107,7 @@
             </div>
 
             <!-- Hover + Add Button -->
-            <div *ngIf="activeCalendarCreateDate() !== day.dateStr"
+            <div *ngIf="isProjectOwner && activeCalendarCreateDate() !== day.dateStr"
                  (click)="startCalendarInlineAdd(day.dateStr)"
                  class="calendar-add-btn"
                  title="Create issue">
@@ -1587,15 +1600,15 @@
         <!-- Column Header -->
         <div class="trello-column-header" cdkDragHandle>
           <div class="col-title-group">
-            <h3 class="col-title" 
+            <h3 class="col-title"
                 *ngIf="editingColumnId() !== col.id"
-                (click)="startEditingColumn(col)"
-                title="Click to rename"
-                style="cursor: pointer;"
+                (click)="isProjectOwner && startEditingColumn(col)"
+                [title]="isProjectOwner ? 'Click to rename' : ''"
+                [style.cursor]="isProjectOwner ? 'pointer' : 'default'"
                 [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#172b4d'">{{ col.name }}</h3>
-            
-            <input type="text" 
-                   *ngIf="editingColumnId() === col.id"
+
+            <input type="text"
+                   *ngIf="editingColumnId() === col.id && isProjectOwner"
                    class="col-title-input"
                    [value]="col.name"
                    (blur)="renameColumn(col, $event)"
@@ -1622,7 +1635,7 @@
                 <button class="btn-icon-tiny" (click)="activeColumnPopoverId.set(null)"><svg lucideX size="14"></svg></button>
               </div>
               <div class="popover-body list-actions-body">
-                <button class="list-action-btn" (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id); activeColumnPopoverId.set(null)">Add card</button>
+                <button class="list-action-btn" *ngIf="isProjectOwner" (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id); activeColumnPopoverId.set(null)">Add card</button>
                 <div class="list-action-divider"></div>
                 
                 <div class="popover-subtitle-row">
@@ -1795,9 +1808,9 @@
           </div>
         </div>
 
-        <!-- Column Footer (Trigger Inline Add) -->
-        <div class="trello-column-footer" *ngIf="!addingCardColumnId() || addingCardColumnId() !== col.id">
-          <button class="btn-ghost" 
+        <!-- Column Footer (Trigger Inline Add) — Owner only -->
+        <div class="trello-column-footer" *ngIf="isProjectOwner && (!addingCardColumnId() || addingCardColumnId() !== col.id)">
+          <button class="btn-ghost"
                   [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'"
                   (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id)">
             <svg lucidePlus size="16"></svg>
@@ -1806,18 +1819,18 @@
         </div>
       </div>
 
-      <!-- Add another list button -->
-      <div class="add-another-list-col">
+      <!-- Add another list button (Owner only) -->
+      <div class="add-another-list-col" *ngIf="isProjectOwner">
         <button type="button" class="btn-add-list" *ngIf="!isAddingColumn()" (click)="isAddingColumn.set(true)">
           <svg lucidePlus size="16"></svg>
           <span>Add another list</span>
         </button>
-        
+
         <div class="add-list-form-container" *ngIf="isAddingColumn()">
-          <input type="text" class="add-list-input" 
-                 placeholder="Enter list title..." 
-                 [ngModel]="newColumnName()" 
-                 (ngModelChange)="newColumnName.set($event)" 
+          <input type="text" class="add-list-input"
+                 placeholder="Enter list title..."
+                 [ngModel]="newColumnName()"
+                 (ngModelChange)="newColumnName.set($event)"
                  (keyup.enter)="addColumn()" autofocus>
           <div class="add-list-actions">
             <button class="btn-primary" (click)="addColumn()">Add list</button>
@@ -1855,10 +1868,10 @@
 
 <div class="access-denied-container" *ngIf="!hasAccess()">
   <div class="access-denied-card">
-    <svg lucideLock size="48" class="access-icon"></svg>
+    <svg lucideLock size="28" class="access-icon"></svg>
     <h2>Access Denied</h2>
-    <p>You don't have access to this project.</p>
-    <button class="btn-back-home" routerLink="/projects">Back to Projects</button>
+    <p>You don't have access to this project. Ask a project manager or admin to add you as a member.</p>
+    <button class="btn-back-home" (click)="goToProjectsList()">Back to Projects</button>
   </div>
 </div>
 
@@ -1913,7 +1926,7 @@
             <svg *ngIf="issueForm.completed" lucideCheck size="14"></svg>
           </span>
         </button>
-        <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" placeholder="Card Title">
+        <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" placeholder="Card Title" [readOnly]="!isProjectOwner">
       </div>
 
       <!-- Action Buttons Row -->
@@ -1934,12 +1947,12 @@
 
         <!-- Priority -->
         <div class="popover-container">
-          <button class="modal-action-btn" (click)="togglePopover('priority')">
+          <button class="modal-action-btn" (click)="isProjectOwner && togglePopover('priority')" [style.cursor]="isProjectOwner ? 'pointer' : 'default'">
             <svg lucideZap size="14" class="btn-icon-svg"></svg>
             <span>Priority</span>
           </button>
 
-          <div class="trello-popover" *ngIf="activePopover() === 'priority'" (click)="$event.stopPropagation()">
+          <div class="trello-popover" *ngIf="isProjectOwner && activePopover() === 'priority'" (click)="$event.stopPropagation()">
             <div class="popover-header">
               <span>Change Priority</span>
               <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
@@ -2132,22 +2145,34 @@
               <input type="text" class="label-search-input mb-3" [(ngModel)]="memberSearchQuery" placeholder="Search members...">
 
               <div class="section-label-subtitle mb-2">Board members</div>
-              
+
               <div class="members-popover-list">
-                <div class="member-popover-item" 
-                     *ngFor="let m of filteredMembers" 
-                     [class.selected]="isMemberAttached(m.id)"
-                     (click)="toggleCardMember(m)">
-                  <div class="member-popover-avatar" [style.background-color]="getMemberColor(m)">
-                    <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="avatar-img" [alt]="m.firstName">
-                    <span *ngIf="!m.avatarUrl">{{ getMemberInitials(m) }}</span>
+                <ng-container *ngIf="isLoadingMembers(); else membersLoaded">
+                  <div class="member-popover-item member-skeleton-item" *ngFor="let s of [1,2,3]">
+                    <div class="skeleton-circle"></div>
+                    <div class="member-popover-info">
+                      <div class="skeleton-line skeleton-line-name"></div>
+                      <div class="skeleton-line skeleton-line-email"></div>
+                    </div>
                   </div>
-                  <div class="member-popover-info">
-                    <div class="member-popover-name">{{ m.firstName }} {{ m.lastName }}</div>
-                    <div class="member-popover-email">{{ m.user?.email || m.designation?.name }}</div>
+                </ng-container>
+                <ng-template #membersLoaded>
+                  <div class="member-popover-item"
+                       *ngFor="let m of filteredProjectMembers"
+                       [class.selected]="isMemberAttached(m.id)"
+                       (click)="toggleCardMember(m)">
+                    <div class="member-popover-avatar" [style.background-color]="getMemberColor(m)">
+                      <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="avatar-img" [alt]="m.firstName">
+                      <span *ngIf="!m.avatarUrl">{{ getMemberInitials(m) }}</span>
+                    </div>
+                    <div class="member-popover-info">
+                      <div class="member-popover-name">{{ m.firstName }} {{ m.lastName }}</div>
+                      <div class="member-popover-email">{{ m.user?.email || m.designation?.name }}</div>
+                    </div>
+                    <svg lucideCheck size="16" *ngIf="isMemberAttached(m.id)" class="member-check-icon"></svg>
                   </div>
-                  <svg lucideCheck size="16" *ngIf="isMemberAttached(m.id)" class="member-check-icon"></svg>
-                </div>
+                  <div class="no-members-empty" *ngIf="filteredProjectMembers.length === 0">No project members found</div>
+                </ng-template>
               </div>
             </div>
           </div>
@@ -2240,7 +2265,7 @@
               +{{ getRemainingMembersCount(selectedIssue()?.members) }}
             </div>
 
-            <button class="btn-add-member-circle" (click)="togglePopover('members')" type="button" title="Add members">
+            <button class="btn-add-member-circle" *ngIf="isProjectOwner" (click)="togglePopover('members')" type="button" title="Add members">
               <svg lucidePlus size="16"></svg>
             </button>
           </div>
@@ -2371,20 +2396,20 @@
         <div class="section-header">
           <svg lucideAlignLeft size="20" class="header-icon"></svg>
           <h3>Description</h3>
-          <button class="btn-edit-desc" *ngIf="!isEditingDescription() && issueForm.description" (click)="startDescriptionEdit()">Edit</button>
+          <button class="btn-edit-desc" *ngIf="isProjectOwner && !isEditingDescription() && issueForm.description" (click)="startDescriptionEdit()">Edit</button>
         </div>
 
         <div class="description-body">
           <!-- State 1: Collapsed / Preview Box (1st Screenshot) -->
-          <div class="description-preview-box" *ngIf="!isEditingDescription()" (click)="startDescriptionEdit()">
+          <div class="description-preview-box" *ngIf="!isEditingDescription()" [style.cursor]="isProjectOwner ? 'pointer' : 'default'" (click)="isProjectOwner && startDescriptionEdit()">
             <div *ngIf="issueForm.description" [innerHTML]="getSafeHtml(issueForm.description)" class="desc-content-html"></div>
             <div *ngIf="!issueForm.description" class="desc-placeholder-text">
               Add a more detailed description...
             </div>
           </div>
 
-          <!-- State 2: Expanded Quill Rich Text Editor (2nd Screenshot) -->
-          <div class="description-editor-container" *ngIf="isEditingDescription()">
+          <!-- State 2: Expanded Quill Rich Text Editor (2nd Screenshot) — Owner only -->
+          <div class="description-editor-container" *ngIf="isEditingDescription() && isProjectOwner">
             <div class="quill-wrapper focus-blue-border">
               <div class="quill-container" #quillContainer></div>
             </div>
@@ -2960,7 +2985,7 @@
 
 <!-- Reject Modal -->
 <div class="modal-overlay" *ngIf="isRejectModalOpen()" (click)="closeRejectModal()"></div>
-<div class="trello-modal" *ngIf="isRejectModalOpen()" style="max-width: 500px;">
+<div class="trello-modal" *ngIf="isRejectModalOpen()" style="width: 500px; max-width: 92vw; min-height: 0;">
   <div class="trello-modal-header" style="background: white; border-bottom: none; padding-bottom: 0;">
     <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #172b4d; display: flex; align-items: center; gap: 8px;">
       <svg lucideX size="20" style="color: #dc2626;"></svg> Reject Task
@@ -2968,12 +2993,14 @@
     <button class="modal-icon-btn" (click)="closeRejectModal()"><svg lucideX size="18"></svg></button>
   </div>
   <div class="trello-modal-body" style="padding-top: 16px;">
-    <p style="margin-top: 0; color: #5e6c84; font-size: 14px;">Please provide a reason for rejecting this task so the assignee knows what to fix.</p>
-    <textarea class="trello-textarea" rows="4" [(ngModel)]="rejectReason" placeholder="e.g. The design does not match the mocks. Please fix the padding." style="width: 100%; resize: none; margin-bottom: 16px;"></textarea>
-    
-    <div style="display: flex; justify-content: flex-end; gap: 12px;">
-      <button class="trello-btn-secondary" (click)="closeRejectModal()">Cancel</button>
-      <button class="trello-btn-primary" style="background: #dc2626;" (click)="confirmRejectIssue()" [disabled]="!rejectReason().trim()">Confirm Reject</button>
+    <div style="width: 100%;">
+      <p style="margin-top: 0; color: #5e6c84; font-size: 14px;">Please provide a reason for rejecting this task so the assignee knows what to fix.</p>
+      <textarea class="trello-textarea" rows="4" [(ngModel)]="rejectReason" placeholder="e.g. The design does not match the mocks. Please fix the padding." style="width: 100%; resize: none; margin-bottom: 16px; box-sizing: border-box;"></textarea>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button class="trello-btn-secondary" (click)="closeRejectModal()">Cancel</button>
+        <button class="trello-btn-primary" style="background: #dc2626;" (click)="confirmRejectIssue()" [disabled]="!rejectReason().trim()">Confirm Reject</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2989,7 +3016,7 @@
       <div>
         <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #0f172a;">Upload Proof of Completion</h3>
         <p style="margin: 2px 0 0 0; font-size: 12.5px; color: #94a3b8;">
-          Required before moving to
+          {{ canSkipProofUpload ? 'Optional before moving to' : 'Required before moving to' }}
           <span class="proof-target-badge">{{ getColumnById(proofTargetColumnId())?.name }}</span>
         </p>
       </div>
@@ -3000,7 +3027,9 @@
   <div class="trello-modal-body">
     <div style="width: 100%;">
       <p class="proof-modal-desc">
-        Please upload supporting documents such as screenshots, deliverables, or relevant files to confirm this task is complete.
+        {{ canSkipProofUpload
+          ? 'You can attach supporting documents (screenshots, deliverables, etc.), or skip this and move the task directly.'
+          : 'Please upload supporting documents such as screenshots, deliverables, or relevant files to confirm this task is complete.' }}
       </p>
 
       <!-- Dropzone -->
@@ -3046,6 +3075,7 @@
       <!-- Footer Actions -->
       <div class="proof-modal-footer">
         <button class="proof-btn-cancel" (click)="closeProofModal()" [disabled]="isUploadingProof()">Cancel</button>
+        <button class="proof-btn-cancel" *ngIf="canSkipProofUpload" (click)="skipProofUpload()" [disabled]="isUploadingProof()">Skip &amp; Move</button>
         <button class="proof-btn-submit" (click)="confirmProofUpload()" [disabled]="isUploadingProof() || proofFiles().length === 0">
           <svg lucideUpload size="14" *ngIf="!isUploadingProof()"></svg>
           {{ isUploadingProof() ? 'Uploading...' : 'Upload & Move' }}

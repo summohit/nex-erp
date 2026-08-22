@@ -4,6 +4,7 @@ import { tap } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 import { signal } from '@angular/core';
 import { environment } from '../../environments/environment';
+import { PermissionsService } from './permissions.service';
 
 @Injectable({
   providedIn: 'root'
@@ -11,6 +12,7 @@ import { environment } from '../../environments/environment';
 export class AuthService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/auth`;
+  private permissionsService = inject(PermissionsService);
 
   currentUser = signal<any>(null);
 
@@ -79,6 +81,8 @@ export class AuthService {
   logout() {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    this.currentUser.set(null);
+    this.permissionsService.clearCache();
   }
 
   refreshToken(): Observable<any> {

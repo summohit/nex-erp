@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { MatMenuModule } from '@angular/material/menu';
 
 export interface AssetActionCellParams extends ICellRendererParams {
+  onViewDetails?: (data: any) => void;
   onEdit?: (data: any) => void;
   canEdit?: (data: any) => boolean;
   editLabel?: string;
@@ -31,6 +32,9 @@ export interface AssetActionCellParams extends ICellRendererParams {
       </button>
 
       <mat-menu #menu="matMenu" panelClass="custom-action-menu">
+        <button mat-menu-item class="menu-item" (click)="viewDetails()" *ngIf="params.onViewDetails">
+          <span class="menu-text">View Details</span>
+        </button>
         <button mat-menu-item class="menu-item" (click)="edit()" *ngIf="params.onEdit && canEdit()">
           <span class="menu-text">{{ params.editLabel || 'Edit' }}</span>
         </button>
@@ -116,6 +120,7 @@ export class AssetActionCellRendererComponent implements ICellRendererAngularCom
     return this.params.canCancel(this.params.data);
   }
 
+  viewDetails() { if (this.params?.onViewDetails) this.params.onViewDetails(this.params.data); }
   edit() { if (this.params?.onEdit) this.params.onEdit(this.params.data); }
   assign() { if (this.params?.onAssign) this.params.onAssign(this.params.data); }
   returnAsset() { if (this.params?.onReturn) this.params.onReturn(this.params.data); }

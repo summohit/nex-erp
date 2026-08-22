@@ -1,0 +1,103 @@
+.dlg-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.dlg-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 360px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+  border: 1px solid #e2e8f0;
+  padding: 28px 24px 20px;
+  text-align: center;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  animation: dlgFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dlgFadeIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.dlg-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.dlg-icon.success { background: #ecfdf5; color: #059669; }
+.dlg-icon.error { background: #fef2f2; color: #dc2626; }
+.dlg-icon.confirm { background: #fffbeb; color: #d97706; }
+
+.dlg-title {
+  margin: 0 0 6px 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dlg-message {
+  margin: 0 0 20px 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.dlg-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.dlg-btn {
+  padding: 9px 20px;
+  border-radius: 9px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  min-width: 96px;
+}
+
+.dlg-btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+.dlg-btn-secondary:hover { background: #e2e8f0; }
+
+.dlg-btn-primary {
+  background: linear-gradient(135deg, #ff5500 0%, #e04400 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(255, 85, 0, 0.25);
+}
+.dlg-btn-primary:hover { box-shadow: 0 4px 12px rgba(255, 85, 0, 0.35); }
+
+.dlg-btn-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+}
+.dlg-btn-success:hover { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); }
+
+.dlg-btn-error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
+}
+.dlg-btn-error:hover { box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35); }

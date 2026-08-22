@@ -38,6 +38,25 @@ export class EmployeesService {
     });
   }
 
+  // Minimal name/avatar list for populating dropdowns and resolving display names
+  // in modules (Assets, Projects, etc.) that need employee identity but not full
+  // directory access (which is gated by assertDirectoryAccess).
+  async findBasicList(companyId: number) {
+    return this.prisma.employee.findMany({
+      where: { companyId, user: { status: { not: 'SUSPENDED' } } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        managerId: true,
+        department: { select: { name: true } },
+        designation: { select: { name: true } }
+      },
+      orderBy: { firstName: 'asc' }
+    });
+  }
+
   async getHeadcountSummary(companyId: number) {
     const employees = await this.prisma.employee.findMany({
       where: { companyId },

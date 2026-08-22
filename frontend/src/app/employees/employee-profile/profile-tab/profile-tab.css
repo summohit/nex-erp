@@ -842,9 +842,41 @@ select.form-control:disabled {
 
 /* Actions */
 .form-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(6px);
+  padding: 14px 4px;
+  margin-top: 20px;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+/* Field-level validation errors */
+.form-control.is-invalid {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.compound-input.error {
+  border-color: #ef4444;
+}
+
+.form-group > .error-msg {
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 6px;
+  display: block;
+}
+
+.form-group.is-invalid .form-control {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 
 .btn-primary {
@@ -864,6 +896,17 @@ select.form-control:disabled {
 
 .btn-primary:hover {
   background: #1d4ed8;
+}
+
+.btn-primary:disabled {
+  background: #60a5fa;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.btn-spinner-light {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
 }
 
 .btn-secondary {

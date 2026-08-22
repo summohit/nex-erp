@@ -1,0 +1,31 @@
+<div class="dlg-backdrop" *ngIf="dialog.state() as s" (click)="s.variant === 'confirm' ? null : respond(true)">
+  <div class="dlg-card" (click)="$event.stopPropagation()">
+    <div class="dlg-icon" [ngClass]="s.variant">
+      <svg *ngIf="s.variant === 'success'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <svg *ngIf="s.variant === 'error'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <svg *ngIf="s.variant === 'confirm'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+    </div>
+
+    <h3 class="dlg-title">{{s.title}}</h3>
+    <p class="dlg-message">{{s.message}}</p>
+
+    <div class="dlg-actions">
+      <button *ngIf="s.variant === 'confirm'" class="dlg-btn dlg-btn-secondary" (click)="respond(false)">{{s.cancelLabel}}</button>
+      <button class="dlg-btn" [ngClass]="{
+        'dlg-btn-primary': s.variant === 'confirm',
+        'dlg-btn-success': s.variant === 'success',
+        'dlg-btn-error': s.variant === 'error'
+      }" (click)="respond(true)">{{s.confirmLabel}}</button>
+    </div>
+  </div>
+</div>

@@ -168,10 +168,17 @@
         </div>
         <div class="form-group">
           <label>Designation (Job Role)</label>
-          <select class="form-control" [(ngModel)]="jobForm.designationId" [disabled]="!jobForm.departmentId">
-            <option value="">Select Designation</option>
-            <option *ngFor="let desig of filteredDesignations()" [value]="desig.id">{{ desig.name }}</option>
-          </select>
+          <input
+            type="text"
+            class="form-control"
+            [(ngModel)]="jobForm.designationName"
+            list="desig-list"
+            placeholder="e.g. Project Engineer"
+            (change)="onDesignationInput()"
+          />
+          <datalist id="desig-list">
+            <option *ngFor="let desig of allDesignations()" [value]="desig.name"></option>
+          </datalist>
         </div>
         <div class="form-group full-width">
           <label>Custom Job Title (Optional)</label>

@@ -9,18 +9,30 @@ export class SalesService {
 
   async createQuotation(companyId: number, data: any, userId: number) {
     const { items, ...quoteData } = data;
-    
+
+    // Convert date strings to DateTime
+    if (quoteData.date && typeof quoteData.date === 'string') {
+      quoteData.date = new Date(quoteData.date);
+    }
+    if (quoteData.validUntil && typeof quoteData.validUntil === 'string') {
+      quoteData.validUntil = new Date(quoteData.validUntil);
+    }
+
     // Auto-calculate subtotal, tax, total
     let subtotal = 0;
     items.forEach(item => {
       item.total = item.quantity * item.unitPrice;
       subtotal += item.total;
     });
-    
-    const tax = subtotal * 0.10; // Simple 10% tax for now, could be dynamic
-    const total = subtotal + tax;
 
-    // Check if total requires approval (e.g. > $10,000)
+    const taxRate = Number(quoteData.taxRate ?? 18);
+    const tax = subtotal * (taxRate / 100);
+    const total = subtotal + tax;
+    delete quoteData.taxRate; // avoid double-writing; stored separately below
+
+    const quoteNumber = `QT-${Date.now().toString().slice(-8)}`;
+
+    // Check if total requires approval (e.g. > 10,000)
     let approvalStatus = 'APPROVED';
     let status = 'DRAFT';
     if (total > 10000) {
@@ -31,8 +43,10 @@ export class SalesService {
     return this.prisma.quotation.create({
       data: {
         ...quoteData,
+        quoteNumber,
         companyId,
         subtotal,
+        taxRate,
         tax,
         total,
         status,
@@ -121,7 +135,7 @@ export class SalesService {
 
     return this.prisma.salesOrder.findMany({
       where: whereClause,
-      include: { client: true },
+      include: { client: true, items: true },
       orderBy: { date: 'desc' }
     });
   }

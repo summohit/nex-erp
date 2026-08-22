@@ -1,3 +1,27 @@
+<!-- Reusable team avatar stack overlay, shown bottom-left of a board card banner -->
+<ng-template #teamStack let-p="p">
+  <div class="team-stack-overlay" *ngIf="getTeamStack(p).visible.length > 0">
+    <span
+      class="team-avatar-circle"
+      *ngFor="let m of getTeamStack(p).visible; let mi = index"
+      [style.zIndex]="getTeamStack(p).visible.length - mi"
+      [style.marginLeft.px]="mi === 0 ? 0 : -8"
+      [style.background]="!m.employee?.avatarUrl ? getPmColor(m.employeeId) : 'transparent'"
+      [title]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')">
+      <!-- Use <img> for real photos so base64 data URIs render reliably -->
+      <img
+        *ngIf="m.employee?.avatarUrl"
+        [src]="m.employee.avatarUrl"
+        class="team-avatar-img"
+        [alt]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')" />
+      <ng-container *ngIf="!m.employee?.avatarUrl">{{ (m.employee?.firstName || '?')[0] | uppercase }}</ng-container>
+    </span>
+    <span class="team-avatar-circle team-avatar-overflow" *ngIf="getTeamStack(p).overflow > 0" style="margin-left:-8px;">
+      +{{ getTeamStack(p).overflow }}
+    </span>
+  </div>
+</ng-template>
+
 <div class="boards-page">
   <!-- Search & Filter Control Bar -->
   <div class="hub-control-bar">
@@ -63,7 +87,7 @@
               class="edit-btn" 
               (click)="openEditModal(p, $event)" 
               title="Edit board"
-              *ngIf="isAdmin">
+              *ngIf="isManagementAdmin">
               <svg lucideEdit2 size="14"></svg>
             </button>
             <button 
@@ -79,18 +103,20 @@
               class="archive-btn" 
               (click)="archiveBoard(p, false, $event)" 
               title="Archive board"
-              *ngIf="isAdmin">
+              *ngIf="isManagementAdmin">
               <svg lucideArchive size="14"></svg>
             </button>
           </div>
+          <ng-container *ngTemplateOutlet="teamStack; context: {p: p}"></ng-container>
         </div>
         <div class="board-card-footer">
-          <div class="title-meta">
-            <span class="board-title">{{ p.name }}</span>
+          <span class="board-title">{{ p.name }}</span>
+          <div class="card-meta-row">
             <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
-          </div>
-          <div class="card-badge" *ngIf="p._count?.issues">
-            {{ p._count.issues }} tasks
+            <div class="card-badge" *ngIf="p._count?.issues">{{ p._count.issues }} tasks</div>
+            <button type="button" class="card-team-btn" *ngIf="p.members?.length" (click)="openTeamModal(p, $event)" [title]="p.members.length + ' members'">
+              <svg lucideUsers size="13"></svg> {{ p.members.length }}
+            </button>
           </div>
         </div>
       </div>
@@ -118,7 +144,7 @@
               class="edit-btn" 
               (click)="openEditModal(p, $event)" 
               title="Edit board"
-              *ngIf="isAdmin">
+              *ngIf="isManagementAdmin">
               <svg lucideEdit2 size="14"></svg>
             </button>
             <button 
@@ -126,7 +152,7 @@
               class="archive-btn" 
               (click)="archiveBoard(p, false, $event)" 
               title="Archive board"
-              *ngIf="isAdmin">
+              *ngIf="isManagementAdmin">
               <svg lucideArchive size="14"></svg>
             </button>
             <button 
@@ -138,10 +164,16 @@
               <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
             </button>
           </div>
+          <ng-container *ngTemplateOutlet="teamStack; context: {p: p}"></ng-container>
         </div>
         <div class="board-card-footer">
-          <div class="title-meta">
-            <span class="board-title">{{ p.name }}</span>
+          <span class="board-title">{{ p.name }}</span>
+          <div class="card-meta-row">
+            <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
+            <div class="card-badge" *ngIf="p._count?.issues">{{ p._count.issues }} tasks</div>
+            <button type="button" class="card-team-btn" *ngIf="p.members?.length" (click)="openTeamModal(p, $event)" [title]="p.members.length + ' members'">
+              <svg lucideUsers size="13"></svg> {{ p.members.length }}
+            </button>
           </div>
         </div>
       </div>
@@ -155,6 +187,55 @@
         <svg lucideUser size="20" class="section-icon"></svg>
         <h2>Your boards</h2>
       </div>
+      <div class="view-toggle">
+        <button
+          type="button"
+          class="view-toggle-btn"
+          [class.active]="viewMode() === 'card'"
+          (click)="setViewMode('card')"
+          title="Card view">
+          <svg lucideLayoutGrid size="16"></svg>
+        </button>
+        <button
+          type="button"
+          class="view-toggle-btn"
+          [class.active]="viewMode() === 'table'"
+          (click)="setViewMode('table')"
+          title="Table view">
+          <svg lucideList size="16"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Filter Chips -->
+    <div class="quick-filter-chips">
+      <button
+        type="button"
+        class="quick-filter-chip"
+        [class.active]="quickFilter() === 'overdue'"
+        (click)="setQuickFilter('overdue')">
+        <svg lucideAlertTriangle size="13"></svg>
+        Overdue
+        <span class="quick-filter-count" *ngIf="quickFilterCounts().overdue > 0">{{ quickFilterCounts().overdue }}</span>
+      </button>
+      <button
+        type="button"
+        class="quick-filter-chip"
+        [class.active]="quickFilter() === 'due-week'"
+        (click)="setQuickFilter('due-week')">
+        <svg lucideClock size="13"></svg>
+        Due this week
+        <span class="quick-filter-count" *ngIf="quickFilterCounts().dueWeek > 0">{{ quickFilterCounts().dueWeek }}</span>
+      </button>
+      <button
+        type="button"
+        class="quick-filter-chip"
+        [class.active]="quickFilter() === 'led-by-me'"
+        (click)="setQuickFilter('led-by-me')">
+        <svg lucideUser size="13"></svg>
+        Led by me
+        <span class="quick-filter-count" *ngIf="quickFilterCounts().ledByMe > 0">{{ quickFilterCounts().ledByMe }}</span>
+      </button>
     </div>
 
     <!-- Boards Grid / Table -->
@@ -174,62 +255,113 @@
 
       <ng-template #boardsContent>
         <!-- CARD VIEW -->
-        <div class="boards-grid">
+        <div class="boards-grid" *ngIf="viewMode() === 'card'">
           <!-- Generate with AI (First) -->
-          <div class="create-board-card ai-wizard-card" routerLink="/projects/onboarding/new">
+          <div class="create-board-card ai-wizard-card" routerLink="/projects/onboarding/new" *ngIf="isAdmin">
             <svg lucideBrainCircuit size="18" class="create-icon"></svg>
             <span>Generate with AI</span>
           </div>
 
           <!-- Create New Board (Second) -->
-          <div class="create-board-card" (click)="openCreateModal()">
+          <div class="create-board-card" (click)="openCreateModal()" *ngIf="isAdmin">
             <svg lucidePlus size="18" class="create-icon"></svg>
             <span>Create new board</span>
           </div>
 
           <!-- Existing Boards -->
-          <div 
-            class="board-card" 
-            *ngFor="let p of filteredProjects(); let i = index" 
+          <div
+            class="board-card"
+            *ngFor="let p of filteredProjects(); let i = index"
             (click)="goToProject(p.id)">
             <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
               <div class="card-actions-wrapper">
-                <button 
-                  type="button" 
-                  class="edit-btn" 
-                  (click)="openEditModal(p, $event)" 
+                <button
+                  type="button"
+                  class="edit-btn"
+                  (click)="openEditModal(p, $event)"
                   title="Edit board"
-                  *ngIf="isAdmin">
+                  *ngIf="isManagementAdmin">
                   <svg lucideEdit2 size="14"></svg>
                 </button>
-                <button 
-                  type="button" 
-                  class="archive-btn" 
-                  (click)="archiveBoard(p, false, $event)" 
+                <button
+                  type="button"
+                  class="archive-btn"
+                  (click)="archiveBoard(p, false, $event)"
                   title="Archive board"
-                  *ngIf="isAdmin">
+                  *ngIf="isManagementAdmin">
                   <svg lucideArchive size="14"></svg>
                 </button>
-                <button 
-                  type="button" 
-                  class="star-btn" 
-                  [class.active]="isStarred(p.id)" 
-                  (click)="toggleStar(p.id, $event)" 
+                <button
+                  type="button"
+                  class="star-btn"
+                  [class.active]="isStarred(p.id)"
+                  (click)="toggleStar(p.id, $event)"
                   title="Toggle star">
                   <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
                 </button>
               </div>
+              <!-- Avatar stack overlaid on banner -->
+              <ng-container *ngTemplateOutlet="teamStack; context: {p: p}"></ng-container>
             </div>
             <div class="board-card-footer">
-              <div class="title-meta">
-                <span class="board-title">{{ p.name }}</span>
+              <span class="board-title">{{ p.name }}</span>
+              <div class="card-meta-row">
                 <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
-              </div>
-              <div class="card-badge" *ngIf="p._count?.issues">
-                {{ p._count.issues }} tasks
+                <div class="card-badge" *ngIf="p._count?.issues">{{ p._count.issues }} tasks</div>
+                <button
+                  type="button"
+                  class="card-team-btn"
+                  *ngIf="p.members?.length"
+                  (click)="openTeamModal(p, $event)"
+                  [title]="p.members.length + ' members'">
+                  <svg lucideUsers size="13"></svg>
+                  {{ p.members.length }}
+                </button>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- TABLE VIEW -->
+        <div class="boards-table-wrapper" *ngIf="viewMode() === 'table'">
+          <div class="table-toolbar" *ngIf="isAdmin">
+            <button type="button" class="btn-create-inline" (click)="openCreateModal()">
+              <svg lucidePlus size="14"></svg>
+              Create new board
+            </button>
+            <a class="btn-create-inline ai" routerLink="/projects/onboarding/new">
+              <svg lucideBrainCircuit size="14"></svg>
+              Generate with AI
+            </a>
+          </div>
+
+          <!-- Bulk action bar — visible when rows are selected -->
+          <div class="bulk-action-bar" *ngIf="selectedProjects().length > 0">
+            <span class="bulk-count">{{ selectedProjects().length }} selected</span>
+            <button class="bulk-btn bulk-archive" (click)="bulkArchiveSelected()" *ngIf="isManagementAdmin">
+              <svg lucideArchive size="14"></svg> Archive
+            </button>
+            <button class="bulk-btn bulk-clear" (click)="clearSelection()">
+              <svg lucideX size="14"></svg> Clear
+            </button>
+          </div>
+
+          <ag-grid-angular
+            class="ag-theme-quartz boards-grid-table"
+            [theme]="'legacy'"
+            [rowData]="filteredProjects()"
+            [columnDefs]="boardsColDefs"
+            [defaultColDef]="defaultColDef"
+            [gridOptions]="gridOptions"
+            [pagination]="true"
+            [paginationPageSize]="paginationPageSize"
+            [paginationPageSizeSelector]="paginationPageSizeOptions"
+            [quickFilterText]="searchQuery()"
+            [rowHeight]="52"
+            (gridReady)="onBoardsGridReady($event)"
+            (selectionChanged)="onBoardsSelectionChanged()"
+            (rowClicked)="onBoardRowClicked($event)">
+          </ag-grid-angular>
         </div>
       </ng-template>
     </div>
@@ -272,12 +404,13 @@
           </div>
         </div>
         <div class="board-card-footer">
-          <div class="title-meta">
-            <span class="board-title">{{ p.name }}</span>
+          <span class="board-title">{{ p.name }}</span>
+          <div class="card-meta-row">
             <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
-          </div>
-          <div class="card-badge" *ngIf="p._count?.issues">
-            {{ p._count.issues }} tasks
+            <div class="card-badge" *ngIf="p._count?.issues">{{ p._count.issues }} tasks</div>
+            <button type="button" class="card-team-btn" *ngIf="p.members?.length" (click)="openTeamModal(p, $event)" [title]="p.members.length + ' members'">
+              <svg lucideUsers size="13"></svg> {{ p.members.length }}
+            </button>
           </div>
         </div>
       </div>
@@ -438,7 +571,8 @@
         <div class="pm-select-trigger" (click)="pmDropdownOpen.set(!pmDropdownOpen())">
           <div class="pm-selected-chips" *ngIf="projectForm.pmIds.length > 0">
             <span class="pm-chip" *ngFor="let pmId of projectForm.pmIds">
-              <span class="pm-chip-avatar" [style.background]="getPmColor(pmId)">{{ getPmInitial(pmId) }}</span>
+              <img *ngIf="getPmAvatarUrl(pmId) as url" [src]="url" class="pm-chip-avatar pm-chip-avatar-img" />
+              <span *ngIf="!getPmAvatarUrl(pmId)" class="pm-chip-avatar" [style.background]="getPmColor(pmId)">{{ getPmInitial(pmId) }}</span>
               {{ getPmName(pmId) }}
               <button class="pm-chip-remove" (click)="removePm(pmId); $event.stopPropagation()">
                 <svg lucideX size="11"></svg>
@@ -460,7 +594,8 @@
               <div class="pm-item-check" [class.checked]="projectForm.pmIds.includes(emp.id)">
                 <svg lucideCheck size="12" *ngIf="projectForm.pmIds.includes(emp.id)"></svg>
               </div>
-              <div class="pm-item-avatar" [style.background]="getPmColor(emp.id)">{{ getPmInitial(emp.id) }}</div>
+              <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="pm-item-avatar pm-item-avatar-img" />
+              <div *ngIf="!emp.avatarUrl" class="pm-item-avatar" [style.background]="getPmColor(emp.id)">{{ getPmInitial(emp.id) }}</div>
               <div class="pm-item-info">
                 <div class="pm-item-name">{{ emp.firstName }} {{ emp.lastName }}</div>
                 <div class="pm-item-email" *ngIf="emp.user?.email">{{ emp.user.email }}</div>
@@ -474,12 +609,49 @@
     </div>
 
     <!-- Action Button -->
-    <button 
-      type="button" 
-      class="btn-trello-submit" 
+    <button
+      type="button"
+      class="btn-trello-submit"
       [disabled]="!projectForm.name.trim()"
       (click)="saveProject()">
       {{ editingProjectId() ? 'Save' : 'Create' }}
     </button>
+  </div>
+</div>
+
+<!-- Team Members Modal -->
+<div class="team-modal-backdrop" *ngIf="teamModalProject()" (click)="closeTeamModal()">
+  <div class="team-modal" (click)="$event.stopPropagation()">
+    <div class="team-modal-header">
+      <div>
+        <h3 class="team-modal-title">{{ teamModalProject().name }}</h3>
+        <span class="team-modal-sub">{{ teamModalProject().members?.length || 0 }} team member{{ teamModalProject().members?.length !== 1 ? 's' : '' }}</span>
+      </div>
+      <button class="team-modal-close" (click)="closeTeamModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+    <div class="team-modal-body">
+      <div class="team-member-row" *ngFor="let m of teamModalProject().members">
+        <div class="team-member-avatar-wrap">
+          <img
+            *ngIf="m.employee?.avatarUrl"
+            [src]="m.employee.avatarUrl"
+            class="team-member-avatar"
+            [alt]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')" />
+          <span
+            *ngIf="!m.employee?.avatarUrl"
+            class="team-member-avatar team-member-initial"
+            [style.background]="getPmColor(m.employeeId)">
+            {{ (m.employee?.firstName || '?')[0] | uppercase }}
+          </span>
+        </div>
+        <div class="team-member-info">
+          <span class="team-member-name">{{ m.employee?.firstName }} {{ m.employee?.lastName }}</span>
+          <span class="team-member-role">{{ m.role }}</span>
+        </div>
+      </div>
+      <div *ngIf="!teamModalProject().members?.length" class="team-modal-empty">No members yet</div>
+    </div>
   </div>
 </div>

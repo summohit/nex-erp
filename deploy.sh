@@ -18,6 +18,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
 BACKEND_DIR="$SCRIPT_DIR/backend"
 
+# SSH connection multiplexing: authenticate once, reuse the same socket for every
+# subsequent ssh/rsync call in this run instead of opening a fresh connection each
+# time. Fewer connection attempts = far less likely to trip the server's rate limiter.
+CTRL_DIR="/tmp/nex-erp-deploy-ctrl"
+mkdir -p "$CTRL_DIR"
+CTRL_PATH="$CTRL_DIR/%r@%h:%p"
+SSH_OPTS=(-o StrictHostKeyChecking=no -o ControlMaster=auto -o ControlPath="$CTRL_PATH" -o ControlPersist=600)
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -30,16 +38,29 @@ warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 err()   { echo -e "${RED}[✘]${NC} $1"; }
 info()  { echo -e "${CYAN}[→]${NC} $1"; }
 
+# ─── Helper: open the shared SSH master connection (authenticates once) ───
+open_master() {
+  if ! ssh -O check -o ControlPath="$CTRL_PATH" "$SERVER_USER@$SERVER_IP" 2>/dev/null; then
+    info "Opening SSH connection to server..."
+    sshpass -p "$SERVER_PASS" ssh "${SSH_OPTS[@]}" -MNf "$SERVER_USER@$SERVER_IP"
+  fi
+}
+
+# ─── Helper: close the shared SSH master connection ───
+close_master() {
+  ssh -O exit -o ControlPath="$CTRL_PATH" "$SERVER_USER@$SERVER_IP" 2>/dev/null || true
+}
+
 # ─── Helper: run command on remote server ───
 remote() {
-  sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "$1"
+  ssh "${SSH_OPTS[@]}" "$SERVER_USER@$SERVER_IP" "$1"
 }
 
 # ─── Helper: rsync to remote server ───
 sync_to_remote() {
-  sshpass -p "$SERVER_PASS" rsync -avz --delete \
+  rsync -avz --delete \
     --exclude node_modules --exclude .git --exclude dist --exclude .angular --exclude .env \
-    -e "ssh -o StrictHostKeyChecking=no" \
+    -e "ssh ${SSH_OPTS[*]}" \
     "$1" "$SERVER_USER@$SERVER_IP:$2"
 }
 
@@ -115,6 +136,9 @@ if ! command -v sshpass &> /dev/null; then
 fi
 
 TARGET="${1:-all}"
+
+trap close_master EXIT
+open_master
 
 case "$TARGET" in
   frontend)

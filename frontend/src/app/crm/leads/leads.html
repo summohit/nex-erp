@@ -92,10 +92,10 @@
         </ng-container>
         <ng-container *ngIf="!isLoading">
           <div class="kanban-card card-accent-new" *ngFor="let lead of newLeads" cdkDrag>
-            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+            <div class="card-drag-handle" title="Drag to reorder/move">
               <svg lucideGripVertical size="14"></svg>
             </div>
-            
+
             <div class="card-body">
               <div class="card-header-row">
                 <h4 class="lead-title">{{lead.title}}</h4>
@@ -126,7 +126,9 @@
 
               <div class="card-footer-row">
                 <span class="value-badge">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <span class="date-tag" *ngIf="lead.createdAt">{{lead.createdAt | date:'shortDate'}}</span>
+                <button class="btn-view-details" (click)="openDetailModal(lead)">
+                  <svg lucideEye size="12"></svg> Details
+                </button>
               </div>
             </div>
           </div>
@@ -156,7 +158,7 @@
         </ng-container>
         <ng-container *ngIf="!isLoading">
           <div class="kanban-card card-accent-qual" *ngFor="let lead of qualifiedLeads" cdkDrag>
-            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+            <div class="card-drag-handle" title="Drag to reorder/move">
               <svg lucideGripVertical size="14"></svg>
             </div>
             
@@ -188,9 +190,14 @@
                 </div>
               </div>
 
+              <div class="card-qual-reason" *ngIf="lead.qualificationReason">
+                <span class="qual-reason-text">💬 {{lead.qualificationReason}}</span>
+              </div>
               <div class="card-footer-row">
                 <span class="value-badge">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <span class="date-tag" *ngIf="lead.createdAt">{{lead.createdAt | date:'shortDate'}}</span>
+                <button class="btn-view-details" (click)="openDetailModal(lead)">
+                  <svg lucideEye size="12"></svg> Details
+                </button>
               </div>
             </div>
           </div>
@@ -220,7 +227,7 @@
         </ng-container>
         <ng-container *ngIf="!isLoading">
           <div class="kanban-card card-accent-prop" *ngFor="let lead of proposalLeads" cdkDrag>
-            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+            <div class="card-drag-handle" title="Drag to reorder/move">
               <svg lucideGripVertical size="14"></svg>
             </div>
             
@@ -252,9 +259,14 @@
                 </div>
               </div>
 
+              <div class="card-proposal-date" *ngIf="lead.proposalDate">
+                <span style="font-size:10px;color:#7C3AED;font-weight:600;">📅 Proposal: {{lead.proposalDate | date:'dd MMM yyyy'}}</span>
+              </div>
               <div class="card-footer-row">
                 <span class="value-badge prop-value">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <span class="date-tag" *ngIf="lead.createdAt">{{lead.createdAt | date:'shortDate'}}</span>
+                <button class="btn-view-details" (click)="openDetailModal(lead)">
+                  <svg lucideEye size="12"></svg> Details
+                </button>
               </div>
             </div>
           </div>
@@ -284,7 +296,7 @@
         </ng-container>
         <ng-container *ngIf="!isLoading">
           <div class="kanban-card card-accent-won" *ngFor="let lead of wonLeads" cdkDrag>
-            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+            <div class="card-drag-handle" title="Drag to reorder/move">
               <svg lucideCheckCircle size="14" class="text-success"></svg>
             </div>
             
@@ -310,7 +322,9 @@
 
               <div class="card-footer-row">
                 <span class="value-badge won-value">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <span class="won-tag">Converted to Client</span>
+                <button class="btn-view-details" (click)="openDetailModal(lead)">
+                  <svg lucideEye size="12"></svg> Details
+                </button>
               </div>
             </div>
           </div>
@@ -340,7 +354,7 @@
         </ng-container>
         <ng-container *ngIf="!isLoading">
           <div class="kanban-card card-accent-lost" *ngFor="let lead of lostLeads" cdkDrag>
-            <div class="card-drag-handle" cdkDragHandle title="Drag to reorder/move">
+            <div class="card-drag-handle" title="Drag to reorder/move">
               <svg lucideGripVertical size="14"></svg>
             </div>
             
@@ -356,12 +370,106 @@
                 <svg lucideBuilding size="12"></svg>
                 <span>{{lead.companyName}}</span>
               </div>
+              <div class="card-footer-row">
+                <span class="value-badge lost-value">{{lead.value | currency:lead.currency||'INR'}}</span>
+                <button class="btn-view-details" (click)="openDetailModal(lead)">
+                  <svg lucideEye size="12"></svg> Details
+                </button>
+              </div>
             </div>
           </div>
         </ng-container>
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Lead Detail Modal -->
+<div class="modal-backdrop" *ngIf="showDetailModal && selectedLead" (click)="closeDetailModal()">
+  <div class="lead-detail-modal" (click)="$event.stopPropagation()">
+    <div class="ldm-header">
+      <div class="ldm-status-badge ldm-status-{{selectedLead.status | lowercase}}">
+        {{getStatusLabel(selectedLead.status)}}
+      </div>
+      <div class="ldm-title-block">
+        <h2 class="ldm-title">{{selectedLead.title}}</h2>
+        <div class="ldm-company" *ngIf="selectedLead.companyName">
+          <svg lucideBuilding size="13"></svg> {{selectedLead.companyName}}
+        </div>
+      </div>
+      <button class="btn-icon-close" (click)="closeDetailModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="ldm-body">
+      <!-- Value highlight -->
+      <div class="ldm-value-banner">
+        <div class="ldm-value-label">Deal Value</div>
+        <div class="ldm-value-amount">{{selectedLead.value | currency:selectedLead.currency||'INR':'symbol-narrow':'1.0-0'}}</div>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="ldm-section">
+        <div class="ldm-section-title">Contact Information</div>
+        <div class="ldm-info-grid">
+          <div class="ldm-info-item" *ngIf="selectedLead.contactName">
+            <span class="ldm-info-icon"><svg lucideUser size="14"></svg></span>
+            <div>
+              <div class="ldm-info-label">Contact Person</div>
+              <div class="ldm-info-value">{{selectedLead.contactName}}</div>
+            </div>
+          </div>
+          <div class="ldm-info-item" *ngIf="selectedLead.email">
+            <span class="ldm-info-icon"><svg lucideMail size="14"></svg></span>
+            <div>
+              <div class="ldm-info-label">Email</div>
+              <div class="ldm-info-value">{{selectedLead.email}}</div>
+            </div>
+          </div>
+          <div class="ldm-info-item" *ngIf="selectedLead.phone">
+            <span class="ldm-info-icon"><svg lucidePhone size="14"></svg></span>
+            <div>
+              <div class="ldm-info-label">Phone</div>
+              <div class="ldm-info-value">{{selectedLead.phone}}</div>
+            </div>
+          </div>
+          <div class="ldm-info-item" *ngIf="selectedLead.createdAt">
+            <span class="ldm-info-icon"><svg lucideCalendar size="14"></svg></span>
+            <div>
+              <div class="ldm-info-label">Created</div>
+              <div class="ldm-info-value">{{selectedLead.createdAt | date:'dd MMM yyyy'}}</div>
+            </div>
+          </div>
+          <div class="ldm-info-item" *ngIf="selectedLead.proposalDate">
+            <span class="ldm-info-icon"><svg lucideCalendar size="14"></svg></span>
+            <div>
+              <div class="ldm-info-label">Proposal Date</div>
+              <div class="ldm-info-value">{{selectedLead.proposalDate | date:'dd MMM yyyy'}}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="ldm-section" *ngIf="selectedLead.description">
+        <div class="ldm-section-title">
+          <svg lucideFileText size="13"></svg> Description
+        </div>
+        <p class="ldm-description">{{selectedLead.description}}</p>
+      </div>
+
+      <!-- Qualification -->
+      <div class="ldm-section ldm-qual-section" *ngIf="selectedLead.qualificationReason">
+        <div class="ldm-section-title">Qualification Notes</div>
+        <p class="ldm-qual-text">{{selectedLead.qualificationReason}}</p>
+      </div>
+    </div>
+
+    <div class="ldm-footer">
+      <button class="btn-secondary" (click)="closeDetailModal()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -452,12 +560,42 @@
             <option value="EUR">€</option>
             <option value="GBP">£</option>
           </select>
-          <input 
-            type="number" 
-            [(ngModel)]="newLeadData.value" 
+          <input
+            type="number"
+            [(ngModel)]="newLeadData.value"
             placeholder="0.00"
             [disabled]="isSaving"
             class="currency-input"
+          />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Detailed Description</label>
+        <textarea
+          [(ngModel)]="newLeadData.description"
+          placeholder="Describe the opportunity, requirements, background..."
+          rows="3"
+          [disabled]="isSaving"
+        ></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Qualification Comments</label>
+          <input
+            type="text"
+            [(ngModel)]="newLeadData.qualificationReason"
+            placeholder="Why is this lead qualified or not?"
+            [disabled]="isSaving"
+          />
+        </div>
+        <div class="form-group">
+          <label>Proposal Date</label>
+          <input
+            type="date"
+            [(ngModel)]="newLeadData.proposalDate"
+            [disabled]="isSaving"
           />
         </div>
       </div>

@@ -4,6 +4,7 @@ import { leaveService, LeaveBalance } from '../api/leaveService';
 import { projectService, Project } from '../api/projectService';
 import { employeeService, EmployeeProfile } from '../api/employeeService';
 import { notificationService, AppNotification } from '../api/notificationService';
+import { useTimesheetStore } from './timesheetStore';
 
 import { Platform, PermissionsAndroid } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
@@ -126,6 +127,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const coords = await getCurrentLocation();
       const record = await attendanceService.clockIn(coords.lat, coords.lng);
       set({ todayAttendance: record, isClockingIn: false });
+      useTimesheetStore.getState().fetchData();
     } catch (error: any) {
       set({ error: error.message || 'Clock in failed', isClockingIn: false });
     }
@@ -139,6 +141,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const coords = await getCurrentLocation();
       const record = await attendanceService.clockOut(coords.lat, coords.lng);
       set({ todayAttendance: record, isClockingIn: false });
+      useTimesheetStore.getState().fetchData();
     } catch (error: any) {
       set({ error: error.message || 'Clock out failed', isClockingIn: false });
     }

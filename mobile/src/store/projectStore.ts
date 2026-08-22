@@ -9,16 +9,22 @@ interface ProjectStoreState {
   currentBoard: any | null;
   currentIssues: any[];
   isLoading: boolean;
-  
+  accessDenied: boolean;
+
   fetchProjects: () => Promise<void>;
   fetchProjectDetails: (id: number) => Promise<void>;
   toggleStar: (id: number) => Promise<void>;
   archiveProject: (id: number, force?: boolean) => Promise<void>;
   unarchiveProject: (id: number) => Promise<void>;
   createIssue: (projectId: number, data: any) => Promise<void>;
+  updateIssue: (projectId: number, issueId: number, data: any) => Promise<void>;
   updateIssueStatus: (projectId: number, issueId: number, status: string) => Promise<void>;
   updateIssueColumn: (projectId: number, issueId: number, columnId: number) => Promise<void>;
   updateIssuePriority: (projectId: number, issueId: number, priority: string) => Promise<void>;
+  toggleIssueArchive: (projectId: number, issueId: number) => Promise<void>;
+  reviewIssue: (projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string) => Promise<void>;
+  addProjectMember: (projectId: number, employeeId: number, role?: string) => Promise<void>;
+  removeProjectMember: (projectId: number, employeeId: number) => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectStoreState>((set, get) => ({
@@ -29,6 +35,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   currentBoard: null,
   currentIssues: [],
   isLoading: false,
+  accessDenied: false,
 
   fetchProjects: async () => {
     set({ isLoading: true });
@@ -76,7 +83,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   },
 
   fetchProjectDetails: async (id: number) => {
-    set({ isLoading: true });
+    set({ isLoading: true, accessDenied: false });
     try {
       const results = await Promise.allSettled([
         projectService.getProject(id),
@@ -84,18 +91,31 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         projectService.getBoard(id),
         projectService.getIssues(id)
       ]);
-      
-      const project = results[0].status === 'fulfilled' ? results[0].value : null;
+
+      const projectResult = results[0];
+      if (projectResult.status === 'rejected' && (projectResult.reason as any)?.response?.status === 403) {
+        set({
+          isLoading: false,
+          accessDenied: true,
+          currentProject: null,
+          currentSummary: null,
+          currentBoard: null,
+          currentIssues: [],
+        });
+        return;
+      }
+
+      const project = projectResult.status === 'fulfilled' ? projectResult.value : null;
       const summary = results[1].status === 'fulfilled' ? results[1].value : null;
       const board = results[2].status === 'fulfilled' ? results[2].value : null;
       const issues = results[3].status === 'fulfilled' ? results[3].value : [];
 
-      set({ 
-        currentProject: project, 
-        currentSummary: summary, 
-        currentBoard: board, 
+      set({
+        currentProject: project,
+        currentSummary: summary,
+        currentBoard: board,
         currentIssues: issues,
-        isLoading: false 
+        isLoading: false
       });
     } catch (error) {
       console.error('Failed to fetch project details', error);
@@ -107,11 +127,17 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     try {
       // Optimistic update
       set((state) => ({
-        currentIssues: state.currentIssues.map(issue => 
+        currentIssues: state.currentIssues.map(issue =>
           issue.id === issueId ? { ...issue, status } : issue
         )
       }));
-      await projectService.updateIssue(projectId, issueId, { status });
+      // Merge the server response — the backend may set side effects here
+      // (e.g. auto-starting/stopping the work timer based on the new status)
+      // that a plain optimistic patch would silently discard.
+      const updated = await projectService.updateIssue(projectId, issueId, { status });
+      set((state) => ({
+        currentIssues: state.currentIssues.map(i => i.id === issueId ? { ...i, ...updated } : i)
+      }));
     } catch (error) {
       console.error('Failed to update issue status', error);
       // Revert on fail
@@ -124,11 +150,17 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     try {
       // Optimistic update
       set((state) => ({
-        currentIssues: state.currentIssues.map(issue => 
+        currentIssues: state.currentIssues.map(issue =>
           issue.id === issueId ? { ...issue, columnId } : issue
         )
       }));
-      await projectService.updateIssue(projectId, issueId, { columnId });
+      // Merge the server response — moving columns can auto-derive a new status
+      // server-side (e.g. IN_PROGRESS/IN_REVIEW) and auto start/stop the work
+      // timer as a side effect; a plain columnId patch would lose that.
+      const updated = await projectService.updateIssue(projectId, issueId, { columnId });
+      set((state) => ({
+        currentIssues: state.currentIssues.map(i => i.id === issueId ? { ...i, ...updated } : i)
+      }));
     } catch (error) {
       console.error('Failed to update issue column', error);
       // Revert on fail
@@ -156,9 +188,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
 
   createIssue: async (projectId: number, data: any) => {
     try {
-      // Create issue on backend
       const newIssue = await projectService.createIssue(projectId, data);
-      // Optimistic update of list
       set((state) => ({
         currentIssues: [...state.currentIssues, newIssue]
       }));
@@ -166,5 +196,63 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       console.error('Failed to create issue', error);
       throw error;
     }
-  }
+  },
+
+  updateIssue: async (projectId: number, issueId: number, data: any) => {
+    try {
+      const updated = await projectService.updateIssue(projectId, issueId, data);
+      set((state) => ({
+        currentIssues: state.currentIssues.map(i => i.id === issueId ? { ...i, ...updated } : i)
+      }));
+    } catch (error) {
+      console.error('Failed to update issue', error);
+      throw error;
+    }
+  },
+
+  toggleIssueArchive: async (projectId: number, issueId: number) => {
+    try {
+      await projectService.toggleIssueArchive(projectId, issueId);
+      set((state) => ({
+        currentIssues: state.currentIssues.map(i =>
+          i.id === issueId ? { ...i, isArchived: !i.isArchived } : i
+        )
+      }));
+    } catch (error) {
+      console.error('Failed to toggle issue archive', error);
+      throw error;
+    }
+  },
+
+  reviewIssue: async (projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string) => {
+    try {
+      const updated = await projectService.reviewIssue(projectId, issueId, action, reason);
+      set((state) => ({
+        currentIssues: state.currentIssues.map(i => i.id === issueId ? { ...i, ...updated } : i)
+      }));
+    } catch (error) {
+      console.error('Failed to review issue', error);
+      throw error;
+    }
+  },
+
+  addProjectMember: async (projectId: number, employeeId: number, role: string = 'MEMBER') => {
+    try {
+      await projectService.addProjectMember(projectId, employeeId, role);
+      await get().fetchProjectDetails(projectId);
+    } catch (error) {
+      console.error('Failed to add project member', error);
+      throw error;
+    }
+  },
+
+  removeProjectMember: async (projectId: number, employeeId: number) => {
+    try {
+      await projectService.removeProjectMember(projectId, employeeId);
+      await get().fetchProjectDetails(projectId);
+    } catch (error) {
+      console.error('Failed to remove project member', error);
+      throw error;
+    }
+  },
 }));

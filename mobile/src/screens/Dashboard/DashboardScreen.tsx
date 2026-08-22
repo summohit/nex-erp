@@ -506,53 +506,85 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* --- Leave Balance & Projects 2-Column Grid --- */}
-        <View style={styles.bottomStatsGrid}>
-          {/* Card 1: Leave balance */}
-          <View style={styles.bottomStatCard}>
-            <Text style={styles.bottomStatTitle}>Leave balance</Text>
-            <Text style={styles.bottomStatBigValue}>{totalLeaveRemaining}</Text>
-            <Text style={styles.bottomStatSubtitle}>days remaining</Text>
+        {/* --- Leave Balance --- */}
+        <TouchableOpacity
+          style={styles.statPanel}
+          activeOpacity={0.85}
+          onPress={() => safeNavigate('Leaves')}
+        >
+          <View style={styles.statPanelHeader}>
+            <View style={styles.statPanelHeaderLeft}>
+              <View style={[styles.statPanelIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                <Calendar size={18} color="#16A34A" />
+              </View>
+              <Text style={styles.statPanelTitle}>Leave Balance</Text>
+            </View>
+            <ChevronRight size={18} color="#CBD5E1" />
+          </View>
 
-            {/* Progress Bar Container */}
-            <View style={styles.leaveProgressSection}>
-              <View style={styles.leaveProgressBarTrack}>
-                <View style={[styles.leaveProgressBarFill, { width: `${leaveProgress}%` }]} />
+          <View style={styles.statPanelValueRow}>
+            <Text style={styles.statPanelBigValue}>{totalLeaveRemaining}</Text>
+            <Text style={styles.statPanelValueUnit}>days remaining</Text>
+          </View>
+
+          <View style={styles.leaveProgressBarTrack}>
+            <View
+              style={[
+                styles.leaveProgressBarFill,
+                { width: `${Math.min(leaveProgress, 100)}%` },
+                leaveProgress >= 90 && { backgroundColor: '#F87171' },
+              ]}
+            />
+          </View>
+          <View style={styles.leaveProgressLabels}>
+            <Text style={styles.leaveProgressText}>{totalLeaveUsed} used</Text>
+            <Text style={styles.leaveProgressText}>{totalLeaveAllocated} total</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* --- Active Projects --- */}
+        <TouchableOpacity
+          style={[styles.statPanel, { marginBottom: 24 }]}
+          activeOpacity={0.85}
+          onPress={() => safeNavigate('Projects')}
+        >
+          <View style={styles.statPanelHeader}>
+            <View style={styles.statPanelHeaderLeft}>
+              <View style={[styles.statPanelIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                <Briefcase size={18} color="#EA580C" />
               </View>
-              <View style={styles.leaveProgressLabels}>
-                <Text style={styles.leaveProgressText}>{totalLeaveUsed} used</Text>
-                <Text style={styles.leaveProgressText}>{totalLeaveAllocated} total</Text>
-              </View>
+              <Text style={styles.statPanelTitle}>Active Projects</Text>
+            </View>
+            <View style={styles.statPanelCountPill}>
+              <Text style={styles.statPanelCountPillText}>{activeProjectsCount}</Text>
             </View>
           </View>
 
-          {/* Card 2: Projects */}
-          <View style={styles.bottomStatCard}>
-            <Text style={styles.bottomStatTitle}>Projects</Text>
-            <Text style={styles.bottomStatBigValue}>{activeProjectsCount}</Text>
-            <Text style={styles.bottomStatSubtitle}>active projects</Text>
-
-            {/* Projects List */}
-            <View style={styles.projectsList}>
-              {projects.slice(0, 3).map((project, index) => (
-                <View key={project.id || index} style={styles.projectItemRow}>
-                  <View style={styles.projectNameGroup}>
-                    <View style={styles.orangeDot} />
-                    <Text style={styles.projectNameText} numberOfLines={1}>{project.name}</Text>
-                  </View>
-                  <View style={[styles.statusBadge, project.status === 'COMPLETED' ? styles.doneBadge : styles.wipBadge]}>
-                    <Text style={project.status === 'COMPLETED' ? styles.doneBadgeText : styles.wipBadgeText}>
-                      {project.status === 'COMPLETED' ? 'DONE' : 'WIP'}
-                    </Text>
-                  </View>
+          <View style={styles.projectsList}>
+            {projects.slice(0, 3).map((project, index) => (
+              <View key={project.id || index} style={styles.projectItemRow}>
+                <View
+                  style={[
+                    styles.projectStatusDot,
+                    { backgroundColor: project.status === 'COMPLETED' ? '#16A34A' : '#EA580C' },
+                  ]}
+                />
+                <Text style={styles.projectNameText} numberOfLines={1}>{project.name}</Text>
+                <View style={[styles.statusBadge, project.status === 'COMPLETED' ? styles.doneBadge : styles.wipBadge]}>
+                  <Text style={project.status === 'COMPLETED' ? styles.doneBadgeText : styles.wipBadgeText}>
+                    {project.status === 'COMPLETED' ? 'DONE' : 'WIP'}
+                  </Text>
                 </View>
-              ))}
-              {projects.length === 0 && (
-                <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 8 }}>No active projects</Text>
-              )}
-            </View>
+              </View>
+            ))}
+            {projects.length === 0 && (
+              <Text style={styles.emptyProjectsText}>No active projects</Text>
+            )}
+            {projects.length > 3 && (
+              <Text style={styles.moreProjectsText}>+{projects.length - 3} more</Text>
+            )}
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* --- Field Visit Section --- */}
         <View style={styles.sectionHeaderRow}>
@@ -1299,42 +1331,67 @@ const styles = StyleSheet.create({
   },
 
   // --- Leave Balance & Projects Styles ---
-  bottomStatsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  bottomStatCard: {
-    flex: 1,
+  statPanel: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 18,
-    shadowColor: '#000',
+    marginBottom: 12,
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
     elevation: 2,
   },
-  bottomStatTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#334155',
-    marginBottom: 8,
+  statPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  bottomStatBigValue: {
-    fontSize: 32,
+  statPanelHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  statPanelIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statPanelTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  statPanelCountPill: {
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  statPanelCountPillText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#EA580C',
+  },
+  statPanelValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginBottom: 14,
+  },
+  statPanelBigValue: {
+    fontSize: 30,
     fontWeight: '900',
     color: '#0F172A',
-    lineHeight: 36,
+    lineHeight: 34,
   },
-  bottomStatSubtitle: {
+  statPanelValueUnit: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
-    marginBottom: 16,
-  },
-  leaveProgressSection: {
-    marginTop: 4,
+    color: '#94A3B8',
   },
   leaveProgressBarTrack: {
     height: 8,
@@ -1358,25 +1415,20 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
   projectsList: {
-    gap: 10,
+    gap: 12,
   },
   projectItemRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
   },
-  projectNameGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  orangeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#EA580C',
+  projectStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   projectNameText: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '700',
     color: '#0F172A',
@@ -1401,6 +1453,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#16A34A',
+  },
+  emptyProjectsText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 4,
+  },
+  moreProjectsText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#E25E3E',
+    marginTop: 2,
   },
 
   // --- Field Visit & Recent Activity Styles ---

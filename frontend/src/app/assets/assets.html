@@ -3,7 +3,7 @@
   <header class="page-header">
     <div class="header-title-group">
       <h1 class="page-title">Assets & IT Management</h1>
-      <p class="page-subtitle">Manage company IT inventory, track device assignments, and process hardware requests.</p>
+      <p class="page-subtitle">Manage your IT assets</p>
     </div>
     <div class="header-actions">
       <button class="btn btn-outline" *ngIf="isAdmin()" (click)="openAssignDrawer()">
@@ -14,7 +14,7 @@
         <svg lucidePlus size="16"></svg>
         <span>Add New Asset</span>
       </button>
-      <button class="btn btn-primary" *ngIf="!isAdmin() || activeTab() === 'requests'" (click)="openRequestDrawer()">
+      <button class="btn btn-primary" *ngIf="activeTab() === 'requests'" (click)="openRequestDrawer()">
         <svg lucidePlus size="16"></svg>
         <span>Submit Request</span>
       </button>
@@ -76,10 +76,10 @@
 
   <!-- Navigation Tabs -->
   <div class="nav-tabs">
-    <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
+    <button class="nav-tab" [class.active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
       Asset Inventory
     </button>
-    <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'assignments'" (click)="setTab('assignments')">
+    <button class="nav-tab" [class.active]="activeTab() === 'assignments'" (click)="setTab('assignments')">
       Assignments
     </button>
     <button class="nav-tab" [class.active]="activeTab() === 'requests'" (click)="setTab('requests')">
@@ -174,22 +174,20 @@
       <button class="btn-close" (click)="isAssetDrawerOpen.set(false)"><svg lucideX size="18"></svg></button>
     </div>
     <div class="drawer-body">
-      <div class="form-group">
+      <div class="form-group" id="asset-field-name">
         <label class="form-label">Asset Name <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" [(ngModel)]="assetForm.name" placeholder="e.g. MacBook Pro M3 Max 16-inch">
+        <input type="text" class="form-control" [class.is-invalid]="assetFormErrors.name" [(ngModel)]="assetForm.name" (ngModelChange)="clearAssetError('name')" placeholder="e.g. MacBook Pro M3 Max 16-inch">
+        <small class="error-msg" *ngIf="assetFormErrors.name">{{ assetFormErrors.name }}</small>
       </div>
       <div class="form-row">
         <div class="form-group col-6">
           <label class="form-label">Category</label>
-          <select class="form-control" [(ngModel)]="assetForm.category">
-            <option value="LAPTOP">Laptop</option>
-            <option value="DESKTOP">Desktop</option>
-            <option value="MONITOR">Monitor</option>
-            <option value="PERIPHERAL">Peripheral (Keyboard/Mouse)</option>
-            <option value="SOFTWARE">Software License</option>
-            <option value="MOBILE">Mobile / Tablet</option>
-            <option value="OTHER">Other</option>
-          </select>
+          <app-searchable-select
+            [options]="categoryOptions()"
+            [value]="assetForm.category"
+            (valueChange)="onCategorySelected($event)"
+            placeholder="Select category">
+          </app-searchable-select>
         </div>
         <div class="form-group col-6">
           <label class="form-label">Status</label>
@@ -202,6 +200,13 @@
         </div>
       </div>
       <div class="form-row">
+        <div class="form-group col-6" id="asset-field-quantity">
+          <label class="form-label">Quantity</label>
+          <input type="number" min="1" class="form-control" [class.is-invalid]="assetFormErrors.quantity" [(ngModel)]="assetForm.quantity" (ngModelChange)="clearAssetError('quantity')" placeholder="1">
+          <small class="error-msg" *ngIf="assetFormErrors.quantity">{{ assetFormErrors.quantity }}</small>
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group col-6">
           <label class="form-label">Brand</label>
           <input type="text" class="form-control" [(ngModel)]="assetForm.brand" placeholder="Apple, Dell, Logitech">
@@ -211,19 +216,74 @@
           <input type="text" class="form-control" [(ngModel)]="assetForm.model" placeholder="Model designation">
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Serial Number</label>
-        <input type="text" class="form-control font-mono" [(ngModel)]="assetForm.serialNumber" placeholder="SN123456789">
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Asset Tag</label>
+          <input type="text" class="form-control font-mono" [(ngModel)]="assetForm.assetTag" placeholder="Leave blank to auto-generate">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Serial Number</label>
+          <input type="text" class="form-control font-mono" [(ngModel)]="assetForm.serialNumber" placeholder="SN123456789">
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group col-6">
           <label class="form-label">Purchase Date</label>
           <input type="date" class="form-control" [(ngModel)]="assetForm.purchaseDate">
         </div>
-        <div class="form-group col-6">
+        <div class="form-group col-6" id="asset-field-cost">
           <label class="form-label">Cost (₹)</label>
-          <input type="number" class="form-control" [(ngModel)]="assetForm.cost" placeholder="0.00">
+          <input type="number" class="form-control" [class.is-invalid]="assetFormErrors.cost" [(ngModel)]="assetForm.cost" (ngModelChange)="clearAssetError('cost')" placeholder="0.00">
+          <small class="error-msg" *ngIf="assetFormErrors.cost">{{ assetFormErrors.cost }}</small>
         </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Warranty Expiry</label>
+          <input type="date" class="form-control" [(ngModel)]="assetForm.warrantyExpiry">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Location / Storage</label>
+          <input type="text" class="form-control" [(ngModel)]="assetForm.location" placeholder="e.g. Floor 3, Rack B2">
+        </div>
+      </div>
+
+      <!-- Specifications Section (for Laptops/Desktops) -->
+      <div class="form-section" *ngIf="assetForm.category === 'LAPTOP' || assetForm.category === 'DESKTOP'">
+        <h4 class="section-title">Specifications</h4>
+        <div class="form-row">
+          <div class="form-group col-4">
+            <label class="form-label">RAM</label>
+            <input type="text" class="form-control" [(ngModel)]="assetForm.ram" placeholder="e.g. 16GB, 32GB">
+          </div>
+          <div class="form-group col-4">
+            <label class="form-label">Storage</label>
+            <input type="text" class="form-control" [(ngModel)]="assetForm.storage" placeholder="e.g. 256GB SSD, 1TB NVMe">
+          </div>
+          <div class="form-group col-4">
+            <label class="form-label">Processor</label>
+            <input type="text" class="form-control" [(ngModel)]="assetForm.processor" placeholder="e.g. Intel Core i7-1365U, Apple M3 Max">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Tags</label>
+        <div class="tag-input-row">
+          <input type="text" class="form-control" [(ngModel)]="tagInput" (keydown.enter)="addTag(); $event.preventDefault()" placeholder="Type a tag and press Enter">
+          <button type="button" class="btn btn-outline btn-sm" (click)="addTag()">Add</button>
+        </div>
+        <div class="tags-chips" *ngIf="assetForm.tags.length > 0">
+          <span class="tag-chip" *ngFor="let tag of assetForm.tags; let i = index">
+            {{ tag }}
+            <button type="button" class="tag-remove" (click)="removeTag(i)"><svg lucideX size="12"></svg></button>
+          </span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-control" rows="3" [(ngModel)]="assetForm.notes" placeholder="Condition, ownership, maintenance notes..."></textarea>
       </div>
 
       <!-- Multiple Images & Invoice Upload Section -->
@@ -237,7 +297,7 @@
           </div>
           <div class="upload-text-content">
             <span class="upload-title">Click to upload photos or invoices</span>
-            <span class="upload-subtitle">PNG, JPG, WEBP or PDF (Max 5MB each, up to 5 files)</span>
+            <span class="upload-subtitle">PNG, JPG, WEBP or PDF (Max 20MB each, up to 5 files)</span>
           </div>
         </div>
 
@@ -253,7 +313,33 @@
     </div>
     <div class="drawer-footer">
       <button class="btn btn-outline" (click)="isAssetDrawerOpen.set(false)">Cancel</button>
-      <button class="btn btn-primary" (click)="saveAsset()">Save Asset</button>
+      <button class="btn btn-primary" (click)="saveAsset()" [disabled]="isSaving">
+        <span *ngIf="isSaving" class="btn-spinner-light"></span>
+        <span *ngIf="!isSaving">Save Asset</span>
+        <span *ngIf="isSaving">Saving...</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADD NEW CATEGORY -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isAddCategoryModalOpen()">
+  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>Add New Category</h3>
+      <button class="btn-close" (click)="isAddCategoryModalOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="form-group">
+        <label class="form-label">Category Name <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" [ngModel]="newCategoryName()" (ngModelChange)="newCategoryName.set($event)" (keydown.enter)="confirmAddCategory()" placeholder="e.g. Tissue, Stationery, Furniture" autofocus>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isAddCategoryModalOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="confirmAddCategory()">Add Category</button>
     </div>
   </div>
 </div>
@@ -415,7 +501,7 @@
           </div>
           <div class="upload-text-content">
             <span class="upload-title">Click to upload photos or quotes</span>
-            <span class="upload-subtitle">PNG, JPG, WEBP (Max 5MB each, up to 5 files)</span>
+            <span class="upload-subtitle">PNG, JPG, WEBP (Max 20MB each, up to 5 files)</span>
           </div>
         </div>
 
@@ -460,6 +546,126 @@
     <div class="drawer-footer">
       <button class="btn btn-outline" (click)="isFulfillModalOpen.set(false)">Cancel</button>
       <button class="btn btn-success" (click)="updateRequestStatus(fulfillForm.requestId, 'FULFILLED', undefined, fulfillForm.fulfilledAssetId)">Confirm Fulfillment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: VIEW ASSET DETAILS -->
+<!-- ========================================== -->
+<div class="drawer-overlay detail-overlay" *ngIf="isDetailModalOpen() && detailAsset()" (click)="closeDetailModal()">
+  <div class="detail-modal" (click)="$event.stopPropagation()">
+    <div class="detail-modal-header">
+      <div class="detail-title-group">
+        <span class="tag-mono">{{ detailAsset()!.assetTag }}</span>
+        <h3 class="detail-asset-name">{{ detailAsset()!.name }}</h3>
+      </div>
+      <button class="btn-close" (click)="closeDetailModal()"><svg lucideX size="18"></svg></button>
+    </div>
+
+    <div class="detail-modal-body">
+      <!-- Photo Gallery -->
+      <div class="detail-gallery" *ngIf="getDetailImages().length > 0">
+        <img *ngFor="let img of getDetailImages(); let i = index"
+          [src]="img" class="detail-gallery-thumb"
+          (click)="openImageViewer(getDetailImages(), i)"
+          title="Click to enlarge" />
+      </div>
+      <div class="detail-no-photo" *ngIf="getDetailImages().length === 0">
+        <span style="font-size:40px;">📷</span>
+        <span>No photos uploaded</span>
+      </div>
+
+      <!-- Info Grid -->
+      <div class="detail-info-grid">
+        <div class="detail-info-block">
+          <span class="detail-info-label">Category</span>
+          <span class="detail-info-value">{{ detailAsset()!.category }}</span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Status</span>
+          <span class="status-pill" [ngClass]="'status-' + (detailAsset()!.status || '').toLowerCase().replace('_', '-')">
+            <span class="status-dot"></span>{{ detailAsset()!.status }}
+          </span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Brand</span>
+          <span class="detail-info-value">{{ detailAsset()!.brand || '—' }}</span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Model</span>
+          <span class="detail-info-value">{{ detailAsset()!.model || '—' }}</span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Serial Number</span>
+          <span class="detail-info-value font-mono">{{ detailAsset()!.serialNumber || '—' }}</span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Quantity</span>
+          <span class="detail-info-value">{{ detailAsset()!.quantity ?? 1 }}</span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Purchase Date</span>
+          <span class="detail-info-value">{{ detailAsset()!.purchaseDate ? (detailAsset()!.purchaseDate | date:'dd MMM yyyy') : '—' }}</span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Cost</span>
+          <span class="detail-info-value">{{ detailAsset()!.cost ? ('₹' + detailAsset()!.cost!.toLocaleString('en-IN')) : '—' }}</span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Warranty Expiry</span>
+          <span class="detail-info-value">{{ detailAsset()!.warrantyExpiry ? (detailAsset()!.warrantyExpiry | date:'dd MMM yyyy') : '—' }}</span>
+        </div>
+        <div class="detail-info-block">
+          <span class="detail-info-label">Location / Storage</span>
+          <span class="detail-info-value">{{ detailAsset()!.location || '—' }}</span>
+        </div>
+
+        <!-- Specs (if available) -->
+        <ng-container *ngIf="detailAsset()!.ram || detailAsset()!.storage || detailAsset()!.processor">
+          <div class="detail-info-block" *ngIf="detailAsset()!.processor">
+            <span class="detail-info-label">Processor</span>
+            <span class="detail-info-value">{{ detailAsset()!.processor }}</span>
+          </div>
+          <div class="detail-info-block" *ngIf="detailAsset()!.ram">
+            <span class="detail-info-label">RAM</span>
+            <span class="detail-info-value">{{ detailAsset()!.ram }}</span>
+          </div>
+          <div class="detail-info-block" *ngIf="detailAsset()!.storage">
+            <span class="detail-info-label">Storage</span>
+            <span class="detail-info-value">{{ detailAsset()!.storage }}</span>
+          </div>
+        </ng-container>
+
+        <!-- Current Assignment -->
+        <div class="detail-info-block col-span-2" *ngIf="detailAsset()!.assignments && detailAsset()!.assignments!.length > 0">
+          <span class="detail-info-label">Currently Assigned To</span>
+          <span class="detail-info-value">
+            {{ detailAsset()!.assignments![0].employee?.firstName }} {{ detailAsset()!.assignments![0].employee?.lastName }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="detail-notes-block" *ngIf="detailAsset()!.notes">
+        <span class="detail-info-label">Notes</span>
+        <p class="detail-notes-text">{{ detailAsset()!.notes }}</p>
+      </div>
+
+      <!-- Tags -->
+      <div class="detail-tags-block" *ngIf="getDetailTags().length > 0">
+        <span class="detail-info-label">Tags</span>
+        <div class="tags-chips" style="margin-top:6px;">
+          <span class="tag-chip" *ngFor="let t of getDetailTags()">{{ t }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="closeDetailModal()">Close</button>
+      <button class="btn btn-primary" *ngIf="isAdmin()" (click)="closeDetailModal(); openEditAssetDrawer(detailAsset()!)">
+        Edit Asset
+      </button>
     </div>
   </div>
 </div>

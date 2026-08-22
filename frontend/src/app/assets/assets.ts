@@ -27,6 +27,15 @@ import {
 } from '@lucide/angular';
 
 import { AssetActionCellRendererComponent } from '../shared/components/asset-action-cell-renderer.component';
+import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
+
+const ADD_NEW_CATEGORY_ID = '__ADD_NEW_CATEGORY__';
+
+interface AssetFormErrors {
+  name?: string;
+  quantity?: string;
+  cost?: string;
+}
 
 function getCategoryClass(cat: string): string {
   const c = (cat || '').toLowerCase();
@@ -67,7 +76,8 @@ function getUrgencyClass(urgency: string): string {
     LucideWrench,
     LucideX,
     LucideClock,
-    LucideUploadCloud
+    LucideUploadCloud,
+    SearchableSelectComponent
   ],
   providers: [DatePipe],
   templateUrl: './assets.html',
@@ -90,12 +100,14 @@ export class AssetsComponent implements OnInit {
   employees = signal<Employee[]>([]);
 
   readonly maxUploadFiles = 5;
+  readonly maxUploadFileSizeMb = 20;
+  readonly maxUploadFileSizeBytes = this.maxUploadFileSizeMb * 1024 * 1024;
 
   // User Auth Role
   currentUser = signal<any>(null);
   isAdmin = computed(() => {
     const r = this.currentUser()?.role;
-    return r === 'SUPERADMIN' || r === 'ADMIN' || r === 'HR';
+    return r === 'SUPERADMIN' || r === 'ADMIN' || r === 'HR' || r === 'OFFICE_STAFF';
   });
   isSuperAdmin = computed(() => {
     return this.currentUser()?.role === 'SUPERADMIN';
@@ -121,6 +133,51 @@ export class AssetsComponent implements OnInit {
   isRequestDrawerOpen = signal<boolean>(false);
   isFulfillModalOpen = signal<boolean>(false);
   isRejectModalOpen = signal<boolean>(false);
+  isAddCategoryModalOpen = signal<boolean>(false);
+  newCategoryName = signal<string>('');
+
+  // Categories: standard set + any custom categories already used by this company
+  private readonly standardCategories: SearchableSelectOption[] = [
+    { id: 'LAPTOP', name: 'Laptop' },
+    { id: 'DESKTOP', name: 'Desktop' },
+    { id: 'MONITOR', name: 'Monitor' },
+    { id: 'PERIPHERAL', name: 'Peripheral (Keyboard/Mouse)' },
+    { id: 'SOFTWARE', name: 'Software License' },
+    { id: 'MOBILE', name: 'Mobile / Tablet' }
+  ];
+  customCategories = signal<string[]>([]);
+  categoryOptions = computed<SearchableSelectOption[]>(() => {
+    const custom = this.customCategories()
+      .filter(c => !this.standardCategories.some(s => s.id === c))
+      .map(c => ({ id: c, name: c }));
+    return [...this.standardCategories, ...custom, { id: ADD_NEW_CATEGORY_ID, name: '+ Add New Category' }];
+  });
+
+  // Detail Modal
+  isDetailModalOpen = signal<boolean>(false);
+  detailAsset = signal<Asset | null>(null);
+
+  openDetailModal(asset: Asset) {
+    this.detailAsset.set(asset);
+    this.isDetailModalOpen.set(true);
+  }
+
+  closeDetailModal() {
+    this.isDetailModalOpen.set(false);
+    this.detailAsset.set(null);
+  }
+
+  getDetailImages(): string[] {
+    const a = this.detailAsset();
+    if (!a?.images) return [];
+    try { return typeof a.images === 'string' ? JSON.parse(a.images as any) : a.images; } catch { return []; }
+  }
+
+  getDetailTags(): string[] {
+    const a = this.detailAsset();
+    if (!a?.tags) return [];
+    try { return typeof a.tags === 'string' ? JSON.parse(a.tags as any) : a.tags; } catch { return []; }
+  }
 
   // Image Lightbox & Edit Request States
   previewImages = signal<string[]>([]);
@@ -138,6 +195,7 @@ export class AssetsComponent implements OnInit {
     assetTag: '',
     name: '',
     category: 'LAPTOP',
+    quantity: 1,
     brand: '',
     model: '',
     serialNumber: '',
@@ -145,8 +203,18 @@ export class AssetsComponent implements OnInit {
     cost: 0,
     warrantyExpiry: '',
     images: [] as string[],
-    status: 'AVAILABLE'
+    location: '',
+    notes: '',
+    tags: [] as string[],
+    status: 'AVAILABLE',
+    ram: '',
+    storage: '',
+    processor: ''
   };
+  tagInput = '';
+
+  assetFormErrors: AssetFormErrors = {};
+  isSaving = false;
 
   assignForm = {
     assetId: 0,
@@ -199,6 +267,23 @@ export class AssetsComponent implements OnInit {
   // AG Grid Inventory Columns
   inventoryColDefs: ColDef[] = [
     {
+      headerName: '',
+      field: 'images',
+      width: 68,
+      sortable: false,
+      filter: false,
+      cellRenderer: (params: any) => {
+        let imgs: string[] = [];
+        if (params.value) {
+          try { imgs = typeof params.value === 'string' ? JSON.parse(params.value) : params.value; } catch (e) { imgs = []; }
+        }
+        if (!imgs || imgs.length === 0) {
+          return `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><div style="width:40px;height:40px;border-radius:8px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:18px;">💻</div></div>`;
+        }
+        return `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><img src="${imgs[0]}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid #E2E8F0;" /></div>`;
+      }
+    },
+    {
       headerName: 'Asset Tag & Name',
       field: 'name',
       flex: 1.8,
@@ -210,13 +295,22 @@ export class AssetsComponent implements OnInit {
 
         return `
           <div class="cell-stacked">
-            <div class="cell-title-bold">${params.data.name}</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="cell-title-bold">${params.data.name}</span>
+              <button data-view-detail="1" style="font-size:11px;font-weight:600;color:#F97316;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap;text-decoration:underline;text-underline-offset:2px;">View Details</button>
+            </div>
             <div class="cell-subtitle-row">
               <span class="tag-mono">${params.data.assetTag}</span>
               <span class="cat-badge ${catClass}">${cat}</span>
             </div>
           </div>
         `;
+      },
+      onCellClicked: (params: any) => {
+        const target = params.event?.target as HTMLElement;
+        if (target?.closest('[data-view-detail]')) {
+          this.openDetailModal(params.data);
+        }
       }
     },
     {
@@ -231,6 +325,13 @@ export class AssetsComponent implements OnInit {
       }
     },
     { headerName: 'Serial No.', field: 'serialNumber', flex: 1.1, minWidth: 120, valueFormatter: p => p.value || '-' },
+    {
+      headerName: 'Qty',
+      field: 'quantity',
+      flex: 0.6,
+      minWidth: 70,
+      valueFormatter: (params: any) => params.value ?? 1
+    },
     {
       headerName: 'Cost',
       field: 'cost',
@@ -274,6 +375,7 @@ export class AssetsComponent implements OnInit {
       pinned: 'right',
       cellRenderer: AssetActionCellRendererComponent,
       cellRendererParams: {
+        onViewDetails: (data: Asset) => this.openDetailModal(data),
         onEdit: (data: Asset) => this.openEditAssetDrawer(data),
         onAssign: (data: Asset) => this.openAssignDrawer(data.id),
         onDelete: (data: Asset) => this.deleteAsset(data)
@@ -549,25 +651,14 @@ export class AssetsComponent implements OnInit {
     if (user) {
       this.currentUser.set(user);
     } else {
-      this.authService.getMe().subscribe(u => {
-        this.currentUser.set(u);
-        if (!this.isAdmin()) {
-          this.activeTab.set('requests');
-        }
-      });
+      this.authService.getMe().subscribe(u => this.currentUser.set(u));
     }
 
-    // Tab parameter check
+    // Tab is driven by the route; the permission guard already restricts
+    // which roles can reach /assets/:tab based on the DB permission matrix.
     this.route.params.subscribe(params => {
       if (params['tab']) {
-        const tab = params['tab'] as 'inventory' | 'assignments' | 'requests';
-        if (!this.isAdmin() && (tab === 'inventory' || tab === 'assignments')) {
-          this.activeTab.set('requests');
-        } else {
-          this.activeTab.set(tab);
-        }
-      } else if (!this.isAdmin()) {
-        this.activeTab.set('requests');
+        this.activeTab.set(params['tab'] as 'inventory' | 'assignments' | 'requests');
       }
     });
 
@@ -583,7 +674,32 @@ export class AssetsComponent implements OnInit {
     this.assetService.getAllAssets().subscribe(res => this.assets.set(res));
     this.assetService.getAssignments().subscribe(res => this.assignments.set(res));
     this.assetService.getHardwareRequests().subscribe(res => this.requests.set(res));
-    this.employeeService.getEmployees().subscribe(res => this.employees.set(res));
+    this.employeeService.getEmployeesBasicList().subscribe(res => this.employees.set(res));
+    this.assetService.getCategories().subscribe(res => this.customCategories.set(res || []));
+  }
+
+  onCategorySelected(value: string | null) {
+    if (value === ADD_NEW_CATEGORY_ID) {
+      this.newCategoryName.set('');
+      this.isAddCategoryModalOpen.set(true);
+      return;
+    }
+    if (!value) return; // category is required; ignore the select's clear option
+    this.assetForm.category = value;
+  }
+
+  confirmAddCategory() {
+    const name = this.newCategoryName().trim();
+    if (!name) {
+      this.toast.error('Please enter a category name');
+      return;
+    }
+    const code = name.toUpperCase();
+    this.assetForm.category = code;
+    if (!this.customCategories().includes(code) && !this.standardCategories.some(s => s.id === code)) {
+      this.customCategories.update(list => [...list, code]);
+    }
+    this.isAddCategoryModalOpen.set(false);
   }
 
   // 1. Asset Drawer Actions
@@ -593,6 +709,7 @@ export class AssetsComponent implements OnInit {
       assetTag: '',
       name: '',
       category: 'LAPTOP',
+      quantity: 1,
       brand: '',
       model: '',
       serialNumber: '',
@@ -600,17 +717,32 @@ export class AssetsComponent implements OnInit {
       cost: 0,
       warrantyExpiry: '',
       images: [],
-      status: 'AVAILABLE'
+      location: '',
+      notes: '',
+      tags: [],
+      status: 'AVAILABLE',
+      ram: '',
+      storage: '',
+      processor: ''
     };
+    this.tagInput = '';
+    this.assetFormErrors = {};
     this.isAssetDrawerOpen.set(true);
   }
 
   openEditAssetDrawer(asset: Asset) {
+    let tags: string[] = [];
+    if (asset.tags) {
+      try {
+        tags = typeof asset.tags === 'string' ? JSON.parse(asset.tags) : asset.tags;
+      } catch (e) { tags = []; }
+    }
     this.assetForm = {
       id: asset.id,
       assetTag: asset.assetTag,
       name: asset.name,
       category: asset.category,
+      quantity: asset.quantity ?? 1,
       brand: asset.brand || '',
       model: asset.model || '',
       serialNumber: asset.serialNumber || '',
@@ -618,9 +750,30 @@ export class AssetsComponent implements OnInit {
       cost: asset.cost || 0,
       warrantyExpiry: asset.warrantyExpiry ? asset.warrantyExpiry.split('T')[0] : '',
       images: asset.images ? [...asset.images] : [],
-      status: asset.status
+      location: asset.location || '',
+      notes: asset.notes || '',
+      tags: tags,
+      status: asset.status,
+      ram: asset.ram || '',
+      storage: asset.storage || '',
+      processor: asset.processor || ''
     };
+    this.tagInput = '';
+    this.assetFormErrors = {};
     this.isAssetDrawerOpen.set(true);
+  }
+
+  addTag() {
+    const value = this.tagInput.trim();
+    if (!value) return;
+    if (!this.assetForm.tags.includes(value)) {
+      this.assetForm.tags.push(value);
+    }
+    this.tagInput = '';
+  }
+
+  removeTag(index: number) {
+    this.assetForm.tags.splice(index, 1);
   }
 
   onFileSelected(event: any) {
@@ -634,6 +787,11 @@ export class AssetsComponent implements OnInit {
     }
 
     Array.from(files).forEach(file => {
+      if (file.size > this.maxUploadFileSizeBytes) {
+        this.toast.error(`"${file.name}" is too large (${this.formatFileSize(file.size)}). Maximum allowed size is ${this.maxUploadFileSizeMb}MB.`);
+        return;
+      }
+
       this.uploadService.uploadFile(file).subscribe({
         next: (res) => {
           if (res?.url) {
@@ -641,9 +799,29 @@ export class AssetsComponent implements OnInit {
             this.toast.success(`Image uploaded`);
           }
         },
-        error: () => this.toast.error('Failed to upload image')
+        error: (err) => this.toast.error(this.getUploadErrorMessage(err, file.name))
       });
     });
+    event.target.value = '';
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    return `${Math.ceil(bytes / 1024)}KB`;
+  }
+
+  private getUploadErrorMessage(err: any, fileName: string): string {
+    if (err?.status === 0) {
+      return `Failed to upload "${fileName}": network error. Check your connection and try again.`;
+    }
+    if (err?.status === 413) {
+      return `"${fileName}" is too large. Maximum allowed size is ${this.maxUploadFileSizeMb}MB.`;
+    }
+    const backendMessage = err?.error?.message;
+    if (backendMessage) {
+      return `Failed to upload "${fileName}": ${Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage}`;
+    }
+    return `Failed to upload "${fileName}". Please try again.`;
   }
 
   removeImage(index: number) {
@@ -651,30 +829,81 @@ export class AssetsComponent implements OnInit {
   }
 
   saveAsset() {
-    if (!this.assetForm.name) {
-      this.toast.error('Asset Name is required');
+    this.validateAssetForm();
+    if (Object.keys(this.assetFormErrors).length > 0) {
+      this.toast.error('Please fix the highlighted fields below.');
+      this.focusFirstAssetError();
       return;
     }
+    if (this.isSaving) return;
+    this.isSaving = true;
 
     if (this.assetForm.id > 0) {
       this.assetService.updateAsset(this.assetForm.id, this.assetForm).subscribe({
         next: () => {
+          this.isSaving = false;
           this.toast.success('Asset updated successfully');
           this.isAssetDrawerOpen.set(false);
           this.loadAllData();
         },
-        error: (err) => this.toast.error(err.error?.message || 'Failed to update asset')
+        error: (err) => {
+          this.isSaving = false;
+          this.toast.error(err.error?.message || 'Failed to update asset');
+        }
       });
     } else {
       this.assetService.createAsset(this.assetForm).subscribe({
         next: () => {
+          this.isSaving = false;
           this.toast.success('Asset created successfully');
           this.isAssetDrawerOpen.set(false);
           this.loadAllData();
         },
-        error: (err) => this.toast.error(err.error?.message || 'Failed to create asset')
+        error: (err) => {
+          this.isSaving = false;
+          this.toast.error(err.error?.message || 'Failed to create asset');
+        }
       });
     }
+  }
+
+  private validateAssetForm() {
+    this.assetFormErrors = {};
+
+    if (!this.assetForm.name?.trim()) {
+      this.assetFormErrors.name = 'Asset name is required.';
+    }
+
+    const qty = Number(this.assetForm.quantity);
+    if (this.assetForm.quantity == null || isNaN(qty) || qty < 1) {
+      this.assetFormErrors.quantity = 'Quantity must be at least 1.';
+    }
+
+    const cost = Number(this.assetForm.cost);
+    if (!isNaN(cost) && cost < 0) {
+      this.assetFormErrors.cost = 'Cost cannot be negative.';
+    }
+  }
+
+  clearAssetError(field: keyof AssetFormErrors) {
+    if (this.assetFormErrors[field]) {
+      delete this.assetFormErrors[field];
+    }
+  }
+
+  private focusFirstAssetError() {
+    const order: (keyof AssetFormErrors)[] = ['name', 'quantity', 'cost'];
+    const first = order.find(k => !!this.assetFormErrors[k]);
+    if (!first) return;
+
+    setTimeout(() => {
+      const el = document.getElementById(`asset-field-${first}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input = el.querySelector('input, select, textarea') as HTMLElement | null;
+        input?.focus({ preventScroll: true });
+      }
+    }, 60);
   }
 
   deleteAsset(asset: Asset) {
@@ -820,6 +1049,11 @@ export class AssetsComponent implements OnInit {
     }
 
     Array.from(files).forEach(file => {
+      if (file.size > this.maxUploadFileSizeBytes) {
+        this.toast.error(`"${file.name}" is too large (${this.formatFileSize(file.size)}). Maximum allowed size is ${this.maxUploadFileSizeMb}MB.`);
+        return;
+      }
+
       this.uploadService.uploadFile(file).subscribe({
         next: (res) => {
           if (res?.url) {
@@ -827,9 +1061,10 @@ export class AssetsComponent implements OnInit {
             this.toast.success('Attachment uploaded');
           }
         },
-        error: () => this.toast.error('Failed to upload attachment')
+        error: (err) => this.toast.error(this.getUploadErrorMessage(err, file.name))
       });
     });
+    event.target.value = '';
   }
 
   removeRequestImage(index: number) {
