@@ -31,9 +31,10 @@ import { ClientsModule } from './clients/clients.module';
 import { CrmModule } from './crm/crm.module';
 import { SalesModule } from './sales/sales.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { FieldVisitsModule } from './field-visits/field-visits.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule],
+  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule],
   controllers: [AppController],
   providers: [AppService],
 })

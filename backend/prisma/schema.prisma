@@ -60,6 +60,7 @@ model Company {
   leads               Lead[]
   quotations          Quotation[]
   salesOrders         SalesOrder[]
+  fieldVisits         FieldVisit[]         @relation("CompanyFieldVisits")
 }
 
 // Authentication & RBAC
@@ -271,6 +272,7 @@ model Employee {
   assignedLeads            Lead[]                     @relation("LeadAssignee")
   peerReviewsGiven         PeerFeedback[]             @relation("PeerReviewer")
   peerReviewsReceived      PeerFeedback[]             @relation("PeerReviewee")
+  fieldVisits              FieldVisit[]               @relation("EmployeeFieldVisits")
 
   @@unique([companyId, employeeCode])
 }
@@ -790,6 +792,7 @@ model Project {
 
   documents    ProjectDocument[]
   analysisRuns ProjectAnalysisRun[]
+  fieldVisits  FieldVisit[]         @relation("ProjectFieldVisits")
 
   @@unique([key, companyId])
 }
@@ -1927,3 +1930,53 @@ model SalesOrderItem {
   isRentalItem     Boolean    @default(false)
   returnedQuantity Float      @default(0)
 }
+
+// ═══════════════════════════════════════════
+// FIELD VISITS
+// ═══════════════════════════════════════════
+
+model FieldVisit {
+  id           Int       @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee  @relation("EmployeeFieldVisits", fields: [employeeId], references: [id], onDelete: Cascade)
+  projectId    Int
+  project      Project   @relation("ProjectFieldVisits", fields: [projectId], references: [id], onDelete: Cascade)
+  companyId    Int
+  company      Company   @relation("CompanyFieldVisits", fields: [companyId], references: [id], onDelete: Cascade)
+
+  startTime    DateTime
+  startLat     Float
+  startLng     Float
+  startAddress String?
+
+  endTime      DateTime?
+  endLat       Float?
+  endLng       Float?
+  endAddress   String?
+
+  distanceKm   Float?
+  durationMins Int?
+  routePoints  Json?     // Compact [[lat,lng,unixMs], ...] array
+
+  status       String    @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
+  purpose      String?
+  notes        String?
+
+  photos       FieldVisitPhoto[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model FieldVisitPhoto {
+  id           Int        @id @default(autoincrement())
+  fieldVisitId Int
+  fieldVisit   FieldVisit @relation(fields: [fieldVisitId], references: [id], onDelete: Cascade)
+
+  url          String
+  takenAt      DateTime
+  caption      String?
+
+  createdAt    DateTime   @default(now())
+}
+
