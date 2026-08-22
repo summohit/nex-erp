@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { attendanceService, AttendanceRecord } from '../api/attendanceService';
 import { leaveService, LeaveBalance } from '../api/leaveService';
-import { projectService, Project } from '../api/projectService';
+import { projectService } from '../api/projectService';
 import { employeeService, EmployeeProfile } from '../api/employeeService';
 import { notificationService, AppNotification } from '../api/notificationService';
 import { useTimesheetStore } from './timesheetStore';
@@ -15,7 +15,7 @@ interface DashboardState {
   attendanceHistory: AttendanceRecord[];
   isClockingIn: boolean;
   leaveBalances: LeaveBalance[];
-  projects: Project[];
+  projects: any[];
   notifications: AppNotification[];
   unreadCount: number;
   isLoading: boolean;
@@ -24,11 +24,13 @@ interface DashboardState {
   fetchDashboardData: () => Promise<void>;
   clockIn: (lat?: number, lng?: number) => Promise<void>;
   clockOut: (lat?: number, lng?: number) => Promise<void>;
+  markNotificationRead: (id: number) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
 }
 
 const requestLocationPermission = async (): Promise<boolean> => {
   if (Platform.OS === 'ios') {
-    Geolocation.requestAuthorization();
+    Geolocation.requestAuthorization('whenInUse');
     return true; 
   }
 
@@ -120,7 +122,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   clockIn: async () => {
-    set({ isClockingIn: true });
+    set({ isClockingIn: true, error: null });
     try {
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) throw new Error('Location permission is required.');
@@ -130,11 +132,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       useTimesheetStore.getState().fetchData();
     } catch (error: any) {
       set({ error: error.message || 'Clock in failed', isClockingIn: false });
+      throw error;
     }
   },
 
   clockOut: async () => {
-    set({ isClockingIn: true });
+    set({ isClockingIn: true, error: null });
     try {
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) throw new Error('Location permission is required.');
@@ -144,6 +147,23 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       useTimesheetStore.getState().fetchData();
     } catch (error: any) {
       set({ error: error.message || 'Clock out failed', isClockingIn: false });
+      throw error;
     }
+  },
+
+  markNotificationRead: async (id: number) => {
+    await notificationService.markAsRead(id);
+    set(state => ({
+      notifications: state.notifications.map(n => n.id === id ? { ...n, isRead: true } : n),
+      unreadCount: Math.max(0, state.unreadCount - 1),
+    }));
+  },
+
+  markAllNotificationsRead: async () => {
+    await notificationService.markAllAsRead();
+    set(state => ({
+      notifications: state.notifications.map(n => ({ ...n, isRead: true })),
+      unreadCount: 0,
+    }));
   },
 }));

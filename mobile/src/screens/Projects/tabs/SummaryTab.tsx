@@ -6,6 +6,9 @@ import {
   ScrollView,
   Image,
   RefreshControl,
+  Alert,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
   CheckCircle,
@@ -18,7 +21,9 @@ import {
   TrendingUp,
 } from 'lucide-react-native';
 import { useProjectStore } from '../../../store/projectStore';
+import { projectService } from '../../../api/projectService';
 import { PulseSkeleton } from '../../../components/SharedUI';
+import FeedbackModal, { ModalType } from '../../../components/FeedbackModal';
 
 const PRIORITY_COLORS: Record<string, string> = {
   CRITICAL: '#EF4444',
@@ -60,6 +65,62 @@ const formatTimeAgo = (dateStr: string) => {
 export default function SummaryTab() {
   const { currentSummary, currentProject, isLoading, fetchProjectDetails } = useProjectStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [feedback, setFeedback] = useState<{ 
+    visible: boolean; 
+    type: ModalType; 
+    title: string; 
+    message: string; 
+    showCancel?: boolean;
+    confirmText?: string;
+    onConfirm?: () => void;
+  }>({ visible: false, type: 'success', title: '', message: '' });
+
+  const handleStatusChange = () => {
+    if (!currentProject) return;
+    const currentStatus = currentProject.status || 'ACTIVE';
+    const nextStatus = currentStatus === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE';
+    
+    setFeedback({
+      visible: true,
+      type: 'warning',
+      title: 'Change Status',
+      message: `Are you sure you want to change the status to ${nextStatus}?`,
+      showCancel: true,
+      confirmText: 'Update',
+      onConfirm: () => {
+        setFeedback(prev => ({ ...prev, visible: false }));
+        setTimeout(async () => {
+          try {
+            setIsUpdatingStatus(true);
+            await projectService.updateProject(currentProject.id, { status: nextStatus });
+            await fetchProjectDetails(currentProject.id);
+            setFeedback({ 
+              visible: true, 
+              type: 'success', 
+              title: 'Success', 
+              message: 'Project status updated successfully',
+              showCancel: false,
+              confirmText: 'OK',
+              onConfirm: undefined
+            });
+          } catch (error: any) {
+            setFeedback({ 
+              visible: true, 
+              type: 'error', 
+              title: 'Error', 
+              message: error?.message || 'Failed to update project status',
+              showCancel: false,
+              confirmText: 'OK',
+              onConfirm: undefined
+            });
+          } finally {
+            setIsUpdatingStatus(false);
+          }
+        }, 300);
+      }
+    });
+  };
 
   const handleRefresh = async () => {
     if (!currentProject?.id) return;
@@ -97,10 +158,11 @@ export default function SummaryTab() {
   const totalIssues = statusOverview.reduce((sum, s) => sum + s.count, 0);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
     >
 
@@ -112,9 +174,17 @@ export default function SummaryTab() {
         ) : null}
         <View style={styles.projectMeta}>
           {currentProject?.status ? (
-            <View style={[styles.statusPill, { backgroundColor: '#E25E3E18' }]}>
-              <Text style={[styles.statusPillText, { color: '#E25E3E' }]}>{currentProject.status}</Text>
-            </View>
+            <TouchableOpacity 
+              style={[styles.statusPill, { backgroundColor: '#E25E3E18' }]} 
+              onPress={handleStatusChange} 
+              disabled={isUpdatingStatus}
+            >
+              {isUpdatingStatus ? (
+                <ActivityIndicator size="small" color="#E25E3E" />
+              ) : (
+                <Text style={[styles.statusPillText, { color: '#E25E3E' }]}>{currentProject.status}</Text>
+              )}
+            </TouchableOpacity>
           ) : null}
           {currentProject?.billingType ? (
             <View style={styles.statusPill}>
@@ -293,6 +363,29 @@ export default function SummaryTab() {
 
       <View style={{ height: 32 }} />
     </ScrollView>
+
+      {/* Updating Overlay */}
+      {isUpdatingStatus && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }]}>
+          <View style={{ backgroundColor: '#fff', padding: 24, borderRadius: 16, alignItems: 'center', width: '80%' }}>
+            <ActivityIndicator size="large" color="#0F172A" />
+            <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: '#0F172A' }}>Updating Status...</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        visible={feedback.visible}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        showCancel={feedback.showCancel}
+        confirmText={feedback.confirmText}
+        onConfirm={feedback.onConfirm}
+        onClose={() => setFeedback(prev => ({ ...prev, visible: false }))}
+      />
+    </View>
   );
 }
 

@@ -24,6 +24,21 @@ export default function BoardTab() {
 
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<any>(null);
+
+  useEffect(() => {
+    if (selectedIssue && currentIssues) {
+      const updated = currentIssues.find(i => i.id === selectedIssue.id);
+      if (updated && updated.updatedAt !== selectedIssue.updatedAt) {
+        // Safe check using updatedAt or just set it
+        setSelectedIssue(updated);
+      } else if (updated) {
+        // Fallback for fields like attachments/coverUrl that might not bump updatedAt instantly in some backends
+        if (JSON.stringify(updated.attachments) !== JSON.stringify(selectedIssue.attachments) || updated.coverUrl !== selectedIssue.coverUrl) {
+          setSelectedIssue(updated);
+        }
+      }
+    }
+  }, [currentIssues]);
   
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [createColumnId, setCreateColumnId] = useState<number | undefined>(undefined);
@@ -195,6 +210,13 @@ export default function BoardTab() {
         activeOpacity={0.7}
         onPress={() => openIssueDetails(item)}
       >
+          {item.coverUrl && (
+            <Image 
+              source={{ uri: item.coverUrl }} 
+              style={{ width: '100%', height: 130, borderRadius: 8, marginBottom: 12 }} 
+              resizeMode="cover" 
+            />
+          )}
           <View style={styles.issueHeader}>
             <Text style={styles.issueKey}>{item.key || `#${item.id}`}</Text>
             <View style={[styles.cardPriorityBadge, { backgroundColor: priorityConfig.bg }]}>
@@ -640,7 +662,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   androidModalOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',

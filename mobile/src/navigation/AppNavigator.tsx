@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import BootSplash from 'react-native-bootsplash';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
@@ -12,11 +13,14 @@ import { theme } from '../theme/theme';
 
 import LoginScreen from '../screens/Auth/LoginScreen';
 import DashboardScreen from '../screens/Dashboard/DashboardScreen';
-import CRMScreen from '../screens/CRM/CRMScreen';
+import ProfileScreen from '../screens/Profile/ProfileScreen';
 import ProjectsScreen from '../screens/Projects/ProjectsScreen';
 import ProjectDetailScreen from '../screens/Projects/ProjectDetailScreen';
 import TeamMembersScreen from '../screens/Projects/TeamMembersScreen';
 import ESSScreen from '../screens/ESS/ESSScreen';
+import CRMScreen from '../screens/CRM/CRMScreen';
+import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
+import PayslipsScreen from '../screens/Payslips/PayslipsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -117,7 +121,7 @@ function MainTabNavigator() {
         component={ESSScreen} 
         initialParams={{ initialTab: 'leaves' }} 
       />
-      <Tab.Screen name="Profile" component={CRMScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -127,8 +131,13 @@ export default function AppNavigator() {
 
   useEffect(() => {
     restoreToken().then(() => {
+      BootSplash.hide({ fade: true });
       if (useAuthStore.getState().token) {
         refreshUserProfile().catch(() => {});
+        // Pre-fetch sidebar menus so the drawer is populated immediately
+        import('../store/menuStore').then(({ useMenuStore }) => {
+          useMenuStore.getState().fetchMenus().catch(() => {});
+        });
       }
     });
   }, []);
@@ -151,6 +160,9 @@ export default function AppNavigator() {
             <Stack.Screen name="MainTabs" component={MainTabNavigator} />
             <Stack.Screen name="ProjectDetail" component={ProjectDetailScreen} />
             <Stack.Screen name="TeamMembers" component={TeamMembersScreen} />
+            <Stack.Screen name="CRM" component={CRMScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Payslips" component={PayslipsScreen} />
           </>
         )}
       </Stack.Navigator>

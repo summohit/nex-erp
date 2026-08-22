@@ -9,6 +9,7 @@ import { AssetService, Asset, AssetAssignment, HardwareRequest } from '../servic
 import { EmployeeService, Employee } from '../services/employee.service';
 import { UploadService } from '../services/upload.service';
 import { AuthService } from '../services/auth.service';
+import { PermissionsService } from '../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { 
   LucideLaptop, 
@@ -88,12 +89,18 @@ export class AssetsComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private uploadService = inject(UploadService);
   private authService = inject(AuthService);
+  private permissionsService = inject(PermissionsService);
   private toast = inject(HotToastService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
   // State Signals
   activeTab = signal<'inventory' | 'assignments' | 'requests'>('inventory');
+
+  // Tab-level permissions (only relevant for non-admin roles)
+  canViewInventory = signal(true);
+  canViewAssignments = signal(true);
+  canViewRequests = signal(true);
   assets = signal<Asset[]>([]);
   assignments = signal<AssetAssignment[]>([]);
   requests = signal<HardwareRequest[]>([]);
@@ -647,15 +654,36 @@ export class AssetsComponent implements OnInit {
   ];
 
   ngOnInit() {
+    const setUserAndLoadPerms = (user: any) => {
+      this.currentUser.set(user);
+      if (!this.isAdmin()) {
+        // Non-admin roles: check which sub-tabs are permitted
+        this.permissionsService.getAllPermissions(user?.role || 'EMPLOYEE').subscribe(perms => {
+          const has = (mod: string) => perms.some(p => p.module === mod && (p.action === 'VIEW' || p.action === 'MANAGE'));
+          this.canViewInventory.set(has('assets/inventory'));
+          this.canViewAssignments.set(has('assets/assignments'));
+          this.canViewRequests.set(has('assets/requests'));
+
+          // Redirect away from the active tab if it's now forbidden
+          const active = this.activeTab();
+          if (active === 'inventory' && !this.canViewInventory()) {
+            const fallback = this.canViewAssignments() ? 'assignments' : this.canViewRequests() ? 'requests' : null;
+            if (fallback) this.setTab(fallback as any);
+          } else if (active === 'assignments' && !this.canViewAssignments()) {
+            const fallback = this.canViewInventory() ? 'inventory' : this.canViewRequests() ? 'requests' : null;
+            if (fallback) this.setTab(fallback as any);
+          }
+        });
+      }
+    };
+
     const user = this.authService.currentUser();
     if (user) {
-      this.currentUser.set(user);
+      setUserAndLoadPerms(user);
     } else {
-      this.authService.getMe().subscribe(u => this.currentUser.set(u));
+      this.authService.getMe().subscribe(u => setUserAndLoadPerms(u));
     }
 
-    // Tab is driven by the route; the permission guard already restricts
-    // which roles can reach /assets/:tab based on the DB permission matrix.
     this.route.params.subscribe(params => {
       if (params['tab']) {
         this.activeTab.set(params['tab'] as 'inventory' | 'assignments' | 'requests');

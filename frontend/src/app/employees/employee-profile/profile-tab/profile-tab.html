@@ -52,8 +52,15 @@
             </div>
 
             <div class="form-row-item">
+              <label class="item-label">Joining Date</label>
+              <div class="item-value">
+                <input type="date" class="form-control" [(ngModel)]="formData.joiningDate" [disabled]="!canEditWorkDetails">
+              </div>
+            </div>
+
+            <div class="form-row-item">
               <label class="item-label">
-                Next Appraisal Date 
+                Next Appraisal Date
                 <span class="help-icon" title="Date of next performance appraisal">?</span>
               </label>
               <div class="item-value">

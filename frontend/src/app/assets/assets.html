@@ -76,20 +76,20 @@
 
   <!-- Navigation Tabs -->
   <div class="nav-tabs">
-    <button class="nav-tab" [class.active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
+    <button class="nav-tab" *ngIf="isAdmin() || canViewInventory()" [class.active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
       Asset Inventory
     </button>
-    <button class="nav-tab" [class.active]="activeTab() === 'assignments'" (click)="setTab('assignments')">
+    <button class="nav-tab" *ngIf="isAdmin() || canViewAssignments()" [class.active]="activeTab() === 'assignments'" (click)="setTab('assignments')">
       Assignments
     </button>
-    <button class="nav-tab" [class.active]="activeTab() === 'requests'" (click)="setTab('requests')">
+    <button class="nav-tab" *ngIf="isAdmin() || canViewRequests()" [class.active]="activeTab() === 'requests'" (click)="setTab('requests')">
       Hardware Requests
       <span class="tab-badge" *ngIf="pendingRequestsCount() > 0">{{ pendingRequestsCount() }}</span>
     </button>
   </div>
 
   <!-- Tab 1: Asset Inventory -->
-  <div class="tab-content" *ngIf="activeTab() === 'inventory'">
+  <div class="tab-content" *ngIf="activeTab() === 'inventory' && (isAdmin() || canViewInventory())">
     <div class="section-card">
       <div class="table-toolbar mb-3">
         <div class="search-box">
@@ -114,7 +114,7 @@
   </div>
 
   <!-- Tab 2: Assignments -->
-  <div class="tab-content" *ngIf="activeTab() === 'assignments'">
+  <div class="tab-content" *ngIf="activeTab() === 'assignments' && (isAdmin() || canViewAssignments())">
     <div class="section-card">
       <div class="table-toolbar mb-3">
         <div class="search-box">
@@ -139,7 +139,7 @@
   </div>
 
   <!-- Tab 3: Hardware Requests -->
-  <div class="tab-content" *ngIf="activeTab() === 'requests'">
+  <div class="tab-content" *ngIf="activeTab() === 'requests' && (isAdmin() || canViewRequests())">
     <div class="section-card">
       <div class="table-toolbar mb-3">
         <div class="search-box">

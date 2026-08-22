@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
-  Modal,
   RefreshControl,
   Image,
   ActivityIndicator,
@@ -18,6 +17,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuthStore } from '../../store/authStore';
 import { useDashboardStore } from '../../store/dashboardStore';
+import { notificationService, AppNotification } from '../../api/notificationService';
+import { useProjectStore } from '../../store/projectStore';
+import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
+import AppDrawer from '../../components/AppDrawer';
 import {
   Briefcase,
   Calendar,
@@ -29,14 +32,6 @@ import {
   MapPin,
   ArrowUp,
   ChevronDown,
-  Navigation,
-  Compass,
-  Home,
-  Users,
-  DollarSign,
-  FileText,
-  Settings,
-  HelpCircle,
   ChevronRight,
   X,
 } from 'lucide-react-native';
@@ -83,18 +78,13 @@ export default function DashboardScreen() {
   const [isTraveling, setIsTraveling] = useState(false);
   const [activeTripLocation, setActiveTripLocation] = useState('NetGuard Sentinel');
 
-  const safeNavigate = (screenName: string) => {
-    const availableScreens = ['Home', 'Attendance', 'Projects', 'Leaves', 'Profile'];
-    if (availableScreens.includes(screenName)) {
-      navigation.navigate(screenName);
-    } else {
+  const safeNavigate = (screenName: string, params?: any) => {
+    const comingSoon = ['Expenses', 'FieldVisits', 'FieldVisitsHistory'];
+    if (comingSoon.includes(screenName)) {
       Alert.alert('Coming Soon', `The ${screenName} screen is currently under development.`);
+    } else {
+      navigation.navigate(screenName as any, params);
     }
-  };
-
-  const handleNavigate = (screenName: string) => {
-    setIsDrawerOpen(false);
-    safeNavigate(screenName);
   };
 
   const toggleTrip = () => {
@@ -143,11 +133,17 @@ export default function DashboardScreen() {
     return () => clearInterval(interval);
   }, [todayAttendance]);
 
-  const handleAttendanceToggle = () => {
-    if (todayAttendance?.clockIn && !todayAttendance?.clockOut) {
-      clockOut();
-    } else {
-      clockIn();
+  const handleAttendanceToggle = async () => {
+    try {
+      if (todayAttendance?.clockIn && !todayAttendance?.clockOut) {
+        await clockOut();
+        setFeedback({ visible: true, type: 'success', title: 'Clocked Out', message: 'You have clocked out successfully.' });
+      } else {
+        await clockIn();
+        setFeedback({ visible: true, type: 'success', title: 'Clocked In', message: 'You have clocked in successfully.' });
+      }
+    } catch (error: any) {
+      setFeedback({ visible: true, type: 'error', title: 'Error', message: error?.message || 'Failed to update attendance' });
     }
   };
 
@@ -157,6 +153,47 @@ export default function DashboardScreen() {
   };
 
   const isCheckedIn = !!(todayAttendance?.clockIn && !todayAttendance?.clockOut);
+
+  const handleNotificationPress = async (notification: AppNotification) => {
+    if (!notification.isRead) {
+      notificationService.markAsRead(notification.id).catch(() => {});
+      useDashboardStore.setState(state => ({
+        notifications: state.notifications.map(n => n.id === notification.id ? { ...n, isRead: true } : n),
+        unreadCount: Math.max(0, state.unreadCount - 1)
+      }));
+    }
+
+    const path = notification.linkUrl?.split('?')[0];
+    if (!path) return;
+
+    if (path.startsWith('/projects/')) {
+      const parts = path.split('/');
+      const projectId = parseInt(parts[2], 10);
+      if (!isNaN(projectId)) {
+        const project = projects.find((p: any) => p.id === projectId);
+        if (project) {
+          (navigation as any).navigate('ProjectDetail', { projectId: project.id, projectName: project.name });
+          return;
+        }
+      }
+      safeNavigate('Projects');
+    } else if (path === '/projects') {
+      safeNavigate('Projects');
+    } else if (path.startsWith('/attendance/leaves') || path === '/attendance/leave') {
+      safeNavigate('Leaves', { initialTab: 'leaves' });
+    } else if (path.startsWith('/attendance')) {
+      safeNavigate('Attendance', { initialTab: 'timesheets' });
+    } else if (path.startsWith('/payroll')) {
+      (navigation as any).navigate('Payslips');
+    }
+  };
+  
+  const [feedback, setFeedback] = useState<{ 
+    visible: boolean; 
+    type: ModalType; 
+    title: string; 
+    message: string; 
+  }>({ visible: false, type: 'success', title: '', message: '' });
   
   // Computed values
   const totalLeaveAllocated = leaveBalances.reduce((sum, lb) => sum + lb.allocated, 0);
@@ -245,14 +282,14 @@ export default function DashboardScreen() {
         )}
         
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={() => safeNavigate('Notifications')}>
             <Bell size={20} color="#0F172A" />
             {unreadCount > 0 && <View style={styles.notificationDot} />}
           </TouchableOpacity>
           {isLoading && !refreshing ? (
             <PulseSkeleton style={{ width: 44, height: 44, borderRadius: 14 }} />
           ) : (
-            <TouchableOpacity style={styles.avatarButton} onPress={logout} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.avatarButton} onPress={() => safeNavigate('Profile')} activeOpacity={0.8}>
               {profile?.avatarUrl ? (
                 <Image source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
               ) : (
@@ -270,13 +307,28 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E25E3E']} />
         }
       >
-        {error && (
-          <View style={{ padding: 12, backgroundColor: '#FEE2E2', marginHorizontal: 20, marginTop: 10, borderRadius: 8 }}>
-            <Text style={{ color: '#DC2626', fontSize: 13 }}>API Error: {error}</Text>
+        {error ? (
+          <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center', marginTop: 40 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <X color="#DC2626" size={32} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8, textAlign: 'center' }}>
+              Oops, something went wrong
+            </Text>
+            <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 24, lineHeight: 20 }}>
+              We couldn't load your dashboard data. Please check your connection and try again.
+            </Text>
+            <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', marginBottom: 24, paddingHorizontal: 20 }}>
+              Error: {error}
+            </Text>
+            <TouchableOpacity 
+              style={{ backgroundColor: '#E25E3E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 100 }}
+              onPress={onRefresh}
+            >
+              <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 14 }}>Try Again</Text>
+            </TouchableOpacity>
           </View>
-        )}
-        
-        {isLoading && !refreshing ? (
+        ) : isLoading && !refreshing ? (
           <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 20 }}>
             <PulseSkeleton style={{ height: 220, borderRadius: 24, width: '100%' }} />
             <PulseSkeleton style={{ height: 100, borderRadius: 16, width: '100%' }} />
@@ -633,9 +685,11 @@ export default function DashboardScreen() {
         <View style={styles.activityCard}>
           {notifications.length > 0 ? notifications.slice(0, 5).map((notification, index) => (
             <React.Fragment key={notification.id}>
-              <View style={styles.activityItemRow}>
+              <TouchableOpacity style={[styles.activityItemRow, !notification.isRead && { backgroundColor: '#F1F5F9', borderRadius: 12, paddingHorizontal: 12, marginHorizontal: -12 }]} activeOpacity={0.7} onPress={() => handleNotificationPress(notification)}>
+
                 <View style={styles.activityIconBox}>
-                  <Bell size={20} color="#64748B" />
+                  <Bell size={20} color={notification.isRead ? "#64748B" : "#2563EB"} />
+                  {!notification.isRead && <View style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />}
                 </View>
                 <View style={styles.activityContent}>
                   <Text style={styles.activityTitle}>{notification.title}</Text>
@@ -646,7 +700,7 @@ export default function DashboardScreen() {
                     {new Date(notification.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
               {index < Math.min(notifications.length, 5) - 1 && <View style={styles.activityDivider} />}
             </React.Fragment>
           )) : (
@@ -660,218 +714,12 @@ export default function DashboardScreen() {
 
       </ScrollView>
 
-      {/* --- Side Navigation Drawer Modal --- */}
-      <Modal
+      {/* Dynamic side drawer — menus fetched from /menus/sidebar API */}
+      <AppDrawer
         visible={isDrawerOpen}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setIsDrawerOpen(false)}
-      >
-        <View style={styles.drawerOverlay}>
-          {/* Backdrop overlay */}
-          <TouchableOpacity
-            style={styles.drawerBackdrop}
-            activeOpacity={1}
-            onPress={() => setIsDrawerOpen(false)}
-          />
-
-          {/* Drawer Content Panel */}
-          <View style={styles.drawerPanel}>
-            <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.drawerScrollContent}>
-                
-                {/* Drawer Header */}
-                <View style={styles.drawerHeader}>
-                  <View style={styles.drawerBrandGroup}>
-                    <View style={styles.drawerLogoBox}>
-                      <Text style={styles.drawerLogoText}>N</Text>
-                    </View>
-                    <View>
-                      <Text style={styles.drawerBrandTitle}>NEX</Text>
-                      <Text style={styles.drawerBrandSubtitle}>Employee Workspace</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.drawerCloseButton}
-                    onPress={() => setIsDrawerOpen(false)}
-                    activeOpacity={0.7}
-                  >
-                    <X size={18} color="#0F172A" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* --- Group 1: WORKSPACE --- */}
-                <Text style={styles.drawerGroupTitle}>WORKSPACE</Text>
-                
-                {/* Home Item (Active) */}
-                <TouchableOpacity style={[styles.drawerItem, styles.drawerItemActive]} activeOpacity={0.8} onPress={() => setIsDrawerOpen(false)}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBoxActive}>
-                      <Home size={18} color="#E25E3E" />
-                    </View>
-                    <Text style={styles.drawerItemTextActive}>Home</Text>
-                  </View>
-                  <ChevronRight size={16} color="#FFFFFF" />
-                </TouchableOpacity>
-
-                {/* Employees */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('Employees')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <Users size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Employees</Text>
-                  </View>
-                  <ChevronRight size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-
-                {/* Projects */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('Projects')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <Briefcase size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Projects</Text>
-                  </View>
-                  <View style={styles.drawerRightGroup}>
-                    {activeProjectsCount > 0 && (
-                      <View style={styles.badgeOrange}>
-                        <Text style={styles.badgeOrangeText}>{activeProjectsCount}</Text>
-                      </View>
-                    )}
-                    <ChevronRight size={16} color="#CBD5E1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* Attendance */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('Attendance')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <Clock size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Attendance</Text>
-                  </View>
-                  <ChevronRight size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-
-                {/* Leave */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('Leaves')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <Calendar size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Leave</Text>
-                  </View>
-                  <View style={styles.drawerRightGroup}>
-                    {totalLeaveRemaining > 0 && (
-                      <View style={styles.badgeOrange}>
-                        <Text style={styles.badgeOrangeText}>{totalLeaveRemaining}</Text>
-                      </View>
-                    )}
-                    <ChevronRight size={16} color="#CBD5E1" />
-                  </View>
-                </TouchableOpacity>
-
-
-                {/* --- Group 2: FINANCE --- */}
-                <Text style={styles.drawerGroupTitle}>FINANCE</Text>
-
-                {/* Payroll */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('Payroll')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <DollarSign size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Payroll</Text>
-                  </View>
-                  <ChevronRight size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-
-                {/* Expenses */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('Expenses')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <FileText size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Expenses</Text>
-                  </View>
-                  <ChevronRight size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-
-
-                {/* --- Group 3: OPERATIONS --- */}
-                <Text style={styles.drawerGroupTitle}>OPERATIONS</Text>
-
-                {/* Field Visits */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('FieldVisits')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <MapPin size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Field Visits</Text>
-                  </View>
-                  <ChevronRight size={16} color="#CBD5E1" />
-                </TouchableOpacity>
-
-                {/* Notifications */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('Notifications')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <Bell size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Notifications</Text>
-                  </View>
-                  <View style={styles.drawerRightGroup}>
-                    {unreadCount > 0 && (
-                      <View style={styles.badgeOrange}>
-                        <Text style={styles.badgeOrangeText}>{unreadCount}</Text>
-                      </View>
-                    )}
-                    <ChevronRight size={16} color="#CBD5E1" />
-                  </View>
-                </TouchableOpacity>
-
-
-                {/* Section Divider */}
-                <View style={styles.drawerDivider} />
-
-
-                {/* Settings & Help */}
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('Settings')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <Settings size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Settings</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.drawerItem} activeOpacity={0.7} onPress={() => handleNavigate('HelpSupport')}>
-                  <View style={styles.drawerItemLeft}>
-                    <View style={styles.drawerIconBox}>
-                      <HelpCircle size={18} color="#64748B" />
-                    </View>
-                    <Text style={styles.drawerItemText}>Help & Support</Text>
-                  </View>
-                </TouchableOpacity>
-
-              </ScrollView>
-
-              {/* Drawer Bottom User Profile Card */}
-              <View style={styles.drawerFooterCard}>
-                <View style={styles.drawerUserAvatar}>
-                  <Text style={styles.drawerUserAvatarText}>{getInitials(user?.email || '')}</Text>
-                </View>
-                <View style={styles.drawerUserInfo}>
-                  <Text style={styles.drawerUserName}>{user?.email?.split('@')[0] || 'Mohit Sharma'}</Text>
-                  <Text style={styles.drawerUserRole}>{(profile as any)?.jobTitle || (user?.role === 'EMPLOYEE' ? 'Software Developer' : 'Administrator')}</Text>
-                </View>
-                <ChevronRight size={16} color="#CBD5E1" />
-              </View>
-            </SafeAreaView>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setIsDrawerOpen(false)}
+        activeScreen="Home"
+      />
 
     </SafeAreaView>
   );
@@ -1641,195 +1489,5 @@ const styles = StyleSheet.create({
   activityDivider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-  },
-
-  // --- Side Navigation Drawer Styles ---
-  drawerOverlay: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  drawerBackdrop: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-  },
-  drawerPanel: {
-    width: '82%',
-    height: '100%',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 8, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 20,
-  },
-  drawerScrollContent: {
-    paddingTop: 12,
-    paddingBottom: 24,
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingTop: 8,
-  },
-  drawerBrandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  drawerLogoBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#E25E3E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#E25E3E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  drawerLogoText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  drawerBrandTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  drawerBrandSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#64748B',
-  },
-  drawerCloseButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  drawerGroupTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 0.8,
-    marginTop: 16,
-    marginBottom: 10,
-  },
-  drawerItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    marginBottom: 4,
-  },
-  drawerItemActive: {
-    backgroundColor: '#E25E3E',
-    shadowColor: '#E25E3E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  drawerItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  drawerIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  drawerIconBoxActive: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  drawerItemText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  drawerItemTextActive: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  drawerRightGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  badgeOrange: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  badgeOrangeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#E25E3E',
-  },
-  drawerDivider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-    marginVertical: 16,
-  },
-  drawerFooterCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 20,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  drawerUserAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#E25E3E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  drawerUserAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  drawerUserInfo: {
-    flex: 1,
-  },
-  drawerUserName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  drawerUserRole: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#64748B',
   },
 });

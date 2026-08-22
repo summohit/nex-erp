@@ -54,7 +54,8 @@ import { useProjectStore } from '../../../store/projectStore';
 import { useAuthStore } from '../../../store/authStore';
 import { useProjectPermissions } from '../../../hooks/useProjectPermissions';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import FeedbackModal, { ModalType } from '../../../components/FeedbackModal';
 
 interface IssueDetailModalProps {
   visible: boolean;
@@ -152,7 +153,14 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [dateType, setDateType] = useState<'START' | 'DUE'>('START');
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const scrollViewRef = useRef<any>(null);
+  const [feedback, setFeedback] = useState<{ visible: boolean; type: ModalType; title: string; message: string }>({ visible: false, type: 'success', title: '', message: '' });
+  const [actionSheet, setActionSheet] = useState<{ title?: string; options: { label: string; destructive?: boolean; onPress: () => void }[] } | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+  // Status change loading
+  const [statusChanging, setStatusChanging] = useState(false);
 
   // Proof-upload gate (shown when a manager-hierarchy approver, not owner/PM, moves a card to Review/Done)
   const [proofPending, setProofPending] = useState<{ columnId: number; statusStr: string } | null>(null);
@@ -352,18 +360,20 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   };
 
   const commitStatusMove = async (columnId: number, statusStr: string) => {
+    setStatusChanging(true);
     try {
       issue.columnId = columnId;
       issue.status = statusStr;
       const { updateIssueColumn } = useProjectStore.getState();
       await updateIssueColumn(projectId, issue.id, columnId);
       loadDetails();
-      // Moving columns can auto start/stop the work timer as a server-side side
-      // effect — re-pull the issue so this modal and the board card both reflect
-      // it immediately, instead of only updating after a manual refresh.
       refreshIssueFromServer();
+      setFeedback({ visible: true, type: 'success', title: 'Status Updated', message: `Card moved to ${statusStr.replace(/_/g, ' ')}` });
     } catch (error) {
       console.error('Failed to update status', error);
+      setFeedback({ visible: true, type: 'error', title: 'Update Failed', message: 'Could not change the card status.' });
+    } finally {
+      setStatusChanging(false);
     }
   };
 
@@ -634,12 +644,42 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
     }
   };
 
-  const handlePickImage = async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1 });
-    if (result.didCancel || !result.assets || result.assets.length === 0) return;
-    
-    const asset = result.assets[0];
+  const handlePickImage = () => {
+    if (isUploadingAttachment) return;
+    setActionSheet({
+      title: 'Upload Attachment',
+      options: [
+        { 
+          label: 'Take Photo', 
+          onPress: async () => {
+            setActionSheet(null);
+            setTimeout(async () => {
+              const result = await launchCamera({ mediaType: 'photo', saveToPhotos: true });
+              if (!result.didCancel && result.assets && result.assets.length > 0) {
+                await processUpload(result.assets[0]);
+              }
+            }, 300);
+          }
+        },
+        { 
+          label: 'Choose from Gallery', 
+          onPress: async () => {
+            setActionSheet(null);
+            setTimeout(async () => {
+              const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1 });
+              if (!result.didCancel && result.assets && result.assets.length > 0) {
+                await processUpload(result.assets[0]);
+              }
+            }, 300);
+          }
+        }
+      ]
+    });
+  };
+
+  const processUpload = async (asset: any) => {
     try {
+      setIsUploadingAttachment(true);
       const formData = new FormData();
       formData.append('file', {
         uri: asset.uri,
@@ -648,9 +688,16 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
       } as any);
 
       const newAttachment = await projectService.uploadAttachment(projectId, issue.id, formData);
-      setAttachments([...attachments, newAttachment]);
-    } catch (error) {
+      setAttachments(prev => [...prev, newAttachment]);
+      await useProjectStore.getState().fetchProjectDetails(projectId);
+
+      setFeedback({ visible: true, type: 'success', title: 'File Uploaded', message: 'Attachment uploaded successfully' });
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 300);
+    } catch (error: any) {
       console.error('Failed to upload image', error);
+      setFeedback({ visible: true, type: 'error', title: 'Upload Failed', message: error?.message || 'Failed to upload attachment' });
+    } finally {
+      setIsUploadingAttachment(false);
     }
   };
 
@@ -661,6 +708,68 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
     const u = url.toLowerCase();
     const n = (fileName || '').toLowerCase();
     return IMAGE_EXTS.some((ext) => u.includes(ext) || n.endsWith(ext));
+  };
+
+  const handleAttachmentAction = (att: any) => {
+    const url = att.fileUrl || att.url;
+    if (!url) return;
+    const fileName = att.fileName || att.name || '';
+    const isImage = isImageAttachment(url, fileName);
+    
+    const options: { label: string; destructive?: boolean; onPress: () => void }[] = [
+      { 
+        label: 'View / Download', 
+        onPress: () => {
+          setActionSheet(null);
+          handleOpenAttachment(att);
+        }
+      }
+    ];
+
+    if (isImage) {
+      options.push({
+        label: 'Toggle Cover',
+        onPress: async () => {
+          setActionSheet(null);
+          try {
+            setIsUploadingAttachment(true);
+            await projectService.toggleCover(projectId, issue.id, att.id);
+            await useProjectStore.getState().fetchProjectDetails(projectId);
+            setFeedback({ visible: true, type: 'success', title: 'Success', message: 'Cover image updated' });
+            loadDetails();
+          } catch (err: any) {
+            setFeedback({ visible: true, type: 'error', title: 'Error', message: 'Failed to toggle cover' });
+          } finally {
+            setIsUploadingAttachment(false);
+          }
+        }
+      });
+    }
+
+    options.push({
+      label: 'Delete',
+      destructive: true,
+      onPress: async () => {
+        setActionSheet(null);
+        try {
+          setIsUploadingAttachment(true);
+          await projectService.deleteAttachment(projectId, issue.id, att.id);
+          setAttachments(prev => prev.filter(a => a.id !== att.id));
+          await useProjectStore.getState().fetchProjectDetails(projectId);
+          loadDetails();
+          setFeedback({ visible: true, type: 'success', title: 'Deleted', message: 'Attachment deleted successfully' });
+        } catch (err: any) {
+          setFeedback({ visible: true, type: 'error', title: 'Error', message: 'Failed to delete attachment' });
+        } finally {
+          setIsUploadingAttachment(false);
+        }
+      }
+    });
+
+    setActionSheet({
+      title: fileName,
+      options
+    });
   };
 
   const handleOpenAttachment = (att: any) => {
@@ -749,7 +858,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={[styles.container, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 12) }]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        {/* @ts-ignore */}<StatusBar barStyle="dark-content" />
 
         {/* Top Header */}
         <View style={styles.header}>
@@ -778,10 +887,19 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView 
+            ref={scrollViewRef}
             style={styles.scrollContent} 
             contentContainerStyle={styles.scrollInner}
             showsVerticalScrollIndicator={false}
           >
+            {/* Cover Image */}
+            {issue.coverUrl && (
+              <Image 
+                source={{ uri: issue.coverUrl }} 
+                style={{ width: '100%', height: 180, borderRadius: 12, marginBottom: 16 }} 
+                resizeMode="cover" 
+              />
+            )}
             {/* Title */}
             <Text style={styles.title}>{issue.title}</Text>
 
@@ -876,9 +994,13 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity style={styles.actionBadge} onPress={handlePickImage}>
-                <Paperclip size={13} color="#64748B" />
-                <Text style={styles.actionBadgeText}>Attachment</Text>
+              <TouchableOpacity style={styles.actionBadge} onPress={handlePickImage} disabled={isUploadingAttachment}>
+                {isUploadingAttachment ? (
+                  <ActivityIndicator size="small" color="#64748B" />
+                ) : (
+                  <Paperclip size={13} color="#64748B" />
+                )}
+                <Text style={styles.actionBadgeText}>{isUploadingAttachment ? 'Uploading...' : 'Attachment'}</Text>
               </TouchableOpacity>
             </ScrollView>
 
@@ -1139,7 +1261,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                         key={att.id || `att-${idx}`}
                         style={styles.attachmentBox}
                         activeOpacity={0.7}
-                        onPress={() => handleOpenAttachment(att)}
+                        onPress={() => handleAttachmentAction(att)}
                       >
                         {img && url ? (
                           <Image source={{ uri: url }} style={styles.attachmentThumb} resizeMode="cover" />
@@ -1886,11 +2008,131 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
           onCancel={() => setDatePickerVisible(false)}
         />
       </View>
+    
+      {/* Uploading Overlay */}
+      {isUploadingAttachment && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }]}>
+          <View style={{ backgroundColor: '#fff', padding: 24, borderRadius: 16, alignItems: 'center', width: '80%' }}>
+            <ActivityIndicator size="large" color="#0F172A" />
+            <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '600', color: '#0F172A' }}>Uploading File...</Text>
+            <Text style={{ marginTop: 8, fontSize: 13, color: '#64748B', textAlign: 'center' }}>Please wait while your attachment is being saved.</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Status Changing Overlay */}
+      {statusChanging && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 9998 }]}>
+          <View style={{ backgroundColor: '#fff', paddingVertical: 20, paddingHorizontal: 28, borderRadius: 16, alignItems: 'center', width: '72%' }}>
+            <ActivityIndicator size="large" color="#E25E3E" />
+            <Text style={{ marginTop: 14, fontSize: 15, fontWeight: '600', color: '#0F172A' }}>Updating Status...</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Action Sheet Modal */}
+      <Modal
+        visible={!!actionSheet}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionSheet(null)}
+      >
+        <TouchableOpacity style={styles.actionSheetOverlay} activeOpacity={1} onPress={() => setActionSheet(null)}>
+          <View style={styles.actionSheetCard}>
+            {actionSheet?.title && (
+              <Text style={styles.actionSheetTitle} numberOfLines={1}>{actionSheet.title}</Text>
+            )}
+            
+            {actionSheet?.options.map((opt, idx) => (
+              <TouchableOpacity 
+                key={idx} 
+                style={[styles.actionSheetOption, opt.destructive && styles.actionSheetOptionDestructive]} 
+                onPress={opt.onPress}
+              >
+                <Text style={[styles.actionSheetOptionText, opt.destructive && styles.actionSheetOptionTextDestructive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.actionSheetDivider} />
+
+            <TouchableOpacity style={styles.actionSheetCancel} onPress={() => setActionSheet(null)}>
+              <Text style={styles.actionSheetCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        visible={feedback.visible}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        onClose={() => setFeedback(prev => ({ ...prev, visible: false }))}
+      />
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  actionSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  actionSheetCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  actionSheetTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  actionSheetOption: {
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    marginBottom: 8,
+  },
+  actionSheetOptionDestructive: {
+    backgroundColor: '#FEF2F2',
+  },
+  actionSheetOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  actionSheetOptionTextDestructive: {
+    color: '#DC2626',
+  },
+  actionSheetDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 8,
+  },
+  actionSheetCancel: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  actionSheetCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748B',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -2312,12 +2554,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pickerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',
     zIndex: 100,
   },
   pickerBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
   },
   sheetHandle: {

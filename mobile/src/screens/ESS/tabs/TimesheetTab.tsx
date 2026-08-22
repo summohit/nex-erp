@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, XCircle, AlertCircle, Calendar, Plane, Star } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTimesheetStore } from '../../../store/timesheetStore';
@@ -156,7 +156,12 @@ export default function TimesheetTab() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={isLoading} onRefresh={fetchData} colors={['#E25E3E']} />
+      }
+    >
       {/* Month Selector */}
       <View style={styles.monthSelector}>
         <TouchableOpacity onPress={handlePrevMonth} style={styles.navBtn}>
@@ -285,7 +290,7 @@ export default function TimesheetTab() {
         onClose={() => setShowDayDetailModal(false)} 
         dayData={selectedDayData} 
       />
-    </View>
+    </ScrollView>
   );
 }
 

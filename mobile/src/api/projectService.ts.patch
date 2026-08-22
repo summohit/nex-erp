@@ -1,0 +1,18 @@
+--- /Users/mohitsingh/Documents/nex-erp/mobile/src/api/projectService.ts
++++ /Users/mohitsingh/Documents/nex-erp/mobile/src/api/projectService.ts
+@@ -62,6 +62,15 @@
+     return response.data;
+   },
+ 
++  uploadProjectDocument: async (projectId: number, formData: FormData): Promise<any> => {
++    const response = await apiClient.post(`/projects/${projectId}/documents`, formData, {
++      headers: {
++        'Content-Type': 'multipart/form-data',
++      },
++    });
++    return response.data;
++  },
++
+   deleteAttachment: async (projectId: number, issueId: number, attachmentId: number): Promise<void> => {
+     await apiClient.delete(`/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}`);
+   },

@@ -464,6 +464,11 @@ export class ProjectsService {
               orderBy: { position: 'asc' }
             }
           }
+        },
+        documents: {
+          include: {
+            employee: { select: { firstName: true, lastName: true, avatarUrl: true } }
+          }
         }
       }
     });
@@ -773,6 +778,8 @@ export class ProjectsService {
     if (data.budgetAmount !== undefined) updateData.budgetAmount = data.budgetAmount ? parseFloat(data.budgetAmount) : null;
     if (data.hourlyRate !== undefined) updateData.hourlyRate = data.hourlyRate ? parseFloat(data.hourlyRate) : null;
     if (data.clientId !== undefined) updateData.clientId = data.clientId ? parseInt(data.clientId, 10) : null;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.workStatus !== undefined) updateData.workStatus = data.workStatus;
 
     const updated = await this.prisma.project.update({
       where: { id },

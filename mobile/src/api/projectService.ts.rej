@@ -1,0 +1,12 @@
+@@ -10,6 +10,11 @@
+     return response.data;
+   },
+ 
++  updateProject: async (projectId: number, data: any): Promise<any> => {
++    const response = await apiClient.put(`/projects/${projectId}`, data);
++    return response.data;
++  },
++
+   getProjectDetails: async (projectId: number): Promise<any> => {
+     const response = await apiClient.get(`/projects/${projectId}`);
+     return response.data;

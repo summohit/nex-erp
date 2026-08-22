@@ -266,7 +266,7 @@ export default function ESSScreen({ route }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      {/* @ts-ignore */}<StatusBar barStyle="dark-content" />
       {/* --- Premium Header & Breadcrumb Bar --- */}
       <View style={styles.headerContainer}>
         {/* Mobile Breadcrumb */}

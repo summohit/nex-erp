@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Calendar as CalendarIcon, Clock, Send } from 'lucide-react-native';
 import { Calendar } from 'react-native-calendars';
 import { useTimesheetStore } from '../../../store/timesheetStore';
@@ -11,12 +12,13 @@ interface Props {
 }
 
 export default function RegularizationFormModal({ visible, onClose, onSuccess }: Props) {
+  const insets = useSafeAreaInsets();
   const [date, setDate] = useState('');
   const [reason, setReason] = useState('');
   const [inTime, setInTime] = useState('');
   const [outTime, setOutTime] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
-  
+
   const { requestRegularization, isLoading, error } = useTimesheetStore();
 
   const handleSubmit = async () => {
@@ -52,8 +54,8 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Request Regularization</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>

@@ -4,6 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { ChevronLeft, Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock } from 'lucide-react-native';
 import { useProjectStore } from '../../store/projectStore';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { projectService } from '../../api/projectService';
+import { Alert } from 'react-native';
 import BoardTab from './tabs/BoardTab';
 import SummaryTab from './tabs/SummaryTab';
 import ListTab from './tabs/ListTab';
@@ -67,6 +70,7 @@ export default function ProjectDetailScreen() {
   const { fetchProjectDetails, isLoading, currentProject, currentIssues, accessDenied } = useProjectStore();
 
   const [activeTab, setActiveTab] = useState('board');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -75,6 +79,32 @@ export default function ProjectDetailScreen() {
   }, [projectId]);
 
   const archivedCount = currentIssues.filter(i => i.isArchived).length;
+
+  const handleUpload = async () => {
+    if (isUploading) return;
+    const result = await launchImageLibrary({ mediaType: 'mixed', selectionLimit: 1 });
+    if (result.didCancel || !result.assets || result.assets.length === 0) return;
+    
+    try {
+      setIsUploading(true);
+      const asset = result.assets[0];
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: asset.type || 'image/jpeg',
+        name: asset.fileName || 'upload.jpg',
+      } as any);
+      
+      await projectService.uploadProjectDocument(projectId, formData);
+      Alert.alert('Success', 'File uploaded successfully');
+      await fetchProjectDetails(projectId);
+      setActiveTab('attachments'); // Switch to Files tab
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'File upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   if (accessDenied) {
     return <AccessDeniedView onBack={() => navigation.goBack()} />;

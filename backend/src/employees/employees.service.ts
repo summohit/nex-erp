@@ -449,6 +449,11 @@ export class EmployeesService {
         usualWorkLocation: data.usualWorkLocation ? data.usualWorkLocation : null,
         workNotes: data.workNotes || null,
 
+        // Work Details Additions
+        joiningDate: data.joiningDate ? new Date(data.joiningDate) : undefined,
+        employmentCategory: data.employmentCategory !== undefined ? data.employmentCategory : undefined,
+        nextAppraisalDate: data.nextAppraisalDate ? new Date(data.nextAppraisalDate) : null,
+
         // Bank Details
         bankName: data.bankName || null,
         bankAccountNumber: data.bankAccountNumber || null,

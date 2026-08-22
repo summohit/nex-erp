@@ -11,8 +11,15 @@ interface User {
   isManager?: boolean;
 }
 
+export interface CompanyInfo {
+  id: number;
+  name: string;
+  logoUrl?: string | null;
+}
+
 interface AuthState {
   user: User | null;
+  company: CompanyInfo | null;
   token: string | null;
   isLoading: boolean;
   login: (user: User, token: string) => Promise<void>;
@@ -23,6 +30,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  company: null,
   token: null,
   isLoading: true,
   login: async (user, token) => {
@@ -33,14 +41,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     await AsyncStorage.removeItem('userToken');
     await AsyncStorage.removeItem('userData');
-    set({ user: null, token: null, isLoading: false });
+    await AsyncStorage.removeItem('companyData');
+    set({ user: null, company: null, token: null, isLoading: false });
   },
   restoreToken: async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       const userData = await AsyncStorage.getItem('userData');
+      const companyData = await AsyncStorage.getItem('companyData');
       if (token && userData) {
-        set({ token, user: JSON.parse(userData), isLoading: false });
+        set({
+          token,
+          user: JSON.parse(userData),
+          company: companyData ? JSON.parse(companyData) : null,
+          isLoading: false,
+        });
       } else {
         set({ isLoading: false });
       }
@@ -56,8 +71,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const updated: User = { ...current, isManager: !!data?.isManager };
       set({ user: updated });
       await AsyncStorage.setItem('userData', JSON.stringify(updated));
+
+      // Persist company info so it survives app restarts
+      if (data?.company) {
+        const company: CompanyInfo = {
+          id: data.company.id,
+          name: data.company.name,
+          logoUrl: data.company.logoUrl ?? null,
+        };
+        set({ company });
+        await AsyncStorage.setItem('companyData', JSON.stringify(company));
+      }
     } catch (e) {
-      // Non-fatal: permission checks fall back to safe defaults if isManager is undefined
+      // Non-fatal
     }
   },
 }));

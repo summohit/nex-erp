@@ -10,7 +10,9 @@ import {
   Alert,
   ScrollView,
   RefreshControl,
+  ActivityIndicator
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import {
   Paperclip,
   FileText,
@@ -61,6 +63,7 @@ export default function AttachmentsTab() {
   const { user } = useAuthStore();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleRefresh = async () => {
     if (!currentProject?.id) return;
@@ -76,11 +79,41 @@ export default function AttachmentsTab() {
     const result: any[] = [];
     currentIssues.forEach(issue => {
       (issue.attachments || []).forEach((att: any) => {
-        result.push({ ...att, issueKey: issue.key, issueTitle: issue.title, issueId: issue.id });
+        result.push({ ...att, issueKey: issue.key, issueTitle: issue.title, issueId: issue.id, isProjectDoc: false });
       });
     });
+    if (currentProject?.documents) {
+      currentProject.documents.forEach((doc: any) => {
+        result.push({ ...doc, isProjectDoc: true, fileUrl: doc.url, fileName: doc.name, uploader: doc.employee });
+      });
+    }
     return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [currentIssues]);
+  }, [currentIssues, currentProject?.documents]);
+
+  const handleUpload = async () => {
+    if (isUploading) return;
+    const result = await launchImageLibrary({ mediaType: 'mixed', selectionLimit: 1 });
+    if (result.didCancel || !result.assets || result.assets.length === 0) return;
+    
+    try {
+      setIsUploading(true);
+      const asset = result.assets[0];
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: asset.type || 'image/jpeg',
+        name: asset.fileName || 'upload.jpg',
+      } as any);
+      
+      await projectService.uploadProjectDocument(currentProject.id, formData);
+      Alert.alert('Success', 'File uploaded successfully');
+      await fetchProjectDetails(currentProject.id); // Refresh
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'File upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleOpen = async (url: string) => {
     try {
@@ -176,7 +209,10 @@ export default function AttachmentsTab() {
       >
         <Paperclip size={44} color="#CBD5E1" />
         <Text style={styles.emptyTitle}>No attachments yet</Text>
-        <Text style={styles.emptySubtitle}>Upload files inside any issue card to see them here</Text>
+        <Text style={styles.emptySubtitle}>Upload files to the project or inside any issue to see them here.</Text>
+        <TouchableOpacity style={{ marginTop: 20, padding: 12, backgroundColor: '#E25E3E', borderRadius: 8 }} onPress={handleUpload} disabled={isUploading}>
+          {isUploading ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Upload File</Text>}
+        </TouchableOpacity>
       </ScrollView>
     );
   }
@@ -195,6 +231,13 @@ export default function AttachmentsTab() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
       />
+          <TouchableOpacity 
+        style={styles.fab} 
+        onPress={handleUpload}
+        disabled={isUploading}
+      >
+        {isUploading ? <ActivityIndicator color="#FFF" /> : <Paperclip color="#FFF" size={24} />}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -260,4 +303,20 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: '#334155' },
   emptySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    backgroundColor: '#E25E3E',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#E25E3E',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 5,
+  },
 });

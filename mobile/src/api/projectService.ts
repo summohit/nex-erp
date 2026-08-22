@@ -22,6 +22,11 @@ export const projectService = {
     return response.data;
   },
 
+  updateProject: async (id: number, data: any): Promise<any> => {
+    const response = await apiClient.put(`/projects/${id}`, data);
+    return response.data;
+  },
+
   getProject: async (id: number): Promise<any> => {
     const response = await apiClient.get(`/projects/${id}`);
     return response.data;
@@ -175,8 +180,22 @@ export const projectService = {
     return response.data;
   },
 
+  uploadProjectDocument: async (projectId: number, formData: FormData): Promise<any> => {
+    const response = await apiClient.post(`/projects/${projectId}/documents`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   deleteAttachment: async (projectId: number, issueId: number, attachmentId: number): Promise<void> => {
     await apiClient.delete(`/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}`);
+  },
+
+  toggleCover: async (projectId: number, issueId: number, attachmentId: number): Promise<any> => {
+    const response = await apiClient.post(`/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}/toggle-cover`);
+    return response.data;
   },
 
   // --- Review (Approve / Reject) ---
