@@ -261,6 +261,7 @@ export class AssetsComponent implements OnInit {
 
   // Drawer & Modal States (legacy flows)
   isAssignDrawerOpen = signal<boolean>(false);
+  isAssetDrawerOpen = signal<boolean>(false);
   isReturnModalOpen = signal<boolean>(false);
   isRequestDrawerOpen = signal<boolean>(false);
   isFulfillModalOpen = signal<boolean>(false);
@@ -1221,6 +1222,10 @@ export class AssetsComponent implements OnInit {
     this.assetService.getInventoryAssignments().subscribe(res => this.inventoryAssignments.set(res));
   }
 
+  removeImage(index: number) {
+    this.assetForm.images.splice(index, 1);
+  }
+
   saveAsset() {
     this.validateAssetForm();
     if (Object.keys(this.assetFormErrors).length > 0) {
@@ -1905,6 +1910,22 @@ export class AssetsComponent implements OnInit {
       notes: ''
     };
     this.isAssignDrawerOpen.set(true);
+  }
+
+  submitAssign() {
+    if (!this.assignForm.assetId || !this.assignForm.employeeId) {
+      this.toast.error('Please select both an Asset and an Employee');
+      return;
+    }
+
+    this.assetService.assignAsset(this.assignForm).subscribe({
+      next: () => {
+        this.toast.success('Asset assigned successfully');
+        this.isAssignDrawerOpen.set(false);
+        this.loadAllData();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Failed to assign asset')
+    });
   }
 
   openReturnModal(assignmentId: number) {
