@@ -61,10 +61,77 @@ export class AssetsController {
   }
 
   // ==========================================
-  // 3. HARDWARE REQUEST ENDPOINTS
+  // 3. PRODUCT/BATCH INVENTORY ENDPOINTS
   // ==========================================
-  @Get('requests')
-  getHardwareRequests(@Request() req) {
+  @Get('inventory')
+  getInventoryItems(@Request() req) {
+    return this.assetsService.getInventoryItems(req.user.companyId);
+  }
+
+  @Post('inventory')
+  createInventoryItem(@Request() req, @Body() data: any) {
+    return this.assetsService.createInventoryItem(req.user.companyId, req.user.sub, data);
+  }
+
+  @Post('inventory/import')
+  importInventoryItems(@Request() req, @Body() body: { rows: any[] }) {
+    return this.assetsService.importInventoryItems(req.user.companyId, req.user.sub, body?.rows || []);
+  }
+
+  @Put('inventory/:id')
+  updateInventoryItem(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.assetsService.updateInventoryItem(req.user.companyId, id, data);
+  }
+
+  @Delete('inventory/:id')
+  deleteInventoryItem(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.assetsService.deleteInventoryItem(req.user.companyId, id);
+  }
+
+  @Get('inventory/assignments')
+  getInventoryAssignments(@Request() req) {
+    return this.assetsService.getInventoryAssignments(req.user.companyId);
+  }
+
+  @Get('inventory/:id/transactions')
+  getInventoryTransactions(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.assetsService.getInventoryTransactions(req.user.companyId, id);
+  }
+
+  @Post('inventory/:id/assign')
+  assignInventoryItem(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.assetsService.assignInventoryItem(req.user.companyId, req.user.sub, id, data);
+  }
+
+  @Put('inventory/transactions/:txnId/return')
+  returnInventoryUnits(@Request() req, @Param('txnId', ParseIntPipe) txnId: number, @Body() data: any) {
+    return this.assetsService.returnInventoryUnits(req.user.companyId, req.user.sub, txnId, data);
+  }
+
+  @Post('inventory/:id/consume')
+  consumeInventoryItem(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.assetsService.consumeInventoryItem(req.user.companyId, req.user.sub, id, data);
+  }
+
+  @Post('inventory/:id/expire')
+  expireInventoryItem(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.assetsService.expireInventoryItem(req.user.companyId, req.user.sub, id, data);
+  }
+
+  @Post('inventory/:id/adjust')
+  adjustInventoryStock(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.assetsService.adjustInventoryStock(req.user.companyId, req.user.sub, id, data);
+  }
+
+  @Put('inventory/:id/status')
+  setInventoryItemStatus(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { status: string }) {
+    return this.assetsService.setInventoryItemStatus(req.user.companyId, id, data.status);
+  }
+
+  // ==========================================
+  // 4. HARDWARE REQUEST ENDPOINTS
+  // ==========================================
+  @Get('requests')  getHardwareRequests(@Request() req) {
     return this.assetsService.getHardwareRequests(req.user.companyId, req.user.sub, req.user.role);
   }
 

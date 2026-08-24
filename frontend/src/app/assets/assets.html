@@ -1,19 +1,36 @@
-<div class="assets-page-container">
+﻿<div class="assets-page-container">
   <!-- Page Header -->
   <header class="page-header">
     <div class="header-title-group">
-      <h1 class="page-title">Assets & IT Management</h1>
-      <p class="page-subtitle">Manage your IT assets</p>
+      <h1 class="page-title">
+        {{ activeTab() === 'inventory' ? 'Inventory' : activeTab() === 'assignments' ? 'Assignments' : 'Hardware Requests' }}
+      </h1>
+      <p class="page-subtitle">
+        {{ activeTab() === 'inventory' ? 'Track and manage all purchased items'
+           : activeTab() === 'assignments' ? 'Items and devices currently issued across the company'
+           : 'Manage company IT inventory, track device assignments, and process hardware requests.' }}
+      </p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-outline" *ngIf="isAdmin()" (click)="openAssignDrawer()">
-        <svg lucideUserCheck size="16"></svg>
-        <span>Assign Asset</span>
-      </button>
-      <button class="btn btn-primary" *ngIf="isAdmin() && activeTab() === 'inventory'" (click)="openAddAssetDrawer()">
-        <svg lucidePlus size="16"></svg>
-        <span>Add New Asset</span>
-      </button>
+      <!-- Inventory tab actions -->
+      <ng-container *ngIf="isAdmin() && activeTab() === 'inventory'">
+        <div class="search-box search-box-sm">
+          <svg lucideSearch size="15" class="search-icon"></svg>
+          <input type="text" placeholder="Search inventory..." [(ngModel)]="searchQuery">
+        </div>
+        <input type="file" #importFileInput accept=".csv" class="hidden-file-input" (change)="onImportFileSelected($event)">
+        <button class="btn btn-outline" (click)="importFileInput.click()" [disabled]="importing()">
+          <svg lucideDownload size="16"></svg>
+          <span>{{ importing() ? 'Importing...' : 'Import' }}</span>
+        </button>
+        <button class="btn btn-outline btn-template" (click)="downloadImportTemplate()" title="Download CSV template">Template</button>
+        <button class="btn btn-primary" (click)="openAddItemModal()">
+          <svg lucidePlus size="16"></svg>
+          <span>Add New Item</span>
+        </button>
+      </ng-container>
+
+      <!-- Requests tab action -->
       <button class="btn btn-primary" *ngIf="activeTab() === 'requests'" (click)="openRequestDrawer()">
         <svg lucidePlus size="16"></svg>
         <span>Submit Request</span>
@@ -21,102 +38,108 @@
     </div>
   </header>
 
-  <!-- KPI Summary Grid -->
-  <div class="kpi-grid">
+  <!-- Inventory Summary Cards -->
+  <div class="kpi-grid inv-kpi-grid" *ngIf="isAdmin() && activeTab() === 'inventory'">
     <div class="kpi-card">
-      <div class="kpi-icon-box bg-blue-tint">
-        <svg lucideLaptop size="22" class="text-blue"></svg>
-      </div>
-      <div class="kpi-content">
-        <span class="kpi-label">Total Assets</span>
-        <h3 class="kpi-value">{{ totalAssetsCount() }}</h3>
-      </div>
+      <span class="kpi-icon-box kpi-icon-sm bg-blue-tint"><svg lucidePackage size="17" class="text-blue"></svg></span>
+      <span class="kpi-label">Total Items</span>
+      <h3 class="kpi-value">{{ invTotalItems() }}</h3>
     </div>
-
     <div class="kpi-card">
-      <div class="kpi-icon-box bg-purple-tint">
-        <svg lucideUserCheck size="22" class="text-purple"></svg>
-      </div>
-      <div class="kpi-content">
-        <span class="kpi-label">Assigned</span>
-        <h3 class="kpi-value">{{ assignedAssetsCount() }}</h3>
-      </div>
+      <span class="kpi-icon-box kpi-icon-sm bg-purple-tint"><svg lucideLayers size="17" class="text-purple"></svg></span>
+      <span class="kpi-label">Total Units</span>
+      <h3 class="kpi-value">{{ invTotalUnits() }}</h3>
     </div>
-
     <div class="kpi-card">
-      <div class="kpi-icon-box bg-green-tint">
-        <svg lucideCheckCircle size="22" class="text-green"></svg>
-      </div>
-      <div class="kpi-content">
-        <span class="kpi-label">Available Stock</span>
-        <h3 class="kpi-value">{{ availableAssetsCount() }}</h3>
-      </div>
+      <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideCheckCircle size="17" class="text-green"></svg></span>
+      <span class="kpi-label">Available</span>
+      <h3 class="kpi-value">{{ invAvailableUnits() }}</h3>
     </div>
-
     <div class="kpi-card">
-      <div class="kpi-icon-box bg-amber-tint">
-        <svg lucideWrench size="22" class="text-amber"></svg>
-      </div>
-      <div class="kpi-content">
-        <span class="kpi-label">Under Repair</span>
-        <h3 class="kpi-value">{{ inRepairAssetsCount() }}</h3>
-      </div>
+      <span class="kpi-icon-box kpi-icon-sm bg-blue-tint"><svg lucideUserCheck size="17" class="text-blue"></svg></span>
+      <span class="kpi-label">Assigned</span>
+      <h3 class="kpi-value">{{ invAssignedUnits() }}</h3>
     </div>
-
     <div class="kpi-card">
-      <div class="kpi-icon-box bg-rose-tint">
-        <svg lucideClock size="22" class="text-rose"></svg>
-      </div>
-      <div class="kpi-content">
-        <span class="kpi-label">Pending Requests</span>
-        <h3 class="kpi-value">{{ pendingRequestsCount() }}</h3>
-      </div>
+      <span class="kpi-icon-box kpi-icon-sm bg-amber-tint"><svg lucideAlertTriangle size="17" class="text-amber"></svg></span>
+      <span class="kpi-label">Low Stock</span>
+      <h3 class="kpi-value">{{ invLowStockCount() }}</h3>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-icon-box kpi-icon-sm bg-amber-tint"><svg lucideClock size="17" class="text-amber"></svg></span>
+      <span class="kpi-label">Expiring Soon</span>
+      <h3 class="kpi-value">{{ invExpiringCount() }}</h3>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-icon-box kpi-icon-sm bg-rose-tint"><svg lucideArchive size="17" class="text-rose"></svg></span>
+      <span class="kpi-label">Expired</span>
+      <h3 class="kpi-value">{{ invExpiredCount() }}</h3>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideIndianRupee size="17" class="text-green"></svg></span>
+      <span class="kpi-label">Inventory Value</span>
+      <h3 class="kpi-value kpi-money">{{ fmtMoney(invTotalValue()) }}</h3>
     </div>
   </div>
 
   <!-- Navigation Tabs -->
   <div class="nav-tabs">
-    <button class="nav-tab" *ngIf="isAdmin() || canViewInventory()" [class.active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
-      Asset Inventory
+    <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
+      Inventory
     </button>
-    <button class="nav-tab" *ngIf="isAdmin() || canViewAssignments()" [class.active]="activeTab() === 'assignments'" (click)="setTab('assignments')">
+    <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'assignments'" (click)="setTab('assignments')">
       Assignments
     </button>
-    <button class="nav-tab" *ngIf="isAdmin() || canViewRequests()" [class.active]="activeTab() === 'requests'" (click)="setTab('requests')">
+    <button class="nav-tab" [class.active]="activeTab() === 'requests'" (click)="setTab('requests')">
       Hardware Requests
       <span class="tab-badge" *ngIf="pendingRequestsCount() > 0">{{ pendingRequestsCount() }}</span>
     </button>
   </div>
 
-  <!-- Tab 1: Asset Inventory -->
-  <div class="tab-content" *ngIf="activeTab() === 'inventory' && (isAdmin() || canViewInventory())">
+  <!-- Tab 1: Inventory -->
+  <div class="tab-content" *ngIf="isAdmin() && activeTab() === 'inventory'">
     <div class="section-card">
-      <div class="table-toolbar mb-3">
-        <div class="search-box">
-          <svg lucideSearch size="16" class="search-icon"></svg>
-          <input type="text" placeholder="Search by asset tag, name, brand..." [(ngModel)]="searchQuery">
+      <!-- Compact empty state (replaces oversized blank grid) -->
+      <div class="inv-empty" *ngIf="!inventoryLoading() && inventoryItems().length === 0">
+        <div class="inv-empty-icon bg-blue-tint"><svg lucidePackage size="24" class="text-blue"></svg></div>
+        <h4>No items in inventory yet</h4>
+        <p>Click Add New Item to record your first purchase.</p>
+        <div class="inv-empty-actions">
+          <button class="btn btn-primary btn-sm" (click)="openAddItemModal()">
+            <svg lucidePlus size="15"></svg>
+            <span>Add New Item</span>
+          </button>
+          <button class="btn btn-outline btn-sm btn-template" (click)="downloadImportTemplate()">Download Template</button>
         </div>
       </div>
 
+      <div class="grid-loading-line" *ngIf="inventoryLoading()">Loading inventory...</div>
+
       <ag-grid-angular
-        class="ag-theme-quartz assets-grid"
+        *ngIf="!inventoryLoading() && inventoryItems().length > 0"
+        class="ag-theme-quartz assets-grid inventory-grid"
         [theme]="'legacy'"
-        [rowData]="assets()"
+        [rowData]="inventoryItems()"
         [columnDefs]="inventoryColDefs"
         [defaultColDef]="defaultColDef"
+        [headerHeight]="46"
         [pagination]="true"
         [paginationPageSize]="paginationPageSize"
         [paginationPageSizeSelector]="paginationPageSizeOptions"
         [quickFilterText]="searchQuery()"
-        [rowHeight]="64">
+        [rowHeight]="56"
+        [getRowHeight]="invRowHeight"
+        [overlayNoRowsTemplate]="'No items match your search.'"
+        (rowClicked)="onInventoryRowClicked($event)">
       </ag-grid-angular>
     </div>
   </div>
 
   <!-- Tab 2: Assignments -->
-  <div class="tab-content" *ngIf="activeTab() === 'assignments' && (isAdmin() || canViewAssignments())">
+  <div class="tab-content" *ngIf="isAdmin() && activeTab() === 'assignments'">
     <div class="section-card">
       <div class="table-toolbar mb-3">
+        <div class="toolbar-hint">Inventory batch assignments and serial-tracked device assignments</div>
         <div class="search-box">
           <svg lucideSearch size="16" class="search-icon"></svg>
           <input type="text" placeholder="Search assignments..." [(ngModel)]="searchQuery">
@@ -126,7 +149,8 @@
       <ag-grid-angular
         class="ag-theme-quartz assets-grid"
         [theme]="'legacy'"
-        [rowData]="assignments()"
+        [rowData]="unifiedAssignments()"
+        [getRowId]="getAssignmentRowId"
         [columnDefs]="assignmentsColDefs"
         [defaultColDef]="defaultColDef"
         [pagination]="true"
@@ -139,7 +163,7 @@
   </div>
 
   <!-- Tab 3: Hardware Requests -->
-  <div class="tab-content" *ngIf="activeTab() === 'requests' && (isAdmin() || canViewRequests())">
+  <div class="tab-content" *ngIf="activeTab() === 'requests'">
     <div class="section-card">
       <div class="table-toolbar mb-3">
         <div class="search-box">
@@ -165,6 +189,808 @@
 </div>
 
 <!-- ========================================== -->
+<!-- ITEM DETAIL MODAL (centered overlay)       -->
+<!-- ========================================== -->
+<div class="modal-overlay-blur" *ngIf="isItemDetailOpen() && selectedItem()" (click)="closeItemDetail()">
+  <div class="detail-modal" (click)="$event.stopPropagation()">
+    <div class="detail-modal-header">
+      <div class="dm-title-block">
+        <div class="dm-title-row">
+          <h3 class="dm-title">{{ selectedItem()!.name }}</h3>
+          <span class="cat-badge" [ngClass]="getCatBadgeClass(selectedItem()!.category)">{{ catLabel(selectedItem()!.category) }}</span>
+          <span class="type-chip">{{ selectedItem()!.itemType === 'CONSUMABLE' ? 'Consumable' : 'Asset' }}</span>
+        </div>
+        <div class="dm-meta-row">
+          <span *ngIf="selectedItem()!.brand"><b>Brand:</b>&nbsp;{{ selectedItem()!.brand }}</span>
+          <span *ngIf="selectedItem()!.supplier"><b>Supplier:</b>&nbsp;{{ selectedItem()!.supplier }}</span>
+          <span *ngIf="selectedItem()!.location"><b>Location:</b>&nbsp;{{ selectedItem()!.location }}</span>
+          <span *ngIf="selectedItem()!.batchNumber"><b>Batch:</b>&nbsp;{{ selectedItem()!.batchNumber }}</span>
+          <span *ngIf="selectedItem()!.expiryDate"><b>Expiry:</b>&nbsp;{{ fmtDate(selectedItem()!.expiryDate) }}</span>
+          <span *ngIf="selectedItem()!.serialNumber"><b>S/N:</b>&nbsp;{{ selectedItem()!.serialNumber }}</span>
+        </div>
+      </div>
+      <div class="dm-actions">
+        <button class="btn btn-primary btn-sm" (click)="openInvAssignModal()" [disabled]="selectedItem()!.available <= 0">
+          <svg lucidePlus size="15"></svg>
+          <span>Assign</span>
+        </button>
+        <button class="btn btn-outline btn-sm" (click)="openEditItemModal(selectedItem()!)">Edit Item</button>
+        <button class="btn-icon" [matMenuTriggerFor]="moreMenu" title="More actions">
+          <svg lucideSettings size="17"></svg>
+        </button>
+        <mat-menu #moreMenu="matMenu" panelClass="custom-action-menu">
+          <button mat-menu-item *ngIf="selectedItem()!.itemType === 'CONSUMABLE'" (click)="openInvConsumeModal()">
+            <span class="menu-text">Record Consumption</span>
+          </button>
+          <button mat-menu-item *ngIf="selectedItem()!.itemType === 'CONSUMABLE'" (click)="openInvExpireModal()">
+            <span class="menu-text text-danger">Record Expiry</span>
+          </button>
+          <button mat-menu-item (click)="openInvAdjustModal()">
+            <span class="menu-text">Adjust Stock</span>
+          </button>
+          <button mat-menu-item *ngIf="selectedItem()!.status === 'ACTIVE'" (click)="setItemStatus(selectedItem()!, 'IN_REPAIR')">
+            <span class="menu-text">Mark Under Repair</span>
+          </button>
+          <button mat-menu-item *ngIf="selectedItem()!.status === 'IN_REPAIR'" (click)="setItemStatus(selectedItem()!, 'ACTIVE')">
+            <span class="menu-text">Mark Active</span>
+          </button>
+          <button mat-menu-item *ngIf="selectedItem()!.status !== 'RETIRED'" (click)="setItemStatus(selectedItem()!, 'RETIRED')">
+            <span class="menu-text">Retire Item</span>
+          </button>
+          <div class="menu-divider"></div>
+          <button mat-menu-item (click)="deleteInventoryItem(selectedItem()!)">
+            <span class="menu-text text-danger">Delete Item</span>
+          </button>
+        </mat-menu>
+        <button class="btn-close" (click)="closeItemDetail()" aria-label="Close">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="detail-modal-body">
+      <!-- Summary Cards -->
+      <div class="summary-cards">
+        <div class="sum-card">
+          <span class="sum-label">{{ selectedItem()!.itemType === 'ASSET' ? 'Total Assets' : 'Total Quantity' }}</span>
+          <span class="sum-value">{{ selectedItem()!.quantity }} <small>{{ selectedItem()!.unit }}</small></span>
+        </div>
+        <div class="sum-card sum-green">
+          <span class="sum-label">Available</span>
+          <span class="sum-value">{{ selectedItem()!.available }} <small>{{ selectedItem()!.unit }}</small></span>
+        </div>
+        <div class="sum-card sum-blue">
+          <span class="sum-label">Assigned</span>
+          <span class="sum-value">{{ selectedItem()!.netAssigned }} <small>{{ selectedItem()!.unit }}</small></span>
+        </div>
+        <div class="sum-card sum-slate">
+          <span class="sum-label">Returned</span>
+          <span class="sum-value">{{ selectedItem()!.returned }} <small>{{ selectedItem()!.unit }}</small></span>
+        </div>
+        <div class="sum-card sum-amber">
+          <span class="sum-label">Consumed</span>
+          <span class="sum-value">{{ selectedItem()!.consumed }} <small>{{ selectedItem()!.unit }}</small></span>
+        </div>
+        <div class="sum-card sum-rose">
+          <span class="sum-label">Expired</span>
+          <span class="sum-value">{{ selectedItem()!.expired }} <small>{{ selectedItem()!.unit }}</small></span>
+        </div>
+        <div class="sum-card sum-value-card">
+          <span class="sum-label">Total Value</span>
+          <span class="sum-value">{{ fmtMoney(selectedItem()!.totalValue) }}</span>
+        </div>
+      </div>
+
+      <!-- Transactions Section -->
+      <div class="txn-section">
+        <div class="txn-tabs-row">
+          <div class="txn-tabs">
+            <button class="txn-tab" [class.active]="detailTab() === 'ALL'" (click)="detailTab.set('ALL')">All Transactions</button>
+            <button class="txn-tab" [class.active]="detailTab() === 'ASSIGNMENT'" (click)="detailTab.set('ASSIGNMENT')">Assignments</button>
+            <button class="txn-tab" [class.active]="detailTab() === 'RETURN'" (click)="detailTab.set('RETURN')">Returns</button>
+            <button class="txn-tab" [class.active]="detailTab() === 'CONSUMPTION'" (click)="detailTab.set('CONSUMPTION')">Consumption</button>
+            <button class="txn-tab" [class.active]="detailTab() === 'ADJUSTMENT'" (click)="detailTab.set('ADJUSTMENT')">Adjustments</button>
+          </div>
+        </div>
+
+        <div class="txn-table-wrap" *ngIf="!detailLoading(); else txnLoading">
+          <table class="txn-table" *ngIf="filteredDetailTxns().length > 0; else txnEmpty">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th class="ta-r">Quantity</th>
+                <th>Assigned To / Location</th>
+                <th>Purpose / Notes</th>
+                <th>Return / Expiry Date</th>
+                <th>Created By</th>
+                <th class="ta-c">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of filteredDetailTxns()" class="txn-row" (click)="openTxnCheck(t)" title="Click to view transaction details">
+                <td class="nowrap">{{ fmtDate(t.date) }}</td>
+                <td><span class="txn-badge" [class]="typeBadgeClass(t)">{{ typeLabel(t) }}</span></td>
+                <td class="ta-r nowrap">
+                  <b *ngIf="t.type !== 'ADJUSTMENT' || t.quantity >= 0">{{ t.quantity }}</b>
+                  <b class="text-danger-cell" *ngIf="t.type === 'ADJUSTMENT' && t.quantity < 0">{{ t.quantity }}</b>&nbsp;<span class="txn-unit">{{ t.type === 'ADJUSTMENT' ? '' : selectedItem()!.unit }}</span>
+                </td>
+                <td>{{ txnParty(t) }}</td>
+                <td class="txn-purpose">{{ t.purpose || t.reason || '-' }}</td>
+                <td class="nowrap">
+                  {{ t.expectedReturnDate ? fmtDate(t.expectedReturnDate) : '-' }}
+                  <span class="outstanding-tag" *ngIf="t.type === 'ASSIGNMENT' && outstandingOf(t) <= 0">fully returned</span>
+                </td>
+                <td>{{ creatorName(t) }}</td>
+                <td class="ta-c" (click)="$event.stopPropagation()">
+                  <button class="btn btn-outline btn-xs btn-return" *ngIf="t.type === 'ASSIGNMENT' && outstandingOf(t) > 0" (click)="openInvReturnModal(t)">
+                    <svg lucideRotateCcw size="12"></svg>
+                    Return {{ outstandingOf(t) }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <ng-template #txnEmpty>
+            <div class="empty-txns">
+              <svg lucidePackage size="28"></svg>
+              <p>No transactions yet for this view</p>
+            </div>
+          </ng-template>
+        </div>
+        <ng-template #txnLoading>
+          <div class="empty-txns"><p>Loading transactions...</p></div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: TRANSACTION CHECK (single txn view) -->
+<!-- ========================================== -->
+<div class="modal-overlay-blur modal-overlay-top txn-check-overlay" *ngIf="isTxnCheckOpen() && checkedTxn()" (click)="isTxnCheckOpen.set(false)">
+  <div class="modal-panel panel-form txn-check-panel" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header">
+      <h3>Transaction Check</h3>
+      <button class="btn-close" (click)="isTxnCheckOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-panel-body">
+      <div class="tc-item-strip">
+        <span class="tc-item-name">{{ selectedItem()?.name }}</span>
+        <span *ngIf="selectedItem()?.batchNumber" class="tag-mono">Batch: {{ selectedItem()!.batchNumber }}</span>
+        <span class="txn-badge" [class]="typeBadgeClass(checkedTxn()!)">{{ typeLabel(checkedTxn()!) }}</span>
+      </div>
+
+      <div class="tc-grid">
+        <div class="tc-field">
+          <span class="tc-label">Date</span>
+          <span class="tc-value">{{ fmtDate(checkedTxn()!.date) }}</span>
+        </div>
+        <div class="tc-field">
+          <span class="tc-label">Quantity</span>
+          <span class="tc-value"><b>{{ checkedTxn()!.quantity > 0 && checkedTxn()!.type === 'ADJUSTMENT' ? '+' : '' }}{{ checkedTxn()!.quantity }}</b>&nbsp;{{ checkedTxn()!.type === 'ADJUSTMENT' ? '' : selectedItem()?.unit }}</span>
+        </div>
+        <div class="tc-field tc-full">
+          <span class="tc-label">{{ checkedTxn()!.type === 'PURCHASE' ? 'Vendor / Supplier' : 'Assigned To / Location' }}</span>
+          <span class="tc-value">{{ txnParty(checkedTxn()!) }}</span>
+        </div>
+        <div class="tc-field tc-full">
+          <span class="tc-label">Purpose / Notes</span>
+          <span class="tc-value">{{ checkedTxn()!.purpose || checkedTxn()!.reason || '-' }}</span>
+        </div>
+        <div class="tc-field">
+          <span class="tc-label">Return / Expiry Date</span>
+          <span class="tc-value">{{ checkedTxn()!.expectedReturnDate ? fmtDate(checkedTxn()!.expectedReturnDate) : '-' }}</span>
+        </div>
+        <div class="tc-field">
+          <span class="tc-label">Created By</span>
+          <span class="tc-value">{{ creatorName(checkedTxn()!) }}</span>
+        </div>
+      </div>
+
+      <!-- Assignment-specific: outstanding + linked returns -->
+      <ng-container *ngIf="checkedTxn()!.type === 'ASSIGNMENT'">
+        <div class="avail-strip">
+          <span>Total Assigned: <b>{{ checkedTxn()!.quantity }}</b></span>
+          <span>Returned: {{ (checkedTxn()!.linkedReturns || []).reduce((s, r) => s + (r.quantity || 0), 0) }}</span>
+          <span>Outstanding: <b>{{ outstandingOf(checkedTxn()!) }}</b></span>
+        </div>
+
+        <div class="form-section-title">Linked Returns</div>
+        <div class="tc-return-row" *ngFor="let r of checkedTxn()!.linkedReturns">
+          {{ fmtDate(r.date) }} ┬╖ {{ r.quantity }} {{ selectedItem()?.unit }} returned ┬╖ Condition: {{ r.conditionOnReturn || '-' }}
+        </div>
+        <p class="tc-none" *ngIf="!checkedTxn()!.linkedReturns?.length">No returns recorded yet.</p>
+      </ng-container>
+    </div>
+    <div class="modal-panel-footer">
+      <button class="btn btn-outline" (click)="isTxnCheckOpen.set(false)">Close</button>
+      <button class="btn btn-primary" *ngIf="checkedTxn()!.type === 'ASSIGNMENT' && outstandingOf(checkedTxn()!) > 0" (click)="openInvReturnModal(checkedTxn()!)">
+        <svg lucideRotateCcw size="14"></svg>
+        Return {{ outstandingOf(checkedTxn()!) }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADD / EDIT INVENTORY ITEM           -->
+<!-- ========================================== -->
+<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvItemFormOpen()" (click)="isInvItemFormOpen.set(false)">
+  <div class="modal-panel" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header">
+      <h3>{{ invItemForm.id != null ? 'Edit Inventory Item' : 'Add New Inventory Item' }}</h3>
+      <button class="btn-close" (click)="isInvItemFormOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-panel-body">
+      <div class="form-section-title">Basic Information</div>
+      <div class="form-group">
+        <label class="form-label">Item Name <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="invItemForm.name" placeholder="e.g. Parle Monaco Biscuit / Dell Latitude 5440">
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Category</label>
+          <select class="form-control" [(ngModel)]="invItemForm.category" (change)="onCategoryChange()">
+            <option *ngFor="let c of categories" [value]="c.value">{{ c.label }}</option>
+          </select>
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Brand</label>
+          <input type="text" class="form-control" [(ngModel)]="invItemForm.brand" placeholder="Parle, Dell, Classmate...">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Item Type</label>
+          <select class="form-control" [(ngModel)]="invItemForm.itemType">
+            <option value="CONSUMABLE">Consumable / Perishable</option>
+            <option value="ASSET">Durable Asset</option>
+          </select>
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Unit</label>
+          <select class="form-control" [(ngModel)]="invItemForm.unit">
+            <option *ngFor="let u of unitOptions" [value]="u">{{ u }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-section-title">Purchase Details</div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">
+            Quantity <span class="text-danger">*</span>
+            <span class="label-hint" *ngIf="invItemForm.id != null">(locked - use Adjust Stock)</span>
+          </label>
+          <input type="number" min="0" step="1" class="form-control" [(ngModel)]="invItemForm.quantity"
+                 [readonly]="invItemForm.id != null" placeholder="10">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Unit Cost (Γé╣)</label>
+          <input type="number" min="0" step="0.01" class="form-control" [(ngModel)]="invItemForm.unitCost" placeholder="50">
+        </div>
+      </div>
+      <div class="total-cost-strip">
+        <span>Total Cost (auto-calculated)</span>
+        <b>{{ fmtMoney(invTotalCostPreview) }}</b>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Purchase Date</label>
+          <input type="date" class="form-control" [(ngModel)]="invItemForm.purchaseDate">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Supplier / Vendor</label>
+          <input type="text" class="form-control" [(ngModel)]="invItemForm.supplier" placeholder="Metro Store">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Batch Number <span class="label-hint">(optional)</span></label>
+          <input type="text" class="form-control font-mono" [(ngModel)]="invItemForm.batchNumber" placeholder="BATCH-001">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Location / Storage</label>
+          <input type="text" class="form-control" [(ngModel)]="invItemForm.location" placeholder="Pantry - 2nd Floor">
+        </div>
+      </div>
+
+      <!-- Consumable-only -->
+      <div *ngIf="showConsumableFields">
+        <div class="form-section-title">Consumable Details</div>
+        <div class="form-group">
+          <label class="form-label">Expiry Date <span class="label-hint">(optional)</span></label>
+          <input type="date" class="form-control" [(ngModel)]="invItemForm.expiryDate">
+        </div>
+      </div>
+
+      <!-- IT-asset-only -->
+      <div *ngIf="isItCategory">
+        <div class="form-section-title">IT Asset Details</div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label class="form-label">Model</label>
+            <input type="text" class="form-control" [(ngModel)]="invItemForm.model" placeholder="Latitude 5440">
+          </div>
+          <div class="form-group col-6">
+            <label class="form-label">Serial Number</label>
+            <input type="text" class="form-control font-mono" [(ngModel)]="invItemForm.serialNumber" placeholder="SN123456789">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Warranty Expiry</label>
+          <input type="date" class="form-control" [(ngModel)]="invItemForm.warrantyExpiry">
+        </div>
+      </div>
+
+      <div class="form-section-title">Notes</div>
+      <div class="form-group">
+        <textarea class="form-control" rows="2" [(ngModel)]="invItemForm.notes" placeholder="Any additional information..."></textarea>
+      </div>
+    </div>
+    <div class="modal-panel-footer">
+      <button class="btn btn-outline" (click)="isInvItemFormOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="saveInventoryItem()" [disabled]="savingItem()">
+        {{ savingItem() ? 'Saving...' : (invItemForm.id != null ? 'Save Changes' : 'Add Item') }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ASSIGN INVENTORY ITEM               -->
+<!-- ========================================== -->
+<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvAssignOpen() && selectedItem()" (click)="isInvAssignOpen.set(false)">
+  <div class="modal-panel panel-form" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header">
+      <h3>Assign "{{ selectedItem()!.name }}"</h3>
+      <button class="btn-close" (click)="isInvAssignOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-panel-body">
+      <div class="avail-strip">
+        <span>Available: <b>{{ selectedItem()!.available }}</b>&nbsp;{{ selectedItem()!.unit }}</span>
+        <span>Total: {{ selectedItem()!.quantity }} ┬╖ Assigned: {{ selectedItem()!.netAssigned }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Assign To</label>
+        <div class="mode-toggle">
+          <button type="button" class="mode-btn" [class.active]="invAssignForm.mode === 'EMPLOYEE'" (click)="invAssignForm.mode = 'EMPLOYEE'">Employee</button>
+          <button type="button" class="mode-btn" [class.active]="invAssignForm.mode === 'LOCATION'" (click)="invAssignForm.mode = 'LOCATION'">Person / Location</button>
+        </div>
+      </div>
+
+      <div class="form-group" *ngIf="invAssignForm.mode === 'EMPLOYEE'">
+        <label class="form-label">Select Employee <span class="text-danger">*</span></label>
+        <select class="form-control" [(ngModel)]="invAssignForm.employeeId">
+          <option [ngValue]="null" disabled>-- Choose Employee --</option>
+          <option *ngFor="let emp of employees()" [ngValue]="emp.id">
+            {{ emp.firstName }} {{ emp.lastName }} ({{ emp.department?.name || 'Employee' }})
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group" *ngIf="invAssignForm.mode === 'LOCATION'">
+        <label class="form-label">Person / Location <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="invAssignForm.assigneeText" placeholder="Pantry - 2nd Floor / Reception desk">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Quantity to Assign <span class="text-danger">*</span></label>
+          <input type="number" min="1" [max]="selectedItem()!.available" step="1" class="form-control"
+                 [(ngModel)]="invAssignForm.quantity" placeholder="Max {{ selectedItem()!.available }}">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Assignment Date</label>
+          <input type="date" class="form-control" [(ngModel)]="invAssignForm.date">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Expected Return Date <span class="label-hint">(optional)</span></label>
+        <input type="date" class="form-control" [(ngModel)]="invAssignForm.expectedReturnDate">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Purpose / Notes</label>
+        <textarea class="form-control" rows="2" [(ngModel)]="invAssignForm.purpose" placeholder="Daily office use..."></textarea>
+      </div>
+
+      <div class="field-error" *ngIf="invAssignError()">{{ invAssignError() }}</div>
+    </div>
+    <div class="modal-panel-footer">
+      <button class="btn btn-outline" (click)="isInvAssignOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitInvAssign()" [disabled]="invAssignSubmitting()">
+        {{ invAssignSubmitting() ? 'Saving...' : 'Submit Assignment' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: RETURN UNITS                        -->
+<!-- ========================================== -->
+<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvReturnOpen() && invReturnTarget()" (click)="isInvReturnOpen.set(false)">
+  <div class="modal-panel panel-form" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header">
+      <h3>Return Units</h3>
+      <button class="btn-close" (click)="isInvReturnOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-panel-body">
+      <div class="avail-strip">
+        <span>Outstanding: <b>{{ invReturnMax() }}</b>&nbsp;{{ selectedItem()?.unit }}</span>
+        <span *ngIf="invReturnTarget()?.employee">{{ invReturnTarget()!.employee!.firstName }} {{ invReturnTarget()!.employee!.lastName }}</span>
+        <span *ngIf="invReturnTarget()?.assigneeText">{{ invReturnTarget()!.assigneeText }}</span>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Quantity to Return <span class="text-danger">*</span></label>
+          <input type="number" min="1" [max]="invReturnMax()" step="1" class="form-control" [(ngModel)]="invReturnForm.quantity">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Return Date</label>
+          <input type="date" class="form-control" [(ngModel)]="invReturnForm.returnDate">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Condition on Return</label>
+        <select class="form-control" [(ngModel)]="invReturnForm.conditionOnReturn">
+          <option value="GOOD">Good</option>
+          <option value="FAIR">Fair</option>
+          <option value="NEEDS_REPAIR">Damaged / Needs Repair</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-control" rows="2" [(ngModel)]="invReturnForm.notes" placeholder="Unused packets returned..."></textarea>
+      </div>
+
+      <div class="field-error" *ngIf="invReturnError()">{{ invReturnError() }}</div>
+    </div>
+    <div class="modal-panel-footer">
+      <button class="btn btn-outline" (click)="isInvReturnOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitInvReturn()" [disabled]="invReturnSubmitting()">
+        {{ invReturnSubmitting() ? 'Saving...' : 'Confirm Return' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: RECORD CONSUMPTION                  -->
+<!-- ========================================== -->
+<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvConsumeOpen() && selectedItem()" (click)="isInvConsumeOpen.set(false)">
+  <div class="modal-panel panel-form" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header">
+      <h3>Record Consumption</h3>
+      <button class="btn-close" (click)="isInvConsumeOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-panel-body">
+      <div class="avail-strip">
+        <span>"{{ selectedItem()!.name }}"</span>
+        <span>Available: <b>{{ selectedItem()!.available }}</b>&nbsp;{{ selectedItem()!.unit }}</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Quantity Used <span class="text-danger">*</span></label>
+          <input type="number" min="1" [max]="selectedItem()!.available" step="1" class="form-control" [(ngModel)]="invConsumeForm.quantity">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" [(ngModel)]="invConsumeForm.date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Purpose / Notes</label>
+        <textarea class="form-control" rows="2" [(ngModel)]="invConsumeForm.purpose" placeholder="Office meeting refreshments..."></textarea>
+      </div>
+      <div class="field-error" *ngIf="invConsumeError()">{{ invConsumeError() }}</div>
+    </div>
+    <div class="modal-panel-footer">
+      <button class="btn btn-outline" (click)="isInvConsumeOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitInvConsume()" [disabled]="invConsumeSubmitting()">
+        {{ invConsumeSubmitting() ? 'Saving...' : 'Record Consumption' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: RECORD EXPIRY                       -->
+<!-- ========================================== -->
+<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvExpireOpen() && selectedItem()" (click)="isInvExpireOpen.set(false)">
+  <div class="modal-panel panel-form" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header">
+      <h3 style="color:#DC2626;">Record Expired Units</h3>
+      <button class="btn-close" (click)="isInvExpireOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-panel-body">
+      <div class="avail-strip">
+        <span>"{{ selectedItem()!.name }}"</span>
+        <span>Available: <b>{{ selectedItem()!.available }}</b>&nbsp;{{ selectedItem()!.unit }}</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Quantity Expired <span class="text-danger">*</span></label>
+          <input type="number" min="1" [max]="selectedItem()!.available" step="1" class="form-control" [(ngModel)]="invExpireForm.quantity">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" [(ngModel)]="invExpireForm.date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason / Notes</label>
+        <textarea class="form-control" rows="2" [(ngModel)]="invExpireForm.reason" placeholder="Past expiry date, discarded..."></textarea>
+      </div>
+      <div class="field-error" *ngIf="invExpireError()">{{ invExpireError() }}</div>
+    </div>
+    <div class="modal-panel-footer">
+      <button class="btn btn-outline" (click)="isInvExpireOpen.set(false)">Cancel</button>
+      <button class="btn btn-danger" (click)="submitInvExpire()" [disabled]="invExpireSubmitting()">
+        {{ invExpireSubmitting() ? 'Saving...' : 'Confirm Expiry' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADJUST STOCK                        -->
+<!-- ========================================== -->
+<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvAdjustOpen() && selectedItem()" (click)="isInvAdjustOpen.set(false)">
+  <div class="modal-panel panel-form" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header">
+      <h3>Adjust Stock</h3>
+      <button class="btn-close" (click)="isInvAdjustOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-panel-body">
+      <div class="avail-strip">
+        <span>Current Total: <b>{{ selectedItem()!.quantity }}</b></span>
+        <span>New Total: <b>{{ invAdjustNewTotal() }}</b></span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adjustment Quantity <span class="text-danger">*</span>
+          <span class="label-hint">use negative numbers to remove stock, e.g. -2</span>
+        </label>
+        <input type="number" step="1" class="form-control" [(ngModel)]="invAdjustForm.delta" placeholder="+5 or -2">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason</label>
+        <textarea class="form-control" rows="2" [(ngModel)]="invAdjustForm.reason" placeholder="Stock count correction, damaged units written off..."></textarea>
+      </div>
+      <div class="field-error" *ngIf="invAdjustError()">{{ invAdjustError() }}</div>
+    </div>
+    <div class="modal-panel-footer">
+      <button class="btn btn-outline" (click)="isInvAdjustOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitInvAdjust()" [disabled]="invAdjustSubmitting()">
+        {{ invAdjustSubmitting() ? 'Saving...' : 'Apply Adjustment' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- DRAWER: SUBMIT / EDIT HARDWARE REQUEST     -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isRequestDrawerOpen()" (click)="isRequestDrawerOpen.set(false)">
+  <div class="drawer-panel" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>{{ editingRequestId() ? 'Edit Hardware Request' : 'Submit Hardware Request' }}</h3>
+      <button class="btn-close" (click)="isRequestDrawerOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Request Type</label>
+          <select class="form-control" [(ngModel)]="requestForm.requestType">
+            <option value="NEW_DEVICE">New Device</option>
+            <option value="REPLACEMENT">Replacement</option>
+            <option value="REPAIR">Repair / Maintenance</option>
+            <option value="PERIPHERAL">Accessory / Peripheral</option>
+          </select>
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Category</label>
+          <select class="form-control" [(ngModel)]="requestForm.category">
+            <option value="LAPTOP">Laptop</option>
+            <option value="DESKTOP">Desktop</option>
+            <option value="MONITOR">Monitor</option>
+            <option value="PERIPHERAL">Keyboard / Mouse / Headset</option>
+            <option value="MOBILE">Mobile / Tablet</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Urgency Level</label>
+        <select class="form-control" [(ngModel)]="requestForm.urgency">
+          <option value="LOW">Low - Within 2 Weeks</option>
+          <option value="MEDIUM">Medium - Within 3-5 Days</option>
+          <option value="HIGH">High - Urgent / Work Stopped</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Reason / Justification <span class="text-danger">*</span></label>
+        <textarea class="form-control" rows="3" [(ngModel)]="requestForm.reason" placeholder="Explain why you need this hardware or describe the issue with your current device..."></textarea>
+      </div>
+
+      <!-- Multiple Images & Attachment Upload Section -->
+      <div class="form-group">
+        <label class="form-label">Photos / Attachments</label>
+        <input type="file" #requestFileInput multiple (change)="onRequestFileSelected($event)" accept="image/*" class="hidden-file-input">
+
+        <div class="upload-dropzone" (click)="requestFileInput.click()">
+          <div class="upload-icon-circle">
+            <svg lucideUploadCloud size="22"></svg>
+          </div>
+          <div class="upload-text-content">
+            <span class="upload-title">Click to upload photos or quotes</span>
+            <span class="upload-subtitle">PNG, JPG, WEBP (Max 5MB each, up to 5 files)</span>
+          </div>
+        </div>
+
+        <div class="image-previews-grid" *ngIf="requestForm.images.length > 0">
+          <div class="image-preview-card" *ngFor="let img of requestForm.images; let i = index">
+            <img [src]="img" alt="Request Attachment" class="preview-img">
+            <button type="button" class="btn-remove-img" (click)="removeRequestImage(i); $event.stopPropagation()">
+              <svg lucideX size="14"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isRequestDrawerOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitRequest()">{{ editingRequestId() ? 'Update Request' : 'Submit Request' }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: FULFILL HARDWARE REQUEST            -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isFulfillModalOpen()" (click)="isFulfillModalOpen.set(false)">
+  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>Fulfill & Assign Asset</h3>
+      <button class="btn-close" (click)="isFulfillModalOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <p class="text-sm text-secondary mb-3">Select an available asset from stock to fulfill this hardware request. It will be assigned to the employee automatically.</p>
+      <div class="form-group">
+        <label class="form-label">Select Available Asset</label>
+        <select class="form-control" [(ngModel)]="fulfillForm.fulfilledAssetId">
+          <option [ngValue]="0" disabled>-- Choose Stock Asset --</option>
+          <option *ngFor="let a of availableAssets()" [ngValue]="a.id">
+            [{{ a.assetTag }}] {{ a.name }} ({{ a.brand || a.category }})
+          </option>
+        </select>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isFulfillModalOpen.set(false)">Cancel</button>
+      <button class="btn btn-success" (click)="updateRequestStatus(fulfillForm.requestId, 'FULFILLED', undefined, fulfillForm.fulfilledAssetId)">Confirm Fulfillment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: RETURN LEGACY ASSET                 -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isReturnModalOpen()" (click)="isReturnModalOpen.set(false)">
+  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3>Return Asset to Stock</h3>
+      <button class="btn-close" (click)="isReturnModalOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="form-group">
+        <label class="form-label">Return Date</label>
+        <input type="date" class="form-control" [(ngModel)]="returnForm.returnDate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Condition on Return</label>
+        <select class="form-control" [(ngModel)]="returnForm.conditionOnReturn">
+          <option value="GOOD">Good</option>
+          <option value="NEEDS_REPAIR">Damaged / Needs Repair</option>
+          <option value="FAIR">Fair</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Next Stock Status</label>
+        <select class="form-control" [(ngModel)]="returnForm.assetNextStatus">
+          <option value="AVAILABLE">Available for Reassign</option>
+          <option value="IN_REPAIR">Under Maintenance / Repair</option>
+          <option value="RETIRED">Retire Asset</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Return Inspection Notes</label>
+        <textarea class="form-control" rows="2" [(ngModel)]="returnForm.notes" placeholder="Condition details upon return..."></textarea>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isReturnModalOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="submitReturn()">Confirm Return</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- IMAGE LIGHTBOX / VIEWER MODAL              -->
+<!-- ========================================== -->
+<div class="viewer-overlay" *ngIf="previewImages().length > 0" (click)="closeImageViewer()">
+  <div class="image-viewer-modal" (click)="$event.stopPropagation()">
+    <button class="btn-close-viewer" (click)="closeImageViewer()" title="Close Viewer">
+      <svg lucideX size="18"></svg>
+    </button>
+
+    <!-- Floating Prev Arrow -->
+    <button
+      type="button"
+      class="lightbox-nav-prev"
+      (click)="prevImage()"
+      *ngIf="previewImages().length > 1"
+      [disabled]="activeImageIndex() === 0"
+      title="Previous Image">
+      ΓÇ╣
+    </button>
+
+    <div class="image-viewer-content">
+      <img [src]="previewImages()[activeImageIndex()]" alt="Asset Photo Full View" class="full-preview-img">
+    </div>
+
+    <!-- Floating Next Arrow -->
+    <button
+      type="button"
+      class="lightbox-nav-next"
+      (click)="nextImage()"
+      *ngIf="previewImages().length > 1"
+      [disabled]="activeImageIndex() === previewImages().length - 1"
+      title="Next Image">
+      ΓÇ║
+    </button>
+
+    <div class="image-viewer-footer" *ngIf="previewImages().length > 1">
+      <span class="img-counter">{{ activeImageIndex() + 1 }} of {{ previewImages().length }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: REJECT HARDWARE REQUEST             -->
+<!-- ========================================== -->
+<div class="drawer-overlay" *ngIf="isRejectModalOpen()" (click)="isRejectModalOpen.set(false)">
+  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <h3 style="color: #DC2626;">Reject Hardware Request</h3>
+      <button class="btn-close" (click)="isRejectModalOpen.set(false)"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="drawer-body">
+      <p class="text-sm text-secondary mb-3">Please state the reason for declining this request. The employee will see this reason in their request history.</p>
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label mb-0">Rejection Reason <span class="text-danger">*</span></label>
+          <span style="font-size: 11px; color: #64748B; font-weight: 600;">{{ rejectForm.rejectionReason.length || 0 }}/100</span>
+        </div>
+        <textarea class="form-control" rows="3" maxlength="100" [(ngModel)]="rejectForm.rejectionReason" placeholder="E.g., Out of budget, Device currently unavailable, Incomplete justification..."></textarea>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn btn-outline" (click)="isRejectModalOpen.set(false)">Cancel</button>
+      <button class="btn btn-danger" (click)="submitReject()">Confirm Rejection</button>
+    </div>
+  </div>
+</div>
+
 <!-- DRAWER 1: ADD / EDIT ASSET -->
 <!-- ========================================== -->
 <div class="drawer-overlay" *ngIf="isAssetDrawerOpen()" (click)="isAssetDrawerOpen.set(false)">
@@ -232,7 +1058,7 @@
           <input type="date" class="form-control" [(ngModel)]="assetForm.purchaseDate">
         </div>
         <div class="form-group col-6" id="asset-field-cost">
-          <label class="form-label">Cost (₹)</label>
+          <label class="form-label">Cost (Γé╣)</label>
           <input type="number" class="form-control" [class.is-invalid]="assetFormErrors.cost" [(ngModel)]="assetForm.cost" (ngModelChange)="clearAssetError('cost')" placeholder="0.00">
           <small class="error-msg" *ngIf="assetFormErrors.cost">{{ assetFormErrors.cost }}</small>
         </div>
@@ -401,161 +1227,11 @@
   </div>
 </div>
 
-<!-- ========================================== -->
-<!-- MODAL 3: RETURN ASSET -->
-<!-- ========================================== -->
-<div class="drawer-overlay" *ngIf="isReturnModalOpen()" (click)="isReturnModalOpen.set(false)">
-  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
-    <div class="drawer-header">
-      <h3>Return Asset to Stock</h3>
-      <button class="btn-close" (click)="isReturnModalOpen.set(false)"><svg lucideX size="18"></svg></button>
-    </div>
-    <div class="drawer-body">
-      <div class="form-group">
-        <label class="form-label">Return Date</label>
-        <input type="date" class="form-control" [(ngModel)]="returnForm.returnDate">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Condition on Return</label>
-        <select class="form-control" [(ngModel)]="returnForm.conditionOnReturn">
-          <option value="GOOD">Good</option>
-          <option value="NEEDS_REPAIR">Damaged / Needs Repair</option>
-          <option value="FAIR">Fair</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Next Stock Status</label>
-        <select class="form-control" [(ngModel)]="returnForm.assetNextStatus">
-          <option value="AVAILABLE">Available for Reassign</option>
-          <option value="IN_REPAIR">Under Maintenance / Repair</option>
-          <option value="RETIRED">Retire Asset</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Return Inspection Notes</label>
-        <textarea class="form-control" rows="2" [(ngModel)]="returnForm.notes" placeholder="Condition details upon return..."></textarea>
-      </div>
-    </div>
-    <div class="drawer-footer">
-      <button class="btn btn-outline" (click)="isReturnModalOpen.set(false)">Cancel</button>
-      <button class="btn btn-primary" (click)="submitReturn()">Confirm Return</button>
-    </div>
-  </div>
-</div>
-
-<!-- ========================================== -->
-<!-- DRAWER 4: SUBMIT / EDIT HARDWARE REQUEST -->
-<!-- ========================================== -->
-<div class="drawer-overlay" *ngIf="isRequestDrawerOpen()" (click)="isRequestDrawerOpen.set(false)">
-  <div class="drawer-panel" (click)="$event.stopPropagation()">
-    <div class="drawer-header">
-      <h3>{{ editingRequestId() ? 'Edit Hardware Request' : 'Submit Hardware Request' }}</h3>
-      <button class="btn-close" (click)="isRequestDrawerOpen.set(false)"><svg lucideX size="18"></svg></button>
-    </div>
-    <div class="drawer-body">
-      <div class="form-row">
-        <div class="form-group col-6">
-          <label class="form-label">Request Type</label>
-          <select class="form-control" [(ngModel)]="requestForm.requestType">
-            <option value="NEW_DEVICE">New Device</option>
-            <option value="REPLACEMENT">Replacement</option>
-            <option value="REPAIR">Repair / Maintenance</option>
-            <option value="PERIPHERAL">Accessory / Peripheral</option>
-          </select>
-        </div>
-        <div class="form-group col-6">
-          <label class="form-label">Category</label>
-          <select class="form-control" [(ngModel)]="requestForm.category">
-            <option value="LAPTOP">Laptop</option>
-            <option value="DESKTOP">Desktop</option>
-            <option value="MONITOR">Monitor</option>
-            <option value="PERIPHERAL">Keyboard / Mouse / Headset</option>
-            <option value="MOBILE">Mobile / Tablet</option>
-            <option value="OTHER">Other</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Urgency Level</label>
-        <select class="form-control" [(ngModel)]="requestForm.urgency">
-          <option value="LOW">Low - Within 2 Weeks</option>
-          <option value="MEDIUM">Medium - Within 3-5 Days</option>
-          <option value="HIGH">High - Urgent / Work Stopped</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Reason / Justification <span class="text-danger">*</span></label>
-        <textarea class="form-control" rows="3" [(ngModel)]="requestForm.reason" placeholder="Explain why you need this hardware or describe the issue with your current device..."></textarea>
-      </div>
-
-      <!-- Multiple Images & Attachment Upload Section -->
-      <div class="form-group">
-        <label class="form-label">Photos / Attachments</label>
-        <input type="file" #requestFileInput multiple (change)="onRequestFileSelected($event)" accept="image/*" class="hidden-file-input">
-        
-        <div class="upload-dropzone" (click)="requestFileInput.click()">
-          <div class="upload-icon-circle">
-            <svg lucideUploadCloud size="22"></svg>
-          </div>
-          <div class="upload-text-content">
-            <span class="upload-title">Click to upload photos or quotes</span>
-            <span class="upload-subtitle">PNG, JPG, WEBP (Max 20MB each, up to 5 files)</span>
-          </div>
-        </div>
-
-        <div class="image-previews-grid" *ngIf="requestForm.images.length > 0">
-          <div class="image-preview-card" *ngFor="let img of requestForm.images; let i = index">
-            <img [src]="img" alt="Request Attachment" class="preview-img">
-            <button type="button" class="btn-remove-img" (click)="removeRequestImage(i); $event.stopPropagation()">
-              <svg lucideX size="14"></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="drawer-footer">
-      <button class="btn btn-outline" (click)="isRequestDrawerOpen.set(false)">Cancel</button>
-      <button class="btn btn-primary" (click)="submitRequest()">{{ editingRequestId() ? 'Update Request' : 'Submit Request' }}</button>
-    </div>
-  </div>
-</div>
-
-<!-- ========================================== -->
-<!-- MODAL 5: FULFILL HARDWARE REQUEST -->
-<!-- ========================================== -->
-<div class="drawer-overlay" *ngIf="isFulfillModalOpen()" (click)="isFulfillModalOpen.set(false)">
-  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
-    <div class="drawer-header">
-      <h3>Fulfill & Assign Asset</h3>
-      <button class="btn-close" (click)="isFulfillModalOpen.set(false)"><svg lucideX size="18"></svg></button>
-    </div>
-    <div class="drawer-body">
-      <p class="text-sm text-secondary mb-3">Select an available asset from inventory to fulfill this hardware request. It will be assigned to the employee automatically.</p>
-      <div class="form-group">
-        <label class="form-label">Select Available Asset</label>
-        <select class="form-control" [(ngModel)]="fulfillForm.fulfilledAssetId">
-          <option [ngValue]="0" disabled>-- Choose Stock Asset --</option>
-          <option *ngFor="let a of availableAssets()" [ngValue]="a.id">
-            [{{ a.assetTag }}] {{ a.name }} ({{ a.brand || a.category }})
-          </option>
-        </select>
-      </div>
-    </div>
-    <div class="drawer-footer">
-      <button class="btn btn-outline" (click)="isFulfillModalOpen.set(false)">Cancel</button>
-      <button class="btn btn-success" (click)="updateRequestStatus(fulfillForm.requestId, 'FULFILLED', undefined, fulfillForm.fulfilledAssetId)">Confirm Fulfillment</button>
-    </div>
-  </div>
-</div>
-
-<!-- ========================================== -->
 <!-- MODAL: VIEW ASSET DETAILS -->
 <!-- ========================================== -->
 <div class="drawer-overlay detail-overlay" *ngIf="isDetailModalOpen() && detailAsset()" (click)="closeDetailModal()">
-  <div class="detail-modal" (click)="$event.stopPropagation()">
-    <div class="detail-modal-header">
+  <div class="asset-detail-sheet" (click)="$event.stopPropagation()">
+    <div class="asset-detail-sheet-header">
       <div class="detail-title-group">
         <span class="tag-mono">{{ detailAsset()!.assetTag }}</span>
         <h3 class="detail-asset-name">{{ detailAsset()!.name }}</h3>
@@ -563,7 +1239,7 @@
       <button class="btn-close" (click)="closeDetailModal()"><svg lucideX size="18"></svg></button>
     </div>
 
-    <div class="detail-modal-body">
+    <div class="asset-detail-sheet-body">
       <!-- Photo Gallery -->
       <div class="detail-gallery" *ngIf="getDetailImages().length > 0">
         <img *ngFor="let img of getDetailImages(); let i = index"
@@ -572,7 +1248,7 @@
           title="Click to enlarge" />
       </div>
       <div class="detail-no-photo" *ngIf="getDetailImages().length === 0">
-        <span style="font-size:40px;">📷</span>
+        <span style="font-size:40px;">≡ƒô╖</span>
         <span>No photos uploaded</span>
       </div>
 
@@ -590,15 +1266,15 @@
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Brand</span>
-          <span class="detail-info-value">{{ detailAsset()!.brand || '—' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.brand || 'ΓÇö' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Model</span>
-          <span class="detail-info-value">{{ detailAsset()!.model || '—' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.model || 'ΓÇö' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Serial Number</span>
-          <span class="detail-info-value font-mono">{{ detailAsset()!.serialNumber || '—' }}</span>
+          <span class="detail-info-value font-mono">{{ detailAsset()!.serialNumber || 'ΓÇö' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Quantity</span>
@@ -606,19 +1282,19 @@
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Purchase Date</span>
-          <span class="detail-info-value">{{ detailAsset()!.purchaseDate ? (detailAsset()!.purchaseDate | date:'dd MMM yyyy') : '—' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.purchaseDate ? (detailAsset()!.purchaseDate | date:'dd MMM yyyy') : 'ΓÇö' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Cost</span>
-          <span class="detail-info-value">{{ detailAsset()!.cost ? ('₹' + detailAsset()!.cost!.toLocaleString('en-IN')) : '—' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.cost ? ('Γé╣' + detailAsset()!.cost!.toLocaleString('en-IN')) : 'ΓÇö' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Warranty Expiry</span>
-          <span class="detail-info-value">{{ detailAsset()!.warrantyExpiry ? (detailAsset()!.warrantyExpiry | date:'dd MMM yyyy') : '—' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.warrantyExpiry ? (detailAsset()!.warrantyExpiry | date:'dd MMM yyyy') : 'ΓÇö' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Location / Storage</span>
-          <span class="detail-info-value">{{ detailAsset()!.location || '—' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.location || 'ΓÇö' }}</span>
         </div>
 
         <!-- Specs (if available) -->
@@ -687,7 +1363,7 @@
       *ngIf="previewImages().length > 1"
       [disabled]="activeImageIndex() === 0"
       title="Previous Image">
-      ‹
+      ΓÇ╣
     </button>
 
     <div class="image-viewer-content">
@@ -702,37 +1378,11 @@
       *ngIf="previewImages().length > 1"
       [disabled]="activeImageIndex() === previewImages().length - 1"
       title="Next Image">
-      ›
+      ΓÇ║
     </button>
 
     <div class="image-viewer-footer" *ngIf="previewImages().length > 1">
       <span class="img-counter">{{ activeImageIndex() + 1 }} of {{ previewImages().length }}</span>
-    </div>
-  </div>
-</div>
-
-<!-- ========================================== -->
-<!-- MODAL 6: REJECT HARDWARE REQUEST -->
-<!-- ========================================== -->
-<div class="drawer-overlay" *ngIf="isRejectModalOpen()" (click)="isRejectModalOpen.set(false)">
-  <div class="drawer-panel panel-sm" (click)="$event.stopPropagation()">
-    <div class="drawer-header">
-      <h3 style="color: #DC2626;">Reject Hardware Request</h3>
-      <button class="btn-close" (click)="isRejectModalOpen.set(false)"><svg lucideX size="18"></svg></button>
-    </div>
-    <div class="drawer-body">
-      <p class="text-sm text-secondary mb-3">Please state the reason for declining this request. The employee will see this reason in their request history.</p>
-      <div class="form-group">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <label class="form-label mb-0">Rejection Reason <span class="text-danger">*</span></label>
-          <span style="font-size: 11px; color: #64748B; font-weight: 600;">{{ rejectForm.rejectionReason.length || 0 }}/100</span>
-        </div>
-        <textarea class="form-control" rows="3" maxlength="100" [(ngModel)]="rejectForm.rejectionReason" placeholder="E.g., Out of budget, Device currently unavailable, Incomplete justification..."></textarea>
-      </div>
-    </div>
-    <div class="drawer-footer">
-      <button class="btn btn-outline" (click)="isRejectModalOpen.set(false)">Cancel</button>
-      <button class="btn btn-danger" (click)="submitReject()">Confirm Rejection</button>
     </div>
   </div>
 </div>

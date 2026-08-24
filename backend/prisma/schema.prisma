@@ -32,9 +32,11 @@ model Company {
   expenseClaims       ExpenseClaim[]
   awardTypes          AwardType[]
   appreciations       Appreciation[]
-  assets              Asset[]
-  assetAssignments    AssetAssignment[]
-  hardwareRequests    HardwareRequest[]
+    assets              Asset[]
+    assetAssignments    AssetAssignment[]
+    hardwareRequests    HardwareRequest[]
+    inventoryItems      InventoryItem[]
+    inventoryTransactions InventoryTransaction[]
   jobs                Job[]
   jobApplications     JobApplication[]
   projects            Project[]
@@ -79,6 +81,7 @@ model User {
   approvedLeaveRequests    LeaveRequest[]
   approvedExpenseClaims    ExpenseClaim[]             @relation("ExpenseApprover")
   approvedHardwareRequests HardwareRequest[]          @relation("HardwareApprover")
+  createdInventoryTxns     InventoryTransaction[]     @relation("InventoryCreatedBy")
   notifications            Notification[]
   userRoles                UserRole[]
   userMenuBookmarks        UserMenuBookmark[]
@@ -246,6 +249,7 @@ model Employee {
   payslips          Payslip[]
   expenseClaims     ExpenseClaim[]
   assetAssignments  AssetAssignment[]
+  inventoryTxns     InventoryTransaction[]
   hardwareRequests  HardwareRequest[]
   interviews        Interview[]
   skills            EmployeeSkill[]
@@ -671,6 +675,64 @@ model HardwareRequest {
   company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// Product/Batch-based Inventory (Assets & IT)
+model InventoryItem {
+  id             Int       @id @default(autoincrement())
+  name           String
+  brand          String?
+  category       String    @default("OTHER") // LAPTOP, DESKTOP, MONITOR, PRINTER, PERIPHERAL, MOBILE, FURNITURE, PANTRY, STATIONERY, HOUSEKEEPING, OTHER
+  itemType       String    @default("CONSUMABLE") // ASSET (non-perishable) | CONSUMABLE (perishable/quantified)
+  unit           String    @default("units") // packets, pcs, boxes, bottles...
+  quantity       Int       @default(0) // total purchased quantity (immutable; changed only via transactions)
+  unitCost       Float     @default(0)
+  purchaseDate   DateTime?
+  supplier       String?
+  batchNumber    String?
+  expiryDate     DateTime?
+  location       String?
+  model          String?
+  serialNumber   String?
+  warrantyExpiry DateTime?
+  notes          String?   @db.Text
+  status         String    @default("ACTIVE") // ACTIVE, IN_REPAIR, RETIRED
+  companyId      Int
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions   InventoryTransaction[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([companyId])
+}
+
+// Transaction ledger against an InventoryItem. All quantities are derived from this history.
+model InventoryTransaction {
+  id                  Int                   @id @default(autoincrement())
+  itemId              Int
+  item                InventoryItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  type                String                // PURCHASE, ASSIGNMENT, RETURN, CONSUMPTION, EXPIRED, ADJUSTMENT
+  quantity            Int                   // units involved (signed for ADJUSTMENT)
+  date                DateTime              @default(now())
+  employeeId          Int?
+  employee            Employee?             @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  assigneeText        String?               // free-text person/location e.g. "Pantry - 2nd Floor"
+  expectedReturnDate  DateTime?
+  parentTransactionId Int?                  // RETURN links back to its ASSIGNMENT
+  parentTransaction   InventoryTransaction? @relation("InventoryTxnLink", fields: [parentTransactionId], references: [id], onDelete: SetNull)
+  linkedReturns       InventoryTransaction[] @relation("InventoryTxnLink")
+  purpose             String?
+  conditionOnReturn   String?
+  reason              String?               // adjustment/expiry reason
+  createdById         Int?
+  createdBy           User?                 @relation("InventoryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  companyId           Int
+  company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([itemId])
+  @@index([companyId])
 }
 
 // Recruitment & ATS

@@ -76,6 +76,59 @@ export interface HardwareRequest {
   createdAt: string;
 }
 
+export interface InventoryItem {
+  id: number;
+  name: string;
+  brand?: string;
+  category: string;
+  itemType: 'ASSET' | 'CONSUMABLE';
+  unit: string;
+  quantity: number;
+  unitCost: number;
+  purchaseDate?: string;
+  supplier?: string;
+  batchNumber?: string;
+  expiryDate?: string;
+  location?: string;
+  model?: string;
+  serialNumber?: string;
+  warrantyExpiry?: string;
+  notes?: string;
+  status: 'ACTIVE' | 'IN_REPAIR' | 'RETIRED';
+  // Derived server-side from the transaction ledger
+  grossAssigned: number;
+  netAssigned: number;
+  returned: number;
+  consumed: number;
+  expired: number;
+  available: number;
+  totalValue: number;
+  statusLabel: string;
+  lowStock: boolean;
+  expiringSoon: boolean;
+  createdAt: string;
+}
+
+export interface InventoryTransaction {
+  id: number;
+  itemId: number;
+  type: 'PURCHASE' | 'ASSIGNMENT' | 'RETURN' | 'CONSUMPTION' | 'EXPIRED' | 'ADJUSTMENT';
+  quantity: number;
+  date: string;
+  employeeId?: number;
+  employee?: { id: number; firstName: string; lastName: string };
+  assigneeText?: string;
+  expectedReturnDate?: string;
+  parentTransactionId?: number;
+  linkedReturns?: { id: number; quantity: number; date?: string; conditionOnReturn?: string; notes?: string }[];
+  purpose?: string;
+  conditionOnReturn?: string;
+  reason?: string;
+  createdById?: number;
+  createdBy?: { id: number; email: string; role: string };
+  createdAt: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -121,9 +174,7 @@ export class AssetService {
   // 3. Hardware Requests
   getHardwareRequests(): Observable<HardwareRequest[]> {
     return this.http.get<HardwareRequest[]>(`${this.apiUrl}/requests`);
-  }
-
-  createHardwareRequest(data: { requestType: string; category: string; urgency: string; reason: string; images?: string[] }): Observable<HardwareRequest> {
+  }  createHardwareRequest(data: { requestType: string; category: string; urgency: string; reason: string; images?: string[] }): Observable<HardwareRequest> {
     return this.http.post<HardwareRequest>(`${this.apiUrl}/requests`, data);
   }
 
@@ -137,5 +188,69 @@ export class AssetService {
 
   updateHardwareRequestStatus(id: number, data: { status: string; rejectionReason?: string; fulfilledAssetId?: number }): Observable<HardwareRequest> {
     return this.http.put<HardwareRequest>(`${this.apiUrl}/requests/${id}/status`, data);
+  }
+
+  // 4. Product/Batch Inventory
+  getInventoryItems(): Observable<InventoryItem[]> {
+    return this.http.get<InventoryItem[]>(`${this.apiUrl}/inventory`);
+  }
+
+  getInventoryAssignments(): Observable<InventoryTransaction[]> {
+    return this.http.get<InventoryTransaction[]>(`${this.apiUrl}/inventory/assignments`);
+  }
+
+  createInventoryItem(data: any): Observable<InventoryItem> {
+    return this.http.post<InventoryItem>(`${this.apiUrl}/inventory`, data);
+  }
+
+  importInventoryItems(rows: any[]): Observable<{ created: number; failed: number; errors: any[] }> {
+    return this.http.post<{ created: number; failed: number; errors: any[] }>(`${this.apiUrl}/inventory/import`, { rows });
+  }
+
+  updateInventoryItem(id: number, data: any): Observable<InventoryItem> {
+    return this.http.put<InventoryItem>(`${this.apiUrl}/inventory/${id}`, data);
+  }
+
+  setInventoryItemStatus(id: number, status: string): Observable<InventoryItem> {
+    return this.http.put<InventoryItem>(`${this.apiUrl}/inventory/${id}/status`, { status });
+  }
+
+  deleteInventoryItem(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/inventory/${id}`);
+  }
+
+  getInventoryTransactions(itemId: number): Observable<InventoryTransaction[]> {
+    return this.http.get<InventoryTransaction[]>(`${this.apiUrl}/inventory/${itemId}/transactions`);
+  }
+
+  assignInventoryItem(itemId: number, data: {
+    quantity: number; employeeId?: number; assigneeText?: string;
+    date?: string; expectedReturnDate?: string; purpose?: string;
+  }): Observable<InventoryTransaction> {
+    return this.http.post<InventoryTransaction>(`${this.apiUrl}/inventory/${itemId}/assign`, data);
+  }
+
+  returnInventoryUnits(txnId: number, data: {
+    quantity: number; returnDate?: string; conditionOnReturn?: string; notes?: string;
+  }): Observable<InventoryTransaction> {
+    return this.http.put<InventoryTransaction>(`${this.apiUrl}/inventory/transactions/${txnId}/return`, data);
+  }
+
+  consumeInventoryItem(itemId: number, data: {
+    quantity: number; date?: string; location?: string; purpose?: string;
+  }): Observable<InventoryTransaction> {
+    return this.http.post<InventoryTransaction>(`${this.apiUrl}/inventory/${itemId}/consume`, data);
+  }
+
+  expireInventoryItem(itemId: number, data: {
+    quantity: number; date?: string; reason?: string;
+  }): Observable<InventoryTransaction> {
+    return this.http.post<InventoryTransaction>(`${this.apiUrl}/inventory/${itemId}/expire`, data);
+  }
+
+  adjustInventoryStock(itemId: number, data: {
+    delta: number; date?: string; reason?: string;
+  }): Observable<InventoryTransaction> {
+    return this.http.post<InventoryTransaction>(`${this.apiUrl}/inventory/${itemId}/adjust`, data);
   }
 }

@@ -5,26 +5,34 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef } from 'ag-grid-community';
 import { MatMenuModule } from '@angular/material/menu';
-import { AssetService, Asset, AssetAssignment, HardwareRequest } from '../services/asset.service';
+import { AssetService, Asset, AssetAssignment, HardwareRequest, InventoryItem, InventoryTransaction } from '../services/asset.service';
 import { EmployeeService, Employee } from '../services/employee.service';
 import { UploadService } from '../services/upload.service';
 import { AuthService } from '../services/auth.service';
 import { PermissionsService } from '../services/permissions.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { 
-  LucideLaptop, 
-  LucidePlus, 
-  LucideSearch, 
-  LucideFilter, 
-  LucideUserCheck, 
-  LucideCheckCircle, 
-  LucideWrench, 
-  LucideMoreHorizontal, 
+import {
+  LucideLaptop,
+  LucidePlus,
+  LucideSearch,
+  LucideFilter,
+  LucideUserCheck,
+  LucideCheckCircle,
+  LucideWrench,
+  LucideMoreHorizontal,
   LucideX,
   LucideClock,
   LucideUploadCloud,
   LucideTrash2,
-  LucideImage
+  LucideImage,
+  LucidePackage,
+  LucideLayers,
+  LucideDownload,
+  LucideRotateCcw,
+  LucideAlertTriangle,
+  LucideArchive,
+  LucideIndianRupee,
+  LucideSettings
 } from '@lucide/angular';
 
 import { AssetActionCellRendererComponent } from '../shared/components/asset-action-cell-renderer.component';
@@ -40,7 +48,10 @@ interface AssetFormErrors {
 
 function getCategoryClass(cat: string): string {
   const c = (cat || '').toLowerCase();
-  if (['laptop', 'desktop', 'monitor', 'software', 'mobile', 'peripheral'].includes(c)) {
+  if (['laptop', 'desktop', 'monitor', 'printer', 'software', 'mobile', 'peripheral'].includes(c)) {
+    return `cat-${c}`;
+  }
+  if (['furniture', 'pantry', 'stationery', 'housekeeping'].includes(c)) {
     return `cat-${c}`;
   }
   return 'cat-default';
@@ -61,6 +72,9 @@ function getUrgencyClass(urgency: string): string {
   return `urgency-${u}`;
 }
 
+const CONSUMABLE_CATEGORIES = ['PANTRY', 'STATIONERY', 'HOUSEKEEPING'];
+const IT_CATEGORIES = ['LAPTOP', 'DESKTOP', 'MONITOR', 'PRINTER', 'PERIPHERAL', 'MOBILE'];
+
 @Component({
   selector: 'app-assets',
   standalone: true,
@@ -78,6 +92,17 @@ function getUrgencyClass(urgency: string): string {
     LucideX,
     LucideClock,
     LucideUploadCloud,
+    LucideTrash2,
+    LucideImage,
+    LucidePackage,
+    LucideLayers,
+    LucideDownload,
+    LucideRotateCcw,
+    LucideAlertTriangle,
+    LucideArchive,
+    LucideIndianRupee,
+    LucideMoreHorizontal,
+    LucideSettings,
     SearchableSelectComponent
   ],
   providers: [DatePipe],
@@ -106,9 +131,30 @@ export class AssetsComponent implements OnInit {
   requests = signal<HardwareRequest[]>([]);
   employees = signal<Employee[]>([]);
 
+  // Product/Batch Inventory state
+  inventoryItems = signal<InventoryItem[]>([]);
+  inventoryAssignments = signal<any[]>([]);
+  inventoryLoading = signal<boolean>(false);
+
   readonly maxUploadFiles = 5;
   readonly maxUploadFileSizeMb = 20;
   readonly maxUploadFileSizeBytes = this.maxUploadFileSizeMb * 1024 * 1024;
+
+  // Category configuration (category-aware fields)
+  readonly categories: { value: string; label: string }[] = [
+    { value: 'PANTRY', label: 'Pantry Items' },
+    { value: 'STATIONERY', label: 'Stationery' },
+    { value: 'HOUSEKEEPING', label: 'Housekeeping' },
+    { value: 'FURNITURE', label: 'Furniture' },
+    { value: 'LAPTOP', label: 'Laptop' },
+    { value: 'DESKTOP', label: 'Desktop' },
+    { value: 'MONITOR', label: 'Monitor' },
+    { value: 'PRINTER', label: 'Printer' },
+    { value: 'PERIPHERAL', label: 'Keyboard / Mouse' },
+    { value: 'MOBILE', label: 'Mobile / Tablet' },
+    { value: 'OTHER', label: 'Other' }
+  ];
+  readonly unitOptions = ['units', 'pcs', 'packets', 'boxes', 'bottles', 'pairs', 'sets', 'kg', 'litres'];
 
   // User Auth Role
   currentUser = signal<any>(null);
@@ -120,21 +166,100 @@ export class AssetsComponent implements OnInit {
     return this.currentUser()?.role === 'SUPERADMIN';
   });
 
-  // KPI Metrics
-  totalAssetsCount = computed(() => this.assets().length);
-  assignedAssetsCount = computed(() => this.assets().filter(a => a.status === 'ASSIGNED').length);
-  availableAssetsCount = computed(() => this.assets().filter(a => a.status === 'AVAILABLE').length);
-  inRepairAssetsCount = computed(() => this.assets().filter(a => a.status === 'IN_REPAIR').length);
+  // Legacy KPI Metrics (requests tab)
   pendingRequestsCount = computed(() => this.requests().filter(r => r.status === 'PENDING').length);
+
+  // Inventory KPI Metrics
+  invTotalItems = computed(() => this.inventoryItems().length);
+  invTotalUnits = computed(() => this.inventoryItems().reduce((s, i) => s + (i.quantity || 0), 0));
+  invAvailableUnits = computed(() => this.inventoryItems().reduce((s, i) => s + (i.available || 0), 0));
+  invAssignedUnits = computed(() => this.inventoryItems().reduce((s, i) => s + (i.netAssigned || 0), 0));
+  invLowStockCount = computed(() => this.inventoryItems().filter(i => i.lowStock).length);
+  invExpiringCount = computed(() => this.inventoryItems().filter(i => i.expiringSoon && i.statusLabel !== 'Expired').length);
+  invExpiredCount = computed(() => this.inventoryItems().filter(i => i.statusLabel === 'Expired').length);
+  invTotalValue = computed(() => this.inventoryItems().reduce((s, i) => s + (i.totalValue || 0), 0));
 
   // Filter Query
   searchQuery = signal<string>('');
 
-  // Available Assets for assignment dropdown
+  // Available Assets for assignment dropdown (legacy hardware request fulfillment)
   availableAssets = computed(() => this.assets().filter(a => a.status === 'AVAILABLE'));
 
-  // Drawer & Modal States
-  isAssetDrawerOpen = signal<boolean>(false);
+  // ===== Item Detail Modal =====
+  isItemDetailOpen = signal<boolean>(false);
+  detailItemId = signal<number | null>(null);
+  detailTxns = signal<InventoryTransaction[]>([]);
+  detailLoading = signal<boolean>(false);
+  detailTab = signal<'ALL' | 'ASSIGNMENT' | 'RETURN' | 'CONSUMPTION' | 'ADJUSTMENT'>('ALL');
+
+  selectedItem = computed(() => this.inventoryItems().find(i => i.id === this.detailItemId()) || null);
+
+  filteredDetailTxns = computed(() => {
+    const tab = this.detailTab();
+    const txns = this.detailTxns();
+    switch (tab) {
+      case 'ASSIGNMENT': return txns.filter(t => t.type === 'ASSIGNMENT');
+      case 'RETURN': return txns.filter(t => t.type === 'RETURN');
+      case 'CONSUMPTION': return txns.filter(t => t.type === 'CONSUMPTION');
+      case 'ADJUSTMENT': return txns.filter(t => t.type === 'ADJUSTMENT' || t.type === 'EXPIRED');
+      default: return txns;
+    }
+  });
+
+  // ===== Inventory Item Form (Add/Edit) =====
+  isInvItemFormOpen = signal(false);
+  savingItem = signal(false);
+  invItemForm: any = this.emptyItemForm();
+
+  get isItCategory(): boolean {
+    return IT_CATEGORIES.includes(this.invItemForm.category);
+  }
+  get showConsumableFields(): boolean {
+    return this.invItemForm.itemType === 'CONSUMABLE';
+  }
+  get invTotalCostPreview(): number {
+    return (Number(this.invItemForm.quantity) || 0) * (Number(this.invItemForm.unitCost) || 0);
+  }
+
+  // ===== Assign / Return / Consume / Expire / Adjust modals =====
+  isInvAssignOpen = signal(false);
+  invAssignSubmitting = signal(false);
+  invAssignError = signal('');
+  invAssignForm: any = {};
+
+  isInvReturnOpen = signal(false);
+  invReturnSubmitting = signal(false);
+  invReturnError = signal('');
+  invReturnTarget = signal<InventoryTransaction | null>(null);
+  invReturnMax = signal(0);
+
+  isTxnCheckOpen = signal(false);
+  checkedTxn = signal<InventoryTransaction | null>(null);
+  invReturnForm: any = {};
+
+  isInvConsumeOpen = signal(false);
+  invConsumeSubmitting = signal(false);
+  invConsumeError = signal('');
+  invConsumeForm: any = {};
+
+  isInvExpireOpen = signal(false);
+  invExpireSubmitting = signal(false);
+  invExpireError = signal('');
+  invExpireForm: any = {};
+
+  isInvAdjustOpen = signal(false);
+  invAdjustSubmitting = signal(false);
+  invAdjustError = signal('');
+  invAdjustForm: any = {};
+  invAdjustNewTotal = computed(() => {
+    const item = this.selectedItem();
+    if (!item) return 0;
+    return Math.max(0, item.quantity + (Number(this.invAdjustForm.delta) || 0));
+  });
+
+  importing = signal(false);
+
+  // Drawer & Modal States (legacy flows)
   isAssignDrawerOpen = signal<boolean>(false);
   isReturnModalOpen = signal<boolean>(false);
   isRequestDrawerOpen = signal<boolean>(false);
@@ -271,45 +396,149 @@ export class AssetsComponent implements OnInit {
   paginationPageSize = 10;
   paginationPageSizeOptions = [10, 20, 50];
 
-  // AG Grid Inventory Columns
+  // ==========================================
+  // FORMATTERS & HELPERS
+  // ==========================================
+  fmtMoney(n?: number | null): string {
+    if (n === null || n === undefined || isNaN(n)) return '-';
+    return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  }
+
+  fmtDate(d?: string | Date | null): string {
+    if (!d) return '-';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  outstandingOf(t: InventoryTransaction): number {
+    const returned = (t.linkedReturns || []).reduce((s, r) => s + (r.quantity || 0), 0);
+    return Math.max(0, (t.quantity || 0) - returned);
+  }
+
+  txnParty(t: InventoryTransaction): string {
+    if (t.employee) return `${t.employee.firstName} ${t.employee.lastName}`;
+    if (t.assigneeText) return t.assigneeText;
+    return '-';
+  }
+
+  openTxnCheck(t: InventoryTransaction) {
+    this.checkedTxn.set(t);
+    this.isTxnCheckOpen.set(true);
+  }
+
+  creatorName(t: InventoryTransaction): string {
+    if (!t.createdBy) return '-';
+    return (t.createdBy.email || '').split('@')[0] || '-';
+  }
+
+  typeBadgeClass(t: InventoryTransaction): string {
+    switch (t.type) {
+      case 'PURCHASE': return 'txn-purchase';
+      case 'ASSIGNMENT': return 'txn-assigned';
+      case 'RETURN': return 'txn-returned';
+      case 'CONSUMPTION': return 'txn-consumed';
+      case 'EXPIRED': return 'txn-expired';
+      default: return 'txn-adjustment';
+    }
+  }
+
+  typeLabel(t: InventoryTransaction): string {
+    switch (t.type) {
+      case 'PURCHASE': return 'PURCHASE';
+      case 'ASSIGNMENT': return 'ASSIGNED';
+      case 'RETURN': return 'RETURNED';
+      case 'CONSUMPTION': return 'CONSUMED';
+      case 'EXPIRED': return 'EXPIRED';
+      case 'ADJUSTMENT': return t.quantity > 0 ? 'ADDED STOCK' : 'REMOVED STOCK';
+      default: return t.type;
+    }
+  }
+
+  statusClassFor(label: string): string {
+    switch (label) {
+      case 'In Stock': return 'status-in-stock';
+      case 'Partially Assigned': return 'status-partially-assigned';
+      case 'Fully Assigned': return 'status-fully-assigned';
+      case 'Expired': return 'status-expired';
+      case 'Out of Stock': return 'status-out-of-stock';
+      case 'Under Repair': return 'status-in-repair';
+      default: return 'status-retired';
+    }
+  }
+
+  getCatBadgeClass(cat?: string): string {
+    return getCategoryClass(cat || '');
+  }
+
+  getAssignmentRowId = (params: any) => params.data?.key || String(params.data?.id || '');
+
+  private emptyItemForm() {
+    return {
+      id: null as number | null,
+      name: '',
+      category: 'PANTRY',
+      itemType: 'CONSUMABLE',
+      brand: '',
+      unit: 'packets',
+      quantity: null as number | null,
+      unitCost: null as number | null,
+      purchaseDate: new Date().toISOString().split('T')[0],
+      supplier: '',
+      batchNumber: '',
+      expiryDate: '',
+      location: '',
+      model: '',
+      serialNumber: '',
+      warrantyExpiry: '',
+      notes: ''
+    };
+  }
+
+  onCategoryChange() {
+    const cat = this.invItemForm.category;
+    if (CONSUMABLE_CATEGORIES.includes(cat)) {
+      this.invItemForm.itemType = 'CONSUMABLE';
+      if (!this.unitOptions.includes(this.invItemForm.unit)) this.invItemForm.unit = 'packets';
+    } else if (IT_CATEGORIES.includes(cat)) {
+      this.invItemForm.itemType = 'ASSET';
+      this.invItemForm.unit = 'units';
+    } else if (cat === 'FURNITURE') {
+      this.invItemForm.itemType = 'ASSET';
+      this.invItemForm.unit = 'pcs';
+    }
+  }
+
+  // ==========================================
+  // INVENTORY GRID
+  // ==========================================
+  catLabel(cat?: string): string {
+    const c = String(cat || '').toUpperCase();
+    if (!c) return '-';
+    const found = this.categories.find(x => x.value === c);
+    return found ? found.label : c;
+  }
+
+  invRowHeight = (params: any): number => {
+    const nameLen = String(params?.data?.name || '').length;
+    return nameLen > 34 ? 72 : 56;
+  };
+
   inventoryColDefs: ColDef[] = [
     {
-      headerName: '',
-      field: 'images',
-      width: 68,
-      sortable: false,
-      filter: false,
-      cellRenderer: (params: any) => {
-        let imgs: string[] = [];
-        if (params.value) {
-          try { imgs = typeof params.value === 'string' ? JSON.parse(params.value) : params.value; } catch (e) { imgs = []; }
-        }
-        if (!imgs || imgs.length === 0) {
-          return `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><div style="width:40px;height:40px;border-radius:8px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:18px;">💻</div></div>`;
-        }
-        return `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><img src="${imgs[0]}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid #E2E8F0;" /></div>`;
-      }
-    },
-    {
-      headerName: 'Asset Tag & Name',
+      headerName: 'Item Name',
       field: 'name',
-      flex: 1.8,
-      minWidth: 240,
+      flex: 2.4,
+      minWidth: 220,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
-        const cat = params.data.category || '';
-        const catClass = getCategoryClass(cat);
-
+        const sub: string[] = [];
+        if (params.data.batchNumber) sub.push(`Batch: ${params.data.batchNumber}`);
+        if (params.data.location) sub.push(params.data.location);
         return `
-          <div class="cell-stacked">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="cell-title-bold">${params.data.name}</span>
-              <button data-view-detail="1" style="font-size:11px;font-weight:600;color:#F97316;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap;text-decoration:underline;text-underline-offset:2px;">View Details</button>
-            </div>
-            <div class="cell-subtitle-row">
-              <span class="tag-mono">${params.data.assetTag}</span>
-              <span class="cat-badge ${catClass}">${cat}</span>
-            </div>
+          <div class="cell-stacked" title="${params.data.name}">
+            <div class="cell-title-bold cell-wrap">${params.data.name}</div>
+            ${sub.length ? `<div class="cell-subtitle-row"><span>${sub.join(' • ')}</span></div>` : ''}
           </div>
         `;
       },
@@ -321,93 +550,186 @@ export class AssetsComponent implements OnInit {
       }
     },
     {
-      headerName: 'Brand & Model',
+      headerName: 'Brand',
       field: 'brand',
-      flex: 1.4,
+      flex: 1,
+      minWidth: 140,
+      valueGetter: (p: any) => p.data?.brand || '-'
+    },
+    {
+      headerName: 'Category',
+      field: 'category',
+      flex: 1.15,
       minWidth: 160,
-      valueGetter: (params: any) => {
-        const b = params.data?.brand || '';
-        const m = params.data?.model || '';
-        return b || m ? `${b} ${m}`.trim() : '-';
+      valueGetter: (p: any) => this.catLabel(p.data?.category),
+      cellRenderer: (params: any) => {
+        if (!params.value || params.value === '-') return '-';
+        const raw = String(params.data?.category || '');
+        return `<span class="cat-badge ${getCategoryClass(raw)}">${this.catLabel(raw)}</span>`;
       }
     },
-    { headerName: 'Serial No.', field: 'serialNumber', flex: 1.1, minWidth: 120, valueFormatter: p => p.value || '-' },
     {
-      headerName: 'Qty',
+      headerName: 'Quantity',
       field: 'quantity',
-      flex: 0.6,
-      minWidth: 70,
-      valueFormatter: (params: any) => params.value ?? 1
+      width: 100,
+      type: 'alignedCenter',
+      filter: 'agNumberColumnFilter',
+      cellRenderer: (params: any) => params.value != null ? `<span class="cell-num">${params.value}</span>` : '-'
     },
     {
-      headerName: 'Cost',
-      field: 'cost',
-      flex: 0.9,
-      minWidth: 100,
-      valueFormatter: (params: any) => params.value ? `₹${params.value.toLocaleString('en-IN')}` : '-'
+      headerName: 'Unit Cost',
+      field: 'unitCost',
+      width: 120,
+      type: 'rightAligned',
+      filter: 'agNumberColumnFilter',
+      valueFormatter: (p: any) => this.fmtMoney(p.value)
+    },
+    {
+      headerName: 'Total Value',
+      field: 'totalValue',
+      width: 140,
+      type: 'rightAligned',
+      filter: 'agNumberColumnFilter',
+      cellRenderer: (params: any) => `<span class="cell-num-strong">${this.fmtMoney(params.value)}</span>`
+    },
+    {
+      headerName: 'Purchase Date',
+      field: 'purchaseDate',
+      width: 148,
+      type: 'alignedCenter',
+      valueFormatter: () => '',
+      valueGetter: (p: any) => p.data?.purchaseDate || '',
+      cellRenderer: (params: any) => this.fmtDate(params.value)
+    },
+    {
+      headerName: 'Available',
+      field: 'available',
+      width: 110,
+      type: 'alignedCenter',
+      filter: 'agNumberColumnFilter',
+      cellRenderer: (params: any) => {
+        const v = params.value ?? 0;
+        if (v <= 0) return `<span class="cell-num text-danger-cell">0</span>`;
+        return `<span class="cell-num-strong" style="color:#059669;">${v}</span>`;
+      }
+    },
+    {
+      headerName: 'Assigned',
+      field: 'netAssigned',
+      width: 110,
+      type: 'alignedCenter',
+      filter: 'agNumberColumnFilter',
+      cellRenderer: (params: any) => {
+        const v = params.value ?? 0;
+        return v > 0 ? `<span class="cell-num-strong" style="color:#2563EB;">${v}</span>` : `<span class="cell-num">0</span>`;
+      }
     },
     {
       headerName: 'Status',
-      field: 'status',
-      flex: 1.1,
-      minWidth: 120,
+      field: 'statusLabel',
+      width: 138,
+      type: 'alignedCenter',
       cellRenderer: (params: any) => {
-        const s = params.value || '';
-        const statusClass = getStatusClass(s);
-
+        if (!params.data) return '';
+        const cls = this.statusClassFor(params.value || 'In Stock');
         return `
-          <span class="status-pill ${statusClass}">
-            <span class="status-dot"></span>
-            ${s}
-          </span>
+          <div class="status-stack">
+            <span class="status-pill ${cls}">
+              <span class="status-dot"></span>
+              ${params.value}
+            </span>
+          </div>
         `;
-      }
-    },
-    {
-      headerName: 'Current Assignee',
-      field: 'assignments',
-      flex: 1.3,
-      minWidth: 140,
-      valueGetter: (params: any) => {
-        const active = params.data?.assignments?.[0]?.employee;
-        return active ? `${active.firstName} ${active.lastName}` : 'Unassigned';
       }
     },
     {
       headerName: 'Actions',
       field: 'actions',
-      width: 90,
+      width: 96,
       sortable: false,
       filter: false,
       pinned: 'right',
       cellRenderer: AssetActionCellRendererComponent,
       cellRendererParams: {
-        onViewDetails: (data: Asset) => this.openDetailModal(data),
-        onEdit: (data: Asset) => this.openEditAssetDrawer(data),
-        onAssign: (data: Asset) => this.openAssignDrawer(data.id),
-        onDelete: (data: Asset) => this.deleteAsset(data)
+        editLabel: 'Edit Item',
+        onEdit: (data: InventoryItem) => this.openEditItemModal(data),
+        onAssign: (data: InventoryItem) => this.openDetailThenAssign(data.id),
+        onDelete: (data: InventoryItem) => this.deleteInventoryItem(data)
       }
     }
   ];
 
-  // AG Grid Assignments Columns
+  onInventoryRowClicked(event: any) {
+    if (!event?.data) return;
+    if (event.column?.getColId() === 'actions') return;
+    this.openItemDetail(event.data.id);
+  }
+
+  // ==========================================
+  // ASSIGNMENTS GRID (merged legacy + inventory)
+  // ==========================================
+  unifiedAssignments = computed(() => {
+    const invRows = this.inventoryAssignments().map((t: any) => ({
+      source: 'INVENTORY',
+      key: `I${t.id}`,
+      id: t.id,
+      itemName: t.item?.name || '-',
+      category: t.item?.category || '',
+      quantity: t.quantity,
+      returnedQty: (t.linkedReturns || []).reduce((s: number, r: any) => s + (r.quantity || 0), 0),
+      employee: t.employee || null,
+      assignedDate: t.date,
+      expectedReturnDate: t.expectedReturnDate || null,
+      purpose: t.purpose || t.assigneeText || '',
+      status: this.outstandingOf(t) > 0 ? 'ACTIVE' : 'RETURNED'
+    }));
+    const legacyRows = this.assignments().map(a => ({
+      source: 'ASSET',
+      key: `A${a.id}`,
+      id: a.id,
+      itemAsset: a.asset,
+      employee: a.employee || null,
+      assignedDate: a.assignedDate,
+      returnDate: a.returnDate || null,
+      conditionOnAssign: a.conditionOnAssign,
+      notes: a.notes,
+      status: a.status
+    }));
+    return [...invRows, ...legacyRows].sort(
+      (a, b) => new Date(b.assignedDate).getTime() - new Date(a.assignedDate).getTime()
+    );
+  });
+
   assignmentsColDefs: ColDef[] = [
     {
-      headerName: 'Asset Details',
-      field: 'asset.name',
-      flex: 1.5,
-      minWidth: 220,
+      headerName: 'Item / Asset',
+      field: 'itemName',
+      flex: 1.6,
+      minWidth: 200,
       cellRenderer: (params: any) => {
-        const a = params.data?.asset;
+        const d = params.data;
+        if (!d) return '-';
+        if (d.source === 'INVENTORY') {
+          const catClass = getCategoryClass(d.category);
+          return `
+            <div class="cell-stacked">
+              <div class="cell-title-bold">${d.itemName}</div>
+              <div class="cell-subtitle-row">
+                <span class="tag-mono">${d.outstanding}/${d.quantity} out</span>
+                ${d.category ? `<span class="cat-badge ${catClass}">${d.category}</span>` : ''}
+              </div>
+            </div>
+          `;
+        }
+        const a = d.itemAsset;
         if (!a) return '-';
-        const cat = a.category || '';
-        const catClass = getCategoryClass(cat);
+        const catClass = getCategoryClass(a.category || '');
         return `
           <div class="cell-stacked">
             <div class="cell-title-bold">${a.name}</div>
             <div class="cell-subtitle-row">
               <span class="tag-mono">${a.assetTag}</span>
-              ${cat ? `<span class="cat-badge ${catClass}">${cat}</span>` : ''}
+              ${a.category ? `<span class="cat-badge ${catClass}">${a.category}</span>` : ''}
             </div>
           </div>
         `;
@@ -416,9 +738,8 @@ export class AssetsComponent implements OnInit {
     {
       headerName: 'Assigned Employee',
       field: 'employee',
-      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
       flex: 1.4,
-      minWidth: 200,
+      minWidth: 190,
       cellRenderer: (params: any) => {
         const emp = params.data?.employee;
         if (!emp) return '-';
@@ -427,9 +748,9 @@ export class AssetsComponent implements OnInit {
         const dept = emp.department?.name || 'Employee';
         const avatarUrl = emp.avatarUrl || emp.user?.avatarUrl;
 
-        const avatarHtml = avatarUrl 
-            ? `<img src="${avatarUrl}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid #E2E8F0;" />`
-            : `<div class="avatar-circle-sm">${initial}</div>`;
+        const avatarHtml = avatarUrl
+          ? `<img src="${avatarUrl}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid #E2E8F0;" />`
+          : `<div class="avatar-circle-sm">${initial}</div>`;
 
         return `
           <div class="cell-user-avatar-row">
@@ -447,45 +768,63 @@ export class AssetsComponent implements OnInit {
       field: 'assignedDate',
       flex: 1,
       minWidth: 120,
-      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
+      valueGetter: (p: any) => p.data?.assignedDate || '',
+      cellRenderer: (params: any) => this.fmtDate(params.value)
     },
-    { 
-      headerName: 'Condition', 
-      field: 'conditionOnAssign', 
-      flex: 1,
-      minWidth: 120,
+    {
+      headerName: 'Qty',
+      field: 'quantity',
+      flex: 0.7,
+      minWidth: 80,
+      type: 'rightAligned',
+      valueGetter: (p: any) => p.data?.source === 'INVENTORY' ? `${p.data.outstanding}/${p.data.quantity}` : '1'
+    },
+    {
+      headerName: 'Condition',
+      field: 'conditionOnAssign',
+      flex: 0.9,
+      minWidth: 110,
       cellRenderer: (params: any) => {
-        const c = params.value || 'GOOD';
+        const d = params.data;
+        if (d?.source !== 'ASSET' || !d.conditionOnAssign) return '<span style="color:#94A3B8;font-size:12px;">-</span>';
+        const c = d.conditionOnAssign;
         const condClass = getConditionClass(c);
-        const label = c.replace('_', ' ');
-        return `
-          <span class="badge-condition ${condClass}">
-            ${label}
-          </span>
-        `;
+        return `<span class="badge-condition ${condClass}">${c.replace('_', ' ')}</span>`;
       }
     },
     {
-      headerName: 'Return Date',
-      field: 'returnDate',
-      flex: 1,
-      minWidth: 120,
-      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
+      headerName: 'Return / Expected',
+      field: 'expectedReturnDate',
+      flex: 1.15,
+      minWidth: 130,
+      valueGetter: (p: any) => {
+        const d = p.data;
+        if (!d) return '';
+        return d.source === 'INVENTORY' ? (d.expectedReturnDate || '') : (d.returnDate || '');
+      },
+      cellRenderer: (params: any) => this.fmtDate(params.value)
     },
     {
       headerName: 'Status',
       field: 'status',
       flex: 1,
-      minWidth: 120,
+      minWidth: 115,
       cellRenderer: (params: any) => {
         const s = params.value;
         const isAssigned = s === 'ACTIVE';
         const statusClass = isAssigned ? 'status-assigned' : 'status-returned';
+        let extra = '';
+        if (params.data?.source === 'INVENTORY' && params.data.returnedQty > 0) {
+          extra = `<div style="font-size:10px;color:#64748B;margin-top:2px;">${params.data.returnedQty} returned</div>`;
+        }
         return `
-          <span class="status-round ${statusClass}">
-            <span class="status-dot"></span>
-            ${isAssigned ? 'ASSIGNED' : 'RETURNED'}
-          </span>
+          <div>
+            <span class="status-round ${statusClass}">
+              <span class="status-dot"></span>
+              ${isAssigned ? 'ASSIGNED' : 'RETURNED'}
+            </span>
+            ${extra}
+          </div>
         `;
       }
     },
@@ -498,9 +837,13 @@ export class AssetsComponent implements OnInit {
       pinned: 'right',
       cellRenderer: AssetActionCellRendererComponent,
       cellRendererParams: {
-        onReturn: (data: AssetAssignment) => {
-          if (data.status === 'ACTIVE' && this.isAdmin()) {
-            this.openReturnModal(data.id);
+        onReturn: (row: any) => {
+          if (row.status !== 'ACTIVE' || !this.isAdmin()) return;
+          if (row.source === 'INVENTORY') {
+            const txn = this.inventoryAssignments().find((t: any) => t.id === row.id);
+            if (txn) this.openInvReturnModal(txn);
+          } else {
+            this.openReturnModal(row.id);
           }
         }
       }
@@ -520,7 +863,7 @@ export class AssetsComponent implements OnInit {
         const initial = emp.firstName ? emp.firstName.charAt(0).toUpperCase() : 'U';
         const avatarUrl = emp.avatarUrl || emp.user?.avatarUrl;
 
-        const avatarHtml = avatarUrl 
+        const avatarHtml = avatarUrl
             ? `<img src="${avatarUrl}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid #E2E8F0;" />`
             : `<div class="avatar-circle-sm">${initial}</div>`;
 
@@ -699,8 +1042,10 @@ export class AssetsComponent implements OnInit {
   }
 
   loadAllData() {
+    this.loadInventory();
     this.assetService.getAllAssets().subscribe(res => this.assets.set(res));
     this.assetService.getAssignments().subscribe(res => this.assignments.set(res));
+    this.assetService.getInventoryAssignments().subscribe(res => this.inventoryAssignments.set(res));
     this.assetService.getHardwareRequests().subscribe(res => this.requests.set(res));
     this.employeeService.getEmployeesBasicList().subscribe(res => this.employees.set(res));
     this.assetService.getCategories().subscribe(res => this.customCategories.set(res || []));
@@ -833,6 +1178,20 @@ export class AssetsComponent implements OnInit {
     event.target.value = '';
   }
 
+  loadInventory() {
+    this.inventoryLoading.set(true);
+    this.assetService.getInventoryItems().subscribe({
+      next: res => {
+        this.inventoryItems.set(res);
+        this.inventoryLoading.set(false);
+      },
+      error: () => {
+        this.toast.error('Failed to load inventory');
+        this.inventoryLoading.set(false);
+      }
+    });
+  }
+
   private formatFileSize(bytes: number): string {
     if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
     return `${Math.ceil(bytes / 1024)}KB`;
@@ -852,8 +1211,14 @@ export class AssetsComponent implements OnInit {
     return `Failed to upload "${fileName}". Please try again.`;
   }
 
-  removeImage(index: number) {
-    this.assetForm.images.splice(index, 1);
+  /** Reload inventory list + refresh detail modal if open */
+  refreshInventoryData() {
+    this.loadInventory();
+    const openId = this.detailItemId();
+    if (openId != null) {
+      this.loadItemTransactions(openId);
+    }
+    this.assetService.getInventoryAssignments().subscribe(res => this.inventoryAssignments.set(res));
   }
 
   saveAsset() {
@@ -890,6 +1255,132 @@ export class AssetsComponent implements OnInit {
         error: (err) => {
           this.isSaving = false;
           this.toast.error(err.error?.message || 'Failed to create asset');
+        }
+      });
+    }
+  }
+
+  // ==========================================
+  // ITEM DETAIL MODAL
+  // ==========================================
+  openItemDetail(itemId: number) {
+    this.detailItemId.set(itemId);
+    this.detailTab.set('ALL');
+    this.isItemDetailOpen.set(true);
+    this.loadItemTransactions(itemId);
+  }
+
+  loadItemTransactions(itemId: number) {
+    this.detailLoading.set(true);
+    this.assetService.getInventoryTransactions(itemId).subscribe({
+      next: res => {
+        this.detailTxns.set(res);
+        this.detailLoading.set(false);
+      },
+      error: () => {
+        this.toast.error('Failed to load transaction history');
+        this.detailLoading.set(false);
+      }
+    });
+  }
+
+  closeItemDetail() {
+    this.isItemDetailOpen.set(false);
+    this.detailItemId.set(null);
+    this.detailTxns.set([]);
+  }
+
+  openDetailThenAssign(itemId: number) {
+    this.openItemDetail(itemId);
+    setTimeout(() => this.openInvAssignModal(), 50);
+  }
+
+  // ==========================================
+  // ADD / EDIT INVENTORY ITEM
+  // ==========================================
+  openAddItemModal() {
+    this.invItemForm = this.emptyItemForm();
+    this.isInvItemFormOpen.set(true);
+  }
+
+  openEditItemModal(item: InventoryItem) {
+    this.invItemForm = {
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      itemType: item.itemType,
+      brand: item.brand || '',
+      unit: item.unit || 'units',
+      quantity: item.quantity,
+      unitCost: item.unitCost,
+      purchaseDate: item.purchaseDate ? new Date(item.purchaseDate).toISOString().split('T')[0] : '',
+      supplier: item.supplier || '',
+      batchNumber: item.batchNumber || '',
+      expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
+      location: item.location || '',
+      model: item.model || '',
+      serialNumber: item.serialNumber || '',
+      warrantyExpiry: item.warrantyExpiry ? new Date(item.warrantyExpiry).toISOString().split('T')[0] : '',
+      notes: item.notes || ''
+    };
+    this.isInvItemFormOpen.set(true);
+  }
+
+  saveInventoryItem() {
+    const f = this.invItemForm;
+    if (!f.name || !String(f.name).trim()) {
+      this.toast.error('Item name is required');
+      return;
+    }
+    if (f.id == null && (f.quantity == null || Number(f.quantity) < 0 || !Number.isInteger(Number(f.quantity)))) {
+      return;
+    }
+
+    const payload: any = {
+      name: f.name.trim(),
+      category: f.category,
+      itemType: f.itemType,
+      brand: f.brand,
+      unit: f.unit,
+      unitCost: f.unitCost,
+      purchaseDate: f.purchaseDate || null,
+      supplier: f.supplier,
+      batchNumber: f.batchNumber,
+      expiryDate: f.showExpiry === false ? null : (f.expiryDate || null),
+      location: f.location,
+      model: this.isItCategory ? f.model : null,
+      serialNumber: this.isItCategory ? f.serialNumber : null,
+      warrantyExpiry: this.isItCategory ? (f.warrantyExpiry || null) : null,
+      notes: f.notes
+    };
+
+    this.savingItem.set(true);
+    if (f.id != null) {
+      delete payload.quantity;
+      this.assetService.updateInventoryItem(f.id, payload).subscribe({
+        next: () => {
+          this.toast.success('Item updated successfully');
+          this.savingItem.set(false);
+          this.isInvItemFormOpen.set(false);
+          this.refreshInventoryData();
+        },
+        error: (err) => {
+          this.toast.error(err.error?.message || 'Failed to update item');
+          this.savingItem.set(false);
+        }
+      });
+    } else {
+      payload.quantity = Number(f.quantity);
+      this.assetService.createInventoryItem(payload).subscribe({
+        next: () => {
+          this.toast.success('Item added to inventory');
+          this.savingItem.set(false);
+          this.isInvItemFormOpen.set(false);
+          this.refreshInventoryData();
+        },
+        error: (err) => {
+          this.toast.error(err.error?.message || 'Failed to create item');
+          this.savingItem.set(false);
         }
       });
     }
@@ -949,7 +1440,462 @@ export class AssetsComponent implements OnInit {
     });
   }
 
-  // 2. Assignment Drawer Actions
+  deleteInventoryItem(item: InventoryItem) {
+    if ((item.netAssigned || 0) > 0) {
+      this.toast.error(`${item.netAssigned} unit(s) still assigned. Record returns before deleting.`);
+      return;
+    }
+    if (!confirm(`Delete "${item.name}" and its full transaction history? This cannot be undone.`)) return;
+    this.assetService.deleteInventoryItem(item.id).subscribe({
+      next: () => {
+        this.toast.success('Item deleted');
+        if (this.detailItemId() === item.id) this.closeItemDetail();
+        this.refreshInventoryData();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Failed to delete item')
+    });
+  }
+
+  setItemStatus(item: InventoryItem, status: 'ACTIVE' | 'IN_REPAIR' | 'RETIRED') {
+    this.assetService.setInventoryItemStatus(item.id, status).subscribe({
+      next: () => {
+        this.toast.success(status === 'IN_REPAIR' ? 'Marked under repair' : status === 'RETIRED' ? 'Item retired' : 'Item marked active');
+        this.refreshInventoryData();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Failed to update status')
+    });
+  }
+
+  // ==========================================
+  // ASSIGN UNITS (+ button)
+  // ==========================================
+  openInvAssignModal() {
+    const item = this.selectedItem();
+    if (!item) return;
+    if (item.available <= 0) {
+      this.toast.error(`No units of "${item.name}" available to assign`);
+      return;
+    }
+    this.invAssignForm = {
+      mode: 'EMPLOYEE',
+      employeeId: null,
+      assigneeText: '',
+      quantity: null,
+      date: new Date().toISOString().split('T')[0],
+      expectedReturnDate: '',
+      purpose: ''
+    };
+    this.invAssignError.set('');
+    this.isInvAssignOpen.set(true);
+  }
+
+  submitInvAssign() {
+    const item = this.selectedItem();
+    if (!item) return;
+    const f = this.invAssignForm;
+    const qty = Number(f.quantity);
+
+    if (!qty || qty < 1 || !Number.isInteger(qty)) {
+      this.invAssignError.set('Enter a valid whole-number quantity');
+      return;
+    }
+    if (qty > item.available) {
+      this.invAssignError.set(`Cannot assign ${qty}: only ${item.available} of ${item.quantity} unit(s) available`);
+      return;
+    }
+    if (f.mode === 'EMPLOYEE' && !f.employeeId) {
+      this.invAssignError.set('Please select an employee');
+      return;
+    }
+    if (f.mode === 'LOCATION' && !f.assigneeText?.trim()) {
+      this.invAssignError.set('Please enter a person or location');
+      return;
+    }
+
+    const payload: any = {
+      quantity: qty,
+      date: f.date || new Date().toISOString().split('T')[0],
+      purpose: f.purpose
+    };
+    if (f.mode === 'EMPLOYEE') payload.employeeId = Number(f.employeeId);
+    else payload.assigneeText = f.assigneeText.trim();
+
+    if (item.itemType === 'CONSUMABLE') payload.expectedReturnDate = f.expectedReturnDate || null;
+    else payload.expectedReturnDate = f.expectedReturnDate || null;
+
+    this.invAssignSubmitting.set(true);
+    this.assetService.assignInventoryItem(item.id, payload).subscribe({
+      next: () => {
+        this.toast.success(`${qty} unit(s) of "${item.name}" assigned`);
+        this.invAssignSubmitting.set(false);
+        this.isInvAssignOpen.set(false);
+        this.refreshInventoryData();
+      },
+      error: (err) => {
+        this.invAssignError.set(err.error?.message || 'Failed to assign');
+        this.invAssignSubmitting.set(false);
+      }
+    });
+  }
+
+  // ==========================================
+  // RETURN UNITS
+  // ==========================================
+  openInvReturnModal(txn: InventoryTransaction) {
+    const max = this.outstandingOf(txn);
+    if (max <= 0) {
+      this.toast.info('This assignment has been fully returned');
+      return;
+    }
+    this.invReturnTarget.set(txn);
+    this.invReturnMax.set(max);
+    this.invReturnForm = {
+      quantity: max,
+      returnDate: new Date().toISOString().split('T')[0],
+      conditionOnReturn: 'GOOD',
+      notes: ''
+    };
+    this.invReturnError.set('');
+    this.isInvReturnOpen.set(true);
+  }
+
+  submitInvReturn() {
+    const target = this.invReturnTarget();
+    if (!target) return;
+    const qty = Number(this.invReturnForm.quantity);
+
+    if (!qty || qty < 1 || !Number.isInteger(qty)) {
+      this.invReturnError.set('Enter a valid whole-number quantity');
+      return;
+    }
+    if (qty > this.invReturnMax()) {
+      this.invReturnError.set(`Only ${this.invReturnMax()} unit(s) are outstanding on this assignment`);
+      return;
+    }
+
+    this.invReturnSubmitting.set(true);
+    this.assetService.returnInventoryUnits(target.id, {
+      quantity: qty,
+      returnDate: this.invReturnForm.returnDate || new Date().toISOString().split('T')[0],
+      conditionOnReturn: this.invReturnForm.conditionOnReturn,
+      notes: this.invReturnForm.notes
+    }).subscribe({
+      next: () => {
+        this.toast.success(`${qty} unit(s) returned to stock`);
+        this.invReturnSubmitting.set(false);
+        this.isInvReturnOpen.set(false);
+        this.refreshInventoryData();
+      },
+      error: (err) => {
+        this.invReturnError.set(err.error?.message || 'Failed to record return');
+        this.invReturnSubmitting.set(false);
+      }
+    });
+  }
+
+  // ==========================================
+  // CONSUME / EXPIRE / ADJUST
+  // ==========================================
+  openInvConsumeModal() {
+    const item = this.selectedItem();
+    if (!item) return;
+    if (item.itemType !== 'CONSUMABLE') {
+      this.toast.error('Consumption applies to consumable items only');
+      return;
+    }
+    if (item.available <= 0) {
+      this.toast.error('No units available to consume');
+      return;
+    }
+    this.invConsumeForm = { quantity: null, date: new Date().toISOString().split('T')[0], purpose: '' };
+    this.invConsumeError.set('');
+    this.isInvConsumeOpen.set(true);
+  }
+
+  submitInvConsume() {
+    const item = this.selectedItem();
+    if (!item) return;
+    const qty = Number(this.invConsumeForm.quantity);
+    if (!qty || qty < 1 || !Number.isInteger(qty)) {
+      this.invConsumeError.set('Enter a valid whole-number quantity');
+      return;
+    }
+    if (qty > item.available) {
+      this.invConsumeError.set(`Cannot consume ${qty}: only ${item.available} unit(s) available`);
+      return;
+    }
+
+    this.invConsumeSubmitting.set(true);
+    this.assetService.consumeInventoryItem(item.id, {
+      quantity: qty,
+      date: this.invConsumeForm.date,
+      purpose: this.invConsumeForm.purpose
+    }).subscribe({
+      next: () => {
+        this.toast.success(`${qty} unit(s) recorded as consumed`);
+        this.invConsumeSubmitting.set(false);
+        this.isInvConsumeOpen.set(false);
+        this.refreshInventoryData();
+      },
+      error: (err) => {
+        this.invConsumeError.set(err.error?.message || 'Failed to record consumption');
+        this.invConsumeSubmitting.set(false);
+      }
+    });
+  }
+
+  openInvExpireModal() {
+    const item = this.selectedItem();
+    if (!item) return;
+    if (item.available <= 0) {
+      this.toast.error('No units available to mark expired');
+      return;
+    }
+    this.invExpireForm = {
+      quantity: item.available,
+      date: new Date().toISOString().split('T')[0],
+      reason: ''
+    };
+    this.invExpireError.set('');
+    this.isInvExpireOpen.set(true);
+  }
+
+  submitInvExpire() {
+    const item = this.selectedItem();
+    if (!item) return;
+    const qty = Number(this.invExpireForm.quantity);
+    if (!qty || qty < 1 || !Number.isInteger(qty)) {
+      this.invExpireError.set('Enter a valid whole-number quantity');
+      return;
+    }
+    if (qty > item.available) {
+      this.invExpireError.set(`Only ${item.available} unit(s) available`);
+      return;
+    }
+
+    this.invExpireSubmitting.set(true);
+    this.assetService.expireInventoryItem(item.id, {
+      quantity: qty,
+      date: this.invExpireForm.date,
+      reason: this.invExpireForm.reason
+    }).subscribe({
+      next: () => {
+        this.toast.success(`${qty} unit(s) marked as expired`);
+        this.invExpireSubmitting.set(false);
+        this.isInvExpireOpen.set(false);
+        this.refreshInventoryData();
+      },
+      error: (err) => {
+        this.invExpireError.set(err.error?.message || 'Failed to record expiry');
+        this.invExpireSubmitting.set(false);
+      }
+    });
+  }
+
+  openInvAdjustModal() {
+    const item = this.selectedItem();
+    if (!item) return;
+    this.invAdjustForm = { delta: null, reason: '' };
+    this.invAdjustError.set('');
+    this.isInvAdjustOpen.set(true);
+  }
+
+  submitInvAdjust() {
+    const item = this.selectedItem();
+    if (!item) return;
+    const delta = Number(this.invAdjustForm.delta);
+    if (!delta || !Number.isInteger(delta)) {
+      this.invAdjustError.set('Enter a non-zero whole number (use minus for removal)');
+      return;
+    }
+    if (delta < 0 && Math.abs(delta) > item.available) {
+      this.invAdjustError.set(`Only ${item.available} unit(s) available to remove`);
+      return;
+    }
+
+    this.invAdjustSubmitting.set(true);
+    this.assetService.adjustInventoryStock(item.id, {
+      delta,
+      reason: this.invAdjustForm.reason
+    }).subscribe({
+      next: () => {
+        this.toast.success(`Stock adjusted by ${delta > 0 ? '+' : ''}${delta}`);
+        this.invAdjustSubmitting.set(false);
+        this.isInvAdjustOpen.set(false);
+        this.refreshInventoryData();
+      },
+      error: (err) => {
+        this.invAdjustError.set(err.error?.message || 'Failed to adjust stock');
+        this.invAdjustSubmitting.set(false);
+      }
+    });
+  }
+
+  // ==========================================
+  // CSV IMPORT
+  // ==========================================
+  onImportFileSelected(event: any) {
+    const file: File = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      this.toast.error('Please upload a .csv file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const rows = this.parseCsvText(String(reader.result || ''));
+        if (rows.length === 0) {
+          this.toast.error('No valid rows found. Use the template format.');
+          return;
+        }
+        this.importing.set(true);
+        this.assetService.importInventoryItems(rows).subscribe({
+          next: (res) => {
+            this.importing.set(false);
+            if (res.created > 0) {
+              this.toast.success(`Imported ${res.created} item(s)` + (res.failed ? `, ${res.failed} failed` : ''));
+            } else {
+              this.toast.error(`Import failed for all ${res.failed} row(s)`);
+            }
+            if (res.errors?.length) {
+              console.warn('Import errors:', res.errors);
+            }
+            this.refreshInventoryData();
+          },
+          error: (err) => {
+            this.importing.set(false);
+            this.toast.error(err.error?.message || 'Import failed');
+          }
+        });
+      } catch (e) {
+        this.toast.error('Could not read the CSV file');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  downloadImportTemplate() {
+    const csv = [
+      'name,brand,category,item_type,unit,quantity,unit_cost,purchase_date,supplier,batch_number,expiry_date,location,notes',
+      'Parle Monaco Biscuit,Parle,PANTRY,CONSUMABLE,packets,10,50,2026-08-20,Metro Store,BATCH-001,2026-11-20,Pantry - Ground Floor,Sample row - delete before import',
+      'Dell Latitude 5440,Dell,LAPTOP,ASSET,units,2,65000,2026-07-15,Computer Depot,,,IT Storage Room,'
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'inventory_import_template.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  private parseCsvText(text: string): any[] {
+    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    const parseLine = (line: string): string[] => {
+      const out: string[] = [];
+      let cur = '';
+      let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQ) {
+          if (ch === '"') {
+            if (line[i + 1] === '"') { cur += '"'; i++; }
+            else inQ = false;
+          } else cur += ch;
+        } else {
+          if (ch === '"') inQ = true;
+          else if (ch === ',') { out.push(cur); cur = ''; }
+          else cur += ch;
+        }
+      }
+      out.push(cur);
+      return out.map(s => s.trim());
+    };
+
+    const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-z]/g, ''));
+    const idx = (...names: string[]) => headers.findIndex(h => names.includes(h));
+
+    const iName = idx('name', 'itemname', 'item');
+    if (iName === -1) throw new Error('Missing "name" column');
+
+    const map = {
+      brand: idx('brand'),
+      category: idx('category'),
+      itemType: idx('itemtype', 'type'),
+      unit: idx('unit', 'units'),
+      quantity: idx('quantity', 'qty'),
+      unitCost: idx('unitcost', 'cost', 'price'),
+      purchaseDate: idx('purchasedate', 'date'),
+      supplier: idx('supplier', 'vendor'),
+      batchNumber: idx('batchnumber', 'batch'),
+      expiryDate: idx('expirydate', 'expiry'),
+      location: idx('location', 'storage'),
+      notes: idx('notes')
+    };
+
+    const normCat = (v: string): string => {
+      const up = (v || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+      const found = this.categories.find(c => c.value === up);
+      if (found) return found.value;
+      const alias: any = {
+        'PANTRY_ITEMS': 'PANTRY', 'PANTRY_ITEM': 'PANTRY',
+        'KEYBOARD_MOUSE': 'PERIPHERAL', 'MOBILE_TABLET': 'MOBILE',
+        'LAPTOPS': 'LAPTOP', 'PRINTERS': 'PRINTER', 'MONITORS': 'MONITOR'
+      };
+      return alias[up] || 'OTHER';
+    };
+
+    const toDate = (v: string): string | null => {
+      if (!v) return null;
+      const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+      if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+      const dmy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(v);
+      if (dmy) {
+        const mm = dmy[2].padStart(2, '0'), dd = dmy[1].padStart(2, '0');
+        return `${dmy[3]}-${mm}-${dd}`;
+      }
+      return null;
+    };
+
+    const rows: any[] = [];
+    for (let r = 1; r < lines.length; r++) {
+      const cells = parseLine(lines[r]);
+      const name = cells[iName];
+      if (!name) continue;
+      const get = (i: number) => (i >= 0 ? cells[i] : '');
+      const category = normCat(get(map.category));
+      const autoType = CONSUMABLE_CATEGORIES.includes(category)
+        ? 'CONSUMABLE'
+        : (IT_CATEGORIES.includes(category) || category === 'FURNITURE') ? 'ASSET' : 'CONSUMABLE';
+      const itRaw = get(map.itemType).toUpperCase();
+
+      rows.push({
+        name,
+        brand: get(map.brand) || null,
+        category,
+        itemType: itRaw === 'ASSET' || itRaw === 'CONSUMABLE' ? itRaw : autoType,
+        unit: get(map.unit) || (autoType === 'ASSET' ? 'units' : 'packets'),
+        quantity: parseInt(get(map.quantity), 10) || 0,
+        unitCost: parseFloat(get(map.unitCost)) || 0,
+        purchaseDate: toDate(get(map.purchaseDate)),
+        supplier: get(map.supplier) || null,
+        batchNumber: get(map.batchNumber) || null,
+        expiryDate: toDate(get(map.expiryDate)),
+        location: get(map.location) || null,
+        notes: get(map.notes) || null
+      });
+    }
+    return rows;
+  }
+
+  // ==========================================
+  // LEGACY: Assignment Drawer Actions (serial assets via hardware fulfillment)
+  // ==========================================
   openAssignDrawer(assetId?: number) {
     this.assignForm = {
       assetId: assetId || (this.availableAssets()[0]?.id || 0),
@@ -959,22 +1905,6 @@ export class AssetsComponent implements OnInit {
       notes: ''
     };
     this.isAssignDrawerOpen.set(true);
-  }
-
-  submitAssign() {
-    if (!this.assignForm.assetId || !this.assignForm.employeeId) {
-      this.toast.error('Please select both an Asset and an Employee');
-      return;
-    }
-
-    this.assetService.assignAsset(this.assignForm).subscribe({
-      next: () => {
-        this.toast.success('Asset assigned successfully');
-        this.isAssignDrawerOpen.set(false);
-        this.loadAllData();
-      },
-      error: (err) => this.toast.error(err.error?.message || 'Failed to assign asset')
-    });
   }
 
   openReturnModal(assignmentId: number) {
@@ -999,7 +1929,9 @@ export class AssetsComponent implements OnInit {
     });
   }
 
-  // 3. Image Viewer Lightbox Methods
+  // ==========================================
+  // Image Viewer Lightbox Methods
+  // ==========================================
   openImageViewer(images: string[], index = 0) {
     if (!images || images.length === 0) return;
     this.previewImages.set(images);
@@ -1023,7 +1955,9 @@ export class AssetsComponent implements OnInit {
     }
   }
 
-  // 4. Hardware Request Actions
+  // ==========================================
+  // Hardware Request Actions
+  // ==========================================
   openRequestDrawer() {
     this.editingRequestId.set(null);
     this.requestForm = {
