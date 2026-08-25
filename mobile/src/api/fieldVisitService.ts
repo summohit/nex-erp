@@ -47,18 +47,35 @@ export const fieldVisitService = {
   },
 
   getActiveVisit: async () => {
-    const response = await apiClient.get('/field-visits/active');
-    return response.data;
+    try {
+      const response = await apiClient.get('/field-visits/active');
+      // Handle nested response or direct data
+      return response.data?.visit || response.data || null;
+    } catch (e: any) {
+      if (e?.response?.status === 404) return null; // No active visit
+      throw e;
+    }
   },
 
   getMyVisits: async () => {
-    const response = await apiClient.get('/field-visits/me');
-    return response.data;
+    try {
+      const response = await apiClient.get('/field-visits/me');
+      // Handle both array response and nested structure
+      const data = response.data?.visits || response.data || [];
+      return Array.isArray(data) ? data : [data].filter(Boolean);
+    } catch (e) {
+      return [];
+    }
   },
 
   getProjectVisits: async (projectId: number) => {
-    const response = await apiClient.get('/field-visits/project/' + projectId);
-    return response.data;
+    try {
+      const response = await apiClient.get('/field-visits/project/' + projectId);
+      const data = response.data?.visits || response.data || [];
+      return Array.isArray(data) ? data : [data].filter(Boolean);
+    } catch (e) {
+      return [];
+    }
   },
 
   getVisitById: async (visitId: number) => {

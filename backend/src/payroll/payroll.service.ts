@@ -548,7 +548,7 @@ export class PayrollService {
 
   // ==================== 4. EXPENSE CLAIMS ====================
 
-  async createExpenseClaim(companyId: number, userId: number, data: { title: string; description?: string; amount: number; category?: string; receiptUrl?: string; purchaseDate?: string; purchasedFrom?: string }) {
+  async createExpenseClaim(companyId: number, userId: number, data: { title: string; description?: string; amount: number; category?: string; receiptUrl?: string; purchaseDate?: string; purchasedFrom?: string; projectCode?: string; projectName?: string; projectId?: number }) {
     const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
     if (!employee) throw new NotFoundException('Employee not found');
 
@@ -581,10 +581,14 @@ export class PayrollService {
         receiptUrl: data.receiptUrl,
         purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null,
         purchasedFrom: data.purchasedFrom || null,
+        projectCode: data.projectCode || null,
+        projectName: data.projectName || null,
+        projectId: data.projectId || null,
         status: 'PENDING'
       }
     });
   }
+
 
   async getMyExpenseClaims(companyId: number, userId: number) {
     const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });

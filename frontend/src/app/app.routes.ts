@@ -216,6 +216,12 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'sales/pos' },
         loadComponent: () => import('./sales/pos/pos').then(m => m.PosComponent)
+      },
+      {
+        path: 'sales/follow-ups',
+        canActivate: [permissionGuard],
+        data: { module: 'sales/follow-ups' },
+        loadComponent: () => import('./sales/follow-ups/follow-ups').then(m => m.FollowUpsComponent)
       }
     ]
   },

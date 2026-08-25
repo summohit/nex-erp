@@ -34,6 +34,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   isLoading: true,
   login: async (user, token) => {
+    // Drop anything the previous session left in memory before the new user's
+    // screens mount, so they never render stale data belonging to someone else.
+    const { resetUserScopedStores } = await import('./resetStores');
+    resetUserScopedStores();
     await AsyncStorage.setItem('userToken', token);
     await AsyncStorage.setItem('userData', JSON.stringify(user));
     set({ user, token, isLoading: false });
@@ -43,6 +47,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await AsyncStorage.removeItem('userData');
     await AsyncStorage.removeItem('companyData');
     set({ user: null, company: null, token: null, isLoading: false });
+    // Clear the other stores too — they are in-memory singletons that would
+    // otherwise hand the next user to sign in the previous user's data.
+    // Imported lazily so this module stays free of store import cycles.
+    const { resetUserScopedStores } = await import('./resetStores');
+    resetUserScopedStores();
   },
   restoreToken: async () => {
     try {

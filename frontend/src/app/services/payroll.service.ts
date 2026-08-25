@@ -148,7 +148,7 @@ export class PayrollService {
   }
 
   // Expense Claims
-  createExpenseClaim(data: { title: string; description?: string; amount: number; category?: string; receiptUrl?: string }): Observable<ExpenseClaim> {
+  createExpenseClaim(data: { title: string; description?: string; amount: number; category?: string; receiptUrl?: string; purchaseDate?: string; purchasedFrom?: string; projectCode?: string; projectName?: string; projectId?: number }): Observable<ExpenseClaim> {
     return this.http.post<ExpenseClaim>(`${this.apiUrl}/expenses`, data);
   }
 

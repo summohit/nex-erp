@@ -124,6 +124,48 @@ export class EmployeeService {
     });
   }
 
+  addSkill(id: number | string, data: { category: string; name: string; level: string }): Observable<any> {
+    const token = localStorage.getItem('access_token');
+    return this.http.post<any>(`${this.apiUrl}/${id}/skills`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  updateSkill(id: number | string, skillId: number, data: { category: string; name: string; level: string }): Observable<any> {
+    const token = localStorage.getItem('access_token');
+    return this.http.put<any>(`${this.apiUrl}/${id}/skills/${skillId}`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  deleteSkill(id: number | string, skillId: number): Observable<any> {
+    const token = localStorage.getItem('access_token');
+    return this.http.delete<any>(`${this.apiUrl}/${id}/skills/${skillId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  addResumeLine(id: number | string, data: any): Observable<any> {
+    const token = localStorage.getItem('access_token');
+    return this.http.post<any>(`${this.apiUrl}/${id}/resume-lines`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  updateResumeLine(id: number | string, lineId: number, data: any): Observable<any> {
+    const token = localStorage.getItem('access_token');
+    return this.http.put<any>(`${this.apiUrl}/${id}/resume-lines/${lineId}`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  deleteResumeLine(id: number | string, lineId: number): Observable<any> {
+    const token = localStorage.getItem('access_token');
+    return this.http.delete<any>(`${this.apiUrl}/${id}/resume-lines/${lineId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   // --- Uploads ---
 
   uploadDocument(file: File): Observable<{ url: string }> {

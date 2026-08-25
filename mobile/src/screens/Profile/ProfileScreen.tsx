@@ -58,7 +58,10 @@ export default function ProfileScreen() {
     message: '',
   });
 
-  const empId = user?.employeeId || user?.id;
+  // Only ever an Employee id. The old `|| user.id` fallback mixed in a User id,
+  // which /employees/:id/profile then resolved as an employee — showing an
+  // unrelated person's profile to any user whose ids did not happen to line up.
+  const empId = user?.employeeId;
 
   // Fetch on mount (master data) and on every tab focus (profile stays fresh with CRM edits)
   useEffect(() => {
@@ -252,11 +255,10 @@ export default function ProfileScreen() {
           )}
           {activeTab === 'Resume' && (
             <ResumeSkillsTab
-              profileData={formData}
-              onFormChange={handleFormChange}
+              profileData={profileData}
               isOwner={true}
               onUploadAttachment={() => {}}
-              refreshVersion={profileVersion}
+              onRefresh={onRefresh}
             />
           )}
           {activeTab === 'Personal' && (

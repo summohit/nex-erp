@@ -74,7 +74,7 @@ export class UploadController {
       const filename = `${crypto.randomBytes(16).toString('hex')}${ext}`;
 
       const form = new FormData();
-      form.append('file', file.buffer, filename);
+      form.append('file', file.buffer.toString('base64'));
       form.append('fileName', filename);
       form.append('folder', folder);
 

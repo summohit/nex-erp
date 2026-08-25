@@ -3,7 +3,7 @@
   <div class="page-header">
     <div class="header-title">
       <h2>CRM Leads Board</h2>
-      <p>Track, manage and convert sales opportunities through your pipeline stages.</p>
+      <p>Manage your sales pipeline.</p>
     </div>
     
     <div class="header-actions-group">
@@ -11,21 +11,40 @@
         <span class="stat-label">Total Pipeline Value</span>
         <span class="stat-value">{{getTotalPipelineValue() | currency:'INR'}}</span>
       </div>
+      <button class="btn-secondary" style="background: white; border: 1px solid #e5e7eb; color: #374151; font-weight: 500;" (click)="goToFollowUps()">
+        <svg lucideCalendarClock size="16"></svg> View Follow-Ups
+      </button>
+      <button class="btn-secondary" style="background: white; border: 1px solid #e5e7eb; color: #374151; font-weight: 500;" (click)="openLeadContactModal()">
+        <svg lucideUserCheck size="16"></svg> Lead Contact
+      </button>
       <button class="btn-primary" (click)="openModal()">
         <svg lucidePlus size="16"></svg> New Lead
       </button>
     </div>
   </div>
 
+  <!-- Main Tab Switcher -->
+  <div class="main-tab-switcher">
+    <button type="button" [class.active]="activeMainTab === 'leads'" (click)="activeMainTab = 'leads'">
+      Leads
+    </button>
+    <button type="button" [class.active]="activeMainTab === 'contacts'" (click)="activeMainTab = 'contacts'">
+      Lead Contacts
+      <span class="tab-count-pill" *ngIf="leadContacts.length > 0">{{ leadContacts.length }}</span>
+    </button>
+  </div>
+
+  <ng-container *ngIf="activeMainTab === 'leads'">
+
   <!-- Filter & Search Bar -->
   <div class="filter-bar-card">
     <div class="search-input-wrapper">
       <svg lucideSearch size="16" class="search-icon"></svg>
-      <input 
-        type="text" 
-        [(ngModel)]="searchQuery" 
-        (ngModelChange)="onFilterChange()" 
-        placeholder="Search leads by title, company, contact or email..." 
+      <input
+        type="text"
+        [(ngModel)]="searchQuery"
+        (ngModelChange)="onFilterChange()"
+        placeholder="Search leads by title, company, contact or email..."
       />
       <button class="btn-clear" *ngIf="searchQuery" (click)="searchQuery = ''; onFilterChange()">
         <svg lucideX size="14"></svg>
@@ -33,21 +52,104 @@
     </div>
 
     <div class="filter-controls">
+      <!-- VIEW TOGGLE -->
+      <div class="view-toggle">
+        <button [class.active]="viewMode === 'kanban'" (click)="viewMode = 'kanban'" title="Kanban View">
+          <svg lucideLayoutGrid size="16"></svg>
+        </button>
+        <button [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table View">
+          <svg lucideList size="16"></svg>
+        </button>
+      </div>
+
       <div class="filter-dropdown">
         <svg lucideFilter size="14" class="filter-icon"></svg>
         <select [(ngModel)]="selectedStage" (change)="onFilterChange()">
           <option value="ALL">All Stages</option>
-          <option value="NEW">New</option>
-          <option value="QUALIFIED">Qualified</option>
-          <option value="PROPOSAL">Proposal</option>
-          <option value="WON">Won</option>
-          <option value="LOST">Lost</option>
+          <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
         </select>
       </div>
 
       <button class="btn-reset-filters" *ngIf="searchQuery || selectedStage !== 'ALL'" (click)="clearFilters()">
         Reset Filters
       </button>
+    </div>
+  </div>
+
+  <!-- Field Visits Widget -->
+  <div style="background: white; border: 1px solid #dfe1e6; border-radius: 10px; margin-bottom: 20px; overflow: hidden;">
+    <button (click)="fieldVisitsExpanded = !fieldVisitsExpanded" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: none; border: none; cursor: pointer; text-align: left;" class="hover:bg-gray-50">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 30px; height: 30px; border-radius: 8px; background: #eff6ff; display: flex; align-items: center; justify-content: center;">
+          <svg lucideMapPin size="16" style="color: #2563eb;"></svg>
+        </div>
+        <span style="font-size: 14.5px; font-weight: 700; color: #172b4d;">Field Visits</span>
+        <span *ngIf="activeFieldVisits.length > 0" style="display: inline-flex; align-items: center; gap: 5px; background: #0f172a; color: #22c55e; font-size: 10.5px; font-weight: 800; letter-spacing: 0.4px; padding: 3px 9px; border-radius: 20px;">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
+          {{ activeFieldVisits.length }} travelling now
+        </span>
+      </div>
+      <svg *ngIf="!fieldVisitsExpanded" lucideChevronDown size="16" style="color: #6b7280;"></svg>
+      <svg *ngIf="fieldVisitsExpanded" lucideChevronUp size="16" style="color: #6b7280;"></svg>
+    </button>
+
+    <div *ngIf="fieldVisitsExpanded" style="border-top: 1px solid #f1f5f9; padding: 16px 18px;">
+
+      <!-- Loading -->
+      <div *ngIf="fieldVisitsLoading" style="font-size: 13px; color: #94a3b8; padding: 8px 0;">Loading&hellip;</div>
+
+      <ng-container *ngIf="!fieldVisitsLoading">
+
+        <!-- Nobody travelling + nothing recent -->
+        <div *ngIf="activeFieldVisits.length === 0 && recentFieldVisits.length === 0" style="font-size: 13px; color: #94a3b8; padding: 8px 0;">
+          No field visits recorded yet.
+        </div>
+
+        <!-- Currently travelling -->
+        <div *ngIf="activeFieldVisits.length > 0" [style.marginBottom.px]="recentFieldVisits.length > 0 ? 16 : 0" style="display: flex; flex-direction: column; gap: 10px;">
+          <div *ngFor="let visit of activeFieldVisits" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+            <img *ngIf="visit.employee?.avatarUrl" [src]="visit.employee?.avatarUrl" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+            <div *ngIf="!visit.employee?.avatarUrl" style="width: 30px; height: 30px; border-radius: 50%; background: #dcfce7; color: #166534; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; flex-shrink: 0;">
+              {{ (visit.employee?.firstName?.[0] || '') + (visit.employee?.lastName?.[0] || '') }}
+            </div>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 13px; font-weight: 700; color: #172b4d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                {{ visit.employee?.firstName }} {{ visit.employee?.lastName }}
+              </div>
+              <div style="font-size: 12px; color: #5e6c84; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                {{ visit.project?.name }}{{ visit.purpose ? ' · ' + visit.purpose : '' }}
+              </div>
+            </div>
+            <div style="font-size: 11px; color: #16a34a; font-weight: 700; flex-shrink: 0;">
+              since {{ visit.startTime | date:'h:mm a' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent visits -->
+        <div *ngIf="recentFieldVisits.length > 0">
+          <div *ngIf="activeFieldVisits.length > 0" style="font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.6px; margin: 4px 0 10px;">Recent</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div *ngFor="let visit of recentFieldVisits" style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px;" class="hover:bg-gray-50">
+              <img *ngIf="visit.employee?.avatarUrl" [src]="visit.employee?.avatarUrl" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+              <div *ngIf="!visit.employee?.avatarUrl" style="width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; flex-shrink: 0;">
+                {{ (visit.employee?.firstName?.[0] || '') + (visit.employee?.lastName?.[0] || '') }}
+              </div>
+              <div style="min-width: 0; flex: 1;">
+                <span style="font-size: 12.5px; font-weight: 600; color: #334155;">{{ visit.employee?.firstName }} {{ visit.employee?.lastName }}</span>
+                <span style="font-size: 12.5px; color: #94a3b8;"> visited </span>
+                <span style="font-size: 12.5px; font-weight: 600; color: #334155;">{{ visit.project?.name }}</span>
+              </div>
+              <span [style.background]="fieldVisitStatusColor(visit.status).bg" [style.color]="fieldVisitStatusColor(visit.status).text" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; flex-shrink: 0;">
+                {{ visit.status.replace('_', ' ') }}
+              </span>
+              <span style="font-size: 11px; color: #94a3b8; flex-shrink: 0; width: 76px; text-align: right;">
+                {{ visit.startTime | date:'MMM d, h:mm a' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </ng-container>
     </div>
   </div>
 
@@ -68,45 +170,54 @@
   </ng-template>
 
   <!-- Kanban Board -->
-  <div class="kanban-board">
+  <div class="kanban-board" *ngIf="viewMode === 'kanban'">
     
-    <!-- NEW -->
-    <div class="kanban-column">
-      <div class="column-header new-header">
+    <div class="kanban-column" *ngFor="let col of kanbanColumns">
+      <div class="column-header" [ngClass]="'header-' + col.id.toLowerCase().replace(' ', '-')">
         <div class="column-header-left">
-          <span class="status-dot dot-new"></span>
-          <span class="column-title">NEW</span>
+          <span class="status-dot" [ngClass]="'dot-' + col.id.toLowerCase().replace(' ', '-')"></span>
+          <span class="column-title">{{col.name | uppercase}}</span>
         </div>
-        <span class="column-count-badge">{{newLeads.length}}</span>
+        <span class="column-count-badge">{{col.leads.length}}</span>
       </div>
       <div 
         class="kanban-list" 
-        id="NEW"
+        [id]="col.id"
         cdkDropList 
-        [cdkDropListData]="newLeads" 
-        [cdkDropListConnectedTo]="['QUALIFIED', 'PROPOSAL', 'WON', 'LOST']" 
+        [cdkDropListData]="col.leads" 
+        [cdkDropListConnectedTo]="getConnectedLists()" 
         (cdkDropListDropped)="drop($event)">
         
         <ng-container *ngIf="isLoading">
           <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
         </ng-container>
         <ng-container *ngIf="!isLoading">
-          <div class="kanban-card card-accent-new" *ngFor="let lead of newLeads" cdkDrag>
+          <div class="kanban-card" [ngClass]="'card-accent-' + col.id.toLowerCase().replace(' ', '-')" *ngFor="let lead of col.leads" cdkDrag>
             <div class="card-drag-handle" title="Drag to reorder/move">
               <svg lucideGripVertical size="14"></svg>
             </div>
-
+            
             <div class="card-body">
               <div class="card-header-row">
-                <h4 class="lead-title">{{lead.title}}</h4>
-                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
-                  <svg lucideTrash2 size="13"></svg>
-                </button>
+                <h4 class="lead-title" [class.strike-through]="col.id === 'Lost' || col.id === 'Junk'">{{lead.title}}</h4>
+                <div class="card-actions-group">
+                  <button type="button" class="btn-card-action btn-card-edit" (click)="openEditModal(lead, $event)" title="Edit Lead">
+                    <svg lucideEdit2 size="13"></svg>
+                  </button>
+                  <button type="button" class="btn-card-action btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
+                    <svg lucideTrash2 size="13"></svg>
+                  </button>
+                </div>
               </div>
 
-              <div class="card-company-pill" *ngIf="lead.companyName">
-                <svg lucideBuilding size="12"></svg>
-                <span>{{lead.companyName}}</span>
+              <div class="card-pills-row">
+                <span class="card-company-pill" *ngIf="lead.companyName">
+                  <svg lucideBuilding size="12"></svg>
+                  <span>{{lead.companyName}}</span>
+                </span>
+                <span class="card-category-pill" *ngIf="lead.dealCategory" [ngStyle]="{'color': getDealCategoryBadge(lead.dealCategory).color, 'background': getDealCategoryBadge(lead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(lead.dealCategory).border}">
+                  {{lead.dealCategory}}
+                </span>
               </div>
 
               <div class="card-details">
@@ -126,327 +237,483 @@
 
               <div class="card-footer-row">
                 <span class="value-badge">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <button class="btn-view-details" (click)="openDetailModal(lead)">
-                  <svg lucideEye size="12"></svg> Details
-                </button>
+                <div class="card-footer-right">
+                  <div class="card-owner-avatar" *ngIf="lead.assignedTo" [title]="'Owner: ' + lead.assignedTo?.firstName + ' ' + lead.assignedTo?.lastName">
+                    <img *ngIf="lead.assignedTo?.avatarUrl" [src]="lead.assignedTo?.avatarUrl" class="card-avatar-img" />
+                    <span *ngIf="!lead.assignedTo?.avatarUrl" class="card-avatar-circle">
+                      {{lead.assignedTo?.firstName?.[0] || ''}}{{lead.assignedTo?.lastName?.[0] || ''}}
+                    </span>
+                  </div>
+                  <button class="btn-view-details" (click)="openDetailModal(lead)">
+                    <svg lucideEye size="12"></svg> Details
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </ng-container>
       </div>
     </div>
-
-    <!-- QUALIFIED -->
-    <div class="kanban-column">
-      <div class="column-header qual-header">
-        <div class="column-header-left">
-          <span class="status-dot dot-qual"></span>
-          <span class="column-title">QUALIFIED</span>
-        </div>
-        <span class="column-count-badge">{{qualifiedLeads.length}}</span>
-      </div>
-      <div 
-        class="kanban-list" 
-        id="QUALIFIED"
-        cdkDropList 
-        [cdkDropListData]="qualifiedLeads" 
-        [cdkDropListConnectedTo]="['NEW', 'PROPOSAL', 'WON', 'LOST']" 
-        (cdkDropListDropped)="drop($event)">
-        
-        <ng-container *ngIf="isLoading">
-          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
-        </ng-container>
-        <ng-container *ngIf="!isLoading">
-          <div class="kanban-card card-accent-qual" *ngFor="let lead of qualifiedLeads" cdkDrag>
-            <div class="card-drag-handle" title="Drag to reorder/move">
-              <svg lucideGripVertical size="14"></svg>
-            </div>
-            
-            <div class="card-body">
-              <div class="card-header-row">
-                <h4 class="lead-title">{{lead.title}}</h4>
-                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
-                  <svg lucideTrash2 size="13"></svg>
-                </button>
-              </div>
-
-              <div class="card-company-pill" *ngIf="lead.companyName">
-                <svg lucideBuilding size="12"></svg>
-                <span>{{lead.companyName}}</span>
-              </div>
-
-              <div class="card-details">
-                <div class="detail-item" *ngIf="lead.contactName">
-                  <svg lucideUser size="12"></svg>
-                  <span>{{lead.contactName}}</span>
-                </div>
-                <div class="detail-item" *ngIf="lead.email">
-                  <svg lucideMail size="12"></svg>
-                  <span>{{lead.email}}</span>
-                </div>
-                <div class="detail-item" *ngIf="lead.phone">
-                  <svg lucidePhone size="12"></svg>
-                  <span>{{lead.phone}}</span>
-                </div>
-              </div>
-
-              <div class="card-qual-reason" *ngIf="lead.qualificationReason">
-                <span class="qual-reason-text">💬 {{lead.qualificationReason}}</span>
-              </div>
-              <div class="card-footer-row">
-                <span class="value-badge">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <button class="btn-view-details" (click)="openDetailModal(lead)">
-                  <svg lucideEye size="12"></svg> Details
-                </button>
-              </div>
-            </div>
-          </div>
-        </ng-container>
-      </div>
-    </div>
-
-    <!-- PROPOSAL -->
-    <div class="kanban-column">
-      <div class="column-header prop-header">
-        <div class="column-header-left">
-          <span class="status-dot dot-prop"></span>
-          <span class="column-title">PROPOSAL</span>
-        </div>
-        <span class="column-count-badge">{{proposalLeads.length}}</span>
-      </div>
-      <div 
-        class="kanban-list" 
-        id="PROPOSAL"
-        cdkDropList 
-        [cdkDropListData]="proposalLeads" 
-        [cdkDropListConnectedTo]="['NEW', 'QUALIFIED', 'WON', 'LOST']" 
-        (cdkDropListDropped)="drop($event)">
-        
-        <ng-container *ngIf="isLoading">
-          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
-        </ng-container>
-        <ng-container *ngIf="!isLoading">
-          <div class="kanban-card card-accent-prop" *ngFor="let lead of proposalLeads" cdkDrag>
-            <div class="card-drag-handle" title="Drag to reorder/move">
-              <svg lucideGripVertical size="14"></svg>
-            </div>
-            
-            <div class="card-body">
-              <div class="card-header-row">
-                <h4 class="lead-title">{{lead.title}}</h4>
-                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
-                  <svg lucideTrash2 size="13"></svg>
-                </button>
-              </div>
-
-              <div class="card-company-pill" *ngIf="lead.companyName">
-                <svg lucideBuilding size="12"></svg>
-                <span>{{lead.companyName}}</span>
-              </div>
-
-              <div class="card-details">
-                <div class="detail-item" *ngIf="lead.contactName">
-                  <svg lucideUser size="12"></svg>
-                  <span>{{lead.contactName}}</span>
-                </div>
-                <div class="detail-item" *ngIf="lead.email">
-                  <svg lucideMail size="12"></svg>
-                  <span>{{lead.email}}</span>
-                </div>
-                <div class="detail-item" *ngIf="lead.phone">
-                  <svg lucidePhone size="12"></svg>
-                  <span>{{lead.phone}}</span>
-                </div>
-              </div>
-
-              <div class="card-proposal-date" *ngIf="lead.proposalDate">
-                <span style="font-size:10px;color:#7C3AED;font-weight:600;">📅 Proposal: {{lead.proposalDate | date:'dd MMM yyyy'}}</span>
-              </div>
-              <div class="card-footer-row">
-                <span class="value-badge prop-value">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <button class="btn-view-details" (click)="openDetailModal(lead)">
-                  <svg lucideEye size="12"></svg> Details
-                </button>
-              </div>
-            </div>
-          </div>
-        </ng-container>
-      </div>
-    </div>
-
-    <!-- WON -->
-    <div class="kanban-column">
-      <div class="column-header won-header">
-        <div class="column-header-left">
-          <span class="status-dot dot-won"></span>
-          <span class="column-title">WON</span>
-        </div>
-        <span class="column-count-badge">{{wonLeads.length}}</span>
-      </div>
-      <div 
-        class="kanban-list" 
-        id="WON"
-        cdkDropList 
-        [cdkDropListData]="wonLeads" 
-        [cdkDropListConnectedTo]="['NEW', 'QUALIFIED', 'PROPOSAL', 'LOST']" 
-        (cdkDropListDropped)="drop($event)">
-        
-        <ng-container *ngIf="isLoading">
-          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
-        </ng-container>
-        <ng-container *ngIf="!isLoading">
-          <div class="kanban-card card-accent-won" *ngFor="let lead of wonLeads" cdkDrag>
-            <div class="card-drag-handle" title="Drag to reorder/move">
-              <svg lucideCheckCircle size="14" class="text-success"></svg>
-            </div>
-            
-            <div class="card-body">
-              <div class="card-header-row">
-                <h4 class="lead-title">{{lead.title}}</h4>
-                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
-                  <svg lucideTrash2 size="13"></svg>
-                </button>
-              </div>
-
-              <div class="card-company-pill" *ngIf="lead.companyName">
-                <svg lucideBuilding size="12"></svg>
-                <span>{{lead.companyName}}</span>
-              </div>
-
-              <div class="card-details">
-                <div class="detail-item" *ngIf="lead.contactName">
-                  <svg lucideUser size="12"></svg>
-                  <span>{{lead.contactName}}</span>
-                </div>
-              </div>
-
-              <div class="card-footer-row">
-                <span class="value-badge won-value">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <button class="btn-view-details" (click)="openDetailModal(lead)">
-                  <svg lucideEye size="12"></svg> Details
-                </button>
-              </div>
-            </div>
-          </div>
-        </ng-container>
-      </div>
-    </div>
-
-    <!-- LOST -->
-    <div class="kanban-column">
-      <div class="column-header lost-header">
-        <div class="column-header-left">
-          <span class="status-dot dot-lost"></span>
-          <span class="column-title">LOST</span>
-        </div>
-        <span class="column-count-badge">{{lostLeads.length}}</span>
-      </div>
-      <div 
-        class="kanban-list" 
-        id="LOST"
-        cdkDropList 
-        [cdkDropListData]="lostLeads" 
-        [cdkDropListConnectedTo]="['NEW', 'QUALIFIED', 'PROPOSAL', 'WON']" 
-        (cdkDropListDropped)="drop($event)">
-        
-        <ng-container *ngIf="isLoading">
-          <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
-        </ng-container>
-        <ng-container *ngIf="!isLoading">
-          <div class="kanban-card card-accent-lost" *ngFor="let lead of lostLeads" cdkDrag>
-            <div class="card-drag-handle" title="Drag to reorder/move">
-              <svg lucideGripVertical size="14"></svg>
-            </div>
-            
-            <div class="card-body">
-              <div class="card-header-row">
-                <h4 class="lead-title strike-through">{{lead.title}}</h4>
-                <button class="btn-card-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
-                  <svg lucideTrash2 size="13"></svg>
-                </button>
-              </div>
-
-              <div class="card-company-pill" *ngIf="lead.companyName">
-                <svg lucideBuilding size="12"></svg>
-                <span>{{lead.companyName}}</span>
-              </div>
-              <div class="card-footer-row">
-                <span class="value-badge lost-value">{{lead.value | currency:lead.currency||'INR'}}</span>
-                <button class="btn-view-details" (click)="openDetailModal(lead)">
-                  <svg lucideEye size="12"></svg> Details
-                </button>
-              </div>
-            </div>
-          </div>
-        </ng-container>
-      </div>
-    </div>
-
   </div>
-</div>
+
+  <!-- Table View -->
+  <div class="table-view-container" *ngIf="viewMode === 'table'">
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Lead / Opportunity</th>
+          <th>Company</th>
+          <th>Lead Owner</th>
+          <th>Contact</th>
+          <th>Status</th>
+          <th>Value</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngIf="isLoading">
+          <tr><td colspan="7" style="text-align: center; padding: 20px;">Loading leads...</td></tr>
+        </ng-container>
+        <ng-container *ngIf="!isLoading && leads.length === 0">
+          <tr><td colspan="7" style="text-align: center; padding: 20px;">No leads found.</td></tr>
+        </ng-container>
+        <ng-container *ngIf="!isLoading">
+          <tr *ngFor="let lead of leads">
+            <td>
+              <div style="font-weight: 600; color: #0f172a;">{{lead.title}}</div>
+              <div style="display: flex; gap: 6px; align-items: center; margin-top: 3px;" *ngIf="lead.dealCategory">
+                <span class="card-category-pill" [ngStyle]="{'color': getDealCategoryBadge(lead.dealCategory).color, 'background': getDealCategoryBadge(lead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(lead.dealCategory).border}">
+                  {{lead.dealCategory}}
+                </span>
+              </div>
+            </td>
+            <td>{{lead.companyName || '-'}}</td>
+            <td>
+              <div class="table-user-cell" *ngIf="lead.assignedTo">
+                <img *ngIf="lead.assignedTo?.avatarUrl" [src]="lead.assignedTo?.avatarUrl" class="table-avatar-img" />
+                <div *ngIf="!lead.assignedTo?.avatarUrl" class="table-avatar-circle">
+                  {{lead.assignedTo?.firstName?.[0] || ''}}{{lead.assignedTo?.lastName?.[0] || ''}}
+                </div>
+                <div class="table-user-info">
+                  <span class="table-user-name">{{lead.assignedTo?.firstName}} {{lead.assignedTo?.lastName}}</span>
+                  <span class="table-user-sub" *ngIf="lead.assignedTo?.designation?.name">{{lead.assignedTo?.designation?.name}}</span>
+                </div>
+              </div>
+              <span *ngIf="!lead.assignedTo" class="unassigned-text">Unassigned</span>
+            </td>
+            <td>
+              <div *ngIf="lead.contactName" style="font-weight: 500;">{{lead.contactName}}</div>
+              <div *ngIf="lead.email" style="color: #64748b; font-size: 11px;">{{lead.email}}</div>
+            </td>
+            <td>
+              <span class="ldm-status-badge ldm-status-{{lead.status | lowercase}}">
+                {{getStatusLabel(lead.status)}}
+              </span>
+            </td>
+            <td style="font-weight: 700; color: #059669;">{{lead.value | currency:lead.currency||'INR'}}</td>
+            <td>
+              <div class="table-actions-group">
+                <button type="button" class="btn-table-action btn-table-details" (click)="openDetailModal(lead)" title="View Details">
+                  <svg lucideEye size="12"></svg> <span>Details</span>
+                </button>
+                <button type="button" class="btn-table-action btn-table-edit" (click)="openEditModal(lead, $event)" title="Edit Lead">
+                  <svg lucideEdit2 size="12"></svg> <span>Edit</span>
+                </button>
+                <button type="button" class="btn-table-action btn-table-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
+                  <svg lucideTrash2 size="12"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
+  </div>
+
+  </ng-container>
+
+  <!-- Lead Contacts Tab -->
+  <div class="contacts-tab-container" *ngIf="activeMainTab === 'contacts'">
+    <!-- Top Filter & Action Bar -->
+    <div class="contacts-toolbar">
+      <div class="contacts-search-wrapper">
+        <svg lucideSearch size="16" class="contacts-search-icon"></svg>
+        <input 
+          type="text" 
+          placeholder="Search contacts by name, company, email, phone, or source..." 
+          [(ngModel)]="contactSearchQuery"
+        />
+        <button *ngIf="contactSearchQuery" class="btn-clear-search" (click)="contactSearchQuery = ''">
+          <svg lucideX size="14"></svg>
+        </button>
+      </div>
+
+      <div class="contacts-toolbar-actions">
+        <div class="contacts-count-badge">
+          <svg lucideUsers size="15"></svg>
+          <span>{{ getFilteredLeadContacts().length }} Contact{{ getFilteredLeadContacts().length === 1 ? '' : 's' }}</span>
+        </div>
+        <button class="btn-primary btn-add-contact" (click)="openLeadContactModal()">
+          <svg lucidePlus size="15"></svg>
+          <span>Add Lead Contact</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Contacts Table Card -->
+    <div class="contacts-table-card" *ngIf="getFilteredLeadContacts().length > 0; else noFilteredContacts">
+      <table class="contacts-table">
+        <thead>
+          <tr>
+            <th>CONTACT PERSON</th>
+            <th>COMPANY & WEBSITE</th>
+            <th>CONTACT DETAILS</th>
+            <th>SOURCE</th>
+            <th>ADDED BY</th>
+            <th>LEADS BROUGHT</th>
+            <th>CREATED</th>
+            <th class="text-right">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let contact of getFilteredLeadContacts()" class="contact-row">
+            <!-- Contact Person -->
+            <td>
+              <div class="contact-person-cell">
+                <div class="contact-avatar-pill">
+                  <span class="avatar-initials">{{ contact.name ? contact.name[0].toUpperCase() : 'C' }}</span>
+                </div>
+                <div class="contact-person-info">
+                  <div class="contact-person-name">
+                    <span class="salutation" *ngIf="contact.salutation">{{ contact.salutation }}</span>
+                    <span class="full-name">{{ contact.name }}</span>
+                  </div>
+                  <span class="contact-location" *ngIf="contact.city || contact.country">
+                    <svg lucideMapPin size="11"></svg> {{ contact.city ? contact.city + (contact.country ? ', ' + contact.country : '') : contact.country }}
+                  </span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Company & Website -->
+            <td>
+              <div class="contact-company-cell">
+                <div class="company-name" *ngIf="contact.companyName">
+                  <svg lucideBuilding size="13"></svg>
+                  <span>{{ contact.companyName }}</span>
+                </div>
+                <span class="no-data-dash" *ngIf="!contact.companyName">—</span>
+                <a *ngIf="contact.website" [href]="contact.website.startsWith('http') ? contact.website : 'https://' + contact.website" target="_blank" class="contact-web-link">
+                  <svg lucideGlobe size="11"></svg>
+                  <span>{{ contact.website.replace('https://', '').replace('http://', '').replace('www.', '') }}</span>
+                  <svg lucideExternalLink size="10"></svg>
+                </a>
+              </div>
+            </td>
+
+            <!-- Contact Details -->
+            <td>
+              <div class="contact-comm-cell">
+                <a *ngIf="contact.email" [href]="'mailto:' + contact.email" class="comm-link email-link" title="Send Email">
+                  <svg lucideMail size="12"></svg>
+                  <span>{{ contact.email }}</span>
+                </a>
+                <a *ngIf="contact.phone || contact.mobile" [href]="'tel:' + (contact.phone || contact.mobile)" class="comm-link phone-link" title="Call">
+                  <svg lucidePhone size="12"></svg>
+                  <span>{{ contact.phone || contact.mobile }}</span>
+                </a>
+                <span class="no-data-dash" *ngIf="!contact.email && !contact.phone && !contact.mobile">—</span>
+              </div>
+            </td>
+
+            <!-- Lead Source -->
+            <td>
+              <span class="source-tag" *ngIf="contact.leadSource">
+                {{ contact.leadSource }}
+              </span>
+              <span class="no-data-dash" *ngIf="!contact.leadSource">—</span>
+            </td>
+
+            <!-- Added By -->
+            <td>
+              <div class="added-by-cell" *ngIf="contact.addedBy">
+                <img *ngIf="contact.addedBy.avatarUrl" [src]="contact.addedBy.avatarUrl" class="rep-avatar-img" alt="Added By" />
+                <div class="rep-avatar" *ngIf="!contact.addedBy.avatarUrl">
+                  {{ contact.addedBy.firstName ? contact.addedBy.firstName[0] : '' }}{{ contact.addedBy.lastName ? contact.addedBy.lastName[0] : '' }}
+                </div>
+                <div class="added-by-info">
+                  <span class="added-by-name">{{ contact.addedBy.firstName }} {{ contact.addedBy.lastName }}</span>
+                  <span class="added-by-role" *ngIf="contact.addedBy.designation?.name || contact.addedBy.department?.name">
+                    {{ contact.addedBy.designation?.name || contact.addedBy.department?.name }}
+                  </span>
+                </div>
+              </div>
+              <span class="unassigned-dash" *ngIf="!contact.addedBy">Direct / System</span>
+            </td>
+
+            <!-- Leads Brought -->
+            <td>
+              <button type="button" class="leads-brought-pill btn-link-pill" [class.has-leads]="getLeadsCountForContact(contact.id) > 0" (click)="openBroughtLeadsModal(contact, $event)">
+                <svg lucideAward size="13"></svg>
+                <span>{{ getLeadsCountForContact(contact.id) }} Lead{{ getLeadsCountForContact(contact.id) === 1 ? '' : 's' }}</span>
+              </button>
+            </td>
+
+            <!-- Created -->
+            <td>
+              <div class="created-date-cell">
+                <svg lucideCalendar size="12"></svg>
+                <span>{{ contact.createdAt | date:'mediumDate' }}</span>
+              </div>
+            </td>
+
+            <!-- Actions -->
+            <td class="text-right">
+              <div class="table-actions-group">
+                <button type="button" class="btn-action-icon edit-action" (click)="openEditLeadContactModal(contact, $event)" title="Edit Contact">
+                  <svg lucideEdit2 size="13"></svg>
+                </button>
+                <button type="button" class="btn-action-icon delete-action" (click)="deleteLeadContact(contact.id, $event)" title="Delete Contact">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <ng-template #noFilteredContacts>
+      <div class="empty-contacts-state">
+        <div class="empty-icon-circle">
+          <svg lucideUserCheck size="28"></svg>
+        </div>
+        <h3 *ngIf="contactSearchQuery">No Contacts Found</h3>
+        <h3 *ngIf="!contactSearchQuery">No Lead Contacts Yet</h3>
+        <p *ngIf="contactSearchQuery">No lead contacts match "{{ contactSearchQuery }}". Try adjusting your search term.</p>
+        <p *ngIf="!contactSearchQuery">Add external brokers, partners, or referrers who can be selected as "Lead Brought By" across CRM leads.</p>
+        <button class="btn-primary" (click)="contactSearchQuery ? contactSearchQuery = '' : openLeadContactModal()">
+          <svg lucidePlus size="14" *ngIf="!contactSearchQuery"></svg>
+          <svg lucideX size="14" *ngIf="contactSearchQuery"></svg>
+          <span>{{ contactSearchQuery ? 'Clear Search' : 'Add First Lead Contact' }}</span>
+        </button>
+      </div>
+    </ng-template>
+  </div>
 
 <!-- Lead Detail Modal -->
 <div class="modal-backdrop" *ngIf="showDetailModal && selectedLead" (click)="closeDetailModal()">
-  <div class="lead-detail-modal" (click)="$event.stopPropagation()">
+  <div class="lead-detail-modal enhanced-detail-modal" (click)="$event.stopPropagation()">
     <div class="ldm-header">
-      <div class="ldm-status-badge ldm-status-{{selectedLead.status | lowercase}}">
-        {{getStatusLabel(selectedLead.status)}}
-      </div>
-      <div class="ldm-title-block">
-        <h2 class="ldm-title">{{selectedLead.title}}</h2>
-        <div class="ldm-company" *ngIf="selectedLead.companyName">
-          <svg lucideBuilding size="13"></svg> {{selectedLead.companyName}}
+      <div class="ldm-header-left">
+        <div class="ldm-status-badge ldm-status-{{selectedLead.status | lowercase}}">
+          {{getStatusLabel(selectedLead.status)}}
+        </div>
+        <div class="ldm-title-block">
+          <h2 class="ldm-title">{{selectedLead.title}}</h2>
+          <div class="ldm-meta-sub">
+            <span class="ldm-company" *ngIf="selectedLead.companyName">
+              <svg lucideBuilding size="13"></svg> {{selectedLead.companyName}}
+            </span>
+            <span class="ldm-subject-badge" *ngIf="selectedLead.subjectLine">
+              <svg lucideTag size="12"></svg> {{selectedLead.subjectLine}}
+            </span>
+          </div>
         </div>
       </div>
-      <button class="btn-icon-close" (click)="closeDetailModal()">
-        <svg lucideX size="18"></svg>
-      </button>
+      <div class="ldm-header-actions">
+        <button type="button" class="btn-detail-followup" (click)="openFollowUpModal(selectedLead, $event)" title="Schedule & View Follow-ups">
+          <svg lucideCalendar size="14"></svg>
+          <span>Follow Up</span>
+        </button>
+        <button type="button" class="btn-detail-edit" (click)="openEditModal(selectedLead, $event)" title="Edit Lead">
+          <svg lucideEdit2 size="13"></svg>
+          <span>Edit Lead</span>
+        </button>
+        <button type="button" class="btn-detail-delete" (click)="deleteLead(selectedLead.id, $event); closeDetailModal()" title="Delete Lead">
+          <svg lucideTrash2 size="14"></svg>
+        </button>
+        <button type="button" class="btn-icon-close" (click)="closeDetailModal()" title="Close">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
     </div>
 
     <div class="ldm-body">
-      <!-- Value highlight -->
+      <!-- Deal Metrics Banner -->
       <div class="ldm-value-banner">
-        <div class="ldm-value-label">Deal Value</div>
-        <div class="ldm-value-amount">{{selectedLead.value | currency:selectedLead.currency||'INR':'symbol-narrow':'1.0-0'}}</div>
+        <div class="ldm-metric-item">
+          <div class="ldm-value-label">Estimated Deal Value</div>
+          <div class="ldm-value-amount">{{selectedLead.value | currency:selectedLead.currency||'INR':'symbol-narrow':'1.0-0'}}</div>
+        </div>
+        <div class="ldm-metric-divider" *ngIf="selectedLead.dealCategory"></div>
+        <div class="ldm-metric-item" *ngIf="selectedLead.dealCategory">
+          <div class="ldm-value-label">Deal Category</div>
+          <div class="ldm-metric-val">
+            <span class="deal-category-pill" [ngStyle]="{'color': getDealCategoryBadge(selectedLead.dealCategory).color, 'background': getDealCategoryBadge(selectedLead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(selectedLead.dealCategory).border}">
+              {{selectedLead.dealCategory}}
+            </span>
+          </div>
+        </div>
+        <div class="ldm-metric-divider" *ngIf="selectedLead.expectedCloseDate"></div>
+        <div class="ldm-metric-item" *ngIf="selectedLead.expectedCloseDate">
+          <div class="ldm-value-label">Target Close Date</div>
+          <div class="ldm-metric-val">{{selectedLead.expectedCloseDate | date:'dd MMM yyyy'}}</div>
+        </div>
+        <div class="ldm-metric-divider" *ngIf="selectedLead.source"></div>
+        <div class="ldm-metric-item" *ngIf="selectedLead.source">
+          <div class="ldm-value-label">Lead Source</div>
+          <div class="ldm-metric-val">{{selectedLead.source}}</div>
+        </div>
       </div>
 
-      <!-- Contact Info -->
+      <div class="ldm-grid-row">
+        <!-- Contact Information Section -->
+        <div class="ldm-section">
+          <div class="ldm-section-title">
+            <svg lucideUser size="14"></svg> Contact Details
+          </div>
+          <div class="ldm-info-grid">
+            <div class="ldm-info-item">
+              <span class="ldm-info-icon"><svg lucideUser size="14"></svg></span>
+              <div>
+                <div class="ldm-info-label">Primary Contact Name</div>
+                <div class="ldm-info-value">{{selectedLead.contactName || 'Not specified'}}</div>
+              </div>
+            </div>
+            <div class="ldm-info-item">
+              <span class="ldm-info-icon"><svg lucideMail size="14"></svg></span>
+              <div>
+                <div class="ldm-info-label">Email Address</div>
+                <div class="ldm-info-value">
+                  <a *ngIf="selectedLead.email" [href]="'mailto:' + selectedLead.email" class="ldm-link">{{selectedLead.email}}</a>
+                  <span *ngIf="!selectedLead.email" class="text-slate-400">Not specified</span>
+                </div>
+              </div>
+            </div>
+            <div class="ldm-info-item">
+              <span class="ldm-info-icon"><svg lucidePhone size="14"></svg></span>
+              <div>
+                <div class="ldm-info-label">WhatsApp / Phone Number</div>
+                <div class="ldm-info-value">
+                  <a *ngIf="selectedLead.phone" [href]="'tel:' + selectedLead.phone" class="ldm-link">{{selectedLead.phone}}</a>
+                  <span *ngIf="!selectedLead.phone" class="text-slate-400">Not specified</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Company & Web Presence Section -->
+        <div class="ldm-section">
+          <div class="ldm-section-title">
+            <svg lucideBuilding size="14"></svg> Company & Location
+          </div>
+          <div class="ldm-info-grid">
+            <div class="ldm-info-item">
+              <span class="ldm-info-icon"><svg lucideBuilding size="14"></svg></span>
+              <div>
+                <div class="ldm-info-label">Company Name</div>
+                <div class="ldm-info-value">{{selectedLead.companyName || 'Not specified'}}</div>
+              </div>
+            </div>
+            <div class="ldm-info-item">
+              <span class="ldm-info-icon"><svg lucideGlobe size="14"></svg></span>
+              <div>
+                <div class="ldm-info-label">Website</div>
+                <div class="ldm-info-value">
+                  <a *ngIf="selectedLead.website" [href]="selectedLead.website" target="_blank" class="ldm-link">{{selectedLead.website}}</a>
+                  <span *ngIf="!selectedLead.website" class="text-slate-400">Not specified</span>
+                </div>
+              </div>
+            </div>
+            <div class="ldm-info-item">
+              <span class="ldm-info-icon"><svg lucideMapPin size="14"></svg></span>
+              <div>
+                <div class="ldm-info-label">Address</div>
+                <div class="ldm-info-value">{{selectedLead.address || 'Not specified'}}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ownership & System Details -->
       <div class="ldm-section">
-        <div class="ldm-section-title">Contact Information</div>
-        <div class="ldm-info-grid">
-          <div class="ldm-info-item" *ngIf="selectedLead.contactName">
-            <span class="ldm-info-icon"><svg lucideUser size="14"></svg></span>
-            <div>
-              <div class="ldm-info-label">Contact Person</div>
-              <div class="ldm-info-value">{{selectedLead.contactName}}</div>
+        <div class="ldm-section-title">
+          <svg lucideUserCheck size="14"></svg> Assignment & Tracking
+        </div>
+        <div class="ldm-owners-row">
+          <!-- Lead Owner -->
+          <div class="ldm-owner-col">
+            <span class="ldm-info-label">Lead Owner</span>
+            <div class="ldm-owner-card" *ngIf="selectedLead.assignedTo">
+              <div class="owner-avatar-circle" *ngIf="!selectedLead.assignedTo?.avatarUrl">
+                {{selectedLead.assignedTo?.firstName?.[0] || ''}}{{selectedLead.assignedTo?.lastName?.[0] || ''}}
+              </div>
+              <img *ngIf="selectedLead.assignedTo?.avatarUrl" [src]="selectedLead.assignedTo?.avatarUrl" class="owner-avatar-img" />
+              <div class="owner-info-text">
+                <span class="owner-name">{{selectedLead.assignedTo?.firstName}} {{selectedLead.assignedTo?.lastName}}</span>
+                <span class="owner-designation" *ngIf="selectedLead.assignedTo?.designation?.name">{{selectedLead.assignedTo?.designation?.name}}</span>
+                <span class="owner-designation" *ngIf="!selectedLead.assignedTo?.designation?.name">Lead Owner</span>
+              </div>
+            </div>
+            <div *ngIf="!selectedLead.assignedTo" class="unassigned-text">Unassigned</div>
+          </div>
+
+          <!-- Created / Added By -->
+          <div class="ldm-owner-col">
+            <span class="ldm-info-label">Lead Brought By</span>
+
+            <!-- Employee / Team Member -->
+            <div class="ldm-owner-card" *ngIf="selectedLead.addedBy">
+              <div class="owner-avatar-circle" *ngIf="!selectedLead.addedBy?.avatarUrl">
+                {{selectedLead.addedBy?.firstName?.[0] || ''}}{{selectedLead.addedBy?.lastName?.[0] || ''}}
+              </div>
+              <img *ngIf="selectedLead.addedBy?.avatarUrl" [src]="selectedLead.addedBy?.avatarUrl" class="owner-avatar-img" alt="Creator Avatar" />
+              <div class="owner-info-text">
+                <span class="owner-name">{{selectedLead.addedBy?.firstName}} {{selectedLead.addedBy?.lastName}}</span>
+                <span class="owner-designation">{{selectedLead.addedBy?.designation?.name || selectedLead.addedBy?.department?.name || 'Team Member'}}</span>
+              </div>
+            </div>
+
+            <!-- External Lead Contact -->
+            <div class="ldm-owner-card ldm-contact-card" *ngIf="!selectedLead.addedBy && selectedLead.broughtByContact">
+              <div class="owner-avatar-circle contact-avatar-badge">
+                {{ selectedLead.broughtByContact.name ? selectedLead.broughtByContact.name[0].toUpperCase() : 'C' }}
+              </div>
+              <div class="owner-info-text">
+                <span class="owner-name">
+                  {{ selectedLead.broughtByContact.name }}
+                  <span class="contact-pill-tag">Contact</span>
+                </span>
+                <span class="owner-designation" *ngIf="selectedLead.broughtByContact.companyName">
+                  {{ selectedLead.broughtByContact.companyName }}
+                </span>
+                <span class="owner-designation" *ngIf="!selectedLead.broughtByContact.companyName">
+                  External Partner / Referrer
+                </span>
+              </div>
+            </div>
+
+            <!-- Fallback -->
+            <div *ngIf="!selectedLead.addedBy && !selectedLead.broughtByContact" class="unassigned-text">
+              Direct / System
             </div>
           </div>
-          <div class="ldm-info-item" *ngIf="selectedLead.email">
-            <span class="ldm-info-icon"><svg lucideMail size="14"></svg></span>
-            <div>
-              <div class="ldm-info-label">Email</div>
-              <div class="ldm-info-value">{{selectedLead.email}}</div>
-            </div>
-          </div>
-          <div class="ldm-info-item" *ngIf="selectedLead.phone">
-            <span class="ldm-info-icon"><svg lucidePhone size="14"></svg></span>
-            <div>
-              <div class="ldm-info-label">Phone</div>
-              <div class="ldm-info-value">{{selectedLead.phone}}</div>
-            </div>
-          </div>
-          <div class="ldm-info-item" *ngIf="selectedLead.createdAt">
-            <span class="ldm-info-icon"><svg lucideCalendar size="14"></svg></span>
-            <div>
-              <div class="ldm-info-label">Created</div>
-              <div class="ldm-info-value">{{selectedLead.createdAt | date:'dd MMM yyyy'}}</div>
-            </div>
-          </div>
-          <div class="ldm-info-item" *ngIf="selectedLead.proposalDate">
-            <span class="ldm-info-icon"><svg lucideCalendar size="14"></svg></span>
-            <div>
-              <div class="ldm-info-label">Proposal Date</div>
-              <div class="ldm-info-value">{{selectedLead.proposalDate | date:'dd MMM yyyy'}}</div>
+
+          <!-- Creation Date -->
+          <div class="ldm-owner-col" *ngIf="selectedLead.createdAt">
+            <span class="ldm-info-label">Creation Date</span>
+            <div class="ldm-owner-card ldm-date-card">
+              <div class="owner-avatar-circle unassigned-avatar">
+                <svg lucideCalendar size="15"></svg>
+              </div>
+              <div class="owner-info-text">
+                <span class="owner-name">{{selectedLead.createdAt | date:'dd MMM yyyy'}}</span>
+                <span class="owner-designation">{{selectedLead.createdAt | date:'h:mm a'}}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -455,14 +722,16 @@
       <!-- Description -->
       <div class="ldm-section" *ngIf="selectedLead.description">
         <div class="ldm-section-title">
-          <svg lucideFileText size="13"></svg> Description
+          <svg lucideFileText size="14"></svg> Opportunity Description
         </div>
         <p class="ldm-description">{{selectedLead.description}}</p>
       </div>
 
-      <!-- Qualification -->
+      <!-- Qualification / Strategic Notes -->
       <div class="ldm-section ldm-qual-section" *ngIf="selectedLead.qualificationReason">
-        <div class="ldm-section-title">Qualification Notes</div>
+        <div class="ldm-section-title">
+          <svg lucideTag size="14"></svg> Qualification & Strategic Notes
+        </div>
         <p class="ldm-qual-text">{{selectedLead.qualificationReason}}</p>
       </div>
     </div>
@@ -475,138 +744,1172 @@
 
 <!-- Refined Glassmorphic Create Modal -->
 <div class="modal-backdrop" *ngIf="showCreateModal" (click)="closeModal()">
-  <div class="modal-card" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <div>
-        <h3>Add New Lead</h3>
-        <p class="modal-subtitle">Enter details to add a new opportunity to your pipeline.</p>
+  <div class="modal-card enhanced-modal" (click)="$event.stopPropagation()">    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-icon-badge">
+          <svg lucideUser size="20" style="color: #ea580c;"></svg>
+        </div>
+        <div>
+          <h3>{{ isEditing ? 'Edit Opportunity / Lead' : 'Add New Lead' }}</h3>
+          <p class="modal-subtitle">{{ isEditing ? 'Update details, assignment, and pipeline stages for this lead.' : 'Enter details to add a new opportunity to your pipeline.' }}</p>
+        </div>
       </div>
       <button class="btn-icon-close" (click)="closeModal()" [disabled]="isSaving">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+
+    <!-- Wizard Steps Stepper -->
+    <div class="wizard-stepper">
+      <div class="wizard-step" [class.active]="activeTab === 1" [class.completed]="activeTab > 1" (click)="activeTab = 1">
+        <div class="step-badge">
+          <span *ngIf="activeTab <= 1">1</span>
+          <svg lucideCheckCircle size="14" *ngIf="activeTab > 1"></svg>
+        </div>
+        <span class="step-label">Primary Contact</span>
+      </div>
+      <div class="step-connector" [class.active]="activeTab > 1"></div>
+      <div class="wizard-step" [class.active]="activeTab === 2" [class.completed]="activeTab > 2" (click)="activeTab = 2">
+        <div class="step-badge">
+          <span *ngIf="activeTab <= 2">2</span>
+          <svg lucideCheckCircle size="14" *ngIf="activeTab > 2"></svg>
+        </div>
+        <span class="step-label">Deal Tracking</span>
+      </div>
+      <div class="step-connector" [class.active]="activeTab > 2"></div>
+      <div class="wizard-step" [class.active]="activeTab === 3" [class.completed]="activeTab > 3" (click)="activeTab = 3">
+        <div class="step-badge">
+          <span *ngIf="activeTab <= 3">3</span>
+          <svg lucideCheckCircle size="14" *ngIf="activeTab > 3"></svg>
+        </div>
+        <span class="step-label">Additional</span>
+      </div>
+    </div>
+
+    <div class="modal-body enhanced-body">
+      <!-- Step 1: Primary Contact Information -->
+      <div *ngIf="activeTab === 1" class="step-content-anim">
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.title.trim()">
+            <label>Opportunity Title <span class="required-asterisk">*</span></label>
+            <input type="text" [(ngModel)]="newLeadData.title" placeholder="e.g., Enterprise Software Package" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.title.trim()">Opportunity Title is required.</span>
+          </div>
+          <div class="form-group">
+            <label>Subject Line / Deal Summary</label>
+            <input type="text" [(ngModel)]="newLeadData.subjectLine" placeholder="e.g., SD-WAN Multi-Branch Setup" [disabled]="isSaving" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.companyName.trim()">
+            <label>Company Name <span class="required-asterisk">*</span></label>
+            <input type="text" [(ngModel)]="newLeadData.companyName" placeholder="e.g., Acme Technologies Inc." [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.companyName.trim()">Company Name is required.</span>
+          </div>
+          <div class="form-group">
+            <label>Primary Contact Name</label>
+            <input type="text" [(ngModel)]="newLeadData.contactName" placeholder="e.g., John Doe" [disabled]="isSaving" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.email.trim()">
+            <label>Email Address <span class="required-asterisk">*</span></label>
+            <input type="email" [(ngModel)]="newLeadData.email" placeholder="john@acme.com" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.email.trim()">Email is required.</span>
+          </div>
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.phone.trim()">
+            <label>WhatsApp / Phone Number <span class="required-asterisk">*</span></label>
+            <input type="text" [(ngModel)]="newLeadData.phone" placeholder="+1 (555) 000-0000" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.phone.trim()">WhatsApp/Phone is required.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Deal & Pipeline Tracking -->
+      <div *ngIf="activeTab === 2" class="step-content-anim">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Initial Pipeline Status</label>
+            <select [(ngModel)]="newLeadData.status" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Deal Category</label>
+            <select [(ngModel)]="newLeadData.dealCategory" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let cat of DEAL_CATEGORIES" [value]="cat.id">{{cat.name}}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Lead Source</label>
+            <select [(ngModel)]="newLeadData.source" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let src of LEAD_SOURCES" [value]="src">{{src}}</option>
+            </select>
+            <input 
+              *ngIf="newLeadData.source === 'Other'" 
+              type="text" 
+              [(ngModel)]="customSource" 
+              placeholder="Specify custom source channel..." 
+              style="margin-top: 8px;" 
+              [disabled]="isSaving" 
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Expected Deal Value</label>
+            <div class="input-with-prefix">
+              <span class="currency-symbol-addon">$</span>
+              <input 
+                type="number" 
+                min="0" 
+                step="any"
+                [(ngModel)]="newLeadData.value" 
+                (keydown)="preventNegative($event)"
+                (input)="validateDealValue()"
+                placeholder="0.00" 
+                [disabled]="isSaving" 
+                class="currency-input" 
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Expected Close Date</label>
+            <input type="date" [(ngModel)]="newLeadData.expectedCloseDate" [disabled]="isSaving" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <!-- 1. Lead Brought By -->
+          <div class="form-group custom-select-group">
+            <div class="field-label-row">
+              <label>Lead Brought By (Source Generator)</label>
+              <button type="button" class="btn-link-pill" (click)="$event.stopPropagation(); openLeadContactModal()">
+                <svg lucidePlus size="12"></svg>
+                <span>New Contact</span>
+              </button>
+            </div>
+            <div class="owner-select-trigger" (click)="showBroughtByDropdown = !showBroughtByDropdown" [class.active]="showBroughtByDropdown">
+              <div *ngIf="getSelectedBroughtBy() as broughtBy" class="selected-owner-display">
+                <!-- If Contact -->
+                <div class="owner-avatar-circle contact-avatar-badge" *ngIf="broughtBy._kind === 'contact'">
+                  {{broughtBy.firstName ? broughtBy.firstName[0].toUpperCase() : 'C'}}
+                </div>
+                <!-- If Employee without image -->
+                <div class="owner-avatar-circle" *ngIf="broughtBy._kind !== 'contact' && !broughtBy.avatarUrl">
+                  {{broughtBy.firstName ? broughtBy.firstName[0] : ''}}{{broughtBy.lastName ? broughtBy.lastName[0] : ''}}
+                </div>
+                <!-- If Employee with image -->
+                <img *ngIf="broughtBy._kind !== 'contact' && broughtBy.avatarUrl" [src]="broughtBy.avatarUrl" class="owner-avatar-img" alt="Avatar" />
+                
+                <div class="owner-info-text">
+                  <span class="owner-name">
+                    {{broughtBy.firstName}} {{broughtBy.lastName}}
+                    <span class="contact-pill-tag" *ngIf="broughtBy._kind === 'contact'">Contact</span>
+                    <span class="team-pill-tag" *ngIf="broughtBy._kind === 'employee'">Team</span>
+                  </span>
+                  <span class="owner-designation" *ngIf="broughtBy.designation?.name">{{broughtBy.designation?.name}}</span>
+                </div>
+                <button type="button" class="btn-clear-owner" (click)="$event.stopPropagation(); selectBroughtBy(null)">
+                  <svg lucideX size="14"></svg>
+                </button>
+              </div>
+              <div *ngIf="!getSelectedBroughtBy()" class="unassigned-placeholder">
+                <div class="owner-avatar-circle unassigned-avatar">
+                  <svg lucideUser size="14"></svg>
+                </div>
+                <span class="placeholder-text">Select Person Who Brought Lead...</span>
+                <svg lucideChevronDown size="16" class="chevron-icon"></svg>
+              </div>
+            </div>
+            <div class="owner-dropdown-menu" *ngIf="showBroughtByDropdown">
+              <div class="owner-search-box">
+                <svg lucideSearch size="14" class="owner-search-icon"></svg>
+                <input type="text" placeholder="Search by name, company..." [(ngModel)]="broughtBySearchQuery" (click)="$event.stopPropagation()" />
+              </div>
+              <div class="owner-list-scroll">
+                <div class="owner-item" (click)="selectBroughtBy(null)" [class.selected]="!newLeadData.addedById && !newLeadData.broughtByContactId">
+                  <div class="owner-avatar-circle unassigned-avatar">
+                    <svg lucideUser size="14"></svg>
+                  </div>
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">None / Direct</span>
+                    <span class="owner-item-sub">Direct or external source</span>
+                  </div>
+                </div>
+
+                <div class="owner-list-subheader" *ngIf="getFilteredBroughtByContacts().length > 0">
+                  <svg lucideUserCheck size="13"></svg>
+                  <span>Lead Contacts (External Referrers)</span>
+                </div>
+                <div class="owner-item" *ngFor="let contact of getFilteredBroughtByContacts()" (click)="selectBroughtByContact(contact)" [class.selected]="newLeadData.broughtByContactId === contact.id">
+                  <div class="owner-avatar-circle contact-avatar-badge">
+                    {{contact.name ? contact.name[0].toUpperCase() : 'C'}}
+                  </div>
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">
+                      {{contact.name}}
+                      <span class="contact-pill-tag">Contact</span>
+                    </span>
+                    <span class="owner-item-sub" *ngIf="contact.companyName">{{contact.companyName}}</span>
+                    <span class="owner-item-sub" *ngIf="!contact.companyName">External Partner</span>
+                  </div>
+                </div>
+
+                <div class="owner-list-subheader" *ngIf="getFilteredBroughtByEmployees().length > 0">
+                  <svg lucideUsers size="13"></svg>
+                  <span>Internal Team Members</span>
+                </div>
+                <div class="owner-item" *ngFor="let emp of getFilteredBroughtByEmployees()" (click)="selectBroughtBy(emp)" [class.selected]="newLeadData.addedById === emp.id">
+                  <div class="owner-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{emp.firstName ? emp.firstName[0] : ''}}{{emp.lastName ? emp.lastName[0] : ''}}
+                  </div>
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="owner-avatar-img" alt="Avatar" />
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">
+                      {{emp.firstName}} {{emp.lastName}}
+                      <span class="team-pill-tag">Team</span>
+                    </span>
+                    <span class="owner-designation" *ngIf="emp.designation?.name">
+                      {{emp.designation?.name}}
+                      <span *ngIf="emp.department?.name" style="opacity: 0.75; font-size: 0.95em;">({{emp.department?.name}})</span>
+                    </span>
+                    <span class="owner-designation" *ngIf="!emp.designation?.name && emp.department?.name">{{emp.department.name}}</span>
+                  </div>
+                </div>
+                <div *ngIf="getFilteredBroughtByEmployees().length === 0 && getFilteredBroughtByContacts().length === 0" class="no-owners-found">
+                  No matching people found
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Lead Owner / Assigned To -->
+          <div class="form-group custom-select-group">
+            <label>Lead Owner / Assigned Rep (Sales, Finance & Admin)</label>
+            <div class="owner-select-trigger" (click)="showOwnerDropdown = !showOwnerDropdown" [class.active]="showOwnerDropdown">
+              <div *ngIf="getSelectedOwner() as owner" class="selected-owner-display">
+                <div class="owner-avatar-circle" *ngIf="!owner.avatarUrl">
+                  {{owner.firstName ? owner.firstName[0] : ''}}{{owner.lastName ? owner.lastName[0] : ''}}
+                </div>
+                <img *ngIf="owner.avatarUrl" [src]="owner.avatarUrl" class="owner-avatar-img" />
+                <div class="owner-info-text">
+                  <span class="owner-name">{{owner.firstName}} {{owner.lastName}}</span>
+                  <span class="owner-designation" *ngIf="owner.designation?.name">{{owner.designation?.name}}</span>
+                </div>
+                <button type="button" class="btn-clear-owner" (click)="$event.stopPropagation(); selectOwner(null)">
+                  <svg lucideX size="14"></svg>
+                </button>
+              </div>
+              <div *ngIf="!getSelectedOwner()" class="unassigned-placeholder">
+                <div class="owner-avatar-circle unassigned-avatar">
+                  <svg lucideUser size="14"></svg>
+                </div>
+                <span class="placeholder-text">Select Rep...</span>
+                <svg lucideChevronDown size="16" class="chevron-icon"></svg>
+              </div>
+            </div>
+            <div class="owner-dropdown-menu" *ngIf="showOwnerDropdown">
+              <div class="owner-search-box">
+                <svg lucideSearch size="14" class="owner-search-icon"></svg>
+                <input type="text" placeholder="Search by name, role..." [(ngModel)]="ownerSearchQuery" (click)="$event.stopPropagation()" />
+              </div>
+              <div class="owner-list-scroll">
+                <div class="owner-item" (click)="selectOwner(null)" [class.selected]="!newLeadData.assignedToId">
+                  <div class="owner-avatar-circle unassigned-avatar">
+                    <svg lucideUser size="14"></svg>
+                  </div>
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">Unassigned</span>
+                    <span class="owner-item-sub">No owner assigned yet</span>
+                  </div>
+                </div>
+                <div class="owner-item" *ngFor="let emp of getFilteredEmployees()" (click)="selectOwner(emp)" [class.selected]="newLeadData.assignedToId === emp.id">
+                  <div class="owner-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{emp.firstName ? emp.firstName[0] : ''}}{{emp.lastName ? emp.lastName[0] : ''}}
+                  </div>
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="owner-avatar-img" />
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">{{emp.firstName}} {{emp.lastName}}</span>
+                    <span class="owner-designation" *ngIf="emp.designation?.name">
+  {{emp.designation?.name}}
+  <span *ngIf="emp.department?.name" style="opacity: 0.75; font-size: 0.95em;">({{emp.department?.name}})</span>
+</span>
+                    <span class="owner-designation" *ngIf="!emp.designation?.name && emp.department?.name">{{emp.department.name}}</span>
+                  </div>
+                </div>
+                <div *ngIf="getFilteredEmployees().length === 0" class="no-owners-found">
+                  No matching reps found
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Additional Details -->
+      <div *ngIf="activeTab === 3" class="step-content-anim">
+        <div class="form-group">
+          <label>Lead Description / Notes</label>
+          <textarea [(ngModel)]="newLeadData.description" placeholder="Enter background information, pain points, or notes..." rows="3" [disabled]="isSaving"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Company Website</label>
+          <input type="url" [(ngModel)]="newLeadData.website" placeholder="https://acme.com" [disabled]="isSaving" />
+        </div>
+        
+        <div class="form-group">
+          <label>Office Address</label>
+          <textarea [(ngModel)]="newLeadData.address" placeholder="Enter physical office address or city/state..." rows="3" [disabled]="isSaving"></textarea>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer enhanced-footer">
+      <button class="btn-secondary" (click)="activeTab = activeTab - 1" *ngIf="activeTab > 1" [disabled]="isSaving">
+        Previous
+      </button>
+      <div *ngIf="activeTab === 1"></div>
+      
+      <div class="footer-right-actions">
+        <button class="btn-secondary" (click)="closeModal()" [disabled]="isSaving">Cancel</button>
+        <button class="btn-primary" (click)="activeTab = activeTab + 1" *ngIf="activeTab < 3" [disabled]="isSaving">
+          Next Step
+        </button>
+        <button class="btn-primary btn-save" (click)="createLead()" *ngIf="activeTab === 3" [disabled]="isSaving">
+          <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving"></svg>
+          <span>{{ isSaving ? (isEditing ? 'Updating Lead...' : 'Creating Lead...') : (isEditing ? 'Save Changes' : 'Submit & Save Lead') }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lead Contact Modal (creates/edits a LeadContact usable as "Lead Brought By") -->
+<div class="modal-backdrop" *ngIf="showLeadContactModal" (click)="closeLeadContactModal()">
+  <div class="modal-card enhanced-modal lead-contact-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-icon-badge">
+          <svg lucideUserCheck size="20"></svg>
+        </div>
+        <div>
+          <h2 style="margin: 0;">{{ isEditingLeadContact ? 'Edit Lead Contact' : 'Lead Contact Detail' }}</h2>
+          <p class="modal-subtitle">{{ isEditingLeadContact ? 'Update external source (broker, partner, referrer) details and internal assignment.' : 'Add an external source (broker, partner, referrer) who can be selected under "Lead Brought By".' }}</p>
+        </div>
+      </div>
+      <button class="btn-icon-close" (click)="closeLeadContactModal()" [disabled]="isSavingLeadContact">
         <svg lucideX size="18"></svg>
       </button>
     </div>
 
-    <div class="modal-body">
-      <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.title.trim()">
-        <label>Opportunity Title <span class="required-asterisk">*</span></label>
-        <input 
-          type="text" 
-          [(ngModel)]="newLeadData.title" 
-          placeholder="e.g., 50 Licenses for Acme Corp" 
-          [disabled]="isSaving"
-        />
-        <span class="error-msg" *ngIf="isSubmitted && !newLeadData.title.trim()">
-          Opportunity Title is required.
-        </span>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.companyName.trim()">
-          <label>Company Name <span class="required-asterisk">*</span></label>
-          <input 
-            type="text" 
-            [(ngModel)]="newLeadData.companyName" 
-            placeholder="e.g., Acme Corp"
-            [disabled]="isSaving"
-          />
-          <span class="error-msg" *ngIf="isSubmitted && !newLeadData.companyName.trim()">
-            Company Name is required.
-          </span>
-        </div>
-        <div class="form-group">
-          <label>Contact Name</label>
-          <input 
-            type="text" 
-            [(ngModel)]="newLeadData.contactName" 
-            placeholder="e.g., John Doe"
-            [disabled]="isSaving"
-          />
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.email.trim()">
-          <label>Email <span class="required-asterisk">*</span></label>
-          <input 
-            type="email" 
-            [(ngModel)]="newLeadData.email" 
-            placeholder="john@acme.com"
-            [disabled]="isSaving"
-          />
-          <span class="error-msg" *ngIf="isSubmitted && !newLeadData.email.trim()">
-            Email is required.
-          </span>
-        </div>
-        <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.phone.trim()">
-          <label>Phone <span class="required-asterisk">*</span></label>
-          <input 
-            type="text" 
-            [(ngModel)]="newLeadData.phone" 
-            placeholder="+1 (555) 000-0000"
-            [disabled]="isSaving"
-          />
-          <span class="error-msg" *ngIf="isSubmitted && !newLeadData.phone.trim()">
-            Phone is required.
-          </span>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Estimated Value</label>
-        <div class="input-with-prefix">
-          <select class="currency-select" [(ngModel)]="newLeadData.currency" [disabled]="isSaving">
-            <option value="INR">₹</option>
-            <option value="USD">$</option>
-            <option value="EUR">€</option>
-            <option value="GBP">£</option>
+    <div class="modal-body enhanced-body">
+      <div class="form-row form-row-3">
+        <div class="form-group salutation-group">
+          <label>Salutation</label>
+          <select [(ngModel)]="leadContactForm.salutation" [disabled]="isSavingLeadContact" class="enhanced-select">
+            <option value="">--</option>
+            <option value="Mr.">Mr.</option>
+            <option value="Mrs.">Mrs.</option>
+            <option value="Ms.">Ms.</option>
+            <option value="Dr.">Dr.</option>
           </select>
-          <input
-            type="number"
-            [(ngModel)]="newLeadData.value"
-            placeholder="0.00"
-            [disabled]="isSaving"
-            class="currency-input"
-          />
+        </div>
+        <div class="form-group">
+          <label>Name <span class="required-asterisk">*</span></label>
+          <input type="text" [(ngModel)]="leadContactForm.name" placeholder="e.g. John Doe" [disabled]="isSavingLeadContact" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" [(ngModel)]="leadContactForm.email" placeholder="e.g. johndoe@example.com" [disabled]="isSavingLeadContact" />
         </div>
       </div>
 
-      <div class="form-group">
-        <label>Detailed Description</label>
-        <textarea
-          [(ngModel)]="newLeadData.description"
-          placeholder="Describe the opportunity, requirements, background..."
-          rows="3"
-          [disabled]="isSaving"
-        ></textarea>
-      </div>
-
-      <div class="form-row">
+      <div class="form-row form-row-3">
         <div class="form-group">
-          <label>Qualification Comments</label>
-          <input
-            type="text"
-            [(ngModel)]="newLeadData.qualificationReason"
-            placeholder="Why is this lead qualified or not?"
-            [disabled]="isSaving"
-          />
+          <label>Phone</label>
+          <input type="text" [(ngModel)]="leadContactForm.phone" placeholder="e.g. 1234567890" [disabled]="isSavingLeadContact" />
         </div>
         <div class="form-group">
-          <label>Proposal Date</label>
-          <input
-            type="date"
-            [(ngModel)]="newLeadData.proposalDate"
-            [disabled]="isSaving"
+          <label>Lead Source</label>
+          <select [(ngModel)]="leadContactForm.leadSource" [disabled]="isSavingLeadContact" class="enhanced-select">
+            <option value="">-- Select Source --</option>
+            <option *ngFor="let src of LEAD_SOURCES" [value]="src">{{ src }}</option>
+          </select>
+        </div>
+        
+        <!-- Searchable Added By with User Avatar -->
+        <div class="form-group custom-select-group">
+          <label>Added By (Team Member)</label>
+          <div class="owner-select-trigger" (click)="showContactAddedByDropdown = !showContactAddedByDropdown" [class.active]="showContactAddedByDropdown">
+            <div *ngIf="getSelectedContactAddedBy() as emp" class="selected-owner-display">
+              <div class="owner-avatar-circle" *ngIf="!emp.avatarUrl">
+                {{emp.firstName ? emp.firstName[0] : ''}}{{emp.lastName ? emp.lastName[0] : ''}}
+              </div>
+              <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="owner-avatar-img" alt="Avatar" />
+              <div class="owner-info-text">
+                <span class="owner-name">
+                  {{emp.firstName}} {{emp.lastName}}
+                  <span class="you-badge" *ngIf="emp.id === (auth.currentUser()?.employee?.id || auth.currentUser()?.employeeId)">(You)</span>
+                </span>
+                <span class="owner-designation" *ngIf="emp.designation?.name">{{emp.designation?.name}}</span>
+              </div>
+              <button type="button" class="btn-clear-owner" (click)="$event.stopPropagation(); selectContactAddedBy(null)">
+                <svg lucideX size="14"></svg>
+              </button>
+            </div>
+            <div *ngIf="!getSelectedContactAddedBy()" class="unassigned-placeholder">
+              <div class="owner-avatar-circle unassigned-avatar">
+                <svg lucideUser size="14"></svg>
+              </div>
+              <span class="placeholder-text">Select Added By...</span>
+              <svg lucideChevronDown size="16" class="chevron-icon"></svg>
+            </div>
+          </div>
+          
+          <div class="owner-dropdown-menu" *ngIf="showContactAddedByDropdown">
+            <div class="owner-search-box">
+              <svg lucideSearch size="14" class="owner-search-icon"></svg>
+              <input type="text" placeholder="Search by name, role..." [(ngModel)]="contactAddedBySearchQuery" (click)="$event.stopPropagation()" />
+            </div>
+            <div class="owner-list-scroll">
+              <div class="owner-item" (click)="selectContactAddedBy(null)" [class.selected]="!leadContactForm.addedById">
+                <div class="owner-avatar-circle unassigned-avatar">
+                  <svg lucideUser size="14"></svg>
+                </div>
+                <div class="owner-item-details">
+                  <span class="owner-item-name">None / Direct</span>
+                  <span class="owner-item-sub">No internal employee assigned</span>
+                </div>
+              </div>
+              <div class="owner-item" *ngFor="let emp of getFilteredContactAddedByEmployees()" (click)="selectContactAddedBy(emp)" [class.selected]="leadContactForm.addedById === emp.id">
+                <div class="owner-avatar-circle" *ngIf="!emp.avatarUrl">
+                  {{emp.firstName ? emp.firstName[0] : ''}}{{emp.lastName ? emp.lastName[0] : ''}}
+                </div>
+                <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="owner-avatar-img" alt="Avatar" />
+                <div class="owner-item-details">
+                  <span class="owner-item-name">
+                    {{emp.firstName}} {{emp.lastName}}
+                    <span class="you-badge" *ngIf="emp.id === (auth.currentUser()?.employee?.id || auth.currentUser()?.employeeId)">(You)</span>
+                  </span>
+                  <span class="owner-designation" *ngIf="emp.designation?.name">
+                    {{emp.designation?.name}}
+                    <span *ngIf="emp.department?.name" style="opacity: 0.75; font-size: 0.95em;">({{emp.department?.name}})</span>
+                  </span>
+                  <span class="owner-designation" *ngIf="!emp.designation?.name && emp.department?.name">{{emp.department.name}}</span>
+                </div>
+              </div>
+              <div *ngIf="getFilteredContactAddedByEmployees().length === 0" class="no-owners-found">
+                No matching employees found
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider-label">
+        <svg lucideBuilding size="14"></svg>
+        <span>Company & Organization Details</span>
+      </div>
+
+      <div class="form-row form-row-2">
+        <div class="form-group">
+          <label>Company Name</label>
+          <input type="text" [(ngModel)]="leadContactForm.companyName" placeholder="e.g. Acme Corporation" [disabled]="isSavingLeadContact" />
+        </div>
+        <div class="form-group">
+          <label>Website</label>
+          <input type="url" [(ngModel)]="leadContactForm.website" placeholder="e.g. https://www.example.com" [disabled]="isSavingLeadContact" />
+        </div>
+      </div>
+
+      <div class="form-row form-row-2">
+        <div class="form-group">
+          <label>Mobile</label>
+          <input type="text" [(ngModel)]="leadContactForm.mobile" placeholder="e.g. 1234567890" [disabled]="isSavingLeadContact" />
+        </div>
+        <div class="form-group">
+          <label>Office Phone Number</label>
+          <input type="text" [(ngModel)]="leadContactForm.officePhoneNumber" placeholder="e.g. +1 555 123 4567" [disabled]="isSavingLeadContact" />
+        </div>
+      </div>
+
+      <div class="form-row form-row-4">
+        <div class="form-group">
+          <label>Country</label>
+          <input type="text" [(ngModel)]="leadContactForm.country" placeholder="e.g. United Arab Emirates, India, USA" [disabled]="isSavingLeadContact" />
+        </div>
+        <div class="form-group">
+          <label>State</label>
+          <input type="text" [(ngModel)]="leadContactForm.state" placeholder="e.g. Dubai, California, Maharashtra" [disabled]="isSavingLeadContact" />
+        </div>
+        <div class="form-group">
+          <label>City</label>
+          <input type="text" [(ngModel)]="leadContactForm.city" placeholder="e.g. Dubai, New York, Mumbai" [disabled]="isSavingLeadContact" />
+        </div>
+        <div class="form-group">
+          <label>Postal code</label>
+          <input type="text" [(ngModel)]="leadContactForm.postalCode" placeholder="e.g. 90250" [disabled]="isSavingLeadContact" />
+        </div>
+      </div>
+<div class="form-group">
+        <label>Address</label>
+        <textarea [(ngModel)]="leadContactForm.address" placeholder="e.g. Office 402, Business Tower, Downtown, Dubai" rows="2" [disabled]="isSavingLeadContact"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer enhanced-footer">
+      <div class="footer-left-actions">
+        <label class="toggle-checkbox-row" *ngIf="!isEditingLeadContact">
+          <input type="checkbox" [(ngModel)]="autoCreateLeadForContact" [disabled]="isSavingLeadContact" />
+          <span>Also create a related Lead / Opportunity</span>
+        </label>
+      </div>
+      <div class="footer-right-actions">
+        <button class="btn-secondary" (click)="closeLeadContactModal()" [disabled]="isSavingLeadContact">Cancel</button>
+        <button class="btn-primary btn-save" (click)="submitLeadContact()" [disabled]="isSavingLeadContact || !leadContactForm.name.trim()">
+          <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingLeadContact"></svg>
+          <span>{{ isSavingLeadContact ? (isEditingLeadContact ? 'Updating...' : 'Saving...') : (isEditingLeadContact ? 'Update Contact' : 'Save Lead Contact') }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== FIELD VISIT MODAL ==================== -->
+<div class="modal-backdrop" *ngIf="selectedFieldVisit" (click)="closeFieldVisit()">
+  <div class="modal-box fv-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Field Visit Details</h2>
+      <button type="button" class="close-btn" (click)="closeFieldVisit()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+    <div class="modal-body p-4">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+          <img *ngIf="selectedFieldVisit.employee?.avatarUrl" [src]="selectedFieldVisit.employee?.avatarUrl" class="w-full h-full object-cover">
+          <svg *ngIf="!selectedFieldVisit.employee?.avatarUrl" lucideUser class="text-gray-400"></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-gray-900">{{selectedFieldVisit.employee?.firstName}} {{selectedFieldVisit.employee?.lastName}}</h3>
+          <p class="text-sm text-gray-500">Sales Representative</p>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Project / Purpose</span>
+          <span class="text-sm font-medium text-slate-800">{{selectedFieldVisit.project?.name || selectedFieldVisit.purpose || 'Unknown'}}</span>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Status</span>
+          <span class="text-xs font-bold px-2 py-1 rounded" [ngStyle]="fieldVisitStatusColor(selectedFieldVisit.status)">
+            {{selectedFieldVisit.status}}
+          </span>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Date & Time</span>
+          <span class="text-sm font-medium text-slate-800">{{selectedFieldVisit.startTime | date:'medium'}}</span>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Location Address</span>
+          <span class="text-sm font-medium text-slate-800">{{selectedFieldVisit.startAddress || 'Not specified'}}</span>
+        </div>
+      </div>
+
+      <div class="mb-4" *ngIf="selectedFieldVisit.notes">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Visit Notes & Outcome</span>
+        <div class="bg-white p-3 rounded-lg border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap">
+          {{selectedFieldVisit.notes}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== FOLLOW-UP MANAGEMENT MODAL ==================== -->
+<div class="modal-backdrop" *ngIf="showFollowUpModal && selectedLead" (click)="closeFollowUpModal()">
+  <div class="followup-modal-card" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="fum-header">
+      <div class="fum-header-left">
+        <div class="fum-icon-badge">
+          <svg lucideCalendar size="20" style="color: #ffffff;"></svg>
+        </div>
+        <div class="fum-header-text">
+          <div class="fum-lead-tag">
+            <span class="ldm-status-badge ldm-status-{{selectedLead.status | lowercase}}">{{getStatusLabel(selectedLead.status)}}</span>
+            <span class="fum-lead-company" *ngIf="selectedLead.companyName">
+              <svg lucideBuilding size="12"></svg> {{selectedLead.companyName}}
+            </span>
+          </div>
+          <h3 class="fum-title">Follow-Up: {{selectedLead.title}}</h3>
+        </div>
+      </div>
+      <button class="btn-icon-close" (click)="closeFollowUpModal()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <!-- Navigation Tabs (Segmented Control) -->
+    <div class="fum-nav-container">
+      <div class="fum-tabs-segmented">
+        <button 
+          type="button" 
+          class="fum-tab-btn" 
+          [class.active]="followUpTab === 'schedule'" 
+          (click)="followUpTab = 'schedule'"
+        >
+          <svg lucideCalendar size="14"></svg> Schedule Next Follow-Up
+        </button>
+        <button 
+          type="button" 
+          class="fum-tab-btn" 
+          [class.active]="followUpTab === 'history'" 
+          (click)="followUpTab = 'history'"
+        >
+          <svg lucideClock size="14"></svg> Follow-Up Timeline & History
+          <span class="fum-count-pill" *ngIf="leadFollowUps.length">{{leadFollowUps.length}}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Scrollable Modal Body -->
+    <div class="fum-body">
+      <!-- TAB 1: SCHEDULE NEW FOLLOW-UP -->
+      <div *ngIf="followUpTab === 'schedule'" class="fum-schedule-form">
+        <!-- Title / Purpose -->
+        <div class="form-group">
+          <label>Follow-Up Title / Purpose <span class="required-asterisk">*</span></label>
+          <input 
+            type="text" 
+            [(ngModel)]="newFollowUp.title" 
+            placeholder="e.g. Discuss revised pricing quote & implementation timeline" 
+            [disabled]="isSavingFollowUp" 
           />
+        </div>
+
+        <!-- Follow-Up Type Selection Grid -->
+        <div class="form-group">
+          <label>Follow-Up Medium / Type</label>
+          <div class="fum-type-grid">
+            <button 
+              type="button" 
+              class="fum-type-btn type-call" 
+              [class.active]="newFollowUp.type === 'CALL'" 
+              (click)="newFollowUp.type = 'CALL'"
+            >
+              <div class="type-icon-box"><svg lucidePhone size="14"></svg></div>
+              <span>Phone Call</span>
+            </button>
+            <button 
+              type="button" 
+              class="fum-type-btn type-meeting" 
+              [class.active]="newFollowUp.type === 'MEETING'" 
+              (click)="newFollowUp.type = 'MEETING'"
+            >
+              <div class="type-icon-box"><svg lucideVideo size="14"></svg></div>
+              <span>Meeting / VC</span>
+            </button>
+            <button 
+              type="button" 
+              class="fum-type-btn type-demo" 
+              [class.active]="newFollowUp.type === 'DEMO'" 
+              (click)="newFollowUp.type = 'DEMO'"
+            >
+              <div class="type-icon-box"><svg lucideEye size="14"></svg></div>
+              <span>Product Demo</span>
+            </button>
+            <button 
+              type="button" 
+              class="fum-type-btn type-email" 
+              [class.active]="newFollowUp.type === 'EMAIL'" 
+              (click)="newFollowUp.type = 'EMAIL'"
+            >
+              <div class="type-icon-box"><svg lucideMail size="14"></svg></div>
+              <span>Email</span>
+            </button>
+            <button 
+              type="button" 
+              class="fum-type-btn type-field" 
+              [class.active]="newFollowUp.type === 'FIELD_VISIT'" 
+              (click)="newFollowUp.type = 'FIELD_VISIT'"
+            >
+              <div class="type-icon-box"><svg lucideMapPin size="14"></svg></div>
+              <span>Field Visit</span>
+            </button>
+            <button 
+              type="button" 
+              class="fum-type-btn type-note" 
+              [class.active]="newFollowUp.type === 'NOTE'" 
+              (click)="newFollowUp.type = 'NOTE'"
+            >
+              <div class="type-icon-box"><svg lucideFileText size="14"></svg></div>
+              <span>Note / Task</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Whom to follow up with (Client Contact Card) -->
+        <div class="fum-section-box">
+          <div class="fum-section-header">
+            <svg lucideUser size="14" style="color: #ea580c;"></svg>
+            <span>Whom to Follow Up With (Client Contact)</span>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contact Person</label>
+              <input type="text" [(ngModel)]="newFollowUp.contactPerson" placeholder="e.g. John Doe - Decision Maker" />
+            </div>
+            <div class="form-group">
+              <label>Direct Phone Number</label>
+              <input type="text" [(ngModel)]="newFollowUp.contactPhone" placeholder="Phone Number" />
+            </div>
+            <div class="form-group">
+              <label>Direct Email Address</label>
+              <input type="email" [(ngModel)]="newFollowUp.contactEmail" placeholder="contact@company.com" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Future Date & Time Schedule -->
+        <div class="form-row">
+          <div class="form-group" style="flex: 1.2;">
+            <label>Scheduled Date & Time (Future) <span class="required-asterisk">*</span></label>
+            <input type="datetime-local" [(ngModel)]="newFollowUp.scheduledAt" [disabled]="isSavingFollowUp" class="fum-datetime-input" />
+            <!-- Quick preset chips -->
+            <div class="fum-presets">
+              <span class="preset-label">Quick Set:</span>
+              <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('today_afternoon')">Today 3 PM</button>
+              <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('tomorrow_morning')">Tomorrow 10 AM</button>
+              <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('in_2_days')">In 2 Days</button>
+              <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('next_week')">Next Week</button>
+            </div>
+          </div>
+
+          <!-- Internal Responsible Rep -->
+          <div class="form-group custom-select-group" style="flex: 1;">
+            <label>Assigned Sales Rep</label>
+            <div 
+              class="owner-select-trigger" 
+              (click)="showFollowUpOwnerDropdown = !showFollowUpOwnerDropdown"
+              [class.active]="showFollowUpOwnerDropdown"
+            >
+              <div *ngIf="getSelectedFollowUpOwner() as owner" class="selected-owner-display">
+                <div class="owner-avatar-circle" *ngIf="!owner.avatarUrl">
+                  {{owner.firstName ? owner.firstName[0] : ''}}{{owner.lastName ? owner.lastName[0] : ''}}
+                </div>
+                <img *ngIf="owner.avatarUrl" [src]="owner.avatarUrl" class="owner-avatar-img" />
+                <div class="owner-info-text">
+                  <span class="owner-name">{{owner.firstName}} {{owner.lastName}}</span>
+                  <span class="owner-designation" *ngIf="owner.designation?.name">{{owner.designation?.name}}</span>
+                </div>
+              </div>
+              <div *ngIf="!getSelectedFollowUpOwner()" class="unassigned-placeholder">
+                <div class="owner-avatar-circle unassigned-avatar">
+                  <svg lucideUser size="14"></svg>
+                </div>
+                <span class="placeholder-text">Select Rep...</span>
+                <svg lucideChevronDown size="16" class="chevron-icon"></svg>
+              </div>
+            </div>
+
+            <!-- Dropdown Menu -->
+            <div class="owner-dropdown-menu" *ngIf="showFollowUpOwnerDropdown">
+              <div class="owner-search-box">
+                <svg lucideSearch size="14" class="owner-search-icon"></svg>
+                <input 
+                  type="text" 
+                  placeholder="Search team member..." 
+                  [(ngModel)]="followUpOwnerSearchQuery"
+                  (click)="$event.stopPropagation()"
+                />
+              </div>
+              <div class="owner-list-scroll">
+                <div 
+                  class="owner-item" 
+                  *ngFor="let emp of getFilteredFollowUpEmployees()" 
+                  (click)="selectFollowUpOwner(emp)"
+                  [class.selected]="newFollowUp.assignedToId === emp.id"
+                >
+                  <div class="owner-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{emp.firstName ? emp.firstName[0] : ''}}{{emp.lastName ? emp.lastName[0] : ''}}
+                  </div>
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="owner-avatar-img" />
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">{{emp.firstName}} {{emp.lastName}}</span>
+                    <span class="owner-designation" *ngIf="emp.designation?.name">
+  {{emp.designation?.name}}
+  <span *ngIf="emp.department?.name" style="opacity: 0.75; font-size: 0.95em;">({{emp.department?.name}})</span>
+</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes / Agenda -->
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Agenda / Discussion Points & Notes</label>
+          <textarea 
+            [(ngModel)]="newFollowUp.notes" 
+            placeholder="Outline key discussion points, questions to ask, or proposal items to clarify..." 
+            rows="3" 
+            [disabled]="isSavingFollowUp"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- TAB 2: FOLLOW-UP TIMELINE & HISTORY -->
+      <div *ngIf="followUpTab === 'history'" class="fum-history-view">
+        <!-- Outcome Dialog if Completing -->
+        <div class="fum-outcome-card" *ngIf="completingFollowUp">
+          <div class="fum-outcome-header">
+            <h4>Complete Follow-Up: <span>{{completingFollowUp.title}}</span></h4>
+            <button class="btn-icon-close" (click)="cancelCompleteFollowUp()"><svg lucideX size="16"></svg></button>
+          </div>
+          <div class="form-group">
+            <label>Outcome / Meeting Summary & Next Actions</label>
+            <textarea 
+              [(ngModel)]="outcomeText" 
+              placeholder="What was discussed? Did the client agree to the proposal? Any next steps required?" 
+              rows="3"
+            ></textarea>
+          </div>
+          <div class="fum-outcome-actions">
+            <button type="button" class="btn-secondary" (click)="cancelCompleteFollowUp()">Cancel</button>
+            <button type="button" class="btn-cancel-status" (click)="submitFollowUpOutcome('CANCELLED')" [disabled]="isSavingOutcome">
+              Mark Cancelled
+            </button>
+            <button type="button" class="btn-complete-status" (click)="submitFollowUpOutcome('COMPLETED')" [disabled]="isSavingOutcome">
+              <svg lucideCheck size="14"></svg> Mark as Completed
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading State -->
+        <div *ngIf="isLoadingFollowUps" class="fum-loading-state">
+          <svg lucideLoader2 size="24" class="spin-icon"></svg>
+          <span>Loading follow-up timeline...</span>
+        </div>
+
+        <!-- Empty State -->
+        <div *ngIf="!isLoadingFollowUps && leadFollowUps.length === 0" class="fum-empty-state">
+          <div class="empty-icon-circle">
+            <svg lucideCalendar size="32" style="color: #ea580c;"></svg>
+          </div>
+          <h4>No Follow-Ups Scheduled Yet</h4>
+          <p>Schedule your first follow-up to track client communications, calls, and product demos.</p>
+          <button type="button" class="btn-primary" (click)="followUpTab = 'schedule'" style="margin-top: 14px;">
+            <svg lucidePlus size="14"></svg> Schedule First Follow-Up
+          </button>
+        </div>
+
+        <!-- Follow-Ups List -->
+        <div *ngIf="!isLoadingFollowUps && leadFollowUps.length > 0" class="fum-timeline">
+          <!-- Pending / Upcoming Items -->
+          <div class="fum-timeline-group" *ngIf="getPendingFollowUps().length > 0">
+            <div class="fum-group-title">
+              <span class="group-dot dot-orange"></span> Upcoming / Scheduled Follow-Ups ({{getPendingFollowUps().length}})
+            </div>
+            <div class="fum-card pending-card" *ngFor="let f of getPendingFollowUps()">
+              <div class="fum-card-top">
+                <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">
+                  {{getFollowUpTypeBadge(f.type).label}}
+                </div>
+                <div class="fum-time-pill" [class.overdue]="isFollowUpOverdue(f.scheduledAt)">
+                  <svg lucideClock size="12"></svg>
+                  <span>{{f.scheduledAt | date:'dd MMM yyyy, h:mm a'}}</span>
+                  <span class="overdue-tag" *ngIf="isFollowUpOverdue(f.scheduledAt)">Overdue</span>
+                </div>
+              </div>
+
+              <h4 class="fum-card-title">{{f.title}}</h4>
+
+              <div class="fum-card-meta">
+                <div class="fum-meta-item" *ngIf="f.contactPerson">
+                  <svg lucideUser size="13"></svg>
+                  <span><strong>Contact:</strong> {{f.contactPerson}}</span>
+                </div>
+                <div class="fum-meta-item" *ngIf="f.contactPhone">
+                  <svg lucidePhone size="13"></svg>
+                  <a [href]="'tel:' + f.contactPhone">{{f.contactPhone}}</a>
+                </div>
+                <div class="fum-meta-item" *ngIf="f.contactEmail">
+                  <svg lucideMail size="13"></svg>
+                  <a [href]="'mailto:' + f.contactEmail">{{f.contactEmail}}</a>
+                </div>
+                <div class="fum-meta-item" *ngIf="f.assignedTo">
+                  <svg lucideUserCheck size="13"></svg>
+                  <span><strong>Rep:</strong> {{f.assignedTo?.firstName}} {{f.assignedTo?.lastName}}</span>
+                </div>
+              </div>
+
+              <p class="fum-card-notes" *ngIf="f.notes">{{f.notes}}</p>
+
+              <div class="fum-card-actions">
+                <button type="button" class="btn-card-complete" (click)="startCompleteFollowUp(f)">
+                  <svg lucideCheck size="13"></svg> Record Outcome / Complete
+                </button>
+                <button type="button" class="btn-card-del" (click)="deleteFollowUp(f.id, $event)" title="Delete Follow-up">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Completed / Past Items -->
+          <div class="fum-timeline-group" *ngIf="getCompletedFollowUps().length > 0">
+            <div class="fum-group-title">
+              <span class="group-dot dot-green"></span> Completed / Past Follow-Ups ({{getCompletedFollowUps().length}})
+            </div>
+            <div class="fum-card completed-card" *ngFor="let f of getCompletedFollowUps()">
+              <div class="fum-card-top">
+                <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">
+                  {{getFollowUpTypeBadge(f.type).label}}
+                </div>
+                <span class="fum-status-badge status-{{f.status | lowercase}}">
+                  {{f.status === 'COMPLETED' ? 'Completed' : 'Cancelled'}}
+                </span>
+                <span class="fum-date-sub">{{f.scheduledAt | date:'dd MMM yyyy, h:mm a'}}</span>
+              </div>
+
+              <h4 class="fum-card-title">{{f.title}}</h4>
+
+              <div class="fum-outcome-box" *ngIf="f.outcome">
+                <span class="outcome-label">Outcome & Remarks:</span>
+                <p class="outcome-text">{{f.outcome}}</p>
+              </div>
+
+              <div class="fum-card-meta" *ngIf="f.contactPerson || f.assignedTo">
+                <div class="fum-meta-item" *ngIf="f.contactPerson">
+                  <svg lucideUser size="13"></svg>
+                  <span>{{f.contactPerson}}</span>
+                </div>
+                <div class="fum-meta-item" *ngIf="f.assignedTo">
+                  <svg lucideUserCheck size="13"></svg>
+                  <span>Handled by {{f.assignedTo?.firstName}} {{f.assignedTo?.lastName}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="modal-footer">
-      <button class="btn-secondary" (click)="closeModal()" [disabled]="isSaving">Cancel</button>
-      <button class="btn-primary" (click)="createLead()" [disabled]="isSaving">
-        <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving"></svg>
-        <span>{{ isSaving ? 'Saving...' : 'Save Lead' }}</span>
+    <!-- Fixed Sticky Modal Footer -->
+    <div class="fum-footer">
+      <button type="button" class="btn-fum-cancel" (click)="closeFollowUpModal()">Cancel</button>
+      <button 
+        *ngIf="followUpTab === 'schedule'" 
+        type="button" 
+        class="btn-fum-submit" 
+        (click)="createFollowUp()" 
+        [disabled]="isSavingFollowUp"
+      >
+        <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingFollowUp"></svg>
+        <svg lucideCalendar size="15" *ngIf="!isSavingFollowUp"></svg>
+        <span>{{ isSavingFollowUp ? 'Scheduling...' : 'Schedule Follow-Up' }}</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Brought Leads Modal -->
+<div class="modal-backdrop" *ngIf="showBroughtLeadsModal" (click)="closeBroughtLeadsModal()">
+  <div class="modal-card brought-leads-modal" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="blm-header">
+      <div class="blm-header-left">
+        <div class="blm-avatar-badge">
+          <span>{{ selectedBroughtContact?.name ? selectedBroughtContact.name[0].toUpperCase() : 'C' }}</span>
+        </div>
+        <div class="blm-header-text">
+          <div class="blm-title-row">
+            <h2>Leads from {{ selectedBroughtContact?.name }}</h2>
+            <span class="blm-source-badge" *ngIf="selectedBroughtContact?.leadSource">
+              <svg lucideTag size="11"></svg>
+              {{ selectedBroughtContact.leadSource }}
+            </span>
+          </div>
+          <div class="blm-meta-pills">
+            <span class="blm-meta-pill" *ngIf="selectedBroughtContact?.companyName">
+              <svg lucideBuilding size="12"></svg>
+              {{ selectedBroughtContact.companyName }}
+            </span>
+            <a [href]="'mailto:' + selectedBroughtContact?.email" class="blm-meta-pill" *ngIf="selectedBroughtContact?.email">
+              <svg lucideMail size="12"></svg>
+              {{ selectedBroughtContact.email }}
+            </a>
+            <a [href]="'tel:' + (selectedBroughtContact?.phone || selectedBroughtContact?.mobile)" class="blm-meta-pill" *ngIf="selectedBroughtContact?.phone || selectedBroughtContact?.mobile">
+              <svg lucidePhone size="12"></svg>
+              {{ selectedBroughtContact.phone || selectedBroughtContact.mobile }}
+            </a>
+            <span class="blm-meta-pill" *ngIf="selectedBroughtContact?.city || selectedBroughtContact?.country">
+              <svg lucideMapPin size="12"></svg>
+              {{ selectedBroughtContact.city ? selectedBroughtContact.city + (selectedBroughtContact.country ? ', ' + selectedBroughtContact.country : '') : selectedBroughtContact.country }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <button class="btn-icon-close" (click)="closeBroughtLeadsModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="blm-body">
+      <!-- Top Metrics Strip -->
+      <div class="blm-metrics-strip">
+        <div class="blm-metric-card">
+          <div class="blm-metric-icon icon-sourced">
+            <svg lucideLayers size="16"></svg>
+          </div>
+          <div class="blm-metric-info">
+            <span class="blm-metric-label">Total Sourced</span>
+            <span class="blm-metric-val">{{ broughtLeadsList.length }} <small>Leads</small></span>
+          </div>
+        </div>
+
+        <div class="blm-metric-card">
+          <div class="blm-metric-icon icon-value">
+            <svg lucideTrendingUp size="16"></svg>
+          </div>
+          <div class="blm-metric-info">
+            <span class="blm-metric-label">Pipeline Value</span>
+            <span class="blm-metric-val val-currency">{{ getBroughtLeadsTotalValue() | currency:'INR':'symbol':'1.0-0' }}</span>
+          </div>
+        </div>
+
+        <div class="blm-metric-card">
+          <div class="blm-metric-icon icon-active">
+            <svg lucideClock size="16"></svg>
+          </div>
+          <div class="blm-metric-info">
+            <span class="blm-metric-label">Active In-Pipeline</span>
+            <span class="blm-metric-val">{{ getBroughtLeadsActiveCount() }}</span>
+          </div>
+        </div>
+
+        <div class="blm-metric-card">
+          <div class="blm-metric-icon icon-won">
+            <svg lucideAward size="16"></svg>
+          </div>
+          <div class="blm-metric-info">
+            <span class="blm-metric-label">Converted / Won</span>
+            <span class="blm-metric-val text-success">{{ getBroughtLeadsWonCount() }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="broughtLeadsList.length === 0" class="blm-empty-state">
+        <div class="blm-empty-icon">
+          <svg lucideGhost size="32"></svg>
+        </div>
+        <h3>No Leads Associated Yet</h3>
+        <p>No sales pipeline opportunities have been linked with {{ selectedBroughtContact?.name }} yet.</p>
+        <button class="btn-primary" style="margin-top: 14px;" (click)="openAddLeadForContact(selectedBroughtContact)">
+          <svg lucidePlus size="16"></svg>
+          <span>Create Lead Sourced by {{ selectedBroughtContact?.name }}</span>
+        </button>
+      </div>
+
+      <!-- Leads Table -->
+      <div class="blm-table-card" *ngIf="broughtLeadsList.length > 0">
+        <div class="blm-table-header-bar">
+          <div class="blm-table-title-group">
+            <span class="blm-table-title">Opportunity Listings</span>
+            <span class="blm-badge-count">{{ broughtLeadsList.length }}</span>
+          </div>
+          <span class="blm-table-hint">Click on any row to open the complete lead dossier</span>
+        </div>
+        <div class="blm-table-wrapper">
+          <table class="blm-table">
+            <thead>
+              <tr>
+                <th style="width: 32%;">Company & Contact</th>
+                <th style="width: 17%;">Status</th>
+                <th style="width: 17%;">Expected Value</th>
+                <th style="width: 16%;">Est. Closing</th>
+                <th style="width: 18%;">Assigned Rep</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let lead of broughtLeadsList" class="blm-row" (click)="openDetailModal(lead); closeBroughtLeadsModal()">
+                <td>
+                  <div class="blm-lead-company-cell">
+                    <div class="blm-company-name-row">
+                      <div class="blm-company-icon">
+                        <svg lucideBuilding2 size="14"></svg>
+                      </div>
+                      <span class="blm-company-title">{{ lead.companyName }}</span>
+                    </div>
+                    <div class="blm-contact-sub" *ngIf="lead.contactName">
+                      <svg lucideUser size="12"></svg>
+                      <span>{{ lead.contactName }}</span>
+                      <span class="blm-dot-separator" *ngIf="lead.email || lead.phone">•</span>
+                      <span *ngIf="lead.phone || lead.email">{{ lead.phone || lead.email }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="blm-stage-badge ldm-status-badge ldm-status-{{ normalizeStatus(lead.status) | lowercase | slice:0:3 }}">
+                    <span class="blm-stage-dot"></span>
+                    <span>{{ lead.status || 'New' }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="blm-deal-value">
+                    <span class="currency-amt" *ngIf="lead.expectedDealValue">{{ lead.expectedDealValue | currency:'INR':'symbol':'1.0-0' }}</span>
+                    <span class="no-data-dash" *ngIf="!lead.expectedDealValue">—</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="blm-close-date" *ngIf="lead.expectedCloseDate">
+                    <svg lucideCalendar size="12"></svg>
+                    <span>{{ lead.expectedCloseDate | date:'mediumDate' }}</span>
+                  </div>
+                  <span class="no-data-dash" *ngIf="!lead.expectedCloseDate">—</span>
+                </td>
+                <td>
+                  <div class="blm-rep-cell" *ngIf="lead.assignedTo">
+                    <img *ngIf="lead.assignedTo.avatarUrl" [src]="lead.assignedTo.avatarUrl" class="rep-avatar-img" />
+                    <div class="rep-avatar" *ngIf="!lead.assignedTo.avatarUrl">
+                      {{ lead.assignedTo.firstName ? lead.assignedTo.firstName[0] : '' }}{{ lead.assignedTo.lastName ? lead.assignedTo.lastName[0] : '' }}
+                    </div>
+                    <div class="blm-rep-info">
+                      <span class="blm-rep-name">{{ lead.assignedTo.firstName }} {{ lead.assignedTo.lastName }}</span>
+                      <span class="blm-rep-dept" *ngIf="lead.assignedTo.department?.name">{{ lead.assignedTo.department.name }}</span>
+                    </div>
+                  </div>
+                  <span class="blm-unassigned" *ngIf="!lead.assignedTo">Unassigned</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="blm-footer">
+      <div class="blm-footer-left">
+        <span class="blm-footer-counter">{{ broughtLeadsList.length }} opportunity record{{ broughtLeadsList.length === 1 ? '' : 's' }}</span>
+      </div>
+      <div class="blm-footer-right">
+        <button type="button" class="btn-secondary" (click)="closeBroughtLeadsModal()">Close</button>
+        <button type="button" class="btn-primary" (click)="openAddLeadForContact(selectedBroughtContact)">
+          <svg lucidePlus size="15"></svg>
+          <span>New Lead for this Source</span>
+        </button>
+      </div>
     </div>
   </div>
 </div>

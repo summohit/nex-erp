@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal } from 'react-native';
-import { FileText, Award, Plus, X, Edit2, Trash2, Paperclip, Calendar, Building2, GraduationCap, CheckCircle2, UploadCloud , Upload} from 'lucide-react-native'; 
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Linking } from 'react-native';
+import { FileText, Award, Plus, X, Edit2, Trash2, Paperclip, Calendar, Building2, GraduationCap, CheckCircle2, UploadCloud , Upload} from 'lucide-react-native';
 import DocumentPicker from 'react-native-document-picker';
 import { Alert } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
@@ -10,15 +10,18 @@ import { ActivityIndicator } from 'react-native';
 
 interface ResumeSkillsTabProps {
   profileData: any;
-  onFormChange: (data: any) => void;
   isOwner: boolean;
   onUploadAttachment: () => void;
-  refreshVersion?: number;
+  /** Refetches the profile from the server — every mutation below calls this
+   * afterward so the list on screen always reflects what's actually in the
+   * database, on real ids, rather than a locally-held guess. */
+  onRefresh: () => void;
 }
 
-export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, onUploadAttachment, refreshVersion }: ResumeSkillsTabProps) {
-  const [formData, setFormData] = useState(profileData || { resumeLines: [], skills: [] });
-  const lastSyncedVersion = useRef<number | undefined>(undefined);
+export default function ResumeSkillsTab({ profileData, isOwner, onUploadAttachment, onRefresh }: ResumeSkillsTabProps) {
+  const employeeId = profileData?.id;
+  const resumeLines: any[] = profileData?.resumeLines || [];
+  const skills: any[] = profileData?.skills || [];
 
   // Modal states
   const [isResumeModalVisible, setResumeModalVisible] = useState(false);
@@ -29,34 +32,16 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
   const [currentResume, setCurrentResume] = useState<any>({});
 
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
-  
+
   const [dateField, setDateField] = useState('');
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-
-  useEffect(() => {
-    if (profileData && profileData.id && refreshVersion !== lastSyncedVersion.current) {
-      setFormData(profileData);
-      lastSyncedVersion.current = refreshVersion;
-    }
-  }, [profileData, refreshVersion]);
-
-  useEffect(() => {
-    onFormChange(formData);
-  }, [formData]);
-
-  const updateFormData = (key: string, value: any) => {
-    if (isOwner) {
-      const newFormData = { ...formData, [key]: value };
-      setFormData(newFormData);
-      onFormChange(newFormData);
-    }
-  };
+  const [isSavingSkills, setIsSavingSkills] = useState(false);
 
   const openResumeModal = (index: number | null = null) => {
     if (!isOwner) return;
     setEditingIndex(index);
-    if (index !== null && formData.resumeLines?.[index]) {
-      setCurrentResume({ ...formData.resumeLines[index] });
+    if (index !== null && resumeLines[index]) {
+      setCurrentResume({ ...resumeLines[index] });
     } else {
       setCurrentResume({ type: 'Experience' });
     }
@@ -65,7 +50,7 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
 
   const saveResumeLine = async () => {
     let finalResume = { ...currentResume };
-    
+
     // Check if attachment is a new file (object with uri)
     if (finalResume.attachment && typeof finalResume.attachment === 'object' && finalResume.attachment.uri) {
       try {
@@ -95,20 +80,61 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
       }
     }
 
-    const lines = [...(formData.resumeLines || [])];
-    if (editingIndex !== null) {
-      lines[editingIndex] = finalResume;
-    } else {
-      lines.push({ ...finalResume, id: Date.now().toString() });
+    // finalResume.attachment is now one of: a freshly-uploaded URL string (the
+    // upload block above just replaced the picked-file object with one), null
+    // (the user tapped the X to explicitly remove it), or untouched/undefined
+    // (no change — keep whatever attachmentUrl already came from the server).
+    const attachmentUrl =
+      finalResume.attachment === null
+        ? null
+        : typeof finalResume.attachment === 'string'
+          ? finalResume.attachment
+          : finalResume.attachmentUrl || undefined;
+
+    const payload = {
+      type: finalResume.type || 'Experience',
+      title: finalResume.title,
+      organization: finalResume.organization,
+      startDate: finalResume.startDate,
+      endDate: finalResume.endDate,
+      description: finalResume.description,
+      attachmentUrl,
+    };
+
+    try {
+      setIsUploadingAttachment(true);
+      if (editingIndex !== null && finalResume.id) {
+        await employeeService.updateResumeLine(employeeId, finalResume.id, payload);
+      } else {
+        await employeeService.addResumeLine(employeeId, payload);
+      }
+      setResumeModalVisible(false);
+      onRefresh();
+    } catch (err) {
+      Alert.alert('Save Failed', 'Could not save this entry. Please try again.');
+    } finally {
+      setIsUploadingAttachment(false);
     }
-    updateFormData('resumeLines', lines);
-    setResumeModalVisible(false);
   };
 
   const deleteResumeLine = (index: number) => {
-    const lines = [...(formData.resumeLines || [])];
-    lines.splice(index, 1);
-    updateFormData('resumeLines', lines);
+    const line = resumeLines[index];
+    if (!line?.id) return;
+    Alert.alert('Delete Entry', `Remove "${line.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await employeeService.deleteResumeLine(employeeId, line.id);
+            onRefresh();
+          } catch (err) {
+            Alert.alert('Delete Failed', 'Could not remove this entry. Please try again.');
+          }
+        },
+      },
+    ]);
   };
 
   const openSkillEditor = (index: number) => {
@@ -123,9 +149,59 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
   };
 
   const removeSkill = (index: number) => {
-    const skills = [...(formData.skills || [])];
-    skills.splice(index, 1);
-    updateFormData('skills', skills);
+    const skill = skills[index];
+    if (!skill?.id) return;
+    Alert.alert('Remove Skill', `Remove "${skill.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await employeeService.deleteSkill(employeeId, skill.id);
+            onRefresh();
+          } catch (err) {
+            Alert.alert('Remove Failed', 'Could not remove this skill. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  /**
+   * SkillsModal is a batch editor — it can add several skills across
+   * multiple categories in one "Save & New" session and always hands back
+   * the full resulting list rather than a single item. Diff that list
+   * against what's actually on the server (matched by category+name, since
+   * the modal doesn't track ids) so each add/edit/remove becomes exactly one
+   * API call — no full-list replace that could stomp a change made from CRM
+   * in between.
+   */
+  const syncSkillsFromModal = async (nextSkills: { category: string; name: string; level: string }[]) => {
+    const keyOf = (s: { category: string; name: string }) => `${s.category}::${s.name}`;
+    const before = new Map(skills.map((s) => [keyOf(s), s]));
+    const after = new Map(nextSkills.map((s) => [keyOf(s), s]));
+
+    const toAdd = nextSkills.filter((s) => !before.has(keyOf(s)));
+    const toRemove = skills.filter((s) => !after.has(keyOf(s)));
+    const toUpdate = skills.filter((s) => {
+      const match = after.get(keyOf(s));
+      return match && match.level !== s.level;
+    });
+
+    setIsSavingSkills(true);
+    try {
+      await Promise.all([
+        ...toAdd.map((s) => employeeService.addSkill(employeeId, s)),
+        ...toRemove.map((s) => employeeService.deleteSkill(employeeId, s.id)),
+        ...toUpdate.map((s) => employeeService.updateSkill(employeeId, s.id, { ...s, level: after.get(keyOf(s))!.level })),
+      ]);
+      onRefresh();
+    } catch (err) {
+      Alert.alert('Save Failed', 'Could not save your skills. Please try again.');
+    } finally {
+      setIsSavingSkills(false);
+    }
   };
 
   const showDatePicker = (field: string) => {
@@ -172,7 +248,7 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
           )}
         </View>
 
-        {(!formData.resumeLines || formData.resumeLines.length === 0) ? (
+        {(!resumeLines || resumeLines.length === 0) ? (
           <View style={styles.emptyState}>
             <GraduationCap size={40} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No experience or education added</Text>
@@ -180,7 +256,7 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
           </View>
         ) : (
           <View style={styles.timelineList}>
-            {formData.resumeLines.map((item: any, index: number) => {
+            {resumeLines.map((item: any, index: number) => {
               const typeConfig = getTypeStyle(item.type);
               const TypeIcon = typeConfig.icon;
               return (
@@ -224,8 +300,11 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
                       <Text style={styles.entryDesc}>{item.description}</Text>
                     ) : null}
 
-                    {item.attachment && (
-                      <TouchableOpacity style={styles.attachmentChip}>
+                    {item.attachmentUrl && (
+                      <TouchableOpacity
+                        style={styles.attachmentChip}
+                        onPress={() => Linking.openURL(item.attachmentUrl).catch(() => {})}
+                      >
                         <Paperclip size={13} color="#2563EB" />
                         <Text style={styles.attachmentChipText}>View Attachment</Text>
                       </TouchableOpacity>
@@ -258,7 +337,7 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
           )}
         </View>
 
-        {(!formData.skills || formData.skills.length === 0) ? (
+        {(!skills || skills.length === 0) ? (
           <View style={styles.emptyState}>
             <Award size={40} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No skills added yet</Text>
@@ -266,7 +345,7 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
           </View>
         ) : (
           <View style={styles.skillsContainer}>
-            {formData.skills.map((skill: any, index: number) => {
+            {skills.map((skill: any, index: number) => {
               const isExpert = skill.level === 'Expert' || skill.level === 'C2';
               const isIntermediate = skill.level === 'Intermediate' || skill.level === 'B1' || skill.level === 'B2';
               return (
@@ -383,13 +462,13 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
 
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Attachment (PDF) <Text style={{ color: '#94A3B8', fontWeight: '400' }}>Optional</Text></Text>
-                {currentResume.attachment ? (
+                {(currentResume.attachment || currentResume.attachmentUrl) ? (
                    <View style={styles.fileSelectedBox}>
                      <Paperclip size={18} color="#2563EB" />
                      <Text style={styles.fileSelectedName} numberOfLines={1}>
-                       {typeof currentResume.attachment === 'string' ? currentResume.attachment.split('/').pop() : currentResume.attachment.fileName}
+                       {currentResume.attachment?.fileName || currentResume.attachmentUrl?.split('/').pop()}
                      </Text>
-                     <TouchableOpacity style={{ padding: 4 }} onPress={() => setCurrentResume({ ...currentResume, attachment: null })}>
+                     <TouchableOpacity style={{ padding: 4 }} onPress={() => setCurrentResume({ ...currentResume, attachment: null, attachmentUrl: null })}>
                        <X size={16} color="#DC2626" />
                      </TouchableOpacity>
                    </View>
@@ -458,12 +537,12 @@ export default function ResumeSkillsTab({ profileData, onFormChange, isOwner, on
           setSkillsModalVisible(false);
           setEditingSkillIndex(null);
         }}
-        onSave={(skills) => {
-          updateFormData('skills', skills);
+        onSave={(nextSkills) => {
+          syncSkillsFromModal(nextSkills);
           setEditingSkillIndex(null);
         }}
-        existingSkills={formData.skills || []}
-        editingSkill={editingSkillIndex !== null ? formData.skills?.[editingSkillIndex] : null}
+        existingSkills={skills}
+        editingSkill={editingSkillIndex !== null ? skills[editingSkillIndex] : null}
       />
     </ScrollView>
   );

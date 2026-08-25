@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { istDateKey, istTimeInstant } from '../common/timezone.util';
+import { haversineKm } from '../common/geo.util';
 
 @Injectable()
 export class AttendanceService {
@@ -10,7 +12,7 @@ export class AttendanceService {
     if (!employee) throw new BadRequestException('Employee profile not found');
 
     const now = new Date();
-    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const today = istDateKey(now);
 
     return this.prisma.attendance.findUnique({
       where: {
@@ -74,14 +76,24 @@ export class AttendanceService {
         }
       }
 
-      // 2. Geofencing Check (Simple Haversine distance check could be added here)
-      // Since lat/lng for branch is not explicitly stored in this DB yet, we just enforce the requirement
-      // if geofenceRadius is defined and strict mode is on.
-      // (Implementation requires adding branch.latitude and branch.longitude in the future)
+      // 2. Geofencing Check — only enforced once an admin has actually set the
+      // branch's coordinates; branches without them behave as before (no check).
+      if (branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
+        if (data.lat == null || data.lng == null) {
+          throw new BadRequestException('Location is required to clock in at this branch.');
+        }
+        const distanceKm = haversineKm(branch.latitude, branch.longitude, data.lat, data.lng);
+        const radiusKm = branch.geofenceRadius / 1000;
+        if (distanceKm > radiusKm) {
+          throw new BadRequestException(
+            `You're ${distanceKm.toFixed(2)}km from ${branch.name}, outside the ${radiusKm.toFixed(2)}km clock-in radius.`,
+          );
+        }
+      }
     }
 
     const nowLocal = new Date();
-    const today = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()));
+    const today = istDateKey(nowLocal);
 
     let existing = await this.prisma.attendance.findUnique({
       where: { employeeId_date: { employeeId: employee.id, date: today } },
@@ -99,15 +111,12 @@ export class AttendanceService {
     let isLate = false;
 
     if (employee.shift) {
-      const shiftStartTokens = employee.shift.startTime.split(':');
-      const shiftStartHour = parseInt(shiftStartTokens[0], 10);
-      const shiftStartMinute = parseInt(shiftStartTokens[1], 10);
-      
-      const expectedStart = new Date(now);
-      expectedStart.setHours(shiftStartHour, shiftStartMinute, 0, 0);
-      
+      // Shift times ("09:00") are IST wall-clock, not server-local — istTimeInstant
+      // resolves them to the correct real-world instant regardless of what
+      // timezone this server's OS happens to be configured with.
+      const expectedStart = istTimeInstant(now, employee.shift.startTime);
       const maxStartTime = new Date(expectedStart.getTime() + (employee.shift.bufferTimeMinutes * 60000));
-      
+
       if (now > maxStartTime) {
         isLate = true;
       }
@@ -147,14 +156,28 @@ export class AttendanceService {
   }
 
   async clockOut(userId: number, data: { lat?: number, lng?: number }) {
-    const employee = await this.prisma.employee.findUnique({ 
+    const employee = await this.prisma.employee.findUnique({
       where: { userId },
-      include: { shift: true }
+      include: { shift: true, branch: true }
     });
     if (!employee) throw new BadRequestException('Employee profile not found');
 
+    const branch = employee.branch;
+    if (branch && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
+      if (data.lat == null || data.lng == null) {
+        throw new BadRequestException('Location is required to clock out at this branch.');
+      }
+      const distanceKm = haversineKm(branch.latitude, branch.longitude, data.lat, data.lng);
+      const radiusKm = branch.geofenceRadius / 1000;
+      if (distanceKm > radiusKm) {
+        throw new BadRequestException(
+          `You're ${distanceKm.toFixed(2)}km from ${branch.name}, outside the ${radiusKm.toFixed(2)}km clock-out radius.`,
+        );
+      }
+    }
+
     const nowLocal = new Date();
-    const today = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()));
+    const today = istDateKey(nowLocal);
 
     const existing = await this.prisma.attendance.findUnique({
       where: { employeeId_date: { employeeId: employee.id, date: today } },
@@ -176,13 +199,9 @@ export class AttendanceService {
     let overtimeHours = 0;
 
     if (employee.shift) {
-      const shiftEndTokens = employee.shift.endTime.split(':');
-      const shiftEndHour = parseInt(shiftEndTokens[0], 10);
-      const shiftEndMinute = parseInt(shiftEndTokens[1], 10);
-      
-      const expectedEnd = new Date(now);
-      expectedEnd.setHours(shiftEndHour, shiftEndMinute, 0, 0);
-      
+      // Same IST-fixed resolution as clockIn — see the comment there.
+      const expectedEnd = istTimeInstant(now, employee.shift.endTime);
+
       if (now < expectedEnd) {
         isEarlyLeave = true;
         status = 'HALF_DAY';

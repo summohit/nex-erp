@@ -7,12 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0B1154F467C36E921E490C71 /* FieldVisitLocation.m in Sources */ = {isa = PBXBuildFile; fileRef = 2C82697F0838371B219211E2 /* FieldVisitLocation.m */; };
 		0C80B921A6F3F58F76C31292 /* libPods-NexMobileApp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-NexMobileApp.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		341FE5DD2CE240D69CB433DE /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 929096E380AC48FBBD9BA33F /* BootSplash.storyboard */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
-		341FE5DD2CE240D69CB433DE /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 929096E380AC48FBBD9BA33F /* BootSplash.storyboard */; };
 		89CCAB61A48948268C9FD83C /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8347DDD89F86406BAFDDB878 /* Colors.xcassets */; };
+		F271BAA96F5D0D0D2FE04EF7 /* FieldVisitLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA08B55521D9450EF0DE6A74 /* FieldVisitLocation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,14 +22,16 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = NexMobileApp/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = NexMobileApp/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = NexMobileApp/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		2C82697F0838371B219211E2 /* FieldVisitLocation.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = FieldVisitLocation.m; path = NexMobileApp/FieldVisitLocation.m; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-NexMobileApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-NexMobileApp.debug.xcconfig"; path = "Target Support Files/Pods-NexMobileApp/Pods-NexMobileApp.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-NexMobileApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-NexMobileApp.release.xcconfig"; path = "Target Support Files/Pods-NexMobileApp/Pods-NexMobileApp.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-NexMobileApp.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-NexMobileApp.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = NexMobileApp/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = NexMobileApp/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		8347DDD89F86406BAFDDB878 /* Colors.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Colors.xcassets; path = NexMobileApp/Colors.xcassets; sourceTree = "<group>"; };
+		929096E380AC48FBBD9BA33F /* BootSplash.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = BootSplash.storyboard; path = NexMobileApp/BootSplash.storyboard; sourceTree = "<group>"; };
+		CA08B55521D9450EF0DE6A74 /* FieldVisitLocation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FieldVisitLocation.swift; path = NexMobileApp/FieldVisitLocation.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		929096E380AC48FBBD9BA33F /* BootSplash.storyboard */ = {isa = PBXFileReference; name = "BootSplash.storyboard"; path = "NexMobileApp/BootSplash.storyboard"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		8347DDD89F86406BAFDDB878 /* Colors.xcassets */ = {isa = PBXFileReference; name = "Colors.xcassets"; path = "NexMobileApp/Colors.xcassets"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = folder.assetcatalog; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +56,8 @@
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				929096E380AC48FBBD9BA33F /* BootSplash.storyboard */,
 				8347DDD89F86406BAFDDB878 /* Colors.xcassets */,
+				CA08B55521D9450EF0DE6A74 /* FieldVisitLocation.swift */,
+				2C82697F0838371B219211E2 /* FieldVisitLocation.m */,
 			);
 			name = NexMobileApp;
 			sourceTree = "<group>";
@@ -253,6 +259,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				F271BAA96F5D0D0D2FE04EF7 /* FieldVisitLocation.swift in Sources */,
+				0B1154F467C36E921E490C71 /* FieldVisitLocation.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -838,7 +838,7 @@ export class IssuesService {
       const filename = `${crypto.randomBytes(12).toString('hex')}${ext}`;
 
       const form = new FormData();
-      form.append('file', file.buffer, filename);
+      form.append('file', file.buffer.toString('base64'));
       form.append('fileName', filename);
       form.append('folder', '/card_attachments');
 

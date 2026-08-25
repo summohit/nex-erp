@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
 import { FieldVisitsService } from './field-visits.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -59,9 +59,21 @@ export class FieldVisitsController {
     return this.fieldVisitsService.getMyVisits(req.user.sub);
   }
 
+  // Must be registered before the ':id' route below, or NestJS matches
+  // "company" as an :id param and these never get hit.
+  @Get('company/active')
+  getCompanyActive(@Request() req) {
+    return this.fieldVisitsService.getCompanyActiveVisits(req.user.companyId);
+  }
+
+  @Get('company/recent')
+  getCompanyRecent(@Request() req, @Query('limit') limit?: string) {
+    return this.fieldVisitsService.getCompanyRecentVisits(req.user.companyId, limit ? parseInt(limit, 10) : 10);
+  }
+
   @Get('project/:projectId')
-  getByProject(@Param('projectId', ParseIntPipe) projectId: number) {
-    return this.fieldVisitsService.getProjectVisits(projectId);
+  getByProject(@Request() req, @Param('projectId', ParseIntPipe) projectId: number) {
+    return this.fieldVisitsService.getProjectVisits(projectId, req.user.companyId);
   }
 
   @Get(':id')

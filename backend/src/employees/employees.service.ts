@@ -485,28 +485,87 @@ export class EmployeesService {
         educationLevel: data.educationLevel || null,
         fieldOfStudy: data.fieldOfStudy || null,
 
-        skills: data.skills ? {
-          deleteMany: {},
-          create: data.skills.map(s => ({
-            category: s.category,
-            name: s.name,
-            level: s.level
-          }))
-        } : undefined,
-        resumeLines: data.resumeLines ? {
-          deleteMany: {},
-          create: data.resumeLines.map(r => ({
-            type: r.type,
-            title: r.title,
-            organization: r.organization,
-            startDate: r.startDate,
-            endDate: r.endDate,
-            description: r.description,
-            attachmentUrl: r.attachmentUrl
-          }))
-        } : undefined
+        // skills / resumeLines are intentionally NOT accepted here — they used
+        // to be a `deleteMany + create` full-replace driven by whatever array
+        // the client happened to hold locally. Any device with a stale copy of
+        // the form (e.g. hadn't refetched since another device added a skill)
+        // would silently wipe that other device's change on its next unrelated
+        // save. addSkill/updateSkill/deleteSkill and their resumeLine
+        // equivalents below replace this — each touches exactly the row it
+        // means to, using the row's real id, never the whole list.
       }
     });
+  }
+
+  async addSkill(id: number, companyId: number, currentUserId: number, role: string, data: any) {
+    await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    if (!data.category || !data.name || !data.level) {
+      throw new BadRequestException('Category, name and level are required');
+    }
+    return this.prisma.employeeSkill.create({
+      data: { employeeId: id, category: data.category, name: data.name, level: data.level }
+    });
+  }
+
+  async updateSkill(id: number, skillId: number, companyId: number, currentUserId: number, role: string, data: any) {
+    await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    const skill = await this.prisma.employeeSkill.findFirst({ where: { id: skillId, employeeId: id } });
+    if (!skill) throw new NotFoundException('Skill not found');
+    return this.prisma.employeeSkill.update({
+      where: { id: skillId },
+      data: { category: data.category, name: data.name, level: data.level }
+    });
+  }
+
+  async deleteSkill(id: number, skillId: number, companyId: number, currentUserId: number, role: string) {
+    await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    const skill = await this.prisma.employeeSkill.findFirst({ where: { id: skillId, employeeId: id } });
+    if (!skill) throw new NotFoundException('Skill not found');
+    return this.prisma.employeeSkill.delete({ where: { id: skillId } });
+  }
+
+  async addResumeLine(id: number, companyId: number, currentUserId: number, role: string, data: any) {
+    await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    if (!data.title || !data.organization) {
+      throw new BadRequestException('Title and organization are required');
+    }
+    return this.prisma.employeeResume.create({
+      data: {
+        employeeId: id,
+        type: data.type || 'Experience',
+        title: data.title,
+        organization: data.organization,
+        startDate: data.startDate || null,
+        endDate: data.endDate || null,
+        description: data.description || null,
+        attachmentUrl: data.attachmentUrl || null,
+      }
+    });
+  }
+
+  async updateResumeLine(id: number, lineId: number, companyId: number, currentUserId: number, role: string, data: any) {
+    await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    const line = await this.prisma.employeeResume.findFirst({ where: { id: lineId, employeeId: id } });
+    if (!line) throw new NotFoundException('Resume entry not found');
+    return this.prisma.employeeResume.update({
+      where: { id: lineId },
+      data: {
+        type: data.type || 'Experience',
+        title: data.title,
+        organization: data.organization,
+        startDate: data.startDate || null,
+        endDate: data.endDate || null,
+        description: data.description || null,
+        attachmentUrl: data.attachmentUrl || null,
+      }
+    });
+  }
+
+  async deleteResumeLine(id: number, lineId: number, companyId: number, currentUserId: number, role: string) {
+    await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    const line = await this.prisma.employeeResume.findFirst({ where: { id: lineId, employeeId: id } });
+    if (!line) throw new NotFoundException('Resume entry not found');
+    return this.prisma.employeeResume.delete({ where: { id: lineId } });
   }
 
   async addContact(id: number, companyId: number, currentUserId: number, role: string, data: any) {

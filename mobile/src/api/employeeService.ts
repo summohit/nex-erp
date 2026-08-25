@@ -64,6 +64,30 @@ export const employeeService = {
     const response = await apiClient.delete(`/employees/${empId}/documents/${docId}`);
     return response.data;
   },
+  addSkill: async (empId: number, data: { category: string; name: string; level: string }): Promise<SkillItem> => {
+    const response = await apiClient.post(`/employees/${empId}/skills`, data);
+    return response.data;
+  },
+  updateSkill: async (empId: number, skillId: number, data: { category: string; name: string; level: string }): Promise<SkillItem> => {
+    const response = await apiClient.put(`/employees/${empId}/skills/${skillId}`, data);
+    return response.data;
+  },
+  deleteSkill: async (empId: number, skillId: number) => {
+    const response = await apiClient.delete(`/employees/${empId}/skills/${skillId}`);
+    return response.data;
+  },
+  addResumeLine: async (empId: number, data: Omit<ResumeLine, 'id'>): Promise<ResumeLine> => {
+    const response = await apiClient.post(`/employees/${empId}/resume-lines`, data);
+    return response.data;
+  },
+  updateResumeLine: async (empId: number, lineId: number, data: Omit<ResumeLine, 'id'>): Promise<ResumeLine> => {
+    const response = await apiClient.put(`/employees/${empId}/resume-lines/${lineId}`, data);
+    return response.data;
+  },
+  deleteResumeLine: async (empId: number, lineId: number) => {
+    const response = await apiClient.delete(`/employees/${empId}/resume-lines/${lineId}`);
+    return response.data;
+  },
   uploadFile: async (formData: FormData) => {
     const response = await apiClient.post('/upload', formData, {
       headers: {

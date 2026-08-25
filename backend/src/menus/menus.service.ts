@@ -91,6 +91,8 @@ export class MenusService implements OnModuleInit {
           });
           this.logger.log('Sales menu auto-seeded successfully.');
         }
+        
+        // Follow-Ups menu is now accessible via the CRM Leads Board, not the sidebar
       }
 
       // Also ensure Payroll Rules is under Settings

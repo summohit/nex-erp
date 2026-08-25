@@ -9,7 +9,36 @@ import {
   Image,
   ActivityIndicator,
   Dimensions,
+  Linking,
 } from 'react-native';
+import { API_URL } from '../api/apiClient';
+
+// The Angular web app is served from the same host as the API, one path
+// segment up (https://host/api -> https://host). The public careers page is
+// a real page in that app, so "opening it in Chrome" from the drawer means
+// building this absolute URL, not an in-app route.
+const WEB_URL = API_URL.replace(/\/api\/?$/, '');
+
+const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+// React Native's Hermes engine doesn't polyfill window.btoa, and the web
+// side's companyId encoding (`btoa(currentUser.companyId)`) is plain ASCII
+// base64 with no unicode edge cases to worry about, so this minimal
+// standalone encoder is enough — no need to pull in a whole base64 package.
+function base64Encode(input: string): string {
+  let output = '';
+  let i = 0;
+  while (i < input.length) {
+    const c1 = input.charCodeAt(i++);
+    const c2 = i < input.length ? input.charCodeAt(i++) : NaN;
+    const c3 = i < input.length ? input.charCodeAt(i++) : NaN;
+    const e1 = c1 >> 2;
+    const e2 = ((c1 & 3) << 4) | (isNaN(c2) ? 0 : c2 >> 4);
+    const e3 = isNaN(c2) ? 64 : (((c2 & 15) << 2) | (isNaN(c3) ? 0 : c3 >> 6));
+    const e4 = isNaN(c3) ? 64 : (c3 & 63);
+    output += B64_CHARS[e1] + B64_CHARS[e2] + (e3 === 64 ? '=' : B64_CHARS[e3]) + (e4 === 64 ? '=' : B64_CHARS[e4]);
+  }
+  return output;
+}
 
 const PANEL_WIDTH = Math.min(300, Dimensions.get('window').width - 56);
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -118,9 +147,14 @@ const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string;
   { group: 'FINANCE',   id: 'payslips',       title: 'Payslips',       icon: 'file-text', route: '/payroll/payslips' },
 ];
 
-// Items that are always shown as WIP regardless of what the API returns
+// Items that are always shown as WIP regardless of what the API returns.
+// Recruitment is NOT here — the API already returns it with real sub-items
+// (Job Postings, Candidates, Interviews, Public Careers Page), so it goes
+// through the normal expandable-item path below instead of being force-stubbed.
+// Individual sub-items that aren't wired to a screen yet (Job Postings,
+// Candidates, Interviews) still fall through to "Coming Soon" on tap via
+// handleSubItemPress — only the Public Careers Page link is actually live.
 const WIP_ITEMS: { group: string; id: string; title: string; icon: string }[] = [
-  { group: 'WORKSPACE', id: 'recruitment', title: 'Recruitment', icon: 'users' },
   { group: 'WORKSPACE', id: 'performance', title: 'Performance', icon: 'target' },
   { group: 'FINANCE', id: 'assets', title: 'Assets & IT', icon: 'package' },
   { group: 'OPERATIONS', id: 'offboarding', title: 'Offboarding', icon: 'door-open' },
@@ -233,6 +267,21 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
   }
 
   function handleSubItemPress(sub: MenuItem) {
+    // Mirrors the web sidebar's handling of external sub-items: the public
+    // careers page is a real page in the web app, opened in the system
+    // browser rather than as an in-app screen. '/careers' is encrypted with
+    // the same scheme web uses (base64 of the company id) so both surfaces
+    // land on the same URL shape.
+    if (sub.external || sub.route === '/careers') {
+      let path = sub.route || '/careers';
+      if (path === '/careers' && user?.companyId != null) {
+        path = `/careers/${base64Encode(String(user.companyId))}`;
+      }
+      onClose();
+      Linking.openURL(`${WEB_URL}${path}`).catch(() => setComingSoon(true));
+      return;
+    }
+
     const nav = resolveNav(sub);
     if (nav) {
       onClose();

@@ -15,26 +15,29 @@ import CalendarTab from './tabs/CalendarTab';
 import AttachmentsTab from './tabs/AttachmentsTab';
 import ReportsTab from './tabs/ReportsTab';
 import ArchivedTab from './tabs/ArchivedTab';
+import FieldVisitsTab from './tabs/FieldVisitsTab';
 import { GradientBanner, PulseSkeleton } from '../../components/SharedUI';
 
 const TABS = [
-  { id: 'summary',     label: 'Summary',  icon: Globe },
-  { id: 'board',       label: 'Board',    icon: Kanban },
-  { id: 'list',        label: 'List',     icon: List },
-  { id: 'roadmap',     label: 'Roadmap',  icon: GanttChart },
-  { id: 'calendar',    label: 'Calendar', icon: Calendar },
-  { id: 'attachments', label: 'Files',    icon: Paperclip },
-  { id: 'reports',     label: 'Reports',  icon: BarChart },
-  { id: 'archived',    label: 'Archived', icon: Archive },
+  { id: 'summary',      label: 'Summary',  icon: Globe },
+  { id: 'board',        label: 'Board',    icon: Kanban },
+  { id: 'list',         label: 'List',     icon: List },
+  { id: 'roadmap',      label: 'Roadmap',  icon: GanttChart },
+  { id: 'calendar',     label: 'Calendar', icon: Calendar },
+  { id: 'fieldvisits',  label: 'Visits',   icon: Users },
+  { id: 'attachments',  label: 'Files',    icon: Paperclip },
+  { id: 'reports',      label: 'Reports',  icon: BarChart },
+  { id: 'archived',     label: 'Archived', icon: Archive },
 ];
 
-function TabContent({ activeTab }: { activeTab: string }) {
+function TabContent({ activeTab, projectId }: { activeTab: string; projectId: number }) {
   switch (activeTab) {
     case 'summary':     return <SummaryTab />;
     case 'board':       return <BoardTab />;
     case 'list':        return <ListTab />;
     case 'roadmap':     return <RoadmapTab />;
     case 'calendar':    return <CalendarTab />;
+    case 'fieldvisits': return <FieldVisitsTab projectId={projectId} />;
     case 'attachments': return <AttachmentsTab />;
     case 'reports':     return <ReportsTab />;
     case 'archived':    return <ArchivedTab />;
@@ -172,7 +175,7 @@ export default function ProjectDetailScreen() {
               <PulseSkeleton style={{ width: '85%', height: 120, borderRadius: 16 }} />
             </View>
           ) : (
-            <TabContent activeTab={activeTab} />
+            <TabContent activeTab={activeTab} projectId={currentProject?.id ?? 0} />
           )}
         </View>
       </SafeAreaView>

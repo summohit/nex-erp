@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "/private/tmp/claude-501/-Users-mohitsingh-Documents-nex-erp/d06fdbe6-6deb-4d32-b784-53a1e29c3999/scratchpad/start-backend.sh",
-      "runtimeArgs": [],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "backend", "run", "start:dev"],
       "port": 3000
     },
     {

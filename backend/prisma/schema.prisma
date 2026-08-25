@@ -63,6 +63,8 @@ model Company {
   quotations          Quotation[]
   salesOrders         SalesOrder[]
   fieldVisits         FieldVisit[]         @relation("CompanyFieldVisits")
+  leadFollowUps       LeadFollowUp[]
+  leadContacts        LeadContact[]
 }
 
 // Authentication & RBAC
@@ -149,26 +151,26 @@ model Designation {
 
 // Core Employee Profile
 model Employee {
-  id            Int          @id @default(autoincrement())
-  firstName     String
-  lastName      String
-  departmentId  Int?
-  department    Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  designationId Int?
-  designation   Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
-  phone         String?
-  userId        Int          @unique
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyId     Int
-  company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  branchId      Int?
-  branch        Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  managerId     Int?
-  manager       Employee?    @relation("EmployeeToManager", fields: [managerId], references: [id], onDelete: SetNull)
-  subordinates  Employee[]   @relation("EmployeeToManager")
-  shiftId       Int?
-  shift         Shift?       @relation(fields: [shiftId], references: [id], onDelete: SetNull)
-  isProjectManager Boolean  @default(false)
+  id               Int          @id @default(autoincrement())
+  firstName        String
+  lastName         String
+  departmentId     Int?
+  department       Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designationId    Int?
+  designation      Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  phone            String?
+  userId           Int          @unique
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId        Int
+  company          Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId         Int?
+  branch           Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  managerId        Int?
+  manager          Employee?    @relation("EmployeeToManager", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates     Employee[]   @relation("EmployeeToManager")
+  shiftId          Int?
+  shift            Shift?       @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  isProjectManager Boolean      @default(false)
 
   employmentType String?
   joiningDate    DateTime?
@@ -274,9 +276,12 @@ model Employee {
   shiftRotations           ShiftRotation[]
   uploadedProjectDocuments ProjectDocument[]
   assignedLeads            Lead[]                     @relation("LeadAssignee")
+  createdLeads             Lead[]                     @relation("LeadCreator")
   peerReviewsGiven         PeerFeedback[]             @relation("PeerReviewer")
   peerReviewsReceived      PeerFeedback[]             @relation("PeerReviewee")
   fieldVisits              FieldVisit[]               @relation("EmployeeFieldVisits")
+  followUpsAssigned        LeadFollowUp[]             @relation("FollowUpAssignee")
+  leadContactsAdded        LeadContact[]              @relation("LeadContactAddedBy")
 
   @@unique([companyId, employeeCode])
 }
@@ -415,39 +420,39 @@ model LeaveRequest {
 }
 
 model Attendance {
-  id            Int       @id @default(autoincrement())
+  id            Int             @id @default(autoincrement())
   employeeId    Int
-  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  date          DateTime  @db.Date
+  employee      Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date          DateTime        @db.Date
   clockIn       DateTime?
   clockOut      DateTime?
   clockInLat    Float?
   clockInLng    Float?
   clockOutLat   Float?
   clockOutLng   Float?
-  overtimeHours Float     @default(0)
-  status        String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
-  isLate        Boolean   @default(false)
-  isEarlyLeave  Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  overtimeHours Float           @default(0)
+  status        String          @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
+  isLate        Boolean         @default(false)
+  isEarlyLeave  Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   logs          AttendanceLog[]
 
   @@unique([employeeId, date])
 }
 
 model AttendanceLog {
-  id            Int         @id @default(autoincrement())
-  attendanceId  Int
-  attendance    Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
-  clockIn       DateTime
-  clockOut      DateTime?
-  clockInLat    Float?
-  clockInLng    Float?
-  clockOutLat   Float?
-  clockOutLng   Float?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id           Int        @id @default(autoincrement())
+  attendanceId Int
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  clockIn      DateTime
+  clockOut     DateTime?
+  clockInLat   Float?
+  clockInLng   Float?
+  clockOutLat  Float?
+  clockOutLng  Float?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
 
 model AttendanceRegularization {
@@ -564,7 +569,7 @@ model ExpenseClaim {
   amount          Float
   category        String    @default("OTHER") // TRAVEL, MEALS, ACCOMMODATION, EQUIPMENT, OTHER
   receiptUrl      String?
-  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED, PAID
   rejectionReason String?
   approvedById    Int?
   approvedBy      User?     @relation("ExpenseApprover", fields: [approvedById], references: [id], onDelete: SetNull)
@@ -575,7 +580,9 @@ model ExpenseClaim {
   purchaseDate    DateTime?
   purchasedFrom   String?
   projectCode     String?
+  projectName     String?
   projectId       Int?
+  project         Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
@@ -627,9 +634,9 @@ model Asset {
   notes             String?           @db.Text
   tags              String?           @db.Text
   status            String            @default("AVAILABLE") // AVAILABLE, ASSIGNED, IN_REPAIR, RETIRED
-  ram               String?           // e.g. "16GB", "32GB"
-  storage           String?           // e.g. "256GB SSD", "1TB NVMe"
-  processor         String?           // e.g. "Intel Core i7-1365U", "Apple M3 Max"
+  ram               String? // e.g. "16GB", "32GB"
+  storage           String? // e.g. "256GB SSD", "1TB NVMe"
+  processor         String? // e.g. "Intel Core i7-1365U", "Apple M3 Max"
   companyId         Int
   company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignments       AssetAssignment[]
@@ -852,9 +859,10 @@ model Project {
   // AI Onboarding
   onboardingStatus String @default("DRAFT") // DRAFT, DOCUMENTS_UPLOADED, ANALYZING, ANALYZED, UNDER_REVIEW, CHANGES_REQUIRED, APPROVED, READY_FOR_KICKOFF, IN_PROGRESS, COMPLETED, ERROR
 
-  documents    ProjectDocument[]
-  analysisRuns ProjectAnalysisRun[]
-  fieldVisits  FieldVisit[]         @relation("ProjectFieldVisits")
+  documents     ProjectDocument[]
+  analysisRuns  ProjectAnalysisRun[]
+  fieldVisits   FieldVisit[]         @relation("ProjectFieldVisits")
+  expenseClaims ExpenseClaim[]
 
   @@unique([key, companyId])
 }
@@ -1298,9 +1306,9 @@ model Issue {
   // Time Tracking Markers
   workStartedAt   DateTime? // When work actually started
   workCompletedAt DateTime? // When work actually finished
-  
+
   // Review System
-  rejectionReason String?   @db.Text
+  rejectionReason String? @db.Text
 
   // Relationships
   projectId  Int
@@ -1890,28 +1898,87 @@ model PayrollSetting {
 // ═══════════════════════════════════════════
 
 model Lead {
-  id           Int         @id @default(autoincrement())
-  title        String
-  companyName  String?
-  contactName  String?
-  email        String?
-  phone        String?
-  value        Float?
-  currency     String?
-  source       String?
-  status               String      @default("NEW") // NEW, QUALIFIED, PROPOSAL, WON, LOST
-  description          String?     @db.Text
-  qualificationReason  String?
-  proposalDate         DateTime?
-  assignedToId Int?
-  assignedTo   Employee?   @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  companyId    Int
-  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  clientId     Int?
-  client       Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  quotations   Quotation[]
+  id                  Int            @id @default(autoincrement())
+  title               String
+  subjectLine         String?
+  dealCategory        String?        @default("Inbound") // Inbound, Outbound, Referral, Enterprise, Retainer
+  companyName         String?
+  contactName         String?
+  email               String?
+  phone               String?
+  value               Float?
+  currency            String?
+  source              String?
+  status              String         @default("NEW") // NEW, QUALIFIED, PROPOSAL, WON, LOST
+  description         String?        @db.Text
+  qualificationReason String?
+  proposalDate        DateTime?
+  assignedToId        Int?
+  assignedTo          Employee?      @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  addedById           Int?
+  addedBy             Employee?      @relation("LeadCreator", fields: [addedById], references: [id], onDelete: SetNull)
+  broughtByContactId  Int? // External source (e.g. broker/partner) who brought this lead — alternative to addedBy
+  broughtByContact    LeadContact?   @relation(fields: [broughtByContactId], references: [id], onDelete: SetNull)
+  expectedCloseDate   DateTime?
+  website             String?
+  address             String?        @db.Text
+  companyId           Int
+  company             Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  clientId            Int?
+  client              Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  quotations          Quotation[]
+  followUps           LeadFollowUp[]
+}
+
+// External contact (broker/partner/referrer) who can be selected as the source
+// of a lead via the "Lead Brought By" field, as an alternative to an internal Employee.
+model LeadContact {
+  id                Int       @id @default(autoincrement())
+  salutation        String?
+  name              String
+  email             String?
+  phone             String?
+  leadSource        String?
+  companyName       String?
+  website           String?
+  mobile            String?
+  officePhoneNumber String?
+  country           String?
+  state             String?
+  city              String?
+  postalCode        String?
+  address           String?   @db.Text
+  addedById         Int?
+  addedBy           Employee? @relation("LeadContactAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  companyId         Int
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  leadsBrought      Lead[]
+}
+
+model LeadFollowUp {
+  id            Int       @id @default(autoincrement())
+  leadId        Int
+  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  title         String // e.g. "Follow-up call regarding pricing"
+  contactPerson String? // Whom to follow up with
+  contactPhone  String?
+  contactEmail  String?
+  type          String    @default("CALL") // CALL, MEETING, DEMO, EMAIL, FIELD_VISIT, NOTE, OTHER
+  status        String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  scheduledAt   DateTime // Future date & time
+  completedAt   DateTime?
+  notes         String?   @db.Text
+  outcome       String?   @db.Text
+  assignedToId  Int? // Responsible rep
+  assignedTo    Employee? @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  companyId     Int
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Quotation {
@@ -1998,36 +2065,36 @@ model SalesOrderItem {
 // ═══════════════════════════════════════════
 
 model FieldVisit {
-  id           Int       @id @default(autoincrement())
-  employeeId   Int
-  employee     Employee  @relation("EmployeeFieldVisits", fields: [employeeId], references: [id], onDelete: Cascade)
-  projectId    Int
-  project      Project   @relation("ProjectFieldVisits", fields: [projectId], references: [id], onDelete: Cascade)
-  companyId    Int
-  company      Company   @relation("CompanyFieldVisits", fields: [companyId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation("EmployeeFieldVisits", fields: [employeeId], references: [id], onDelete: Cascade)
+  projectId  Int
+  project    Project  @relation("ProjectFieldVisits", fields: [projectId], references: [id], onDelete: Cascade)
+  companyId  Int
+  company    Company  @relation("CompanyFieldVisits", fields: [companyId], references: [id], onDelete: Cascade)
 
   startTime    DateTime
   startLat     Float
   startLng     Float
   startAddress String?
 
-  endTime      DateTime?
-  endLat       Float?
-  endLng       Float?
-  endAddress   String?
+  endTime    DateTime?
+  endLat     Float?
+  endLng     Float?
+  endAddress String?
 
   distanceKm   Float?
   durationMins Int?
-  routePoints  Json?     // Compact [[lat,lng,unixMs], ...] array
+  routePoints  Json? // Compact [[lat,lng,unixMs], ...] array
 
-  status       String    @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
-  purpose      String?
-  notes        String?
+  status  String  @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
+  purpose String?
+  notes   String?
 
-  photos       FieldVisitPhoto[]
+  photos FieldVisitPhoto[]
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model FieldVisitPhoto {
@@ -2035,10 +2102,9 @@ model FieldVisitPhoto {
   fieldVisitId Int
   fieldVisit   FieldVisit @relation(fields: [fieldVisitId], references: [id], onDelete: Cascade)
 
-  url          String
-  takenAt      DateTime
-  caption      String?
+  url     String
+  takenAt DateTime
+  caption String?
 
-  createdAt    DateTime   @default(now())
+  createdAt DateTime @default(now())
 }
-

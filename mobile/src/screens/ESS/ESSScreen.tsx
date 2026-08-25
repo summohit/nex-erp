@@ -31,10 +31,12 @@ import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
 import TimesheetTab from './tabs/TimesheetTab';
 import HolidaysTab from './tabs/HolidaysTab';
+import ExpensesTab from './tabs/ExpensesTab';
+
 export default function ESSScreen({ route }: any) {
   const navigation = useNavigation<any>();
   const { balances, requests, isLoading, isSubmitting, fetchLeaveData, submitLeaveRequest, cancelLeaveRequest } = useLeaveStore();
-  const [mainTab, setMainTab] = useState<'timesheets' | 'leaves' | 'holidays'>((route?.params?.initialTab as any) || 'timesheets');
+  const [mainTab, setMainTab] = useState<'timesheets' | 'leaves' | 'holidays' | 'expenses'>((route?.params?.initialTab as any) || 'timesheets');
   const [activeTab, setActiveTab] = useState<'requests' | 'apply'>('requests');
 
   useEffect(() => {
@@ -312,7 +314,12 @@ export default function ESSScreen({ route }: any) {
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchLeaveData} colors={['#E25E3E']} />}
       >
         {/* --- Main Navigation Tabs --- */}
-        <View style={styles.mainTabsContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={styles.mainTabsScroll}
+          contentContainerStyle={styles.mainTabsContainer}
+        >
           <TouchableOpacity 
             style={[styles.mainTabButton, mainTab === 'timesheets' && styles.mainTabActive]}
             onPress={() => setMainTab('timesheets')}
@@ -331,7 +338,13 @@ export default function ESSScreen({ route }: any) {
           >
             <Text style={[styles.mainTabText, mainTab === 'holidays' && styles.mainTabTextActive]}>Holidays</Text>
           </TouchableOpacity>
-        </View>
+          <TouchableOpacity 
+            style={[styles.mainTabButton, mainTab === 'expenses' && styles.mainTabActive, { marginRight: 20 }]}
+            onPress={() => setMainTab('expenses')}
+          >
+            <Text style={[styles.mainTabText, mainTab === 'expenses' && styles.mainTabTextActive]}>Expenses</Text>
+          </TouchableOpacity>
+        </ScrollView>
 
         {mainTab === 'timesheets' && (
           <TimesheetTab />
@@ -339,6 +352,10 @@ export default function ESSScreen({ route }: any) {
 
         {mainTab === 'holidays' && (
           <HolidaysTab />
+        )}
+
+        {mainTab === 'expenses' && (
+          <ExpensesTab />
         )}
 
         {mainTab === 'leaves' && (
@@ -833,13 +850,15 @@ const styles = StyleSheet.create({
   },
 
   /* --- Main Tabs --- */
-  mainTabsContainer: {
-    flexDirection: 'row',
+  mainTabsScroll: {
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
     marginBottom: 16,
+  },
+  mainTabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
   },
   mainTabButton: {
     paddingVertical: 14,

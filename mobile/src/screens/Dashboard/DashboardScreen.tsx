@@ -19,6 +19,8 @@ import { useAuthStore } from '../../store/authStore';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { notificationService, AppNotification } from '../../api/notificationService';
 import { useProjectStore } from '../../store/projectStore';
+import { useFieldVisitStore } from '../../store/fieldVisitStore';
+import { formatElapsed } from '../../utils/haversine';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
 import AppDrawer from '../../components/AppDrawer';
 import {
@@ -74,25 +76,38 @@ export default function DashboardScreen() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Local state for field visit
-  const [isTraveling, setIsTraveling] = useState(false);
-  const [activeTripLocation, setActiveTripLocation] = useState('NetGuard Sentinel');
+  // Field visit — live data from the store
+  const { activeVisit, fetchActiveVisit } = useFieldVisitStore();
+  const isTraveling = !!activeVisit;
+  const [visitElapsed, setVisitElapsed] = useState('00:00:00');
+
+  // Tick the elapsed timer off the visit's own start time, so it stays correct
+  // even though the GPS tracking intervals only run on the Field Visit screen.
+  useEffect(() => {
+    if (!activeVisit?.startTime) return;
+    const tick = () => {
+      const secs = Math.max(0, Math.floor((Date.now() - new Date(activeVisit.startTime).getTime()) / 1000));
+      setVisitElapsed(formatElapsed(secs));
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [activeVisit?.startTime]);
 
   const safeNavigate = (screenName: string, params?: any) => {
-    const comingSoon = ['Expenses', 'FieldVisits', 'FieldVisitsHistory'];
+    const comingSoon: string[] = []; // removed Expenses
     if (comingSoon.includes(screenName)) {
       Alert.alert('Coming Soon', `The ${screenName} screen is currently under development.`);
+    } else if (screenName === 'Expenses') {
+      navigation.navigate('Attendance' as any, { initialTab: 'expenses' });
     } else {
       navigation.navigate(screenName as any, params);
     }
   };
 
-  const toggleTrip = () => {
-    setIsTraveling(!isTraveling);
-  };
-
   useEffect(() => {
     fetchDashboardData();
+    fetchActiveVisit().catch(() => {});
   }, []);
 
   const onRefresh = async () => {
@@ -353,20 +368,20 @@ export default function DashboardScreen() {
           <View style={styles.attendanceTimeRow}>
             <Text style={styles.timeClock}>{currentTime || '00: 00: 00'}</Text>
             
-            <View style={{ position: 'relative', width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
-              <Svg width="80" height="80" viewBox="0 0 80 80">
+            <View style={{ position: 'relative', width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+              <Svg width="60" height="60" viewBox="0 0 60 60">
                 <Circle
-                  cx="40" cy="40" r="35"
-                  stroke="#F3E8E5" strokeWidth="6" fill="none"
+                  cx="30" cy="30" r="26"
+                  stroke="#F3E8E5" strokeWidth="5" fill="none"
                 />
                 <Circle
-                  cx="40" cy="40" r="35"
-                  stroke="#EA580C" strokeWidth="6" fill="none"
-                  strokeDasharray={`${2 * Math.PI * 35}`}
-                  strokeDashoffset={`${2 * Math.PI * 35 * (1 - Math.min((liveWorkedTime.hours * 60 + liveWorkedTime.minutes) / (9 * 60), 1))}`}
+                  cx="30" cy="30" r="26"
+                  stroke="#EA580C" strokeWidth="5" fill="none"
+                  strokeDasharray={`${2 * Math.PI * 26}`}
+                  strokeDashoffset={`${2 * Math.PI * 26 * (1 - Math.min((liveWorkedTime.hours * 60 + liveWorkedTime.minutes) / (9 * 60), 1))}`}
                   strokeLinecap="round"
                   rotation="-90"
-                  origin="40, 40"
+                  origin="30, 30"
                 />
               </Svg>
               <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
@@ -430,7 +445,7 @@ export default function DashboardScreen() {
             <Text style={styles.qaText}>Expense</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.7} onPress={() => safeNavigate('FieldVisits')}>
+          <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.7} onPress={() => safeNavigate('FieldVisit')}>
             <View style={[styles.qaIconWrapper, { backgroundColor: '#FAF5FF' }]}>
               <MapPin size={22} color="#9333EA" />
             </View>
@@ -641,38 +656,78 @@ export default function DashboardScreen() {
         {/* --- Field Visit Section --- */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Field Visit</Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('FieldVisitsHistory')}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('FieldVisit')}>
             <Text style={styles.historyText}>History</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.fieldVisitCard}>
-          <View style={styles.fieldVisitHeaderRow}>
-            <View>
-              <Text style={styles.fieldVisitTag}>FIELD VISIT</Text>
-              <Text style={styles.fieldVisitStatusText}>{isTraveling ? 'Traveling' : 'Not traveling'}</Text>
+        <TouchableOpacity activeOpacity={0.97} onPress={() => safeNavigate('FieldVisit')}>
+          <View style={styles.fieldVisitCard}>
+            <View style={styles.fieldVisitHeaderRow}>
+              <View>
+                <Text style={styles.fieldVisitTag}>FIELD VISIT</Text>
+                <Text style={styles.fieldVisitStatusText}>{isTraveling ? 'Traveling' : 'Not traveling'}</Text>
+              </View>
+              <View style={[styles.idlePill, isTraveling && { backgroundColor: '#DCFCE7' }]}>
+                <View style={[styles.idleDot, isTraveling && { backgroundColor: '#16A34A' }]} />
+                <Text style={[styles.idlePillText, isTraveling && { color: '#16A34A' }]}>{isTraveling ? 'Active' : 'Idle'}</Text>
+              </View>
             </View>
-            <View style={[styles.idlePill, isTraveling && { backgroundColor: '#DCFCE7' }]}>
-              <View style={[styles.idleDot, isTraveling && { backgroundColor: '#16A34A' }]} />
-              <Text style={[styles.idlePillText, isTraveling && { color: '#16A34A' }]}>{isTraveling ? 'Active' : 'Idle'}</Text>
-            </View>
+
+            {isTraveling && activeVisit ? (
+              <>
+                <Text style={styles.travelingForLabel}>Traveling for</Text>
+                <View style={styles.dropdownInput}>
+                  <View style={[styles.projectDot, { backgroundColor: activeVisit.project?.color || '#2563EB', marginRight: 8 }]} />
+                  <Text style={styles.dropdownSelectedText} numberOfLines={1}>
+                    {activeVisit.project?.name || 'Active visit'}
+                  </Text>
+                </View>
+
+                {activeVisit.purpose ? (
+                  <Text style={styles.visitPurposeText} numberOfLines={2}>{activeVisit.purpose}</Text>
+                ) : null}
+
+                <View style={styles.visitLiveRow}>
+                  <View style={styles.visitLiveBox}>
+                    <Clock size={15} color="#E25E3E" />
+                    <Text style={styles.visitLiveValue}>{visitElapsed}</Text>
+                    <Text style={styles.visitLiveLabel}>Elapsed</Text>
+                  </View>
+                  <View style={styles.visitLiveDivider} />
+                  <View style={styles.visitLiveBox}>
+                    <MapPin size={15} color="#2563EB" />
+                    <Text style={styles.visitLiveValue}>
+                      {new Date(activeVisit.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    <Text style={styles.visitLiveLabel}>Started</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.startTripButton, { backgroundColor: '#EF4444', shadowColor: '#EF4444' }]}
+                  activeOpacity={0.8}
+                  onPress={() => safeNavigate('FieldVisit')}
+                >
+                  <MapPin size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.startTripButtonText}>View Active Visit</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.travelingForLabel}>Ready to start a field visit?</Text>
+                <TouchableOpacity
+                  style={styles.startTripButton}
+                  activeOpacity={0.8}
+                  onPress={() => safeNavigate('FieldVisit')}
+                >
+                  <MapPin size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.startTripButtonText}>Start Trip</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-
-          <Text style={styles.travelingForLabel}>Traveling for</Text>
-          <TouchableOpacity style={styles.dropdownInput} activeOpacity={0.7}>
-            <Text style={styles.dropdownSelectedText}>{activeTripLocation}</Text>
-            <ChevronDown size={20} color="#64748B" />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.startTripButton, isTraveling && { backgroundColor: '#EF4444', shadowColor: '#EF4444' }]} 
-            activeOpacity={0.8}
-            onPress={toggleTrip}
-          >
-            <MapPin size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.startTripButtonText}>{isTraveling ? 'End Trip' : 'Start Trip'}</Text>
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
 
         {/* --- Recent Activity Section --- */}
         <View style={styles.sectionHeaderRow}>
@@ -812,8 +867,8 @@ const styles = StyleSheet.create({
   attendanceCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 22,
-    marginBottom: 24,
+    padding: 16,
+    marginBottom: 16,
     position: 'relative',
     overflow: 'hidden',
     shadowColor: '#E25E3E',
@@ -840,22 +895,22 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   attendanceDate: {
     fontSize: 14,
     fontWeight: '600',
     color: '#64748B',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   attendanceTimeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 14,
   },
   timeClock: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.5,
@@ -880,7 +935,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   progressRingText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#0F172A',
   },
@@ -895,8 +950,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 20,
   },
   statusDot: {
@@ -913,9 +968,9 @@ const styles = StyleSheet.create({
   punchButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 22,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -932,7 +987,7 @@ const styles = StyleSheet.create({
   punchButtonText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 15,
+    fontSize: 14,
   },
 
   // --- Quick Actions Grid (4 Columns side-by-side) ---
@@ -1376,9 +1431,34 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
+  projectDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  visitPurposeText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: -8,
+    marginBottom: 14,
+    lineHeight: 18,
+  },
+  visitLiveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  visitLiveBox: { flex: 1, alignItems: 'center', gap: 3 },
+  visitLiveDivider: { width: 1, height: 34, backgroundColor: '#E2E8F0' },
+  visitLiveValue: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  visitLiveLabel: { fontSize: 10.5, fontWeight: '600', color: '#94A3B8' },
   dropdownInput: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderWidth: 1,

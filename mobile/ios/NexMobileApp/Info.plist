@@ -34,7 +34,19 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Nex requires access to your location when you punch in and punch out for accurate attendance records.</string>
+	<string>CES Work uses your location to track field visits, record GPS routes, and geo-stamp your attendance clock-in and clock-out.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>CES Work uses your location to track field visits, record GPS routes, and geo-stamp your attendance clock-in and clock-out.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>CES Work needs camera access to take photos during field visits and update your profile picture.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CES Work needs access to your photo library to attach images to project issues and field visit reports.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>CES Work may save field visit photos to your library.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>BootSplash</string>
 	<key>UIRequiredDeviceCapabilities</key>

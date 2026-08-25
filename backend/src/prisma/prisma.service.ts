@@ -12,10 +12,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   constructor() {
     if (!globalForPrisma.pgPool) {
+      // DATABASE_URL points at Supabase's *transaction* pooler (port 6543), which
+      // multiplexes client connections — the 15-connection ceiling in the old
+      // comment applies to session mode (5432), not here. A pool of 4 was
+      // throttling the dashboard, which fires six endpoints in parallel on load.
       globalForPrisma.pgPool = new Pool({
         connectionString: process.env.DATABASE_URL || 'postgresql://mohitsingh@localhost:5432/erp_db?host=/tmp',
-        max: 4, // Supabase allows 15 in session mode — keep low for clustered instances
-        min: 1, // Keep 1 idle connections warm to reduce cold-start latency
+        max: Number(process.env.DB_POOL_MAX ?? 15),
+        min: Number(process.env.DB_POOL_MIN ?? 2), // Keep connections warm to reduce cold-start latency
         idleTimeoutMillis: 30000, // Drop idle connections after 30s
         connectionTimeoutMillis: 15000, // 15s timeout for acquiring a connection
         allowExitOnIdle: false, // Keep pool alive
@@ -34,7 +38,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     await this.$connect();
-    this.logger.log(`PG Pool initialized (max: 10, min: 2)`);
+    this.logger.log(
+      `PG Pool initialized (max: ${this.pgPool.options.max}, min: ${this.pgPool.options.min})`,
+    );
   }
 
   async onModuleDestroy() {

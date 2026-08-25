@@ -2,6 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import {
   LucidePlus, LucideX,
   LucideTrash2, LucideLayoutGrid,
@@ -377,36 +378,51 @@ export class ProfileTabComponent implements OnInit {
   saveSkill(andNew: boolean = false) {
     if (this.selectedSkillNames.size === 0) return;
 
-    for (const skillName of this.selectedSkillNames) {
-      const existingIdx = this.formData.skills.findIndex(
+    // Each skill is its own row server-side — update the existing one in
+    // place (by id) or create a new one, rather than replacing the whole
+    // list. That's what lets this stay correct if the mobile app changed a
+    // different skill in the meantime instead of silently overwriting it.
+    const requests = Array.from(this.selectedSkillNames).map((skillName) => {
+      const existing = (this.employeeData.skills || []).find(
         (s: any) => s.category === this.selectedSkillCategory && s.name === skillName
       );
+      const payload = { category: this.selectedSkillCategory, name: skillName, level: this.selectedSkillLevel };
+      return existing
+        ? this.employeeService.updateSkill(this.employeeData.id, existing.id, payload)
+        : this.employeeService.addSkill(this.employeeData.id, payload);
+    });
 
-      if (existingIdx > -1) {
-        this.formData.skills[existingIdx].level = this.selectedSkillLevel;
-      } else {
-        this.formData.skills.push({
-          id: Date.now() + Math.random(),
-          category: this.selectedSkillCategory,
-          name: skillName,
-          level: this.selectedSkillLevel
-        });
+    const count = this.selectedSkillNames.size;
+    forkJoin(requests).subscribe({
+      next: () => {
+        this.toast.success(`${count} skill(s) updated`);
+        this.refreshProfile.emit();
+      },
+      error: (err) => {
+        this.toast.error('Failed to update skills');
+        console.error(err);
       }
-    }
+    });
 
-    this.toast.success(`${this.selectedSkillNames.size} skill(s) updated`);
-    this.saveProfile();
     this.selectedSkillNames = new Set<string>();
-
     if (!andNew) {
       this.closeUpdateSkillsModal();
     }
   }
 
   removeSkill(idx: number) {
-    this.formData.skills.splice(idx, 1);
-    this.toast.success('Skill removed');
-    this.saveProfile();
+    const skill = this.formData.skills[idx];
+    if (!skill?.id) return;
+    this.employeeService.deleteSkill(this.employeeData.id, skill.id).subscribe({
+      next: () => {
+        this.toast.success('Skill removed');
+        this.refreshProfile.emit();
+      },
+      error: (err) => {
+        this.toast.error('Failed to remove skill');
+        console.error(err);
+      }
+    });
   }
 
   // --- Resume Lines Modal Handlers ---
@@ -465,10 +481,16 @@ export class ProfileTabComponent implements OnInit {
 
   saveResumeLine() {
     this.resumeFormSubmitted = true;
-    if (!this.newResumeLine.title?.trim() || !this.newResumeLine.organization?.trim()) {
+    if (!this.newResumeLine.title?.trim()) {
+      setTimeout(() => document.getElementById('resumeTitleInput')?.focus(), 0);
+      return;
+    }
+    if (!this.newResumeLine.organization?.trim()) {
+      setTimeout(() => document.getElementById('resumeOrgInput')?.focus(), 0);
       return;
     }
     if (this.isEndDateInvalid()) {
+      setTimeout(() => document.getElementById('resumeEndDateInput')?.focus(), 0);
       return;
     }
 
@@ -494,7 +516,6 @@ export class ProfileTabComponent implements OnInit {
 
   private pushResumeLineToForm(attachmentUrl?: string) {
     const payload = {
-      id: this.newResumeLine.id || Date.now(),
       type: this.newResumeLine.type || 'Experience',
       title: (this.newResumeLine.title || '').trim(),
       organization: (this.newResumeLine.organization || '').trim(),
@@ -504,22 +525,38 @@ export class ProfileTabComponent implements OnInit {
       attachmentUrl: attachmentUrl || this.newResumeLine.attachmentUrl || null
     };
 
-    if (this.editingResumeLineIndex !== null) {
-      this.formData.resumeLines[this.editingResumeLineIndex] = payload;
-      this.toast.success('Resume line updated');
-    } else {
-      this.formData.resumeLines.push(payload);
-      this.toast.success('Resume line created');
-    }
+    const isEdit = this.editingResumeLineIndex !== null;
+    const existingId = isEdit ? this.formData.resumeLines[this.editingResumeLineIndex!]?.id : null;
+    const request = isEdit && existingId
+      ? this.employeeService.updateResumeLine(this.employeeData.id, existingId, payload)
+      : this.employeeService.addResumeLine(this.employeeData.id, payload);
 
-    this.closeCreateResumeModal();
-    this.saveProfile();
+    request.subscribe({
+      next: () => {
+        this.toast.success(isEdit ? 'Resume line updated' : 'Resume line created');
+        this.closeCreateResumeModal();
+        this.refreshProfile.emit();
+      },
+      error: (err) => {
+        this.toast.error('Failed to save resume line');
+        console.error(err);
+      }
+    });
   }
 
   removeResumeLine(idx: number) {
-    this.formData.resumeLines.splice(idx, 1);
-    this.toast.success('Resume line removed');
-    this.saveProfile();
+    const line = this.formData.resumeLines[idx];
+    if (!line?.id) return;
+    this.employeeService.deleteResumeLine(this.employeeData.id, line.id).subscribe({
+      next: () => {
+        this.toast.success('Resume line removed');
+        this.refreshProfile.emit();
+      },
+      error: (err) => {
+        this.toast.error('Failed to remove resume line');
+        console.error(err);
+      }
+    });
   }
 
   // --- Country / State / City Handlers ---
@@ -599,15 +636,17 @@ export class ProfileTabComponent implements OnInit {
 
     this.isSaving = true;
 
-    // Construct payload for API
+    // Construct payload for API. skills/resumeLines are deliberately left
+    // out — they're saved through their own granular add/update/delete calls
+    // (see saveSkill, removeSkill, pushResumeLineToForm, removeResumeLine)
+    // the moment each change happens, not batched into this form save.
+    const { skills, resumeLines, ...formDataWithoutResumeSkills } = this.formData;
     const payload = {
-      ...this.formData,
+      ...formDataWithoutResumeSkills,
       managerId: this.formData.managerId ? Number(this.formData.managerId) : null,
       branchId: this.formData.branchId ? Number(this.formData.branchId) : null,
       departmentId: this.formData.departmentId ? Number(this.formData.departmentId) : null,
       designationId: this.formData.designationId ? Number(this.formData.designationId) : null,
-      skills: this.formData.skills,
-      resumeLines: this.formData.resumeLines
     };
 
     if (!payload.password) {

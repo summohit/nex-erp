@@ -6,6 +6,16 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.2.0"
+
+        // play-services-location 21.x turned FusedLocationProviderClient from a
+        // class into an interface. react-native-geolocation-service is compiled
+        // against 18.0.0 and crashes with IncompatibleClassChangeError on 21.x,
+        // which react-native-maps otherwise pulls in. 20.0.0 is the last release
+        // where it is still a class, so pin every consumer to it.
+        googlePlayServicesVersion = "20.0.0"
+        playServicesVersion = "20.0.0"
+        playServicesLocationVersion = "20.0.0"
+        googlePlayServicesLocationVersion = "20.0.0"
     }
     repositories {
         google()

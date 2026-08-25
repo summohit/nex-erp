@@ -862,6 +862,7 @@
       <div class="form-group mb-3">
         <label>Title / Position <span class="required">*</span></label>
         <input 
+          id="resumeTitleInput"
           type="text" 
           class="form-control" 
           [class.is-invalid]="resumeFormSubmitted && !newResumeLine.title?.trim()"
@@ -872,6 +873,7 @@
       <div class="form-group mb-3">
         <label>Organization / Institution <span class="required">*</span></label>
         <input 
+          id="resumeOrgInput"
           type="text" 
           class="form-control" 
           [class.is-invalid]="resumeFormSubmitted && !newResumeLine.organization?.trim()"
@@ -887,6 +889,7 @@
         <div class="form-group">
           <label>End Date</label>
           <input 
+            id="resumeEndDateInput"
             type="date" 
             class="form-control" 
             [class.is-invalid]="resumeFormSubmitted && isEndDateInvalid()"

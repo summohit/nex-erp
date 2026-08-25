@@ -124,7 +124,7 @@ export default function LoginScreen() {
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Sign into your NEX ERP account</Text>
+            <Text style={styles.title}>Sign into your CES Work account</Text>
             <Text style={styles.subtitle}>Manage your workspace on the go</Text>
           </View>
 
@@ -211,7 +211,7 @@ export default function LoginScreen() {
           {/* Footer Terms */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              By clicking 'Continue', I accept the NEX ERP{' '}
+              By clicking 'Continue', I accept the CES Work{' '}
               <Text style={styles.footerLink}>Terms of Service</Text> and{' '}
               <Text style={styles.footerLink}>Privacy Notice</Text>
             </Text>

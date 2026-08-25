@@ -266,7 +266,7 @@ export class ProjectsService {
       const filename = `${crypto.randomBytes(16).toString('hex')}${ext}`;
       
       const form = new FormData();
-      form.append('file', file.buffer, filename);
+      form.append('file', file.buffer.toString('base64'));
       form.append('fileName', filename);
       form.append('folder', '/project_documents');
 
@@ -383,7 +383,7 @@ export class ProjectsService {
       };
     }
 
-    return this.prisma.project.findMany({
+    const projects = await this.prisma.project.findMany({
       where: whereClause,
       include: {
         _count: {
@@ -402,9 +402,22 @@ export class ProjectsService {
               select: { id: true, firstName: true, lastName: true, avatarUrl: true }
             }
           }
+        },
+        issues: {
+          select: { status: true }
+        },
+        expenseClaims: {
+          where: { status: 'PAID' },
+          select: { amount: true }
         }
       }
     });
+
+    return projects.map(({ issues, expenseClaims, ...p }) => ({
+      ...p,
+      remainingIssues: issues.filter((i) => i.status !== 'DONE' && i.status !== 'CANCELLED').length,
+      paidExpenseTotal: expenseClaims.reduce((sum, c) => sum + c.amount, 0)
+    }));
   }
 
   async getArchivedProjects(companyId: number, userId: number, role: string) {

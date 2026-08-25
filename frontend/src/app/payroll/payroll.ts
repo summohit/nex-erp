@@ -8,8 +8,10 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { PayrollService, Payslip, ExpenseClaim, SalaryComponent, SalaryStructureItem } from '../services/payroll.service';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
+import { ProjectsService } from '../services/projects';
 import { ActionCellRendererComponent } from '../shared/components/action-cell-renderer.component';
 import { ExpenseActionCellRendererComponent } from '../shared/components/expense-action-cell-renderer.component';
+import { SearchableSelectComponent } from '../shared/components/searchable-select/searchable-select.component';
 import { UploadService } from '../services/upload.service';
 import { 
   LucideFilter, 
@@ -31,7 +33,8 @@ import { MatMenuModule } from '@angular/material/menu';
     LucideFilter,
     LucideUploadCloud,
     LucideX,
-    MatMenuModule
+    MatMenuModule,
+    SearchableSelectComponent
   ],
   templateUrl: './payroll.html',
   styleUrls: ['./payroll.css']
@@ -67,6 +70,7 @@ export class PayrollComponent implements OnInit {
   myExpenseClaims = signal<ExpenseClaim[]>([]);
   components = signal<SalaryComponent[]>([]);
   employees = signal<any[]>([]);
+  projects = signal<any[]>([]);
 
   // Structure tab state
   selectedEmployeeId = signal<number | null>(null);
@@ -85,7 +89,7 @@ export class PayrollComponent implements OnInit {
   }
 
   isExpenseModalOpen = signal<boolean>(false);
-  expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '', receipts: [] as string[], purchaseDate: '', purchasedFrom: '', projectCode: '' };
+  expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '', receipts: [] as string[], purchaseDate: '', purchasedFrom: '', projectCode: '', projectName: '', projectId: null as number | null };
   
   // Image Lightbox Viewer states
   previewImages = signal<string[]>([]);
@@ -566,7 +570,8 @@ export class PayrollComponent implements OnInit {
         let statusClass = 'status-pending';
         if (s === 'APPROVED') statusClass = 'status-approved';
         if (s === 'REJECTED') statusClass = 'status-rejected';
-        const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason 
+        if (s === 'PAID') statusClass = 'status-paid';
+        const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason
           ? `<div style="font-size: 10px; color: #DC2626; font-weight: 500; line-height: 1.2; margin-top: 3px;">Reason: ${params.data.rejectionReason}</div>`
           : '';
         return `
@@ -589,7 +594,8 @@ export class PayrollComponent implements OnInit {
       cellRenderer: ExpenseActionCellRendererComponent,
       cellRendererParams: {
         onApprove: (data: any) => this.updateExpenseStatus(data.id, 'APPROVED'),
-        onReject: (data: any) => this.openRejectModal(data.id)
+        onReject: (data: any) => this.openRejectModal(data.id),
+        onMarkPaid: (data: any) => this.markExpensePaid(data)
       }
     }
   ];
@@ -620,6 +626,7 @@ export class PayrollComponent implements OnInit {
   constructor(
     private payrollService: PayrollService,
     private employeeService: EmployeeService,
+    private projectsService: ProjectsService,
     public authService: AuthService,
     private toast: HotToastService,
     private route: ActivatedRoute,
@@ -647,6 +654,9 @@ export class PayrollComponent implements OnInit {
       if (res.length > 0 && !this.selectedEmployeeId()) {
         this.selectEmployeeForStructure(res[0].id);
       }
+    });
+    this.projectsService.getProjects().subscribe(res => {
+      this.projects.set(res);
     });
   }
 
@@ -883,6 +893,28 @@ export class PayrollComponent implements OnInit {
   }
 
   // Expense Claims
+  projectOptions = computed(() => {
+    return this.projects().map(p => ({
+      id: p.id,
+      name: `${p.name} (${p.key || p.code})`
+    }));
+  });
+
+  onProjectSelected(projectId: any) {
+    if (!projectId) {
+      this.expenseForm.projectId = null;
+      this.expenseForm.projectName = '';
+      this.expenseForm.projectCode = '';
+      return;
+    }
+    const project = this.projects().find(p => p.id === projectId);
+    if (project) {
+      this.expenseForm.projectId = project.id;
+      this.expenseForm.projectName = project.name;
+      this.expenseForm.projectCode = project.key || project.code || '';
+    }
+  }
+
   openExpenseModal() {
     this.expenseForm = { 
       title: '',
@@ -893,7 +925,9 @@ export class PayrollComponent implements OnInit {
       receipts: [],
       purchaseDate: new Date().toISOString().split('T')[0],
       purchasedFrom: '',
-      projectCode: ''
+      projectCode: '',
+      projectName: '',
+      projectId: null
     };
     this.selectedFile.set(null);
     this.isExpenseModalOpen.set(true);
@@ -929,8 +963,11 @@ export class PayrollComponent implements OnInit {
       purchaseDate: this.expenseForm.purchaseDate,
       purchasedFrom: this.expenseForm.purchasedFrom,
       projectCode: this.expenseForm.projectCode || undefined,
+      projectName: this.expenseForm.projectName || undefined,
+      projectId: this.expenseForm.projectId || undefined,
       receiptUrl: this.expenseForm.receipts.length > 0 ? JSON.stringify(this.expenseForm.receipts) : ''
     };
+
 
     this.payrollService.createExpenseClaim(payload).subscribe({
       next: () => {
@@ -982,6 +1019,17 @@ export class PayrollComponent implements OnInit {
         this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
       },
       error: (err) => this.toast.error(err.error?.message || 'Failed to update expense claim')
+    });
+  }
+
+  markExpensePaid(data: any) {
+    if (!confirm(`Mark this expense claim as paid?`)) return;
+    this.payrollService.updateExpenseClaimStatus(data.id, { status: 'PAID' }).subscribe({
+      next: () => {
+        this.toast.success('Expense claim marked as paid');
+        this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Failed to mark expense claim as paid')
     });
   }
 

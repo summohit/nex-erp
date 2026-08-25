@@ -9,6 +9,7 @@ export interface ExpenseActionCellParams extends ICellRendererParams {
   onApprove?: (data: any) => void;
   onReject?: (data: any) => void;
   onDelete?: (data: any) => void;
+  onMarkPaid?: (data: any) => void;
 }
 
 @Component({
@@ -18,11 +19,11 @@ export interface ExpenseActionCellParams extends ICellRendererParams {
   template: `
     <div class="action-container" *ngIf="!params.data?.isSummaryRow" (click)="$event.stopPropagation()">
 
-      <!-- Resolved: show a dash -->
-      <span class="resolved-dash" *ngIf="params.data?.status !== 'PENDING'" title="Claim already {{ params.data?.status?.toLowerCase() }}">—</span>
+      <!-- Resolved with nothing left to do: show a dash -->
+      <span class="resolved-dash" *ngIf="params.data?.status === 'REJECTED' || params.data?.status === 'PAID'" title="Claim already {{ params.data?.status?.toLowerCase() }}">—</span>
 
-      <!-- Pending: show action menu -->
-      <ng-container *ngIf="params.data?.status === 'PENDING'">
+      <!-- Pending, or Approved-with-something-to-do: show action menu -->
+      <ng-container *ngIf="params.data?.status === 'PENDING' || (params.data?.status === 'APPROVED' && params.onMarkPaid)">
         <button class="btn-icon" [matMenuTriggerFor]="menu">
           <svg lucideMoreHorizontal size="16"></svg>
         </button>
@@ -31,17 +32,23 @@ export interface ExpenseActionCellParams extends ICellRendererParams {
           <button mat-menu-item class="menu-item" (click)="viewReceipt()" *ngIf="params.data?.receiptUrl">
             <span class="menu-text">View Receipt</span>
           </button>
-          <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove">
+          <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove && params.data?.status === 'PENDING'">
             <span class="menu-text">Approve</span>
           </button>
-          <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject">
+          <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject && params.data?.status === 'PENDING'">
             <span class="menu-text">Reject</span>
           </button>
-          <button mat-menu-item class="menu-item text-danger" (click)="deleteClaim()" *ngIf="params.onDelete">
+          <button mat-menu-item class="menu-item text-success" (click)="markPaid()" *ngIf="params.onMarkPaid && params.data?.status === 'APPROVED'">
+            <span class="menu-text">Mark Paid</span>
+          </button>
+          <button mat-menu-item class="menu-item text-danger" (click)="deleteClaim()" *ngIf="params.onDelete && params.data?.status === 'PENDING'">
             <span class="menu-text">Cancel Claim</span>
           </button>
         </mat-menu>
       </ng-container>
+
+      <!-- Approved with nothing actionable for this viewer (e.g. employee's own claim) -->
+      <span class="resolved-dash" *ngIf="params.data?.status === 'APPROVED' && !params.onMarkPaid" title="Claim approved">—</span>
     </div>
   `,
   styles: [`
@@ -112,6 +119,12 @@ export class ExpenseActionCellRendererComponent implements ICellRendererAngularC
   reject() {
     if (this.params.onReject && this.params.data) {
       this.params.onReject(this.params.data);
+    }
+  }
+
+  markPaid() {
+    if (this.params.onMarkPaid && this.params.data) {
+      this.params.onMarkPaid(this.params.data);
     }
   }
 

@@ -91,7 +91,7 @@ export class PayrollController {
   @Post('expenses')
   createExpenseClaim(
     @Request() req,
-    @Body() data: { title: string; description?: string; amount: number; category?: string; receiptUrl?: string }
+    @Body() data: { title: string; description?: string; amount: number; category?: string; receiptUrl?: string; purchaseDate?: string; purchasedFrom?: string; projectCode?: string; projectName?: string; projectId?: number }
   ) {
     return this.payrollService.createExpenseClaim(req.user.companyId, req.user.sub, data);
   }

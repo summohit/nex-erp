@@ -605,8 +605,13 @@
           </div>
           <div class="row mb-3" style="display: flex; gap: 12px;">
             <div class="form-group" style="flex: 1;">
-              <label>Project Code</label>
-              <input type="text" class="form-control" [(ngModel)]="expenseForm.projectCode" name="projectCode" placeholder="e.g. CES-001, PRJ-2026-05">
+              <label>Project</label>
+              <app-searchable-select
+                [options]="projectOptions()"
+                placeholder="Search Project..."
+                [value]="expenseForm.projectId"
+                (valueChange)="onProjectSelected($event)">
+              </app-searchable-select>
             </div>
           </div>
           <div class="form-group mb-3">

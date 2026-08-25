@@ -7,6 +7,9 @@ export interface MenuItem {
   icon?: string;
   route?: string;
   subItems?: MenuItem[];
+  /** True for links meant to open in the system browser (e.g. the public
+   * careers page) instead of navigating to an in-app screen. */
+  external?: boolean;
 }
 
 export interface MenuSection {

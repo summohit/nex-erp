@@ -118,4 +118,34 @@ export class EmployeesController {
   deleteDocument(@Request() req, @Param('id') id: string, @Param('documentId') documentId: string) {
     return this.employeesService.deleteDocument(+id, +documentId, req.user.companyId, req.user.sub, req.user.role);
   }
+
+  @Post(':id/skills')
+  addSkill(@Request() req, @Param('id') id: string, @Body() data: any) {
+    return this.employeesService.addSkill(+id, req.user.companyId, req.user.sub, req.user.role, data);
+  }
+
+  @Put(':id/skills/:skillId')
+  updateSkill(@Request() req, @Param('id') id: string, @Param('skillId') skillId: string, @Body() data: any) {
+    return this.employeesService.updateSkill(+id, +skillId, req.user.companyId, req.user.sub, req.user.role, data);
+  }
+
+  @Delete(':id/skills/:skillId')
+  deleteSkill(@Request() req, @Param('id') id: string, @Param('skillId') skillId: string) {
+    return this.employeesService.deleteSkill(+id, +skillId, req.user.companyId, req.user.sub, req.user.role);
+  }
+
+  @Post(':id/resume-lines')
+  addResumeLine(@Request() req, @Param('id') id: string, @Body() data: any) {
+    return this.employeesService.addResumeLine(+id, req.user.companyId, req.user.sub, req.user.role, data);
+  }
+
+  @Put(':id/resume-lines/:lineId')
+  updateResumeLine(@Request() req, @Param('id') id: string, @Param('lineId') lineId: string, @Body() data: any) {
+    return this.employeesService.updateResumeLine(+id, +lineId, req.user.companyId, req.user.sub, req.user.role, data);
+  }
+
+  @Delete(':id/resume-lines/:lineId')
+  deleteResumeLine(@Request() req, @Param('id') id: string, @Param('lineId') lineId: string) {
+    return this.employeesService.deleteResumeLine(+id, +lineId, req.user.companyId, req.user.sub, req.user.role);
+  }
 }

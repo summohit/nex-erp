@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ProjectsService, ProjectSummary } from '../../services/projects';
+import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
 import { 
   LucideLayoutDashboard, LucideKanban,
   LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
@@ -16,7 +17,8 @@ import {
   LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
-  LucideFileUp, LucideUpload
+  LucideFileUp, LucideUpload,
+  LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { SocketService } from '../../services/socket.service';
@@ -46,6 +48,7 @@ declare var Quill: any;
     LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
     LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
     LucideFileUp, LucideUpload,
+    LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
     AgGridAngular
   ],
   templateUrl: './project-detail.html',
@@ -60,6 +63,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private toast = inject(HotToastService);
   private sanitizer = inject(DomSanitizer);
   private socketService = inject(SocketService);
+  private fieldVisitsService = inject(FieldVisitsService);
 
   Math = Math;
   paginationPageSizeSelector = [10, 25, 50, 100];
@@ -360,6 +364,46 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   activeTab = signal<'board'|'backlog'|'analytics'|'settings'>('board');
   activeProjectTab = signal<string>('board');
   projectSummary = signal<ProjectSummary | null>(null);
+
+  // Field Visits tab
+  fieldVisits = signal<FieldVisit[]>([]);
+  fieldVisitsLoading = signal(false);
+  fieldVisitsLoaded = false;
+  selectedFieldVisit = signal<FieldVisit | null>(null);
+
+  loadFieldVisits() {
+    if (this.fieldVisitsLoaded) return;
+    this.fieldVisitsLoading.set(true);
+    this.fieldVisitsService.getProjectVisits(this.projectId).subscribe({
+      next: (visits) => {
+        this.fieldVisits.set(visits);
+        this.fieldVisitsLoaded = true;
+        this.fieldVisitsLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Error loading field visits', err);
+        this.fieldVisitsLoading.set(false);
+      }
+    });
+  }
+
+  fieldVisitStatusColor(status: string) {
+    if (status === 'COMPLETED') return { bg: '#dcfce7', text: '#166534' };
+    if (status === 'CANCELLED') return { bg: '#fee2e2', text: '#991b1b' };
+    return { bg: '#fef9c3', text: '#854d0e' };
+  }
+
+  fieldVisitPointCount(visit: FieldVisit): number {
+    return Array.isArray(visit.routePoints) ? visit.routePoints.length : 0;
+  }
+
+  openFieldVisitDetail(visit: FieldVisit) {
+    this.selectedFieldVisit.set(visit);
+  }
+
+  closeFieldVisitDetail() {
+    this.selectedFieldVisit.set(null);
+  }
 
   // List Tab Filters
   listSearchQuery = signal<string>('');
@@ -1165,6 +1209,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     localStorage.setItem('project_active_tab', tab);
     if (tab === 'summary' || tab === 'reports') {
       this.loadSummary();
+    }
+    if (tab === 'field-visits') {
+      this.loadFieldVisits();
     }
   }
 

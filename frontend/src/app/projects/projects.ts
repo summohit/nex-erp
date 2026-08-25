@@ -139,6 +139,24 @@ export class ProjectsComponent implements OnInit {
 
   private readonly avatarBase = `width:28px;height:28px;border-radius:50%;border:2px solid #fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;box-shadow:0 1px 3px rgba(9,30,66,.2);flex-shrink:0;`;
 
+  /** Builds an avatar + name chip for a single person, for use in ag-Grid cellRenderers. */
+  private buildPersonHtml(person: any): string {
+    if (!person) return '<span style="color:#94a3b8;font-size:12px;">—</span>';
+    const name = `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unknown';
+    const initial = ((person.firstName || '?')[0] || '?').toUpperCase();
+    const avatarStyle = `width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;`;
+    const avatar = person.avatarUrl
+      ? `<span style="${avatarStyle}background:url('${person.avatarUrl}') center/cover no-repeat;"></span>`
+      : `<span style="${avatarStyle}background:${this.getPmColor(person.id || 0)};">${initial}</span>`;
+    return `<div style="display:flex;align-items:center;gap:6px;">${avatar}<span>${name}</span></div>`;
+  }
+
+  /** Builds a wrapped list of avatar + name chips, for use in ag-Grid cellRenderers. */
+  private buildPeopleHtml(people: any[]): string {
+    if (!people?.length) return '<span style="color:#94a3b8;font-size:12px;">—</span>';
+    return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">${people.map(p => this.buildPersonHtml(p)).join('')}</div>`;
+  }
+
   /** Builds a raw-HTML avatar stack for use in ag-Grid cellRenderers (inline styles — no component CSS available). */
   buildTeamStackHtml(project: any): string {
     const members: any[] = project?.members || [];
@@ -336,34 +354,48 @@ export class ProjectsComponent implements OnInit {
     {
       headerName: 'Name',
       field: 'name',
-      flex: 1.8,
-      minWidth: 220,
+      flex: 2.2,
+      minWidth: 260,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const color = this.getGradient(params.data.color, params.node?.rowIndex || 0);
+        const key = params.data.key ? `<span style="margin-left:8px;font-weight:700;">${params.data.key}</span>` : '';
         return `
           <div class="table-name-cell">
             <span class="table-color-dot" style="background:${color}"></span>
             <span class="board-title">${params.data.name}</span>
+            ${key}
           </div>
         `;
       }
     },
     {
-      headerName: 'Key',
-      field: 'key',
-      flex: 0.8,
-      minWidth: 100,
-      cellRenderer: (params: any) => params.value ? `<span class="badge">${params.value}</span>` : '—'
-    },
-    {
       headerName: 'Lead',
       field: 'lead',
-      flex: 1.1,
-      minWidth: 140,
+      flex: 1.2,
+      minWidth: 160,
       valueGetter: (params: any) => {
         const lead = params.data?.lead;
         return lead ? `${lead.firstName || ''} ${lead.lastName || ''}`.trim() : '—';
+      },
+      cellRenderer: (params: any) => this.buildPersonHtml(params.data?.lead)
+    },
+    {
+      headerName: 'PM',
+      field: 'pm',
+      flex: 1.2,
+      minWidth: 160,
+      sortable: false,
+      valueGetter: (params: any) => {
+        const pms = (params.data?.members || []).filter((m: any) => m.role === 'PROJECT_MANAGER');
+        if (!pms.length) return '—';
+        return pms.map((m: any) => `${m.employee?.firstName || ''} ${m.employee?.lastName || ''}`.trim()).join(', ');
+      },
+      cellRenderer: (params: any) => {
+        const pms = (params.data?.members || [])
+          .filter((m: any) => m.role === 'PROJECT_MANAGER')
+          .map((m: any) => m.employee);
+        return this.buildPeopleHtml(pms);
       }
     },
     {
@@ -394,16 +426,32 @@ export class ProjectsComponent implements OnInit {
     {
       headerName: 'Tasks',
       field: '_count.issues',
-      flex: 0.6,
-      minWidth: 80,
-      valueGetter: (params: any) => params.data?._count?.issues ?? 0
+      flex: 1,
+      minWidth: 150,
+      valueGetter: (params: any) => params.data?._count?.issues ?? 0,
+      cellRenderer: (params: any) => {
+        const total = params.data?._count?.issues ?? 0;
+        const remaining = params.data?.remainingIssues ?? 0;
+        const done = total - remaining;
+        if (total === 0) return '<span style="color:#94a3b8;font-size:12px;">—</span>';
+        const pct = Math.round((done / total) * 100);
+        const color = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
+        const bg = pct === 100 ? '#dcfce7' : pct >= 50 ? '#fef3c7' : '#fee2e2';
+        return `
+          <div style="display:flex;align-items:center;gap:6px;height:100%;">
+            <span style="background:${bg};color:${color};font-weight:700;font-size:11.5px;padding:3px 8px;border-radius:10px;white-space:nowrap;">${remaining} left</span>
+            <span style="background:#eef2ff;color:#4338ca;font-weight:700;font-size:11.5px;padding:3px 8px;border-radius:10px;white-space:nowrap;">${total} total</span>
+          </div>
+        `;
+      }
     },
     {
-      headerName: 'Members',
-      field: '_count.members',
-      flex: 0.7,
-      minWidth: 90,
-      valueGetter: (params: any) => params.data?._count?.members ?? 0
+      headerName: 'Paid Expense',
+      field: 'paidExpenseTotal',
+      flex: 0.9,
+      minWidth: 130,
+      valueGetter: (params: any) => params.data?.paidExpenseTotal ?? 0,
+      valueFormatter: (params: any) => `₹${(params.value ?? 0).toLocaleString('en-IN')}`
     },
     {
       headerName: 'Start date',

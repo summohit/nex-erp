@@ -107,6 +107,15 @@ android {
     }
 }
 
+// Gradle resolves version conflicts by picking the highest, so an ext var alone
+// is not enough — any transitive dep asking for 21.x would win and reintroduce
+// the FusedLocationProviderClient IncompatibleClassChangeError crash.
+configurations.all {
+    resolutionStrategy {
+        force "com.google.android.gms:play-services-location:20.0.0"
+    }
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
@@ -116,4 +125,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // First-party Kotlin (FieldVisitLocationService) calls FusedLocationProviderClient
+    // directly, so declare it explicitly rather than leaning on react-native-maps'
+    // transitive dependency — pinned to 20.0.0 for the same reason as the force{} above.
+    implementation "com.google.android.gms:play-services-location:${rootProject.ext.googlePlayServicesVersion}"
 }

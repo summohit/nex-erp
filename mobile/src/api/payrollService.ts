@@ -31,9 +31,45 @@ export interface Payslip {
   };
 }
 
+export interface ExpenseClaim {
+  id: number;
+  title: string;
+  description?: string;
+  amount: number;
+  category: string;
+  receiptUrl?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectionReason?: string;
+  purchaseDate?: string;
+  purchasedFrom?: string;
+  projectCode?: string;
+  projectName?: string;
+  createdAt: string;
+  approvedBy?: {
+    employee: {
+      firstName: string;
+      lastName: string;
+    }
+  };
+}
+
 export const payrollService = {
   getMyPayslips: async (): Promise<Payslip[]> => {
     const response = await apiClient.get('/payroll/payslips/me');
     return response.data;
   },
+
+  getMyExpenseClaims: async (): Promise<ExpenseClaim[]> => {
+    const response = await apiClient.get('/payroll/expenses/me');
+    return response.data;
+  },
+
+  createExpenseClaim: async (data: any): Promise<ExpenseClaim> => {
+    const response = await apiClient.post('/payroll/expenses', data);
+    return response.data;
+  },
+
+  deleteExpenseClaim: async (id: number): Promise<void> => {
+    await apiClient.delete(`/payroll/expenses/${id}`);
+  }
 };

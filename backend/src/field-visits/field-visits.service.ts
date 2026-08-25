@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -15,6 +15,18 @@ export class FieldVisitsService {
     // Resolve employeeId from userId
     const employee = await this.prisma.employee.findFirst({ where: { userId } });
     if (!employee) throw new NotFoundException('Employee not found');
+
+    // One active visit per employee — the client hides the start button while a
+    // visit is running, but enforce it here so a stale client cannot double-start.
+    const existing = await this.prisma.fieldVisit.findFirst({
+      where: { employeeId: employee.id, status: 'IN_PROGRESS' },
+      include: { project: { select: { name: true } } },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `You already have a field visit in progress for ${existing.project?.name ?? 'another project'}. End it before starting a new one.`,
+      );
+    }
 
     return this.prisma.fieldVisit.create({
       data: {
@@ -138,13 +150,41 @@ export class FieldVisitsService {
     });
   }
 
-  async getProjectVisits(projectId: number) {
+  async getProjectVisits(projectId: number, companyId: number) {
+    // Scope by companyId too — projectId alone would let one company's user read
+    // another company's field visits by guessing an id.
     return this.prisma.fieldVisit.findMany({
-      where: { projectId },
+      where: { projectId, companyId },
       orderBy: { startTime: 'desc' },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         photos: { select: { id: true, url: true, takenAt: true, caption: true } },
+      },
+    });
+  }
+
+  /** Everyone currently out on a visit, company-wide — powers the CRM "who's travelling" widget. */
+  async getCompanyActiveVisits(companyId: number) {
+    return this.prisma.fieldVisit.findMany({
+      where: { companyId, status: 'IN_PROGRESS' },
+      orderBy: { startTime: 'desc' },
+      include: {
+        employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        project: { select: { id: true, name: true, key: true, color: true } },
+      },
+    });
+  }
+
+  /** Most recently finished visits company-wide, for the same widget's activity feed. */
+  async getCompanyRecentVisits(companyId: number, limit: number) {
+    return this.prisma.fieldVisit.findMany({
+      where: { companyId, status: { in: ['COMPLETED', 'CANCELLED'] } },
+      orderBy: { startTime: 'desc' },
+      take: Math.min(Math.max(limit, 1), 50),
+      include: {
+        employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        project: { select: { id: true, name: true, key: true, color: true } },
+        photos: { select: { id: true } },
       },
     });
   }
