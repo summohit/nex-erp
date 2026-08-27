@@ -68,6 +68,34 @@ export class JobsService {
     return job;
   }
 
+  async getJobDetail(id: number, companyId: number) {
+    const job = await this.prisma.job.findFirst({
+      where: { id, companyId },
+      include: {
+        department: true,
+        designation: true,
+        branch: true,
+        recruiter: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        applications: { select: { status: true } },
+      },
+    });
+    if (!job) {
+      throw new NotFoundException(`Job #${id} not found`);
+    }
+
+    const { applications, ...jobFields } = job;
+    const statusCounts: Record<string, number> = {};
+    for (const app of applications) {
+      statusCounts[app.status] = (statusCounts[app.status] || 0) + 1;
+    }
+
+    return {
+      ...jobFields,
+      totalApplications: applications.length,
+      statusCounts,
+    };
+  }
+
   async create(companyId: number, data: any) {
     const { minSalary, maxSalary, startDate, endDate, totalOpenings, recruiterId, discloseSalary, ...rest } = data;
     return this.prisma.job.create({

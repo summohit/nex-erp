@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { CandidatesService, JobApplication } from '../../services/candidates.service';
@@ -12,7 +13,9 @@ import {
   LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
   LucideClock, LucideBuilding, LucideTrash2, LucideSparkles,
   LucideInbox, LucideEye, LucideStar, LucideUsers, LucideAward,
-  LucideCheckCircle, LucideXCircle
+  LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
+  LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
+  LucidePenLine, LucideCopy, LucideExternalLink
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
@@ -23,12 +26,14 @@ ModuleRegistry.registerModules([AllCommunityModule]);
   selector: 'app-candidates',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, DragDropModule, AgGridAngular, DatePipe,
+    CommonModule, FormsModule, DragDropModule, AgGridAngular, DatePipe, RouterLink,
     LucideX, LucideLayoutGrid, LucideTable, LucideFileText,
     LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
     LucideClock, LucideBuilding, LucideTrash2, LucideSparkles,
     LucideInbox, LucideEye, LucideStar, LucideUsers, LucideAward,
-    LucideCheckCircle, LucideXCircle
+    LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
+    LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
+    LucidePenLine, LucideCopy, LucideExternalLink
   ],
   templateUrl: './candidates.html',
   styleUrls: ['./candidates.css'],
@@ -40,11 +45,19 @@ export class CandidatesComponent implements OnInit {
   private toast = inject(HotToastService);
   private datePipe = inject(DatePipe);
   private http = inject(HttpClient);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   viewMode = signal<'KANBAN' | 'TABLE'>('KANBAN');
   
   jobs = signal<Job[]>([]);
   selectedJobId = signal<number | null>(null);
+
+  selectedJob = computed(() => {
+    const id = this.selectedJobId();
+    if (!id) return null;
+    return this.jobs().find(j => j.id === id) || null;
+  });
 
   applications = signal<JobApplication[]>([]);
   
@@ -64,10 +77,81 @@ export class CandidatesComponent implements OnInit {
   showSalaryPrompt = signal(false);
   pendingStatusChange = signal<{ id: number, status: string } | null>(null);
   offeredSalaryInput = signal<number | null>(null);
+  // Both print on the generated offer letter, so they are captured at offer time.
+  joiningDateInput = signal<string>('');
+  addressInput = signal<string>('');
+
+  pendingCandidate = computed(() => {
+    const pending = this.pendingStatusChange();
+    if (!pending) return null;
+    return this.applications().find(a => a.id === pending.id) || this.selectedApp() || null;
+  });
+
+  pendingRejectCandidate = computed(() => {
+    const id = this.pendingRejectId();
+    if (!id) return null;
+    return this.applications().find(a => a.id === id) || this.selectedApp() || null;
+  });
+
+  salaryExceedsBudget = computed(() => {
+    const cand = this.pendingCandidate();
+    const offered = this.offeredSalaryInput();
+    if (!cand?.job?.maxSalary || !offered) return false;
+    return Number(offered) > Number(cand.job.maxSalary);
+  });
+
+  setQuickOfferedSalary(amount: number) {
+    this.offeredSalaryInput.set(amount);
+  }
+
+  // ── E-signature link sharing ──────────────────────────────
+  copiedKey = signal<string | null>(null);
+
+  /** Built client-side so the link always matches the host actually in use. */
+  getSigningLink(ol: any): string {
+    return `${window.location.origin}${ol?.signingPath || ''}`;
+  }
+
+  copyText(value: string, key: string) {
+    if (!value) return;
+    navigator.clipboard.writeText(value).then(() => {
+      this.copiedKey.set(key);
+      this.toast.success(key === 'pw' ? 'Password copied' : 'Signing link copied');
+      setTimeout(() => { if (this.copiedKey() === key) this.copiedKey.set(null); }, 2000);
+    });
+  }
+
+  /**
+   * Opens the offer modal, seeding the offer-letter fields from whatever the
+   * candidate record already has (address falls back to the location they
+   * applied with; joining date defaults to two weeks out).
+   */
+  private openSalaryPrompt(app: JobApplication, status: string) {
+    this.pendingStatusChange.set({ id: app.id, status });
+    this.offeredSalaryInput.set(app.offeredSalary ?? null);
+    this.addressInput.set(app.address || app.currentLocation || '');
+
+    if (app.joiningDate) {
+      this.joiningDateInput.set(app.joiningDate.split('T')[0]);
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() + 14);
+      this.joiningDateInput.set(d.toISOString().split('T')[0]);
+    }
+
+    this.showSalaryPrompt.set(true);
+  }
+
+  showRejectPrompt = signal(false);
+  pendingRejectId = signal<number | null>(null);
+  rejectReasonInput = signal<string>('');
   
   showAnnexureModal = signal(false);
   annexureData = signal<any>(null);
   isLoadingAnnexure = signal(false);
+
+  offerLetter = signal<any>(null);
+  isGeneratingOfferLetter = signal(false);
   
   newInterview = signal<any>({});
   editInterviewMode = signal<number | null>(null);
@@ -170,7 +254,24 @@ export class CandidatesComponent implements OnInit {
 
   ngOnInit() {
     this.loadJobs();
-    this.loadApplications();
+
+    this.route.queryParams.subscribe(params => {
+      const qJobId = params['jobId'];
+      if (qJobId) {
+        this.selectedJobId.set(+qJobId);
+      } else {
+        this.selectedJobId.set(null);
+      }
+      this.loadApplications();
+
+      const applicationId = params['applicationId'];
+      if (applicationId) {
+        this.candidatesService.getApplication(+applicationId).subscribe({
+          next: (app) => this.openApplication(app),
+          error: () => this.toast.error('Application not found')
+        });
+      }
+    });
   }
 
   loadJobs() {
@@ -193,7 +294,18 @@ export class CandidatesComponent implements OnInit {
   analyticsData = signal<any>(null);
 
   onFilterChange() {
+    const jobId = this.selectedJobId();
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { jobId: jobId || null },
+      queryParamsHandling: 'merge'
+    });
     this.loadApplications();
+  }
+
+  clearJobFilter() {
+    this.selectedJobId.set(null);
+    this.onFilterChange();
   }
 
   openAnalytics() {
@@ -287,9 +399,11 @@ export class CandidatesComponent implements OnInit {
       const movedItem = event.container.data[event.currentIndex];
       
       if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
-        this.pendingStatusChange.set({ id: movedItem.id, status: newStatus });
-        this.offeredSalaryInput.set(null);
-        this.showSalaryPrompt.set(true);
+        this.openSalaryPrompt(movedItem, newStatus);
+      } else if (newStatus === 'REJECTED') {
+        this.pendingRejectId.set(movedItem.id);
+        this.rejectReasonInput.set('');
+        this.showRejectPrompt.set(true);
       } else {
         movedItem.status = newStatus;
         this.candidatesService.updateStatus(movedItem.id, newStatus).subscribe({
@@ -310,7 +424,14 @@ export class CandidatesComponent implements OnInit {
     const pending = this.pendingStatusChange();
     if (!pending) return;
     
-    this.candidatesService.updateStatus(pending.id, pending.status, this.offeredSalaryInput() || undefined).subscribe({
+    this.candidatesService.updateStatus(
+      pending.id,
+      pending.status,
+      this.offeredSalaryInput() || undefined,
+      undefined,
+      this.joiningDateInput() || undefined,
+      this.addressInput() || undefined,
+    ).subscribe({
       next: (updatedApp) => {
         if (updatedApp.approvalStatus === 'PENDING_APPROVAL') {
           this.toast.success('Salary exceeds maximum. Sent for approval.');
@@ -335,6 +456,36 @@ export class CandidatesComponent implements OnInit {
     this.showSalaryPrompt.set(false);
     this.pendingStatusChange.set(null);
     this.offeredSalaryInput.set(null);
+    this.joiningDateInput.set('');
+    this.addressInput.set('');
+    this.loadApplications(); // Revert kanban UI if canceled
+  }
+
+  submitRejectPrompt() {
+    const id = this.pendingRejectId();
+    if (!id) return;
+
+    this.candidatesService.updateStatus(id, 'REJECTED', undefined, this.rejectReasonInput().trim() || undefined).subscribe({
+      next: (updatedApp) => {
+        this.toast.success('Application rejected');
+        this.closeRejectPrompt();
+        this.loadApplications();
+        if (this.selectedApp()?.id === updatedApp.id) {
+          this.selectedApp.set(updatedApp);
+        }
+      },
+      error: () => {
+        this.toast.error('Failed to reject application');
+        this.closeRejectPrompt();
+        this.loadApplications();
+      }
+    });
+  }
+
+  closeRejectPrompt() {
+    this.showRejectPrompt.set(false);
+    this.pendingRejectId.set(null);
+    this.rejectReasonInput.set('');
     this.loadApplications(); // Revert kanban UI if canceled
   }
 
@@ -349,6 +500,7 @@ export class CandidatesComponent implements OnInit {
     
     // Load interviews if already fetched, or fetch them
     this.loadInterviews(app.id);
+    this.loadOfferLetter(app.id);
 
     // Also load employees for interviewer dropdown if not loaded
     if (this.employees().length === 0) {
@@ -361,6 +513,31 @@ export class CandidatesComponent implements OnInit {
   closeDrawer() {
     this.selectedApp.set(null);
     this.offeredSalaryInput.set(null);
+    this.offerLetter.set(null);
+  }
+
+  loadOfferLetter(applicationId: number) {
+    this.candidatesService.getOfferLetter(applicationId).subscribe({
+      next: (letter) => this.offerLetter.set(letter),
+      error: () => this.offerLetter.set(null)
+    });
+  }
+
+  generateOfferLetter() {
+    const app = this.selectedApp();
+    if (!app) return;
+    this.isGeneratingOfferLetter.set(true);
+    this.candidatesService.generateOfferLetter(app.id).subscribe({
+      next: (letter) => {
+        this.offerLetter.set(letter);
+        this.isGeneratingOfferLetter.set(false);
+        this.toast.success('Offer letter generated');
+      },
+      error: (err) => {
+        this.isGeneratingOfferLetter.set(false);
+        this.toast.error(err?.error?.message || 'Failed to generate offer letter');
+      }
+    });
   }
 
   viewAnnexure(applicationId: number) {
@@ -383,6 +560,10 @@ export class CandidatesComponent implements OnInit {
     this.showAnnexureModal.set(false);
     this.annexureData.set(null);
     this.isLoadingAnnexure.set(false);
+  }
+
+  printAnnexure() {
+    window.print();
   }
 
   loadInterviews(appId: number) {
@@ -467,9 +648,14 @@ export class CandidatesComponent implements OnInit {
     if (!app) return;
     
     if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
-      this.pendingStatusChange.set({ id: app.id, status: newStatus });
-      this.offeredSalaryInput.set(null);
-      this.showSalaryPrompt.set(true);
+      this.openSalaryPrompt(app, newStatus);
+      return;
+    }
+
+    if (newStatus === 'REJECTED') {
+      this.pendingRejectId.set(app.id);
+      this.rejectReasonInput.set('');
+      this.showRejectPrompt.set(true);
       return;
     }
 

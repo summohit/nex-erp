@@ -21,26 +21,34 @@ export class ProjectsService {
       throw new BadRequestException(`Project with name "${data.name}" already exists`);
     }
 
-    // Generate base key from name
-    const words = data.name.split(' ').filter((w: string) => w.length > 0);
-    let baseKey = '';
-    if (words.length >= 2) {
-      baseKey = (words[0].substring(0, 2) + words[1][0]).toUpperCase();
-    } else {
-      baseKey = data.name.substring(0, 3).toUpperCase();
+    // Generate new project code format: CES/MMYY/SEQ (e.g., CES/0626/01)
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(-2);
+    const baseKey = `CES/${mm}${yy}/`;
+
+    // Find the highest sequence number for this month
+    const existingProjects = await this.prisma.project.findMany({
+      where: {
+        companyId,
+        key: { startsWith: baseKey }
+      },
+      select: { key: true }
+    });
+
+    let maxSeq = 0;
+    for (const proj of existingProjects) {
+      const parts = proj.key.split('/');
+      if (parts.length === 3) {
+        const seqNum = parseInt(parts[2], 10);
+        if (!isNaN(seqNum) && seqNum > maxSeq) {
+          maxSeq = seqNum;
+        }
+      }
     }
-    
-    // Ensure key uniqueness per company
-    let finalKey = baseKey;
-    let counter = 1;
-    while (true) {
-      const existing = await this.prisma.project.findUnique({
-        where: { key_companyId: { key: finalKey, companyId } }
-      });
-      if (!existing) break;
-      finalKey = `${baseKey}${counter}`;
-      counter++;
-    }
+
+    const nextSeq = String(maxSeq + 1).padStart(2, '0');
+    const finalKey = `${baseKey}${nextSeq}`;
 
     // Create project, member, and default board
     const project = await this.prisma.project.create({
@@ -89,24 +97,32 @@ export class ProjectsService {
   }
 
   async createAiProject(companyId: number, leadId: number, data: any) {
-    const words = data.name.split(' ').filter((w: string) => w.length > 0);
-    let baseKey = '';
-    if (words.length >= 2) {
-      baseKey = (words[0].substring(0, 2) + words[1][0]).toUpperCase();
-    } else {
-      baseKey = data.name.substring(0, 3).toUpperCase();
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(-2);
+    const baseKey = `CES/${mm}${yy}/`;
+
+    const existingProjects = await this.prisma.project.findMany({
+      where: {
+        companyId,
+        key: { startsWith: baseKey }
+      },
+      select: { key: true }
+    });
+
+    let maxSeq = 0;
+    for (const proj of existingProjects) {
+      const parts = proj.key.split('/');
+      if (parts.length === 3) {
+        const seqNum = parseInt(parts[2], 10);
+        if (!isNaN(seqNum) && seqNum > maxSeq) {
+          maxSeq = seqNum;
+        }
+      }
     }
-    
-    let finalKey = baseKey;
-    let counter = 1;
-    while (true) {
-      const existing = await this.prisma.project.findUnique({
-        where: { key_companyId: { key: finalKey, companyId } }
-      });
-      if (!existing) break;
-      finalKey = `${baseKey}${counter}`;
-      counter++;
-    }
+
+    const nextSeq = String(maxSeq + 1).padStart(2, '0');
+    const finalKey = `${baseKey}${nextSeq}`;
 
     try {
       // Create a client automatically using the project name

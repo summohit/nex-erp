@@ -485,6 +485,37 @@
   margin-top: 4px;
 }
 
+.previous-application-banner {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #3730a3;
+}
+
+.previous-application-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.previous-application-actions .btn-outline {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.btn-dismiss {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 5px 8px;
+}
+
 .input-error {
   border-color: #ef4444 !important;
   background-color: #fef2f2 !important;

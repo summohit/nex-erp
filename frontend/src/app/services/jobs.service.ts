@@ -17,8 +17,11 @@ export interface Job {
   status: string; // Open, Draft, Closed
   descriptionHtml?: string;
   screeningQuestions?: string;
+  requiredSkills?: string[];
   minSalary?: number;
   maxSalary?: number;
+  totalOpenings?: number;
+  endDate?: Date;
   companyId: number;
   postedDate?: Date;
   createdAt?: Date;
@@ -43,6 +46,10 @@ export class JobsService {
 
   getJob(id: number): Observable<Job> {
     return this.http.get<Job>(`${this.apiUrl}/${id}`);
+  }
+
+  getJobDetail(id: number): Observable<Job & { totalApplications: number; statusCounts: Record<string, number> }> {
+    return this.http.get<Job & { totalApplications: number; statusCounts: Record<string, number> }>(`${this.apiUrl}/${id}/detail`);
   }
 
   createJob(jobData: any): Observable<Job> {

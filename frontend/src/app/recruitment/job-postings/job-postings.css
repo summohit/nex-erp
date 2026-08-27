@@ -402,56 +402,97 @@ select.form-control:disabled {
 }
 
 /* Screening Questions Section */
-.screening-questions-section {
-  background: #fff;
+/* Enhanced Card Sections (Screening Questions & Required Skills) */
+.enhanced-card-section {
+  background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 18px;
+  border-radius: 14px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  gap: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
 }
 
-.questions-header {
+.section-top-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 14px;
 }
 
-.questions-title-group {
+.header-left-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.section-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.questions-title-group h3 {
+.badge-amber {
+  background: #fff7ed;
+  color: #ea580c;
+  border: 1px solid #fed7aa;
+}
+
+.badge-indigo {
+  background: #eef2ff;
+  color: #4f46e5;
+  border: 1px solid #c7d2fe;
+}
+
+.header-title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.section-heading {
   margin: 0;
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 700;
   color: #0f172a;
+  letter-spacing: -0.01em;
 }
 
-.text-orange {
-  color: #ff5a1f;
+.section-sub-text {
+  margin: 0;
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.4;
 }
 
-.badge-count {
+.count-pill {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pill-amber {
   background: #fff7ed;
   color: #c2410c;
-  border: 1px solid #ffedd5;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
+  border: 1px solid #fed7aa;
 }
 
-.section-help-text {
-  font-size: 12px;
-  color: #64748b;
-  margin: 0;
+.pill-indigo {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
 }
 
+/* Question List & Items */
 .questions-list {
   display: flex;
   flex-direction: column;
@@ -460,18 +501,32 @@ select.form-control:disabled {
 
 .question-item {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  transition: all 0.15s ease;
+}
+
+.question-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .q-num {
   font-weight: 700;
-  color: #ff5a1f;
-  font-size: 13px;
+  color: #ea580c;
+  font-size: 12px;
+  background: #fff7ed;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .q-text {
@@ -479,35 +534,170 @@ select.form-control:disabled {
   font-size: 13px;
   color: #1e293b;
   line-height: 1.4;
+  font-weight: 500;
 }
 
-.btn-icon-danger {
+.btn-item-delete {
   background: transparent;
   border: none;
   color: #94a3b8;
   cursor: pointer;
-  padding: 2px;
-  border-radius: 4px;
+  padding: 4px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
-.btn-icon-danger:hover {
+.btn-item-delete:hover {
   background: #fee2e2;
   color: #ef4444;
 }
 
-.add-question-bar {
+/* Skill Chips */
+.skill-chips-container {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.btn-add-q {
+.modern-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.modern-skill-chip:hover {
+  background: #e0e7ff;
+}
+
+.btn-chip-remove {
+  background: transparent;
+  border: none;
+  color: #6366f1;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.btn-chip-remove:hover {
+  color: #dc2626;
+}
+
+/* Add Entry Row (Inputs & Add Button) */
+.add-entry-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.entry-input {
+  flex: 1;
+  padding: 9px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.entry-input:focus {
+  background: #ffffff;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+
+.btn-entry-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 16px;
+  border-radius: 9px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
   white-space: nowrap;
-  padding: 0 16px !important;
-  height: 42px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+}
+
+.btn-entry-add:hover {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+}
+
+/* Quick Skills Box */
+.quick-skills-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.quick-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.quick-tags-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-quick-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-quick-tag:hover {
+  background: #eef2ff;
+  border-color: #818cf8;
+  color: #4338ca;
+  border-style: solid;
+}
+
+.btn-quick-tag.added {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: default;
+  border-style: solid;
 }
 
 .drawer-footer {

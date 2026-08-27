@@ -12,6 +12,11 @@ export class JobsController {
     return this.jobsService.findAll(req.user.companyId);
   }
 
+  @Get(':id/detail')
+  getJobDetail(@Request() req, @Param('id') id: string) {
+    return this.jobsService.getJobDetail(+id, req.user.companyId);
+  }
+
   @Post()
   create(@Request() req, @Body() data: any) {
     return this.jobsService.create(req.user.companyId, data);

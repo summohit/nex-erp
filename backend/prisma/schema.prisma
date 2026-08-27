@@ -58,6 +58,7 @@ model Company {
   clients             Client[]
   kioskEnabled        Boolean              @default(false)
   payrollSetting      PayrollSetting?
+  systemSetting       SystemSetting?
   baseCurrency        String               @default("USD")
   leads               Lead[]
   quotations          Quotation[]
@@ -65,6 +66,7 @@ model Company {
   fieldVisits         FieldVisit[]         @relation("CompanyFieldVisits")
   leadFollowUps       LeadFollowUp[]
   leadContacts        LeadContact[]
+  offerLetters        OfferLetter[]
 }
 
 // Authentication & RBAC
@@ -760,6 +762,7 @@ model Job {
   discloseSalary     Boolean          @default(false)
   descriptionHtml    String?          @db.Text
   screeningQuestions String?          @db.Text // Store as JSON string or comma-separated
+  requiredSkills     String[]         @default([])
   companyId          Int
   company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   postedDate         DateTime?
@@ -788,18 +791,63 @@ model JobApplication {
   portfolioUrl    String?
   experienceYears String?
   noticePeriod    String?
-  status          String      @default("NEW") // NEW, REVIEWING, SHORTLISTED, REJECTED, HIRED, ONBOARDED
+  skills          String[]      @default([])
+  dateOfBirth     DateTime?
+  gender          String?
+  currentLocation String?
+  currentCtc      Float?
+  expectedCtc     Float?
+  source          String?
+  coverLetter     String?       @db.Text
+  photoUrl        String?
+  address         String?       @db.Text // Full postal address, printed on the offer letter
+  joiningDate     DateTime? // Agreed date of joining, printed on the offer letter
+  status          String        @default("NEW") // NEW, REVIEWING, SHORTLISTED, INTERVIEWING, OFFERED, REJECTED, HIRED, ONBOARDED
+  rejectionReason String?       @db.Text
   offeredSalary   Float?
-  approvalStatus  String?     @default("APPROVED") // PENDING_APPROVAL, APPROVED, REJECTED
-  answers         String?     @db.Text // Store JSON string of answers
+  approvalStatus  String?       @default("APPROVED") // PENDING_APPROVAL, APPROVED, REJECTED
+  answers         String?       @db.Text // Store JSON string of answers
   aiScore         Int?
-  aiSummary       String?     @db.Text
-  isAiScored      Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  aiSummary       String?       @db.Text
+  isAiScored      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   interviews      Interview[]
+  offerLetter     OfferLetter?
+}
 
-  @@unique([jobId, email])
+// A generated offer letter for a hired/offered candidate. v1 uses a single
+// SuperAdmin-managed HTML template (System Settings) rather than a full
+// merge-field engine, matching the payslip PDF generation pattern already
+// used elsewhere in this codebase (Puppeteer + hardcoded HTML template).
+model OfferLetter {
+  id                    Int             @id @default(autoincrement())
+  applicationId         Int             @unique
+  application           JobApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  companyId             Int
+  company               Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  status                String          @default("DRAFT") // DRAFT, SENT, ACCEPTED, DECLINED
+  pdfUrl                String?
+  accessToken           String          @unique // opaque token for the candidate accept/decline link
+  issuedAt              DateTime?
+  respondedAt           DateTime?
+  
+  // E-Signature Fields
+  signatureName         String?
+  signatureIp           String?
+  signatureUserAgent    String?
+  countersignedPdfUrl   String?
+  signatureImage        String?   @db.Text // adopted signature as a data: URI
+  signatureType         String?   // DRAWN | TYPED | UPLOADED
+  initialsImage         String?   @db.Text
+
+  // Signing audit trail
+  unlockedAt            DateTime?
+  viewedAt              DateTime?
+  unlockAttempts        Int       @default(0)
+
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 }
 
 model Interview {
@@ -1893,6 +1941,22 @@ model PayrollSetting {
   updatedAt       DateTime @updatedAt
 }
 
+// SuperAdmin-controlled, company-wide system toggles.
+model SystemSetting {
+  id                             Int      @id @default(autoincrement())
+  companyId                      Int      @unique
+  company                        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shiftRosterVisibleToEmployees  Boolean  @default(false)
+  offerLetterTemplateHtml        String?  @db.Text
+  offerLetterTemplateDocxUrl     String?  // ImageKit URL for the uploaded Word Template
+  // Company legal identity, statutory policy constants and salary-structure ratios
+  // used to render offer letters. Kept as JSON so adding a clause doesn't require a
+  // migration — see OfferLetterConfig in offer-letters.service.ts for the shape.
+  offerLetterConfig              Json?
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
+}
+
 // ═══════════════════════════════════════════
 // SALES & CRM MODULE
 // ═══════════════════════════════════════════
@@ -1959,6 +2023,9 @@ model LeadContact {
   leadsBrought      Lead[]
 }
 
+// A follow-up is a single logged/scheduled interaction on a lead — a running
+// activity note, not a task with a completion workflow. Whether it's "upcoming"
+// or "past" is computed from `scheduledAt` vs now; there is no stored status.
 model LeadFollowUp {
   id            Int       @id @default(autoincrement())
   leadId        Int
@@ -1968,11 +2035,8 @@ model LeadFollowUp {
   contactPhone  String?
   contactEmail  String?
   type          String    @default("CALL") // CALL, MEETING, DEMO, EMAIL, FIELD_VISIT, NOTE, OTHER
-  status        String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
-  scheduledAt   DateTime // Future date & time
-  completedAt   DateTime?
-  notes         String?   @db.Text
-  outcome       String?   @db.Text
+  scheduledAt   DateTime // When this interaction is/was planned
+  notes         String?   @db.Text // Agenda going in, remarks/outcome coming out — one running note
   assignedToId  Int? // Responsible rep
   assignedTo    Employee? @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   companyId     Int

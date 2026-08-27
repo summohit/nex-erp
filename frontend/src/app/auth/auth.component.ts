@@ -1,26 +1,27 @@
-import { Component, inject, ChangeDetectorRef, signal } from '@angular/core';
+import { Component, inject, ChangeDetectorRef, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { LucideEye, LucideEyeOff } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-auth',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, LucideEye, LucideEyeOff],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, LucideEye, LucideEyeOff],
   templateUrl: './auth.component.html',
   styleUrls: ['./auth.component.css']
 })
-export class AuthComponent {
+export class AuthComponent implements OnInit {
   currentView: 'login' | 'register' = 'login';
-  
+
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
   private toast = inject(HotToastService);
   private cdr = inject(ChangeDetectorRef);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   registerForm: FormGroup;
   loginForm: FormGroup;
@@ -46,12 +47,22 @@ export class AuthComponent {
     });
   }
 
+  ngOnInit() {
+    // /login and /signup render this same component; the route decides which view.
+    this.route.data.subscribe(data => {
+      this.currentView = data['view'] === 'register' ? 'register' : 'login';
+      this.apiError = '';
+      this.showPassword = false;
+      this.registerForm.reset();
+      this.loginForm.reset();
+    });
+  }
+
+  // Navigate rather than flip a flag, so the URL always reflects the visible view
+  // (and browser back/forward behaves sensibly). ngOnInit's data subscription
+  // handles the actual view swap and form reset.
   toggleView() {
-    this.currentView = this.currentView === 'login' ? 'register' : 'login';
-    this.apiError = '';
-    this.showPassword = false;
-    this.registerForm.reset();
-    this.loginForm.reset();
+    this.router.navigate([this.currentView === 'login' ? '/signup' : '/login']);
   }
 
   togglePassword() {

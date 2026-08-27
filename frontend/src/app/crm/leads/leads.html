@@ -1,24 +1,52 @@
 <div class="leads-container page-container">
-  <!-- Page Header -->
-  <div class="page-header">
-    <div class="header-title">
-      <h2>CRM Leads Board</h2>
-      <p>Manage your sales pipeline.</p>
+  <!-- Enhanced Page Header Card -->
+  <div class="page-header-card">
+    <div class="header-title-group">
+      <div class="header-title-row">
+        <h1>CRM Leads Board</h1>
+        <span class="leads-count-pill">{{ leads.length }} Deal{{ leads.length === 1 ? '' : 's' }}</span>
+      </div>
+      <p>Manage, track, and convert sales pipeline opportunities</p>
     </div>
     
     <div class="header-actions-group">
-      <div class="pipeline-stat-card">
-        <span class="stat-label">Total Pipeline Value</span>
-        <span class="stat-value">{{getTotalPipelineValue() | currency:'INR'}}</span>
+      <!-- Total Pipeline Value KPI Widget -->
+      <div class="pipeline-kpi-badge">
+        <div class="kpi-icon-circle">
+          <svg lucideTrendingUp size="16"></svg>
+        </div>
+        <div class="kpi-info-col">
+          <span class="kpi-label">Total Pipeline Value</span>
+          <span class="kpi-amount">{{ getTotalPipelineValue() | currency:'INR' }}</span>
+        </div>
       </div>
-      <button class="btn-secondary" style="background: white; border: 1px solid #e5e7eb; color: #374151; font-weight: 500;" (click)="goToFollowUps()">
-        <svg lucideCalendarClock size="16"></svg> View Follow-Ups
+
+      <!-- Lead Insights Button (Admin only) -->
+      <button
+        class="btn-header-insights"
+        *ngIf="auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'SUPERADMIN'"
+        (click)="goToLeadsDashboard()"
+        title="View AI & Pipeline Analytics">
+        <svg lucideSparkles size="15"></svg>
+        <span>Lead Insights</span>
       </button>
-      <button class="btn-secondary" style="background: white; border: 1px solid #e5e7eb; color: #374151; font-weight: 500;" (click)="openLeadContactModal()">
-        <svg lucideUserCheck size="16"></svg> Lead Contact
+
+      <!-- View Follow-Ups Button -->
+      <button class="btn-header-secondary" (click)="goToFollowUps()" title="View Scheduled Follow-ups & Reminders">
+        <svg lucideCalendarClock size="15"></svg>
+        <span>View Follow-Ups</span>
       </button>
-      <button class="btn-primary" (click)="openModal()">
-        <svg lucidePlus size="16"></svg> New Lead
+
+      <!-- Lead Contact Button -->
+      <button class="btn-header-secondary" (click)="openLeadContactModal()" title="Add / Manage External Lead Contact">
+        <svg lucideUserCheck size="15"></svg>
+        <span>Lead Contact</span>
+      </button>
+
+      <!-- New Lead Button (Primary) -->
+      <button class="btn-header-primary" (click)="openModal()" title="Create New Lead Opportunity">
+        <svg lucidePlus size="16"></svg>
+        <span>New Lead</span>
       </button>
     </div>
   </div>
@@ -37,42 +65,402 @@
   <ng-container *ngIf="activeMainTab === 'leads'">
 
   <!-- Filter & Search Bar -->
-  <div class="filter-bar-card">
-    <div class="search-input-wrapper">
-      <svg lucideSearch size="16" class="search-icon"></svg>
-      <input
-        type="text"
-        [(ngModel)]="searchQuery"
-        (ngModelChange)="onFilterChange()"
-        placeholder="Search leads by title, company, contact or email..."
-      />
-      <button class="btn-clear" *ngIf="searchQuery" (click)="searchQuery = ''; onFilterChange()">
-        <svg lucideX size="14"></svg>
-      </button>
+  <div class="filter-bar-card filter-bar-card-wrap">
+    <div class="filter-bar-main-row">
+      <!-- Search Input -->
+      <div class="search-input-wrapper">
+        <svg lucideSearch size="16" class="search-icon"></svg>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          (ngModelChange)="onFilterChange()"
+          placeholder="Search by name, email, mobile or company..."
+        />
+        <button class="btn-clear" *ngIf="searchQuery" (click)="searchQuery = ''; onFilterChange()" title="Clear search">
+          <svg lucideX size="14"></svg>
+        </button>
+      </div>
+
+      <div class="filter-controls">
+        <!-- VIEW TOGGLE -->
+        <div class="view-toggle">
+          <button [class.active]="viewMode === 'kanban'" (click)="viewMode = 'kanban'" title="Kanban Board View">
+            <svg lucideLayoutGrid size="15"></svg>
+            <span>Kanban</span>
+          </button>
+          <button [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table List View">
+            <svg lucideList size="15"></svg>
+            <span>Table</span>
+          </button>
+        </div>
+
+        <!-- SORT -->
+        <div class="custom-select-wrapper sort-select-wrapper">
+          <svg lucideArrowUpDown size="14" class="select-prefix-icon"></svg>
+          <select [(ngModel)]="sortBy" (change)="onFilterChange()" title="Sort leads">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="value_desc">Highest Value</option>
+            <option value="value_asc">Lowest Value</option>
+            <option value="closing_soon">Closing Soonest</option>
+          </select>
+          <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+        </div>
+
+        <!-- ADVANCED FILTERS TOGGLE BUTTON -->
+        <button class="btn-advanced-filters-toggle" [class.active]="showAdvancedFilters" (click)="showAdvancedFilters = !showAdvancedFilters">
+          <svg lucideFilter size="14"></svg>
+          <span>Filters</span>
+          <span class="filter-count-badge" *ngIf="hasActiveFilters()">{{ getActiveFilterChips().length }}</span>
+          <svg lucideChevronDown size="14" class="toggle-chevron" [class.rotated-180]="showAdvancedFilters"></svg>
+        </button>
+
+        <!-- RESET FILTERS BUTTON -->
+        <button class="btn-reset-filters" *ngIf="hasActiveFilters()" (click)="clearFilters()" title="Reset all filters">
+          <svg lucideRotateCcw size="13"></svg>
+          <span>Reset</span>
+        </button>
+      </div>
     </div>
 
-    <div class="filter-controls">
-      <!-- VIEW TOGGLE -->
-      <div class="view-toggle">
-        <button [class.active]="viewMode === 'kanban'" (click)="viewMode = 'kanban'" title="Kanban View">
-          <svg lucideLayoutGrid size="16"></svg>
-        </button>
-        <button [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table View">
-          <svg lucideList size="16"></svg>
+    <!-- Advanced Filters Panel -->
+    <div class="advanced-filters-panel" *ngIf="showAdvancedFilters">
+      <div class="adv-filters-header">
+        <div class="adv-filters-header-left">
+          <svg lucideSlidersHorizontal size="14" class="text-orange"></svg>
+          <span class="adv-title">Filter Pipeline</span>
+          <span class="adv-subtitle" *ngIf="hasActiveFilters()">({{ getActiveFilterChips().length }} active)</span>
+        </div>
+        <button type="button" class="adv-clear-all-btn" *ngIf="hasActiveFilters()" (click)="clearFilters()">
+          <svg lucideRotateCcw size="12"></svg> Clear all filters
         </button>
       </div>
 
-      <div class="filter-dropdown">
-        <svg lucideFilter size="14" class="filter-icon"></svg>
-        <select [(ngModel)]="selectedStage" (change)="onFilterChange()">
-          <option value="ALL">All Stages</option>
-          <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
-        </select>
-      </div>
+      <div class="adv-filters-grid">
+        <!-- 1. Stage (multi-select with search) -->
+        <div class="adv-filter-item">
+          <label><svg lucideLayers size="13"></svg> Stage</label>
+          <div class="searchable-filter-dropdown">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedStages.length > 0" (click)="showStageDropdown = !showStageDropdown; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
+              <span class="trigger-text">{{ selectedStages.length === 0 ? 'All Stages' : (selectedStages.length + ' selected') }}</span>
+              <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showStageDropdown"></svg>
+            </button>
+            <div class="filter-dropdown-popover" *ngIf="showStageDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch size="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search stages..." [(ngModel)]="stageSearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="stageSearchQuery" (click)="stageSearchQuery = ''"><svg lucideX size="11"></svg></button>
+              </div>
+              <div class="popover-header-actions">
+                <span>{{ selectedStages.length }} of {{ LEAD_STATUSES.length }} Selected</span>
+                <button type="button" class="popover-clear-btn" *ngIf="selectedStages.length > 0" (click)="clearStages()">Clear</button>
+              </div>
+              <div class="popover-options-scroll">
+                <label class="popover-option-item checkbox-item" *ngFor="let status of getFilteredStages()" [class.checked]="isStageSelected(status)">
+                  <input type="checkbox" [checked]="isStageSelected(status)" (change)="toggleStage(status)" />
+                  <span class="option-label">{{ status }}</span>
+                </label>
+                <div class="popover-empty" *ngIf="getFilteredStages().length === 0">
+                  No stages match "{{ stageSearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showStageDropdown" (click)="showStageDropdown = false"></div>
+          </div>
+        </div>
 
-      <button class="btn-reset-filters" *ngIf="searchQuery || selectedStage !== 'ALL'" (click)="clearFilters()">
-        Reset Filters
-      </button>
+        <!-- 2. Sales Rep (searchable) -->
+        <div class="adv-filter-item">
+          <label><svg lucideUser size="13"></svg> Sales Rep</label>
+          <div class="searchable-filter-dropdown">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedRepId !== 'ALL'" (click)="showRepDropdown = !showRepDropdown; showStageDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
+              <span class="trigger-text">{{ getSelectedRepLabel() }}</span>
+              <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showRepDropdown"></svg>
+            </button>
+            <div class="filter-dropdown-popover" *ngIf="showRepDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch size="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search sales reps..." [(ngModel)]="repSearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="repSearchQuery" (click)="repSearchQuery = ''"><svg lucideX size="11"></svg></button>
+              </div>
+              <div class="popover-options-scroll">
+                <div class="popover-option-item" (click)="selectRepFilter('ALL')" [class.selected]="selectedRepId === 'ALL'">
+                  <div class="option-avatar-circle neutral">ALL</div>
+                  <div class="option-details">
+                    <span class="option-primary">All Reps</span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedRepId === 'ALL'"></svg>
+                </div>
+                <div class="popover-option-item" (click)="selectRepFilter('UNASSIGNED')" [class.selected]="selectedRepId === 'UNASSIGNED'">
+                  <div class="option-avatar-circle neutral"><svg lucideUser size="12"></svg></div>
+                  <div class="option-details">
+                    <span class="option-primary">Unassigned</span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedRepId === 'UNASSIGNED'"></svg>
+                </div>
+                <div class="popover-option-item" *ngFor="let emp of getFilteredRepsForFilter()" (click)="selectRepFilter(emp.id)" [class.selected]="selectedRepId === emp.id">
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="option-avatar-img" />
+                  <div class="option-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{ emp.firstName ? emp.firstName[0] : '' }}{{ emp.lastName ? emp.lastName[0] : '' }}
+                  </div>
+                  <div class="option-details">
+                    <span class="option-primary">{{ emp.firstName }} {{ emp.lastName }}</span>
+                    <span class="option-secondary" *ngIf="emp.department?.name || emp.designation?.name">
+                      {{ emp.designation?.name || emp.department?.name }}
+                    </span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedRepId === emp.id"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredRepsForFilter().length === 0">
+                  No reps match "{{ repSearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showRepDropdown" (click)="showRepDropdown = false"></div>
+          </div>
+        </div>
+
+        <!-- 3. Deal Category (searchable) -->
+        <div class="adv-filter-item">
+          <label><svg lucideTag size="13"></svg> Deal Category</label>
+          <div class="searchable-filter-dropdown">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedCategory !== 'ALL'" (click)="showCategoryDropdown = !showCategoryDropdown; showStageDropdown=false; showRepDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
+              <span class="trigger-text">{{ getSelectedCategoryLabel() }}</span>
+              <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showCategoryDropdown"></svg>
+            </button>
+            <div class="filter-dropdown-popover" *ngIf="showCategoryDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch size="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search categories..." [(ngModel)]="categorySearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="categorySearchQuery" (click)="categorySearchQuery = ''"><svg lucideX size="11"></svg></button>
+              </div>
+              <div class="popover-options-scroll">
+                <div class="popover-option-item" (click)="selectCategoryFilter('ALL')" [class.selected]="selectedCategory === 'ALL'">
+                  <span class="option-primary">All Categories</span>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedCategory === 'ALL'"></svg>
+                </div>
+                <div class="popover-option-item" *ngFor="let cat of getFilteredCategoriesForFilter()" (click)="selectCategoryFilter(cat.id)" [class.selected]="selectedCategory === cat.id">
+                  <span class="option-primary">{{ cat.name }}</span>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedCategory === cat.id"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredCategoriesForFilter().length === 0">
+                  No categories match "{{ categorySearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showCategoryDropdown" (click)="showCategoryDropdown = false"></div>
+          </div>
+        </div>
+
+        <!-- 4. Lead Source (searchable) -->
+        <div class="adv-filter-item">
+          <label><svg lucideGlobe size="13"></svg> Lead Source</label>
+          <div class="searchable-filter-dropdown">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedSource !== 'ALL'" (click)="showSourceDropdown = !showSourceDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
+              <span class="trigger-text">{{ getSelectedSourceLabel() }}</span>
+              <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showSourceDropdown"></svg>
+            </button>
+            <div class="filter-dropdown-popover" *ngIf="showSourceDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch size="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search sources..." [(ngModel)]="sourceSearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="sourceSearchQuery" (click)="sourceSearchQuery = ''"><svg lucideX size="11"></svg></button>
+              </div>
+              <div class="popover-options-scroll">
+                <div class="popover-option-item" (click)="selectSourceFilter('ALL')" [class.selected]="selectedSource === 'ALL'">
+                  <span class="option-primary">All Sources</span>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedSource === 'ALL'"></svg>
+                </div>
+                <div class="popover-option-item" *ngFor="let src of getFilteredSourcesForFilter()" (click)="selectSourceFilter(src)" [class.selected]="selectedSource === src">
+                  <span class="option-primary">{{ src }}</span>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedSource === src"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredSourcesForFilter().length === 0">
+                  No sources match "{{ sourceSearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showSourceDropdown" (click)="showSourceDropdown = false"></div>
+          </div>
+        </div>
+
+        <!-- 5. Lead Contact (searchable) -->
+        <div class="adv-filter-item">
+          <label><svg lucideUserCheck size="13"></svg> Lead Contact</label>
+          <div class="searchable-filter-dropdown">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedContactId !== 'ALL'" (click)="showContactDropdown = !showContactDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showAddedByDropdown=false">
+              <span class="trigger-text">{{ getSelectedContactLabel() }}</span>
+              <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showContactDropdown"></svg>
+            </button>
+            <div class="filter-dropdown-popover" *ngIf="showContactDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch size="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search name, company, email..." [(ngModel)]="contactFilterSearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="contactFilterSearchQuery" (click)="contactFilterSearchQuery = ''"><svg lucideX size="11"></svg></button>
+              </div>
+              <div class="popover-options-scroll">
+                <div class="popover-option-item" (click)="selectContactFilter('ALL')" [class.selected]="selectedContactId === 'ALL'">
+                  <div class="option-details">
+                    <span class="option-primary">All Contacts</span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedContactId === 'ALL'"></svg>
+                </div>
+                <div class="popover-option-item" *ngFor="let c of getFilteredContactsForFilter()" (click)="selectContactFilter(c.id)" [class.selected]="selectedContactId === c.id">
+                  <div class="option-avatar-circle" style="background: #e0e7ff; color: #4338ca;">
+                    {{ c.name ? c.name[0] : 'C' }}
+                  </div>
+                  <div class="option-details">
+                    <span class="option-primary">{{ c.name }}</span>
+                    <span class="option-secondary" *ngIf="c.companyName || c.email">
+                      {{ c.companyName || c.email }}
+                    </span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedContactId === c.id"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredContactsForFilter().length === 0">
+                  No contacts match "{{ contactFilterSearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showContactDropdown" (click)="showContactDropdown = false"></div>
+          </div>
+        </div>
+
+        <!-- 6. Added By (searchable) -->
+        <div class="adv-filter-item">
+          <label><svg lucideUserCheck size="13"></svg> Added By</label>
+          <div class="searchable-filter-dropdown">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedAddedById !== 'ALL'" (click)="showAddedByDropdown = !showAddedByDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false">
+              <span class="trigger-text">{{ getSelectedAddedByLabel() }}</span>
+              <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showAddedByDropdown"></svg>
+            </button>
+            <div class="filter-dropdown-popover" *ngIf="showAddedByDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch size="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search employees..." [(ngModel)]="addedByFilterSearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="addedByFilterSearchQuery" (click)="addedByFilterSearchQuery = ''"><svg lucideX size="11"></svg></button>
+              </div>
+              <div class="popover-options-scroll">
+                <div class="popover-option-item" (click)="selectAddedByFilter('ALL')" [class.selected]="selectedAddedById === 'ALL'">
+                  <div class="option-avatar-circle neutral">ALL</div>
+                  <div class="option-details">
+                    <span class="option-primary">All</span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedAddedById === 'ALL'"></svg>
+                </div>
+                <div class="popover-option-item" *ngFor="let emp of getFilteredAddedByForFilter()" (click)="selectAddedByFilter(emp.id)" [class.selected]="selectedAddedById === emp.id">
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="option-avatar-img" />
+                  <div class="option-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{ emp.firstName ? emp.firstName[0] : '' }}{{ emp.lastName ? emp.lastName[0] : '' }}
+                  </div>
+                  <div class="option-details">
+                    <span class="option-primary">{{ emp.firstName }} {{ emp.lastName }}</span>
+                    <span class="option-secondary" *ngIf="emp.department?.name || emp.designation?.name">
+                      {{ emp.designation?.name || emp.department?.name }}
+                    </span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedAddedById === emp.id"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredAddedByForFilter().length === 0">
+                  No employees match "{{ addedByFilterSearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showAddedByDropdown" (click)="showAddedByDropdown = false"></div>
+          </div>
+        </div>
+
+        <!-- 7. Quotation Status -->
+        <div class="adv-filter-item">
+          <label><svg lucideFileText size="13"></svg> Quotation Status</label>
+          <div class="custom-select-wrapper">
+            <select [(ngModel)]="selectedQuotationStatus" (change)="onFilterChange()" [class.has-selection]="selectedQuotationStatus !== 'ALL'">
+              <option value="ALL">All</option>
+              <option value="QUOTED">Quoted</option>
+              <option value="NOT_QUOTED">Not Quoted</option>
+            </select>
+            <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+          </div>
+        </div>
+
+        <!-- 8. Follow-Up Status -->
+        <div class="adv-filter-item">
+          <label><svg lucideCalendarClock size="13"></svg> Follow-Up Status</label>
+          <div class="custom-select-wrapper">
+            <select [(ngModel)]="selectedFollowUpStatus" (change)="onFilterChange()" [class.has-selection]="selectedFollowUpStatus !== 'ALL'">
+              <option value="ALL">All</option>
+              <option value="OVERDUE">Overdue</option>
+              <option value="SCHEDULED">Scheduled</option>
+              <option value="NONE">No Follow-Up</option>
+            </select>
+            <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+          </div>
+        </div>
+
+        <!-- 9. Deal Value Range -->
+        <div class="adv-filter-item value-range-item">
+          <label><svg lucideIndianRupee size="13"></svg> Deal Value (₹)</label>
+          <div class="value-range-inputs">
+            <div class="value-input-box">
+              <span class="curr-prefix">₹</span>
+              <input type="number" min="0" placeholder="Min" [(ngModel)]="minValue" (ngModelChange)="onFilterChange()" />
+            </div>
+            <span class="range-sep">—</span>
+            <div class="value-input-box">
+              <span class="curr-prefix">₹</span>
+              <input type="number" min="0" placeholder="Max" [(ngModel)]="maxValue" (ngModelChange)="onFilterChange()" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. Date Filter -->
+        <div class="adv-filter-item date-filter-item">
+          <label><svg lucideCalendar size="13"></svg> Date Filter</label>
+          <div class="date-filter-row">
+            <div class="custom-select-wrapper date-field-select">
+              <select [(ngModel)]="dateField" (change)="onFilterChange()">
+                <option value="createdAt">Created Date</option>
+                <option value="expectedCloseDate">Expected Close</option>
+              </select>
+              <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+            </div>
+            <div class="custom-select-wrapper date-preset-select">
+              <select [(ngModel)]="datePreset" (change)="onFilterChange()" [class.has-selection]="datePreset !== 'ALL'">
+                <option value="ALL">Any Time</option>
+                <option value="TODAY">Today</option>
+                <option value="THIS_WEEK">This Week</option>
+                <option value="THIS_MONTH">This Month</option>
+                <option value="NEXT_MONTH">Next Month</option>
+                <option value="THIS_QUARTER">This Quarter</option>
+                <option value="CUSTOM">Custom Range</option>
+              </select>
+              <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+            </div>
+          </div>
+          <div class="custom-date-range" *ngIf="datePreset === 'CUSTOM'">
+            <input type="date" [(ngModel)]="dateStart" (ngModelChange)="onFilterChange()" />
+            <span class="date-sep">to</span>
+            <input type="date" [(ngModel)]="dateEnd" (ngModelChange)="onFilterChange()" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Filter Chips -->
+    <div class="active-filter-chips" *ngIf="hasActiveFilters()">
+      <div class="chips-title">
+        <svg lucideFilter size="12"></svg>
+        <span>Active Filters:</span>
+      </div>
+      <div class="filter-chips-list">
+        <span class="filter-chip" *ngFor="let chip of getActiveFilterChips()">
+          <span class="chip-text">{{ chip.label }}</span>
+          <button type="button" class="chip-remove-btn" (click)="chip.clear()" title="Remove filter">
+            <svg lucideX size="11"></svg>
+          </button>
+        </span>
+      </div>
+      <button type="button" class="btn-clear-all-chips" (click)="clearFilters()">Reset All</button>
     </div>
   </div>
 
@@ -192,7 +580,7 @@
           <ng-container *ngTemplateOutlet="skeletonLoader"></ng-container>
         </ng-container>
         <ng-container *ngIf="!isLoading">
-          <div class="kanban-card" [ngClass]="'card-accent-' + col.id.toLowerCase().replace(' ', '-')" *ngFor="let lead of col.leads" cdkDrag>
+          <div class="kanban-card" [id]="'lead-card-' + lead.id" [ngClass]="'card-accent-' + col.id.toLowerCase().replace(' ', '-')" [class.card-just-created]="highlightedLeadId === lead.id" *ngFor="let lead of col.leads" cdkDrag>
             <div class="card-drag-handle" title="Drag to reorder/move">
               <svg lucideGripVertical size="14"></svg>
             </div>
@@ -238,10 +626,10 @@
               <div class="card-footer-row">
                 <span class="value-badge">{{lead.value | currency:lead.currency||'INR'}}</span>
                 <div class="card-footer-right">
-                  <div class="card-owner-avatar" *ngIf="lead.assignedTo" [title]="'Owner: ' + lead.assignedTo?.firstName + ' ' + lead.assignedTo?.lastName">
-                    <img *ngIf="lead.assignedTo?.avatarUrl" [src]="lead.assignedTo?.avatarUrl" class="card-avatar-img" />
-                    <span *ngIf="!lead.assignedTo?.avatarUrl" class="card-avatar-circle">
-                      {{lead.assignedTo?.firstName?.[0] || ''}}{{lead.assignedTo?.lastName?.[0] || ''}}
+                  <div class="card-owner-avatar" *ngIf="lead.assignedTo" [title]="'Owner: ' + lead.assignedTo.firstName + ' ' + lead.assignedTo.lastName">
+                    <img *ngIf="lead.assignedTo.avatarUrl" [src]="lead.assignedTo.avatarUrl" class="card-avatar-img" />
+                    <span *ngIf="!lead.assignedTo.avatarUrl" class="card-avatar-circle">
+                      {{lead.assignedTo.firstName[0] || ''}}{{lead.assignedTo.lastName[0] || ''}}
                     </span>
                   </div>
                   <button class="btn-view-details" (click)="openDetailModal(lead)">
@@ -274,11 +662,11 @@
         <ng-container *ngIf="isLoading">
           <tr><td colspan="7" style="text-align: center; padding: 20px;">Loading leads...</td></tr>
         </ng-container>
-        <ng-container *ngIf="!isLoading && leads.length === 0">
-          <tr><td colspan="7" style="text-align: center; padding: 20px;">No leads found.</td></tr>
+        <ng-container *ngIf="!isLoading && getFilteredLeads().length === 0">
+          <tr><td colspan="7" style="text-align: center; padding: 20px;">No leads match your filters.</td></tr>
         </ng-container>
         <ng-container *ngIf="!isLoading">
-          <tr *ngFor="let lead of leads">
+          <tr *ngFor="let lead of getFilteredLeads()">
             <td>
               <div style="font-weight: 600; color: #0f172a;">{{lead.title}}</div>
               <div style="display: flex; gap: 6px; align-items: center; margin-top: 3px;" *ngIf="lead.dealCategory">
@@ -290,13 +678,13 @@
             <td>{{lead.companyName || '-'}}</td>
             <td>
               <div class="table-user-cell" *ngIf="lead.assignedTo">
-                <img *ngIf="lead.assignedTo?.avatarUrl" [src]="lead.assignedTo?.avatarUrl" class="table-avatar-img" />
-                <div *ngIf="!lead.assignedTo?.avatarUrl" class="table-avatar-circle">
-                  {{lead.assignedTo?.firstName?.[0] || ''}}{{lead.assignedTo?.lastName?.[0] || ''}}
+                <img *ngIf="lead.assignedTo.avatarUrl" [src]="lead.assignedTo.avatarUrl" class="table-avatar-img" />
+                <div *ngIf="!lead.assignedTo.avatarUrl" class="table-avatar-circle">
+                  {{lead.assignedTo.firstName[0] || ''}}{{lead.assignedTo.lastName[0] || ''}}
                 </div>
                 <div class="table-user-info">
-                  <span class="table-user-name">{{lead.assignedTo?.firstName}} {{lead.assignedTo?.lastName}}</span>
-                  <span class="table-user-sub" *ngIf="lead.assignedTo?.designation?.name">{{lead.assignedTo?.designation?.name}}</span>
+                  <span class="table-user-name">{{lead.assignedTo.firstName}} {{lead.assignedTo.lastName}}</span>
+                  <span class="table-user-sub" *ngIf="lead.assignedTo.designation?.name">{{lead.assignedTo.designation?.name}}</span>
                 </div>
               </div>
               <span *ngIf="!lead.assignedTo" class="unassigned-text">Unassigned</span>
@@ -649,14 +1037,14 @@
           <div class="ldm-owner-col">
             <span class="ldm-info-label">Lead Owner</span>
             <div class="ldm-owner-card" *ngIf="selectedLead.assignedTo">
-              <div class="owner-avatar-circle" *ngIf="!selectedLead.assignedTo?.avatarUrl">
-                {{selectedLead.assignedTo?.firstName?.[0] || ''}}{{selectedLead.assignedTo?.lastName?.[0] || ''}}
+              <div class="owner-avatar-circle" *ngIf="!selectedLead.assignedTo.avatarUrl">
+                {{selectedLead.assignedTo.firstName[0] || ''}}{{selectedLead.assignedTo.lastName[0] || ''}}
               </div>
-              <img *ngIf="selectedLead.assignedTo?.avatarUrl" [src]="selectedLead.assignedTo?.avatarUrl" class="owner-avatar-img" />
+              <img *ngIf="selectedLead.assignedTo.avatarUrl" [src]="selectedLead.assignedTo.avatarUrl" class="owner-avatar-img" />
               <div class="owner-info-text">
-                <span class="owner-name">{{selectedLead.assignedTo?.firstName}} {{selectedLead.assignedTo?.lastName}}</span>
-                <span class="owner-designation" *ngIf="selectedLead.assignedTo?.designation?.name">{{selectedLead.assignedTo?.designation?.name}}</span>
-                <span class="owner-designation" *ngIf="!selectedLead.assignedTo?.designation?.name">Lead Owner</span>
+                <span class="owner-name">{{selectedLead.assignedTo.firstName}} {{selectedLead.assignedTo.lastName}}</span>
+                <span class="owner-designation" *ngIf="selectedLead.assignedTo.designation?.name">{{selectedLead.assignedTo.designation?.name}}</span>
+                <span class="owner-designation" *ngIf="!selectedLead.assignedTo.designation?.name">Lead Owner</span>
               </div>
             </div>
             <div *ngIf="!selectedLead.assignedTo" class="unassigned-text">Unassigned</div>
@@ -668,13 +1056,13 @@
 
             <!-- Employee / Team Member -->
             <div class="ldm-owner-card" *ngIf="selectedLead.addedBy">
-              <div class="owner-avatar-circle" *ngIf="!selectedLead.addedBy?.avatarUrl">
-                {{selectedLead.addedBy?.firstName?.[0] || ''}}{{selectedLead.addedBy?.lastName?.[0] || ''}}
+              <div class="owner-avatar-circle" *ngIf="!selectedLead.addedBy.avatarUrl">
+                {{selectedLead.addedBy.firstName[0] || ''}}{{selectedLead.addedBy.lastName[0] || ''}}
               </div>
-              <img *ngIf="selectedLead.addedBy?.avatarUrl" [src]="selectedLead.addedBy?.avatarUrl" class="owner-avatar-img" alt="Creator Avatar" />
+              <img *ngIf="selectedLead.addedBy.avatarUrl" [src]="selectedLead.addedBy.avatarUrl" class="owner-avatar-img" alt="Creator Avatar" />
               <div class="owner-info-text">
-                <span class="owner-name">{{selectedLead.addedBy?.firstName}} {{selectedLead.addedBy?.lastName}}</span>
-                <span class="owner-designation">{{selectedLead.addedBy?.designation?.name || selectedLead.addedBy?.department?.name || 'Team Member'}}</span>
+                <span class="owner-name">{{selectedLead.addedBy.firstName}} {{selectedLead.addedBy.lastName}}</span>
+                <span class="owner-designation">{{selectedLead.addedBy.designation?.name || selectedLead.addedBy.department?.name || 'Team Member'}}</span>
               </div>
             </div>
 
@@ -1478,89 +1866,36 @@
         </div>
 
         <!-- Future Date & Time Schedule -->
-        <div class="form-row">
-          <div class="form-group" style="flex: 1.2;">
-            <label>Scheduled Date & Time (Future) <span class="required-asterisk">*</span></label>
-            <input type="datetime-local" [(ngModel)]="newFollowUp.scheduledAt" [disabled]="isSavingFollowUp" class="fum-datetime-input" />
-            <!-- Quick preset chips -->
-            <div class="fum-presets">
-              <span class="preset-label">Quick Set:</span>
-              <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('today_afternoon')">Today 3 PM</button>
-              <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('tomorrow_morning')">Tomorrow 10 AM</button>
-              <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('in_2_days')">In 2 Days</button>
-              <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('next_week')">Next Week</button>
-            </div>
+        <div class="form-group">
+          <label>Scheduled Date & Time (Future) <span class="required-asterisk">*</span></label>
+          <input type="datetime-local" [(ngModel)]="newFollowUp.scheduledAt" [disabled]="isSavingFollowUp" class="fum-datetime-input" />
+          <!-- Quick preset chips -->
+          <div class="fum-presets">
+            <span class="preset-label">Quick Set:</span>
+            <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('today_afternoon')">Today 3 PM</button>
+            <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('tomorrow_morning')">Tomorrow 10 AM</button>
+            <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('in_2_days')">In 2 Days</button>
+            <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('next_week')">Next Week</button>
           </div>
+        </div>
 
-          <!-- Internal Responsible Rep -->
-          <div class="form-group custom-select-group" style="flex: 1;">
-            <label>Assigned Sales Rep</label>
-            <div 
-              class="owner-select-trigger" 
-              (click)="showFollowUpOwnerDropdown = !showFollowUpOwnerDropdown"
-              [class.active]="showFollowUpOwnerDropdown"
-            >
-              <div *ngIf="getSelectedFollowUpOwner() as owner" class="selected-owner-display">
-                <div class="owner-avatar-circle" *ngIf="!owner.avatarUrl">
-                  {{owner.firstName ? owner.firstName[0] : ''}}{{owner.lastName ? owner.lastName[0] : ''}}
-                </div>
-                <img *ngIf="owner.avatarUrl" [src]="owner.avatarUrl" class="owner-avatar-img" />
-                <div class="owner-info-text">
-                  <span class="owner-name">{{owner.firstName}} {{owner.lastName}}</span>
-                  <span class="owner-designation" *ngIf="owner.designation?.name">{{owner.designation?.name}}</span>
-                </div>
-              </div>
-              <div *ngIf="!getSelectedFollowUpOwner()" class="unassigned-placeholder">
-                <div class="owner-avatar-circle unassigned-avatar">
-                  <svg lucideUser size="14"></svg>
-                </div>
-                <span class="placeholder-text">Select Rep...</span>
-                <svg lucideChevronDown size="16" class="chevron-icon"></svg>
-              </div>
-            </div>
-
-            <!-- Dropdown Menu -->
-            <div class="owner-dropdown-menu" *ngIf="showFollowUpOwnerDropdown">
-              <div class="owner-search-box">
-                <svg lucideSearch size="14" class="owner-search-icon"></svg>
-                <input 
-                  type="text" 
-                  placeholder="Search team member..." 
-                  [(ngModel)]="followUpOwnerSearchQuery"
-                  (click)="$event.stopPropagation()"
-                />
-              </div>
-              <div class="owner-list-scroll">
-                <div 
-                  class="owner-item" 
-                  *ngFor="let emp of getFilteredFollowUpEmployees()" 
-                  (click)="selectFollowUpOwner(emp)"
-                  [class.selected]="newFollowUp.assignedToId === emp.id"
-                >
-                  <div class="owner-avatar-circle" *ngIf="!emp.avatarUrl">
-                    {{emp.firstName ? emp.firstName[0] : ''}}{{emp.lastName ? emp.lastName[0] : ''}}
-                  </div>
-                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="owner-avatar-img" />
-                  <div class="owner-item-details">
-                    <span class="owner-item-name">{{emp.firstName}} {{emp.lastName}}</span>
-                    <span class="owner-designation" *ngIf="emp.designation?.name">
-  {{emp.designation?.name}}
-  <span *ngIf="emp.department?.name" style="opacity: 0.75; font-size: 0.95em;">({{emp.department?.name}})</span>
-</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <!-- Previous follow-up note, for continuity -->
+        <div class="fum-section-box" *ngIf="getPreviousFollowUpNote() as prev" style="background:#f8fafc;">
+          <div class="fum-section-header">
+            <svg lucideHistory size="14" style="color: #64748b;"></svg>
+            <span>Last Follow-Up ({{ prev.scheduledAt | date:'d MMM, h:mm a' }})</span>
           </div>
+          <p style="margin: 6px 0 0 0; font-size: 13px; color: #475569;" *ngIf="prev.notes">{{ prev.notes }}</p>
+          <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; font-style: italic;" *ngIf="!prev.notes">No notes were recorded.</p>
         </div>
 
         <!-- Notes / Agenda -->
         <div class="form-group" style="margin-bottom: 0;">
           <label>Agenda / Discussion Points & Notes</label>
-          <textarea 
-            [(ngModel)]="newFollowUp.notes" 
-            placeholder="Outline key discussion points, questions to ask, or proposal items to clarify..." 
-            rows="3" 
+          <textarea
+            [(ngModel)]="newFollowUp.notes"
+            placeholder="Outline key discussion points, questions to ask, or proposal items to clarify..."
+            rows="3"
             [disabled]="isSavingFollowUp"
           ></textarea>
         </div>
@@ -1568,31 +1903,6 @@
 
       <!-- TAB 2: FOLLOW-UP TIMELINE & HISTORY -->
       <div *ngIf="followUpTab === 'history'" class="fum-history-view">
-        <!-- Outcome Dialog if Completing -->
-        <div class="fum-outcome-card" *ngIf="completingFollowUp">
-          <div class="fum-outcome-header">
-            <h4>Complete Follow-Up: <span>{{completingFollowUp.title}}</span></h4>
-            <button class="btn-icon-close" (click)="cancelCompleteFollowUp()"><svg lucideX size="16"></svg></button>
-          </div>
-          <div class="form-group">
-            <label>Outcome / Meeting Summary & Next Actions</label>
-            <textarea 
-              [(ngModel)]="outcomeText" 
-              placeholder="What was discussed? Did the client agree to the proposal? Any next steps required?" 
-              rows="3"
-            ></textarea>
-          </div>
-          <div class="fum-outcome-actions">
-            <button type="button" class="btn-secondary" (click)="cancelCompleteFollowUp()">Cancel</button>
-            <button type="button" class="btn-cancel-status" (click)="submitFollowUpOutcome('CANCELLED')" [disabled]="isSavingOutcome">
-              Mark Cancelled
-            </button>
-            <button type="button" class="btn-complete-status" (click)="submitFollowUpOutcome('COMPLETED')" [disabled]="isSavingOutcome">
-              <svg lucideCheck size="14"></svg> Mark as Completed
-            </button>
-          </div>
-        </div>
-
         <!-- Loading State -->
         <div *ngIf="isLoadingFollowUps" class="fum-loading-state">
           <svg lucideLoader2 size="24" class="spin-icon"></svg>
@@ -1613,20 +1923,19 @@
 
         <!-- Follow-Ups List -->
         <div *ngIf="!isLoadingFollowUps && leadFollowUps.length > 0" class="fum-timeline">
-          <!-- Pending / Upcoming Items -->
-          <div class="fum-timeline-group" *ngIf="getPendingFollowUps().length > 0">
+          <!-- Upcoming Items -->
+          <div class="fum-timeline-group" *ngIf="getUpcomingFollowUps().length > 0">
             <div class="fum-group-title">
-              <span class="group-dot dot-orange"></span> Upcoming / Scheduled Follow-Ups ({{getPendingFollowUps().length}})
+              <span class="group-dot dot-orange"></span> Upcoming Follow-Ups ({{getUpcomingFollowUps().length}})
             </div>
-            <div class="fum-card pending-card" *ngFor="let f of getPendingFollowUps()">
+            <div class="fum-card pending-card" *ngFor="let f of getUpcomingFollowUps()">
               <div class="fum-card-top">
                 <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">
                   {{getFollowUpTypeBadge(f.type).label}}
                 </div>
-                <div class="fum-time-pill" [class.overdue]="isFollowUpOverdue(f.scheduledAt)">
+                <div class="fum-time-pill">
                   <svg lucideClock size="12"></svg>
                   <span>{{f.scheduledAt | date:'dd MMM yyyy, h:mm a'}}</span>
-                  <span class="overdue-tag" *ngIf="isFollowUpOverdue(f.scheduledAt)">Overdue</span>
                 </div>
               </div>
 
@@ -1647,16 +1956,13 @@
                 </div>
                 <div class="fum-meta-item" *ngIf="f.assignedTo">
                   <svg lucideUserCheck size="13"></svg>
-                  <span><strong>Rep:</strong> {{f.assignedTo?.firstName}} {{f.assignedTo?.lastName}}</span>
+                  <span><strong>Rep:</strong> {{f.assignedTo.firstName}} {{f.assignedTo.lastName}}</span>
                 </div>
               </div>
 
               <p class="fum-card-notes" *ngIf="f.notes">{{f.notes}}</p>
 
               <div class="fum-card-actions">
-                <button type="button" class="btn-card-complete" (click)="startCompleteFollowUp(f)">
-                  <svg lucideCheck size="13"></svg> Record Outcome / Complete
-                </button>
                 <button type="button" class="btn-card-del" (click)="deleteFollowUp(f.id, $event)" title="Delete Follow-up">
                   <svg lucideTrash2 size="13"></svg>
                 </button>
@@ -1664,28 +1970,22 @@
             </div>
           </div>
 
-          <!-- Completed / Past Items -->
-          <div class="fum-timeline-group" *ngIf="getCompletedFollowUps().length > 0">
+          <!-- Past Items -->
+          <div class="fum-timeline-group" *ngIf="getPastFollowUps().length > 0">
             <div class="fum-group-title">
-              <span class="group-dot dot-green"></span> Completed / Past Follow-Ups ({{getCompletedFollowUps().length}})
+              <span class="group-dot dot-green"></span> Past Follow-Ups ({{getPastFollowUps().length}})
             </div>
-            <div class="fum-card completed-card" *ngFor="let f of getCompletedFollowUps()">
+            <div class="fum-card completed-card" *ngFor="let f of getPastFollowUps()">
               <div class="fum-card-top">
                 <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">
                   {{getFollowUpTypeBadge(f.type).label}}
                 </div>
-                <span class="fum-status-badge status-{{f.status | lowercase}}">
-                  {{f.status === 'COMPLETED' ? 'Completed' : 'Cancelled'}}
-                </span>
                 <span class="fum-date-sub">{{f.scheduledAt | date:'dd MMM yyyy, h:mm a'}}</span>
               </div>
 
               <h4 class="fum-card-title">{{f.title}}</h4>
 
-              <div class="fum-outcome-box" *ngIf="f.outcome">
-                <span class="outcome-label">Outcome & Remarks:</span>
-                <p class="outcome-text">{{f.outcome}}</p>
-              </div>
+              <p class="fum-card-notes" *ngIf="f.notes">{{f.notes}}</p>
 
               <div class="fum-card-meta" *ngIf="f.contactPerson || f.assignedTo">
                 <div class="fum-meta-item" *ngIf="f.contactPerson">
@@ -1694,8 +1994,14 @@
                 </div>
                 <div class="fum-meta-item" *ngIf="f.assignedTo">
                   <svg lucideUserCheck size="13"></svg>
-                  <span>Handled by {{f.assignedTo?.firstName}} {{f.assignedTo?.lastName}}</span>
+                  <span>Handled by {{f.assignedTo.firstName}} {{f.assignedTo.lastName}}</span>
                 </div>
+              </div>
+
+              <div class="fum-card-actions">
+                <button type="button" class="btn-card-del" (click)="deleteFollowUp(f.id, $event)" title="Delete Follow-up">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
               </div>
             </div>
           </div>

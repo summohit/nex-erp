@@ -9,7 +9,11 @@ import { OnboardingComponent } from './employees/onboarding/onboarding';
 import { TimesheetsComponent } from './timesheets/timesheets.component';
 
 export const routes: Routes = [
-  { path: '', component: AuthComponent },
+  // Public marketing site. Sign in / sign up live on their own routes so they can be
+  // linked to directly (and so permissionGuard's existing '/login' redirect resolves).
+  { path: '', pathMatch: 'full', loadComponent: () => import('./public/landing/landing').then(m => m.LandingComponent) },
+  { path: 'login', component: AuthComponent, data: { view: 'login' } },
+  { path: 'signup', component: AuthComponent, data: { view: 'register' } },
   { path: 'auth/check-email', loadComponent: () => import('./auth/check-email/check-email').then(m => m.CheckEmailComponent) },
   { path: 'auth/verify-email', loadComponent: () => import('./auth/verify-email/verify-email').then(m => m.VerifyEmailComponent) },
   { path: 'auth/forgot-password', loadComponent: () => import('./auth/forgot-password/forgot-password').then(m => m.ForgotPasswordComponent) },
@@ -17,6 +21,7 @@ export const routes: Routes = [
   { path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.OnboardingComponent) },
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
+  { path: 'offer/:token', loadComponent: () => import('./public/offer-letter/offer-letter').then(m => m.OfferLetterComponent) },
   { 
     path: 'projects/onboarding/:id', 
     canActivate: [authGuard, permissionGuard],
@@ -102,6 +107,12 @@ export const routes: Routes = [
         loadComponent: () => import('./settings/permissions/permissions.component').then(m => m.PermissionsComponent)
       },
       {
+        path: 'settings/system',
+        canActivate: [permissionGuard],
+        data: { module: 'settings/system' },
+        loadComponent: () => import('./settings/system-settings/system-settings').then(m => m.SystemSettingsComponent)
+      },
+      {
         path: 'settings/payroll',
         canActivate: [permissionGuard],
         data: { module: 'settings/company' }, // Re-using company permission for now
@@ -111,6 +122,12 @@ export const routes: Routes = [
         path: 'attendance',
         redirectTo: 'attendance/my-attendance',
         pathMatch: 'full'
+      },
+      {
+        path: 'attendance/all',
+        canActivate: [permissionGuard],
+        data: { module: 'attendance/all' },
+        loadComponent: () => import('./attendance/all-attendance/all-attendance').then(m => m.AllAttendanceComponent)
       },
       {
         path: 'attendance/:tab',
@@ -164,6 +181,12 @@ export const routes: Routes = [
         loadComponent: () => import('./recruitment/job-postings/job-postings').then(m => m.JobPostingsComponent)
       },
       {
+        path: 'recruitment/jobs/:id',
+        canActivate: [permissionGuard],
+        data: { module: 'recruitment/jobs' },
+        loadComponent: () => import('./recruitment/job-detail/job-detail').then(m => m.JobDetailComponent)
+      },
+      {
         path: 'recruitment/candidates',
         canActivate: [permissionGuard],
         data: { module: 'recruitment/candidates' },
@@ -174,6 +197,12 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'recruitment/interviews' },
         loadComponent: () => import('./recruitment/interviews/interviews').then(m => m.InterviewsComponent)
+      },
+      {
+        path: 'recruitment/reports',
+        canActivate: [permissionGuard],
+        data: { module: 'recruitment/candidates' },
+        loadComponent: () => import('./recruitment/reports/reports').then(m => m.HiringReportsComponent)
       },
       {
         path: 'projects',
@@ -198,6 +227,12 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'crm/leads' },
         loadComponent: () => import('./crm/leads/leads').then(m => m.LeadsComponent)
+      },
+      {
+        path: 'crm/leads/dashboard',
+        canActivate: [permissionGuard],
+        data: { module: 'crm/leads' },
+        loadComponent: () => import('./crm/leads-dashboard/leads-dashboard').then(m => m.LeadsDashboardComponent)
       },
       {
         path: 'sales/quotations',

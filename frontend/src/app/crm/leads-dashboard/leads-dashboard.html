@@ -1,0 +1,373 @@
+<div class="lda-container">
+
+  <!-- Header Card -->
+  <div class="lda-header-card">
+    <div class="lda-header-left">
+      <button class="btn-back-leads" (click)="goBack()" title="Back to Leads Board">
+        <svg lucideArrowLeft size="15"></svg>
+        <span>Back to Leads</span>
+      </button>
+      <div class="header-titles">
+        <div class="header-title-row">
+          <h2>Lead Analytics Dashboard</h2>
+          <span class="admin-insights-pill">
+            <svg lucideSparkles size="12"></svg> Pipeline Intelligence
+          </span>
+        </div>
+        <p>Pipeline velocity, conversion funnel, source quality, and sales rep performance</p>
+      </div>
+    </div>
+
+    <!-- Range selector -->
+    <div class="timeframe-selector">
+      <button [class.active]="range() === 'this_month'" (click)="setRange('this_month')">This Month</button>
+      <button [class.active]="range() === 'this_quarter'" (click)="setRange('this_quarter')">This Quarter</button>
+      <button [class.active]="range() === 'this_year'" (click)="setRange('this_year')">This Year</button>
+      <button [class.active]="range() === 'custom'" (click)="setRange('custom')">Custom</button>
+    </div>
+  </div>
+
+  <div class="custom-range-card" *ngIf="range() === 'custom'">
+    <div class="custom-range-inputs">
+      <div class="date-input-group">
+        <label>Start Date</label>
+        <input type="date" [(ngModel)]="customStart" />
+      </div>
+      <span class="range-arrow">→</span>
+      <div class="date-input-group">
+        <label>End Date</label>
+        <input type="date" [(ngModel)]="customEnd" />
+      </div>
+      <button class="btn-apply-range" (click)="applyCustomRange()" [disabled]="!customStart || !customEnd">
+        Apply Range
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="lda-loading-card" *ngIf="isLoading()">
+    <svg lucideLoader2 size="28" class="spin-icon"></svg>
+    <span>Crunching pipeline analytics...</span>
+  </div>
+
+  <!-- Error -->
+  <div class="lda-error-card" *ngIf="!isLoading() && error()">
+    <svg lucideAlertTriangle size="20"></svg>
+    <span>{{ error() }}</span>
+  </div>
+
+  <ng-container *ngIf="!isLoading() && !error() && data() as d">
+
+    <!-- KPI Strip: 6-Column Unified Grid -->
+    <div class="kpi-grid-6">
+      <div class="kpi-modern-card bg-blue">
+        <div class="kpi-icon-wrap"><svg lucideIndianRupee size="20"></svg></div>
+        <div class="kpi-content">
+          <span class="kpi-label">Open Pipeline Value</span>
+          <span class="kpi-val">{{ formatCurrency(d.kpis.totalPipelineValue) }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-modern-card bg-indigo">
+        <div class="kpi-icon-wrap"><svg lucideUsers size="20"></svg></div>
+        <div class="kpi-content">
+          <span class="kpi-label">Open Leads</span>
+          <span class="kpi-val">{{ d.kpis.openLeadsCount }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-modern-card bg-purple">
+        <div class="kpi-icon-wrap"><svg lucideCalendar size="20"></svg></div>
+        <div class="kpi-content">
+          <span class="kpi-label">Leads Created</span>
+          <span class="kpi-val">{{ d.kpis.leadsCreatedThisPeriod }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-modern-card bg-emerald">
+        <div class="kpi-icon-wrap"><svg lucideTarget size="20"></svg></div>
+        <div class="kpi-content">
+          <span class="kpi-label">Win Rate</span>
+          <span class="kpi-val">{{ formatPct(d.kpis.winRate) }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-modern-card bg-amber">
+        <div class="kpi-icon-wrap"><svg lucideAward size="20"></svg></div>
+        <div class="kpi-content">
+          <span class="kpi-label">Avg Deal Size</span>
+          <span class="kpi-val">{{ formatCurrency(d.kpis.avgDealSize) }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-modern-card bg-teal">
+        <div class="kpi-icon-wrap"><svg lucideClock size="20"></svg></div>
+        <div class="kpi-content">
+          <span class="kpi-label">Avg Sales Cycle</span>
+          <span class="kpi-val">{{ formatDays(d.kpis.avgSalesCycleDays) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leads created trend vs prior period -->
+    <div class="trend-banner-row" *ngIf="d.kpis.leadsCreatedTrendPct !== null">
+      <div class="trend-banner" [class.trend-up]="trendUpPositive(d.kpis.leadsCreatedTrendPct)" [class.trend-down]="!trendUpPositive(d.kpis.leadsCreatedTrendPct)">
+        <div class="trend-icon-badge">
+          <svg *ngIf="trendUpPositive(d.kpis.leadsCreatedTrendPct)" lucideTrendingUp size="14"></svg>
+          <svg *ngIf="!trendUpPositive(d.kpis.leadsCreatedTrendPct)" lucideTrendingDown size="14"></svg>
+        </div>
+        <span class="trend-text">
+          <strong>{{ formatPct(d.kpis.leadsCreatedTrendPct) }}</strong> {{ trendUpPositive(d.kpis.leadsCreatedTrendPct) ? 'growth' : 'decrease' }} in leads created vs previous period ({{ d.kpis.leadsCreatedPrevPeriod }} leads)
+        </span>
+      </div>
+    </div>
+
+    <!-- Funnel + Trend Charts -->
+    <div class="chart-row-2">
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-header-icon bg-blue-light">
+              <svg lucideFilter size="16"></svg>
+            </div>
+            <div>
+              <h3>Pipeline Funnel</h3>
+              <span class="card-subtitle">Distribution of opportunities by stage</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <app-chart-card type="bar" [series]="funnelSeries()" [categories]="funnelCategories()" [colors]="['#ff5500']" [showLegend]="false" [height]="280" emptyHint="No leads created in this period yet."></app-chart-card>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-header-icon bg-emerald-light">
+              <svg lucideTrendingUp size="16"></svg>
+            </div>
+            <div>
+              <h3>New vs Won (Weekly)</h3>
+              <span class="card-subtitle">Pacing of lead velocity against deal closures</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <app-chart-card type="line" [series]="trendSeries()" [categories]="trendCategories()" [colors]="['#ff5500', '#059669']" [height]="280" emptyHint="Trend fills in as leads are created."></app-chart-card>
+        </div>
+      </div>
+    </div>
+
+    <!-- Best Lead Profile: Source & Category -->
+    <div class="chart-row-2">
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-header-icon bg-indigo-light">
+              <svg lucideGlobe size="16"></svg>
+            </div>
+            <div>
+              <h3>Best Performing Sources</h3>
+              <span class="card-subtitle">Channel conversion efficiency</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <table class="lda-table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Leads</th>
+                <th>Win Rate</th>
+                <th class="text-right">Value Won</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of d.bySource">
+                <td class="lda-label-cell">
+                  <div class="item-with-icon">
+                    <span class="source-dot"></span>
+                    <span>{{ s.label }}</span>
+                  </div>
+                </td>
+                <td><span class="count-pill">{{ s.count }}</span></td>
+                <td>
+                  <span class="winrate-badge" [class.rate-high]="s.winRate >= 30" [class.rate-mid]="s.winRate >= 15 && s.winRate < 30" [class.rate-low]="s.winRate > 0 && s.winRate < 15">
+                    {{ formatPct(s.winRate) }}
+                  </span>
+                </td>
+                <td class="text-right text-value">{{ formatCurrency(s.valueWon) }}</td>
+              </tr>
+              <tr *ngIf="d.bySource.length === 0"><td colspan="4" class="lda-empty-row">No data for this period.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-header-icon bg-amber-light">
+              <svg lucideTag size="16"></svg>
+            </div>
+            <div>
+              <h3>Best Performing Categories</h3>
+              <span class="card-subtitle">Deal size and sector breakdown</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <table class="lda-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Leads</th>
+                <th>Win Rate</th>
+                <th class="text-right">Value Won</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of d.byCategory">
+                <td class="lda-label-cell">
+                  <div class="item-with-icon">
+                    <span class="category-tag-pill">{{ c.label }}</span>
+                  </div>
+                </td>
+                <td><span class="count-pill">{{ c.count }}</span></td>
+                <td>
+                  <span class="winrate-badge" [class.rate-high]="c.winRate >= 30" [class.rate-mid]="c.winRate >= 15 && c.winRate < 30" [class.rate-low]="c.winRate > 0 && c.winRate < 15">
+                    {{ formatPct(c.winRate) }}
+                  </span>
+                </td>
+                <td class="text-right text-value">{{ formatCurrency(c.valueWon) }}</td>
+              </tr>
+              <tr *ngIf="d.byCategory.length === 0"><td colspan="4" class="lda-empty-row">No data for this period.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Performers Leaderboard -->
+    <div class="dashboard-card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-icon bg-gold-light">
+            <svg lucideTrophy size="16"></svg>
+          </div>
+          <div>
+            <h3>Top Performers Leaderboard</h3>
+            <span class="card-subtitle">Sales rep rankings by revenue, conversion, and engagement</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <table class="lda-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Rank & Sales Rep</th>
+              <th>Leads Owned</th>
+              <th>Leads Won</th>
+              <th>Win Rate</th>
+              <th>Value Won</th>
+              <th>Avg Deal Size</th>
+              <th>Follow-Ups Logged</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of d.leaderboard; let i = index">
+              <td class="rep-cell">
+                <span class="rank-badge" [class.rank-1]="i === 0" [class.rank-2]="i === 1" [class.rank-3]="i === 2">
+                  {{ i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1))) }}
+                </span>
+                <div class="rep-avatar" *ngIf="!r.rep.avatarUrl">{{ r.rep.firstName?.[0] }}{{ r.rep.lastName?.[0] }}</div>
+                <img *ngIf="r.rep.avatarUrl" [src]="r.rep.avatarUrl" class="rep-avatar-img" alt="Avatar" />
+                <div class="rep-info-col">
+                  <span class="rep-name">{{ r.rep.firstName }} {{ r.rep.lastName }}</span>
+                </div>
+              </td>
+              <td><span class="metric-pill">{{ r.leadsOwned }}</span></td>
+              <td><span class="metric-pill won">{{ r.leadsWon }}</span></td>
+              <td>
+                <span class="winrate-badge" [class.rate-high]="r.winRate >= 30" [class.rate-mid]="r.winRate >= 15 && r.winRate < 30" [class.rate-low]="r.winRate > 0 && r.winRate < 15">
+                  {{ formatPct(r.winRate) }}
+                </span>
+              </td>
+              <td class="text-value">{{ formatCurrency(r.valueWon) }}</td>
+              <td class="text-slate-600 font-semibold">{{ formatCurrency(r.avgDealSize) }}</td>
+              <td>
+                <span class="followups-badge">
+                  <svg lucideClock size="12"></svg> {{ r.followUpsLogged }}
+                </span>
+              </td>
+            </tr>
+            <tr *ngIf="d.leaderboard.length === 0"><td colspan="7" class="lda-empty-row">No sales rep activity recorded in this timeframe.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Aging Leads + Lost Reasons -->
+    <div class="chart-row-2-uneven">
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-header-icon bg-rose-light">
+              <svg lucideHourglass size="16"></svg>
+            </div>
+            <div>
+              <h3>Stalled Pipeline Deals <span class="stale-hint">(open 14+ days)</span></h3>
+              <span class="card-subtitle">Opportunities needing immediate sales rep follow-up</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <table class="lda-table">
+            <thead>
+              <tr>
+                <th>Lead / Company</th>
+                <th>Stage</th>
+                <th>Owner</th>
+                <th>Days Open</th>
+                <th class="text-right">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let a of d.agingLeads">
+                <td class="lda-label-cell">
+                  <span class="lead-company-name">{{ a.companyName || a.title }}</span>
+                </td>
+                <td><span class="stage-pill">{{ a.status }}</span></td>
+                <td>
+                  <span class="owner-name-tag">{{ a.assignedTo ? (a.assignedTo.firstName + ' ' + a.assignedTo.lastName) : 'Unassigned' }}</span>
+                </td>
+                <td><span class="days-open-badge">{{ a.daysOpen }}d</span></td>
+                <td class="text-right text-value">{{ formatCurrency(a.value) }}</td>
+              </tr>
+              <tr *ngIf="d.agingLeads.length === 0"><td colspan="5" class="lda-empty-row">✨ No stalled leads — pipeline velocity is healthy.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-header-icon bg-purple-light">
+              <svg lucidePieChart size="16"></svg>
+            </div>
+            <div>
+              <h3>Lost Reasons</h3>
+              <span class="card-subtitle">Root cause breakdown for closed-lost opportunities</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <app-chart-card type="donut" [series]="lostReasonsSeries()" [labels]="lostReasonsLabels()" [height]="240" emptyHint="No lost leads in this period."></app-chart-card>
+        </div>
+      </div>
+    </div>
+
+  </ng-container>
+</div>

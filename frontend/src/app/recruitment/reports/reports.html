@@ -1,0 +1,390 @@
+<div class="reports-page-container" *ngIf="!isLoading() && data() as d">
+  
+  <!-- TOP BREADCRUMB & CONTEXT BAR -->
+  <div class="reports-top-bar">
+    <div class="bar-left">
+      <button class="btn-back-pill" routerLink="/recruitment/candidates">
+        <svg lucideArrowLeft size="15"></svg>
+        <span>Back to ATS</span>
+      </button>
+      <nav class="reports-breadcrumbs">
+        <span class="crumb-link" routerLink="/recruitment/job-postings">Recruitment</span>
+        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
+        <span class="crumb-current">Hiring Reports & Analytics</span>
+      </nav>
+    </div>
+
+    <div class="bar-right">
+      <button class="btn-top-action" (click)="exportReportCSV()" title="Export Hiring Report CSV">
+        <svg lucideDownload size="15"></svg>
+        <span>Export CSV</span>
+      </button>
+      <a class="btn-top-action btn-top-primary" routerLink="/recruitment/candidates" title="Open Candidates ATS Pipeline">
+        <svg lucideUsers size="15"></svg>
+        <span>Open ATS Pipeline</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- HERO TITLE CARD -->
+  <div class="reports-hero-card">
+    <div class="hero-icon-circle">
+      <svg lucideBarChart3 size="24"></svg>
+    </div>
+    <div class="hero-text">
+      <h2>Hiring Reports & Pipeline Breakdown</h2>
+      <p>Analyze applicant throughput, conversion rates, and recruitment velocity across all open job requisitions.</p>
+    </div>
+  </div>
+
+  <!-- KPI SUMMARY GRID (4 METRICS) -->
+  <div class="kpi-summary-grid" *ngIf="kpiSummary() as kpi">
+    <div class="kpi-card kpi-indigo">
+      <div class="kpi-icon-wrap bg-indigo-soft">
+        <svg lucideUsers size="20"></svg>
+      </div>
+      <div class="kpi-data">
+        <span class="kpi-label">Total Applications</span>
+        <div class="kpi-num-row">
+          <span class="kpi-val text-indigo">{{ kpi.totalApps }}</span>
+          <span class="kpi-sub">Received</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-icon-wrap bg-blue-soft">
+        <svg lucideBriefcase size="20"></svg>
+      </div>
+      <div class="kpi-data">
+        <span class="kpi-label">Jobs Analyzed</span>
+        <div class="kpi-num-row">
+          <span class="kpi-val text-blue">{{ kpi.totalJobs }}</span>
+          <span class="kpi-sub">Positions</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-emerald">
+      <div class="kpi-icon-wrap bg-emerald-soft">
+        <svg lucideCheckCircle size="20"></svg>
+      </div>
+      <div class="kpi-data">
+        <span class="kpi-label">Hired Candidates</span>
+        <div class="kpi-num-row">
+          <span class="kpi-val text-emerald">{{ kpi.totalHires }}</span>
+          <span class="kpi-badge-pill">{{ kpi.conversionRate }}% conversion</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-amber">
+      <div class="kpi-icon-wrap bg-amber-soft">
+        <svg lucideClock size="20"></svg>
+      </div>
+      <div class="kpi-data">
+        <span class="kpi-label">Avg. Time to Hire</span>
+        <div class="kpi-num-row">
+          <span class="kpi-val text-amber">{{ kpi.avgDays !== null ? (kpi.avgDays + ' Days') : '—' }}</span>
+          <span class="kpi-sub">Velocity</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTERS & CONTROLS TOOLBAR -->
+  <div class="filters-card">
+    <div class="filters-top-row">
+      
+      <!-- Search Input -->
+      <div class="filter-search-box">
+        <svg lucideSearch size="16" class="search-icon"></svg>
+        <input 
+          type="text" 
+          [ngModel]="searchQuery()" 
+          (ngModelChange)="searchQuery.set($event)" 
+          placeholder="Search job title, location, or department..." />
+        <button class="btn-clear-search" *ngIf="searchQuery()" (click)="searchQuery.set('')">
+          <svg lucideX size="14"></svg>
+        </button>
+      </div>
+
+      <!-- Department Filter -->
+      <div class="filter-select-group" *ngIf="departments().length > 0">
+        <label>Dept:</label>
+        <select class="filter-select" [ngModel]="selectedDepartment()" (ngModelChange)="selectedDepartment.set($event)">
+          <option value="ALL">All Departments</option>
+          <option *ngFor="let d of departments()" [value]="d">{{ d }}</option>
+        </select>
+      </div>
+
+      <!-- Location / Branch Filter -->
+      <div class="filter-select-group" *ngIf="branches().length > 0">
+        <label>Location:</label>
+        <select class="filter-select" [ngModel]="selectedBranch()" (ngModelChange)="selectedBranch.set($event)">
+          <option value="ALL">All Locations</option>
+          <option *ngFor="let b of branches()" [value]="b">{{ b }}</option>
+        </select>
+      </div>
+
+      <!-- Application Volume Filter -->
+      <div class="filter-select-group">
+        <label>Volume:</label>
+        <select class="filter-select" [ngModel]="selectedVolume()" (ngModelChange)="selectedVolume.set($event)">
+          <option value="ALL">All Volumes</option>
+          <option value="HIGH">High Volume (20+ Apps)</option>
+          <option value="MEDIUM">Medium (5 - 19 Apps)</option>
+          <option value="LOW">Low (1 - 4 Apps)</option>
+        </select>
+      </div>
+
+      <!-- Pipeline Outcome Filter -->
+      <div class="filter-select-group">
+        <label>Outcome:</label>
+        <select class="filter-select" [ngModel]="selectedStageFilter()" (ngModelChange)="selectedStageFilter.set($event)">
+          <option value="ALL">All Outcomes</option>
+          <option value="HAS_HIRES">Has Hires / Offers</option>
+          <option value="HAS_OFFERS">Has Offers Extended</option>
+          <option value="HAS_REJECTIONS">Has Rejections</option>
+          <option value="ALL_NEW">All In New / Untriaged</option>
+        </select>
+      </div>
+
+      <!-- Sort By -->
+      <div class="filter-select-group">
+        <label>Sort:</label>
+        <select class="filter-select" [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)">
+          <option value="TOTAL_DESC">Total Apps (High → Low)</option>
+          <option value="TOTAL_ASC">Total Apps (Low → High)</option>
+          <option value="HIRED_DESC">Most Hires</option>
+          <option value="REJECTED_DESC">Most Rejected</option>
+          <option value="TITLE_ASC">Job Title (A → Z)</option>
+        </select>
+      </div>
+
+      <!-- Reset Filters Button -->
+      <button 
+        class="btn-reset-filters" 
+        *ngIf="searchQuery() || selectedDepartment() !== 'ALL' || selectedBranch() !== 'ALL' || selectedVolume() !== 'ALL' || selectedStageFilter() !== 'ALL' || sortBy() !== 'TOTAL_DESC'"
+        (click)="resetFilters()">
+        <svg lucideX size="14"></svg>
+        <span>Reset</span>
+      </button>
+
+    </div>
+
+    <!-- Active Filter Summary & Tab Switcher -->
+    <div class="filters-bottom-row">
+      <div class="results-count">
+        <span>Showing <strong>{{ activeTab() === 'JOB' ? filteredJobs().length : filteredRecruiters().length }}</strong> {{ activeTab() === 'JOB' ? 'positions' : 'recruiters' }}</span>
+      </div>
+
+      <div class="report-tab-toggles">
+        <button 
+          class="tab-btn" 
+          [class.active]="activeTab() === 'JOB'" 
+          (click)="activeTab.set('JOB')">
+          <svg lucideBriefcase size="15"></svg>
+          <span>By Job Position ({{ filteredJobs().length }})</span>
+        </button>
+        <button 
+          class="tab-btn" 
+          [class.active]="activeTab() === 'RECRUITER'" 
+          (click)="activeTab.set('RECRUITER')">
+          <svg lucideUsers size="15"></svg>
+          <span>By Recruiter ({{ filteredRecruiters().length }})</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTE ON AVERAGE TIME TO HIRE -->
+  <div class="time-note-pill" *ngIf="d.timeToHireNote">
+    <svg lucideClock size="14"></svg>
+    <span>{{ d.timeToHireNote }}</span>
+  </div>
+
+  <!-- BY JOB REPORT CARD -->
+  <div class="report-main-card" *ngIf="activeTab() === 'JOB'">
+    <div class="table-scroll-wrap" *ngIf="filteredJobs().length > 0">
+      <table class="modern-report-table">
+        <thead>
+          <tr>
+            <th class="th-job">Job Requisition</th>
+            <th class="th-center">Total</th>
+            <th class="th-center col-new">New</th>
+            <th class="th-center col-reviewing">Reviewing</th>
+            <th class="th-center col-shortlisted">Shortlisted</th>
+            <th class="th-center col-interviewing">Interviewing</th>
+            <th class="th-center col-offered">Offered</th>
+            <th class="th-center col-hired">Hired</th>
+            <th class="th-center col-onboarded">Onboarded</th>
+            <th class="th-center col-rejected">Rejected</th>
+            <th class="th-pipeline">Pipeline Distribution</th>
+            <th class="th-actions text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let job of filteredJobs()" class="report-row">
+            
+            <!-- Job Title, Dept, Branch -->
+            <td class="cell-job-info" (click)="navigateToJob(job.jobId)">
+              <div class="job-info-stack">
+                <span class="job-title-link">{{ job.jobTitle }}</span>
+                <div class="job-meta-chips">
+                  <span class="meta-badge" *ngIf="job.department">{{ job.department }}</span>
+                  <span class="meta-badge" *ngIf="job.branch">{{ job.branch }}</span>
+                  <span class="meta-type" *ngIf="job.type">{{ job.type }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Total Applications -->
+            <td class="cell-num cell-total">
+              <span class="total-badge">{{ job.total }}</span>
+            </td>
+
+            <!-- Pipeline Counts -->
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-new" *ngIf="pipelineCount(job.pipeline, 'NEW') > 0">{{ pipelineCount(job.pipeline, 'NEW') }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'NEW') === 0">0</span>
+            </td>
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-reviewing" *ngIf="pipelineCount(job.pipeline, 'REVIEWING') > 0">{{ pipelineCount(job.pipeline, 'REVIEWING') }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'REVIEWING') === 0">0</span>
+            </td>
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-shortlisted" *ngIf="pipelineCount(job.pipeline, 'SHORTLISTED') > 0">{{ pipelineCount(job.pipeline, 'SHORTLISTED') }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'SHORTLISTED') === 0">0</span>
+            </td>
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-interviewing" *ngIf="pipelineCount(job.pipeline, 'INTERVIEWING') > 0">{{ pipelineCount(job.pipeline, 'INTERVIEWING') }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'INTERVIEWING') === 0">0</span>
+            </td>
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-offered" *ngIf="pipelineCount(job.pipeline, 'OFFERED') > 0">{{ pipelineCount(job.pipeline, 'OFFERED') }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'OFFERED') === 0">0</span>
+            </td>
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-hired" *ngIf="pipelineCount(job.pipeline, 'HIRED') > 0">{{ pipelineCount(job.pipeline, 'HIRED') }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'HIRED') === 0">0</span>
+            </td>
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-onboarded" *ngIf="pipelineCount(job.pipeline, 'ONBOARDED') > 0">{{ pipelineCount(job.pipeline, 'ONBOARDED') }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'ONBOARDED') === 0">0</span>
+            </td>
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-rejected" *ngIf="pipelineCount(job.pipeline, 'REJECTED') > 0">{{ pipelineCount(job.pipeline, 'REJECTED') }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'REJECTED') === 0">0</span>
+            </td>
+
+            <!-- Visual Pipeline Distribution Bar -->
+            <td class="cell-distribution">
+              <div class="micro-funnel-bar" [title]="'Total: ' + job.total">
+                <div class="funnel-seg seg-new" [style.width.%]="getStagePercent(job.pipeline, 'NEW', job.total)"></div>
+                <div class="funnel-seg seg-reviewing" [style.width.%]="getStagePercent(job.pipeline, 'REVIEWING', job.total)"></div>
+                <div class="funnel-seg seg-shortlisted" [style.width.%]="getStagePercent(job.pipeline, 'SHORTLISTED', job.total)"></div>
+                <div class="funnel-seg seg-interviewing" [style.width.%]="getStagePercent(job.pipeline, 'INTERVIEWING', job.total)"></div>
+                <div class="funnel-seg seg-offered" [style.width.%]="getStagePercent(job.pipeline, 'OFFERED', job.total)"></div>
+                <div class="funnel-seg seg-hired" [style.width.%]="getStagePercent(job.pipeline, 'HIRED', job.total)"></div>
+                <div class="funnel-seg seg-onboarded" [style.width.%]="getStagePercent(job.pipeline, 'ONBOARDED', job.total)"></div>
+                <div class="funnel-seg seg-rejected" [style.width.%]="getStagePercent(job.pipeline, 'REJECTED', job.total)"></div>
+              </div>
+            </td>
+
+            <!-- Quick Action Links -->
+            <td class="cell-actions text-right" (click)="$event.stopPropagation()">
+              <div class="action-btn-pair">
+                <button class="btn-job-action" (click)="navigateToJob(job.jobId, $event)" title="View Job Details">
+                  <svg lucideBriefcase size="13"></svg>
+                  <span>Job</span>
+                </button>
+                <button class="btn-job-action btn-ats-accent" (click)="navigateToATS(job.jobId, $event)" title="Open in ATS Pipeline">
+                  <svg lucideUsers size="13"></svg>
+                  <span>ATS</span>
+                </button>
+              </div>
+            </td>
+
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-reports-box" *ngIf="filteredJobs().length === 0">
+      <svg lucideBriefcase size="36"></svg>
+      <h3>No matching job requisitions</h3>
+      <p>No job positions match your current filter selection or search keywords.</p>
+      <button class="btn-empty-reset" (click)="resetFilters()">
+        Reset All Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- BY RECRUITER REPORT CARD -->
+  <div class="report-main-card" *ngIf="activeTab() === 'RECRUITER'">
+    <div class="table-scroll-wrap" *ngIf="filteredRecruiters().length > 0">
+      <table class="modern-report-table">
+        <thead>
+          <tr>
+            <th>Recruiter / Hiring Lead</th>
+            <th class="th-center">Total Applications Managed</th>
+            <th class="th-center">Candidates Hired</th>
+            <th class="th-center">Hire Success Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of filteredRecruiters()" class="report-row">
+            <td class="cell-recruiter">
+              <div class="recruiter-avatar-wrap">
+                <!-- Profile Photo if available -->
+                <img *ngIf="r.avatarUrl" [src]="r.avatarUrl" class="recruiter-avatar-img" [alt]="r.recruiterName" />
+                
+                <!-- Fallback Initials Avatar -->
+                <div *ngIf="!r.avatarUrl" class="recruiter-avatar-fallback" [style.background-color]="getAvatarColor(r.recruiterName)">
+                  {{ getInitials(r.recruiterName) }}
+                </div>
+
+                <div class="recruiter-info-text">
+                  <span class="recruiter-name-text">{{ r.recruiterName }}</span>
+                  <div class="recruiter-sub-meta">
+                    <span class="recruiter-dept-badge" *ngIf="r.designation">{{ r.designation }}</span>
+                    <span class="recruiter-email" *ngIf="r.email">{{ r.email }}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td class="cell-num">
+              <span class="total-badge">{{ r.total }}</span>
+            </td>
+            <td class="cell-num">
+              <span class="stage-cell-pill pill-hired">{{ r.hired }}</span>
+            </td>
+            <td class="cell-num">
+              <span class="rate-badge">{{ r.total > 0 ? (Math.round((r.hired / r.total) * 100) + '%') : '0%' }}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-reports-box" *ngIf="filteredRecruiters().length === 0">
+      <svg lucideUsers size="36"></svg>
+      <h3>No recruiters found</h3>
+      <p>No recruiters match your search keywords.</p>
+      <button class="btn-empty-reset" (click)="resetFilters()">
+        Reset All Filters
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- SKELETON LOADING STATE -->
+<div class="reports-loading-state" *ngIf="isLoading()">
+  <div class="spinner"></div>
+  <p>Compiling recruitment pipeline reports…</p>
+</div>
+

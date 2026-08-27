@@ -10,6 +10,7 @@ import { LeavesService, LeaveBalance, LeaveRequest } from '../services/leaves';
 import { MasterDataService, Holiday, LeaveType } from '../services/master-data.service';
 import { EmployeeService, Employee } from '../services/employee.service';
 import { ShiftsService } from '../services/shifts.service';
+import { SystemSettingsService } from '../services/system-settings.service';
 import { AuthService } from '../services/auth.service';
 import { LeaveActionCellRendererComponent } from '../shared/components/leave-action-cell-renderer.component';
 import { ActionCellRendererComponent } from '../shared/components/action-cell-renderer.component';
@@ -94,10 +95,15 @@ export class AttendanceLeaveComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
   private shiftsService = inject(ShiftsService);
+  private systemSettingsService = inject(SystemSettingsService);
   private sanitizer = inject(DomSanitizer);
   public authService = inject(AuthService);
   private toast = inject(HotToastService);
   private datePipe = inject(DatePipe);
+
+  shiftRosterVisible = signal<boolean>(false);
+  myShift = signal<{ shift: Shift | null; rotations: any[] } | null>(null);
+  isLoadingMyShift = signal<boolean>(false);
 
   activeTab = signal<string>('attendance');
   
@@ -1406,6 +1412,9 @@ export class AttendanceLeaveComponent implements OnInit {
       } else if (tab === 'timeline') {
         this.activeTab.set('timeline');
         this.loadTeamTimeline();
+      } else if (tab === 'my-shift') {
+        this.activeTab.set('my-shift');
+        this.loadMyShift();
       } else {
         this.activeTab.set('attendance');
       }
@@ -1415,7 +1424,23 @@ export class AttendanceLeaveComponent implements OnInit {
       this.currentTime.set(new Date());
     }, 1000);
 
+    this.systemSettingsService.getSettings().subscribe({
+      next: (res) => this.shiftRosterVisible.set(!!res.shiftRosterVisibleToEmployees),
+      error: () => this.shiftRosterVisible.set(false)
+    });
+
     this.loadData();
+  }
+
+  loadMyShift() {
+    this.isLoadingMyShift.set(true);
+    this.shiftsService.getMyShift().subscribe({
+      next: (res) => {
+        this.myShift.set(res);
+        this.isLoadingMyShift.set(false);
+      },
+      error: () => this.isLoadingMyShift.set(false)
+    });
   }
 
   ngOnDestroy() {
@@ -1718,6 +1743,9 @@ export class AttendanceLeaveComponent implements OnInit {
     }
     if (tab === 'timeline') {
       this.loadTeamTimeline();
+    }
+    if (tab === 'my-shift') {
+      this.loadMyShift();
     }
     this.router.navigate(['/attendance', tab]);
   }

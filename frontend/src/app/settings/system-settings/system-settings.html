@@ -1,0 +1,301 @@
+<div class="system-settings-page" *ngIf="!isLoading()">
+  
+  <!-- Top Navigation Header -->
+  <div class="settings-header-bar">
+    <div class="header-left">
+      <div class="header-badge">
+        <svg lucideShieldAlert size="16"></svg>
+        <span>SuperAdmin Controls</span>
+      </div>
+      <h2>System Settings</h2>
+      <p>Configure company-wide defaults, automated templates, and employee visibility.</p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-save" (click)="save()" [disabled]="isSaving() || isUploading()">
+        <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving()"></svg>
+        <svg lucideSave size="16" *ngIf="!isSaving()"></svg>
+        <span>{{ isSaving() ? 'Saving Changes...' : 'Save Changes' }}</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="settings-grid" *ngIf="settings() as s">
+    
+    <!-- Card 1: Attendance & Shift Visibility -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap shift-icon">
+          <svg lucideCalendarClock size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <h3>Employee Shift Roster Visibility</h3>
+          <p>Allow employees to view their own assigned shift schedule and active shift rotations under their Attendance & Leave portal.</p>
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle-switch">
+            <input type="checkbox" [checked]="s.shiftRosterVisibleToEmployees" (change)="toggleShiftRosterVisible()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="card-footer-note">
+        <svg lucideInfo size="14"></svg>
+        <span>Employees will only see their own roster and will not have access to colleagues' confidential shift data.</span>
+      </div>
+    </div>
+
+    <!-- Card 2: Offer Letter Template (.docx) -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap docx-icon">
+          <svg lucideFileText size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <div class="title-with-pill">
+            <h3>Offer Letter Document Template (.docx)</h3>
+            <span class="status-pill active" *ngIf="s.offerLetterTemplateDocxUrl">
+              <svg lucideCheck size="12"></svg> Custom Template Active
+            </span>
+            <span class="status-pill default" *ngIf="!s.offerLetterTemplateDocxUrl">
+              Default System Template
+            </span>
+          </div>
+          <p>Upload a standard Microsoft Word (.docx) file. The system automatically populates dynamic tags when generating offers, converts them to PDF, and attaches digital signature certificates upon acceptance.</p>
+        </div>
+      </div>
+
+      <!-- Placeholders / Dynamic Tags Reference -->
+      <div class="placeholders-section">
+        <div class="section-label">
+          <svg lucideSparkles size="14"></svg>
+          <span>Available Dynamic Placeholders (Click to copy)</span>
+        </div>
+
+        <div class="placeholder-group" *ngFor="let g of placeholderGroups()">
+          <span class="placeholder-group-name">{{ g.group }}</span>
+          <div class="chips-container">
+            <button
+              type="button"
+              class="placeholder-chip"
+              *ngFor="let item of g.tags"
+              (click)="copyToClipboard(item.tag)"
+              [title]="item.label"
+              [class.copied]="copiedTag() === item.tag"
+            >
+              <span class="chip-code">{{ item.tag }}</span>
+              <span class="chip-label">{{ item.label }}</span>
+              <svg lucideCopy size="12" class="copy-icon" *ngIf="copiedTag() !== item.tag"></svg>
+              <svg lucideCheck size="12" class="check-icon" *ngIf="copiedTag() === item.tag"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Template File Card (When Uploaded) -->
+      <div class="active-template-card" *ngIf="s.offerLetterTemplateDocxUrl">
+        <div class="template-file-info">
+          <div class="file-icon-box">
+            <svg lucideFileText size="24"></svg>
+            <span class="ext-badge">DOCX</span>
+          </div>
+          <div class="file-details">
+            <h4>Custom Company Offer Letter.docx</h4>
+            <div class="file-meta">
+              <span class="meta-item success">
+                <svg lucideCheckCircle2 size="13"></svg> Ready for PDF generation &amp; e-sign
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="template-file-actions">
+          <a [href]="s.offerLetterTemplateDocxUrl" target="_blank" class="btn-action-outline" title="Download current template">
+            <svg lucideDownload size="15"></svg>
+            <span>Download</span>
+          </a>
+
+          <label for="replaceDocxUpload" class="btn-action-outline" [class.disabled]="isUploading()">
+            <svg lucideLoader2 size="15" class="spin-icon" *ngIf="isUploading()"></svg>
+            <svg lucideUploadCloud size="15" *ngIf="!isUploading()"></svg>
+            <span>{{ isUploading() ? 'Uploading...' : 'Replace' }}</span>
+          </label>
+          <input type="file" id="replaceDocxUpload" accept=".docx" (change)="onFileSelected($event)" style="display: none;">
+
+          <button type="button" class="btn-action-danger" (click)="removeTemplate()" [disabled]="isSaving() || isUploading()" title="Reset to default template">
+            <svg lucideTrash2 size="15"></svg>
+            <span>Reset to Default</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Dropzone Upload Area (When No Template Uploaded or as an alternative) -->
+      <div 
+        class="upload-dropzone" 
+        *ngIf="!s.offerLetterTemplateDocxUrl"
+        [class.dragging]="isDragging()"
+        [class.uploading]="isUploading()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+      >
+        <input type="file" id="docxUploadInput" accept=".docx" (change)="onFileSelected($event)" style="display: none;">
+        
+        <div class="dropzone-content" *ngIf="!isUploading()">
+          <div class="dropzone-icon">
+            <svg lucideUploadCloud size="32"></svg>
+          </div>
+          <h4>Upload your Word (.docx) Template</h4>
+          <p>Drag and drop your file here, or click to browse from your computer</p>
+          <label for="docxUploadInput" class="btn-browse">
+            <span>Browse .docx Files</span>
+          </label>
+          <div class="dropzone-hints">
+            <span>Supported: .docx format</span>
+            <span class="dot">•</span>
+            <span>Max file size: 10MB</span>
+          </div>
+        </div>
+
+        <div class="dropzone-uploading" *ngIf="isUploading()">
+          <svg lucideLoader2 size="32" class="spin-icon"></svg>
+          <h4>Uploading &amp; Configuring Template...</h4>
+          <p>Please wait while we store your template on ImageKit.</p>
+        </div>
+      </div>
+
+      <!-- System Default Note -->
+      <div class="default-template-callout" *ngIf="!s.offerLetterTemplateDocxUrl">
+        <div class="callout-icon">
+          <svg lucideInfo size="16"></svg>
+        </div>
+        <div class="callout-body">
+          <strong>Default Template Active:</strong> Generated offer letters currently use the clean built-in system letterhead format. Upload your company's Microsoft Word template above at any time to customize branding.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Card 3: Built-in HTML Letter Template -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap html-icon">
+          <svg lucideFileText size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <div class="title-with-pill">
+            <h3>Built-in Letter Template</h3>
+            <span class="status-pill active" *ngIf="isUsingCustomHtml">
+              <svg lucideCheck size="12"></svg> Customised
+            </span>
+            <span class="status-pill default" *ngIf="!isUsingCustomHtml">
+              System Default
+            </span>
+          </div>
+          <p>
+            The formatted letter used when no Word template is uploaded — letterhead, all standard
+            clauses, and the salary annexure generated from the candidate's CTC. Preview it with
+            sample data, or edit the HTML source to change wording.
+          </p>
+        </div>
+      </div>
+
+      <div class="template-actions-row">
+        <button type="button" class="btn-action-outline" (click)="openPreview()" [disabled]="isPreviewLoading()">
+          <svg lucideLoader2 size="15" class="spin-icon" *ngIf="isPreviewLoading()"></svg>
+          <svg lucideExternalLink size="15" *ngIf="!isPreviewLoading()"></svg>
+          <span>{{ isPreviewLoading() ? 'Rendering...' : 'Preview Letter' }}</span>
+        </button>
+
+        <button type="button" class="btn-action-outline" (click)="toggleTemplateEditor()">
+          <svg lucideFileText size="15"></svg>
+          <span>{{ showTemplateEditor() ? 'Hide HTML Source' : 'Edit HTML Source' }}</span>
+        </button>
+
+        <button type="button" class="btn-action-danger" *ngIf="isUsingCustomHtml"
+                (click)="resetHtmlTemplate()" [disabled]="isSaving()">
+          <svg lucideRotateCcw size="15"></svg>
+          <span>Reset to Default</span>
+        </button>
+      </div>
+
+      <div class="template-editor-wrap" *ngIf="showTemplateEditor()">
+        <textarea
+          class="template-source-editor"
+          spellcheck="false"
+          rows="20"
+          [(ngModel)]="templateSource"
+          placeholder="Loading built-in template..."
+        ></textarea>
+        <div class="editor-hint">
+          <svg lucideInfo size="14"></svg>
+          <span>
+            Use the placeholder tags above. <code>{{ '{{salaryTable}}' }}</code> expands
+            into the full salary annexure table. Save, then hit Preview to see your changes.
+          </span>
+        </div>
+      </div>
+
+      <div class="default-template-callout" *ngIf="s.offerLetterTemplateDocxUrl">
+        <div class="callout-icon">
+          <svg lucideInfo size="16"></svg>
+        </div>
+        <div class="callout-body">
+          <strong>Currently overridden:</strong> a Word template is uploaded above, so it takes
+          priority over this HTML template. Remove it to use this one.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Offer Letter Preview Modal -->
+  <div class="preview-overlay" *ngIf="showPreview()" (click)="closePreview()">
+    <div class="preview-modal" (click)="$event.stopPropagation()">
+      <div class="preview-modal-header">
+        <div class="preview-title-group">
+          <h3>Offer Letter Preview</h3>
+          <span class="preview-sample-note">Rendered with sample candidate data</span>
+        </div>
+        <button type="button" class="preview-close-btn" (click)="closePreview()" title="Close preview">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="preview-modal-body">
+        <div class="preview-loading" *ngIf="isPreviewLoading()">
+          <svg lucideLoader2 size="28" class="spin-icon"></svg>
+          <span>Rendering letter...</span>
+        </div>
+        <iframe
+          *ngIf="!isPreviewLoading() && previewUrl()"
+          [src]="previewUrl()"
+          class="preview-frame"
+          title="Offer letter preview"
+        ></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Save Bar (Sticky on long pages) -->
+  <div class="bottom-action-bar" *ngIf="settings()">
+    <div class="save-hint">
+      <svg lucideCheckCircle2 size="16"></svg>
+      <span>Changes apply immediately across all future offer letter generations.</span>
+    </div>
+    <button class="btn-save" (click)="save()" [disabled]="isSaving() || isUploading()">
+      <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving()"></svg>
+      <svg lucideSave size="16" *ngIf="!isSaving()"></svg>
+      <span>{{ isSaving() ? 'Saving Changes...' : 'Save Changes' }}</span>
+    </button>
+  </div>
+
+</div>
+
+<!-- Loading Fullscreen State -->
+<div class="loading-state" *ngIf="isLoading()">
+  <div class="spinner-wrap">
+    <svg lucideLoader2 size="36" class="spin-icon"></svg>
+  </div>
+  <h3>Loading System Settings</h3>
+  <p>Fetching company configuration...</p>
+</div>

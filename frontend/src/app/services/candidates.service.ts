@@ -16,12 +16,24 @@ export interface JobApplication {
   experienceYears?: string;
   noticePeriod?: string;
   status: string; // NEW, REVIEWING, SHORTLISTED, INTERVIEWING, OFFERED, HIRED, REJECTED
-  answers?: string; 
+  rejectionReason?: string;
+  answers?: string;
   offeredSalary?: number;
   approvalStatus?: string;
   aiScore?: number;
   aiSummary?: string;
   isAiScored?: boolean;
+  dateOfBirth?: string;
+  gender?: string;
+  currentLocation?: string;
+  currentCtc?: number;
+  expectedCtc?: number;
+  source?: string;
+  coverLetter?: string;
+  photoUrl?: string;
+  // Captured when an offer is made; both print on the generated offer letter.
+  address?: string;
+  joiningDate?: string;
   createdAt: string;
   updatedAt: string;
   job?: {
@@ -51,8 +63,17 @@ export class CandidatesService {
     return this.http.get<JobApplication>(`${this.apiUrl}/${id}`);
   }
 
-  updateStatus(id: number, status: string, offeredSalary?: number): Observable<JobApplication> {
-    return this.http.put<JobApplication>(`${this.apiUrl}/${id}/status`, { status, offeredSalary });
+  updateStatus(
+    id: number,
+    status: string,
+    offeredSalary?: number,
+    rejectionReason?: string,
+    joiningDate?: string,
+    address?: string,
+  ): Observable<JobApplication> {
+    return this.http.put<JobApplication>(`${this.apiUrl}/${id}/status`, {
+      status, offeredSalary, rejectionReason, joiningDate, address,
+    });
   }
 
   approveSalary(id: number): Observable<any> {
@@ -81,6 +102,14 @@ export class CandidatesService {
     return this.http.get<any>(`${this.apiUrl}/${applicationId}/annexure`);
   }
 
+  getOfferLetter(applicationId: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/${applicationId}/offer-letter`);
+  }
+
+  generateOfferLetter(applicationId: number): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/${applicationId}/offer-letter`, {});
+  }
+
   scheduleInterview(applicationId: number, data: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/${applicationId}/interviews`, data);
   }
@@ -97,5 +126,9 @@ export class CandidatesService {
 
   getAnalytics(): Observable<any> {
     return this.http.get(`${this.apiUrl}/analytics/dashboard`);
+  }
+
+  getHiringReports(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/analytics/hiring-reports`);
   }
 }

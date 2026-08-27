@@ -17,15 +17,15 @@
 
     <!-- Quick Stats Cards (Click to Filter) -->
     <div class="header-stats-group">
-      <div class="stat-pill clickable-pill" 
+      <div class="stat-pill clickable-pill"
            [class.stat-highlight]="stats().today > 0"
-           [class.active-pill]="filterDate() === 'today' && filterStatus() !== 'COMPLETED'"
+           [class.active-pill]="filterDate() === 'today'"
            (click)="quickFilter('today')"
            title="Filter Today's Follow-Ups">
         <span class="stat-pill-label">Today</span>
         <span class="stat-pill-value">{{ stats().today }}</span>
       </div>
-      <div class="stat-pill clickable-pill" 
+      <div class="stat-pill clickable-pill"
            [class.stat-overdue]="stats().overdue > 0"
            [class.active-pill]="filterDate() === 'overdue'"
            (click)="quickFilter('overdue')"
@@ -33,19 +33,19 @@
         <span class="stat-pill-label">Overdue</span>
         <span class="stat-pill-value">{{ stats().overdue }}</span>
       </div>
-      <div class="stat-pill clickable-pill" 
-           [class.active-pill]="filterStatus() === 'PENDING' && filterDate() === 'all'"
-           (click)="quickFilter('pending')"
-           title="Filter All Pending Follow-Ups">
-        <span class="stat-pill-label">Pending</span>
-        <span class="stat-pill-value">{{ stats().pending }}</span>
+      <div class="stat-pill clickable-pill"
+           [class.active-pill]="filterDate() === 'upcoming'"
+           (click)="quickFilter('upcoming')"
+           title="Filter Upcoming Follow-Ups">
+        <span class="stat-pill-label">Upcoming</span>
+        <span class="stat-pill-value">{{ stats().upcoming }}</span>
       </div>
-      <div class="stat-pill clickable-pill" 
-           [class.active-pill]="filterStatus() === 'COMPLETED'"
-           (click)="quickFilter('completed')"
-           title="Filter Completed Follow-Ups">
-        <span class="stat-pill-label">Completed</span>
-        <span class="stat-pill-value text-green">{{ stats().completed }}</span>
+      <div class="stat-pill clickable-pill"
+           [class.active-pill]="filterDate() === 'all'"
+           (click)="quickFilter('all')"
+           title="View All Follow-Ups">
+        <span class="stat-pill-label">Total</span>
+        <span class="stat-pill-value">{{ stats().total }}</span>
       </div>
     </div>
   </div>
@@ -94,32 +94,6 @@
             <option value="DEMO">Product Demo</option>
             <option value="EMAIL">Email</option>
             <option value="FIELD_VISIT">Field Visit</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Assigned Rep Filter -->
-      <div class="filter-control-item">
-        <span class="filter-label">Assigned Rep:</span>
-        <div class="custom-select-wrapper">
-          <svg lucideUser size="14" class="select-icon"></svg>
-          <select [ngModel]="filterAssignee()" (ngModelChange)="filterAssignee.set($event); onFilterChange()">
-            <option value="">All Reps & Admins</option>
-            <option *ngFor="let emp of employees()" [value]="emp.id">
-              {{ emp.firstName }} {{ emp.lastName }} <span *ngIf="emp.department?.name">({{emp.department?.name}})</span>
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Status Filter -->
-      <div class="filter-control-item">
-        <span class="filter-label">Status:</span>
-        <div class="custom-select-wrapper">
-          <select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event); onFilterChange()">
-            <option value="PENDING">Pending Only</option>
-            <option value="COMPLETED">Completed Only</option>
-            <option value="all">All Statuses</option>
           </select>
         </div>
       </div>
@@ -198,17 +172,14 @@
           <th>Objective / Notes</th>
           <th style="width: 180px;">Contact Details</th>
           <th style="width: 190px;">Scheduled For</th>
-          <th style="width: 170px;">Assigned Rep</th>
-          <th style="width: 110px;">Status</th>
           <th style="width: 80px; text-align: right;">Actions</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let fu of filteredFollowUps()" 
-            [class.row-completed]="fu.status === 'COMPLETED'"
+        <tr *ngFor="let fu of filteredFollowUps()"
             [class.row-overdue]="isOverdue(fu)"
-            [class.row-today]="isToday(fu.scheduledAt) && fu.status === 'PENDING'">
-          
+            [class.row-today]="isToday(fu.scheduledAt)">
+
           <!-- Type Badge -->
           <td>
             <span class="fu-type-badge" [ngClass]="getTypeBadgeClass(fu.type)">
@@ -244,9 +215,9 @@
               <span class="fu-notes-snippet" *ngIf="fu.notes" [title]="fu.notes">
                 "{{ fu.notes }}"
               </span>
-              <div class="fu-recent-remark" *ngIf="getLatestCompletedRemark(fu)">
+              <div class="fu-recent-remark" *ngIf="getLatestRemark(fu)">
                 <span class="remark-badge">Last Remark:</span>
-                <span class="remark-text">"{{ getLatestCompletedRemark(fu) }}"</span>
+                <span class="remark-text">"{{ getLatestRemark(fu) }}"</span>
               </div>
             </div>
           </td>
@@ -280,34 +251,9 @@
                 <span class="time-text">{{ fu.scheduledAt | date:'mediumDate' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
               </div>
               <span class="relative-pill pill-overdue" *ngIf="isOverdue(fu)">Overdue</span>
-              <span class="relative-pill pill-today" *ngIf="isToday(fu.scheduledAt) && fu.status === 'PENDING'">Today</span>
-              <span class="relative-pill pill-tomorrow" *ngIf="isTomorrow(fu.scheduledAt) && fu.status === 'PENDING'">Tomorrow</span>
+              <span class="relative-pill pill-today" *ngIf="isToday(fu.scheduledAt)">Today</span>
+              <span class="relative-pill pill-tomorrow" *ngIf="isTomorrow(fu.scheduledAt)">Tomorrow</span>
             </div>
-          </td>
-
-          <!-- Assigned Rep -->
-          <td>
-            <div class="rep-info-cell" *ngIf="fu.assignedTo">
-              <div class="rep-avatar" *ngIf="!fu.assignedTo.avatarUrl">
-                {{ fu.assignedTo.firstName ? fu.assignedTo.firstName[0] : '' }}{{ fu.assignedTo.lastName ? fu.assignedTo.lastName[0] : '' }}
-              </div>
-              <img *ngIf="fu.assignedTo.avatarUrl" [src]="fu.assignedTo.avatarUrl" class="rep-avatar-img" alt="Rep Avatar" />
-              <div class="rep-text">
-                <span class="rep-name">{{ fu.assignedTo.firstName }} {{ fu.assignedTo.lastName }}</span>
-                <span class="rep-dept" *ngIf="fu.assignedTo.designation?.name || fu.assignedTo.department?.name">
-                  {{ fu.assignedTo.designation?.name || fu.assignedTo.department?.name }}
-                </span>
-              </div>
-            </div>
-            <div class="unassigned-text" *ngIf="!fu.assignedTo">Unassigned</div>
-          </td>
-
-          <!-- Status Badge -->
-          <td>
-            <span class="status-pill" [class.status-pill-pending]="fu.status === 'PENDING'" [class.status-pill-completed]="fu.status === 'COMPLETED'">
-              <span class="status-dot"></span>
-              {{ fu.status === 'COMPLETED' ? 'Done' : 'Pending' }}
-            </span>
           </td>
 
           <!-- Action Menu (Employee Directory style) -->
@@ -318,16 +264,16 @@
               </button>
 
               <mat-menu #actionMenu="matMenu" panelClass="custom-action-menu" xPosition="before">
-                <!-- Schedule Follow-Up -->
-                <button mat-menu-item class="menu-item" (click)="openAddFollowUpModal(fu, $event)">
-                  <svg lucidePlus size="14" class="menu-icon text-primary"></svg>
-                  <span class="menu-text">Schedule Follow-Up</span>
+                <!-- Edit Follow-Up -->
+                <button mat-menu-item class="menu-item" (click)="openEditFollowUpModal(fu, $event)">
+                  <svg lucideCalendarClock size="14" class="menu-icon text-primary"></svg>
+                  <span class="menu-text">Edit Follow-Up</span>
                 </button>
 
-                <!-- Mark as Completed -->
-                <button mat-menu-item class="menu-item text-success" *ngIf="fu.status === 'PENDING'" (click)="startCompleteFollowUp(fu, $event)">
-                  <svg lucideCheck size="14" class="menu-icon text-success"></svg>
-                  <span class="menu-text">Mark as Done</span>
+                <!-- Schedule New Follow-Up -->
+                <button mat-menu-item class="menu-item" (click)="openAddFollowUpModal(fu, $event)">
+                  <svg lucidePlus size="14" class="menu-icon"></svg>
+                  <span class="menu-text">Schedule Follow-Up</span>
                 </button>
 
                 <!-- View Lead Details & History -->
@@ -345,12 +291,11 @@
 
   <!-- MAIN VIEW: CARDS GRID VIEW -->
   <div class="cards-grid" *ngIf="!isLoading() && !error() && filteredFollowUps().length > 0 && viewMode() === 'cards'">
-    <div class="fu-card" 
-         *ngFor="let fu of filteredFollowUps()" 
-         [class.card-completed]="fu.status === 'COMPLETED'"
+    <div class="fu-card"
+         *ngFor="let fu of filteredFollowUps()"
          [class.card-overdue]="isOverdue(fu)"
-         [class.card-today]="isToday(fu.scheduledAt) && fu.status === 'PENDING'">
-      
+         [class.card-today]="isToday(fu.scheduledAt)">
+
       <!-- Card Header -->
       <div class="fu-card-header">
         <span class="fu-type-badge" [ngClass]="getTypeBadgeClass(fu.type)">
@@ -367,10 +312,7 @@
 
         <div class="header-badges-right">
           <span class="relative-pill pill-overdue" *ngIf="isOverdue(fu)">Overdue</span>
-          <span class="relative-pill pill-today" *ngIf="isToday(fu.scheduledAt) && fu.status === 'PENDING'">Today</span>
-          <span class="status-pill" [class.status-pill-pending]="fu.status === 'PENDING'" [class.status-pill-completed]="fu.status === 'COMPLETED'">
-            {{ fu.status === 'COMPLETED' ? 'Completed' : 'Pending' }}
-          </span>
+          <span class="relative-pill pill-today" *ngIf="isToday(fu.scheduledAt)">Today</span>
         </div>
       </div>
 
@@ -413,14 +355,6 @@
           <svg lucideCalendarClock size="15"></svg>
           <span>{{ fu.scheduledAt | date:'mediumDate' }} at {{ fu.scheduledAt | date:'shortTime' }}</span>
         </div>
-
-        <div class="meta-row rep-row" *ngIf="fu.assignedTo">
-          <div class="rep-avatar-sm" *ngIf="!fu.assignedTo.avatarUrl">
-            {{ fu.assignedTo.firstName ? fu.assignedTo.firstName[0] : '' }}{{ fu.assignedTo.lastName ? fu.assignedTo.lastName[0] : '' }}
-          </div>
-          <img *ngIf="fu.assignedTo.avatarUrl" [src]="fu.assignedTo.avatarUrl" class="rep-avatar-img-sm" alt="Avatar" />
-          <span class="rep-name-sm">{{ fu.assignedTo.firstName }} {{ fu.assignedTo.lastName }}</span>
-        </div>
       </div>
 
       <!-- Card Actions Footer -->
@@ -436,13 +370,13 @@
           </button>
 
           <mat-menu #cardMenu="matMenu" panelClass="custom-action-menu" xPosition="before">
-            <button mat-menu-item class="menu-item" (click)="openAddFollowUpModal(fu, $event)">
-              <svg lucidePlus size="14" class="menu-icon text-primary"></svg>
-              <span class="menu-text">Schedule Follow-Up</span>
+            <button mat-menu-item class="menu-item" (click)="openEditFollowUpModal(fu, $event)">
+              <svg lucideCalendarClock size="14" class="menu-icon text-primary"></svg>
+              <span class="menu-text">Edit Follow-Up</span>
             </button>
-            <button mat-menu-item class="menu-item text-success" *ngIf="fu.status === 'PENDING'" (click)="startCompleteFollowUp(fu, $event)">
-              <svg lucideCheck size="14" class="menu-icon text-success"></svg>
-              <span class="menu-text">Mark as Done</span>
+            <button mat-menu-item class="menu-item" (click)="openAddFollowUpModal(fu, $event)">
+              <svg lucidePlus size="14" class="menu-icon"></svg>
+              <span class="menu-text">Schedule Follow-Up</span>
             </button>
             <button mat-menu-item class="menu-item" (click)="viewLead(fu.lead, $event)">
               <svg lucideEye size="14" class="menu-icon"></svg>
@@ -452,86 +386,6 @@
         </div>
       </div>
 
-    </div>
-  </div>
-</div>
-
-<!-- ==================== COMPLETE FOLLOW-UP MODAL ==================== -->
-<div class="modal-backdrop" *ngIf="showCompleteModal && completingFollowUp" (click)="cancelCompleteFollowUp()">
-  <div class="modal-card followup-modal-card complete-fu-modal" (click)="$event.stopPropagation()">
-    <!-- Modal Header -->
-    <div class="modal-header">
-      <div class="modal-header-left">
-        <div class="modal-icon-badge icon-badge-complete">
-          <svg lucideCheckCircle size="20"></svg>
-        </div>
-        <div>
-          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #0f172a;">Complete Follow-Up</h3>
-          <p class="modal-subtitle">{{ completingFollowUp.title }} • {{ completingFollowUp.lead?.companyName || 'Client' }}</p>
-        </div>
-      </div>
-      <button class="btn-icon-close" (click)="cancelCompleteFollowUp()" [disabled]="isSavingOutcome">
-        <svg lucideX size="18"></svg>
-      </button>
-    </div>
-    
-    <!-- Modal Body -->
-    <div class="modal-body enhanced-body" style="padding: 20px 24px;">
-      <!-- Follow-up Mini Summary Info -->
-      <div class="complete-fu-summary">
-        <div class="fu-summary-item">
-          <span class="fu-summary-label">Type:</span>
-          <span class="fu-type-badge" [ngClass]="getTypeBadgeClass(completingFollowUp.type)">
-            <span [ngSwitch]="completingFollowUp.type">
-              <svg *ngSwitchCase="'CALL'" lucidePhone size="12"></svg>
-              <svg *ngSwitchCase="'EMAIL'" lucideMail size="12"></svg>
-              <svg *ngSwitchCase="'MEETING'" lucideUser size="12"></svg>
-              <svg *ngSwitchCase="'DEMO'" lucideVideo size="12"></svg>
-              <svg *ngSwitchCase="'FIELD_VISIT'" lucideMapPin size="12"></svg>
-              <svg *ngSwitchDefault lucideCalendarClock size="12"></svg>
-            </span>
-            <span>{{ getTypeLabel(completingFollowUp.type) }}</span>
-          </span>
-        </div>
-        <div class="fu-summary-item" *ngIf="completingFollowUp.contactPerson">
-          <span class="fu-summary-label">Contact:</span>
-          <span class="fu-summary-val">{{ completingFollowUp.contactPerson }}</span>
-        </div>
-        <div class="fu-summary-item">
-          <span class="fu-summary-label">Scheduled:</span>
-          <span class="fu-summary-val">{{ completingFollowUp.scheduledAt | date:'mediumDate' }} at {{ completingFollowUp.scheduledAt | date:'shortTime' }}</span>
-        </div>
-      </div>
-
-      <!-- Textarea for Outcome -->
-      <div class="form-group" style="margin-top: 14px;">
-        <label style="font-weight: 600; color: #1e293b; font-size: 13px;">
-          Meeting Outcome & Discussion Remarks <span style="color: #ef4444;">*</span>
-        </label>
-        <textarea 
-          [(ngModel)]="outcomeText" 
-          placeholder="What was discussed? Did the client agree to the next step? Enter detailed meeting notes or next action points..." 
-          rows="4"
-          [disabled]="isSavingOutcome"
-          style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; line-height: 1.5;"
-        ></textarea>
-      </div>
-    </div>
-    
-    <!-- Modal Footer -->
-    <div class="modal-footer enhanced-footer">
-      <button type="button" class="btn-secondary" (click)="cancelCompleteFollowUp()" [disabled]="isSavingOutcome">Cancel</button>
-      <div class="footer-right-actions">
-        <button type="button" class="btn-cancel-status" (click)="submitFollowUpOutcome('CANCELLED')" [disabled]="isSavingOutcome">
-          <svg lucideX size="14"></svg>
-          <span>Mark Cancelled</span>
-        </button>
-        <button type="button" class="btn-complete-status" (click)="submitFollowUpOutcome('COMPLETED')" [disabled]="isSavingOutcome">
-          <svg *ngIf="isSavingOutcome" lucideLoader2 size="15" class="spin-icon"></svg>
-          <svg *ngIf="!isSavingOutcome" lucideCheck size="15"></svg>
-          <span>{{ isSavingOutcome ? 'Saving...' : 'Mark as Completed' }}</span>
-        </button>
-      </div>
     </div>
   </div>
 </div>
@@ -786,10 +640,9 @@
 
         <!-- History Timeline -->
         <div class="ldm-timeline" *ngIf="!isLoadingLeadHistory && selectedLeadFollowUps.length > 0">
-          <div class="ldm-timeline-item" *ngFor="let h of selectedLeadFollowUps" [class.timeline-completed]="h.status === 'COMPLETED'">
-            <div class="timeline-dot" [class.dot-completed]="h.status === 'COMPLETED'" [class.dot-pending]="h.status === 'PENDING'">
-              <svg *ngIf="h.status === 'COMPLETED'" lucideCheck size="11"></svg>
-              <svg *ngIf="h.status === 'PENDING'" lucideClock size="11"></svg>
+          <div class="ldm-timeline-item" *ngFor="let h of selectedLeadFollowUps">
+            <div class="timeline-dot">
+              <svg lucideClock size="11"></svg>
             </div>
             <div class="timeline-card">
               <div class="timeline-top">
@@ -807,39 +660,16 @@
                   </span>
                   <span class="timeline-objective">{{ h.title }}</span>
                 </div>
-                <div class="timeline-status-badge" [class.badge-completed]="h.status === 'COMPLETED'" [class.badge-pending]="h.status === 'PENDING'">
-                  {{ h.status === 'COMPLETED' ? 'Completed' : 'Pending' }}
-                </div>
               </div>
 
               <!-- Notes / Objective description -->
               <p class="timeline-notes" *ngIf="h.notes">{{ h.notes }}</p>
 
-              <!-- Completed Outcome / Remarks Box -->
-              <div class="timeline-outcome-box" *ngIf="h.outcome">
-                <div class="outcome-label">
-                  <svg lucideMessageSquare size="12"></svg>
-                  <span>Completion Remark / Outcome:</span>
-                </div>
-                <p class="outcome-text">"{{ h.outcome }}"</p>
-              </div>
-
-              <!-- Timeline Metadata: Handled by, Scheduled date, Completed date -->
+              <!-- Timeline Metadata: Scheduled date -->
               <div class="timeline-meta-bar">
                 <div class="meta-item">
                   <svg lucideCalendar size="12"></svg>
                   <span>Scheduled: {{ h.scheduledAt | date:'mediumDate' }} at {{ h.scheduledAt | date:'shortTime' }}</span>
-                </div>
-                <div class="meta-item" *ngIf="h.completedAt">
-                  <svg lucideCheckCircle size="12" class="text-success"></svg>
-                  <span>Done: {{ h.completedAt | date:'mediumDate' }}</span>
-                </div>
-                <div class="meta-item meta-rep" *ngIf="h.assignedTo">
-                  <img *ngIf="h.assignedTo.avatarUrl" [src]="h.assignedTo.avatarUrl" class="rep-avatar-xs" />
-                  <div class="rep-avatar-xs text-avatar" *ngIf="!h.assignedTo.avatarUrl">
-                    {{ h.assignedTo.firstName ? h.assignedTo.firstName[0] : '' }}
-                  </div>
-                  <span>Handled by {{ h.assignedTo.firstName }} {{ h.assignedTo.lastName }}</span>
                 </div>
               </div>
             </div>
@@ -868,7 +698,7 @@
           <svg lucideCalendarClock size="20"></svg>
         </div>
         <div>
-          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #0f172a;">Schedule New Follow-Up</h3>
+          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #0f172a;">{{ editingFollowUp ? 'Edit Follow-Up' : 'Schedule New Follow-Up' }}</h3>
           <p class="modal-subtitle">For {{ scheduleLead?.companyName }} ({{ scheduleLead?.contactName || scheduleLead?.contactPerson || 'Client' }})</p>
         </div>
       </div>
@@ -911,17 +741,6 @@
         </div>
       </div>
 
-      <!-- Assign Rep -->
-      <div class="form-group">
-        <label>Assign Sales Rep</label>
-        <select [(ngModel)]="scheduleForm.assignedToId" [disabled]="isSavingSchedule">
-          <option [ngValue]="null">Select Assigned Rep</option>
-          <option *ngFor="let emp of employees()" [ngValue]="emp.id">
-            {{ emp.firstName }} {{ emp.lastName }} ({{ emp.designation?.name || emp.department?.name || 'Sales Rep' }})
-          </option>
-        </select>
-      </div>
-
       <!-- Contact Person & Phone -->
       <div class="form-row form-row-2">
         <div class="form-group">
@@ -932,6 +751,15 @@
           <label>Phone / WhatsApp</label>
           <input type="text" [(ngModel)]="scheduleForm.contactPhone" placeholder="Phone number" [disabled]="isSavingSchedule" />
         </div>
+      </div>
+
+      <!-- Last Remark from Previous Follow-Up -->
+      <div class="last-remark-box" *ngIf="!editingFollowUp && previousFollowUpNote?.notes">
+        <div class="last-remark-label">
+          <svg lucideMessageSquare size="13"></svg>
+          <span>Last Remark ({{ previousFollowUpNote?.scheduledAt | date:'mediumDate' }})</span>
+        </div>
+        <p class="last-remark-text">"{{ previousFollowUpNote?.notes }}"</p>
       </div>
 
       <!-- Notes / Agenda -->
@@ -948,7 +776,7 @@
         <button type="button" class="btn-modal-primary" (click)="submitScheduleFollowUp()" [disabled]="isSavingSchedule || !scheduleForm.title.trim() || !scheduleForm.scheduledAt">
           <svg *ngIf="isSavingSchedule" lucideLoader2 size="15" class="spin-icon"></svg>
           <svg *ngIf="!isSavingSchedule" lucideCalendarClock size="15"></svg>
-          <span>{{ isSavingSchedule ? 'Scheduling...' : 'Schedule Follow-Up' }}</span>
+          <span>{{ isSavingSchedule ? 'Saving...' : editingFollowUp ? 'Save Changes' : 'Schedule Follow-Up' }}</span>
         </button>
       </div>
     </div>

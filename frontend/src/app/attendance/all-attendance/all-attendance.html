@@ -1,0 +1,101 @@
+<div class="all-attendance-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h2>All People Attendance</h2>
+      <p>Company-wide attendance for the selected month, filterable by employee, department, or status.</p>
+    </div>
+  </div>
+
+  <div class="filters-card">
+    <div class="filter-group">
+      <label>Month</label>
+      <select class="form-input" [(ngModel)]="filterMonth" (change)="load()">
+        <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Year</label>
+      <select class="form-input" [(ngModel)]="filterYear" (change)="load()">
+        <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Employee</label>
+      <select class="form-input" [(ngModel)]="filterEmployeeId" (change)="load()">
+        <option [ngValue]="null">All Employees</option>
+        <option *ngFor="let emp of employees()" [ngValue]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Department</label>
+      <select class="form-input" [(ngModel)]="filterDepartmentId" (change)="load()">
+        <option [ngValue]="null">All Departments</option>
+        <option *ngFor="let dept of departments()" [ngValue]="dept.id">{{ dept.name }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Status</label>
+      <select class="form-input" [(ngModel)]="filterStatus" (change)="load()">
+        <option value="">All Statuses</option>
+        <option value="PRESENT">Present</option>
+        <option value="ABSENT">Absent</option>
+        <option value="HALF_DAY">Half Day</option>
+      </select>
+    </div>
+
+    <button class="btn-reset" (click)="resetFilters()">
+      <svg lucideRotateCcw size="14"></svg> Reset
+    </button>
+  </div>
+
+  <div class="loading-state" *ngIf="isLoading()">
+    <div class="spinner"></div>
+    <p>Loading attendance…</p>
+  </div>
+
+  <div class="empty-state" *ngIf="!isLoading() && records().length === 0">
+    <svg lucideCalendarClock size="40"></svg>
+    <h3>No Attendance Records</h3>
+    <p>No attendance found for the selected filters.</p>
+  </div>
+
+  <div class="table-wrapper" *ngIf="!isLoading() && records().length > 0">
+    <table class="attendance-table">
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Department</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Clock In</th>
+          <th>Clock Out</th>
+          <th>Flags</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of records()">
+          <td>
+            <div class="employee-cell">
+              <div class="avatar-circle" *ngIf="!r.employee?.avatarUrl">{{ (r.employee?.firstName || '?')[0] }}</div>
+              <img *ngIf="r.employee?.avatarUrl" [src]="r.employee?.avatarUrl" class="avatar-img" />
+              <span>{{ r.employee?.firstName }} {{ r.employee?.lastName }}</span>
+            </div>
+          </td>
+          <td>{{ r.employee?.department?.name || '—' }}</td>
+          <td>{{ r.date | date:'mediumDate' }}</td>
+          <td><span class="status-round" [ngClass]="statusClass(r.status)"><span class="status-dot"></span>{{ r.status }}</span></td>
+          <td>{{ formatTime(r.clockIn) }}</td>
+          <td>{{ formatTime(r.clockOut) }}</td>
+          <td>
+            <span class="flag-badge late" *ngIf="r.isLate">Late</span>
+            <span class="flag-badge early" *ngIf="r.isEarlyLeave">Early Leave</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

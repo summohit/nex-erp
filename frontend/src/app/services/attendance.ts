@@ -74,4 +74,15 @@ export class AttendanceService {
   getTeamTimeline(start: string, end: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/team/timeline?start=${start}&end=${end}`);
   }
+
+  getAllEmployeesAttendance(filters: { month?: number; year?: number; employeeId?: number; departmentId?: number; status?: string }): Observable<AttendanceRecord[]> {
+    const params: string[] = [];
+    if (filters.month) params.push(`month=${filters.month}`);
+    if (filters.year) params.push(`year=${filters.year}`);
+    if (filters.employeeId) params.push(`employeeId=${filters.employeeId}`);
+    if (filters.departmentId) params.push(`departmentId=${filters.departmentId}`);
+    if (filters.status) params.push(`status=${filters.status}`);
+    const qs = params.length ? `?${params.join('&')}` : '';
+    return this.http.get<AttendanceRecord[]>(`${this.apiUrl}/all${qs}`);
+  }
 }

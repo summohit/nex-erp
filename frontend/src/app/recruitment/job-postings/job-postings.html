@@ -407,39 +407,101 @@
       </div>
 
       <!-- Dedicated Screening Questions Section -->
-      <div class="screening-questions-section">
-        <div class="questions-header">
-          <div class="questions-title-group">
-            <svg lucideHelpCircle size="18" class="text-orange"></svg>
-            <h3>Suggested Screening Questions</h3>
+      <!-- Dedicated Screening Questions Section -->
+      <div class="enhanced-card-section">
+        <div class="section-top-header">
+          <div class="header-left-wrap">
+            <div class="section-icon-badge badge-amber">
+              <svg lucideHelpCircle size="18"></svg>
+            </div>
+            <div class="header-title-text">
+              <h3 class="section-heading">Suggested Screening Questions</h3>
+              <p class="section-sub-text">These questions will be automatically assigned to interviewers for candidate screening.</p>
+            </div>
           </div>
-          <span class="badge-count">{{ screeningQuestions().length }} Questions</span>
+          <span class="count-pill pill-amber">{{ screeningQuestions().length }} Questions</span>
         </div>
-
-        <p class="section-help-text">These questions will be automatically assigned to interviewers for candidate screening.</p>
 
         <!-- Question List -->
         <div class="questions-list" *ngIf="screeningQuestions().length > 0">
           <div *ngFor="let q of screeningQuestions(); let i = index" class="question-item">
-            <span class="q-num">{{ i + 1 }}.</span>
+            <span class="q-num">{{ i + 1 }}</span>
             <span class="q-text">{{ q }}</span>
-            <button class="btn-icon-danger" (click)="removeScreeningQuestion(i)" title="Remove Question">
+            <button class="btn-item-delete" (click)="removeScreeningQuestion(i)" title="Remove Question">
               <svg lucideTrash2 size="14"></svg>
             </button>
           </div>
         </div>
 
         <!-- Add Custom Question Input -->
-        <div class="add-question-bar">
+        <div class="add-entry-row">
           <input 
             type="text" 
-            class="form-control" 
+            class="entry-input" 
             placeholder="Add custom screening question..." 
             [(ngModel)]="newQuestionInput" 
             (keyup.enter)="addScreeningQuestion()">
-          <button class="btn-outline btn-add-q" (click)="addScreeningQuestion()">
-            <svg lucidePlus size="14"></svg> Add
+          <button class="btn-entry-add" (click)="addScreeningQuestion()">
+            <svg lucidePlus size="14"></svg>
+            <span>Add</span>
           </button>
+        </div>
+      </div>
+
+      <!-- Required Skills Section -->
+      <div class="enhanced-card-section">
+        <div class="section-top-header">
+          <div class="header-left-wrap">
+            <div class="section-icon-badge badge-indigo">
+              <svg lucideBriefcase size="18"></svg>
+            </div>
+            <div class="header-title-text">
+              <h3 class="section-heading">Required Skills & Competencies</h3>
+              <p class="section-sub-text">Essential technical proficiencies and skills expected of candidates for this role.</p>
+            </div>
+          </div>
+          <span class="count-pill pill-indigo">{{ requiredSkills().length }} Skills</span>
+        </div>
+
+        <!-- Active Skill Chips List -->
+        <div class="skill-chips-container" *ngIf="requiredSkills().length > 0">
+          <span *ngFor="let skill of requiredSkills(); let i = index" class="modern-skill-chip">
+            <span>{{ skill }}</span>
+            <button class="btn-chip-remove" (click)="removeRequiredSkill(i)" title="Remove Skill">
+              <svg lucideX size="12"></svg>
+            </button>
+          </span>
+        </div>
+
+        <!-- Add Skill Input Bar -->
+        <div class="add-entry-row">
+          <input
+            type="text"
+            class="entry-input"
+            placeholder="Add a skill (e.g. Cisco, Firewall, AWS)..."
+            [(ngModel)]="newSkillInput"
+            (keyup.enter)="addRequiredSkill()">
+          <button class="btn-entry-add" (click)="addRequiredSkill()">
+            <svg lucidePlus size="14"></svg>
+            <span>Add</span>
+          </button>
+        </div>
+
+        <!-- Quick-add Suggestions -->
+        <div class="quick-skills-box">
+          <span class="quick-label">Suggested:</span>
+          <div class="quick-tags-list">
+            <button 
+              type="button"
+              *ngFor="let s of suggestedSkills" 
+              class="btn-quick-tag" 
+              [class.added]="requiredSkills().includes(s)"
+              (click)="addRequiredSkill(s)">
+              <svg lucidePlus size="11" *ngIf="!requiredSkills().includes(s)"></svg>
+              <svg lucideCheck size="11" *ngIf="requiredSkills().includes(s)"></svg>
+              <span>{{ s }}</span>
+            </button>
+          </div>
         </div>
       </div>
 

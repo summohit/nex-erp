@@ -293,9 +293,11 @@ export class DashboardService {
   }
 
   private async getCelebrations(companyId: number) {
+    // No avatarUrl here — this is fetched for every employee on every dashboard
+    // load, and the Upcoming Celebrations widget never renders a photo.
     const employees = await this.prisma.employee.findMany({
       where: { companyId },
-      select: { id: true, firstName: true, lastName: true, avatarUrl: true, dateOfBirth: true, joiningDate: true }
+      select: { id: true, firstName: true, lastName: true, dateOfBirth: true, joiningDate: true }
     });
 
     const now = new Date();

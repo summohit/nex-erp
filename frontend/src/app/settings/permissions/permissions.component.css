@@ -260,6 +260,12 @@
   color: #374151;
 }
 
+.action-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
 /* Toggle Switch */
 .toggle-switch {
   position: relative;

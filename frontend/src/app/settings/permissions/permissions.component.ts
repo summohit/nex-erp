@@ -15,6 +15,7 @@ interface PermissionNode {
 interface PermissionCategory extends PermissionNode {
   isExpanded: boolean;
   subItems: PermissionNode[];
+  viewAllEnabled?: boolean;
 }
 
 @Component({
@@ -76,9 +77,13 @@ export class PermissionsComponent implements OnInit {
     {
       id: 'attendance', title: 'Attendance & Leave', isExpanded: true, enabled: false,
       subItems: [
-        { id: 'attendance/timesheets', title: 'Timesheets', enabled: false },
+        { id: 'attendance/timesheets', title: 'Attendance', enabled: false },
+        { id: 'attendance/all', title: 'All People Attendance', enabled: false },
         { id: 'attendance/leaves', title: 'Time Off Requests', enabled: false },
-        { id: 'attendance/shifts', title: 'Shift Roster', enabled: false },
+        { id: 'attendance/approvals', title: 'Leave Approvals', enabled: false },
+        { id: 'attendance/balances', title: 'Leave Balances', enabled: false },
+        { id: 'attendance/shifts', title: 'All People Shift Roster', enabled: false },
+        { id: 'attendance/timeline', title: 'Team Timeline', enabled: false },
         { id: 'attendance/holidays', title: 'Holidays', enabled: false }
       ]
     },
@@ -112,7 +117,7 @@ export class PermissionsComponent implements OnInit {
     },
     {
       id: 'crm/leads', title: 'CRM', isExpanded: true, enabled: false,
-      subItems: []
+      subItems: [], viewAllEnabled: false
     },
     {
       id: 'sales', title: 'Sales', isExpanded: true, enabled: false,
@@ -128,6 +133,7 @@ export class PermissionsComponent implements OnInit {
         { id: 'settings/company', title: 'Company Profile', enabled: false },
         { id: 'settings/master-data', title: 'Master Data', enabled: false },
         { id: 'settings/permissions', title: 'Roles & Permissions', enabled: false },
+        { id: 'settings/system', title: 'System Settings', enabled: false },
         { id: 'settings/integrations', title: 'Integrations', enabled: false }
       ]
     }
@@ -242,6 +248,7 @@ export class PermissionsComponent implements OnInit {
         // Reset all toggles
         this.sidebarModules.forEach(cat => {
           cat.enabled = false;
+          if (cat.viewAllEnabled !== undefined) cat.viewAllEnabled = false;
           cat.subItems.forEach(sub => sub.enabled = false);
         });
 
@@ -257,6 +264,9 @@ export class PermissionsComponent implements OnInit {
                 if (sub) sub.enabled = true;
               });
             }
+          } else if (p.action === 'VIEW_ALL') {
+            const cat = this.sidebarModules.find(c => c.id === p.module);
+            if (cat) cat.viewAllEnabled = true;
           }
         });
         
@@ -319,5 +329,18 @@ export class PermissionsComponent implements OnInit {
 
   toggleExpand(category: PermissionCategory) {
     category.isExpanded = !category.isExpanded;
+  }
+
+  toggleViewAllLeads(category: PermissionCategory, enabled: boolean) {
+    category.viewAllEnabled = enabled;
+    this.permissionsService.setPermission(this.selectedRole, category.id, 'VIEW_ALL', enabled).subscribe({
+      next: () => {
+        this.toast.success(`View All Leads ${enabled ? 'enabled' : 'disabled'} for ${this.selectedRole}`);
+      },
+      error: () => {
+        category.viewAllEnabled = !enabled;
+        this.toast.error('Failed to update permission');
+      }
+    });
   }
 }

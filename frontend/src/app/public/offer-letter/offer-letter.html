@@ -1,0 +1,283 @@
+<!-- ══════════════ LOADING ══════════════ -->
+<div class="ol-centre" *ngIf="stage() === 'LOADING'">
+  <svg lucideLoader2 size="30" class="ol-spin"></svg>
+  <p>Preparing your document…</p>
+</div>
+
+<!-- ══════════════ ERROR ══════════════ -->
+<div class="ol-centre" *ngIf="stage() === 'ERROR'">
+  <div class="ol-state-icon err"><svg lucideAlertCircle size="26"></svg></div>
+  <h2>We couldn't open this document</h2>
+  <p>{{ errorMsg() }}</p>
+</div>
+
+<!-- ══════════════ LOCKED — password gate ══════════════ -->
+<div class="ol-lock-screen" *ngIf="stage() === 'LOCKED'">
+  <div class="ol-lock-card">
+    <div class="ol-lock-icon"><svg lucideLock size="24"></svg></div>
+    <h1>This document is protected</h1>
+    <p class="ol-lock-sub">
+      Hi {{ access()?.candidateName }} — please confirm your identity to open your
+      {{ access()?.jobTitle }} offer letter.
+    </p>
+
+    <label class="ol-field-label" for="docpw">Document password</label>
+    <input
+      id="docpw"
+      type="password"
+      class="ol-pw-input"
+      [class.err]="unlockError()"
+      placeholder="Enter password"
+      [ngModel]="passwordInput()"
+      (ngModelChange)="passwordInput.set($event)"
+      (keyup.enter)="submitPassword()"
+      autocomplete="off"
+    />
+
+    <p class="ol-hint" *ngIf="access()?.passwordHint">
+      <svg lucideShieldCheck size="13"></svg>
+      <span>{{ access()?.passwordHint }}</span>
+    </p>
+
+    <p class="ol-err-msg" *ngIf="unlockError()">
+      <svg lucideAlertCircle size="13"></svg> {{ unlockError() }}
+    </p>
+
+    <button class="ol-btn-primary full" (click)="submitPassword()" [disabled]="!passwordInput().trim() || isUnlocking()">
+      <svg *ngIf="isUnlocking()" lucideLoader2 size="15" class="ol-spin"></svg>
+      <span>{{ isUnlocking() ? 'Verifying…' : 'Open Document' }}</span>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════ SIGNING / COMPLETED / DECLINED shell ══════════════ -->
+<div class="ol-shell" *ngIf="stage() === 'SIGNING' || stage() === 'COMPLETED' || stage() === 'DECLINED'">
+
+  <!-- Top action bar -->
+  <header class="ol-topbar">
+    <div class="ol-topbar-left">
+      <div class="ol-doc-badge"><svg lucideFileText size="16"></svg></div>
+      <div class="ol-doc-meta">
+        <span class="ol-doc-title">Offer of Employment — {{ doc()?.jobTitle || access()?.jobTitle }}</span>
+        <span class="ol-doc-sub">{{ doc()?.companyName }}</span>
+      </div>
+    </div>
+
+    <!-- Progress + actions (signing only) -->
+    <div class="ol-topbar-right" *ngIf="stage() === 'SIGNING'">
+      <div class="ol-progress">
+        <div class="ol-progress-bar">
+          <div class="ol-progress-fill" [style.width.%]="(fieldsDone() / fieldsTotal) * 100"></div>
+        </div>
+        <span class="ol-progress-text">{{ fieldsDone() }} of {{ fieldsTotal }} required field{{ fieldsTotal === 1 ? '' : 's' }}</span>
+      </div>
+      <button class="ol-btn-ghost" (click)="openDecline()">Decline</button>
+      <button class="ol-btn-primary" (click)="finishSigning()" [disabled]="!canFinish()">
+        <svg *ngIf="isSubmitting()" lucideLoader2 size="15" class="ol-spin"></svg>
+        <svg *ngIf="!isSubmitting()" lucideCheck size="15"></svg>
+        <span>{{ isSubmitting() ? 'Submitting…' : 'Finish & Sign' }}</span>
+      </button>
+    </div>
+
+    <!-- Completed actions -->
+    <div class="ol-topbar-right" *ngIf="stage() === 'COMPLETED'">
+      <span class="ol-status-chip done"><svg lucideCheck size="13"></svg> Completed</span>
+      <button class="ol-btn-primary" (click)="downloadSigned()" [disabled]="!doc()?.signedPdfUrl">
+        <svg lucideDownload size="15"></svg><span>Download Signed PDF</span>
+      </button>
+    </div>
+
+    <div class="ol-topbar-right" *ngIf="stage() === 'DECLINED'">
+      <span class="ol-status-chip declined"><svg lucideX size="13"></svg> Declined</span>
+    </div>
+  </header>
+
+  <!-- Sticky action strip (signing only) -->
+  <div class="ol-action-strip" *ngIf="stage() === 'SIGNING'">
+    <ng-container *ngIf="!adoptedSignature()">
+      <span class="ol-strip-dot"></span>
+      <span class="ol-strip-text">Review the document, then add your signature to continue.</span>
+      <button class="ol-btn-yellow" (click)="scrollToField()">
+        <svg lucidePenLine size="14"></svg> Go to signature
+      </button>
+    </ng-container>
+    <ng-container *ngIf="adoptedSignature()">
+      <span class="ol-strip-dot done"></span>
+      <span class="ol-strip-text">Signature added. Tick the consent box below the document, then choose <strong>Finish &amp; Sign</strong>.</span>
+    </ng-container>
+  </div>
+
+  <!-- Completion banner -->
+  <div class="ol-banner done" *ngIf="stage() === 'COMPLETED'">
+    <div class="ol-banner-icon"><svg lucideCheck size="20"></svg></div>
+    <div>
+      <strong>Thank you — your offer has been signed.</strong>
+      <p>A countersigned copy including the Certificate of Completion is available above.</p>
+    </div>
+  </div>
+
+  <div class="ol-banner declined" *ngIf="stage() === 'DECLINED'">
+    <div class="ol-banner-icon"><svg lucideX size="20"></svg></div>
+    <div>
+      <strong>You have declined this offer.</strong>
+      <p>The hiring team has been notified. Contact them directly if this was a mistake.</p>
+    </div>
+  </div>
+
+  <!-- Document viewport -->
+  <main class="ol-doc-scroll" #docScroll>
+    <div class="ol-page" *ngIf="docHtml()">
+      <div class="ol-page-body" [innerHTML]="docHtml()"></div>
+    </div>
+
+    <div class="ol-page-loading" *ngIf="!docHtml()">
+      <svg lucideLoader2 size="22" class="ol-spin"></svg>
+      <span>Loading document…</span>
+    </div>
+
+    <!-- Signature field (signing only) -->
+    <div class="ol-sign-zone" *ngIf="stage() === 'SIGNING' && docHtml()" #signField>
+      <div class="ol-sign-card">
+        <div class="ol-sign-head">
+          <span class="ol-required-tag">Required</span>
+          <span class="ol-sign-label">Signature of {{ access()?.candidateName }}</span>
+        </div>
+
+        <!-- Empty field -->
+        <button class="ol-sign-target" *ngIf="!adoptedSignature()" (click)="openAdoptModal()">
+          <span class="ol-sign-tab"><svg lucidePenLine size="13"></svg> Sign</span>
+          <span class="ol-sign-placeholder">Click to add your signature</span>
+        </button>
+
+        <!-- Filled field -->
+        <div class="ol-sign-filled" *ngIf="adoptedSignature()">
+          <img [src]="adoptedSignature()" alt="Your signature" />
+          <div class="ol-sign-filled-actions">
+            <button (click)="openAdoptModal()" title="Change signature"><svg lucidePenLine size="13"></svg> Change</button>
+            <button class="danger" (click)="clearAdopted()" title="Remove signature"><svg lucideTrash2 size="13"></svg> Remove</button>
+          </div>
+        </div>
+
+        <!-- Consent -->
+        <label class="ol-consent">
+          <input type="checkbox" [checked]="agreedToTerms()" (change)="agreedToTerms.set(!agreedToTerms())" />
+          <span>
+            I have read and agree to the terms of this offer letter, and I consent to signing
+            electronically. I understand my electronic signature is legally binding.
+          </span>
+        </label>
+
+        <button class="ol-btn-primary full lg" (click)="finishSigning()" [disabled]="!canFinish()">
+          <svg *ngIf="isSubmitting()" lucideLoader2 size="16" class="ol-spin"></svg>
+          <svg *ngIf="!isSubmitting()" lucideCheck size="16"></svg>
+          <span>{{ isSubmitting() ? 'Submitting…' : 'Finish & Sign' }}</span>
+        </button>
+        <p class="ol-err-msg centre" *ngIf="errorMsg()"><svg lucideAlertCircle size="13"></svg> {{ errorMsg() }}</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══════════════ ADOPT SIGNATURE MODAL ══════════════ -->
+<div class="ol-modal-backdrop" *ngIf="showAdoptModal()" (click)="closeAdoptModal()">
+  <div class="ol-modal" (click)="$event.stopPropagation()">
+    <div class="ol-modal-head">
+      <div>
+        <h3>Adopt your signature</h3>
+        <p>Confirm how your signature should appear on the document.</p>
+      </div>
+      <button class="ol-modal-close" (click)="closeAdoptModal()"><svg lucideX size="18"></svg></button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="ol-tabs">
+      <button [class.active]="sigTab() === 'TYPE'" (click)="setSigTab('TYPE')"><svg lucideType size="14"></svg> Type</button>
+      <button [class.active]="sigTab() === 'DRAW'" (click)="setSigTab('DRAW')"><svg lucidePenLine size="14"></svg> Draw</button>
+      <button [class.active]="sigTab() === 'UPLOAD'" (click)="setSigTab('UPLOAD')"><svg lucideUpload size="14"></svg> Upload</button>
+    </div>
+
+    <div class="ol-modal-body">
+      <!-- TYPE -->
+      <ng-container *ngIf="sigTab() === 'TYPE'">
+        <label class="ol-field-label" for="typedname">Full name</label>
+        <input id="typedname" type="text" class="ol-text-input"
+               [ngModel]="typedName()" (ngModelChange)="typedName.set($event)" placeholder="Your full name" />
+
+        <p class="ol-field-label mt">Choose a style</p>
+        <div class="ol-font-grid">
+          <button *ngFor="let f of signatureFonts; let i = index"
+                  class="ol-font-option" [class.active]="selectedFont() === i" (click)="selectedFont.set(i)">
+            <span class="ol-font-preview" [style.fontFamily]="f.css">{{ typedName() || 'Your Name' }}</span>
+            <span class="ol-font-name">{{ f.label }}</span>
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- DRAW -->
+      <ng-container *ngIf="sigTab() === 'DRAW'">
+        <p class="ol-field-label">Draw your signature below</p>
+        <div class="ol-canvas-wrap">
+          <canvas #drawCanvas class="ol-canvas"
+                  (mousedown)="startDraw($event)" (mousemove)="moveDraw($event)"
+                  (mouseup)="endDraw()" (mouseleave)="endDraw()"
+                  (touchstart)="startDraw($event)" (touchmove)="moveDraw($event)"
+                  (touchend)="endDraw()"></canvas>
+          <span class="ol-canvas-baseline"></span>
+        </div>
+        <button class="ol-btn-text" (click)="clearCanvas()"><svg lucideTrash2 size="13"></svg> Clear</button>
+      </ng-container>
+
+      <!-- UPLOAD -->
+      <ng-container *ngIf="sigTab() === 'UPLOAD'">
+        <p class="ol-field-label">Upload an image of your signature</p>
+        <label class="ol-upload-zone" for="sigUpload">
+          <svg lucideUpload size="26"></svg>
+          <strong>Choose an image</strong>
+          <span>PNG or JPG with a transparent or white background works best</span>
+        </label>
+        <input id="sigUpload" type="file" accept="image/*" (change)="onSignatureUpload($event)" hidden />
+      </ng-container>
+    </div>
+
+    <div class="ol-modal-foot">
+      <p class="ol-legal">
+        By selecting <strong>Adopt and Sign</strong>, I agree this signature will be the electronic
+        representation of my signature for all purposes on this document.
+      </p>
+      <div class="ol-modal-actions">
+        <button class="ol-btn-ghost" (click)="closeAdoptModal()">Cancel</button>
+        <button class="ol-btn-primary" (click)="adoptSignature()" [disabled]="!canAdopt()" *ngIf="sigTab() !== 'UPLOAD'">
+          Adopt and Sign
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ DECLINE MODAL ══════════════ -->
+<div class="ol-modal-backdrop" *ngIf="showDeclineModal()" (click)="closeDecline()">
+  <div class="ol-modal sm" (click)="$event.stopPropagation()">
+    <div class="ol-modal-head">
+      <div>
+        <h3>Decline this offer?</h3>
+        <p>The hiring team will be notified. This cannot be undone.</p>
+      </div>
+      <button class="ol-modal-close" (click)="closeDecline()"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="ol-modal-body">
+      <label class="ol-field-label" for="declinereason">Reason (optional)</label>
+      <textarea id="declinereason" rows="3" class="ol-text-input"
+                [ngModel]="declineReason()" (ngModelChange)="declineReason.set($event)"
+                placeholder="Let them know why, if you'd like"></textarea>
+    </div>
+    <div class="ol-modal-foot">
+      <div class="ol-modal-actions">
+        <button class="ol-btn-ghost" (click)="closeDecline()">Cancel</button>
+        <button class="ol-btn-danger" (click)="confirmDecline()" [disabled]="isSubmitting()">
+          <svg *ngIf="isSubmitting()" lucideLoader2 size="15" class="ol-spin"></svg>
+          <span>{{ isSubmitting() ? 'Submitting…' : 'Decline Offer' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

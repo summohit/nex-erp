@@ -1,9 +1,11 @@
 import { Controller, Get, Post, Body, UseGuards, Request, Param, Query } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 
 @Controller('attendance')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
@@ -56,5 +58,24 @@ export class AttendanceController {
   @Get('team/timeline')
   getTeamTimeline(@Request() req, @Query('start') start: string, @Query('end') end: string) {
     return this.attendanceService.getTeamTimeline(req.user.companyId, start, end);
+  }
+
+  @Get('all')
+  @Permissions('attendance/all')
+  getAllEmployeesAttendance(
+    @Request() req,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('employeeId') employeeId?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.attendanceService.getAllEmployeesAttendance(req.user.companyId, {
+      month: month ? +month : undefined,
+      year: year ? +year : undefined,
+      employeeId: employeeId ? +employeeId : undefined,
+      departmentId: departmentId ? +departmentId : undefined,
+      status,
+    });
   }
 }

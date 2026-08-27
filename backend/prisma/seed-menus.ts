@@ -77,11 +77,12 @@ const menuSections: MenuSection[] = [
         icon: 'lucideCalendarClock',
         route: '/attendance',
         subItems: [
-          { id: 'attendance/timesheets', title: 'Timesheets', route: '/attendance/timesheets' },
+          { id: 'attendance/timesheets', title: 'Attendance', route: '/attendance/timesheets' },
+          { id: 'attendance/all', title: 'All People Attendance', route: '/attendance/all' },
           { id: 'attendance/leaves', title: 'Time Off Requests', route: '/attendance/leaves' },
           { id: 'attendance/approvals', title: 'Leave Approvals', route: '/attendance/approvals' },
           { id: 'attendance/balances', title: 'Leave Balances', route: '/attendance/balances' },
-          { id: 'attendance/shifts', title: 'Shift Roster', route: '/attendance/shifts' },
+          { id: 'attendance/shifts', title: 'All People Shift Roster', route: '/attendance/shifts' },
           { id: 'attendance/timeline', title: 'Team Timeline', route: '/attendance/timeline' },
           { id: 'attendance/holidays', title: 'Holidays', route: '/attendance/holidays' }
         ]

@@ -15,6 +15,10 @@ export class ShiftsService {
     return this.http.get<Shift[]>(this.apiUrl);
   }
 
+  getMyShift(): Observable<{ shift: Shift | null; rotations: any[] }> {
+    return this.http.get<{ shift: Shift | null; rotations: any[] }>(`${this.apiUrl}/me`);
+  }
+
   createShift(data: Partial<Shift>): Observable<Shift> {
     return this.http.post<Shift>(this.apiUrl, data);
   }

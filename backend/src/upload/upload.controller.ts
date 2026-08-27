@@ -59,6 +59,21 @@ export class UploadController {
     return this.processUpload(file, '/resumes');
   }
 
+  @Post('image')
+  @UseInterceptors(FileInterceptor('file', {
+    fileFilter: (req: any, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!['image/jpeg', 'image/png'].includes(file.mimetype) && !['.jpg', '.jpeg', '.png'].includes(ext)) {
+        return cb(new HttpException('Only JPG and PNG images are allowed', HttpStatus.BAD_REQUEST), false);
+      }
+      cb(null, true);
+    },
+    limits: { fileSize: 5 * 1024 * 1024 }
+  }))
+  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+    return this.processUpload(file, '/candidate_photos');
+  }
+
   private async processUpload(file: Express.Multer.File, folder: string) {
     if (!file) {
       throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);

@@ -57,9 +57,19 @@ export class ApplicationsService {
     return application;
   }
 
-  async updateStatus(id: number, companyId: number, status: string, offeredSalary?: number) {
+  async updateStatus(
+    id: number,
+    companyId: number,
+    status: string,
+    offeredSalary?: number,
+    rejectionReason?: string,
+    // Captured alongside the salary when an offer is made — both are printed on
+    // the generated offer letter ({{joiningDate}} / {{candidateAddress}}).
+    joiningDate?: string | Date | null,
+    address?: string | null,
+  ) {
     const application = await this.findOne(id, companyId);
-    
+
     let approvalStatus = application.approvalStatus;
     let finalStatus = status;
 
@@ -74,9 +84,14 @@ export class ApplicationsService {
 
     return this.prisma.jobApplication.update({
       where: { id: application.id },
-      data: { 
+      data: {
         status: finalStatus,
         ...(offeredSalary !== undefined && { offeredSalary }),
+        ...(status === 'REJECTED' && { rejectionReason: rejectionReason || null }),
+        ...(joiningDate !== undefined && {
+          joiningDate: joiningDate ? new Date(joiningDate) : null,
+        }),
+        ...(address !== undefined && { address: address || null }),
         approvalStatus
       },
     });
@@ -349,6 +364,117 @@ export class ApplicationsService {
       totalApplications: applications.length,
       pipeline: pipelineCounts,
       averageScore: scoredCount > 0 ? Math.round(totalScore / scoredCount) : 0,
+    };
+  }
+
+  async getHiringReports(companyId: number) {
+    const applications = await this.prisma.jobApplication.findMany({
+      where: { companyId },
+      select: {
+        status: true,
+        jobId: true,
+        createdAt: true,
+        updatedAt: true,
+        job: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            status: true,
+            totalOpenings: true,
+            department: { select: { id: true, name: true } },
+            branch: { select: { id: true, name: true } },
+            recruiterId: true,
+            recruiter: { 
+              select: { 
+                id: true,
+                firstName: true, 
+                lastName: true,
+                avatarUrl: true,
+                user: { select: { email: true } },
+                designation: { select: { name: true } },
+                department: { select: { name: true } }
+              } 
+            },
+          },
+        },
+      },
+    });
+
+    const perJob: Record<string, { 
+      jobId: number; 
+      jobTitle: string; 
+      department: string;
+      branch: string;
+      type: string;
+      status: string;
+      totalOpenings: number;
+      total: number; 
+      pipeline: Record<string, number> 
+    }> = {};
+    const perRecruiter: Record<string, { 
+      recruiterId: number | null;
+      recruiterName: string;
+      avatarUrl: string | null;
+      email: string | null;
+      designation: string | null;
+      department: string | null;
+      total: number; 
+      hired: number 
+    }> = {};
+
+    let totalTimeToHireDays = 0;
+    let hiredCount = 0;
+
+    for (const app of applications) {
+      const jobKey = String(app.jobId);
+      if (!perJob[jobKey]) {
+        perJob[jobKey] = { 
+          jobId: app.jobId, 
+          jobTitle: app.job.title, 
+          department: app.job.department?.name || 'General',
+          branch: app.job.branch?.name || 'Main Office',
+          type: app.job.type || 'Full Time',
+          status: app.job.status || 'Open',
+          totalOpenings: app.job.totalOpenings || 1,
+          total: 0, 
+          pipeline: {} 
+        };
+      }
+      perJob[jobKey].total++;
+      perJob[jobKey].pipeline[app.status] = (perJob[jobKey].pipeline[app.status] || 0) + 1;
+
+      const recruiterKey = app.job.recruiterId ? String(app.job.recruiterId) : 'unassigned';
+      const recruiterName = app.job.recruiter
+        ? `${app.job.recruiter.firstName} ${app.job.recruiter.lastName}`
+        : 'Unassigned';
+      if (!perRecruiter[recruiterKey]) {
+        perRecruiter[recruiterKey] = { 
+          recruiterId: app.job.recruiter?.id || null,
+          recruiterName, 
+          avatarUrl: app.job.recruiter?.avatarUrl || null,
+          email: app.job.recruiter?.user?.email || null,
+          designation: app.job.recruiter?.designation?.name || null,
+          department: app.job.recruiter?.department?.name || null,
+          total: 0, 
+          hired: 0 
+        };
+      }
+      perRecruiter[recruiterKey].total++;
+
+      if (app.status === 'HIRED' || app.status === 'ONBOARDED') {
+        perRecruiter[recruiterKey].hired++;
+        const days = (app.updatedAt.getTime() - app.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+        totalTimeToHireDays += days;
+        hiredCount++;
+      }
+    }
+
+    return {
+      perJob: Object.values(perJob),
+      perRecruiter: Object.values(perRecruiter),
+      averageTimeToHireDays: hiredCount > 0 ? Math.round(totalTimeToHireDays / hiredCount) : null,
+      timeToHireNote: 'Approximated from application creation to last status update — no status-change history is tracked, so this is a lower bound, not an exact figure.',
     };
   }
 }

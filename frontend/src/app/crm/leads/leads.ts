@@ -8,13 +8,13 @@ import { environment } from '../../../environments/environment';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
 import { AuthService } from '../../services/auth.service';
+import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucidePlus,
   LucideGripVertical,
   LucideBuilding,
   LucidePhone,
   LucideMail,
-  LucideDollarSign,
   LucideCheckCircle,
   LucideX,
   LucideLoader2,
@@ -30,9 +30,10 @@ import {
   LucideChevronDown,
   LucideChevronUp, LucideLayoutGrid, LucideList,
   LucideGlobe, LucideTag, LucideUserCheck,
-  LucideClock, LucideCalendarClock, LucideMessageSquare, LucideVideo, LucideCheck,
+  LucideClock, LucideCalendarClock, LucideVideo, LucideCheck, LucideHistory,
   LucideUsers, LucideAward, LucideExternalLink,
-  LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost
+  LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
+  LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles
 } from '@lucide/angular';
 
 export interface FollowUp {
@@ -43,11 +44,8 @@ export interface FollowUp {
   contactPhone?: string;
   contactEmail?: string;
   type: 'CALL' | 'MEETING' | 'DEMO' | 'EMAIL' | 'FIELD_VISIT' | 'NOTE' | 'OTHER';
-  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
   scheduledAt: string;
-  completedAt?: string;
   notes?: string;
-  outcome?: string;
   assignedToId?: number;
   assignedTo?: { id: number, firstName: string, lastName: string, avatarUrl?: string, designation?: { name: string } };
   createdAt: string;
@@ -77,6 +75,7 @@ interface Lead {
   proposalDate?: string;
   createdAt: string;
   followUps?: FollowUp[];
+  quotations?: { id: number }[];
 }
 
 @Component({
@@ -89,10 +88,9 @@ interface Lead {
     LucidePlus, 
     LucideGripVertical, 
     LucideBuilding, 
-    LucidePhone, 
-    LucideMail, 
-    LucideDollarSign, 
-    LucideCheckCircle, 
+    LucidePhone,
+    LucideMail,
+    LucideCheckCircle,
     LucideX, 
     LucideLoader2,
     LucideSearch,
@@ -107,9 +105,10 @@ interface Lead {
     LucideChevronDown,
     LucideChevronUp, LucideLayoutGrid, LucideList,
     LucideGlobe, LucideTag, LucideUserCheck,
-    LucideClock, LucideCalendarClock, LucideMessageSquare, LucideVideo, LucideCheck,
+    LucideClock, LucideCalendarClock, LucideVideo, LucideCheck, LucideHistory,
     LucideUsers, LucideAward, LucideExternalLink,
-    LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost
+    LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
+    LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles
   ],
   templateUrl: './leads.html',
   styleUrls: ['./leads.css']
@@ -125,7 +124,42 @@ export class LeadsComponent implements OnInit {
   
   // Filter states
   searchQuery = '';
-  selectedStage = 'ALL';
+  selectedStages: string[] = []; // empty = all stages
+  showStageDropdown = false;
+  stageSearchQuery = '';
+  
+  selectedRepId: number | 'ALL' | 'UNASSIGNED' = 'ALL';
+  showRepDropdown = false;
+  repSearchQuery = '';
+
+  selectedCategory = 'ALL';
+  showCategoryDropdown = false;
+  categorySearchQuery = '';
+
+  selectedSource = 'ALL';
+  showSourceDropdown = false;
+  sourceSearchQuery = '';
+
+  selectedContactId: number | 'ALL' = 'ALL';
+  showContactDropdown = false;
+  contactFilterSearchQuery = '';
+
+  selectedAddedById: number | 'ALL' = 'ALL';
+  showAddedByDropdown = false;
+  addedByFilterSearchQuery = '';
+
+  selectedQuotationStatus: 'ALL' | 'QUOTED' | 'NOT_QUOTED' = 'ALL';
+  selectedFollowUpStatus: 'ALL' | 'OVERDUE' | 'SCHEDULED' | 'NONE' = 'ALL';
+
+  minValue: number | null = null;
+  maxValue: number | null = null;
+  dateField: 'createdAt' | 'expectedCloseDate' = 'createdAt';
+  datePreset: 'ALL' | 'TODAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'NEXT_MONTH' | 'THIS_QUARTER' | 'CUSTOM' = 'ALL';
+  dateStart = '';
+  dateEnd = '';
+  sortBy: 'newest' | 'oldest' | 'value_desc' | 'value_asc' | 'closing_soon' = 'newest';
+  showAdvancedFilters = false;
+
   ownerSearchQuery = '';
   showOwnerDropdown = false;
   broughtBySearchQuery = '';
@@ -163,8 +197,9 @@ export class LeadsComponent implements OnInit {
   ];
   
   viewMode: 'kanban' | 'table' = 'kanban';
-  
+
   kanbanColumns: { id: string, name: string, leads: Lead[] }[] = [];
+  highlightedLeadId: number | null = null;
 
   // Lead Form
   isEditing = false;
@@ -239,17 +274,8 @@ export class LeadsComponent implements OnInit {
     contactEmail: '',
     type: 'CALL' as 'CALL' | 'MEETING' | 'DEMO' | 'EMAIL' | 'FIELD_VISIT' | 'NOTE' | 'OTHER',
     scheduledAt: '',
-    notes: '',
-    assignedToId: null as number | null
+    notes: ''
   };
-
-  followUpOwnerSearchQuery = '';
-  showFollowUpOwnerDropdown = false;
-
-  // Outcome Logging
-  completingFollowUp: FollowUp | null = null;
-  outcomeText = '';
-  isSavingOutcome = false;
 
   // Field Visits
   selectedFieldVisit: FieldVisit | null = null;
@@ -261,7 +287,7 @@ export class LeadsComponent implements OnInit {
   fieldVisitsLoading = true;
   fieldVisitsExpanded = false;
 
-  constructor(private http: HttpClient, private fieldVisitsService: FieldVisitsService, private router: Router, public auth: AuthService) {}
+  constructor(private http: HttpClient, private fieldVisitsService: FieldVisitsService, private router: Router, public auth: AuthService, private toast: HotToastService) {}
 
   ngOnInit() {
     this.loadLeads();
@@ -272,6 +298,10 @@ export class LeadsComponent implements OnInit {
 
   goToFollowUps() {
     this.router.navigate(['/sales/follow-ups']);
+  }
+
+  goToLeadsDashboard() {
+    this.router.navigate(['/crm/leads/dashboard']);
   }
 
   loadEmployees() {
@@ -314,16 +344,29 @@ export class LeadsComponent implements OnInit {
     return { bg: '#fef9c3', text: '#854d0e' };
   }
 
-  loadLeads() {
+  loadLeads(onLoaded?: () => void) {
     this.isLoading = true;
     this.http.get<Lead[]>(`${environment.apiUrl}/crm/leads`).subscribe(data => {
       this.leads = data;
       this.distributeLeads();
       this.isLoading = false;
+      if (onLoaded) onLoaded();
     }, error => {
       this.isLoading = false;
       console.error('Failed to load leads', error);
     });
+  }
+
+  private highlightNewLead(leadId: number) {
+    this.highlightedLeadId = leadId;
+    if (this.viewMode === 'kanban') {
+      setTimeout(() => {
+        document.getElementById('lead-card-' + leadId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+    }
+    setTimeout(() => {
+      if (this.highlightedLeadId === leadId) this.highlightedLeadId = null;
+    }, 3000);
   }
 
   getFilteredEmployees(): any[] {
@@ -622,21 +665,150 @@ export class LeadsComponent implements OnInit {
     return 'New';
   }
 
+  private getDateRangeForPreset(): { start: Date | null, end: Date | null } {
+    if (this.datePreset === 'ALL') return { start: null, end: null };
+
+    if (this.datePreset === 'CUSTOM') {
+      const start = this.dateStart ? new Date(this.dateStart + 'T00:00:00') : null;
+      const end = this.dateEnd ? new Date(this.dateEnd + 'T23:59:59.999') : null;
+      return { start, end };
+    }
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    if (this.datePreset === 'TODAY') {
+      return { start: startOfToday, end: endOfToday };
+    }
+    if (this.datePreset === 'THIS_WEEK') {
+      const dayOfWeek = startOfToday.getDay(); // 0 = Sunday
+      const monday = new Date(startOfToday);
+      monday.setDate(startOfToday.getDate() - ((dayOfWeek + 6) % 7));
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+      return { start: monday, end: sunday };
+    }
+    if (this.datePreset === 'THIS_MONTH') {
+      const first = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const last = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { start: first, end: last };
+    }
+    if (this.datePreset === 'NEXT_MONTH') {
+      const first = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+      const last = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
+      return { start: first, end: last };
+    }
+    if (this.datePreset === 'THIS_QUARTER') {
+      const qStartMonth = Math.floor(now.getMonth() / 3) * 3;
+      const first = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0, 0);
+      const last = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59, 999);
+      return { start: first, end: last };
+    }
+    return { start: null, end: null };
+  }
+
+  // Follow-up status is derived from `scheduledAt` on the lead's follow-ups — there's
+  // no separate status field (removed from the model; a follow-up is just a logged
+  // interaction). "Overdue" = earliest upcoming follow-up already in the past.
+  private getLeadFollowUpStatus(lead: Lead): 'OVERDUE' | 'SCHEDULED' | 'NONE' {
+    const followUps = lead.followUps || [];
+    if (followUps.length === 0) return 'NONE';
+    const now = new Date();
+    const hasOverdue = followUps.some(f => new Date(f.scheduledAt) < now);
+    return hasOverdue ? 'OVERDUE' : 'SCHEDULED';
+  }
+
   getFilteredLeads(): Lead[] {
-    return this.leads.filter(lead => {
-      const matchesSearch = 
-        !this.searchQuery.trim() ||
-        lead.title?.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        lead.companyName?.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        lead.contactName?.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        lead.email?.toLowerCase().includes(this.searchQuery.toLowerCase());
+    const q = this.searchQuery.trim().toLowerCase();
+    const { start, end } = this.getDateRangeForPreset();
+
+    const filtered = this.leads.filter(lead => {
+      const matchesSearch =
+        !q ||
+        lead.title?.toLowerCase().includes(q) ||
+        lead.companyName?.toLowerCase().includes(q) ||
+        lead.contactName?.toLowerCase().includes(q) ||
+        lead.email?.toLowerCase().includes(q) ||
+        lead.phone?.toLowerCase().includes(q);
 
       const normalized = this.normalizeStatus(lead.status);
-      const matchesStage = 
-        this.selectedStage === 'ALL' || normalized === this.selectedStage;
+      const matchesStage =
+        this.selectedStages.length === 0 || this.selectedStages.includes(normalized);
 
-      return matchesSearch && matchesStage;
+      const matchesRep =
+        this.selectedRepId === 'ALL' ||
+        (this.selectedRepId === 'UNASSIGNED' ? !lead.assignedTo : lead.assignedTo?.id === this.selectedRepId);
+
+      const matchesCategory =
+        this.selectedCategory === 'ALL' || lead.dealCategory === this.selectedCategory;
+
+      const matchesSource =
+        this.selectedSource === 'ALL' || lead.source === this.selectedSource;
+
+      const matchesContact =
+        this.selectedContactId === 'ALL' || (lead as any).broughtByContact?.id === this.selectedContactId;
+
+      const matchesAddedBy =
+        this.selectedAddedById === 'ALL' || lead.addedBy?.id === this.selectedAddedById;
+
+      const hasQuotation = (lead.quotations?.length || 0) > 0;
+      const matchesQuotation =
+        this.selectedQuotationStatus === 'ALL' ||
+        (this.selectedQuotationStatus === 'QUOTED' ? hasQuotation : !hasQuotation);
+
+      const matchesFollowUpStatus =
+        this.selectedFollowUpStatus === 'ALL' || this.getLeadFollowUpStatus(lead) === this.selectedFollowUpStatus;
+
+      const value = Number(lead.value) || 0;
+      const matchesMin = this.minValue === null || this.minValue === undefined || value >= this.minValue;
+      const matchesMax = this.maxValue === null || this.maxValue === undefined || value <= this.maxValue;
+
+      let matchesDate = true;
+      if (start || end) {
+        const raw = this.dateField === 'expectedCloseDate' ? lead.expectedCloseDate : lead.createdAt;
+        if (!raw) {
+          matchesDate = false;
+        } else {
+          const d = new Date(raw);
+          matchesDate = (!start || d >= start) && (!end || d <= end);
+        }
+      }
+
+      return matchesSearch && matchesStage && matchesRep && matchesCategory &&
+        matchesSource && matchesContact && matchesAddedBy && matchesQuotation &&
+        matchesFollowUpStatus && matchesMin && matchesMax && matchesDate;
     });
+
+    return this.sortLeads(filtered);
+  }
+
+  private sortLeads(list: Lead[]): Lead[] {
+    const sorted = [...list];
+    switch (this.sortBy) {
+      case 'oldest':
+        sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        break;
+      case 'value_desc':
+        sorted.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+        break;
+      case 'value_asc':
+        sorted.sort((a, b) => (Number(a.value) || 0) - (Number(b.value) || 0));
+        break;
+      case 'closing_soon':
+        sorted.sort((a, b) => {
+          const aDate = a.expectedCloseDate ? new Date(a.expectedCloseDate).getTime() : Infinity;
+          const bDate = b.expectedCloseDate ? new Date(b.expectedCloseDate).getTime() : Infinity;
+          return aDate - bDate;
+        });
+        break;
+      case 'newest':
+      default:
+        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+    }
+    return sorted;
   }
 
   distributeLeads() {
@@ -656,9 +828,238 @@ export class LeadsComponent implements OnInit {
     return this.LEAD_STATUSES;
   }
 
+  // --- Stage multi-select dropdown ---
+  getFilteredStages(): string[] {
+    if (!this.stageSearchQuery.trim()) return this.LEAD_STATUSES;
+    const q = this.stageSearchQuery.toLowerCase();
+    return this.LEAD_STATUSES.filter(s => s.toLowerCase().includes(q));
+  }
+
+  toggleStage(status: string) {
+    const idx = this.selectedStages.indexOf(status);
+    if (idx > -1) this.selectedStages.splice(idx, 1);
+    else this.selectedStages.push(status);
+    this.onFilterChange();
+  }
+
+  isStageSelected(status: string): boolean {
+    return this.selectedStages.includes(status);
+  }
+
+  clearStages() {
+    this.selectedStages = [];
+    this.stageSearchQuery = '';
+    this.onFilterChange();
+  }
+
+  // --- Searchable Filter Dropdowns ---
+  getFilteredRepsForFilter(): any[] {
+    let reps = this.employees.filter(e => {
+      const dept = e.department?.name?.toLowerCase() || '';
+      const role = e.user?.role?.toUpperCase() || '';
+      return dept.includes('finance') || dept.includes('sales') || role === 'ADMIN' || role === 'SUPERADMIN';
+    });
+    if (this.repSearchQuery.trim()) {
+      const q = this.repSearchQuery.toLowerCase();
+      reps = reps.filter(e => 
+        `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+        e.designation?.name?.toLowerCase().includes(q) ||
+        e.department?.name?.toLowerCase().includes(q)
+      );
+    }
+    return reps;
+  }
+
+  selectRepFilter(repId: number | 'ALL' | 'UNASSIGNED') {
+    this.selectedRepId = repId;
+    this.showRepDropdown = false;
+    this.repSearchQuery = '';
+    this.onFilterChange();
+  }
+
+  getSelectedRepLabel(): string {
+    if (this.selectedRepId === 'ALL') return 'All Reps';
+    if (this.selectedRepId === 'UNASSIGNED') return 'Unassigned';
+    return this.getRepName(this.selectedRepId) || 'Selected Rep';
+  }
+
+  getFilteredContactsForFilter(): any[] {
+    if (!this.contactFilterSearchQuery.trim()) return this.leadContacts;
+    const q = this.contactFilterSearchQuery.toLowerCase();
+    return this.leadContacts.filter(c => 
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.companyName && c.companyName.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.mobile && c.mobile.toLowerCase().includes(q))
+    );
+  }
+
+  selectContactFilter(contactId: number | 'ALL') {
+    this.selectedContactId = contactId;
+    this.showContactDropdown = false;
+    this.contactFilterSearchQuery = '';
+    this.onFilterChange();
+  }
+
+  getSelectedContactLabel(): string {
+    if (this.selectedContactId === 'ALL') return 'All Contacts';
+    const c = this.leadContacts.find(item => item.id === this.selectedContactId);
+    return c ? (c.name + (c.companyName ? ` (${c.companyName})` : '')) : 'Selected Contact';
+  }
+
+  getFilteredAddedByForFilter(): any[] {
+    if (!this.addedByFilterSearchQuery.trim()) return this.employees;
+    const q = this.addedByFilterSearchQuery.toLowerCase();
+    return this.employees.filter(e =>
+      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+      e.designation?.name?.toLowerCase().includes(q) ||
+      e.department?.name?.toLowerCase().includes(q)
+    );
+  }
+
+  selectAddedByFilter(empId: number | 'ALL') {
+    this.selectedAddedById = empId;
+    this.showAddedByDropdown = false;
+    this.addedByFilterSearchQuery = '';
+    this.onFilterChange();
+  }
+
+  getSelectedAddedByLabel(): string {
+    if (this.selectedAddedById === 'ALL') return 'All';
+    const emp = this.employees.find(e => e.id === this.selectedAddedById);
+    return emp ? `${emp.firstName} ${emp.lastName}` : 'Selected';
+  }
+
+  selectQuotationStatusFilter(status: 'ALL' | 'QUOTED' | 'NOT_QUOTED') {
+    this.selectedQuotationStatus = status;
+    this.onFilterChange();
+  }
+
+  selectFollowUpStatusFilter(status: 'ALL' | 'OVERDUE' | 'SCHEDULED' | 'NONE') {
+    this.selectedFollowUpStatus = status;
+    this.onFilterChange();
+  }
+
+  getFilteredCategoriesForFilter(): any[] {
+    if (!this.categorySearchQuery.trim()) return this.DEAL_CATEGORIES;
+    const q = this.categorySearchQuery.toLowerCase();
+    return this.DEAL_CATEGORIES.filter(c => c.name.toLowerCase().includes(q));
+  }
+
+  selectCategoryFilter(categoryId: string) {
+    this.selectedCategory = categoryId;
+    this.showCategoryDropdown = false;
+    this.categorySearchQuery = '';
+    this.onFilterChange();
+  }
+
+  getSelectedCategoryLabel(): string {
+    if (this.selectedCategory === 'ALL') return 'All Categories';
+    const cat = this.DEAL_CATEGORIES.find(c => c.id === this.selectedCategory);
+    return cat?.name || this.selectedCategory;
+  }
+
+  getFilteredSourcesForFilter(): string[] {
+    if (!this.sourceSearchQuery.trim()) return this.LEAD_SOURCES;
+    const q = this.sourceSearchQuery.toLowerCase();
+    return this.LEAD_SOURCES.filter(s => s.toLowerCase().includes(q));
+  }
+
+  selectSourceFilter(source: string) {
+    this.selectedSource = source;
+    this.showSourceDropdown = false;
+    this.sourceSearchQuery = '';
+    this.onFilterChange();
+  }
+
+  getSelectedSourceLabel(): string {
+    return this.selectedSource === 'ALL' ? 'All Sources' : this.selectedSource;
+  }
+
+  closeAllFilterDropdowns() {
+    this.showStageDropdown = false;
+    this.showRepDropdown = false;
+    this.showCategoryDropdown = false;
+    this.showSourceDropdown = false;
+    this.showContactDropdown = false;
+    this.showAddedByDropdown = false;
+  }
+
+  // --- Active filter chips ---
+  getActiveFilterChips(): { key: string, label: string, clear: () => void }[] {
+    const chips: { key: string, label: string, clear: () => void }[] = [];
+
+    if (this.searchQuery.trim()) {
+      chips.push({ key: 'search', label: `Search: "${this.searchQuery.trim()}"`, clear: () => { this.searchQuery = ''; this.onFilterChange(); } });
+    }
+    if (this.selectedStages.length > 0) {
+      chips.push({ key: 'stage', label: `Stage: ${this.selectedStages.join(', ')}`, clear: () => this.clearStages() });
+    }
+    if (this.selectedRepId !== 'ALL') {
+      const label = this.selectedRepId === 'UNASSIGNED' ? 'Unassigned' : this.getRepName(this.selectedRepId);
+      chips.push({ key: 'rep', label: `Rep: ${label}`, clear: () => { this.selectedRepId = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.selectedCategory !== 'ALL') {
+      chips.push({ key: 'category', label: `Category: ${this.selectedCategory}`, clear: () => { this.selectedCategory = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.selectedSource !== 'ALL') {
+      chips.push({ key: 'source', label: `Source: ${this.selectedSource}`, clear: () => { this.selectedSource = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.selectedContactId !== 'ALL') {
+      const contact = this.leadContacts.find(c => c.id === this.selectedContactId);
+      chips.push({ key: 'contact', label: `Contact: ${contact?.name || 'Unknown'}`, clear: () => { this.selectedContactId = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.selectedAddedById !== 'ALL') {
+      chips.push({ key: 'addedBy', label: `Added By: ${this.getSelectedAddedByLabel()}`, clear: () => { this.selectedAddedById = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.selectedQuotationStatus !== 'ALL') {
+      chips.push({ key: 'quotation', label: `Quotation: ${this.selectedQuotationStatus === 'QUOTED' ? 'Quoted' : 'Not Quoted'}`, clear: () => { this.selectedQuotationStatus = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.selectedFollowUpStatus !== 'ALL') {
+      const label = this.selectedFollowUpStatus === 'OVERDUE' ? 'Overdue' : this.selectedFollowUpStatus === 'SCHEDULED' ? 'Scheduled' : 'No Follow-Up';
+      chips.push({ key: 'followUpStatus', label: `Follow-Up: ${label}`, clear: () => { this.selectedFollowUpStatus = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.minValue !== null || this.maxValue !== null) {
+      const min = this.minValue !== null ? this.minValue.toLocaleString() : '0';
+      const max = this.maxValue !== null ? this.maxValue.toLocaleString() : '∞';
+      chips.push({ key: 'value', label: `Value: ${min} - ${max}`, clear: () => { this.minValue = null; this.maxValue = null; this.onFilterChange(); } });
+    }
+    if (this.datePreset !== 'ALL') {
+      const fieldLabel = this.dateField === 'expectedCloseDate' ? 'Closing' : 'Created';
+      const presetLabel = this.datePreset === 'CUSTOM' ? `${this.dateStart || '…'} to ${this.dateEnd || '…'}` : this.datePreset.replace('_', ' ');
+      chips.push({ key: 'date', label: `${fieldLabel}: ${presetLabel}`, clear: () => { this.datePreset = 'ALL'; this.dateStart = ''; this.dateEnd = ''; this.onFilterChange(); } });
+    }
+
+    return chips;
+  }
+
+  getRepName(repId: number | 'ALL' | 'UNASSIGNED'): string {
+    if (repId === 'ALL' || repId === 'UNASSIGNED') return '';
+    const emp = this.employees.find(e => e.id === repId);
+    return emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown';
+  }
+
+  hasActiveFilters(): boolean {
+    return this.getActiveFilterChips().length > 0;
+  }
+
   clearFilters() {
     this.searchQuery = '';
-    this.selectedStage = 'ALL';
+    this.selectedStages = [];
+    this.selectedRepId = 'ALL';
+    this.selectedCategory = 'ALL';
+    this.selectedSource = 'ALL';
+    this.selectedContactId = 'ALL';
+    this.selectedAddedById = 'ALL';
+    this.selectedQuotationStatus = 'ALL';
+    this.selectedFollowUpStatus = 'ALL';
+    this.minValue = null;
+    this.maxValue = null;
+    this.datePreset = 'ALL';
+    this.dateField = 'createdAt';
+    this.dateStart = '';
+    this.dateEnd = '';
+    this.sortBy = 'newest';
     this.distributeLeads();
   }
 
@@ -792,26 +1193,28 @@ export class LeadsComponent implements OnInit {
         next: (updated) => {
           this.isSaving = false;
           this.closeModal();
-          this.loadLeads();
+          this.toast.success('Lead updated successfully');
+          this.loadLeads(() => this.highlightNewLead(updated.id));
           if (this.selectedLead && this.selectedLead.id === updated.id) {
             this.selectedLead = updated;
           }
         },
         error: (err) => {
           this.isSaving = false;
-          alert(err?.error?.message || 'Failed to update lead.');
+          this.toast.error(err?.error?.message || 'Failed to update lead.');
         }
       });
     } else {
       this.http.post<Lead>(`${environment.apiUrl}/crm/leads`, payload).subscribe({
-        next: () => {
+        next: (created) => {
           this.isSaving = false;
           this.closeModal();
-          this.loadLeads();
+          this.toast.success('Lead created successfully');
+          this.loadLeads(() => this.highlightNewLead(created.id));
         },
         error: (err) => {
           this.isSaving = false;
-          alert(err?.error?.message || 'Failed to save lead.');
+          this.toast.error(err?.error?.message || 'Failed to save lead.');
         }
       });
     }
@@ -849,8 +1252,6 @@ export class LeadsComponent implements OnInit {
     this.selectedLead = lead;
     this.showFollowUpModal = true;
     this.followUpTab = 'schedule';
-    this.completingFollowUp = null;
-    this.outcomeText = '';
 
     // Default scheduled time: Tomorrow at 10:00 AM local time
     const tomorrow = new Date();
@@ -866,8 +1267,7 @@ export class LeadsComponent implements OnInit {
       contactEmail: lead.email || '',
       type: 'CALL',
       scheduledAt: localISOTime,
-      notes: '',
-      assignedToId: lead.assignedTo?.id || (lead as any).assignedToId || null
+      notes: ''
     };
 
     this.loadLeadFollowUps(lead.id);
@@ -875,8 +1275,14 @@ export class LeadsComponent implements OnInit {
 
   closeFollowUpModal() {
     this.showFollowUpModal = false;
-    this.completingFollowUp = null;
-    this.outcomeText = '';
+  }
+
+  // Most recently scheduled follow-up already on file for this lead — shown as
+  // read-only context when scheduling the next one, since there's no separate
+  // "outcome" step anymore to surface it from.
+  getPreviousFollowUpNote(): FollowUp | null {
+    if (!this.leadFollowUps.length) return null;
+    return [...this.leadFollowUps].sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())[0];
   }
 
   loadLeadFollowUps(leadId: number) {
@@ -911,26 +1317,6 @@ export class LeadsComponent implements OnInit {
     this.newFollowUp.scheduledAt = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
   }
 
-  getFilteredFollowUpEmployees(): any[] {
-    if (!this.followUpOwnerSearchQuery.trim()) return this.employees;
-    const q = this.followUpOwnerSearchQuery.toLowerCase();
-    return this.employees.filter(e => 
-      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
-      e.designation?.name?.toLowerCase().includes(q)
-    );
-  }
-
-  getSelectedFollowUpOwner(): any {
-    if (!this.newFollowUp.assignedToId) return null;
-    return this.employees.find(e => e.id === this.newFollowUp.assignedToId);
-  }
-
-  selectFollowUpOwner(emp: any) {
-    this.newFollowUp.assignedToId = emp ? emp.id : null;
-    this.showFollowUpOwnerDropdown = false;
-    this.followUpOwnerSearchQuery = '';
-  }
-
   createFollowUp() {
     if (!this.selectedLead) return;
     if (!this.newFollowUp.title.trim() || !this.newFollowUp.scheduledAt) {
@@ -955,32 +1341,17 @@ export class LeadsComponent implements OnInit {
     });
   }
 
-  startCompleteFollowUp(f: FollowUp) {
-    this.completingFollowUp = f;
-    this.outcomeText = '';
-  }
-
-  cancelCompleteFollowUp() {
-    this.completingFollowUp = null;
-    this.outcomeText = '';
-  }
-
-  submitFollowUpOutcome(status: 'COMPLETED' | 'CANCELLED') {
-    if (!this.selectedLead || !this.completingFollowUp) return;
-    this.isSavingOutcome = true;
+  updateFollowUpNotes(f: FollowUp, notes: string) {
+    if (!this.selectedLead) return;
     this.http.put<FollowUp>(
-      `${environment.apiUrl}/crm/leads/${this.selectedLead.id}/follow-ups/${this.completingFollowUp.id}`,
-      { status, outcome: this.outcomeText }
+      `${environment.apiUrl}/crm/leads/${this.selectedLead.id}/follow-ups/${f.id}`,
+      { notes }
     ).subscribe({
-      next: () => {
-        this.isSavingOutcome = false;
-        this.completingFollowUp = null;
-        this.outcomeText = '';
-        this.loadLeadFollowUps(this.selectedLead!.id);
+      next: (updated) => {
+        this.leadFollowUps = this.leadFollowUps.map(x => x.id === updated.id ? updated : x);
       },
       error: (err) => {
-        this.isSavingOutcome = false;
-        alert(err?.error?.message || 'Failed to update follow-up status.');
+        alert(err?.error?.message || 'Failed to update notes.');
       }
     });
   }
@@ -1000,12 +1371,15 @@ export class LeadsComponent implements OnInit {
     }
   }
 
-  getPendingFollowUps(): FollowUp[] {
-    return this.leadFollowUps.filter(f => f.status === 'PENDING');
+  getUpcomingFollowUps(): FollowUp[] {
+    const now = new Date();
+    return this.leadFollowUps.filter(f => new Date(f.scheduledAt) >= now);
   }
 
-  getCompletedFollowUps(): FollowUp[] {
-    return this.leadFollowUps.filter(f => f.status === 'COMPLETED' || f.status === 'CANCELLED');
+  getPastFollowUps(): FollowUp[] {
+    const now = new Date();
+    return this.leadFollowUps.filter(f => new Date(f.scheduledAt) < now)
+      .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
   }
 
   isFollowUpOverdue(scheduledAt: string): boolean {

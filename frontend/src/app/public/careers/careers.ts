@@ -27,6 +27,7 @@ export interface PublicJob {
   workLocationType?: string;
   startDate?: string;
   endDate?: string;
+  companyId?: string;
 }
 
 @Component({
@@ -55,16 +56,26 @@ export class CareersComponent implements OnInit {
   // Drawer / Application State
   selectedJob = signal<PublicJob | null>(null);
   isApplyDrawerOpen = signal(false);
+  
   uploadFileName = signal<string>('');
   uploadError = signal<string>('');
   isUploading = signal<boolean>(false);
+
+  photoFileName = signal<string>('');
+  photoError = signal<string>('');
+  isPhotoUploading = signal<boolean>(false);
+
+
+
+
+
   isSubmitting = signal<boolean>(false);
   isSubmittedSuccess = signal<boolean>(false);
   submitError = signal<string | null>(null);
   showValidationErrors = signal<boolean>(false);
 
   // Candidate Application Form
-  candidateForm = {
+  candidateForm: any = {
     fullName: '',
     email: '',
     phone: '',
@@ -72,10 +83,24 @@ export class CareersComponent implements OnInit {
     portfolioUrl: '',
     experienceYears: '3-5 Years',
     noticePeriod: 'Immediate',
-    resumeUrl: ''
+    resumeUrl: '',
+    skills: [] as string[],
+    dateOfBirth: '',
+    gender: '',
+    currentLocation: '',
+    currentCtc: null,
+    expectedCtc: null,
+    source: '',
+    coverLetter: '',
+    photoUrl: ''
   };
 
+  newSkillInput = '';
   answersMap: { [key: string]: string } = {};
+
+  previousApplicationFound = signal(false);
+  previousApplicationData = signal<any>(null);
+  hasLoadedPreviousDetails = signal(false);
 
   ngOnInit() {
     this.fetchPublicJobs();
@@ -100,6 +125,54 @@ export class CareersComponent implements OnInit {
     } catch (err) {
       console.error('Error fetching public jobs:', err);
     }
+  }
+
+  checkPreviousApplication() {
+    const email = this.candidateForm.email?.trim();
+    const job = this.selectedJob();
+    if (!email || !job?.companyId || this.hasLoadedPreviousDetails()) return;
+
+    this.http.get<any>(`${environment.apiUrl}/public/applications/lookup`, {
+      params: { email, companyId: job.companyId }
+    }).subscribe({
+      next: (res) => {
+        if (res?.found) {
+          this.previousApplicationFound.set(true);
+          this.previousApplicationData.set(res.data);
+        } else {
+          this.previousApplicationFound.set(false);
+          this.previousApplicationData.set(null);
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  loadPreviousDetails() {
+    const data = this.previousApplicationData();
+    if (!data) return;
+    this.candidateForm = { ...this.candidateForm, ...data };
+    if (data.dateOfBirth) {
+      this.candidateForm.dateOfBirth = data.dateOfBirth.split('T')[0];
+    }
+    this.hasLoadedPreviousDetails.set(true);
+    this.previousApplicationFound.set(false);
+  }
+
+  dismissPreviousApplicationPrompt() {
+    this.previousApplicationFound.set(false);
+  }
+
+  addCandidateSkill() {
+    const skill = this.newSkillInput.trim();
+    if (skill && !this.candidateForm.skills.includes(skill)) {
+      this.candidateForm.skills = [...this.candidateForm.skills, skill];
+    }
+    this.newSkillInput = '';
+  }
+
+  removeCandidateSkill(index: number) {
+    this.candidateForm.skills = this.candidateForm.skills.filter((_: any, i: number) => i !== index);
   }
 
   filterByDepartment(dept: string) {
@@ -136,13 +209,26 @@ export class CareersComponent implements OnInit {
       portfolioUrl: '',
       experienceYears: job.experienceYears || '3-5 Years',
       noticePeriod: 'Immediate',
-      resumeUrl: ''
+      resumeUrl: '',
+      skills: [] as string[],
+      dateOfBirth: '',
+      gender: '',
+      currentLocation: '',
+      currentCtc: null,
+      expectedCtc: null,
+      source: '',
+      coverLetter: '',
+      photoUrl: ''
     };
     this.answersMap = {};
     (job.screeningQuestions || []).forEach(q => this.answersMap[q] = '');
     this.isSubmittedSuccess.set(false);
+    this.previousApplicationFound.set(false);
+    this.previousApplicationData.set(null);
+    this.hasLoadedPreviousDetails.set(false);
     this.submitError.set(null);
     this.uploadFileName.set('');
+    this.photoFileName.set('');
     this.isApplyDrawerOpen.set(true);
   }
 
@@ -187,6 +273,44 @@ export class CareersComponent implements OnInit {
       this.uploadFileName.set('');
     } finally {
       this.isUploading.set(false);
+    }
+  }
+
+  async onPhotoSelected(event: any) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    this.photoError.set('');
+    const maxSize = 5 * 1024 * 1024;
+
+    if (!file.type.startsWith('image/')) {
+      this.photoError.set('Only image files are allowed.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > maxSize) {
+      this.photoError.set('File size must be under 5MB.');
+      event.target.value = '';
+      return;
+    }
+
+    this.isPhotoUploading.set(true);
+    this.photoFileName.set(file.name);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res: any = await firstValueFrom(
+        this.http.post(`${environment.apiUrl}/upload/image`, formData)
+      );
+      this.candidateForm.photoUrl = res.url || res.filename || file.name;
+    } catch (err) {
+      this.photoError.set('Failed to upload photo. Please try again.');
+      this.photoFileName.set('');
+    } finally {
+      this.isPhotoUploading.set(false);
     }
   }
 

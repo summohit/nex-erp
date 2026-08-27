@@ -17,6 +17,23 @@ export class ShiftsService {
     });
   }
 
+  async getMyShift(userId: number) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { userId },
+      select: {
+        shift: true,
+        shiftRotations: { select: { id: true, name: true, description: true, rotationType: true } },
+      },
+    });
+
+    if (!employee) throw new BadRequestException('Employee profile not found');
+
+    return {
+      shift: employee.shift || null,
+      rotations: employee.shiftRotations || [],
+    };
+  }
+
   async create(companyId: number, data: { name: string, startTime: string, endTime: string, bufferTimeMinutes?: number }) {
     if (!data.name || !data.startTime || !data.endTime) {
       throw new BadRequestException('Name, startTime, and endTime are required');

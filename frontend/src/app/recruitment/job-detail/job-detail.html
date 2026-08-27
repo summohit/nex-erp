@@ -1,0 +1,603 @@
+<div class="job-detail-page" *ngIf="!isLoading() && job() as j">
+  
+  <!-- TOP NAVIGATION BAR -->
+  <div class="top-nav-bar">
+    <div class="nav-left">
+      <button class="btn-back-pill" (click)="goBack()">
+        <svg lucideArrowLeft size="16"></svg>
+        <span>Back to Jobs</span>
+      </button>
+      <div class="nav-breadcrumbs">
+        <span class="crumb-muted">Recruitment</span>
+        <span class="crumb-separator">/</span>
+        <span class="crumb-muted">Job Postings</span>
+        <span class="crumb-separator">/</span>
+        <span class="crumb-active">{{ j.title }}</span>
+      </div>
+    </div>
+    
+    <div class="nav-actions">
+      <button class="btn-nav-action" (click)="openJobDescriptionModal()" title="View Job Description & Requirements">
+        <svg lucideInfo size="15"></svg>
+        <span>Job Overview</span>
+      </button>
+      <button class="btn-nav-action" (click)="copyJobLink()" title="Copy Public Careers Page Link">
+        <svg *ngIf="!isCopiedJobLink()" lucideCopy size="15"></svg>
+        <svg *ngIf="isCopiedJobLink()" lucideCheck size="15"></svg>
+        <span>{{ isCopiedJobLink() ? 'Link Copied!' : 'Share Posting' }}</span>
+      </button>
+      <button class="btn-nav-action btn-nav-primary" (click)="openFullATS()" title="Open in ATS Kanban Board">
+        <svg lucideLayoutGrid size="15"></svg>
+        <span>ATS Kanban Board</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- JOB HERO OVERVIEW CARD -->
+  <div class="job-hero-card">
+    <div class="hero-main-content">
+      <div class="hero-title-section">
+        <div class="hero-badge-row">
+          <span class="job-status-pill" [ngClass]="'status-' + (j.status || 'open').toLowerCase()">
+            <span class="status-indicator-dot"></span>
+            {{ j.status || 'OPEN' }}
+          </span>
+          <span class="hero-type-pill" *ngIf="j.type">
+            <svg lucideBriefcase size="12"></svg>
+            {{ j.type }}
+          </span>
+        </div>
+        
+        <h1 class="hero-job-title">{{ j.title }}</h1>
+
+        <div class="hero-meta-grid">
+          <div class="hero-meta-item" *ngIf="j.department?.name">
+            <svg lucideBuilding size="14"></svg>
+            <span>{{ j.department?.name }}</span>
+          </div>
+          <div class="hero-meta-item" *ngIf="j.branch?.name">
+            <svg lucideMapPin size="14"></svg>
+            <span>{{ j.branch?.name }}</span>
+          </div>
+          <div class="hero-meta-item" *ngIf="j.experienceYears">
+            <svg lucideClock size="14"></svg>
+            <span>{{ j.experienceYears }} Experience</span>
+          </div>
+          <div class="hero-meta-item" *ngIf="j.minSalary || j.maxSalary">
+            <svg lucideDollarSign size="14"></svg>
+            <span>₹{{ (j.minSalary || 0) | number }} - ₹{{ (j.maxSalary || 0) | number }}</span>
+          </div>
+          <div class="hero-meta-item" *ngIf="j.createdAt">
+            <svg lucideCalendar size="14"></svg>
+            <span>Posted {{ j.createdAt | date:'mediumDate' }}</span>
+          </div>
+          <div class="hero-meta-item text-amber" *ngIf="j.endDate">
+            <svg lucideCalendarClock size="14"></svg>
+            <span>Deadline: {{ j.endDate | date:'mediumDate' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-quick-cta">
+        <button class="btn-view-desc" (click)="openJobDescriptionModal()">
+          <svg lucideFileText size="15"></svg>
+          <span>View Full Job Spec</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIPELINE STATS KPI CARDS -->
+  <div class="kpi-grid" *ngIf="pipelineStats() as stats">
+    <div class="kpi-card kpi-card-indigo" (click)="selectStageFilter('ALL')" [class.active-kpi]="statusFilter() === 'ALL'">
+      <div class="kpi-icon-wrap bg-indigo-soft">
+        <svg lucideUsers size="20"></svg>
+      </div>
+      <div class="kpi-body">
+        <span class="kpi-label">Total Applications</span>
+        <div class="kpi-number-row">
+          <span class="kpi-value text-indigo">{{ stats.total }}</span>
+          <span class="kpi-subtext">Received</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-card-purple" (click)="selectStageFilter('INTERVIEWING')" [class.active-kpi]="statusFilter() === 'INTERVIEWING'">
+      <div class="kpi-icon-wrap bg-purple-soft">
+        <svg lucideSparkles size="20"></svg>
+      </div>
+      <div class="kpi-body">
+        <span class="kpi-label">Active in Pipeline</span>
+        <div class="kpi-number-row">
+          <span class="kpi-value text-purple">{{ stats.activePipeline }}</span>
+          <span class="kpi-subtext">In Stages</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-card-emerald" (click)="selectStageFilter('HIRED')" [class.active-kpi]="statusFilter() === 'HIRED'">
+      <div class="kpi-icon-wrap bg-emerald-soft">
+        <svg lucideAward size="20"></svg>
+      </div>
+      <div class="kpi-body">
+        <span class="kpi-label">Hired / Openings</span>
+        <div class="kpi-number-row">
+          <span class="kpi-value text-emerald">{{ stats.hiredCount }} <small class="text-slate-muted">/ {{ stats.totalOpenings }}</small></span>
+          <span class="kpi-badge-pct">{{ stats.progressPercent }}% filled</span>
+        </div>
+        <div class="kpi-progress-track">
+          <div class="kpi-progress-bar bg-emerald" [style.width.%]="stats.progressPercent"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-card-rose" (click)="selectStageFilter('REJECTED')" [class.active-kpi]="statusFilter() === 'REJECTED'">
+      <div class="kpi-icon-wrap bg-rose-soft">
+        <svg lucideXCircle size="20"></svg>
+      </div>
+      <div class="kpi-body">
+        <span class="kpi-label">Archived / Rejected</span>
+        <div class="kpi-number-row">
+          <span class="kpi-value text-rose">{{ stats.rejectedCount }}</span>
+          <span class="kpi-subtext">Not Proceeding</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIPELINE STAGES FILTER PILLS -->
+  <div class="stages-filter-container">
+    <div class="stages-scroll-wrapper">
+      <button 
+        *ngFor="let stage of statusStages" 
+        class="stage-pill-btn" 
+        [class.active]="statusFilter() === stage.key"
+        [ngClass]="'stage-' + stage.color"
+        (click)="selectStageFilter(stage.key)">
+        <span class="stage-name">{{ stage.label }}</span>
+        <span class="stage-count-badge">{{ getStageCount(stage.key) }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- APPLICANTS MANAGEMENT CARD -->
+  <div class="applicants-main-card">
+    
+    <!-- CARD TOOLBAR -->
+    <div class="card-toolbar">
+      <div class="toolbar-left">
+        <div class="search-box">
+          <svg lucideSearch size="16" class="search-box-icon"></svg>
+          <input 
+            type="text" 
+            [ngModel]="searchQuery()" 
+            (ngModelChange)="searchQuery.set($event)" 
+            placeholder="Search candidate by name, email, phone..." />
+          <button class="search-clear-btn" *ngIf="searchQuery()" (click)="searchQuery.set('')">
+            <svg lucideX size="14"></svg>
+          </button>
+        </div>
+
+        <div class="results-summary-chip">
+          <span>Showing <strong>{{ filteredApplications().length }}</strong> candidate{{ filteredApplications().length === 1 ? '' : 's' }}</span>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <button class="btn-toolbar-action" (click)="exportCSV()" title="Export Filtered List to CSV">
+          <svg lucideDownload size="15"></svg>
+          <span>Export CSV</span>
+        </button>
+
+        <div class="view-mode-toggle">
+          <button 
+            class="toggle-btn" 
+            [class.active]="viewMode() === 'TABLE'" 
+            (click)="viewMode.set('TABLE')" 
+            title="Table View">
+            <svg lucideTable size="16"></svg>
+          </button>
+          <button 
+            class="toggle-btn" 
+            [class.active]="viewMode() === 'CARDS'" 
+            (click)="viewMode.set('CARDS')" 
+            title="Grid Cards View">
+            <svg lucideLayoutGrid size="16"></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE VIEW -->
+    <div class="table-responsive-wrapper" *ngIf="viewMode() === 'TABLE' && filteredApplications().length > 0">
+      <table class="applicants-modern-table">
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Contact Details</th>
+            <th>Current Stage</th>
+            <th>Applied Date</th>
+            <th>Experience / Info</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let app of filteredApplications()" class="applicant-row" (click)="openCandidateQuickView(app)">
+            
+            <!-- CANDIDATE NAME & AVATAR -->
+            <td class="cell-candidate">
+              <div class="candidate-info-group">
+                <div class="candidate-avatar" [style.background-color]="getAvatarColor(app.fullName)">
+                  {{ getInitials(app.fullName) }}
+                </div>
+                <div class="candidate-text">
+                  <span class="candidate-name-link">{{ app.fullName }}</span>
+                  <span class="candidate-sub" *ngIf="app.noticePeriod">Notice: {{ app.noticePeriod }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- CONTACT DETAILS -->
+            <td class="cell-contact" (click)="$event.stopPropagation()">
+              <div class="contact-links-group">
+                <div class="contact-line">
+                  <svg lucideMail size="13" class="text-slate"></svg>
+                  <a [href]="'mailto:' + app.email" class="contact-link" (click)="$event.stopPropagation()">{{ app.email }}</a>
+                  <button class="btn-copy-tiny" (click)="copyEmail(app.email, app.id, $event)" title="Copy email">
+                    <svg *ngIf="copiedEmailId() !== app.id" lucideCopy size="12"></svg>
+                    <svg *ngIf="copiedEmailId() === app.id" lucideCheck size="12"></svg>
+                  </button>
+                </div>
+                <div class="contact-line" *ngIf="app.phone">
+                  <svg lucidePhone size="13" class="text-slate"></svg>
+                  <a [href]="'tel:' + app.phone" class="contact-link" (click)="$event.stopPropagation()">{{ app.phone }}</a>
+                </div>
+              </div>
+            </td>
+
+            <!-- STAGE / STATUS BADGE (INTERACTIVE) -->
+            <td class="cell-status" (click)="$event.stopPropagation()">
+              <div class="status-dropdown-wrapper">
+                <button 
+                  class="stage-interactive-badge" 
+                  [ngClass]="statusBadgeClass(app.status)"
+                  (click)="toggleStatusMenu(app.id, $event)"
+                  title="Click to change candidate stage">
+                  <span class="badge-dot"></span>
+                  <span class="badge-text">{{ app.status || 'NEW' }}</span>
+                  <svg lucideChevronRight size="12" class="badge-chevron"></svg>
+                </button>
+
+                <!-- STATUS PICKER MENU -->
+                <div class="status-menu-popover" *ngIf="activeStatusMenuId() === app.id" (click)="$event.stopPropagation()">
+                  <div class="status-menu-header">Change Candidate Stage</div>
+                  <div class="status-menu-items">
+                    <button 
+                      *ngFor="let st of ['NEW', 'REVIEWING', 'SHORTLISTED', 'INTERVIEWING', 'OFFERED', 'HIRED', 'ONBOARDED', 'REJECTED']"
+                      class="status-menu-option"
+                      [class.current]="app.status === st"
+                      (click)="updateCandidateStatus(app, st, $event)">
+                      <span class="menu-dot" [ngClass]="'dot-' + st.toLowerCase()"></span>
+                      <span>{{ st }}</span>
+                      <svg lucideCheck size="14" class="menu-check" *ngIf="app.status === st"></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- APPLIED DATE -->
+            <td class="cell-applied">
+              <div class="applied-date-wrap">
+                <svg lucideCalendar size="13" class="text-slate"></svg>
+                <span>{{ app.createdAt | date:'mediumDate' }}</span>
+              </div>
+            </td>
+
+            <!-- EXPERIENCE / RESUME -->
+            <td class="cell-resume" (click)="$event.stopPropagation()">
+              <div class="resume-pill-group">
+                <span class="exp-tag" *ngIf="app.experienceYears">
+                  <svg lucideClock size="11"></svg>
+                  {{ app.experienceYears }}
+                </span>
+                <a *ngIf="app.resumeUrl" [href]="app.resumeUrl" target="_blank" class="btn-resume-link" (click)="$event.stopPropagation()">
+                  <svg lucideFileText size="13"></svg>
+                  <span>Resume</span>
+                </a>
+              </div>
+            </td>
+
+            <!-- ACTIONS -->
+            <td class="cell-actions text-right" (click)="$event.stopPropagation()">
+              <div class="actions-button-group">
+                <button class="btn-action-view" (click)="openCandidateQuickView(app)" title="Quick Candidate Preview">
+                  <svg lucideEye size="14"></svg>
+                  <span>View</span>
+                </button>
+                <button class="btn-action-ats" (click)="openFullATS(app)" title="Open in ATS Pipeline">
+                  <svg lucideExternalLink size="13"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- CARDS GRID VIEW -->
+    <div class="cards-grid-wrapper" *ngIf="viewMode() === 'CARDS' && filteredApplications().length > 0">
+      <div class="candidate-card-item" *ngFor="let app of filteredApplications()" (click)="openCandidateQuickView(app)">
+        <div class="card-item-header">
+          <div class="candidate-avatar" [style.background-color]="getAvatarColor(app.fullName)">
+            {{ getInitials(app.fullName) }}
+          </div>
+          <div class="card-item-title">
+            <h4 class="card-candidate-name">{{ app.fullName }}</h4>
+            <span class="card-applied-time">Applied {{ app.createdAt | date:'mediumDate' }}</span>
+          </div>
+          <span class="stage-interactive-badge card-badge" [ngClass]="statusBadgeClass(app.status)">
+            <span class="badge-dot"></span>
+            {{ app.status || 'NEW' }}
+          </span>
+        </div>
+
+        <div class="card-item-body">
+          <div class="card-info-row">
+            <svg lucideMail size="14" class="text-slate"></svg>
+            <span class="truncate">{{ app.email }}</span>
+          </div>
+          <div class="card-info-row" *ngIf="app.phone">
+            <svg lucidePhone size="14" class="text-slate"></svg>
+            <span>{{ app.phone }}</span>
+          </div>
+          <div class="card-info-row" *ngIf="app.experienceYears">
+            <svg lucideClock size="14" class="text-slate"></svg>
+            <span>{{ app.experienceYears }} Experience</span>
+          </div>
+        </div>
+
+        <div class="card-item-footer" (click)="$event.stopPropagation()">
+          <a *ngIf="app.resumeUrl" [href]="app.resumeUrl" target="_blank" class="card-resume-btn" (click)="$event.stopPropagation()">
+            <svg lucideFileText size="13"></svg>
+            <span>Resume</span>
+          </a>
+          <div class="card-footer-actions">
+            <button class="btn-card-primary" (click)="openCandidateQuickView(app)">
+              <svg lucideEye size="14"></svg> View
+            </button>
+            <button class="btn-card-secondary" (click)="openFullATS(app)" title="Full ATS view">
+              <svg lucideExternalLink size="13"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMPTY STATE -->
+    <div class="empty-state-card" *ngIf="filteredApplications().length === 0">
+      <div class="empty-icon-circle">
+        <svg lucideUsers size="36"></svg>
+      </div>
+      <h3>No candidates found</h3>
+      <p *ngIf="searchQuery() || statusFilter() !== 'ALL'">
+        No applications match your search query "{{ searchQuery() }}" or status filter "{{ statusFilter() }}".
+      </p>
+      <p *ngIf="!searchQuery() && statusFilter() === 'ALL'">
+        No applications have been received for this job posting yet.
+      </p>
+      <div class="empty-actions">
+        <button class="btn-empty-clear" *ngIf="searchQuery() || statusFilter() !== 'ALL'" (click)="searchQuery.set(''); statusFilter.set('ALL')">
+          Clear Filters
+        </button>
+        <button class="btn-empty-share" (click)="copyJobLink()">
+          <svg lucideShare2 size="15"></svg> Copy Careers Link
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CANDIDATE QUICK VIEW DRAWER (SLIDE OVER) -->
+<div class="drawer-overlay-backdrop" *ngIf="selectedApp()" (click)="closeCandidateQuickView()"></div>
+<div class="candidate-drawer" *ngIf="selectedApp() as candidate" [class.open]="selectedApp()">
+  <div class="drawer-top-header">
+    <div class="drawer-header-left">
+      <h3>Candidate Profile</h3>
+      <span class="drawer-subtitle">{{ job()?.title }}</span>
+    </div>
+    <button class="drawer-close-btn" (click)="closeCandidateQuickView()">
+      <svg lucideX size="18"></svg>
+    </button>
+  </div>
+
+  <div class="drawer-scroll-content">
+    
+    <!-- CANDIDATE IDENTITY CARD -->
+    <div class="drawer-identity-box">
+      <div class="drawer-avatar-big" [style.background-color]="getAvatarColor(candidate.fullName)">
+        {{ getInitials(candidate.fullName) }}
+      </div>
+      <div class="drawer-identity-info">
+        <h2 class="drawer-candidate-title">{{ candidate.fullName }}</h2>
+        <div class="drawer-status-pill-wrap">
+          <span class="stage-interactive-badge" [ngClass]="statusBadgeClass(candidate.status)">
+            <span class="badge-dot"></span>
+            {{ candidate.status || 'NEW' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK STAGE TRANSITION ACTIONS -->
+    <div class="drawer-section">
+      <div class="section-heading">Move Candidate Stage</div>
+      <div class="quick-stage-buttons-grid">
+        <button 
+          *ngFor="let s of ['REVIEWING', 'SHORTLISTED', 'INTERVIEWING', 'OFFERED', 'HIRED', 'REJECTED']"
+          class="btn-stage-quick"
+          [class.active-stage]="candidate.status === s"
+          [ngClass]="'btn-stage-' + s.toLowerCase()"
+          (click)="updateCandidateStatus(candidate, s)">
+          <span>{{ s }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- CONTACT DETAILS -->
+    <div class="drawer-section">
+      <div class="section-heading">Contact & Information</div>
+      <div class="drawer-info-list">
+        <div class="drawer-info-row">
+          <span class="info-label"><svg lucideMail size="14"></svg> Email</span>
+          <span class="info-val">
+            <a [href]="'mailto:' + candidate.email">{{ candidate.email }}</a>
+          </span>
+        </div>
+        <div class="drawer-info-row" *ngIf="candidate.phone">
+          <span class="info-label"><svg lucidePhone size="14"></svg> Phone</span>
+          <span class="info-val">
+            <a [href]="'tel:' + candidate.phone">{{ candidate.phone }}</a>
+          </span>
+        </div>
+        <div class="drawer-info-row" *ngIf="candidate.experienceYears">
+          <span class="info-label"><svg lucideClock size="14"></svg> Experience</span>
+          <span class="info-val bold">{{ candidate.experienceYears }}</span>
+        </div>
+        <div class="drawer-info-row" *ngIf="candidate.noticePeriod">
+          <span class="info-label"><svg lucideCalendarClock size="14"></svg> Notice Period</span>
+          <span class="info-val">{{ candidate.noticePeriod }}</span>
+        </div>
+        <div class="drawer-info-row" *ngIf="candidate.createdAt">
+          <span class="info-label"><svg lucideCalendar size="14"></svg> Applied On</span>
+          <span class="info-val">{{ candidate.createdAt | date:'medium' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESUME & LINKS -->
+    <div class="drawer-section" *ngIf="candidate.resumeUrl || candidate.linkedinUrl || candidate.portfolioUrl">
+      <div class="section-heading">Documents & Portfolios</div>
+      <div class="drawer-links-column">
+        <a *ngIf="candidate.resumeUrl" [href]="candidate.resumeUrl" target="_blank" class="drawer-doc-btn">
+          <svg lucideFileText size="16"></svg>
+          <div class="doc-text">
+            <strong>Download Resume</strong>
+            <small>PDF / Document</small>
+          </div>
+          <svg lucideExternalLink size="14" class="doc-ext-icon"></svg>
+        </a>
+        <a *ngIf="candidate.linkedinUrl" [href]="candidate.linkedinUrl" target="_blank" class="drawer-doc-btn">
+          <svg lucideGlobe size="16"></svg>
+          <div class="doc-text">
+            <strong>LinkedIn Profile</strong>
+            <small class="truncate">{{ candidate.linkedinUrl }}</small>
+          </div>
+          <svg lucideExternalLink size="14" class="doc-ext-icon"></svg>
+        </a>
+        <a *ngIf="candidate.portfolioUrl" [href]="candidate.portfolioUrl" target="_blank" class="drawer-doc-btn">
+          <svg lucideLink size="16"></svg>
+          <div class="doc-text">
+            <strong>Portfolio / Website</strong>
+            <small class="truncate">{{ candidate.portfolioUrl }}</small>
+          </div>
+          <svg lucideExternalLink size="14" class="doc-ext-icon"></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- SCREENING QUESTIONS ANSWERS (IF ANY) -->
+    <div class="drawer-section" *ngIf="candidate.answers">
+      <div class="section-heading">Screening Answers</div>
+      <div class="screening-answers-box">
+        <p class="screening-text">{{ candidate.answers }}</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DRAWER FOOTER -->
+  <div class="drawer-footer-actions">
+    <button class="btn-drawer-full-ats" (click)="openFullATS(candidate)">
+      <svg lucideLayoutGrid size="16"></svg>
+      <span>Open Full ATS Profile</span>
+    </button>
+    <button class="btn-drawer-close" (click)="closeCandidateQuickView()">
+      Close
+    </button>
+  </div>
+</div>
+
+<!-- JOB DESCRIPTION & DETAILS MODAL -->
+<div class="modal-backdrop-fixed" *ngIf="showJobModal()" (click)="closeJobDescriptionModal()">
+  <div class="job-spec-modal-container" (click)="$event.stopPropagation()">
+    <div class="modal-header-spec">
+      <div>
+        <span class="spec-job-badge">{{ job()?.type }} • {{ job()?.department?.name || 'Department' }}</span>
+        <h2>{{ job()?.title }}</h2>
+      </div>
+      <button class="modal-close-icon-btn" (click)="closeJobDescriptionModal()">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body-spec">
+      <div class="spec-details-summary">
+        <div class="spec-item" *ngIf="job()?.department?.name">
+          <span class="label">Department</span>
+          <span class="val">{{ job()?.department?.name }}</span>
+        </div>
+        <div class="spec-item" *ngIf="job()?.branch?.name">
+          <span class="label">Branch / Office</span>
+          <span class="val">{{ job()?.branch?.name }}</span>
+        </div>
+        <div class="spec-item" *ngIf="job()?.experienceYears">
+          <span class="label">Experience</span>
+          <span class="val">{{ job()?.experienceYears }}</span>
+        </div>
+        <div class="spec-item" *ngIf="job()?.totalOpenings">
+          <span class="label">Total Openings</span>
+          <span class="val">{{ job()?.totalOpenings }} positions</span>
+        </div>
+        <div class="spec-item" *ngIf="job()?.minSalary || job()?.maxSalary">
+          <span class="label">Salary Range</span>
+          <span class="val">₹{{ (job()?.minSalary || 0) | number }} - ₹{{ (job()?.maxSalary || 0) | number }}</span>
+        </div>
+        <div class="spec-item" *ngIf="job()?.endDate">
+          <span class="label">Application Deadline</span>
+          <span class="val">{{ job()?.endDate | date:'mediumDate' }}</span>
+        </div>
+      </div>
+
+      <div class="spec-desc-section" *ngIf="job()?.descriptionHtml">
+        <h3>Job Description</h3>
+        <div class="job-html-content" [innerHTML]="job()?.descriptionHtml"></div>
+      </div>
+
+      <div class="spec-desc-section" *ngIf="job()?.screeningQuestions">
+        <h3>Screening Questions</h3>
+        <p class="screening-questions-text">{{ job()?.screeningQuestions }}</p>
+      </div>
+    </div>
+
+    <div class="modal-footer-spec">
+      <button class="btn-modal-share" (click)="copyJobLink()">
+        <svg lucideShare2 size="15"></svg> Copy Public Careers Link
+      </button>
+      <button class="btn-modal-close" (click)="closeJobDescriptionModal()">
+        Done
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SKELETON LOADING STATE -->
+<div class="job-detail-loading" *ngIf="isLoading()">
+  <div class="skeleton-header"></div>
+  <div class="skeleton-kpis">
+    <div class="skeleton-kpi-card" *ngFor="let i of [1,2,3,4]"></div>
+  </div>
+  <div class="skeleton-table"></div>
+</div>
+

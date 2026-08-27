@@ -12,31 +12,24 @@ import {
   LucideMail,
   LucideCalendar,
   LucideCalendarClock,
-  LucideBriefcase,
   LucideFileText,
-  LucideCheckCircle,
   LucideClock,
   LucideBuilding,
-  LucideFilter,
   LucideSearch,
   LucideLayoutGrid,
   LucideList,
   LucideArrowLeft,
-  LucideExternalLink,
-  LucideCheck,
   LucideX,
   LucideAlertCircle,
   LucideVideo,
   LucideMapPin,
-  LucideChevronDown,
   LucideRotateCcw,
   LucidePlus,
   LucideEye,
   LucideLoader2,
   LucideMessageSquare,
   LucideHistory,
-  LucideMoreHorizontal,
-  LucideMoreVertical
+  LucideMoreHorizontal
 } from '@lucide/angular';
 import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../../services/auth.service';
@@ -50,11 +43,8 @@ export interface FollowUpItem {
   contactPhone?: string;
   contactEmail?: string;
   type: string;
-  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
   scheduledAt: string;
-  completedAt?: string;
   notes?: string;
-  outcome?: string;
   assignedToId?: number;
   assignedTo?: {
     id: number;
@@ -96,23 +86,17 @@ export interface FollowUpItem {
     LucideMail,
     LucideCalendar,
     LucideCalendarClock,
-    LucideBriefcase,
     LucideFileText,
-    LucideCheckCircle,
     LucideClock,
     LucideBuilding,
-    LucideFilter,
     LucideSearch,
     LucideLayoutGrid,
     LucideList,
     LucideArrowLeft,
-    LucideExternalLink,
-    LucideCheck,
     LucideX,
     LucideAlertCircle,
     LucideVideo,
     LucideMapPin,
-    LucideChevronDown,
     LucideRotateCcw,
     LucidePlus,
     LucideEye,
@@ -120,7 +104,6 @@ export interface FollowUpItem {
     LucideMessageSquare,
     LucideHistory,
     LucideMoreHorizontal,
-    LucideMoreVertical,
     MatMenuModule
   ],
   providers: [DatePipe],
@@ -134,7 +117,6 @@ export class FollowUpsComponent implements OnInit {
   private route = inject(ActivatedRoute);
 
   followUps = signal<FollowUpItem[]>([]);
-  employees = signal<any[]>([]);
   isLoading = signal<boolean>(false);
   error = signal<string | null>(null);
 
@@ -143,9 +125,7 @@ export class FollowUpsComponent implements OnInit {
 
   // Search & Filter state
   searchQuery = signal<string>('');
-  filterDate = signal<string>('upcoming'); // 'today' | 'tomorrow' | 'upcoming' | 'overdue' | 'all' | 'custom'
-  filterAssignee = signal<string>('');
-  filterStatus = signal<string>('PENDING'); // 'PENDING' | 'COMPLETED' | 'all'
+  filterDate = signal<string>('upcoming'); // 'today' | 'tomorrow' | 'upcoming' | 'past' | 'all' | 'custom'
   filterType = signal<string>('all'); // 'all' | 'CALL' | 'MEETING' | 'DEMO' | 'EMAIL' | 'FIELD_VISIT'
   filterStartDate = signal<string>('');
   filterEndDate = signal<string>('');
@@ -188,63 +168,42 @@ export class FollowUpsComponent implements OnInit {
   });
 
   // Dynamic KPI statistics from API
-  kpiStats = signal<{ today: number; overdue: number; pending: number; completed: number; total: number }>({
+  kpiStats = signal<{ today: number; upcoming: number; past: number; total: number; overdue: number }>({
     today: 0,
-    overdue: 0,
-    pending: 0,
-    completed: 0,
-    total: 0
+    upcoming: 0,
+    past: 0,
+    total: 0,
+    overdue: 0
   });
 
   stats = computed(() => this.kpiStats());
 
   ngOnInit() {
-    this.fetchEmployees();
     this.fetchStats();
     this.fetchFollowUps();
   }
 
-  
+
   fetchStats() {
-    this.http.get<{ today: number; overdue: number; pending: number; completed: number; total: number }>(
+    this.http.get<{ today: number; upcoming: number; past: number; total: number; overdue?: number }>(
       `${environment.apiUrl}/crm/follow-ups/stats`
     ).subscribe({
       next: (res) => {
-        if (res) this.kpiStats.set(res);
+        if (res) this.kpiStats.set({
+          today: res.today ?? 0,
+          upcoming: res.upcoming ?? 0,
+          past: res.past ?? 0,
+          total: res.total ?? 0,
+          overdue: res.overdue ?? 0
+        });
       },
       error: (err) => console.error('Failed to load follow-up stats', err)
     });
   }
 
-  quickFilter(type: 'today' | 'overdue' | 'pending' | 'completed') {
-    if (type === 'today') {
-      this.filterDate.set('today');
-      this.filterStatus.set('PENDING');
-    } else if (type === 'overdue') {
-      this.filterDate.set('overdue');
-      this.filterStatus.set('PENDING');
-    } else if (type === 'pending') {
-      this.filterStatus.set('PENDING');
-      this.filterDate.set('all');
-    } else if (type === 'completed') {
-      this.filterStatus.set('COMPLETED');
-      this.filterDate.set('all');
-    }
+  quickFilter(type: 'today' | 'upcoming' | 'past' | 'overdue' | 'all') {
+    this.filterDate.set(type);
     this.onFilterChange();
-  }
-
-  fetchEmployees() {
-    this.http.get<any[]>(`${environment.apiUrl}/employees/basic-list`).subscribe({
-      next: (res) => {
-        // filter finance, sales, and admin users
-        this.employees.set(res.filter(e => {
-          const dept = e.department?.name?.toLowerCase() || '';
-          const role = e.user?.role?.toUpperCase() || '';
-          return dept.includes('sales') || dept.includes('finance') || role === 'ADMIN' || role === 'SUPERADMIN';
-        }));
-      },
-      error: (err) => console.error('Failed to load employees', err)
-    });
   }
 
   fetchFollowUps() {
@@ -256,8 +215,6 @@ export class FollowUpsComponent implements OnInit {
       if (this.filterStartDate()) params.push(`startDate=${this.filterStartDate()}`);
       if (this.filterEndDate()) params.push(`endDate=${this.filterEndDate()}`);
     }
-    if (this.filterAssignee()) params.push(`assignedToId=${this.filterAssignee()}`);
-    if (this.filterStatus() !== 'all') params.push(`status=${this.filterStatus()}`);
 
     const queryString = params.length ? `?${params.join('&')}` : '';
 
@@ -281,8 +238,6 @@ export class FollowUpsComponent implements OnInit {
   resetFilters() {
     this.searchQuery.set('');
     this.filterDate.set('upcoming');
-    this.filterAssignee.set('');
-    this.filterStatus.set('PENDING');
     this.filterType.set('all');
     this.filterStartDate.set('');
     this.filterEndDate.set('');
@@ -293,24 +248,30 @@ export class FollowUpsComponent implements OnInit {
 
   
 
-  
-  // Outcome Modal State
-  showCompleteModal: boolean = false;
-  completingFollowUp: FollowUpItem | null = null;
-  outcomeText: string = '';
-  isSavingOutcome: boolean = false;
-
   // Lead Detail Modal State with Follow-Up History
   showDetailModal: boolean = false;
   selectedLead: any | null = null;
   selectedLeadFollowUps: any[] = [];
   isLoadingLeadHistory: boolean = false;
 
-  // Schedule New Follow-Up Modal State
+  // Previous follow-up note for context when scheduling
+  previousFollowUpNote: FollowUpItem | null = null;
+
+  // Schedule / Edit Follow-Up Modal State
   showScheduleModal: boolean = false;
   scheduleLead: any = null;
+  editingFollowUp: FollowUpItem | null = null;
   isSavingSchedule: boolean = false;
-  scheduleForm = {
+  scheduleForm: {
+    title: string;
+    contactPerson: string;
+    contactPhone: string;
+    contactEmail: string;
+    type: string;
+    scheduledAt: string;
+    notes: string;
+    assignedToId: number | null;
+  } = {
     title: '',
     contactPerson: '',
     contactPhone: '',
@@ -318,61 +279,8 @@ export class FollowUpsComponent implements OnInit {
     type: 'CALL',
     scheduledAt: '',
     notes: '',
-    assignedToId: null as number | null
+    assignedToId: null
   };
-
-  getLatestCompletedRemark(fu: FollowUpItem): string | null {
-    if (fu.outcome) return fu.outcome;
-    const history = (fu.lead as any)?.followUps;
-    if (Array.isArray(history)) {
-      const pastCompleted = history.find((h: any) => h.id !== fu.id && (h.status === 'COMPLETED' || h.outcome) && (h.outcome || h.notes));
-      if (pastCompleted) {
-        return pastCompleted.outcome || pastCompleted.notes || null;
-      }
-    }
-    return null;
-  }
-
-  startCompleteFollowUp(followUp: FollowUpItem, event?: Event) {
-    if (event) event.stopPropagation();
-    this.completingFollowUp = followUp;
-    this.outcomeText = '';
-    this.showCompleteModal = true;
-  }
-
-  cancelCompleteFollowUp() {
-    this.showCompleteModal = false;
-    this.completingFollowUp = null;
-    this.outcomeText = '';
-  }
-
-  submitFollowUpOutcome(status: 'COMPLETED' | 'CANCELLED') {
-    const f = this.completingFollowUp;
-    if (!f) return;
-    this.isSavingOutcome = true;
-    
-    const payload = { 
-      status, 
-      notes: this.outcomeText || f.notes, 
-      completedAt: new Date().toISOString() 
-    };
-    
-    this.http.put(`${environment.apiUrl}/crm/leads/${f.leadId}/follow-ups/${f.id}`, payload).subscribe({
-      next: () => {
-        this.fetchFollowUps();
-        this.isSavingOutcome = false;
-        this.cancelCompleteFollowUp();
-        if (this.showDetailModal && this.selectedLead?.id === f.leadId) {
-          this.fetchLeadHistory(f.leadId);
-        }
-      },
-      error: (err) => {
-        console.error('Failed to update follow-up', err);
-        alert('Failed to update follow-up');
-        this.isSavingOutcome = false;
-      }
-    });
-  }
 
   viewLead(lead: any, event?: Event) {
     if (event) event.stopPropagation();
@@ -408,7 +316,7 @@ export class FollowUpsComponent implements OnInit {
     if (event) event.stopPropagation();
     const lead = fuOrLead?.lead ? fuOrLead.lead : fuOrLead;
     this.scheduleLead = lead;
-    
+
     // Default scheduled time: Tomorrow 10:00 AM local time
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -419,7 +327,6 @@ export class FollowUpsComponent implements OnInit {
     const contactName = fuOrLead.contactPerson || lead.contactName || lead.contactPerson || '';
     const phone = fuOrLead.contactPhone || lead.phone || lead.contactPhone || '';
     const email = fuOrLead.contactEmail || lead.email || lead.contactEmail || '';
-    const currentEmpId = this.auth.currentUser()?.employee?.id || this.auth.currentUser()?.employeeId || null;
 
     this.scheduleForm = {
       title: `Follow-up with ${contactName || lead.companyName || 'Client'}`,
@@ -429,8 +336,19 @@ export class FollowUpsComponent implements OnInit {
       type: 'CALL',
       scheduledAt: localISOTime,
       notes: '',
-      assignedToId: lead.assignedTo?.id || lead.assignedToId || currentEmpId
+      assignedToId: null
     };
+
+    this.previousFollowUpNote = null;
+    if (lead?.id) {
+      this.http.get<FollowUpItem[]>(`${environment.apiUrl}/crm/leads/${lead.id}/follow-ups`).subscribe({
+        next: (res) => {
+          if (res?.length) {
+            this.previousFollowUpNote = [...res].sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())[0];
+          }
+        }
+      });
+    }
 
     this.showScheduleModal = true;
   }
@@ -438,6 +356,30 @@ export class FollowUpsComponent implements OnInit {
   closeScheduleModal() {
     this.showScheduleModal = false;
     this.scheduleLead = null;
+    this.editingFollowUp = null;
+  }
+
+  openEditFollowUpModal(fu: FollowUpItem, event?: Event) {
+    if (event) event.stopPropagation();
+    this.editingFollowUp = fu;
+    this.scheduleLead = fu.lead;
+
+    const d = new Date(fu.scheduledAt);
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
+
+    this.scheduleForm = {
+      title: fu.title,
+      contactPerson: fu.contactPerson || '',
+      contactPhone: fu.contactPhone || '',
+      contactEmail: fu.contactEmail || '',
+      type: fu.type || 'CALL',
+      scheduledAt: localISOTime,
+      notes: fu.notes || '',
+      assignedToId: fu.assignedToId || null
+    };
+
+    this.showScheduleModal = true;
   }
 
   submitScheduleFollowUp() {
@@ -449,18 +391,23 @@ export class FollowUpsComponent implements OnInit {
       scheduledAt: new Date(this.scheduleForm.scheduledAt).toISOString()
     };
 
-    this.http.post(`${environment.apiUrl}/crm/leads/${this.scheduleLead.id}/follow-ups`, payload).subscribe({
+    const leadId = this.scheduleLead.id;
+    const request$ = this.editingFollowUp
+      ? this.http.put(`${environment.apiUrl}/crm/leads/${leadId}/follow-ups/${this.editingFollowUp.id}`, payload)
+      : this.http.post(`${environment.apiUrl}/crm/leads/${leadId}/follow-ups`, payload);
+
+    request$.subscribe({
       next: () => {
         this.isSavingSchedule = false;
         this.closeScheduleModal();
         this.fetchFollowUps();
-        if (this.showDetailModal && this.selectedLead?.id === this.scheduleLead.id) {
-          this.fetchLeadHistory(this.scheduleLead.id);
+        if (this.showDetailModal && this.selectedLead?.id === leadId) {
+          this.fetchLeadHistory(leadId);
         }
       },
       error: (err) => {
         this.isSavingSchedule = false;
-        alert(err?.error?.message || 'Failed to schedule follow-up');
+        alert(err?.error?.message || 'Failed to save follow-up');
       }
     });
   }
@@ -509,7 +456,7 @@ export class FollowUpsComponent implements OnInit {
   }
 
   isOverdue(item: FollowUpItem): boolean {
-    if (item.status === 'COMPLETED' || !item.scheduledAt) return false;
+    if (!item.scheduledAt) return false;
     const itemDate = new Date(item.scheduledAt);
     const now = new Date();
     return itemDate.getTime() < now.getTime() && !this.isToday(item.scheduledAt);
@@ -535,6 +482,16 @@ export class FollowUpsComponent implements OnInit {
       case 'FIELD_VISIT': return 'type-badge-visit';
       default: return 'type-badge-default';
     }
+  }
+
+  // Most recent prior note for the same lead — shown inline in the list as context.
+  getLatestRemark(fu: FollowUpItem): string | null {
+    const history = (fu.lead as any)?.followUps;
+    if (!Array.isArray(history)) return null;
+    const prior = history
+      .filter((h: any) => h.id !== fu.id && h.notes)
+      .sort((a: any, b: any) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+    return prior.length ? prior[0].notes : null;
   }
 }
 

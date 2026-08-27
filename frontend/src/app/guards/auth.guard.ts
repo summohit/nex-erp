@@ -12,5 +12,5 @@ export const authGuard: CanActivateFn = (route, state) => {
   }
 
   toast.error('You must be logged in to access the dashboard.');
-  return router.parseUrl('/');
+  return router.parseUrl('/login');
 };

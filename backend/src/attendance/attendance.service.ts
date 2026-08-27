@@ -348,4 +348,36 @@ export class AttendanceService {
 
     return employees;
   }
+
+  async getAllEmployeesAttendance(
+    companyId: number,
+    filters: { month?: number; year?: number; employeeId?: number; departmentId?: number; status?: string },
+  ) {
+    const now = new Date();
+    const year = filters.year ?? now.getFullYear();
+    const month = filters.month ?? now.getMonth() + 1; // 1-12, default current month
+
+    const startDate = new Date(Date.UTC(year, month - 1, 1));
+    const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+
+    const where: any = {
+      date: { gte: startDate, lte: endDate },
+      employee: { companyId },
+    };
+    if (filters.employeeId) where.employeeId = filters.employeeId;
+    if (filters.departmentId) where.employee = { companyId, departmentId: filters.departmentId };
+    if (filters.status) where.status = filters.status;
+
+    const records = await this.prisma.attendance.findMany({
+      where,
+      include: {
+        employee: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, department: { select: { id: true, name: true } } },
+        },
+      },
+      orderBy: [{ date: 'desc' }, { employeeId: 'asc' }],
+    });
+
+    return records;
+  }
 }

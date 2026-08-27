@@ -1,0 +1,309 @@
+/* ============================================================
+   Offer letter e-signing — DocuSign-style signing experience
+   ============================================================ */
+
+:host {
+  display: block;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color: #111827;
+  background: #f3f4f6;
+  min-height: 100vh;
+}
+
+.ol-spin { animation: ol-rotate 0.8s linear infinite; }
+@keyframes ol-rotate { to { transform: rotate(360deg); } }
+
+/* ---------- Buttons ---------- */
+.ol-btn-primary, .ol-btn-ghost, .ol-btn-danger, .ol-btn-yellow {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 9px 18px; border-radius: 8px; border: 1px solid transparent;
+  font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s ease; white-space: nowrap;
+}
+.ol-btn-primary { background: #ff5500; color: #fff; box-shadow: 0 1px 3px rgba(255,85,0,.3); }
+.ol-btn-primary:hover:not(:disabled) { background: #e04400; transform: translateY(-1px); }
+.ol-btn-primary:disabled { background: #d1d5db; color: #9ca3af; box-shadow: none; cursor: not-allowed; }
+.ol-btn-ghost { background: #fff; color: #374151; border-color: #d1d5db; }
+.ol-btn-ghost:hover { background: #f9fafb; border-color: #9ca3af; }
+.ol-btn-danger { background: #dc2626; color: #fff; }
+.ol-btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.ol-btn-yellow { background: #fbbf24; color: #78350f; font-weight: 700; }
+.ol-btn-yellow:hover { background: #f59e0b; }
+.ol-btn-text {
+  background: none; border: none; color: #6b7280; font-family: inherit; font-size: 12.5px;
+  font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 8px; padding: 0;
+}
+.ol-btn-text:hover { color: #dc2626; }
+.full { width: 100%; }
+.lg { padding: 12px 20px; font-size: 14.5px; }
+
+/* ---------- Centred states ---------- */
+.ol-centre {
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 12px; color: #6b7280; padding: 24px; text-align: center;
+}
+.ol-centre h2 { margin: 4px 0 0; font-size: 19px; color: #111827; }
+.ol-centre p { margin: 0; font-size: 14px; max-width: 420px; }
+.ol-state-icon {
+  width: 54px; height: 54px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center;
+}
+.ol-state-icon.err { background: #fee2e2; color: #dc2626; }
+
+/* ---------- Password gate ---------- */
+.ol-lock-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: linear-gradient(160deg, #f9fafb 0%, #eef2f7 100%);
+}
+.ol-lock-card {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 16px;
+  padding: 34px 32px; width: 100%; max-width: 420px;
+  box-shadow: 0 12px 40px rgba(15,23,42,.09); text-align: center;
+}
+.ol-lock-icon {
+  width: 54px; height: 54px; border-radius: 14px; background: #fff7ed; color: #ff5500;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;
+}
+.ol-lock-card h1 { margin: 0 0 8px; font-size: 20px; font-weight: 800; }
+.ol-lock-sub { margin: 0 0 24px; font-size: 13.5px; color: #6b7280; line-height: 1.6; }
+
+.ol-field-label {
+  display: block; text-align: left; font-size: 11.5px; font-weight: 700;
+  color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+}
+.ol-field-label.mt { margin-top: 18px; }
+
+.ol-pw-input, .ol-text-input {
+  width: 100%; box-sizing: border-box; padding: 11px 14px; border: 1px solid #d1d5db;
+  border-radius: 9px; font-family: inherit; font-size: 14px; color: #111827;
+  transition: border-color .15s ease, box-shadow .15s ease; background: #fff;
+}
+.ol-pw-input:focus, .ol-text-input:focus {
+  outline: none; border-color: #ff5500; box-shadow: 0 0 0 3px rgba(255,85,0,.13);
+}
+.ol-pw-input.err { border-color: #dc2626; }
+.ol-text-input { resize: vertical; }
+
+.ol-hint {
+  display: flex; align-items: flex-start; gap: 7px; margin: 10px 0 0;
+  font-size: 12px; color: #6b7280; text-align: left; line-height: 1.55;
+}
+.ol-hint svg { color: #059669; flex-shrink: 0; margin-top: 2px; }
+
+.ol-err-msg {
+  display: flex; align-items: center; gap: 6px; margin: 12px 0 0;
+  font-size: 12.5px; color: #dc2626; font-weight: 600; text-align: left;
+}
+.ol-err-msg.centre { justify-content: center; }
+.ol-lock-card .ol-btn-primary { margin-top: 20px; }
+
+/* ---------- Shell ---------- */
+.ol-shell { display: flex; flex-direction: column; min-height: 100vh; }
+
+.ol-topbar {
+  position: sticky; top: 0; z-index: 40; background: #fff; border-bottom: 1px solid #e5e7eb;
+  padding: 12px 22px; display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(15,23,42,.05);
+}
+.ol-topbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ol-doc-badge {
+  width: 38px; height: 38px; border-radius: 10px; background: #fff7ed; color: #ff5500;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.ol-doc-meta { display: flex; flex-direction: column; min-width: 0; }
+.ol-doc-title {
+  font-size: 14px; font-weight: 700; color: #111827;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ol-doc-sub { font-size: 12px; color: #6b7280; }
+.ol-topbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.ol-progress { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.ol-progress-bar { height: 5px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+.ol-progress-fill { height: 100%; background: #ff5500; border-radius: 3px; transition: width .3s ease; }
+.ol-progress-text { font-size: 11px; color: #6b7280; font-weight: 600; }
+
+.ol-status-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px;
+  border-radius: 20px; font-size: 12px; font-weight: 700;
+}
+.ol-status-chip.done { background: #dcfce7; color: #166534; }
+.ol-status-chip.declined { background: #fee2e2; color: #991b1b; }
+
+/* ---------- Action strip ---------- */
+.ol-action-strip {
+  background: #fef3c7; border-bottom: 1px solid #fde68a; padding: 10px 22px;
+  display: flex; align-items: center; gap: 10px; font-size: 13px; color: #78350f;
+  position: sticky; top: 63px; z-index: 30;
+}
+.ol-strip-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; flex-shrink: 0;
+  animation: ol-pulse 1.8s ease-in-out infinite;
+}
+.ol-strip-dot.done { background: #16a34a; animation: none; }
+@keyframes ol-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.ol-strip-text { flex: 1; }
+
+/* ---------- Banners ---------- */
+.ol-banner {
+  display: flex; align-items: flex-start; gap: 14px; padding: 16px 22px;
+  border-bottom: 1px solid transparent;
+}
+.ol-banner strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.ol-banner p { margin: 0; font-size: 13px; opacity: .85; }
+.ol-banner-icon {
+  width: 38px; height: 38px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.ol-banner.done { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.ol-banner.done .ol-banner-icon { background: #dcfce7; }
+.ol-banner.declined { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.ol-banner.declined .ol-banner-icon { background: #fee2e2; }
+
+/* ---------- Document viewport ---------- */
+.ol-doc-scroll { flex: 1; overflow-y: auto; padding: 26px 20px 60px; }
+
+.ol-page {
+  max-width: 850px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 4px; box-shadow: 0 4px 16px rgba(15,23,42,.08); overflow: hidden;
+}
+.ol-page-body { padding: 40px 46px; }
+/* The letter ships its own typography; keep images fluid inside the page. */
+.ol-page-body :is(img) { max-width: 100%; }
+
+.ol-page-loading {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 70px 0; color: #6b7280; font-size: 13.5px;
+}
+
+/* ---------- Signature zone ---------- */
+.ol-sign-zone { max-width: 850px; margin: 22px auto 0; }
+.ol-sign-card {
+  background: #fff; border: 2px solid #fbbf24; border-radius: 12px; padding: 22px 24px;
+  box-shadow: 0 6px 22px rgba(251,191,36,.16);
+}
+.ol-sign-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.ol-required-tag {
+  background: #fbbf24; color: #78350f; font-size: 10px; font-weight: 800;
+  padding: 3px 9px; border-radius: 4px; text-transform: uppercase; letter-spacing: .05em;
+}
+.ol-sign-label { font-size: 13px; font-weight: 700; color: #374151; }
+
+.ol-sign-target {
+  width: 100%; display: flex; align-items: center; gap: 14px; padding: 22px 18px;
+  border: 2px dashed #fbbf24; border-radius: 9px; background: #fffbeb;
+  cursor: pointer; font-family: inherit; transition: all .15s ease;
+}
+.ol-sign-target:hover { background: #fef3c7; border-color: #f59e0b; }
+.ol-sign-tab {
+  display: inline-flex; align-items: center; gap: 5px; background: #fbbf24; color: #78350f;
+  font-size: 12px; font-weight: 800; padding: 6px 13px; border-radius: 4px; flex-shrink: 0;
+}
+.ol-sign-placeholder { color: #92400e; font-size: 13.5px; font-weight: 600; }
+
+.ol-sign-filled {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 18px; border: 1px solid #d1d5db; border-radius: 9px; background: #f9fafb;
+}
+.ol-sign-filled img { max-height: 62px; max-width: 260px; object-fit: contain; }
+.ol-sign-filled-actions { display: flex; gap: 8px; }
+.ol-sign-filled-actions button {
+  display: inline-flex; align-items: center; gap: 5px; background: #fff; border: 1px solid #d1d5db;
+  border-radius: 7px; padding: 6px 11px; font-family: inherit; font-size: 12px;
+  font-weight: 600; color: #374151; cursor: pointer;
+}
+.ol-sign-filled-actions button:hover { background: #f3f4f6; }
+.ol-sign-filled-actions button.danger:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+
+.ol-consent {
+  display: flex; align-items: flex-start; gap: 10px; margin: 18px 0;
+  font-size: 12.5px; color: #4b5563; line-height: 1.6; cursor: pointer;
+}
+.ol-consent input { margin-top: 2px; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; accent-color: #ff5500; }
+
+/* ---------- Modal ---------- */
+.ol-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; z-index: 100; padding: 22px;
+}
+.ol-modal {
+  background: #fff; border-radius: 14px; width: 100%; max-width: 560px;
+  box-shadow: 0 20px 56px rgba(15,23,42,.28); display: flex; flex-direction: column;
+  max-height: 92vh; overflow: hidden;
+}
+.ol-modal.sm { max-width: 430px; }
+.ol-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+  padding: 20px 22px 16px; border-bottom: 1px solid #e5e7eb;
+}
+.ol-modal-head h3 { margin: 0 0 3px; font-size: 16.5px; font-weight: 800; }
+.ol-modal-head p { margin: 0; font-size: 12.5px; color: #6b7280; }
+.ol-modal-close {
+  background: #f3f4f6; border: none; border-radius: 8px; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center; color: #4b5563;
+  cursor: pointer; flex-shrink: 0;
+}
+.ol-modal-close:hover { background: #e5e7eb; }
+
+.ol-tabs { display: flex; gap: 2px; padding: 12px 22px 0; border-bottom: 1px solid #e5e7eb; }
+.ol-tabs button {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+  border-bottom: 2px solid transparent; padding: 9px 14px; font-family: inherit;
+  font-size: 13px; font-weight: 600; color: #6b7280; cursor: pointer;
+}
+.ol-tabs button.active { color: #ff5500; border-bottom-color: #ff5500; }
+.ol-tabs button:hover:not(.active) { color: #374151; }
+
+.ol-modal-body { padding: 20px 22px; overflow-y: auto; }
+
+.ol-font-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ol-font-option {
+  border: 1.5px solid #e5e7eb; border-radius: 9px; background: #fff; padding: 14px 12px;
+  cursor: pointer; text-align: center; display: flex; flex-direction: column; gap: 6px;
+  transition: all .15s ease; overflow: hidden;
+}
+.ol-font-option:hover { border-color: #d1d5db; background: #f9fafb; }
+.ol-font-option.active { border-color: #ff5500; background: #fff7ed; }
+.ol-font-preview {
+  font-size: 24px; color: #1e3a8a; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; line-height: 1.35;
+}
+.ol-font-name {
+  font-size: 10.5px; color: #9ca3af; text-transform: uppercase;
+  letter-spacing: .06em; font-weight: 700;
+}
+
+.ol-canvas-wrap { position: relative; border: 1.5px solid #e5e7eb; border-radius: 9px; background: #fff; }
+.ol-canvas { display: block; width: 100%; height: 180px; cursor: crosshair; touch-action: none; }
+.ol-canvas-baseline {
+  position: absolute; left: 26px; right: 26px; bottom: 46px;
+  border-bottom: 1px dashed #d1d5db; pointer-events: none;
+}
+
+.ol-upload-zone {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 34px 20px; border: 2px dashed #d1d5db; border-radius: 11px;
+  background: #f9fafb; cursor: pointer; text-align: center; color: #6b7280;
+}
+.ol-upload-zone:hover { border-color: #ff5500; background: #fff7ed; }
+.ol-upload-zone svg { color: #9ca3af; }
+.ol-upload-zone strong { font-size: 13.5px; color: #374151; }
+.ol-upload-zone span { font-size: 11.5px; }
+
+.ol-modal-foot { padding: 16px 22px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; }
+.ol-legal { margin: 0 0 14px; font-size: 11px; color: #6b7280; line-height: 1.6; }
+.ol-modal-actions { display: flex; justify-content: flex-end; gap: 9px; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 720px) {
+  .ol-topbar { padding: 10px 14px; }
+  .ol-topbar-right { width: 100%; justify-content: space-between; }
+  .ol-progress { min-width: 0; flex: 1; }
+  .ol-action-strip { top: auto; position: static; flex-wrap: wrap; padding: 10px 14px; }
+  .ol-doc-scroll { padding: 16px 12px 44px; }
+  .ol-page-body { padding: 24px 20px; }
+  .ol-sign-card { padding: 18px 16px; }
+  .ol-sign-filled { flex-direction: column; align-items: flex-start; }
+  .ol-font-grid { grid-template-columns: 1fr; }
+}

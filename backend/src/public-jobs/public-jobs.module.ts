@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { PublicJobsController } from './public-jobs.controller';
 import { PublicJobsService } from './public-jobs.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { RecruitmentModule } from '../recruitment/recruitment.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, RecruitmentModule],
   controllers: [PublicJobsController],
   providers: [PublicJobsService],
   exports: [PublicJobsService],

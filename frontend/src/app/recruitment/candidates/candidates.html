@@ -1,36 +1,86 @@
 <div class="page-container" style="padding: 24px;">
+
+  <!-- TOP BREADCRUMB & CONTEXT NAVIGATION -->
+  <div class="ats-breadcrumb-bar">
+    <div class="breadcrumb-left">
+      <!-- Back to Job Pill (when job filter is active) -->
+      <a *ngIf="selectedJob() as selJob" [routerLink]="['/recruitment/jobs', selJob.id]" class="btn-back-to-job">
+        <svg lucideArrowLeft size="15"></svg>
+        <span>Back to {{ selJob.title }}</span>
+      </a>
+
+      <!-- Breadcrumbs Trail -->
+      <nav class="ats-breadcrumbs">
+        <span class="crumb-link" routerLink="/recruitment/job-postings">Recruitment</span>
+        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
+        <span class="crumb-link" routerLink="/recruitment/job-postings">Job Postings</span>
+        <ng-container *ngIf="selectedJob() as selJob">
+          <svg lucideChevronRight size="13" class="crumb-sep"></svg>
+          <a [routerLink]="['/recruitment/jobs', selJob.id]" class="crumb-link crumb-job">{{ selJob.title }}</a>
+        </ng-container>
+        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
+        <span class="crumb-current">Candidates (ATS)</span>
+      </nav>
+    </div>
+
+    <div class="breadcrumb-right" *ngIf="selectedJob() as selJob">
+      <div class="active-filter-pill">
+        <svg lucideFilter size="13"></svg>
+        <span>Filtered: <strong>{{ selJob.title }}</strong></span>
+        <button class="btn-clear-filter-pill" (click)="clearJobFilter()" title="Clear Job Filter">
+          <svg lucideX size="13"></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENHANCED HEADER CARD -->
   <div class="page-header-card">
     <div class="header-title-group">
-      <h1>Candidates (ATS)</h1>
-      <p>Manage and track job applications</p>
+      <div class="header-title-row">
+        <h1>Candidates (ATS)</h1>
+        <span class="candidates-count-pill">{{ applications().length }} Candidate{{ applications().length === 1 ? '' : 's' }}</span>
+      </div>
+      <p>Manage, review and transition candidate applications across pipeline stages</p>
     </div>
     
     <div class="header-actions">
       <!-- Filter Dropdown -->
       <div class="filter-group">
+        <svg lucideFilter size="14" class="filter-icon-prefix"></svg>
         <label>Filter by Job:</label>
-        <select class="form-select" [(ngModel)]="selectedJobId" (change)="onFilterChange()">
-          <option [ngValue]="null">All Jobs</option>
+        <select class="form-select" [ngModel]="selectedJobId()" (ngModelChange)="selectedJobId.set($event); onFilterChange()">
+          <option [ngValue]="null">All Jobs ({{ jobs().length }} Openings)</option>
           <option *ngFor="let job of jobs()" [ngValue]="job.id">
-            {{job.title}} ({{job.department?.name}})
+            {{job.title}} {{ job.department?.name ? '(' + job.department.name + ')' : '' }}
           </option>
         </select>
+        <button class="btn-clear-select" *ngIf="selectedJobId()" (click)="clearJobFilter()" title="Clear filter">
+          <svg lucideX size="14"></svg>
+        </button>
       </div>
 
-      <button class="btn-secondary" (click)="exportCSV()">
-        <svg lucideFileText size="16"></svg> Export CSV
+      <button class="btn-secondary" (click)="exportCSV()" title="Export candidate data as CSV">
+        <svg lucideDownload size="15"></svg>
+        <span>Export CSV</span>
       </button>
 
-      <button class="btn-primary" (click)="openAnalytics()">
-        <svg lucideSparkles size="16"></svg> Analytics
+      <a class="btn-secondary" routerLink="/recruitment/reports" title="View Recruitment Reports">
+        <svg lucideFileText size="15"></svg>
+        <span>Hiring Reports</span>
+      </a>
+
+      <button class="btn-primary" (click)="openAnalytics()" title="Open Recruitment Analytics">
+        <svg lucideSparkles size="15"></svg>
+        <span>Analytics</span>
       </button>
 
       <div class="view-toggles">
         <button [class.active]="viewMode() === 'KANBAN'" (click)="viewMode.set('KANBAN')" class="toggle-btn" title="Kanban View">
-          <svg lucideLayoutGrid size="18"></svg>
+          <svg lucideLayoutGrid size="16"></svg>
         </button>
         <button [class.active]="viewMode() === 'TABLE'" (click)="viewMode.set('TABLE')" class="toggle-btn" title="Table View">
-          <svg lucideTable size="18"></svg>
+          <svg lucideTable size="16"></svg>
         </button>
       </div>
     </div>
@@ -267,7 +317,8 @@
   <div class="drawer-content" *ngIf="selectedApp() as app">
     
     <div class="profile-section">
-      <div class="avatar">{{ getInitials(app.fullName) }}</div>
+      <img *ngIf="app.photoUrl" [src]="app.photoUrl" alt="Avatar" class="avatar" style="object-fit: cover;">
+      <div *ngIf="!app.photoUrl" class="avatar">{{ getInitials(app.fullName) }}</div>
       <div class="profile-info">
         <h3>{{app.fullName}}</h3>
         <p class="role-badge" [innerHtml]="renderStatusBadge(app.status)"></p>
@@ -345,6 +396,48 @@
             <span>{{app.noticePeriod || 'Not specified'}}</span>
           </div>
         </div>
+        <div class="info-item" *ngIf="app.dateOfBirth">
+          <svg lucideFileText size="16" class="icon"></svg>
+          <div class="text">
+            <label>Date of Birth</label>
+            <span>{{app.dateOfBirth | date:'longDate'}}</span>
+          </div>
+        </div>
+        <div class="info-item" *ngIf="app.gender">
+          <svg lucideUsers size="16" class="icon"></svg>
+          <div class="text">
+            <label>Gender</label>
+            <span>{{app.gender}}</span>
+          </div>
+        </div>
+        <div class="info-item" *ngIf="app.currentLocation">
+          <svg lucideMapPin size="16" class="icon"></svg>
+          <div class="text">
+            <label>Location</label>
+            <span>{{app.currentLocation}}</span>
+          </div>
+        </div>
+        <div class="info-item" *ngIf="app.currentCtc">
+          <svg lucideBriefcase size="16" class="icon"></svg>
+          <div class="text">
+            <label>Current CTC (₹)</label>
+            <span>{{app.currentCtc | number}}</span>
+          </div>
+        </div>
+        <div class="info-item" *ngIf="app.expectedCtc">
+          <svg lucideAward size="16" class="icon"></svg>
+          <div class="text">
+            <label>Expected CTC (₹)</label>
+            <span>{{app.expectedCtc | number}}</span>
+          </div>
+        </div>
+        <div class="info-item" *ngIf="app.source">
+          <svg lucideLink size="16" class="icon"></svg>
+          <div class="text">
+            <label>Source</label>
+            <span>{{app.source}}</span>
+          </div>
+        </div>
       </div>
 
       <!-- AI Insights -->
@@ -409,13 +502,153 @@
         </div>
       </div>
 
-      <!-- Resume Link -->
+      <!-- Cover Letter Text -->
+      <div class="section-block" *ngIf="app.coverLetter">
+        <h4>Cover Letter</h4>
+        <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 13.5px; color: #334155; white-space: pre-wrap;">{{app.coverLetter}}</div>
+      </div>
+
+      <!-- Documents Link -->
       <div class="section-block" *ngIf="app.resumeUrl">
-        <h4>Resume / CV</h4>
-        <a [href]="app.resumeUrl" target="_blank" class="resume-link">
-          <svg lucideFileText size="20"></svg>
-          <span>View Resume PDF</span>
-        </a>
+        <h4>Candidate Documents</h4>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <a [href]="app.resumeUrl" target="_blank" class="resume-link" style="flex: 1;">
+            <svg lucideFileText size="18"></svg>
+            <span>View Resume</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Offer Package & Compensation Card -->
+      <div class="section-block compensation-package-card" *ngIf="app.offeredSalary || app.status === 'OFFERED' || app.status === 'HIRED' || app.status === 'ONBOARDED'">
+        <div class="compensation-card-header">
+          <div class="compensation-header-title">
+            <div class="compensation-icon">
+              <svg lucideAward size="18"></svg>
+            </div>
+            <div>
+              <h4>Offer Package & Compensation</h4>
+              <p>Salary breakdown and compensation structure</p>
+            </div>
+          </div>
+          <span class="approval-badge" [ngClass]="{
+            'approved': app.approvalStatus === 'APPROVED' || (!app.approvalStatus && app.offeredSalary),
+            'pending': app.approvalStatus === 'PENDING_APPROVAL',
+            'rejected': app.approvalStatus === 'REJECTED'
+          }">
+            <span class="badge-dot"></span>
+            {{ app.approvalStatus === 'PENDING_APPROVAL' ? 'Pending Approval' : (app.approvalStatus === 'REJECTED' ? 'Salary Rejected' : 'Approved Offer') }}
+          </span>
+        </div>
+
+        <div class="compensation-details-grid" *ngIf="app.offeredSalary">
+          <div class="comp-stat-item highlight">
+            <span class="comp-stat-label">Offered Annual CTC</span>
+            <strong class="comp-stat-value text-orange">₹{{ app.offeredSalary | number }}</strong>
+            <span class="comp-lpa" *ngIf="app.offeredSalary >= 100000">{{ (app.offeredSalary / 100000).toFixed(2) }} LPA</span>
+          </div>
+          <div class="comp-stat-item">
+            <span class="comp-stat-label">Monthly Gross</span>
+            <strong class="comp-stat-value">₹{{ (app.offeredSalary / 12) | number:'1.0-0' }} / mo</strong>
+          </div>
+          <div class="comp-stat-item" *ngIf="app.expectedCtc">
+            <span class="comp-stat-label">Candidate Expected</span>
+            <strong class="comp-stat-value text-slate">₹{{ app.expectedCtc | number }}</strong>
+          </div>
+        </div>
+
+        <!-- Compensation Quick Actions -->
+        <div class="compensation-actions-row">
+          <button 
+            type="button" 
+            class="btn-annexure-action" 
+            (click)="viewAnnexure(app.id)"
+            *ngIf="app.offeredSalary && app.approvalStatus !== 'REJECTED'"
+          >
+            <svg lucideFileText size="16"></svg>
+            <span>View Offer Annexure (CTC Breakdown)</span>
+          </button>
+
+          <div class="letter-actions-group" *ngIf="app.status === 'OFFERED' || app.status === 'HIRED' || app.status === 'ONBOARDED'">
+            <a 
+              *ngIf="offerLetter() as ol" 
+              [href]="ol.countersignedPdfUrl || ol.pdfUrl" 
+              target="_blank" 
+              class="btn-letter-action view" 
+              [class.btn-disabled]="!ol.pdfUrl"
+              [class.signed]="!!ol.countersignedPdfUrl"
+            >
+              <svg lucideDownload size="15"></svg>
+              <span>{{ ol.countersignedPdfUrl ? 'Download Letter (SIGNED)' : 'Download Letter (' + ol.status + ')' }}</span>
+            </a>
+            <button
+              type="button"
+              class="btn-letter-action generate"
+              (click)="generateOfferLetter()"
+              [disabled]="isGeneratingOfferLetter()"
+            >
+              <svg lucideSparkles size="15"></svg>
+              <span>{{ isGeneratingOfferLetter() ? 'Generating...' : (offerLetter() ? 'Regenerate Letter' : 'Generate Letter') }}</span>
+            </button>
+          </div>
+
+          <!-- E-signature: link the candidate uses to review and sign -->
+          <div class="esign-panel" *ngIf="offerLetter() as ol">
+            <div class="esign-head">
+              <div class="esign-title">
+                <svg lucidePenLine size="15"></svg>
+                <span>Candidate E-Signature</span>
+              </div>
+              <span class="esign-status" [ngClass]="ol.status?.toLowerCase()">
+                {{ ol.status === 'ACCEPTED' ? 'Signed' : ol.status === 'DECLINED' ? 'Declined' : ol.viewedAt ? 'Viewed' : 'Awaiting signature' }}
+              </span>
+            </div>
+
+            <p class="esign-hint">
+              Send this link to the candidate. They confirm their identity, review the letter and sign it electronically.
+            </p>
+
+            <div class="esign-row">
+              <span class="esign-label">Signing link</span>
+              <div class="esign-value-box">
+                <code>{{ getSigningLink(ol) }}</code>
+                <button type="button" (click)="copyText(getSigningLink(ol), 'link')" [title]="'Copy signing link'">
+                  <svg *ngIf="copiedKey() !== 'link'" lucideCopy size="13"></svg>
+                  <svg *ngIf="copiedKey() === 'link'" lucideCheck size="13"></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="esign-row" *ngIf="ol.documentPassword">
+              <span class="esign-label">Document password</span>
+              <div class="esign-value-box">
+                <code>{{ ol.documentPassword }}</code>
+                <button type="button" (click)="copyText(ol.documentPassword, 'pw')" title="Copy password">
+                  <svg *ngIf="copiedKey() !== 'pw'" lucideCopy size="13"></svg>
+                  <svg *ngIf="copiedKey() === 'pw'" lucideCheck size="13"></svg>
+                </button>
+              </div>
+            </div>
+            <p class="esign-pw-note" *ngIf="ol.documentPassword">
+              Surname in lowercase + last 4 digits of their phone. The candidate can work this out themselves — the page shows a hint.
+            </p>
+            <p class="esign-pw-note warn" *ngIf="!ol.documentPassword">
+              No password could be derived (the application is missing a name or phone number), so the link alone grants access.
+            </p>
+
+            <div class="esign-actions">
+              <a [href]="getSigningLink(ol)" target="_blank" class="btn-letter-action view">
+                <svg lucideExternalLink size="15"></svg>
+                <span>Open Signing Page</span>
+              </a>
+            </div>
+
+            <div class="esign-timeline" *ngIf="ol.viewedAt || ol.respondedAt">
+              <span *ngIf="ol.viewedAt"><strong>Viewed:</strong> {{ ol.viewedAt | date:'medium' }}</span>
+              <span *ngIf="ol.respondedAt"><strong>{{ ol.status === 'ACCEPTED' ? 'Signed' : 'Responded' }}:</strong> {{ ol.respondedAt | date:'medium' }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -508,36 +741,31 @@
             </div>
 
             <!-- Click Backdrop Overlay -->
-            <div class="dropdown-backdrop" *ngIf="isEmpDropdownOpen()" (click)="closeEmpDropdown()"></div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Location / Meeting Link</label>
-          <input type="text" class="form-control" [ngModel]="newInterview().locationUrl" (ngModelChange)="newInterview.update(v => ({...v, locationUrl: $event}))" placeholder="Zoom/Meet Link">
+          <select class="form-select" [ngModel]="newInterview().interviewerId" (ngModelChange)="newInterview.update(v => ({...v, interviewerId: +$event}))">
+            <option [value]="null">Select Interviewer</option>
+            <option *ngFor="let emp of employees()" [value]="emp.id">{{emp.firstName}} {{emp.lastName}}</option>
+          </select>
         </div>
         <div class="form-actions">
-          <button class="btn-secondary" (click)="cancelInterviewForm()">Cancel</button>
-          <button class="btn-primary" (click)="submitInterview()" [disabled]="isSubmittingInterview()" style="display: flex; align-items: center; gap: 6px;">
-            <span class="btn-spinner" *ngIf="isSubmittingInterview()"></span>
-            <span *ngIf="!isSubmittingInterview()">{{ editInterviewMode() ? 'Update Interview' : 'Save Interview' }}</span>
-            <span *ngIf="isSubmittingInterview()">Saving...</span>
+          <button class="btn-outline" (click)="cancelInterviewForm()">Cancel</button>
+          <button class="btn-primary" (click)="submitInterview()" [disabled]="isSubmittingInterview()">
+            {{ isSubmittingInterview() ? 'Saving...' : (editInterviewMode() ? 'Update' : 'Schedule') }}
           </button>
-
         </div>
       </div>
 
-      <!-- Interview List -->
-      <div class="interview-list">
-        <div class="empty-state" *ngIf="interviews().length === 0 && !showInterviewForm()">
-          No interviews scheduled.
+      <!-- Interviews List -->
+      <div class="interviews-list" *ngIf="!showInterviewForm()">
+        <div class="empty-state-sm" *ngIf="interviews().length === 0">
+          <p>No interviews scheduled yet.</p>
         </div>
-        
         <div class="interview-card" *ngFor="let interview of interviews()">
           <div class="interview-card-header">
             <div class="i-title">{{interview.title}}</div>
             <div class="i-header-actions">
               <span class="i-status" [ngClass]="interview.status.toLowerCase()">{{interview.status}}</span>
               <button class="btn-edit-small" *ngIf="interview.status === 'SCHEDULED'" (click)="editScheduledInterview(interview)">
+                <svg lucideEdit2 size="14"></svg>
                 Edit
               </button>
             </div>
@@ -595,9 +823,15 @@
     </div>
   </div>
 
-  <div class="drawer-footer" *ngIf="selectedApp() as app">
-    <div class="status-actions">
-      <select class="form-select status-select" [ngModel]="app.status" (ngModelChange)="updateDrawerStatus($event)">
+  <div class="reject-reason-banner" *ngIf="selectedApp() as app" [style.display]="app.status === 'REJECTED' && app.rejectionReason ? 'block' : 'none'" style="padding: 10px 20px; background: #fef2f2; border-top: 1px solid #fecaca; font-size: 13px; color: #991b1b;">
+    <strong>Rejection reason:</strong> {{ app.rejectionReason }}
+  </div>
+
+  <!-- Redesigned Drawer Footer -->
+  <div class="drawer-footer-enhanced" *ngIf="selectedApp() as app">
+    <div class="footer-stage-selector">
+      <span class="stage-prefix">Status:</span>
+      <select class="form-select status-dropdown" [ngModel]="app.status" (ngModelChange)="updateDrawerStatus($event)">
         <option value="NEW">New</option>
         <option value="REVIEWING">Reviewing</option>
         <option value="SHORTLISTED">Shortlisted</option>
@@ -609,24 +843,53 @@
       </select>
     </div>
     
-    <div class="drawer-actions">
-      <button *ngIf="app.status === 'HIRED' && app.approvalStatus !== 'PENDING_APPROVAL'" class="btn-primary drawer-action-btn" (click)="onboardCandidate()">
-        <svg lucideBriefcase size="16"></svg> Onboard Candidate
+    <div class="footer-actions-group">
+      <!-- Onboard button -->
+      <button 
+        *ngIf="app.status === 'HIRED' && app.approvalStatus !== 'PENDING_APPROVAL'" 
+        class="btn-drawer-primary" 
+        (click)="onboardCandidate()"
+      >
+        <svg lucideBriefcase size="15"></svg>
+        <span>Onboard</span>
       </button>
 
-      <button *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" class="btn-primary btn-approve-salary drawer-action-btn" (click)="approveSalary()">
-        Approve Salary
+      <!-- Approve/Reject Salary buttons -->
+      <button 
+        *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" 
+        class="btn-drawer-approve" 
+        (click)="approveSalary()"
+      >
+        <svg lucideCheckCircle size="15"></svg>
+        <span>Approve Salary</span>
       </button>
-      <button *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" class="btn-danger-outline drawer-action-btn" (click)="rejectSalary()">
-        Reject Salary
+      <button 
+        *ngIf="app.approvalStatus === 'PENDING_APPROVAL'" 
+        class="btn-drawer-reject" 
+        (click)="rejectSalary()"
+      >
+        <svg lucideXCircle size="15"></svg>
+        <span>Reject Salary</span>
       </button>
 
-      <button *ngIf="app.offeredSalary && app.approvalStatus !== 'REJECTED'" class="btn-outline btn-view-annexure drawer-action-btn" (click)="viewAnnexure(app.id)">
-        <svg lucideFileText size="16"></svg> View Offer Annexure
+      <!-- View Offer Annexure in footer -->
+      <button 
+        *ngIf="app.offeredSalary && app.approvalStatus !== 'REJECTED'" 
+        class="btn-drawer-annexure" 
+        (click)="viewAnnexure(app.id)"
+        title="View CTC Compensation Breakdown"
+      >
+        <svg lucideFileText size="15"></svg>
+        <span>Offer Annexure</span>
       </button>
-      
-      <button class="btn-danger-outline drawer-action-btn" (click)="deleteApplication()">
-        <svg lucideTrash2 size="16"></svg> Delete
+
+      <!-- Delete Application -->
+      <button 
+        class="btn-drawer-delete" 
+        (click)="deleteApplication()" 
+        title="Delete Candidate"
+      >
+        <svg lucideTrash2 size="15"></svg>
       </button>
     </div>
   </div>
@@ -634,23 +897,203 @@
 
 <!-- Salary Prompt Modal -->
 <div class="modal-overlay" *ngIf="showSalaryPrompt()" (click)="closeSalaryPrompt()">
-  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 400px;">
-    <div class="modal-header">
-      <h2>Enter Offered Salary</h2>
-      <button class="close-btn" (click)="closeSalaryPrompt()"><svg lucideX size="18"></svg></button>
+  <div class="modal-content salary-modal-card" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="salary-modal-header">
+      <div class="salary-modal-header-icon">
+        <svg lucideAward size="22"></svg>
+      </div>
+      <div class="salary-modal-header-info">
+        <h3>{{ pendingStatusChange()?.status === 'HIRED' ? 'Confirm Candidate Hire' : 'Make Job Offer' }}</h3>
+        <p *ngIf="pendingCandidate() as cand">
+          <strong>{{ cand.fullName }}</strong> <span class="header-divider">·</span> {{ cand.job?.title || 'Open Position' }}
+        </p>
+      </div>
+      <button type="button" class="modal-close-btn" (click)="closeSalaryPrompt()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
     </div>
-    <div class="modal-body">
-      <p style="font-size: 14px; color: #475569; margin-bottom: 16px;">
-        Please enter the salary offered to the candidate for validation.
-      </p>
-      <div class="form-group">
-        <label>Offered Salary (₹)</label>
-        <input type="number" class="form-control" [(ngModel)]="offeredSalaryInput" placeholder="e.g. 75000">
+
+    <!-- Body -->
+    <div class="salary-modal-body" *ngIf="pendingCandidate() as cand">
+      <!-- Intelligence Strip -->
+      <div class="salary-intel-grid">
+        <div class="salary-intel-chip" *ngIf="cand.job?.minSalary || cand.job?.maxSalary">
+          <span class="chip-label">Approved Job Budget</span>
+          <strong class="chip-val">₹{{ (cand.job?.minSalary || 0) | number }} - ₹{{ (cand.job?.maxSalary || 0) | number }}</strong>
+        </div>
+        <div class="salary-intel-chip" *ngIf="cand.expectedCtc">
+          <span class="chip-label">Candidate Expected CTC</span>
+          <strong class="chip-val text-blue">₹{{ cand.expectedCtc | number }}</strong>
+        </div>
+        <div class="salary-intel-chip" *ngIf="cand.currentCtc">
+          <span class="chip-label">Current CTC</span>
+          <strong class="chip-val text-slate">₹{{ cand.currentCtc | number }}</strong>
+        </div>
+      </div>
+
+      <!-- Main Input Field -->
+      <div class="salary-input-group">
+        <div class="salary-input-header">
+          <label class="salary-input-label">Offered Annual Salary (CTC)</label>
+          <span class="currency-tag">INR (₹)</span>
+        </div>
+        <div class="salary-input-wrapper">
+          <span class="currency-symbol">₹</span>
+          <input 
+            type="number" 
+            class="salary-number-input" 
+            [ngModel]="offeredSalaryInput()" 
+            (ngModelChange)="offeredSalaryInput.set($event)"
+            placeholder="e.g. 850000"
+          />
+        </div>
+        
+        <!-- Live Formatter & LPA Tag -->
+        <div class="salary-helper-row" *ngIf="offeredSalaryInput() as amt">
+          <span class="formatted-text">Formatted: <strong>₹ {{ amt | number }}</strong></span>
+          <span class="lpa-badge" *ngIf="amt >= 100000">{{ (amt / 100000).toFixed(2) }} LPA</span>
+        </div>
+      </div>
+
+      <!-- Quick Preset Suggestions -->
+      <div class="salary-presets-row" *ngIf="cand.job?.maxSalary || cand.expectedCtc">
+        <span class="preset-label">Quick fill:</span>
+        <button 
+          type="button" 
+          class="salary-preset-pill" 
+          *ngIf="cand.expectedCtc"
+          (click)="setQuickOfferedSalary(cand.expectedCtc)"
+        >
+          Match Expected (₹{{ cand.expectedCtc | number }})
+        </button>
+        <button 
+          type="button" 
+          class="salary-preset-pill" 
+          *ngIf="cand.job?.maxSalary"
+          (click)="setQuickOfferedSalary(cand.job?.maxSalary!)"
+        >
+          Max Budget (₹{{ cand.job?.maxSalary | number }})
+        </button>
+      </div>
+
+      <!-- Offer Letter Details -->
+      <div class="offer-letter-fields">
+        <div class="offer-fields-header">
+          <svg lucideFileText size="14"></svg>
+          <span>Offer Letter Details</span>
+          <small>Printed on the generated letter</small>
+        </div>
+
+        <div class="offer-field-row">
+          <label class="offer-field-label" for="joiningDateInput">Expected Joining Date</label>
+          <input
+            id="joiningDateInput"
+            type="date"
+            class="offer-field-input"
+            [ngModel]="joiningDateInput()"
+            (ngModelChange)="joiningDateInput.set($event)"
+          />
+        </div>
+
+        <div class="offer-field-row">
+          <label class="offer-field-label" for="addressInput">Candidate Postal Address</label>
+          <textarea
+            id="addressInput"
+            class="offer-field-input offer-field-textarea"
+            rows="3"
+            placeholder="Full address as it should appear on the offer letter"
+            [ngModel]="addressInput()"
+            (ngModelChange)="addressInput.set($event)"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Live Budget Validation Banner -->
+      <div class="salary-status-banner warning" *ngIf="salaryExceedsBudget()">
+        <div class="banner-icon"><svg lucideAlertCircle size="18"></svg></div>
+        <div class="banner-content">
+          <strong>Exceeds Approved Job Budget (Max: ₹{{ cand.job?.maxSalary | number }})</strong>
+          <p>Submitting this offer will automatically keep it in <em>OFFERED</em> status and route it for managerial budget approval.</p>
+        </div>
+      </div>
+
+      <div class="salary-status-banner success" *ngIf="offeredSalaryInput() && !salaryExceedsBudget()">
+        <div class="banner-icon"><svg lucideCheckCircle2 size="18"></svg></div>
+        <div class="banner-content">
+          <strong>Within Approved Budget</strong>
+          <p>Candidate status will immediately be updated to <em>{{ pendingStatusChange()?.status }}</em>.</p>
+        </div>
       </div>
     </div>
-    <div class="modal-footer" style="padding: 16px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
-      <button class="btn-outline" (click)="closeSalaryPrompt()">Cancel</button>
-      <button class="btn-primary" (click)="submitSalaryPrompt()" [disabled]="!offeredSalaryInput()">Confirm & Submit</button>
+
+    <!-- Footer Actions -->
+    <div class="salary-modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeSalaryPrompt()">
+        Cancel
+      </button>
+      <button 
+        type="button" 
+        class="btn-modal-submit" 
+        (click)="submitSalaryPrompt()" 
+        [disabled]="!offeredSalaryInput() || offeredSalaryInput()! <= 0"
+      >
+        <svg lucideCheckCircle size="16"></svg>
+        <span>Confirm & Submit Offer</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Reason Modal -->
+<div class="modal-overlay" *ngIf="showRejectPrompt()" (click)="closeRejectPrompt()">
+  <div class="modal-content reject-modal-card" (click)="$event.stopPropagation()">
+    <div class="reject-modal-header">
+      <div class="reject-modal-header-icon">
+        <svg lucideXCircle size="22"></svg>
+      </div>
+      <div class="reject-modal-header-info">
+        <h3>Reject Application</h3>
+        <p *ngIf="pendingRejectCandidate() as cand">
+          <strong>{{ cand.fullName }}</strong> <span class="header-divider">·</span> {{ cand.job?.title || 'Applicant' }}
+        </p>
+      </div>
+      <button type="button" class="modal-close-btn" (click)="closeRejectPrompt()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+    
+    <div class="reject-modal-body">
+      <p class="reject-help-text">
+        Optionally specify why this candidate is being archived. This note is retained on their internal ATS profile.
+      </p>
+      
+      <!-- Quick Reason Tags -->
+      <div class="reject-reasons-chips">
+        <button type="button" class="reason-chip" (click)="rejectReasonInput.set('Salary expectations beyond budget')">Salary Mismatch</button>
+        <button type="button" class="reason-chip" (click)="rejectReasonInput.set('Skills/experience mismatch for this seniority')">Skills Mismatch</button>
+        <button type="button" class="reason-chip" (click)="rejectReasonInput.set('Candidate declined or unavailable')">Declined / Ghosted</button>
+        <button type="button" class="reason-chip" (click)="rejectReasonInput.set('Role filled with another candidate')">Role Filled</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Internal Rejection Note (Optional)</label>
+        <textarea 
+          class="form-control reject-textarea" 
+          rows="3" 
+          [ngModel]="rejectReasonInput()" 
+          (ngModelChange)="rejectReasonInput.set($event)" 
+          placeholder="e.g. Needs more experience with distributed microservices..."
+        ></textarea>
+      </div>
+    </div>
+    
+    <div class="reject-modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeRejectPrompt()">Cancel</button>
+      <button type="button" class="btn-confirm-reject" (click)="submitRejectPrompt()">
+        <svg lucideTrash2 size="16"></svg>
+        <span>Confirm Rejection</span>
+      </button>
     </div>
   </div>
 </div>
@@ -812,108 +1255,141 @@
 
 <!-- Annexure Modal -->
 <div class="modal-overlay" *ngIf="showAnnexureModal()" (click)="closeAnnexureModal()">
-  <div class="modal-content annexure-modal" (click)="$event.stopPropagation()" style="max-width: 800px; width: 100%;">
-    <div class="modal-header">
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div class="icon-circle" style="background: #eff6ff; padding: 10px; border-radius: 50%;">
-          <svg lucideFileText size="20" color="#3b82f6"></svg>
-        </div>
-        <div>
-          <h2 style="margin: 0; font-size: 18px;">Offer Annexure</h2>
-          <p style="margin: 0; font-size: 13px; color: #64748b;" *ngIf="annexureData()">{{annexureData().candidateName}} - {{annexureData().jobTitle}}</p>
-        </div>
+  <div class="modal-content annexure-modal-card" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="annexure-modal-header">
+      <div class="annexure-modal-header-icon">
+        <svg lucideFileText size="22"></svg>
       </div>
-      <button class="close-btn" (click)="closeAnnexureModal()"><svg lucideX size="18"></svg></button>
+      <div class="annexure-modal-header-info">
+        <h3>Compensation Annexure & CTC Structure</h3>
+        <p *ngIf="annexureData() as d">
+          <strong>{{ d.candidateName }}</strong> <span class="header-divider">·</span> {{ d.jobTitle }}
+        </p>
+      </div>
+      <button type="button" class="modal-close-btn" (click)="closeAnnexureModal()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
     </div>
     
-    <div class="modal-body" style="padding: 24px;" *ngIf="isLoadingAnnexure()">
-      <div style="display: flex; flex-direction: column; align-items: center; padding: 40px; color: #64748b;">
-        <div class="spinner" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px;"></div>
-        Generating Annexure...
-      </div>
+    <!-- Loading State -->
+    <div class="annexure-loading" *ngIf="isLoadingAnnexure()">
+      <div class="annexure-spinner"></div>
+      <p>Calculating CTC components and tax deductions...</p>
     </div>
 
-    <div class="modal-body" style="padding: 0;" *ngIf="!isLoadingAnnexure() && annexureData()">
+    <!-- Body Content -->
+    <div class="annexure-modal-body" *ngIf="!isLoadingAnnexure() && annexureData() as d">
       
-      <div class="annexure-summary-box" style="display: flex; gap: 20px; padding: 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-        <div class="summary-item" style="flex: 1;">
-          <span class="label" style="display: block; font-size: 13px; color: #64748b; margin-bottom: 4px;">Total Annual CTC</span>
-          <span class="value" style="display: block; font-size: 24px; font-weight: 600; color: #0f172a;">₹{{annexureData().totalCTC | number}}</span>
+      <!-- Top Summary Metric Cards -->
+      <div class="annexure-metrics-grid">
+        <div class="annexure-metric-card highlight">
+          <span class="metric-label">Total Annual CTC</span>
+          <strong class="metric-val text-orange">₹{{ d.totalCTC | number }}</strong>
+          <span class="metric-badge" *ngIf="d.totalCTC >= 100000">{{ (d.totalCTC / 100000).toFixed(2) }} LPA</span>
         </div>
-        <div class="summary-item" style="flex: 1;">
-          <span class="label" style="display: block; font-size: 13px; color: #64748b; margin-bottom: 4px;">Monthly CTC</span>
-          <span class="value" style="display: block; font-size: 24px; font-weight: 600; color: #0f172a;">₹{{annexureData().monthlyCTC | number}}</span>
+        <div class="annexure-metric-card">
+          <span class="metric-label">Monthly Gross Cost</span>
+          <strong class="metric-val">₹{{ d.monthlyCTC | number }}</strong>
+          <span class="metric-subtext">per calendar month</span>
+        </div>
+        <div class="annexure-metric-card">
+          <span class="metric-label">Monthly Gross Pay (A)</span>
+          <strong class="metric-val text-blue">₹{{ d.breakdown.earnings.totalGross.monthly | number }}</strong>
+          <span class="metric-subtext">Base + Allowances</span>
+        </div>
+        <div class="annexure-metric-card">
+          <span class="metric-label">Monthly Deductions (B)</span>
+          <strong class="metric-val text-slate">₹{{ d.breakdown.deductions.totalDeductions.monthly | number }}</strong>
+          <span class="metric-subtext">PF + Gratuity</span>
         </div>
       </div>
 
-      <div class="annexure-table-container" style="padding: 24px;">
-        <table class="annexure-table" style="width: 100%; border-collapse: collapse;">
+      <!-- Salary Breakdown Table -->
+      <div class="annexure-table-wrapper">
+        <table class="annexure-styled-table">
           <thead>
             <tr>
-              <th style="text-align: left; padding: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; font-weight: 600;">Salary Component</th>
-              <th style="text-align: right; padding: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; font-weight: 600;">Monthly (₹)</th>
-              <th style="text-align: right; padding: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; font-weight: 600;">Annual (₹)</th>
+              <th class="col-component">Salary Component</th>
+              <th class="col-num">Monthly (₹)</th>
+              <th class="col-num">Annual (₹)</th>
             </tr>
           </thead>
           <tbody>
-            <tr class="section-header" style="background: #f8fafc;">
-              <td colspan="3" style="padding: 12px; font-weight: 600; border: 1px solid #e2e8f0;">A. EARNINGS</td>
+            <!-- Part A -->
+            <tr class="table-section-title">
+              <td colspan="3">
+                <span class="section-pill earnings">A. EARNINGS & ALLOWANCES</span>
+              </td>
             </tr>
             <tr>
-              <td style="padding: 12px; border: 1px solid #e2e8f0;">Basic Salary</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.basic.monthly | number}}</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.basic.annual | number}}</td>
+              <td class="col-component indent">Basic Salary</td>
+              <td class="col-num">{{ d.breakdown.earnings.basic.monthly | number }}</td>
+              <td class="col-num font-semibold">{{ d.breakdown.earnings.basic.annual | number }}</td>
             </tr>
             <tr>
-              <td style="padding: 12px; border: 1px solid #e2e8f0;">House Rent Allowance (HRA)</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.hra.monthly | number}}</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.hra.annual | number}}</td>
+              <td class="col-component indent">House Rent Allowance (HRA)</td>
+              <td class="col-num">{{ d.breakdown.earnings.hra.monthly | number }}</td>
+              <td class="col-num font-semibold">{{ d.breakdown.earnings.hra.annual | number }}</td>
             </tr>
             <tr>
-              <td style="padding: 12px; border: 1px solid #e2e8f0;">Special Allowance / Bonus</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.specialAllowance.monthly | number}}</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.specialAllowance.annual | number}}</td>
+              <td class="col-component indent">Special Allowance / Bonus</td>
+              <td class="col-num">{{ d.breakdown.earnings.specialAllowance.monthly | number }}</td>
+              <td class="col-num font-semibold">{{ d.breakdown.earnings.specialAllowance.annual | number }}</td>
             </tr>
-            <tr class="subtotal-row" style="background: #eff6ff; font-weight: 600;">
-              <td style="padding: 12px; border: 1px solid #e2e8f0;">Total Gross Salary (A)</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.totalGross.monthly | number}}</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.earnings.totalGross.annual | number}}</td>
+            <tr class="table-subtotal-row earnings-subtotal">
+              <td class="col-component"><strong>Total Gross Salary (A)</strong></td>
+              <td class="col-num"><strong>₹{{ d.breakdown.earnings.totalGross.monthly | number }}</strong></td>
+              <td class="col-num"><strong>₹{{ d.breakdown.earnings.totalGross.annual | number }}</strong></td>
             </tr>
             
-            <tr class="section-header" style="background: #f8fafc;">
-              <td colspan="3" style="padding: 12px; font-weight: 600; border: 1px solid #e2e8f0;">B. EMPLOYER CONTRIBUTIONS (DEDUCTIONS)</td>
+            <!-- Part B -->
+            <tr class="table-section-title">
+              <td colspan="3">
+                <span class="section-pill deductions">B. EMPLOYER CONTRIBUTIONS & STATUTORY</span>
+              </td>
             </tr>
             <tr>
-              <td style="padding: 12px; border: 1px solid #e2e8f0;">Provident Fund (Employer)</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.pf.monthly | number}}</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.pf.annual | number}}</td>
+              <td class="col-component indent">Provident Fund (Employer PF)</td>
+              <td class="col-num">{{ d.breakdown.deductions.pf.monthly | number }}</td>
+              <td class="col-num font-semibold">{{ d.breakdown.deductions.pf.annual | number }}</td>
             </tr>
             <tr>
-              <td style="padding: 12px; border: 1px solid #e2e8f0;">Gratuity</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.gratuity.monthly | number}}</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.gratuity.annual | number}}</td>
+              <td class="col-component indent">Gratuity Allocation</td>
+              <td class="col-num">{{ d.breakdown.deductions.gratuity.monthly | number }}</td>
+              <td class="col-num font-semibold">{{ d.breakdown.deductions.gratuity.annual | number }}</td>
             </tr>
-            <tr class="subtotal-row" style="background: #fff1f2; font-weight: 600;">
-              <td style="padding: 12px; border: 1px solid #e2e8f0;">Total Deductions (B)</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.totalDeductions.monthly | number}}</td>
-              <td style="text-align: right; padding: 12px; border: 1px solid #e2e8f0;">{{annexureData().breakdown.deductions.totalDeductions.annual | number}}</td>
+            <tr class="table-subtotal-row deductions-subtotal">
+              <td class="col-component"><strong>Total Employer Deductions (B)</strong></td>
+              <td class="col-num"><strong>₹{{ d.breakdown.deductions.totalDeductions.monthly | number }}</strong></td>
+              <td class="col-num"><strong>₹{{ d.breakdown.deductions.totalDeductions.annual | number }}</strong></td>
             </tr>
 
-            <tr class="grand-total-row" style="background: #f1f5f9; font-weight: 700;">
-              <td style="padding: 16px 12px; border: 1px solid #cbd5e1;">Total Cost to Company (A + B)</td>
-              <td style="text-align: right; padding: 16px 12px; border: 1px solid #cbd5e1;">{{annexureData().monthlyCTC | number}}</td>
-              <td style="text-align: right; padding: 16px 12px; border: 1px solid #cbd5e1;">{{annexureData().totalCTC | number}}</td>
+            <!-- Grand Total -->
+            <tr class="table-grand-total-row">
+              <td class="col-component">
+                <span class="grand-total-label">Total Cost to Company (CTC = A + B)</span>
+              </td>
+              <td class="col-num grand-val">₹{{ d.monthlyCTC | number }}</td>
+              <td class="col-num grand-val">₹{{ d.totalCTC | number }}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
+      <!-- Compliance Notice Footer Note -->
+      <div class="annexure-legal-note">
+        <svg lucideFileText size="14"></svg>
+        <span>This salary annexure forms an integral schedule of the Employment Contract. Standard statutory deductions (Employee PF, Professional Tax, TDS) apply to gross monthly disbursements.</span>
+      </div>
     </div>
     
-    <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; background: #f8fafc; border-radius: 0 0 12px 12px;">
-      <button class="btn-outline" (click)="closeAnnexureModal()">Close</button>
-      <button class="btn-primary" style="display: flex; align-items: center; gap: 8px;" [disabled]="isLoadingAnnexure()">
-        <svg lucideDownload size="16"></svg> Download PDF
+    <!-- Footer -->
+    <div class="annexure-modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeAnnexureModal()">Close</button>
+      <button type="button" class="btn-annexure-print" (click)="printAnnexure()" [disabled]="isLoadingAnnexure()">
+        <svg lucideDownload size="16"></svg>
+        <span>Print / Save PDF</span>
       </button>
     </div>
   </div>

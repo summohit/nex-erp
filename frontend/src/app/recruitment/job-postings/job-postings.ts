@@ -2,6 +2,7 @@ import { Component, signal, inject, OnInit, ViewChild, ElementRef } from '@angul
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import {
   LucidePlus, LucideBriefcase, LucideMapPin, LucideClock, LucideSparkles,
@@ -25,7 +26,7 @@ declare var Quill: any;
   selector: 'app-job-postings',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, LucidePlus,
+    CommonModule, FormsModule, LucidePlus, LucideBriefcase, LucideMapPin, LucideClock,
     LucideSparkles, LucideX, LucideSearch,
     LucideHelpCircle, LucideTrash2, LucideBuilding,
     LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff,
@@ -37,6 +38,7 @@ declare var Quill: any;
 })
 export class JobPostingsComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
+  private router = inject(Router);
   private http = inject(HttpClient);
   private jobsService = inject(JobsService);
   private employeeService = inject(EmployeeService);
@@ -138,12 +140,6 @@ export class JobPostingsComponent implements OnInit {
   };
 
   gridOptions = {
-    rowSelection: {
-      mode: 'multiRow' as const,
-      checkboxes: true,
-      headerCheckbox: true,
-      enableClickSelection: false
-    },
     pagination: true,
     paginationPageSize: 10,
     paginationPageSizeSelector: [10, 25, 50, 100]
@@ -220,6 +216,15 @@ export class JobPostingsComponent implements OnInit {
       }
     },
     {
+      field: 'endDate',
+      headerName: 'End Date',
+      valueFormatter: (params: any) => {
+        if (!params.value) return '—';
+        const d = new Date(params.value);
+        return d.toLocaleDateString();
+      }
+    },
+    {
       headerName: 'Actions',
       width: 100,
       flex: 0,
@@ -274,6 +279,8 @@ export class JobPostingsComponent implements OnInit {
   selectedJob = signal<Job | null>(null);
   screeningQuestions = signal<string[]>([]);
   newQuestionInput = '';
+  requiredSkills = signal<string[]>([]);
+  newSkillInput = '';
   
   jobForm: any = {
     title: '',
@@ -386,6 +393,7 @@ export class JobPostingsComponent implements OnInit {
     this.drawerMode.set('create');
     this.selectedJob.set(null);
     this.screeningQuestions.set([]);
+    this.requiredSkills.set([]);
     this.jobForm = { 
       title: '', 
       departmentId: '', 
@@ -464,14 +472,13 @@ export class JobPostingsComponent implements OnInit {
       aiPrompt: ''
     };
     this.screeningQuestions.set((job.screeningQuestions as any) || []);
+    this.requiredSkills.set((job as any).requiredSkills || []);
     this.isCreateModalOpen.set(true);
     setTimeout(() => this.initQuill(), 100);
   }
 
   viewJobDetails(job: Job) {
-    this.selectedJob.set(job);
-    this.drawerMode.set('view');
-    this.isCreateModalOpen.set(true);
+    this.router.navigate(['/recruitment/jobs', job.id]);
   }
 
   deleteJob(job: Job) {
@@ -511,7 +518,8 @@ export class JobPostingsComponent implements OnInit {
       minSalary: this.jobForm.minSalary ? Number(this.jobForm.minSalary) : null,
       maxSalary: this.jobForm.maxSalary ? Number(this.jobForm.maxSalary) : null,
       descriptionHtml: this.jobForm.descriptionHtml,
-      screeningQuestions: JSON.stringify(this.screeningQuestions())
+      screeningQuestions: JSON.stringify(this.screeningQuestions()),
+      requiredSkills: this.requiredSkills()
     };
     
     if (this.drawerMode() === 'edit' && this.selectedJob()) {
@@ -543,6 +551,32 @@ export class JobPostingsComponent implements OnInit {
 
   removeScreeningQuestion(index: number) {
     this.screeningQuestions.update(q => q.filter((_, i) => i !== index));
+  }
+
+  suggestedSkills = ['Cisco ACI', 'Python', 'AWS', 'Network Routing', 'BGP', 'Firewall', 'Troubleshooting', 'Communication', 'Docker', 'Linux'];
+
+  addRequiredSkill(skillName?: string) {
+    const raw = (skillName || this.newSkillInput).trim();
+    if (!raw) return;
+
+    const skills = raw.split(/[,;\n]+/).map(s => s.trim()).filter(s => s.length > 0);
+    this.requiredSkills.update(current => {
+      const updated = [...current];
+      for (const s of skills) {
+        if (!updated.some(existing => existing.toLowerCase() === s.toLowerCase())) {
+          updated.push(s);
+        }
+      }
+      return updated;
+    });
+
+    if (!skillName) {
+      this.newSkillInput = '';
+    }
+  }
+
+  removeRequiredSkill(index: number) {
+    this.requiredSkills.update(s => s.filter((_, i) => i !== index));
   }
 
   initQuill() {

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Request, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Request, Query, UseGuards, ParseIntPipe, ForbiddenException } from '@nestjs/common';
 import { CrmService } from './crm.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -15,12 +15,20 @@ export class CrmController {
     if (data.addedById !== undefined) data.addedById = data.addedById ? parseInt(data.addedById, 10) : null;
     if (data.assignedToId !== undefined) data.assignedToId = data.assignedToId ? parseInt(data.assignedToId, 10) : null;
     if (data.broughtByContactId !== undefined) data.broughtByContactId = data.broughtByContactId ? parseInt(data.broughtByContactId, 10) : null;
-    return this.crmService.createLead(req.user.companyId, data);
+    return this.crmService.createLead(req.user.companyId, data, req.user.employeeId);
   }
 
   @Get('leads')
   getLeads(@Request() req) {
-    return this.crmService.getLeads(req.user.companyId);
+    return this.crmService.getLeads(req.user.companyId, req.user);
+  }
+
+  @Get('leads/dashboard')
+  getLeadsAnalyticsDashboard(@Request() req, @Query() query: any) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
+      throw new ForbiddenException('Only admins can view the leads analytics dashboard.');
+    }
+    return this.crmService.getLeadsAnalyticsDashboard(req.user.companyId, query);
   }
 
   @Put('leads/:id/status')
@@ -75,12 +83,12 @@ export class CrmController {
   }
   @Get('follow-ups/stats')
   getFollowUpStats(@Request() req) {
-    return this.crmService.getFollowUpStats(req.user.companyId);
+    return this.crmService.getFollowUpStats(req.user.companyId, req.user);
   }
 
   @Get('follow-ups')
   getAllFollowUps(@Request() req, @Query() query: any) {
-    return this.crmService.getAllCompanyFollowUps(req.user.companyId, query);
+    return this.crmService.getAllCompanyFollowUps(req.user.companyId, query, req.user);
   }
 
   // ═══════════════════════════════════════════

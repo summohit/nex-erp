@@ -1,0 +1,1379 @@
+<div class="lp-root">
+
+  <!-- ================= NAVBAR ================= -->
+  <header class="lp-nav">
+    <div class="lp-nav-inner">
+      <a class="lp-brand" routerLink="/">
+        <img src="/logo.png" alt="NEX ERP" class="lp-logo" />
+      </a>
+
+      <nav class="lp-nav-links">
+        <button type="button" (click)="scrollTo('tour')">Product Tour</button>
+        <button type="button" (click)="scrollTo('modules')">All Modules</button>
+        <button type="button" (click)="scrollTo('mobile')">Mobile App</button>
+        <button type="button" (click)="scrollTo('why')">Why NEX</button>
+        <button type="button" (click)="scrollTo('faq')">FAQ</button>
+      </nav>
+
+      <div class="lp-nav-actions">
+        <button type="button" class="lp-btn-ghost" (click)="goToLogin()">Sign In</button>
+        <button type="button" class="lp-btn-primary" (click)="goToSignup()">
+          Sign Up Free
+          <svg lucideArrowRight size="15"></svg>
+        </button>
+      </div>
+
+      <button type="button" class="lp-burger" (click)="toggleMobileNav()" aria-label="Toggle menu">
+        <svg *ngIf="!mobileNavOpen()" lucideMenu size="22"></svg>
+        <svg *ngIf="mobileNavOpen()" lucideX size="22"></svg>
+      </button>
+    </div>
+
+    <!-- Mobile dropdown -->
+    <div class="lp-mobile-menu" *ngIf="mobileNavOpen()">
+      <button type="button" (click)="scrollTo('tour')">Product Tour</button>
+      <button type="button" (click)="scrollTo('modules')">All Modules</button>
+      <button type="button" (click)="scrollTo('mobile')">Mobile App</button>
+      <button type="button" (click)="scrollTo('why')">Why NEX</button>
+      <button type="button" (click)="scrollTo('faq')">FAQ</button>
+      <div class="lp-mobile-actions">
+        <button type="button" class="lp-btn-ghost full" (click)="goToLogin()">Sign In</button>
+        <button type="button" class="lp-btn-primary full" (click)="goToSignup()">
+          Sign Up Free
+          <svg lucideArrowRight size="15"></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= HERO SECTION ================= -->
+  <section class="lp-hero">
+    <div class="lp-hero-bg-glow"></div>
+    <div class="lp-hero-inner">
+      <div class="lp-hero-copy">
+        <h1>
+          Run your entire company from
+          <span class="lp-accent-gradient">one intelligent place.</span>
+        </h1>
+
+        <p class="lp-hero-sub">
+          NEX ERP brings People, Biometric Attendance, 1-Click Payroll, Recruitment ATS,
+          CRM Deals, and Agile Projects into a single high-velocity platform.
+        </p>
+
+        <!-- Monday.com-style Interactive "What would you like to manage?" Hero Switcher -->
+        <div class="lp-hero-pill-selector">
+          <div class="pill-prompt-row">
+            <span class="pill-prompt-label">What would you like to manage?</span>
+          </div>
+          <div class="hero-pills-row">
+            <button 
+              type="button" 
+              class="hero-pill-btn" 
+              [class.active]="heroSelectedModule() === 'crm'"
+              (click)="selectHeroModule('crm')">
+              <svg lucideTrendingUp size="16"></svg>
+              <span>CRM & Sales</span>
+              <span class="pill-check" *ngIf="heroSelectedModule() === 'crm'">✓</span>
+            </button>
+            
+            <button 
+              type="button" 
+              class="hero-pill-btn" 
+              [class.active]="heroSelectedModule() === 'attendance'"
+              (click)="selectHeroModule('attendance')">
+              <svg lucideCalendarClock size="16"></svg>
+              <span>Attendance</span>
+              <span class="pill-check" *ngIf="heroSelectedModule() === 'attendance'">✓</span>
+            </button>
+
+            <button 
+              type="button" 
+              class="hero-pill-btn" 
+              [class.active]="heroSelectedModule() === 'payroll'"
+              (click)="selectHeroModule('payroll')">
+              <svg lucideBanknote size="16"></svg>
+              <span>Payroll</span>
+              <span class="pill-check" *ngIf="heroSelectedModule() === 'payroll'">✓</span>
+            </button>
+
+            <button 
+              type="button" 
+              class="hero-pill-btn" 
+              [class.active]="heroSelectedModule() === 'recruitment'"
+              (click)="selectHeroModule('recruitment')">
+              <svg lucideBriefcase size="16"></svg>
+              <span>Recruitment</span>
+              <span class="pill-check" *ngIf="heroSelectedModule() === 'recruitment'">✓</span>
+            </button>
+
+            <button 
+              type="button" 
+              class="hero-pill-btn" 
+              [class.active]="heroSelectedModule() === 'projects'"
+              (click)="selectHeroModule('projects')">
+              <svg lucideFolderKanban size="16"></svg>
+              <span>Projects</span>
+              <span class="pill-check" *ngIf="heroSelectedModule() === 'projects'">✓</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="lp-hero-cta">
+          <button type="button" class="lp-btn-primary lg" (click)="goToSignup()">
+            Start Free 14-Day Trial
+            <svg lucideArrowRight size="17"></svg>
+          </button>
+          <button type="button" class="lp-btn-outline lg" (click)="scrollTo('tour')">
+            <svg lucideEye size="17"></svg>
+            Explore Live Tour
+          </button>
+        </div>
+
+        <div class="lp-hero-trust-bar">
+          <div class="lp-trust-item">
+            <svg lucideCheckCircle2 size="15"></svg>
+            <span>No credit card required</span>
+          </div>
+          <div class="lp-trust-item">
+            <svg lucideCheckCircle2 size="15"></svg>
+            <span>Instant 2-minute setup</span>
+          </div>
+          <div class="lp-trust-item">
+            <svg lucideShieldCheck size="15"></svg>
+            <span>Enterprise 256-bit SSL</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-Data High-Fidelity ERP Mockup Visual -->
+      <div class="lp-hero-visual">
+        <div class="lp-hero-mockup-frame">
+          
+          <!-- Mockup Topbar with Dynamic URL -->
+          <div class="lp-mock-window-bar">
+            <div class="lp-mock-window-controls">
+              <span class="lp-dot red"></span>
+              <span class="lp-dot amber"></span>
+              <span class="lp-dot green"></span>
+            </div>
+            <div class="lp-mock-address-bar">
+              <svg lucideShieldCheck size="12" class="shield-icon"></svg>
+              <span *ngIf="heroSelectedModule() === 'crm'">app.nexerp.io/crm/leads-board</span>
+              <span *ngIf="heroSelectedModule() === 'attendance'">app.nexerp.io/attendance/live-kiosk</span>
+              <span *ngIf="heroSelectedModule() === 'payroll'">app.nexerp.io/payroll/disbursals</span>
+              <span *ngIf="heroSelectedModule() === 'recruitment'">app.nexerp.io/recruitment/candidate-pipeline</span>
+              <span *ngIf="heroSelectedModule() === 'projects'">app.nexerp.io/projects/sprints</span>
+            </div>
+            <div class="lp-mock-user-pill">
+              <span class="live-pulse-dot"></span>
+              <span>148 Active Online</span>
+            </div>
+          </div>
+
+          <!-- Mockup App Shell -->
+          <div class="lp-mock-app-body">
+            
+            <!-- App Mini Sidebar -->
+            <aside class="lp-mock-app-sidebar">
+              <div class="lp-mock-sidebar-brand">
+                <div class="brand-avatar">N</div>
+                <div class="brand-info">
+                  <strong>CES Tech</strong>
+                  <small>Enterprise</small>
+                </div>
+              </div>
+              <div class="lp-mock-sidebar-nav">
+                <div class="nav-item">
+                  <svg lucideBarChart3 size="13"></svg>
+                  <span>Dashboard</span>
+                </div>
+                <div class="nav-item" [class.active]="heroSelectedModule() === 'crm'" (click)="selectHeroModule('crm')">
+                  <svg lucideTrendingUp size="13"></svg>
+                  <span>CRM Leads</span>
+                  <span class="nav-badge">18</span>
+                </div>
+                <div class="nav-item" [class.active]="heroSelectedModule() === 'attendance'" (click)="selectHeroModule('attendance')">
+                  <svg lucideCalendarClock size="13"></svg>
+                  <span>Attendance</span>
+                </div>
+                <div class="nav-item" [class.active]="heroSelectedModule() === 'payroll'" (click)="selectHeroModule('payroll')">
+                  <svg lucideBanknote size="13"></svg>
+                  <span>Payroll</span>
+                </div>
+                <div class="nav-item" [class.active]="heroSelectedModule() === 'recruitment'" (click)="selectHeroModule('recruitment')">
+                  <svg lucideBriefcase size="13"></svg>
+                  <span>Recruitment</span>
+                </div>
+                <div class="nav-item" [class.active]="heroSelectedModule() === 'projects'" (click)="selectHeroModule('projects')">
+                  <svg lucideFolderKanban size="13"></svg>
+                  <span>Projects</span>
+                </div>
+              </div>
+            </aside>
+
+            <!-- App Main Content Stage -->
+            <main class="lp-mock-app-content">
+              
+              <!-- 1. CRM VIEW -->
+              <ng-container *ngIf="heroSelectedModule() === 'crm'">
+                <div class="lp-mock-content-header">
+                  <div>
+                    <h4>CRM Deal Pipeline</h4>
+                    <p>18 Active Opportunities · Total Pipeline Value ₹48.5L</p>
+                  </div>
+                  <div class="header-actions">
+                    <span class="kpi-tag-chip">
+                      <svg lucideSparkles size="12"></svg>
+                      Win Rate 38.4%
+                    </span>
+                    <button class="mock-btn-action">+ New Lead</button>
+                  </div>
+                </div>
+
+                <div class="lp-mock-metrics-row">
+                  <div class="mock-stat-card blue">
+                    <span class="stat-label">TOTAL PIPELINE</span>
+                    <strong class="stat-val">₹48,50,000</strong>
+                    <span class="stat-growth up">↑ 24.2% vs last mo</span>
+                  </div>
+                  <div class="mock-stat-card emerald">
+                    <span class="stat-label">WON THIS MONTH</span>
+                    <strong class="stat-val">₹24,80,000</strong>
+                    <span class="stat-sub">6 Deals closed</span>
+                  </div>
+                  <div class="mock-stat-card purple">
+                    <span class="stat-label">AVG DEAL SIZE</span>
+                    <strong class="stat-val">₹2,69,444</strong>
+                    <span class="stat-badge-ok">Top: ₹16.5L</span>
+                  </div>
+                </div>
+
+                <div class="lp-mock-kanban-board">
+                  <div class="lp-kanban-col">
+                    <div class="kanban-col-head">
+                      <span class="col-dot blue"></span>
+                      <span class="col-title">QUALIFIED (2)</span>
+                      <span class="col-sum">₹18.5L</span>
+                    </div>
+                    <div class="kanban-deal-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Tata Motors Fleet</span>
+                        <span class="deal-badge enterprise">Enterprise</span>
+                      </div>
+                      <div class="deal-title">Cloud ERP Rollout (200 Seats)</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹12,50,000</strong>
+                        <span class="deal-owner">Mohit S.</span>
+                      </div>
+                    </div>
+                    <div class="kanban-deal-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Apollo Health</span>
+                        <span class="deal-badge inbound">Inbound</span>
+                      </div>
+                      <div class="deal-title">Biometric Kiosk Setup</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹6,00,000</strong>
+                        <span class="deal-owner">Priya K.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="kanban-col">
+                    <div class="kanban-col-head">
+                      <span class="col-dot purple"></span>
+                      <span class="col-title">PROPOSAL (2)</span>
+                      <span class="col-sum">₹22.0L</span>
+                    </div>
+                    <div class="kanban-deal-card highlight-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Reliance Retail</span>
+                        <span class="deal-badge-urgent">Follow-up Today</span>
+                      </div>
+                      <div class="deal-title">POS & Multi-Store Inventory</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹16,50,000</strong>
+                        <span class="deal-owner">Ananya S.</span>
+                      </div>
+                    </div>
+                    <div class="kanban-deal-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Nexus Logistics</span>
+                        <span class="deal-badge partner">Partner</span>
+                      </div>
+                      <div class="deal-title">Field Visit Geofencing</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹5,50,000</strong>
+                        <span class="deal-owner">Rohan D.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="kanban-col">
+                    <div class="kanban-col-head">
+                      <span class="col-dot emerald"></span>
+                      <span class="col-title">WON THIS MONTH (4)</span>
+                      <span class="col-sum">₹24.8L</span>
+                    </div>
+                    <div class="kanban-deal-card won-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Zenith FinTech</span>
+                        <span class="deal-badge-won">Won Yesterday</span>
+                      </div>
+                      <div class="deal-title">Payroll + ATS Annual Suite</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹8,00,000</strong>
+                        <span class="deal-owner">Vikram S.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- 2. ATTENDANCE VIEW -->
+              <ng-container *ngIf="heroSelectedModule() === 'attendance'">
+                <div class="lp-mock-content-header">
+                  <div>
+                    <h4>Live Shift & Biometric Headcount</h4>
+                    <p>148 Checked In · 4 on Approved Leave · 0 Unexcused</p>
+                  </div>
+                  <div class="header-actions">
+                    <span class="kpi-tag-chip">
+                      <svg lucideClock size="12"></svg>
+                      97.4% On-Time
+                    </span>
+                    <button class="mock-btn-action">Shift Roster</button>
+                  </div>
+                </div>
+
+                <div class="lp-mock-metrics-row">
+                  <div class="mock-stat-card emerald">
+                    <span class="stat-label">PRESENT TODAY</span>
+                    <strong class="stat-val">148 / 152</strong>
+                    <span class="stat-growth up">97.4% Attendance</span>
+                  </div>
+                  <div class="mock-stat-card blue">
+                    <span class="stat-label">GEOFENCE PUNCHES</span>
+                    <strong class="stat-val">34 Field Staff</strong>
+                    <span class="stat-sub">GPS Verified</span>
+                  </div>
+                  <div class="mock-stat-card purple">
+                    <span class="stat-label">KIOSK VERIFIED</span>
+                    <strong class="stat-val">114 Punches</strong>
+                    <span class="stat-badge-ok">Biometric/Selfie</span>
+                  </div>
+                </div>
+
+                <div class="pane-chart-box" style="padding: 4px 0 0 0;">
+                  <div class="attend-live-list">
+                    <div class="attend-item" style="padding: 7px 10px; margin-bottom: 6px;">
+                      <div class="attend-avatar" style="width: 28px; height: 28px; font-size: 0.75rem;">PS</div>
+                      <div class="attend-info">
+                        <strong style="font-size: 0.75rem;">Priya Sharma <span class="dept-text">· Engineering</span></strong>
+                        <small style="font-size: 0.625rem;"><svg lucideMapPin size="10"></svg> Head Office (Biometric Kiosk)</small>
+                      </div>
+                      <div class="attend-timing">
+                        <span class="punch-time" style="font-size: 0.6875rem;">09:04 AM</span>
+                        <span class="attend-badge ok">On Time</span>
+                      </div>
+                    </div>
+                    <div class="attend-item" style="padding: 7px 10px; margin-bottom: 6px;">
+                      <div class="attend-avatar" style="width: 28px; height: 28px; font-size: 0.75rem; background: #eff6ff; color: #2563eb;">RV</div>
+                      <div class="attend-info">
+                        <strong style="font-size: 0.75rem;">Rahul Verma <span class="dept-text">· Field Sales</span></strong>
+                        <small style="font-size: 0.625rem;"><svg lucideMapPin size="10"></svg> Tata Motors Site (Bangalore)</small>
+                      </div>
+                      <div class="attend-timing">
+                        <span class="punch-time" style="font-size: 0.6875rem;">09:12 AM</span>
+                        <span class="attend-badge ok">Geo-Verified</span>
+                      </div>
+                    </div>
+                    <div class="attend-item" style="padding: 7px 10px;">
+                      <div class="attend-avatar" style="width: 28px; height: 28px; font-size: 0.75rem; background: #ecfdf5; color: #059669;">KR</div>
+                      <div class="attend-info">
+                        <strong style="font-size: 0.75rem;">Kavita Reddy <span class="dept-text">· People Ops</span></strong>
+                        <small style="font-size: 0.625rem;"><svg lucideMapPin size="10"></svg> Head Office (Tablet Camera)</small>
+                      </div>
+                      <div class="attend-timing">
+                        <span class="punch-time" style="font-size: 0.6875rem;">09:00 AM</span>
+                        <span class="attend-badge ok">On Time</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- 3. PAYROLL VIEW -->
+              <ng-container *ngIf="heroSelectedModule() === 'payroll'">
+                <div class="lp-mock-content-header">
+                  <div>
+                    <h4>August 2026 Salary Disbursal</h4>
+                    <p>152/152 Salaries Computed · Auto LOP Sync Active</p>
+                  </div>
+                  <div class="header-actions">
+                    <span class="kpi-tag-chip">
+                      <svg lucideCheckCircle2 size="12"></svg>
+                      Tax Compliant
+                    </span>
+                    <button class="mock-btn-action">Download Bank Batch</button>
+                  </div>
+                </div>
+
+                <div class="lp-mock-metrics-row">
+                  <div class="mock-stat-card purple">
+                    <span class="stat-label">NET PAYROLL DISBURSAL</span>
+                    <strong class="stat-val">₹18,40,250</strong>
+                    <span class="stat-badge-ok">✓ Ready to Export</span>
+                  </div>
+                  <div class="mock-stat-card blue">
+                    <span class="stat-label">GROSS SALARY</span>
+                    <strong class="stat-val">₹21,85,000</strong>
+                    <span class="stat-growth up">152 Employees</span>
+                  </div>
+                  <div class="mock-stat-card emerald">
+                    <span class="stat-label">TOTAL TAX (PF/TDS)</span>
+                    <strong class="stat-val">₹3,44,750</strong>
+                    <span class="stat-sub">Auto Reconciled</span>
+                  </div>
+                </div>
+
+                <div class="payroll-breakdown-grid" style="margin-top: 4px; gap: 8px;">
+                  <div class="pay-stat full-row" style="padding: 10px 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <small style="font-size: 0.625rem;">SALARY PROCESSING ENGINE</small>
+                      <span style="font-size: 0.625rem; font-weight: 800; color: #059669;">100% Calculated</span>
+                    </div>
+                    <div class="progress-line" style="margin: 4px 0 6px 0;">
+                      <div class="progress-fill" style="width: 100%;"></div>
+                    </div>
+                    <div class="progress-labels" style="font-size: 0.6875rem;">
+                      <span>152 Encrypted Payslips Generated</span>
+                      <strong class="text-success">0 Errors</strong>
+                    </div>
+                  </div>
+                  <div class="payslip-preview-item" style="padding: 8px 12px; margin-top: 0;">
+                    <svg lucideFileText size="16" class="text-primary"></svg>
+                    <div class="ps-info">
+                      <strong style="font-size: 0.75rem;">CES_Salary_NEFT_Aug2026.csv</strong>
+                      <small style="font-size: 0.625rem;">HDFC / ICICI Corporate Banking Bulk Format</small>
+                    </div>
+                    <span class="badge-approved" style="font-size: 0.625rem;">✓ Validated</span>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- 4. RECRUITMENT VIEW -->
+              <ng-container *ngIf="heroSelectedModule() === 'recruitment'">
+                <div class="lp-mock-content-header">
+                  <div>
+                    <h4>Recruitment & Applicant Pipeline</h4>
+                    <p>12 Open Roles · 48 Active Candidates</p>
+                  </div>
+                  <div class="header-actions">
+                    <span class="kpi-tag-chip">
+                      <svg lucideUserPlus size="12"></svg>
+                      <span>4 Hires This Mo</span>
+                    </span>
+                    <button class="mock-btn-action">+ Post Job</button>
+                  </div>
+                </div>
+
+                <div class="lp-mock-metrics-row">
+                  <div class="mock-stat-card amber">
+                    <span class="stat-label">TOTAL CANDIDATES</span>
+                    <strong class="stat-val">48 In Funnel</strong>
+                    <span class="stat-growth up">↑ 14 this week</span>
+                  </div>
+                  <div class="mock-stat-card purple">
+                    <span class="stat-label">INTERVIEWS SCHEDULED</span>
+                    <strong class="stat-val">16 Active</strong>
+                    <span class="stat-sub">Next 48 hrs</span>
+                  </div>
+                  <div class="mock-stat-card emerald">
+                    <span class="stat-label">OFFER LETTERS</span>
+                    <strong class="stat-val">3 Accepted</strong>
+                    <span class="stat-badge-ok">✓ 1-Click Onboard</span>
+                  </div>
+                </div>
+
+                <div class="lp-mock-kanban-board">
+                  <div class="lp-kanban-col">
+                    <div class="kanban-col-head">
+                      <span class="col-dot blue"></span>
+                      <span class="col-title">SCREENING (3)</span>
+                      <span class="col-sum">Resume</span>
+                    </div>
+                    <div class="kanban-deal-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Sneha Patil</span>
+                        <span class="deal-badge inbound">4.0 Yrs</span>
+                      </div>
+                      <div class="deal-title">Product UI/UX Designer</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹16 LPA</strong>
+                        <span class="deal-owner">Score 9/10</span>
+                      </div>
+                    </div>
+                    <div class="kanban-deal-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Deepak Joshi</span>
+                        <span class="deal-badge partner">5.2 Yrs</span>
+                      </div>
+                      <div class="deal-title">Cloud DevOps Specialist</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹21 LPA</strong>
+                        <span class="deal-owner">Score 8/10</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="kanban-col">
+                    <div class="kanban-col-head">
+                      <span class="col-dot purple"></span>
+                      <span class="col-title">INTERVIEW (2)</span>
+                      <span class="col-sum">Round 2</span>
+                    </div>
+                    <div class="kanban-deal-card highlight-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Rohan Gupta</span>
+                        <span class="deal-badge-urgent">Today 3 PM</span>
+                      </div>
+                      <div class="deal-title">Backend Node.js Lead</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹22 LPA</strong>
+                        <span class="deal-owner">Tech Panel</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="kanban-col">
+                    <div class="kanban-col-head">
+                      <span class="col-dot emerald"></span>
+                      <span class="col-title">OFFER DISPATCHED (2)</span>
+                      <span class="col-sum">Accepted</span>
+                    </div>
+                    <div class="kanban-deal-card won-card">
+                      <div class="deal-top">
+                        <span class="deal-company">Siddharth Nair</span>
+                        <span class="deal-badge-won">Accepted</span>
+                      </div>
+                      <div class="deal-title">Senior Full Stack Lead</div>
+                      <div class="deal-bottom">
+                        <strong class="deal-val">₹24 LPA</strong>
+                        <span class="deal-owner">Joining Sep 1</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- 5. PROJECTS VIEW -->
+              <ng-container *ngIf="heroSelectedModule() === 'projects'">
+                <div class="lp-mock-content-header">
+                  <div>
+                    <h4>Agile Sprint & Issue Tracker</h4>
+                    <p>Sprint 34: Infrastructure & CRM 2.0 · 94% on track</p>
+                  </div>
+                  <div class="header-actions">
+                    <span class="kpi-tag-chip">
+                      <svg lucideZap size="12"></svg>
+                      18 Issues Closed
+                    </span>
+                    <button class="mock-btn-action">+ New Task</button>
+                  </div>
+                </div>
+
+                <div class="lp-mock-metrics-row">
+                  <div class="mock-stat-card indigo">
+                    <span class="stat-label">ACTIVE SPRINT GOAL</span>
+                    <strong class="stat-val">94% Velocity</strong>
+                    <span class="stat-growth up">3 Days Remaining</span>
+                  </div>
+                  <div class="mock-stat-card blue">
+                    <span class="stat-label">TOTAL ISSUES</span>
+                    <strong class="stat-val">28 Tasks</strong>
+                    <span class="stat-sub">CES Standard IDs</span>
+                  </div>
+                  <div class="mock-stat-card emerald">
+                    <span class="stat-label">DEPLOYMENT STATUS</span>
+                    <strong class="stat-val">Passing</strong>
+                    <span class="stat-badge-ok">Production Live</span>
+                  </div>
+                </div>
+
+                <div class="project-issues-list" style="margin-top: 4px; gap: 6px;">
+                  <div class="issue-item" style="padding: 8px 10px;">
+                    <div class="issue-code-col"><code style="font-size: 0.625rem;">CES/0826/01</code></div>
+                    <div class="issue-title-col">
+                      <strong style="font-size: 0.75rem;">Payment Gateway Webhook Sync</strong>
+                      <small style="font-size: 0.625rem;">Assigned to: Mohit S.</small>
+                    </div>
+                    <div class="issue-status-col">
+                      <span class="issue-status-badge" style="font-size: 0.625rem;">IN PROGRESS</span>
+                    </div>
+                  </div>
+                  <div class="issue-item" style="padding: 8px 10px;">
+                    <div class="issue-code-col"><code style="font-size: 0.625rem;">CES/0826/02</code></div>
+                    <div class="issue-title-col">
+                      <strong style="font-size: 0.75rem;">Biometric Kiosk Android Build v2.1</strong>
+                      <small style="font-size: 0.625rem;">Assigned to: Vikramjit S.</small>
+                    </div>
+                    <div class="issue-status-col">
+                      <span class="issue-status-badge" style="font-size: 0.625rem;">REVIEW</span>
+                    </div>
+                  </div>
+                  <div class="issue-item" style="padding: 8px 10px;">
+                    <div class="issue-code-col"><code style="font-size: 0.625rem;">CES/0826/03</code></div>
+                    <div class="issue-title-col">
+                      <strong style="font-size: 0.75rem;">GST & TDS Invoice Export Formatting</strong>
+                      <small style="font-size: 0.625rem;">Assigned to: Rohan D.</small>
+                    </div>
+                    <div class="issue-status-col">
+                      <span class="issue-status-badge done" style="font-size: 0.625rem;">DONE</span>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+            </main>
+
+          </div>
+
+          <!-- Floating Notification Popover Mock -->
+          <div class="lp-floating-badge-alert top-right" *ngIf="heroSelectedModule() === 'crm' || heroSelectedModule() === 'payroll'">
+            <div class="alert-icon-wrap emerald">
+              <svg lucideZap size="15"></svg>
+            </div>
+            <div class="alert-content">
+              <strong>1-Click Payroll Auto-Generated</strong>
+              <span>152 employee bank transfers finalized</span>
+            </div>
+          </div>
+
+          <div class="lp-floating-badge-alert bottom-left" *ngIf="heroSelectedModule() === 'crm' || heroSelectedModule() === 'recruitment'">
+            <div class="alert-icon-wrap orange">
+              <svg lucideAward size="15"></svg>
+            </div>
+            <div class="alert-content">
+              <strong>Deal Closed: ₹8,00,000</strong>
+              <span>Zenith FinTech accepted Quotation #Q-2608</span>
+            </div>
+          </div>
+
+          <div class="lp-floating-badge-alert top-right" *ngIf="heroSelectedModule() === 'attendance'">
+            <div class="alert-icon-wrap emerald">
+              <svg lucideMapPin size="15"></svg>
+            </div>
+            <div class="alert-content">
+              <strong>Geofence Clock-In Verified</strong>
+              <span>Rahul V. logged site visit in Bangalore</span>
+            </div>
+          </div>
+
+          <div class="lp-floating-badge-alert bottom-left" *ngIf="heroSelectedModule() === 'projects'">
+            <div class="alert-icon-wrap orange">
+              <svg lucideCheckCircle2 size="15"></svg>
+            </div>
+            <div class="alert-content">
+              <strong>Issue CES/0826/03 Merged</strong>
+              <span>GST & TDS Invoice Export live in prod</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Platform Performance Strip -->
+    <div class="lp-stats-strip">
+      <div class="lp-stats-inner">
+        <div class="lp-stat-card" *ngFor="let s of stats">
+          <div class="stat-num-row">
+            <span class="stat-number">{{ s.value }}</span>
+            <span class="stat-verified-icon">
+              <svg lucideCheckCircle2 size="16"></svg>
+            </span>
+          </div>
+          <strong class="stat-headline">{{ s.label }}</strong>
+          <span class="stat-subdesc">{{ s.desc }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= INTERACTIVE PRODUCT TOUR ================= -->
+  <section class="lp-section lp-tour-section" id="tour">
+    <div class="lp-section-head">
+      <span class="lp-section-tag">
+        <svg lucideSparkles size="13"></svg>
+        Product Deep-Dive
+      </span>
+      <h2>Experience the Connected Workspace</h2>
+      <p>
+        Every department is synchronized in real time. See how data flows effortlessly from recruitment into attendance, payroll, and CRM.
+      </p>
+    </div>
+
+    <!-- Tour Tabs Selector -->
+    <div class="lp-tour-tabs">
+      <button 
+        type="button" 
+        class="tour-tab-btn" 
+        [class.active]="activeModuleTab() === 'crm'"
+        (click)="setModuleTab('crm')">
+        <svg lucideTrendingUp size="16"></svg>
+        <span>CRM & Pipeline</span>
+      </button>
+      <button 
+        type="button" 
+        class="tour-tab-btn" 
+        [class.active]="activeModuleTab() === 'attendance'"
+        (click)="setModuleTab('attendance')">
+        <svg lucideCalendarClock size="16"></svg>
+        <span>Attendance & Kiosk</span>
+      </button>
+      <button 
+        type="button" 
+        class="tour-tab-btn" 
+        [class.active]="activeModuleTab() === 'payroll'"
+        (click)="setModuleTab('payroll')">
+        <svg lucideBanknote size="16"></svg>
+        <span>1-Click Payroll</span>
+      </button>
+      <button 
+        type="button" 
+        class="tour-tab-btn" 
+        [class.active]="activeModuleTab() === 'recruitment'"
+        (click)="setModuleTab('recruitment')">
+        <svg lucideBriefcase size="16"></svg>
+        <span>Recruitment & ATS</span>
+      </button>
+      <button 
+        type="button" 
+        class="tour-tab-btn" 
+        [class.active]="activeModuleTab() === 'projects'"
+        (click)="setModuleTab('projects')">
+        <svg lucideFolderKanban size="16"></svg>
+        <span>Projects & Sprints</span>
+      </button>
+    </div>
+
+    <!-- Interactive Tab Previews -->
+    <div class="lp-tour-container">
+      
+      <!-- TAB 1: CRM -->
+      <div class="lp-tour-pane" *ngIf="activeModuleTab() === 'crm'">
+        <div class="pane-grid">
+          <div class="pane-details">
+            <span class="pane-badge orange">Sales & Revenue</span>
+            <h3>Close deals 2.5x faster with zero dropped leads</h3>
+            <p>
+              Track inquiries from initial contact to paid invoice. Automated follow-up scheduling ensures your reps never miss an opportunity, while real-time deal probability helps you forecast revenue accurately.
+            </p>
+            <ul class="pane-checklist">
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Searchable Filter Bar:</strong> Filter by Stage, Sales Rep, Category, Close Date & Follow-Up status</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Instant Quotation PDF:</strong> Generate professional branded quotes with taxes in seconds</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Broker & Partner Tracking:</strong> Attribute leads to external partners under "Lead Brought By"</span>
+              </li>
+            </ul>
+            <button class="lp-btn-primary" (click)="goToSignup()">
+              Try CRM Board Free
+              <svg lucideArrowRight size="15"></svg>
+            </button>
+          </div>
+          <div class="pane-visual-card">
+            <div class="pane-card-header">
+              <div class="header-left">
+                <strong>Pipeline Health Overview</strong>
+                <span class="live-tag">Live</span>
+              </div>
+              <span class="val-badge">₹48.5L Active</span>
+            </div>
+            <div class="pane-chart-box">
+              <div class="lead-row" *ngFor="let deal of [
+                { company: 'Tata Motors Fleet', value: '₹12,50,000', rep: 'Mohit Singh', stage: 'Qualified', badge: 'High Prob 85%' },
+                { company: 'Reliance Retail POS', value: '₹16,50,000', rep: 'Ananya S.', stage: 'Proposal', badge: 'Follow-up Today' },
+                { company: 'Zenith FinTech Suite', value: '₹8,00,000', rep: 'Vikram S.', stage: 'Won', badge: 'Converted' },
+                { company: 'Apollo Health Kiosks', value: '₹6,00,000', rep: 'Priya K.', stage: 'Interested', badge: 'New Lead' }
+              ]">
+                <div class="lead-icon-col">
+                  <div class="co-initials">{{ deal.company.substring(0,2).toUpperCase() }}</div>
+                </div>
+                <div class="lead-info-col">
+                  <strong>{{ deal.company }}</strong>
+                  <small>Rep: {{ deal.rep }} · Stage: {{ deal.stage }}</small>
+                </div>
+                <div class="lead-val-col">
+                  <strong>{{ deal.value }}</strong>
+                  <span class="prob-tag">{{ deal.badge }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Attendance -->
+      <div class="lp-tour-pane" *ngIf="activeModuleTab() === 'attendance'">
+        <div class="pane-grid">
+          <div class="pane-details">
+            <span class="pane-badge purple">Time & Location</span>
+            <h3>Eliminate buddy punching with Biometric & GPS Kiosks</h3>
+            <p>
+              Whether your team works in the head office, remote, or at client field sites, track every shift accurately with facial recognition kiosks, geofenced mobile punches, and automated overtime sync.
+            </p>
+            <ul class="pane-checklist">
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Tablet Kiosk Camera Mode:</strong> Instant selfie clock-in with live verification</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>GPS Field Site Tracking:</strong> Log customer visits with geocoded coordinates</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Automatic Shift Rosters:</strong> Multi-shift rotations and automated overtime multipliers</span>
+              </li>
+            </ul>
+            <button class="lp-btn-primary" (click)="goToSignup()">
+              Explore Attendance Suite
+              <svg lucideArrowRight size="15"></svg>
+            </button>
+          </div>
+          <div class="pane-visual-card">
+            <div class="pane-card-header">
+              <div class="header-left">
+                <strong>Today's Live Headcount</strong>
+                <span class="live-tag pulse">97.4% Present</span>
+              </div>
+              <span class="val-badge green">148 On-Duty</span>
+            </div>
+            <div class="pane-chart-box">
+              <div class="attend-live-list">
+                <div class="attend-item" *ngFor="let emp of [
+                  { name: 'Priya Sharma', dept: 'Engineering', punch: '09:04 AM', loc: 'Head Office (Biometric)', status: 'On Time' },
+                  { name: 'Rahul Verma', dept: 'Field Sales', punch: '09:12 AM', loc: 'Client Site (Bangalore Hub)', status: 'Geo-Verified' },
+                  { name: 'Kavita Reddy', dept: 'People Ops', punch: '09:00 AM', loc: 'Head Office (Kiosk)', status: 'On Time' },
+                  { name: 'Amit Roy', dept: 'Design', punch: '09:28 AM', loc: 'Remote (Approved WFH)', status: 'WFH Active' }
+                ]">
+                  <div class="attend-avatar">{{ emp.name.substring(0,1) }}</div>
+                  <div class="attend-info">
+                    <strong>{{ emp.name }} <span class="dept-text">· {{ emp.dept }}</span></strong>
+                    <small><svg lucideMapPin size="11"></svg> {{ emp.loc }}</small>
+                  </div>
+                  <div class="attend-timing">
+                    <span class="punch-time">{{ emp.punch }}</span>
+                    <span class="attend-badge ok">{{ emp.status }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Payroll -->
+      <div class="lp-tour-pane" *ngIf="activeModuleTab() === 'payroll'">
+        <div class="pane-grid">
+          <div class="pane-details">
+            <span class="pane-badge emerald">100% Tax & Compliance</span>
+            <h3>Run company-wide payroll in under 3 minutes</h3>
+            <p>
+              No more exporting Excel files. NEX ERP automatically reconciles biometric attendance, leaves, unpaid days (LOP), expense claims, and statutory taxes (PF, ESI, TDS) with one-click bank batch files.
+            </p>
+            <ul class="pane-checklist">
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Direct LOP & Overtime Auto-Calculation:</strong> Zero manual calculations</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Encrypted PDF Payslips:</strong> Employees get instant mobile & email notifications</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Salary Components & Deductions:</strong> Custom HRA, Special Allowance, PF & Gratuity</span>
+              </li>
+            </ul>
+            <button class="lp-btn-primary" (click)="goToSignup()">
+              Try Payroll Engine
+              <svg lucideArrowRight size="15"></svg>
+            </button>
+          </div>
+          <div class="pane-visual-card">
+            <div class="pane-card-header">
+              <div class="header-left">
+                <strong>August 2026 Payroll Summary</strong>
+                <span class="live-tag">Disbursal Ready</span>
+              </div>
+              <span class="val-badge purple">₹18.4L Net Pay</span>
+            </div>
+            <div class="pane-chart-box">
+              <div class="payroll-breakdown-grid">
+                <div class="pay-stat">
+                  <small>GROSS EARNINGS</small>
+                  <strong>₹21,85,000</strong>
+                </div>
+                <div class="pay-stat">
+                  <small>TOTAL DEDUCTIONS (PF/TDS)</small>
+                  <strong class="deduct">- ₹3,44,750</strong>
+                </div>
+                <div class="pay-stat full-row">
+                  <small>TOTAL EMPLOYEES PROCESSED</small>
+                  <div class="progress-line">
+                    <div class="progress-fill" style="width: 100%;"></div>
+                  </div>
+                  <div class="progress-labels">
+                    <span>152 / 152 Payslips Generated</span>
+                    <strong class="text-success">100% Complete</strong>
+                  </div>
+                </div>
+                <div class="payslip-preview-item">
+                  <svg lucideFileText size="18" class="text-primary"></svg>
+                  <div class="ps-info">
+                    <strong>Payslip_CES_Aug2026_All.pdf</strong>
+                    <small>Batch bank transfer format (NEFT/RTGS compliant)</small>
+                  </div>
+                  <span class="badge-approved">✓ Ready</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Recruitment -->
+      <div class="lp-tour-pane" *ngIf="activeModuleTab() === 'recruitment'">
+        <div class="pane-grid">
+          <div class="pane-details">
+            <span class="pane-badge amber">Talent & ATS</span>
+            <h3>Attract top talent with custom career portals</h3>
+            <p>
+              Publish open job listings to your branded careers portal in 1 click. Collect rich applications with resumes, experience, current & expected CTC, and transition hired candidates into active employees seamlessly.
+            </p>
+            <ul class="pane-checklist">
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Public Job Board:</strong> Built-in mobile responsive apply pages</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Visual Candidate Pipeline:</strong> Screened, Interviewed, Offered, Hired</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>1-Click Employee Conversion:</strong> Hired candidates instantly enter HRMS</span>
+              </li>
+            </ul>
+            <button class="lp-btn-primary" (click)="goToSignup()">
+              Explore Recruitment ATS
+              <svg lucideArrowRight size="15"></svg>
+            </button>
+          </div>
+          <div class="pane-visual-card">
+            <div class="pane-card-header">
+              <div class="header-left">
+                <strong>Active Hiring Pipeline</strong>
+                <span class="live-tag">12 Open Roles</span>
+              </div>
+              <span class="val-badge">48 Applicants</span>
+            </div>
+            <div class="pane-chart-box">
+              <div class="rec-candidate-list">
+                <div class="rec-card" *ngFor="let cand of [
+                  { name: 'Siddharth Nair', role: 'Senior Full Stack Lead', exp: '6.5 Yrs', ctc: '₹24 LPA', stage: 'Offer Dispatched', color: 'emerald' },
+                  { name: 'Sneha Patil', role: 'Product UI/UX Designer', exp: '4.0 Yrs', ctc: '₹16 LPA', stage: 'Technical Round 2', color: 'purple' },
+                  { name: 'Deepak Joshi', role: 'DevOps & Cloud Specialist', exp: '5.2 Yrs', ctc: '₹21 LPA', stage: 'HR Screening', color: 'blue' }
+                ]">
+                  <div class="cand-top">
+                    <strong>{{ cand.name }}</strong>
+                    <span class="cand-stage-pill" [ngClass]="cand.color">{{ cand.stage }}</span>
+                  </div>
+                  <div class="cand-sub">{{ cand.role }} · {{ cand.exp }} Exp · Exp. CTC: {{ cand.ctc }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: Projects -->
+      <div class="lp-tour-pane" *ngIf="activeModuleTab() === 'projects'">
+        <div class="pane-grid">
+          <div class="pane-details">
+            <span class="pane-badge indigo">Delivery & Agile</span>
+            <h3>Execute projects with standardized CES task tracking</h3>
+            <p>
+              Organize sprints, monitor issue life-cycles with sequential tracking (e.g. CES/0826/01), attach deliverables, and keep clients updated with dedicated client portal permissions.
+            </p>
+            <ul class="pane-checklist">
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Sequential Issue Formatting:</strong> Enforces standard CES/MMYY/SEQ IDs</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Client Association:</strong> Tie projects to CRM converted leads and clients</span>
+              </li>
+              <li>
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span><strong>Task Workloads & Deadlines:</strong> Prevent burnout with clear task assignments</span>
+              </li>
+            </ul>
+            <button class="lp-btn-primary" (click)="goToSignup()">
+              Explore Project Boards
+              <svg lucideArrowRight size="15"></svg>
+            </button>
+          </div>
+          <div class="pane-visual-card">
+            <div class="pane-card-header">
+              <div class="header-left">
+                <strong>Active Engineering Sprint</strong>
+                <span class="live-tag">On Track</span>
+              </div>
+              <span class="val-badge">94% Sprint Goal</span>
+            </div>
+            <div class="pane-chart-box">
+              <div class="project-issues-list">
+                <div class="issue-item" *ngFor="let issue of [
+                  { code: 'CES/0826/01', title: 'Payment Gateway Webhook Sync', status: 'IN PROGRESS', priority: 'HIGH', assignee: 'Mohit S.' },
+                  { code: 'CES/0826/02', title: 'Biometric Kiosk Android Build v2.1', status: 'REVIEW', priority: 'URGENT', assignee: 'Vikramjit' },
+                  { code: 'CES/0826/03', title: 'GST & TDS Invoice Export Formatting', status: 'DONE', priority: 'NORMAL', assignee: 'Rohan D.' }
+                ]">
+                  <div class="issue-code-col">
+                    <code>{{ issue.code }}</code>
+                  </div>
+                  <div class="issue-title-col">
+                    <strong>{{ issue.title }}</strong>
+                    <small>Assigned to: {{ issue.assignee }}</small>
+                  </div>
+                  <div class="issue-status-col">
+                    <span class="issue-status-badge" [class.done]="issue.status === 'DONE'">{{ issue.status }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= ALL MODULES GRID ================= -->
+  <section class="lp-section" id="modules">
+    <div class="lp-section-head">
+      <span class="lp-section-tag">Enterprise Ecosystem</span>
+      <h2>Everything your company runs on, out of the box</h2>
+      <p>
+        Replace messy, disconnected apps with a single synchronized suite. When someone is hired in ATS, they instantly appear in HRMS, Attendance, and Payroll.
+      </p>
+    </div>
+
+    <div class="lp-module-grid">
+      <div class="lp-module-card" *ngFor="let m of modules" [ngClass]="m.colorTheme">
+        <div class="lp-module-card-top">
+          <div class="lp-module-icon" [ngClass]="m.icon">
+            <svg *ngIf="m.icon === 'users'" lucideUsers size="22"></svg>
+            <svg *ngIf="m.icon === 'calendar'" lucideCalendarClock size="22"></svg>
+            <svg *ngIf="m.icon === 'payroll'" lucideBanknote size="22"></svg>
+            <svg *ngIf="m.icon === 'recruitment'" lucideBriefcase size="22"></svg>
+            <svg *ngIf="m.icon === 'crm'" lucideTrendingUp size="22"></svg>
+            <svg *ngIf="m.icon === 'projects'" lucideLayers size="22"></svg>
+            <svg *ngIf="m.icon === 'assets'" lucideLaptop size="22"></svg>
+            <svg *ngIf="m.icon === 'performance'" lucideAward size="22"></svg>
+          </div>
+          <span class="module-badge-tag">{{ m.badge }}</span>
+        </div>
+        <h3>{{ m.title }}</h3>
+        <p class="lp-module-desc">{{ m.description }}</p>
+        <ul class="lp-module-points">
+          <li *ngFor="let p of m.points">
+            <svg lucideCheck size="14"></svg>
+            <span>{{ p }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MOBILE APP SHOWCASE ================= -->
+  <section class="lp-mobile-section" id="mobile">
+    <div class="lp-mobile-inner">
+
+      <div class="lp-mobile-copy">
+        <div class="lp-eyebrow-pill light">
+          <svg lucideSmartphone size="13"></svg>
+          <span>ANDROID WORKSPACE APP</span>
+        </div>
+        <h2>Your entire business, right in your pocket.</h2>
+        <p class="lp-mobile-sub">
+          Keep your on-ground workforce and mobile executives productive on the go. Clock-in with GPS geofencing, approve leave requests between meetings, and close CRM deals anywhere.
+        </p>
+
+        <div class="lp-mobile-features">
+          <div class="lp-mobile-feature" *ngFor="let f of mobileFeatures">
+            <div class="lp-mf-icon">
+              <svg *ngIf="f.icon === 'calendar'" lucideCalendarClock size="15"></svg>
+              <svg *ngIf="f.icon === 'payroll'" lucideBanknote size="15"></svg>
+              <svg *ngIf="f.icon === 'mappin'" lucideMapPin size="15"></svg>
+              <svg *ngIf="f.icon === 'crm'" lucideTrendingUp size="15"></svg>
+              <svg *ngIf="f.icon === 'bell'" lucideBell size="15"></svg>
+              <svg *ngIf="f.icon === 'doc'" lucideFileText size="15"></svg>
+            </div>
+            <span>{{ f.label }}</span>
+          </div>
+        </div>
+
+        <div class="lp-mobile-cta">
+          <a *ngIf="hasAndroidBuild" class="lp-btn-download" [href]="androidApkUrl" target="_blank" rel="noopener">
+            <svg lucideDownload size="20"></svg>
+            <span class="dl-text">
+              <small>Direct Download</small>
+              <strong>Android APK (v2.4)</strong>
+            </span>
+          </a>
+
+          <button *ngIf="!hasAndroidBuild" type="button" class="lp-btn-download disabled" disabled>
+            <svg lucideSmartphone size="20"></svg>
+            <span class="dl-text">
+              <small>Android APK</small>
+              <strong>Ready for Deployment</strong>
+            </span>
+          </button>
+
+          <span class="lp-ios-note">
+            <svg lucideShieldCheck size="14"></svg>
+            Includes Offline Sync & Biometric Lock
+          </span>
+        </div>
+      </div>
+
+      <!-- Real Smartphone UI Mockup with Real Data -->
+      <div class="lp-phone-wrap">
+        <div class="lp-phone">
+          <div class="lp-phone-speaker"></div>
+          <div class="lp-phone-screen">
+            
+            <!-- Phone Status Bar -->
+            <div class="lp-phone-statusbar">
+              <span>09:41</span>
+              <div class="status-icons">
+                <span>5G</span>
+                <span>100%</span>
+              </div>
+            </div>
+
+            <!-- Phone User Header -->
+            <div class="lp-phone-user-header">
+              <div class="phone-avatar-box">MS</div>
+              <div class="phone-user-meta">
+                <span class="greeting">Welcome back 👋</span>
+                <strong>Mohit Singh</strong>
+                <small>Lead Solution Architect</small>
+              </div>
+            </div>
+
+            <!-- Real Live Punch In/Out Card -->
+            <div class="lp-phone-punch-card">
+              <div class="punch-status-badge">
+                <span class="punch-dot-pulse"></span>
+                <span>Active Shift · On-Duty</span>
+              </div>
+              <div class="punch-timer-display">04:32:18</div>
+              <div class="punch-location-info">
+                <svg lucideMapPin size="12"></svg>
+                <span>CES HQ, Bangalore (Inside Geofence)</span>
+              </div>
+              <div class="punch-actions-row">
+                <button class="btn-break">Take Break</button>
+                <button class="btn-clockout">Clock Out</button>
+              </div>
+            </div>
+
+            <!-- Quick Action Grid -->
+            <div class="lp-phone-quick-grid">
+              <div class="quick-tile">
+                <svg lucideMapPin size="16"></svg>
+                <span>Field Visit</span>
+              </div>
+              <div class="quick-tile">
+                <svg lucideFileText size="16"></svg>
+                <span>Apply Leave</span>
+              </div>
+              <div class="quick-tile">
+                <svg lucideTrendingUp size="16"></svg>
+                <span>CRM Leads</span>
+              </div>
+              <div class="quick-tile">
+                <svg lucideBanknote size="16"></svg>
+                <span>Payslips</span>
+              </div>
+            </div>
+
+            <!-- Recent Alerts List -->
+            <div class="lp-phone-recent-feed">
+              <span class="feed-title">RECENT UPDATES</span>
+              <div class="feed-item">
+                <div class="feed-icon-circle green">✓</div>
+                <div class="feed-text">
+                  <strong>Leave Approved by HR</strong>
+                  <small>Casual Leave on Sep 4, 2026</small>
+                </div>
+              </div>
+              <div class="feed-item">
+                <div class="feed-icon-circle purple">💼</div>
+                <div class="feed-text">
+                  <strong>Follow-up with Tata Motors</strong>
+                  <small>Scheduled today at 3:30 PM</small>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= WHY NEX ERP ================= -->
+  <section class="lp-section lp-why-section" id="why">
+    <div class="lp-section-head">
+      <span class="lp-section-tag">Architecture</span>
+      <h2>Built to eliminate the software patchwork</h2>
+      <p>Most companies run on 5 different tools that do not talk to each other. NEX ERP was built ground-up to be unified.</p>
+    </div>
+
+    <div class="lp-why-grid">
+      <div class="lp-why-card">
+        <div class="lp-why-icon-wrap blue"><svg lucideLayers size="22"></svg></div>
+        <h3>Truly Unified Single Database</h3>
+        <p>
+          Attendance feeds payroll. Recruitment feeds HR. CRM feeds projects and invoices. Enter employee or deal data once and it flows everywhere without duplicate entry or sync failures.
+        </p>
+      </div>
+      <div class="lp-why-card">
+        <div class="lp-why-icon-wrap emerald"><svg lucideShieldCheck size="22"></svg></div>
+        <h3>Enterprise Role-Based Security</h3>
+        <p>
+          Granular permission matrix prevents unauthorized data access. Sales reps see their own deals, HR manages sensitive salaries securely, and department leads manage their team rosters.
+        </p>
+      </div>
+      <div class="lp-why-card">
+        <div class="lp-why-icon-wrap orange"><svg lucideTrendingUp size="22"></svg></div>
+        <h3>Actionable Real-Time Analytics</h3>
+        <p>
+          Live dashboards for pipeline velocity, hiring funnels, attendance trends, and payroll disbursal. Make executive decisions based on live company data rather than manual weekly reports.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FAQ SECTION ================= -->
+  <section class="lp-section lp-faq-section" id="faq">
+    <div class="lp-section-head">
+      <span class="lp-section-tag">Knowledge Base</span>
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know about setting up, migrating, and scaling with NEX ERP.</p>
+    </div>
+
+    <div class="lp-faq-accordion">
+      <div class="lp-faq-item" *ngFor="let f of faqs; let i = index" [class.open]="activeFaq() === i">
+        <button type="button" class="faq-question-btn" (click)="toggleFaq(i)">
+          <span class="faq-q-text">{{ f.question }}</span>
+          <span class="faq-chevron">
+            <svg *ngIf="activeFaq() !== i" lucideChevronDown size="18"></svg>
+            <svg *ngIf="activeFaq() === i" lucideChevronUp size="18"></svg>
+          </span>
+        </button>
+        <div class="faq-answer-body" *ngIf="activeFaq() === i">
+          <p>{{ f.answer }}</p>
+          <span class="faq-cat-badge">Category: {{ f.category }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FINAL HIGH-CONVERSION CTA ================= -->
+  <section class="lp-cta">
+    <div class="lp-cta-glow"></div>
+    <div class="lp-cta-inner">
+      <div class="lp-cta-badge">Instant Setup</div>
+      <h2>Ready to unify your entire company?</h2>
+      <p>Join hundreds of forward-thinking teams streamlining their operations with NEX ERP today.</p>
+      <div class="lp-cta-buttons">
+        <button type="button" class="lp-btn-white lg" (click)="goToSignup()">
+          Start Your Free Account
+          <svg lucideArrowRight size="17"></svg>
+        </button>
+        <button type="button" class="lp-btn-ghost-light lg" (click)="goToLogin()">
+          Sign In to Workspace
+        </button>
+      </div>
+      <div class="lp-cta-footer-note">
+        <span>✓ 14-day free trial</span>
+        <span>✓ No credit card required</span>
+        <span>✓ Cancel anytime</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="lp-footer">
+    <div class="lp-footer-inner">
+      <div class="lp-footer-brand">
+        <img src="/logo.png" alt="NEX ERP" class="lp-logo" />
+        <p>The all-in-one business operating system for high-performance companies.</p>
+        <div class="system-status-pill">
+          <span class="status-dot"></span>
+          <span>All Cloud Systems Operational (99.98% SLA)</span>
+        </div>
+      </div>
+
+      <div class="lp-footer-col">
+        <h4>Product Modules</h4>
+        <button type="button" (click)="scrollTo('tour')">CRM & Sales Deals</button>
+        <button type="button" (click)="scrollTo('tour')">Attendance & Biometrics</button>
+        <button type="button" (click)="scrollTo('tour')">Automated Payroll</button>
+        <button type="button" (click)="scrollTo('tour')">Recruitment & ATS</button>
+        <button type="button" (click)="scrollTo('tour')">Agile Projects</button>
+      </div>
+
+      <div class="lp-footer-col">
+        <h4>Platform</h4>
+        <button type="button" (click)="scrollTo('mobile')">Android App</button>
+        <button type="button" (click)="scrollTo('why')">Why NEX ERP</button>
+        <button type="button" (click)="scrollTo('faq')">FAQ</button>
+      </div>
+
+      <div class="lp-footer-col">
+        <h4>Account & Careers</h4>
+        <button type="button" (click)="goToLogin()">Sign In</button>
+        <button type="button" (click)="goToSignup()">Create Company</button>
+        <a routerLink="/careers" class="footer-link">Careers at CES</a>
+      </div>
+    </div>
+
+    <div class="lp-footer-bottom">
+      <span>&copy; {{ currentYear }} NEX ERP & CES Technologies. All rights reserved.</span>
+      <div class="legal-links">
+        <span>Privacy Policy</span>
+        <span>Terms of Service</span>
+        <span>Security Overview</span>
+      </div>
+    </div>
+  </footer>
+
+</div>
+

@@ -149,14 +149,42 @@
 
               <div class="form-group">
                 <label>Email Address <span class="required">*</span></label>
-                <input type="email" class="form-control" [class.input-error]="showValidationErrors() && !candidateForm.email" [(ngModel)]="candidateForm.email" placeholder="sarah@example.com">
+                <input type="email" class="form-control" [class.input-error]="showValidationErrors() && !candidateForm.email" [(ngModel)]="candidateForm.email" (blur)="checkPreviousApplication()" placeholder="sarah@example.com">
                 <span class="error-text" *ngIf="showValidationErrors() && !candidateForm.email">Email Address is required</span>
+                <div class="previous-application-banner" *ngIf="previousApplicationFound()">
+                  <span>We found your details from a previous application. Load them into this form?</span>
+                  <div class="previous-application-actions">
+                    <button type="button" class="btn-outline" (click)="loadPreviousDetails()">Load My Details</button>
+                    <button type="button" class="btn-dismiss" (click)="dismissPreviousApplicationPrompt()">Dismiss</button>
+                  </div>
+                </div>
               </div>
 
               <div class="form-group">
                 <label>Phone Number <span class="required">*</span></label>
                 <input type="tel" class="form-control" [class.input-error]="showValidationErrors() && !candidateForm.phone" [(ngModel)]="candidateForm.phone" placeholder="+1 (555) 019-2834">
                 <span class="error-text" *ngIf="showValidationErrors() && !candidateForm.phone">Phone Number is required</span>
+              </div>
+
+              <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" class="form-control" [(ngModel)]="candidateForm.dateOfBirth">
+              </div>
+
+              <div class="form-group">
+                <label>Gender</label>
+                <select class="form-control" [(ngModel)]="candidateForm.gender">
+                  <option value="" disabled selected>Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Current Location</label>
+                <input type="text" class="form-control" [(ngModel)]="candidateForm.currentLocation" placeholder="e.g. Mumbai, Maharashtra">
               </div>
 
               <div class="form-group">
@@ -171,12 +199,35 @@
               </div>
 
               <div class="form-group">
+                <label>Current CTC (₹)</label>
+                <input type="number" class="form-control" [(ngModel)]="candidateForm.currentCtc" placeholder="e.g. 800000">
+              </div>
+
+              <div class="form-group">
+                <label>Expected CTC (₹)</label>
+                <input type="number" class="form-control" [(ngModel)]="candidateForm.expectedCtc" placeholder="e.g. 1200000">
+              </div>
+
+              <div class="form-group">
                 <label>Notice Period</label>
                 <select class="form-control" [(ngModel)]="candidateForm.noticePeriod">
                   <option value="Immediate">Immediate / Serving Notice</option>
                   <option value="15 Days">15 Days</option>
                   <option value="30 Days">30 Days</option>
                   <option value="60+ Days">60+ Days</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>From where did you hear about us?</label>
+                <select class="form-control" [(ngModel)]="candidateForm.source">
+                  <option value="" disabled selected>Select Source</option>
+                  <option value="LinkedIn">LinkedIn</option>
+                  <option value="Naukri">Naukri</option>
+                  <option value="Indeed">Indeed</option>
+                  <option value="Company Website">Company Website</option>
+                  <option value="Referral">Referral</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 
@@ -191,7 +242,39 @@
               </div>
             </div>
 
-            <!-- Resume / CV Upload Dropzone -->
+            <!-- Skills -->
+            <div class="form-group">
+              <label>Skills</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;" *ngIf="candidateForm.skills.length > 0">
+                <span *ngFor="let skill of candidateForm.skills; let i = index" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: #eef2ff; color: #4338ca; border-radius: 999px; font-size: 12.5px; font-weight: 600;">
+                  {{ skill }}
+                  <button type="button" (click)="removeCandidateSkill(i)" style="background: none; border: none; cursor: pointer; color: #4338ca; display: flex; padding: 0;">
+                    <svg lucideX size="12"></svg>
+                  </button>
+                </span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" class="form-control" [(ngModel)]="newSkillInput" (keyup.enter)="addCandidateSkill()" placeholder="e.g. Cisco, AWS, Firewall...">
+                <button type="button" class="btn-outline" (click)="addCandidateSkill()">Add</button>
+              </div>
+            </div>
+
+            <!-- Document Uploads -->
+            <div class="upload-section">
+              <label class="upload-label">Photo Upload</label>
+              <div class="file-dropzone" (click)="!isPhotoUploading() && photoInput.click()">
+                <svg lucideLoader size="24" class="upload-icon spinner" *ngIf="isPhotoUploading()"></svg>
+                <svg lucideUpload size="24" class="upload-icon" *ngIf="!isPhotoUploading()"></svg>
+                <div class="upload-text">
+                  <span class="main-text" *ngIf="isPhotoUploading()">Uploading {{ photoFileName() }}...</span>
+                  <span class="main-text" *ngIf="!isPhotoUploading()">{{ photoFileName() ? photoFileName() : 'Click to upload your Photo (JPG/PNG)' }}</span>
+                  <span class="sub-text" *ngIf="!isPhotoUploading()">Max file size: 5MB</span>
+                </div>
+                <input #photoInput type="file" (change)="onPhotoSelected($event)" accept="image/jpeg,image/png" style="display: none;">
+              </div>
+              <span class="error-text" *ngIf="photoError()">{{ photoError() }}</span>
+            </div>
+
             <div class="upload-section">
               <label class="upload-label">Upload CV / Resume <span class="required">*</span></label>
               <div class="file-dropzone" [class.dropzone-error]="showValidationErrors() && !candidateForm.resumeUrl" (click)="!isUploading() && fileInput.click()">
@@ -206,6 +289,11 @@
               </div>
               <span class="error-text" *ngIf="uploadError()">{{ uploadError() }}</span>
               <span class="error-text" *ngIf="!uploadError() && showValidationErrors() && !candidateForm.resumeUrl">Resume is required</span>
+            </div>
+
+            <div class="form-group" style="margin-top: 16px;">
+              <label>Cover Letter</label>
+              <textarea class="form-control" rows="5" [(ngModel)]="candidateForm.coverLetter" placeholder="Write your cover letter here..."></textarea>
             </div>
 
             <!-- Dynamic Screening Questions -->

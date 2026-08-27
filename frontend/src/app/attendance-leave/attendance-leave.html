@@ -9,12 +9,15 @@
   <div class="tabs-wrapper">
     <div class="tabs-nav">
       <button class="nav-tab"
-        [class.active]="activeTab() === 'attendance'" 
+        [class.active]="activeTab() === 'attendance'"
         (click)="setTab('timesheets')">
-        Timesheets
+        Attendance
       </button>
         <button class="nav-tab" [class.active]="activeTab() === 'leaves'" (click)="setTab('leaves')">
           My Leaves
+        </button>
+        <button class="nav-tab" *ngIf="shiftRosterVisible()" [class.active]="activeTab() === 'my-shift'" (click)="setTab('my-shift')">
+          My Shift
         </button>
         <button class="nav-tab" *ngIf="isAdmin()" [class.active]="activeTab() === 'approvals'" (click)="setTab('approvals')">
           Leave Approvals
@@ -282,6 +285,30 @@
       </div>
 
     </div>
+  </div>
+
+  <div class="tab-content" *ngIf="activeTab() === 'my-shift' && shiftRosterVisible()">
+    <div class="widget-card" *ngIf="!isLoadingMyShift()">
+      <div class="widget-header">
+        <h3>My Shift</h3>
+      </div>
+      <div *ngIf="myShift() as ms">
+        <div *ngIf="ms.shift" style="padding: 16px 0;">
+          <p style="font-size: 15px; font-weight: 700; color: #172b4d; margin: 0 0 4px 0;">{{ ms.shift.name }}</p>
+          <p style="font-size: 13.5px; color: #5e6c84; margin: 0;">{{ ms.shift.startTime }} – {{ ms.shift.endTime }}</p>
+        </div>
+        <div *ngIf="!ms.shift" style="padding: 16px 0; color: #94a3b8; font-size: 13.5px;">
+          No shift has been assigned to you yet.
+        </div>
+        <div *ngIf="ms.rotations && ms.rotations.length > 0" style="margin-top: 8px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
+          <p style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; margin: 0 0 10px 0;">Rotations</p>
+          <div *ngFor="let r of ms.rotations" style="font-size: 13.5px; color: #172b4d; margin-bottom: 6px;">
+            {{ r.name }} <span style="color: #94a3b8;">({{ r.rotationType }})</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="loading-state" *ngIf="isLoadingMyShift()">Loading…</div>
   </div>
 
   <div class="tab-content" *ngIf="activeTab() === 'leaves'">
