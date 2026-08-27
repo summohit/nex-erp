@@ -10,8 +10,9 @@ export interface AssetActionCellParams extends ICellRendererParams {
   onEdit?: (data: any) => void;
   canEdit?: (data: any) => boolean;
   editLabel?: string;
-  onAssign?: (data: any) => void;
-  onReturn?: (data: any) => void;
+   onAssign?: (data: any) => void;
+   onReturn?: (data: any) => void;
+   canReturn?: (data: any) => boolean;
   onApprove?: (data: any) => void;
   canApprove?: (data: any) => boolean;
   onReject?: (data: any) => void;
@@ -41,7 +42,7 @@ export interface AssetActionCellParams extends ICellRendererParams {
         <button mat-menu-item class="menu-item text-primary" (click)="assign()" *ngIf="params.onAssign">
           <span class="menu-text">Assign to Employee</span>
         </button>
-        <button mat-menu-item class="menu-item text-primary" (click)="returnAsset()" *ngIf="params.onReturn">
+        <button mat-menu-item class="menu-item text-primary" (click)="returnAsset()" *ngIf="params.onReturn && canReturn()">
           <span class="menu-text">Return Asset</span>
         </button>
         <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove && canApprove()">
@@ -118,6 +119,11 @@ export class AssetActionCellRendererComponent implements ICellRendererAngularCom
   canCancel(): boolean {
     if (!this.params?.canCancel) return true;
     return this.params.canCancel(this.params.data);
+  }
+
+  canReturn(): boolean {
+    if (!this.params?.canReturn) return true;
+    return this.params.canReturn(this.params.data);
   }
 
   viewDetails() { if (this.params?.onViewDetails) this.params.onViewDetails(this.params.data); }

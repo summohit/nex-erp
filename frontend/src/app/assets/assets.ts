@@ -428,6 +428,14 @@ export class AssetsComponent implements OnInit {
     this.isTxnCheckOpen.set(true);
   }
 
+  returnConditionLabel(c?: string | null): string {
+    return c ? c.replace(/_/g, ' ') : 'Not recorded';
+  }
+
+  returnConditionClass(c?: string | null): string {
+    return getConditionClass(c || '');
+  }
+
   creatorName(t: InventoryTransaction): string {
     if (!t.createdBy) return '-';
     return (t.createdBy.email || '').split('@')[0] || '-';
@@ -676,8 +684,11 @@ export class AssetsComponent implements OnInit {
       id: t.id,
       itemName: t.item?.name || '-',
       category: t.item?.category || '',
-      quantity: t.quantity,
+      unit: t.item?.unit || 'units',
+      quantity: Number(t.quantity ?? 0),
       returnedQty: (t.linkedReturns || []).reduce((s: number, r: any) => s + (r.quantity || 0), 0),
+      outstanding: this.outstandingOf(t),
+      lastCondition: (t.linkedReturns || []).map((r: any) => r.conditionOnReturn).filter((c: any) => !!c).slice(-1)[0] || null,
       employee: t.employee || null,
       assignedDate: t.date,
       expectedReturnDate: t.expectedReturnDate || null,
@@ -694,12 +705,50 @@ export class AssetsComponent implements OnInit {
       returnDate: a.returnDate || null,
       conditionOnAssign: a.conditionOnAssign,
       notes: a.notes,
+      outstanding: 0,
+      quantity: 1,
+      returnedQty: 0,
+      lastCondition: null,
       status: a.status
     }));
     return [...invRows, ...legacyRows].sort(
       (a, b) => new Date(b.assignedDate).getTime() - new Date(a.assignedDate).getTime()
     );
   });
+
+  asgActiveCount = computed(() => this.unifiedAssignments().filter(r => r.status === 'ACTIVE').length);
+  asgUnitsOut = computed(() =>
+    this.unifiedAssignments()
+      .filter(r => r.source === 'INVENTORY' && r.status === 'ACTIVE')
+      .reduce((s, r) => s + (Number(r.outstanding) || 0), 0)
+  );
+  asgDevicesOut = computed(() => this.unifiedAssignments().filter(r => r.source === 'ASSET' && r.status === 'ACTIVE').length);
+  asgOverdueCount = computed(() => this.unifiedAssignments().filter(r => this.isOverdueRow(r)).length);
+
+  isOverdueRow(r: any): boolean {
+    if (!r || r.status !== 'ACTIVE' || r.source !== 'INVENTORY' || !r.expectedReturnDate) return false;
+    const due = new Date(r.expectedReturnDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return !isNaN(due.getTime()) && due.getTime() < today.getTime();
+  }
+
+  assignmentQuery = signal('');
+  reqQuery = signal('');
+
+  asgRowHeight = (params: any): number => {
+    const nameLen = String(params?.data?.itemName || params?.data?.itemAsset?.name || '').length;
+    return nameLen > 34 ? 76 : 64;
+  };
+
+  onAssignmentRowClicked(event: any) {
+    if (!event?.data) return;
+    if (event.column?.getColId() === 'actions') return;
+    if (event.data.source === 'INVENTORY') {
+      const txn = this.inventoryAssignments().find((t: any) => t.id === event.data.id);
+      if (txn) this.openTxnCheck(txn);
+    }
+  }
 
   assignmentsColDefs: ColDef[] = [
     {
@@ -712,11 +761,12 @@ export class AssetsComponent implements OnInit {
         if (!d) return '-';
         if (d.source === 'INVENTORY') {
           const catClass = getCategoryClass(d.category);
+          const unitWord = d.unit || 'units';
           return `
             <div class="cell-stacked">
               <div class="cell-title-bold">${d.itemName}</div>
               <div class="cell-subtitle-row">
-                <span class="tag-mono">${d.outstanding}/${d.quantity} out</span>
+                <span class="tag-mono">${d.outstanding ?? 0} of ${d.quantity ?? 0} ${unitWord} out</span>
                 ${d.category ? `<span class="cat-badge ${catClass}">${d.category}</span>` : ''}
               </div>
             </div>
@@ -778,7 +828,13 @@ export class AssetsComponent implements OnInit {
       flex: 0.7,
       minWidth: 80,
       type: 'rightAligned',
-      valueGetter: (p: any) => p.data?.source === 'INVENTORY' ? `${p.data.outstanding}/${p.data.quantity}` : '1'
+      valueGetter: (p: any) => {
+        const d = p.data;
+        if (!d) return '';
+        return d.source === 'INVENTORY'
+          ? `${Number(d.outstanding ?? 0)}/${Number(d.quantity ?? 0)}`
+          : '1';
+      }
     },
     {
       headerName: 'Condition',
@@ -787,10 +843,11 @@ export class AssetsComponent implements OnInit {
       minWidth: 110,
       cellRenderer: (params: any) => {
         const d = params.data;
-        if (d?.source !== 'ASSET' || !d.conditionOnAssign) return '<span style="color:#94A3B8;font-size:12px;">-</span>';
-        const c = d.conditionOnAssign;
-        const condClass = getConditionClass(c);
-        return `<span class="badge-condition ${condClass}">${c.replace('_', ' ')}</span>`;
+        if (!d) return '-';
+        const cond = d.source === 'INVENTORY' ? d.lastCondition : d.conditionOnAssign;
+        if (!cond) return '<span style="color:#CBD5E1;font-size:12px;">&#8212;</span>';
+        const condClass = getConditionClass(cond);
+        return `<span class="badge-condition ${condClass}">${String(cond).replace(/_/g, ' ')}</span>`;
       }
     },
     {
@@ -803,26 +860,37 @@ export class AssetsComponent implements OnInit {
         if (!d) return '';
         return d.source === 'INVENTORY' ? (d.expectedReturnDate || '') : (d.returnDate || '');
       },
-      cellRenderer: (params: any) => this.fmtDate(params.value)
+      cellRenderer: (params: any) => {
+        const d = params.data;
+        if (!params.value && d?.status !== 'ACTIVE') return '<span style="color:#94A3B8;font-size:12px;">-</span>';
+        if (!params.value) return '<span style="color:#94A3B8;font-size:12px;">No due date</span>';
+        const overdue = this.isOverdueRow(d);
+        const dateHtml = this.fmtDate(params.value);
+        return overdue
+          ? `<div class="due-stack"><span>${dateHtml}</span><span class="badge-overdue-mini">OVERDUE</span></div>`
+          : dateHtml;
+      }
     },
     {
       headerName: 'Status',
       field: 'status',
       flex: 1,
-      minWidth: 115,
+      minWidth: 118,
       cellRenderer: (params: any) => {
-        const s = params.value;
-        const isAssigned = s === 'ACTIVE';
-        const statusClass = isAssigned ? 'status-assigned' : 'status-returned';
+        const d = params.data || {};
+        const active = d.status === 'ACTIVE';
+        const overdue = this.isOverdueRow(d);
+        const statusClass = overdue ? 'status-overdue' : (active ? 'status-assigned' : 'status-returned');
+        const label = overdue ? 'OVERDUE' : (active ? 'ASSIGNED' : 'RETURNED');
         let extra = '';
-        if (params.data?.source === 'INVENTORY' && params.data.returnedQty > 0) {
-          extra = `<div style="font-size:10px;color:#64748B;margin-top:2px;">${params.data.returnedQty} returned</div>`;
+        if (d.source === 'INVENTORY' && Number(d.returnedQty) > 0) {
+          extra = `<div class="ret-mini">${d.returnedQty} returned</div>`;
         }
         return `
           <div>
             <span class="status-round ${statusClass}">
               <span class="status-dot"></span>
-              ${isAssigned ? 'ASSIGNED' : 'RETURNED'}
+              ${label}
             </span>
             ${extra}
           </div>
@@ -846,7 +914,8 @@ export class AssetsComponent implements OnInit {
           } else {
             this.openReturnModal(row.id);
           }
-        }
+        },
+        canReturn: (row: any) => !!row && row.status === 'ACTIVE' && this.isAdmin()
       }
     }
   ];

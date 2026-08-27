@@ -1415,13 +1415,31 @@
   word-break: break-word;
 }
 .tc-return-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   font-size: 0.8125rem;
   color: #065F46;
   background: #ECFDF5;
   border: 1px solid #A7F3D0;
-  padding: 7px 11px;
+  padding: 8px 12px;
   border-radius: 8px;
   margin-bottom: 6px;
+}
+.tc-return-row .tag-mono {
+  color: #047857;
+}
+.tc-ret-qty {
+  color: #065F46;
+}
+.tc-ret-qty b {
+  font-size: 0.875rem;
+}
+.badge-condition.is-empty {
+  background: #F8FAFC;
+  color: #94A3B8;
+  border: 1px dashed #CBD5E1;
 }
 .tc-none {
   color: #94A3B8;
@@ -1840,4 +1858,60 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* ========================================== */
+/* ASSIGNMENTS TAB                             */
+/* ========================================== */
+.status-round {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.status-overdue { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
+.status-overdue .status-dot {
+  background: #DC2626;
+  animation: overdue-pulse 1.6s ease-in-out infinite;
+}
+@keyframes overdue-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.badge-overdue-mini {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.due-stack {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.assignments-grid .ag-row {
+  cursor: pointer;
+}
+
+
+
+.ret-mini {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748B;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  width: max-content;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.assignments-grid .status-round {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }

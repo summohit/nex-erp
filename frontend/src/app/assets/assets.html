@@ -30,6 +30,14 @@
         </button>
       </ng-container>
 
+      <!-- Assignments tab actions -->
+      <ng-container *ngIf="isAdmin() && activeTab() === 'assignments'">
+        <div class="search-box search-box-sm">
+          <svg lucideSearch size="15" class="search-icon"></svg>
+          <input type="text" placeholder="Search assignments..." [(ngModel)]="assignmentQuery">
+        </div>
+      </ng-container>
+
       <!-- Requests tab action -->
       <button class="btn btn-primary" *ngIf="activeTab() === 'requests'" (click)="openRequestDrawer()">
         <svg lucidePlus size="16"></svg>
@@ -79,6 +87,30 @@
       <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideIndianRupee size="17" class="text-green"></svg></span>
       <span class="kpi-label">Inventory Value</span>
       <h3 class="kpi-value kpi-money">{{ fmtMoney(invTotalValue()) }}</h3>
+    </div>
+  </div>
+
+  <!-- Assignments Summary Cards -->
+  <div class="kpi-grid inv-kpi-grid" *ngIf="isAdmin() && activeTab() === 'assignments'">
+    <div class="kpi-card">
+      <span class="kpi-icon-box kpi-icon-sm bg-blue-tint"><svg lucideUserCheck size="17" class="text-blue"></svg></span>
+      <span class="kpi-label">Active Assignments</span>
+      <h3 class="kpi-value">{{ asgActiveCount() }}</h3>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-icon-box kpi-icon-sm bg-purple-tint"><svg lucideLayers size="17" class="text-purple"></svg></span>
+      <span class="kpi-label">Units Out</span>
+      <h3 class="kpi-value">{{ asgUnitsOut() }}</h3>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideLaptop size="17" class="text-green"></svg></span>
+      <span class="kpi-label">Devices Assigned</span>
+      <h3 class="kpi-value">{{ asgDevicesOut() }}</h3>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-icon-box kpi-icon-sm bg-rose-tint"><svg lucideAlertTriangle size="17" class="text-rose"></svg></span>
+      <span class="kpi-label">Overdue Returns</span>
+      <h3 class="kpi-value">{{ asgOverdueCount() }}</h3>
     </div>
   </div>
 
@@ -138,26 +170,36 @@
   <!-- Tab 2: Assignments -->
   <div class="tab-content" *ngIf="isAdmin() && activeTab() === 'assignments'">
     <div class="section-card">
-      <div class="table-toolbar mb-3">
-        <div class="toolbar-hint">Inventory batch assignments and serial-tracked device assignments</div>
-        <div class="search-box">
-          <svg lucideSearch size="16" class="search-icon"></svg>
-          <input type="text" placeholder="Search assignments..." [(ngModel)]="searchQuery">
+      <!-- Compact empty state -->
+      <div class="inv-empty" *ngIf="unifiedAssignments().length === 0">
+        <div class="inv-empty-icon bg-blue-tint"><svg lucideUserCheck size="24" class="text-blue"></svg></div>
+        <h4>No assignments yet</h4>
+        <p>Assign items from the Inventory tab, or fulfill a hardware request to see it here.</p>
+        <div class="inv-empty-actions">
+          <button class="btn btn-primary btn-sm" (click)="setTab('inventory')">
+            <svg lucidePackage size="15"></svg>
+            <span>Go to Inventory</span>
+          </button>
         </div>
       </div>
 
       <ag-grid-angular
-        class="ag-theme-quartz assets-grid"
+        *ngIf="unifiedAssignments().length > 0"
+        class="ag-theme-quartz assets-grid inventory-grid assignments-grid"
         [theme]="'legacy'"
         [rowData]="unifiedAssignments()"
         [getRowId]="getAssignmentRowId"
         [columnDefs]="assignmentsColDefs"
         [defaultColDef]="defaultColDef"
+        [headerHeight]="46"
         [pagination]="true"
         [paginationPageSize]="paginationPageSize"
         [paginationPageSizeSelector]="paginationPageSizeOptions"
-        [quickFilterText]="searchQuery()"
-        [rowHeight]="64">
+        [quickFilterText]="assignmentQuery()"
+        [rowHeight]="64"
+        [getRowHeight]="asgRowHeight"
+        [overlayNoRowsTemplate]="'No assignments match your search.'"
+        (rowClicked)="onAssignmentRowClicked($event)">
       </ag-grid-angular>
     </div>
   </div>
@@ -168,7 +210,7 @@
       <div class="table-toolbar mb-3">
         <div class="search-box">
           <svg lucideSearch size="16" class="search-icon"></svg>
-          <input type="text" placeholder="Search requests..." [(ngModel)]="searchQuery">
+          <input type="text" placeholder="Search requests..." [(ngModel)]="reqQuery">
         </div>
       </div>
 
@@ -181,7 +223,7 @@
         [pagination]="true"
         [paginationPageSize]="paginationPageSize"
         [paginationPageSizeSelector]="paginationPageSizeOptions"
-        [quickFilterText]="searchQuery()"
+        [quickFilterText]="reqQuery()"
         [rowHeight]="64">
       </ag-grid-angular>
     </div>
@@ -399,7 +441,9 @@
 
         <div class="form-section-title">Linked Returns</div>
         <div class="tc-return-row" *ngFor="let r of checkedTxn()!.linkedReturns">
-          {{ fmtDate(r.date) }} ┬╖ {{ r.quantity }} {{ selectedItem()?.unit }} returned ┬╖ Condition: {{ r.conditionOnReturn || '-' }}
+          <span class="tag-mono">{{ fmtDate(r.date) }}</span>
+          <span class="tc-ret-qty"><b>{{ r.quantity }}</b>&nbsp;{{ selectedItem()?.unit }} returned</span>
+          <span class="badge-condition" [class]="returnConditionClass(r.conditionOnReturn)" [class.is-empty]="!r.conditionOnReturn">{{ returnConditionLabel(r.conditionOnReturn) }}</span>
         </div>
         <p class="tc-none" *ngIf="!checkedTxn()!.linkedReturns?.length">No returns recorded yet.</p>
       </ng-container>
