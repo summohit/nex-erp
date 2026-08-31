@@ -3613,6 +3613,121 @@ textarea:focus {
 }
 
 /* ==========================================================================
+   LEAD DETAIL MODAL — ENHANCED HEADER V2
+   ========================================================================== */
+.ldm-header-v2 {
+  background: linear-gradient(135deg, #fefcfb 0%, #fff7ed 100%);
+  border-bottom: 1px solid #f1e8df;
+  padding: 0;
+}
+
+.ldm-header-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px 0;
+  gap: 10px;
+}
+.ldm-header-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ldm-deal-cat-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.ldm-header-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 24px 16px;
+}
+.ldm-header-icon-circle {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(234, 88, 12, 0.2);
+}
+.ldm-header-title-block {
+  flex: 1;
+  min-width: 0;
+}
+.ldm-header-v2 .ldm-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.ldm-header-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ldm-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  background: rgba(255,255,255,0.75);
+  border: 1px solid #e8dfd5;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ldm-meta-chip svg { flex-shrink: 0; color: #94a3b8; }
+.ldm-meta-link { color: #ea580c; cursor: default; }
+.ldm-meta-link svg { color: #ea580c; }
+
+.ldm-header-value-pill {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 16px;
+  background: #fff;
+  border: 1px solid #f1e8df;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.ldm-header-value-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+}
+.ldm-header-value-amount {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ea580c;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* ==========================================================================
    FOLLOW-UP MANAGEMENT MODAL (PREMIUM ERP DESIGN)
    ========================================================================== */
 

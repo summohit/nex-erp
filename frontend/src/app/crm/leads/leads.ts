@@ -118,6 +118,7 @@ export class LeadsComponent implements OnInit {
   isLoading = true;
   isSaving = false;
   isSubmitted = false;
+  saveContactFromLead: boolean | null = null;
   showCreateModal = false;
   showDetailModal = false;
   selectedLead: Lead | null = null;
@@ -1144,6 +1145,22 @@ export class LeadsComponent implements OnInit {
     };
   }
 
+  get isContactEmailNew(): boolean {
+    const email = this.newLeadData.email?.trim().toLowerCase();
+    if (!email) return false;
+    return !this.leadContacts.some(c => c.email?.trim().toLowerCase() === email);
+  }
+
+  // null = user hasn't manually toggled the checkbox yet, so it tracks isContactEmailNew
+  // automatically (covers browser-autofilled fields, which don't fire ngModelChange).
+  get contactCheckboxChecked(): boolean {
+    return this.saveContactFromLead === null ? this.isContactEmailNew : this.saveContactFromLead;
+  }
+
+  onContactCheckboxChange(checked: boolean) {
+    this.saveContactFromLead = checked;
+  }
+
   closeModal() {
     if (this.isSaving) return;
     this.showCreateModal = false;
@@ -1151,6 +1168,7 @@ export class LeadsComponent implements OnInit {
     this.isEditing = false;
     this.editingLeadId = null;
     this.customSource = '';
+    this.saveContactFromLead = null;
   }
 
   preventNegative(event: KeyboardEvent) {
@@ -1208,6 +1226,18 @@ export class LeadsComponent implements OnInit {
       this.http.post<Lead>(`${environment.apiUrl}/crm/leads`, payload).subscribe({
         next: (created) => {
           this.isSaving = false;
+          if (this.contactCheckboxChecked && this.newLeadData.contactName?.trim()) {
+            const contactPayload = {
+              name: this.newLeadData.contactName.trim(),
+              email: this.newLeadData.email?.trim() || undefined,
+              phone: this.newLeadData.phone?.trim() || undefined,
+              companyName: this.newLeadData.companyName?.trim() || undefined,
+            };
+            this.http.post(`${environment.apiUrl}/crm/lead-contacts`, contactPayload).subscribe({
+              next: () => this.loadLeadContacts(),
+              error: () => {},
+            });
+          }
           this.closeModal();
           this.toast.success('Lead created successfully');
           this.loadLeads(() => this.highlightNewLead(created.id));

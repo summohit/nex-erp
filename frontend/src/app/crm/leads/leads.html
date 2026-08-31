@@ -893,38 +893,65 @@
 <!-- Lead Detail Modal -->
 <div class="modal-backdrop" *ngIf="showDetailModal && selectedLead" (click)="closeDetailModal()">
   <div class="lead-detail-modal enhanced-detail-modal" (click)="$event.stopPropagation()">
-    <div class="ldm-header">
-      <div class="ldm-header-left">
-        <div class="ldm-status-badge ldm-status-{{selectedLead.status | lowercase}}">
-          {{getStatusLabel(selectedLead.status)}}
+    <div class="ldm-header-v2">
+      <!-- Top bar: status + actions -->
+      <div class="ldm-header-topbar">
+        <div class="ldm-header-topbar-left">
+          <div class="ldm-status-badge ldm-status-{{selectedLead.status | lowercase}}">
+            {{getStatusLabel(selectedLead.status)}}
+          </div>
+          <span class="ldm-subject-badge" *ngIf="selectedLead.subjectLine">
+            <svg lucideTag size="11"></svg> {{selectedLead.subjectLine}}
+          </span>
+          <span class="ldm-deal-cat-chip" *ngIf="selectedLead.dealCategory"
+            [ngStyle]="{'color': getDealCategoryBadge(selectedLead.dealCategory).color, 'background': getDealCategoryBadge(selectedLead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(selectedLead.dealCategory).border}">
+            {{selectedLead.dealCategory}}
+          </span>
         </div>
-        <div class="ldm-title-block">
+        <div class="ldm-header-actions">
+          <button type="button" class="btn-detail-followup" (click)="openFollowUpModal(selectedLead, $event)" title="Schedule & View Follow-ups">
+            <svg lucideCalendar size="14"></svg>
+            <span>Follow Up</span>
+          </button>
+          <button type="button" class="btn-detail-edit" (click)="openEditModal(selectedLead, $event)" title="Edit Lead">
+            <svg lucideEdit2 size="13"></svg>
+            <span>Edit Lead</span>
+          </button>
+          <button type="button" class="btn-detail-delete" (click)="deleteLead(selectedLead.id, $event); closeDetailModal()" title="Delete Lead">
+            <svg lucideTrash2 size="14"></svg>
+          </button>
+          <button type="button" class="btn-icon-close" (click)="closeDetailModal()" title="Close">
+            <svg lucideX size="18"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Title row -->
+      <div class="ldm-header-title-row">
+        <div class="ldm-header-icon-circle">
+          <svg lucideBriefcase size="20"></svg>
+        </div>
+        <div class="ldm-header-title-block">
           <h2 class="ldm-title">{{selectedLead.title}}</h2>
-          <div class="ldm-meta-sub">
-            <span class="ldm-company" *ngIf="selectedLead.companyName">
-              <svg lucideBuilding size="13"></svg> {{selectedLead.companyName}}
+          <div class="ldm-header-meta-row">
+            <span class="ldm-meta-chip" *ngIf="selectedLead.companyName">
+              <svg lucideBuilding2 size="12"></svg> {{selectedLead.companyName}}
             </span>
-            <span class="ldm-subject-badge" *ngIf="selectedLead.subjectLine">
-              <svg lucideTag size="12"></svg> {{selectedLead.subjectLine}}
+            <span class="ldm-meta-chip" *ngIf="selectedLead.contactName">
+              <svg lucideUser size="12"></svg> {{selectedLead.contactName}}
+            </span>
+            <span class="ldm-meta-chip ldm-meta-link" *ngIf="selectedLead.email">
+              <svg lucideMail size="12"></svg> {{selectedLead.email}}
+            </span>
+            <span class="ldm-meta-chip" *ngIf="selectedLead.phone">
+              <svg lucidePhone size="12"></svg> {{selectedLead.phone}}
             </span>
           </div>
         </div>
-      </div>
-      <div class="ldm-header-actions">
-        <button type="button" class="btn-detail-followup" (click)="openFollowUpModal(selectedLead, $event)" title="Schedule & View Follow-ups">
-          <svg lucideCalendar size="14"></svg>
-          <span>Follow Up</span>
-        </button>
-        <button type="button" class="btn-detail-edit" (click)="openEditModal(selectedLead, $event)" title="Edit Lead">
-          <svg lucideEdit2 size="13"></svg>
-          <span>Edit Lead</span>
-        </button>
-        <button type="button" class="btn-detail-delete" (click)="deleteLead(selectedLead.id, $event); closeDetailModal()" title="Delete Lead">
-          <svg lucideTrash2 size="14"></svg>
-        </button>
-        <button type="button" class="btn-icon-close" (click)="closeDetailModal()" title="Close">
-          <svg lucideX size="18"></svg>
-        </button>
+        <div class="ldm-header-value-pill" *ngIf="selectedLead.value">
+          <span class="ldm-header-value-label">Deal Value</span>
+          <span class="ldm-header-value-amount">{{selectedLead.value | currency:selectedLead.currency||'INR':'symbol-narrow':'1.0-0'}}</span>
+        </div>
       </div>
     </div>
 
@@ -1212,6 +1239,13 @@
             <input type="text" [(ngModel)]="newLeadData.phone" placeholder="+1 (555) 000-0000" [disabled]="isSaving" />
             <span class="error-msg" *ngIf="isSubmitted && !newLeadData.phone.trim()">WhatsApp/Phone is required.</span>
           </div>
+        </div>
+
+        <div *ngIf="newLeadData.contactName?.trim() && isContactEmailNew && !isEditing" style="display:flex;align-items:center;gap:8px;margin-top:4px;padding:10px 12px;background:var(--bg-subtle,#f8f9fc);border:1px solid var(--border-color,#e5e7eb);border-radius:8px;">
+          <input type="checkbox" id="saveContactFromLead" [checked]="contactCheckboxChecked" (change)="onContactCheckboxChange($any($event.target).checked)" [disabled]="isSaving" style="width:15px;height:15px;accent-color:var(--primary-color,#E25E3E);cursor:pointer;flex-shrink:0;" />
+          <label for="saveContactFromLead" style="font-size:13px;color:var(--text-secondary,#374151);cursor:pointer;margin:0;line-height:1.4;">
+            Also save <strong style="color:var(--text-primary,#111827)">{{newLeadData.contactName}}</strong> as a Lead Contact
+          </label>
         </div>
       </div>
 

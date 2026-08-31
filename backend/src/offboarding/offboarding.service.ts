@@ -63,17 +63,35 @@ export class OffboardingService {
       }
     });
 
-    // Notify Manager or HR
+    // Notify Manager and HR/Admin users
     const emp = await this.prisma.employee.findUnique({
       where: { id: employeeId },
       include: { manager: true }
     });
 
+    const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'An employee';
+    const notifyUserIds = new Set<number>();
+
     if (emp?.manager?.userId) {
+      notifyUserIds.add(emp.manager.userId);
+    }
+
+    // Always notify HR/Admin users in the company (exclude the submitting employee's own user)
+    const hrAdmins = await this.prisma.user.findMany({
+      where: {
+        companyId,
+        role: { in: ['HR', 'ADMIN', 'SUPERADMIN'] },
+        ...(emp?.userId ? { id: { not: emp.userId } } : {}),
+      },
+      select: { id: true },
+    });
+    for (const u of hrAdmins) notifyUserIds.add(u.id);
+
+    for (const uid of notifyUserIds) {
       await this.notificationsService.createNotification(
-        emp.manager.userId,
+        uid,
         'Resignation Submitted',
-        `An employee has submitted their resignation.`,
+        `${empName} has submitted their resignation.`,
         'ACTION_REQUIRED',
         '/offboarding'
       );
