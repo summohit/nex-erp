@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -217,21 +217,34 @@ export default function PayslipsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Payslip | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await payrollService.getMyPayslips();
-      // Sort newest first
       data.sort((a, b) => b.year !== a.year ? b.year - a.year : b.month - a.month);
       setPayslips(data);
+      if (data.length > 0) {
+        setSelectedYear(data[0].year);
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to load payslips');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const years = useMemo(() => {
+    const set = new Set(payslips.map(p => p.year));
+    return Array.from(set).sort((a, b) => b - a);
+  }, [payslips]);
+
+  const filtered = useMemo(
+    () => payslips.filter(p => p.year === selectedYear),
+    [payslips, selectedYear],
+  );
 
   useEffect(() => { load(); }, [load]);
 
@@ -267,15 +280,43 @@ export default function PayslipsScreen() {
           <Text style={styles.emptyMsg}>Your finalized payslips will appear here once payroll is processed.</Text>
         </View>
       ) : (
-        <FlatList
-          data={payslips}
-          keyExtractor={item => String(item.id)}
-          renderItem={({ item }) => (
-            <PayslipCard payslip={item} onPress={() => setSelected(item)} />
+        <>
+          {years.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.yearBar}
+              contentContainerStyle={styles.yearBarContent}
+            >
+              {years.map(y => (
+                <TouchableOpacity
+                  key={y}
+                  style={[styles.yearChip, selectedYear === y && styles.yearChipActive]}
+                  onPress={() => setSelectedYear(y)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.yearChipText, selectedYear === y && styles.yearChipTextActive]}>
+                    {y}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           )}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-        />
+          <FlatList
+            data={filtered}
+            keyExtractor={item => String(item.id)}
+            renderItem={({ item }) => (
+              <PayslipCard payslip={item} onPress={() => setSelected(item)} />
+            )}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>No payslips for {selectedYear}</Text>
+              </View>
+            }
+          />
+        </>
       )}
 
       {selected && (
@@ -318,6 +359,38 @@ const styles = StyleSheet.create({
   list: {
     padding: 16,
     gap: 10,
+  },
+  yearBar: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  yearBarContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  yearChip: {
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginRight: 8,
+  },
+  yearChipActive: {
+    backgroundColor: '#E25E3E',
+    borderColor: '#E25E3E',
+  },
+  yearChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  yearChipTextActive: {
+    color: '#FFFFFF',
   },
   card: {
     backgroundColor: '#FFFFFF',

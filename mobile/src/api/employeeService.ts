@@ -90,9 +90,14 @@ export const employeeService = {
   },
   uploadFile: async (formData: FormData) => {
     const response = await apiClient.post('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  uploadImage: async (formData: FormData) => {
+    const response = await apiClient.post('/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },

@@ -1136,26 +1136,48 @@
         </div>
 
         <div class="lp-mobile-cta">
-          <a *ngIf="hasAndroidBuild" class="lp-btn-download" [href]="androidApkUrl" target="_blank" rel="noopener">
-            <svg lucideDownload size="20"></svg>
+          <a *ngIf="hasAndroidBuild" class="lp-btn-download" [href]="androidApkUrl" download>
+            <span class="dl-icon"><svg lucideDownload size="20"></svg></span>
             <span class="dl-text">
-              <small>Direct Download</small>
-              <strong>Android APK (v2.4)</strong>
+              <strong>Download App</strong>
+              <small>Android APK · {{ androidBuildLabel }}</small>
             </span>
           </a>
 
           <button *ngIf="!hasAndroidBuild" type="button" class="lp-btn-download disabled" disabled>
-            <svg lucideSmartphone size="20"></svg>
+            <span class="dl-icon"><svg lucideSmartphone size="20"></svg></span>
             <span class="dl-text">
+              <strong>Coming Soon</strong>
               <small>Android APK</small>
-              <strong>Ready for Deployment</strong>
             </span>
           </button>
 
           <span class="lp-ios-note">
             <svg lucideShieldCheck size="14"></svg>
-            Includes Offline Sync & Biometric Lock
+            Includes Offline Sync &amp; Biometric Lock
           </span>
+        </div>
+
+        <!-- Sideload guidance. Shown only alongside a live build: users are
+             installing outside the Play Store, so Android will interrupt them
+             with an "unknown apps" permission prompt they need to expect. -->
+        <div class="lp-install-steps" *ngIf="hasAndroidBuild">
+          <div class="lp-install-step">
+            <span class="lp-step-num">1</span>
+            <p>Tap <strong>Download App</strong> — the APK saves to your Downloads folder.</p>
+          </div>
+          <div class="lp-install-step">
+            <span class="lp-step-num">2</span>
+            <p>Open it. If Android asks, allow <strong>Install unknown apps</strong> for your browser.</p>
+          </div>
+          <div class="lp-install-step">
+            <span class="lp-step-num">3</span>
+            <p>Install, then sign in with your NEX work credentials.</p>
+          </div>
+          <p class="lp-install-foot">
+            The unknown-apps prompt is normal for apps installed directly rather than
+            through the Play Store. A Play Store listing is on the way.
+          </p>
         </div>
       </div>
 

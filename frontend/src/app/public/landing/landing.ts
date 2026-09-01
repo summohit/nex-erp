@@ -119,21 +119,56 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   // Android APK download link
   androidApkUrl = environment.androidApkUrl;
 
+  // Populated from the backend's /app-download/android/info probe. Until that
+  // resolves (or if no build has been published) the CTA stays in its
+  // "Coming Soon" state, so the button can never point at a 404.
+  androidBuild = signal<{ version: string | null; sizeBytes: number } | null>(null);
+
   private scrollObserver: IntersectionObserver | null = null;
 
   get hasAndroidBuild(): boolean {
-    return !!this.androidApkUrl && this.androidApkUrl.trim().length > 0;
+    return this.androidBuild() !== null;
+  }
+
+  /** e.g. "v2.4.0 · 79 MB", or just the size when the sidecar has no version. */
+  get androidBuildLabel(): string {
+    const build = this.androidBuild();
+    if (!build) return '';
+    const mb = `${Math.round(build.sizeBytes / (1024 * 1024))} MB`;
+    return build.version ? `v${build.version} · ${mb}` : mb;
   }
 
   constructor(private router: Router, private el: ElementRef) {}
 
   ngAfterViewInit() {
     this.initScrollAnimations();
+    this.probeAndroidBuild();
   }
 
   ngOnDestroy() {
     if (this.scrollObserver) {
       this.scrollObserver.disconnect();
+    }
+  }
+
+  /**
+   * Ask the backend whether a signed build is actually on disk. A failure here
+   * is not worth surfacing — the CTA simply stays in its "Coming Soon" state.
+   */
+  private async probeAndroidBuild() {
+    if (!this.androidApkUrl || typeof fetch === 'undefined') return;
+    try {
+      const res = await fetch(`${this.androidApkUrl}/info`);
+      if (!res.ok) return;
+      const info = await res.json();
+      if (info?.available) {
+        this.androidBuild.set({
+          version: info.version ?? null,
+          sizeBytes: info.sizeBytes ?? 0,
+        });
+      }
+    } catch {
+      // Offline or backend down — leave the button in its placeholder state.
     }
   }
 

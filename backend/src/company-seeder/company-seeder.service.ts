@@ -210,14 +210,14 @@ export class CompanySeederService implements OnModuleInit {
         'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
         'assets', 'assets/inventory', 'assets/assignments', 'assets/requests',
         'settings', 'settings/company', 'settings/master-data', 'settings/permissions', 'settings/integrations',
-        'projects'
+        'projects', 'crm/tickets'
       ],
       HR: [
         'employees', 'employees/directory', 'employees/org-chart', 'employees/onboarding', 'employees/documents',
         'recruitment', 'recruitment/jobs', 'recruitment/candidates', 'recruitment/interviews', 'recruitment/careers-page',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/shifts', 'attendance/holidays',
         'payroll', 'payroll/processing', 'payroll/payslips',
-        'projects'
+        'projects', 'crm/tickets'
       ],
       FINANCE: [
         'employees', 'employees/directory', 'employees/org-chart',
@@ -225,14 +225,14 @@ export class CompanySeederService implements OnModuleInit {
         'attendance', 'attendance/timesheets',
         'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
         'assets', 'assets/inventory', 'assets/assignments',
-        'projects'
+        'projects', 'crm/tickets'
       ],
       SALES: [
         'employees', 'employees/org-chart',
         'recruitment', 'recruitment/careers-page',
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
         'payroll', 'payroll/payslips', 'payroll/expenses',
-        'projects'
+        'projects', 'crm/tickets'
       ],
       EMPLOYEE: [
         'employees', 'employees/org-chart',
@@ -240,7 +240,7 @@ export class CompanySeederService implements OnModuleInit {
         'attendance', 'attendance/timesheets', 'attendance/leaves', 'attendance/holidays',
         'payroll', 'payroll/payslips', 'payroll/expenses', 'payroll/taxes',
         'assets', 'assets/requests',
-        'projects'
+        'projects', 'crm/tickets'
       ]
     };
 

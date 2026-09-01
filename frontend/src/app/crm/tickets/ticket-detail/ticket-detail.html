@@ -1,0 +1,342 @@
+<div class="detail-backdrop" (click)="close()"></div>
+
+<div class="detail-panel">
+
+  <!-- Header -->
+  <div class="detail-header">
+    <div class="detail-header-left">
+      <div class="ticket-badge-group">
+        <span class="ticket-id-badge">{{ ticket.ticketNumber }}</span>
+        <button class="btn-copy-id" (click)="copyTicketId()" title="Copy Ticket Number">
+          <svg lucideCopy [size]="13"></svg>
+        </button>
+      </div>
+
+      <span class="status-pill" [class]="statusColors[ticket.status]">
+        <span class="status-indicator-dot"></span>
+        {{ formatLabel(ticket.status) }}
+      </span>
+    </div>
+
+    <button class="btn-icon-close" (click)="close()" title="Close details">
+      <svg lucideX [size]="20"></svg>
+    </button>
+  </div>
+
+  <!-- Status Quick Actions Bar -->
+  <!-- Reporter confirmation: the fix is done, close it off -->
+  <div class="status-actions-bar reporter-bar" *ngIf="canCloseAsReporter()">
+    <div class="actions-label">
+      <svg lucideCheckCircle2 [size]="14"></svg>
+      <span>Resolved — is this fixed for you?</span>
+    </div>
+    <div class="action-buttons-group">
+      <button class="btn-status-action btn-status-closed" (click)="closeAsReporter()">
+        <span>Yes, close this ticket</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="status-actions-bar" *ngIf="canManage() && (nextStatuses().length > 0 || isAdmin())">
+    <div class="actions-label">
+      <svg lucideSparkles [size]="14"></svg>
+      <span>Next Step:</span>
+    </div>
+    <div class="action-buttons-group">
+      <button
+        *ngFor="let s of nextStatuses()"
+        class="btn-status-action"
+        [class]="'btn-status-' + s.toLowerCase().replace('_','-')"
+        (click)="changeStatus(s)">
+        <span>Move to {{ formatLabel(s) }}</span>
+      </button>
+
+      <!-- Admin Searchable Status Select -->
+      <div class="searchable-filter-dropdown admin-dropdown" *ngIf="isAdmin()">
+        <button type="button" class="filter-dropdown-trigger admin-trigger" (click)="showAdminStatusDropdown = !showAdminStatusDropdown">
+          <span>Set Status</span>
+          <svg lucideChevronDown [size]="12" class="trigger-chevron" [class.rotated]="showAdminStatusDropdown"></svg>
+        </button>
+        <div class="filter-dropdown-popover" *ngIf="showAdminStatusDropdown">
+          <div class="popover-search-box">
+            <svg lucideSearch [size]="12" class="popover-search-icon"></svg>
+            <input type="text" placeholder="Search status..." [(ngModel)]="adminStatusSearchQuery" (click)="$event.stopPropagation()" />
+            <button type="button" class="popover-search-clear" *ngIf="adminStatusSearchQuery" (click)="adminStatusSearchQuery = ''"><svg lucideX [size]="10"></svg></button>
+          </div>
+          <div class="popover-options-scroll">
+            <div class="popover-option-item" *ngFor="let s of getFilteredStatuses(adminStatusSearchQuery)" (click)="changeStatus(s)" [class.selected]="ticket.status === s">
+              <span class="status-pill {{ statusColors[s] }} mini"><span class="status-indicator-dot"></span>{{ formatLabel(s) }}</span>
+              <svg lucideCheck [size]="13" class="check-icon" *ngIf="ticket.status === s"></svg>
+            </div>
+            <div class="popover-empty" *ngIf="getFilteredStatuses(adminStatusSearchQuery).length === 0">
+              No matches
+            </div>
+          </div>
+        </div>
+        <div class="dropdown-backdrop-transparent" *ngIf="showAdminStatusDropdown" (click)="showAdminStatusDropdown = false"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scrollable Body -->
+  <div class="detail-scroll">
+
+    <!-- Title & Type Header Card -->
+    <div class="detail-title-card">
+      <div class="title-meta-row">
+        <span class="type-pill" [class]="typeBadgeClasses[ticket.type]">{{ formatLabel(ticket.type) }}</span>
+        <span class="platform-tag" [class]="'platform-' + ticket.platform.toLowerCase()">{{ ticket.platform }}</span>
+      </div>
+      <h2 class="detail-title">{{ ticket.title }}</h2>
+    </div>
+
+    <!-- Metadata Grid Card -->
+    <div class="meta-section-card">
+      <div class="meta-section-header">
+        <svg lucideLayers [size]="14"></svg>
+        <span>Ticket Properties</span>
+      </div>
+
+      <div class="meta-grid">
+        <!-- Priority -->
+        <div class="meta-item">
+          <span class="meta-label">Priority</span>
+          <div class="meta-value-box">
+            <span class="priority-pill" [class]="priorityColors[ticket.priority]">
+              <span class="priority-dot" [style.background-color]="priorityDotColors[ticket.priority]"></span>
+              {{ ticket.priority }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Department -->
+        <div class="meta-item">
+          <span class="meta-label">Department</span>
+          <div class="meta-value-box">
+            <span class="meta-value-text">{{ ticket.department?.name ?? 'General' }}</span>
+          </div>
+        </div>
+
+        <!-- Assignee (reassignable within the same department) -->
+        <div class="meta-item">
+          <span class="meta-label">
+            Assignee
+            <button
+              type="button"
+              class="btn-reassign"
+              *ngIf="canReassign()"
+              (click)="openAssigneePicker()"
+              [title]="ticket.assignee ? 'Reassign within this team' : 'Assign to a team member'">
+              {{ ticket.assignee ? 'Change' : 'Assign' }}
+            </button>
+          </span>
+
+          <div class="meta-value-box" *ngIf="!showAssigneePicker">
+            <div class="user-meta-cell" *ngIf="ticket.assignee">
+              <img *ngIf="ticket.assignee.avatarUrl" [src]="ticket.assignee.avatarUrl" class="avatar-img small" alt="" />
+              <span *ngIf="!ticket.assignee.avatarUrl" class="avatar-circle small">{{ ticket.assignee.firstName[0] }}{{ ticket.assignee.lastName[0] }}</span>
+              <span class="meta-value-text">{{ ticket.assignee.firstName }} {{ ticket.assignee.lastName }}</span>
+            </div>
+            <span class="unassigned-text" *ngIf="!ticket.assignee">Unassigned</span>
+          </div>
+
+          <!-- Reassign picker -->
+          <div class="assignee-reassign" *ngIf="showAssigneePicker">
+            <input
+              type="text"
+              class="reassign-search"
+              placeholder="Search team members..."
+              [(ngModel)]="assigneeSearchQuery" />
+
+            <div class="reassign-list">
+              <div class="reassign-loading" *ngIf="loadingMembers">Loading team…</div>
+
+              <div
+                class="reassign-option"
+                *ngFor="let m of filteredMembers()"
+                [class.selected]="ticket.assigneeId === m.id"
+                (click)="reassignTo(m)">
+                <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="avatar-img small" alt="" />
+                <span *ngIf="!m.avatarUrl" class="avatar-circle small">{{ m.firstName[0] }}{{ m.lastName[0] }}</span>
+                <div class="reassign-person">
+                  <span class="reassign-name">{{ m.firstName }} {{ m.lastName }}</span>
+                  <span class="reassign-role">{{ m.designation?.name || 'Team member' }}</span>
+                </div>
+                <svg lucideCheck [size]="13" *ngIf="ticket.assigneeId === m.id"></svg>
+              </div>
+
+              <div class="reassign-empty" *ngIf="!loadingMembers && filteredMembers().length === 0">
+                No team members found
+              </div>
+            </div>
+
+            <button type="button" class="btn-cancel-reassign" (click)="showAssigneePicker = false">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Reporter -->
+        <div class="meta-item">
+          <span class="meta-label">Reporter</span>
+          <div class="meta-value-box">
+            <div class="user-meta-cell" *ngIf="ticket.reporter">
+              <img *ngIf="ticket.reporter.avatarUrl" [src]="ticket.reporter.avatarUrl" class="avatar-img small" alt="" />
+              <span *ngIf="!ticket.reporter.avatarUrl" class="avatar-circle small reporter-avatar">{{ ticket.reporter.firstName[0] }}{{ ticket.reporter.lastName[0] }}</span>
+              <span class="meta-value-text">{{ ticket.reporter.firstName }} {{ ticket.reporter.lastName }}</span>
+            </div>
+            <span class="unassigned-text" *ngIf="!ticket.reporter">—</span>
+          </div>
+        </div>
+
+        <!-- Created At -->
+        <div class="meta-item">
+          <span class="meta-label">Created Date</span>
+          <div class="meta-value-box">
+            <span class="meta-value-text">{{ ticket.createdAt | date:'mediumDate' }}</span>
+          </div>
+        </div>
+
+        <!-- Resolved At -->
+        <div class="meta-item" *ngIf="ticket.resolvedAt">
+          <span class="meta-label">Resolved Date</span>
+          <div class="meta-value-box">
+            <span class="meta-value-text text-green">{{ ticket.resolvedAt | date:'mediumDate' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Description Card -->
+    <div class="detail-section-card" *ngIf="ticket.description">
+      <div class="section-card-header">
+        <span>Description</span>
+      </div>
+      <!-- Rich text from the Quill editor; Angular sanitizes it on bind. -->
+      <div class="description-content rich-text" [innerHTML]="ticket.description"></div>
+    </div>
+
+    <!-- Attachments Card -->
+    <div class="detail-section-card" *ngIf="ticket.attachments?.length">
+      <div class="section-card-header">
+        <svg lucideImage [size]="14"></svg>
+        <span>Attachments ({{ ticket.attachments?.length }})</span>
+      </div>
+      <div class="attachment-gallery">
+        <a
+          class="gallery-item"
+          *ngFor="let a of ticket.attachments"
+          [href]="a.fileUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          [title]="a.fileName">
+          <img [src]="a.fileUrl" [alt]="a.fileName" />
+          <span class="gallery-name">{{ a.fileName }}</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Activity Log Card -->
+    <div class="detail-section-card" *ngIf="ticket.activities && ticket.activities.length">
+      <div class="section-card-header">
+        <svg lucideHistory [size]="14"></svg>
+        <span>Activity Log</span>
+      </div>
+
+      <div class="activity-timeline">
+        <div class="timeline-item" *ngFor="let a of ticket.activities">
+          <div class="timeline-line"></div>
+          <div class="timeline-dot"></div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <div class="timeline-actor-badge">
+                <img *ngIf="a.actor?.avatarUrl" [src]="a.actor.avatarUrl" class="avatar-img micro" alt="" />
+                <span *ngIf="!a.actor?.avatarUrl" class="avatar-circle micro">{{ a.actor?.firstName?.[0] }}{{ a.actor?.lastName?.[0] }}</span>
+                <span class="actor-name">{{ a.actor?.firstName }} {{ a.actor?.lastName }}</span>
+              </div>
+              <span class="activity-time">{{ a.createdAt | date:'short' }}</span>
+            </div>
+            <div class="timeline-desc">
+              <span class="action-tag">{{ formatLabel(a.action) }}</span>
+              <span class="change-diff" *ngIf="a.oldValue && a.newValue">
+                {{ formatLabel(a.oldValue) }} <svg lucideArrowRight [size]="11"></svg> {{ formatLabel(a.newValue) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comments & Discussion Card -->
+    <div class="detail-section-card comments-section">
+      <div class="section-card-header">
+        <div class="comments-header-title">
+          <svg lucideMessageSquare [size]="15"></svg>
+          <span>Discussion</span>
+          <span class="comments-count-pill">{{ ticket.comments?.length ?? 0 }}</span>
+        </div>
+      </div>
+
+      <!-- Comments Stream -->
+      <div class="comments-stream">
+        <div class="comment-card" *ngFor="let c of ticket.comments">
+          <div class="comment-avatar">
+            <img *ngIf="c.author?.avatarUrl" [src]="c.author.avatarUrl" class="avatar-img-cover" alt="" />
+            <span *ngIf="!c.author?.avatarUrl">{{ c.author?.firstName?.charAt(0) }}{{ c.author?.lastName?.charAt(0) }}</span>
+          </div>
+
+          <div class="comment-content-box">
+            <div class="comment-top-bar">
+              <div class="comment-author-info">
+                <span class="comment-author-name">{{ c.author?.firstName }} {{ c.author?.lastName }}</span>
+                <span class="comment-date">{{ c.createdAt | date:'MMM d, h:mm a' }}</span>
+              </div>
+
+              <div class="comment-actions" *ngIf="canEditComment(c) || canDeleteComment(c)">
+                <button class="btn-micro" *ngIf="canEditComment(c)" (click)="startEditComment(c)" title="Edit comment">
+                  <svg lucideEdit2 [size]="12"></svg>
+                </button>
+                <button class="btn-micro btn-micro-danger" *ngIf="canDeleteComment(c)" (click)="deleteComment(c)" title="Delete comment">
+                  <svg lucideTrash2 [size]="12"></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- View Comment -->
+            <div *ngIf="editingCommentId !== c.id" class="comment-body-text">
+              {{ c.body }}
+            </div>
+
+            <!-- Inline Edit Comment -->
+            <div *ngIf="editingCommentId === c.id" class="inline-edit-box">
+              <textarea class="edit-textarea" [(ngModel)]="editCommentBody" rows="2"></textarea>
+              <div class="edit-actions-row">
+                <button class="btn-primary-sm" (click)="saveEditComment(c)">Save</button>
+                <button class="btn-secondary-sm" (click)="editingCommentId=null">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="empty-comments-state" *ngIf="!ticket.comments?.length">
+          <p>No comments yet. Be the first to leave a message.</p>
+        </div>
+      </div>
+
+      <!-- Add Comment Composer -->
+      <div class="comment-composer-box">
+        <textarea
+          class="composer-textarea"
+          [(ngModel)]="commentBody"
+          placeholder="Leave a message or status update…"
+          rows="3">
+        </textarea>
+        <div class="composer-footer">
+          <button class="btn-send-comment" (click)="submitComment()" [disabled]="submittingComment || !commentBody.trim()">
+            <svg lucideSend [size]="14"></svg>
+            <span>{{ submittingComment ? 'Posting…' : 'Send' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

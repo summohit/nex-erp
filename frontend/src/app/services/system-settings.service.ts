@@ -10,6 +10,8 @@ export interface SystemSetting {
   offerLetterTemplateHtml?: string | null;
   offerLetterTemplateDocxUrl?: string | null;
   offerLetterConfig?: Record<string, any> | null;
+  /** Employee every new ticket is auto-assigned to (the software dev PM). */
+  defaultTicketAssigneeId?: number | null;
 }
 
 export interface PlaceholderTag {

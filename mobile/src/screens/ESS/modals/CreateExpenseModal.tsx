@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, TextInput,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { X, Calendar as CalendarIcon, UploadCloud, Camera, Image as ImageIcon, FileText, ChevronDown } from 'lucide-react-native';
+import { X, Calendar as CalendarIcon, Camera, Image as ImageIcon, FileText, ChevronDown, ZoomIn } from 'lucide-react-native';
 import DocumentPicker from 'react-native-document-picker';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { payrollService } from '../../../api/payrollService';
@@ -16,32 +16,60 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  editingClaim?: import('../../../api/payrollService').ExpenseClaim | null;
+}
+
+interface Attachment {
+  uri: string;
+  name: string;
+  type: string;
+  isImage: boolean;
+}
+
+interface Errors {
+  title?: string;
+  amount?: string;
+  purchaseDate?: string;
+  receipt?: string;
 }
 
 const CATEGORIES = ['TRAVEL', 'MEALS', 'ACCOMMODATION', 'EQUIPMENT', 'OTHER'];
 
-export default function CreateExpenseModal({ visible, onClose, onSuccess }: Props) {
+export default function CreateExpenseModal({ visible, onClose, onSuccess, editingClaim }: Props) {
   const insets = useSafeAreaInsets();
+  const isEditing = !!editingClaim;
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('OTHER');
   const [purchaseDate, setPurchaseDate] = useState('');
   const [purchasedFrom, setPurchasedFrom] = useState('');
-  
   const [projects, setProjects] = useState<any[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  
-  const [attachment, setAttachment] = useState<any>(null);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Errors>({});
+  const [lightboxVisible, setLightboxVisible] = useState(false);
 
   useEffect(() => {
     if (visible) {
       projectService.getProjects().then(setProjects).catch(() => {});
+      if (editingClaim) {
+        setTitle(editingClaim.title);
+        setDescription(editingClaim.description || '');
+        setAmount(String(editingClaim.amount));
+        setCategory(editingClaim.category);
+        setPurchaseDate(editingClaim.purchaseDate ? editingClaim.purchaseDate.split('T')[0] : '');
+        setPurchasedFrom(editingClaim.purchasedFrom || '');
+        setExistingReceiptUrl(editingClaim.receiptUrl || null);
+        setAttachment(null);
+      }
     }
-  }, [visible]);
+  }, [visible, editingClaim]);
 
   const resetForm = () => {
     setTitle('');
@@ -51,8 +79,10 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
     setPurchaseDate('');
     setPurchasedFrom('');
     setAttachment(null);
+    setExistingReceiptUrl(null);
     setProjectId(null);
     setShowProjectDropdown(false);
+    setErrors({});
   };
 
   const handleClose = () => {
@@ -65,10 +95,12 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
     if (res.assets && res.assets.length > 0) {
       const asset = res.assets[0];
       setAttachment({
-        uri: asset.uri,
+        uri: asset.uri!,
         name: asset.fileName || `photo_${Date.now()}.jpg`,
-        type: asset.type || 'image/jpeg'
+        type: asset.type || 'image/jpeg',
+        isImage: true,
       });
+      setErrors(e => ({ ...e, receipt: undefined }));
     }
   };
 
@@ -77,10 +109,12 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
     if (res.assets && res.assets.length > 0) {
       const asset = res.assets[0];
       setAttachment({
-        uri: asset.uri,
+        uri: asset.uri!,
         name: asset.fileName || `image_${Date.now()}.jpg`,
-        type: asset.type || 'image/jpeg'
+        type: asset.type || 'image/jpeg',
+        isImage: true,
       });
+      setErrors(e => ({ ...e, receipt: undefined }));
     }
   };
 
@@ -89,7 +123,14 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
       const res = await DocumentPicker.pickSingle({
         type: [DocumentPicker.types.pdf, DocumentPicker.types.images],
       });
-      setAttachment(res);
+      const isImage = (res.type || '').startsWith('image/');
+      setAttachment({
+        uri: res.uri,
+        name: res.name || 'document',
+        type: res.type || 'application/pdf',
+        isImage,
+      });
+      setErrors(e => ({ ...e, receipt: undefined }));
     } catch (err) {
       if (!DocumentPicker.isCancel(err)) {
         Alert.alert('Error', 'Failed to pick document');
@@ -97,63 +138,77 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
     }
   };
 
-  const handleSubmit = async () => {
-    if (!title.trim() || !amount.trim()) {
-      Alert.alert('Missing Fields', 'Title and Amount are required.');
-      return;
-    }
-    
+  const validate = (): boolean => {
+    const next: Errors = {};
+    if (!title.trim()) next.title = 'Title is required.';
+
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Amount must be greater than zero.');
-      return;
+    if (!amount.trim()) {
+      next.amount = 'Amount is required.';
+    } else if (isNaN(numAmount) || numAmount <= 0) {
+      next.amount = 'Amount must be greater than zero.';
+    } else if (numAmount > 100000) {
+      next.amount = 'Maximum claim limit is ₹1,00,000.';
     }
-    if (numAmount > 100000) {
-      Alert.alert('Limit Exceeded', 'Maximum claim limit is ₹1,00,000.');
-      return;
-    }
-    
+
     if (purchaseDate) {
       const pDate = new Date(purchaseDate);
       if (pDate > new Date()) {
-        Alert.alert('Invalid Date', 'Purchase date cannot be in the future.');
-        return;
+        next.purchaseDate = 'Purchase date cannot be in the future.';
       }
     }
 
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) return;
+
     setIsSubmitting(true);
     try {
-      let receiptUrl = null;
-      
+      let receiptUrl: string | null | undefined = isEditing ? (existingReceiptUrl || editingClaim?.receiptUrl) : null;
+
       if (attachment) {
         const fileData = new FormData();
         fileData.append('file', {
           uri: attachment.uri,
-          name: attachment.name || 'receipt.pdf',
-          type: attachment.type || 'application/pdf',
+          name: attachment.name,
+          type: attachment.type,
         } as any);
 
-        const uploadRes = await employeeService.uploadFile(fileData); 
+        let uploadRes: any;
+        if (attachment.isImage) {
+          uploadRes = await employeeService.uploadImage(fileData);
+        } else {
+          uploadRes = await employeeService.uploadFile(fileData);
+        }
         receiptUrl = uploadRes?.url || uploadRes?.fileUrl || uploadRes;
-        
+
         if (!receiptUrl || typeof receiptUrl !== 'string') {
-          throw new Error('Upload failed');
+          setErrors(e => ({ ...e, receipt: 'Upload failed. Please try again.' }));
+          return;
         }
       }
 
       const selectedProject = projects.find(p => p.id === projectId);
-
-      await payrollService.createExpenseClaim({
+      const payload = {
         title: title.trim(),
         description: description.trim(),
-        amount: numAmount,
+        amount: parseFloat(amount),
         category,
         receiptUrl,
         purchaseDate: purchaseDate ? new Date(purchaseDate).toISOString() : undefined,
         purchasedFrom: purchasedFrom.trim() || undefined,
         projectId: selectedProject?.id,
         projectName: selectedProject?.name,
-      });
+      };
+
+      if (isEditing && editingClaim) {
+        await payrollService.updateExpenseClaim(editingClaim.id, payload);
+      } else {
+        await payrollService.createExpenseClaim(payload);
+      }
 
       onSuccess();
       handleClose();
@@ -166,6 +221,10 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
   };
 
   const selectedProject = projects.find(p => p.id === projectId);
+  const previewImageUri = attachment?.isImage ? attachment.uri : null;
+  const existingIsImage = existingReceiptUrl
+    ? /\.(jpg|jpeg|png|gif|webp)/i.test(existingReceiptUrl)
+    : false;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
@@ -174,37 +233,43 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
-        
+
         <View style={[styles.content, { paddingBottom: insets.bottom || 20 }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>Raise Expense Claim</Text>
+            <Text style={styles.headerTitle}>{isEditing ? 'Edit Expense Claim' : 'Raise Expense Claim'}</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
               <X size={20} color="#64748B" />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+            {/* Title */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Title *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.title && styles.inputError]}
                 placeholder="e.g. Flight to Mumbai"
                 value={title}
-                onChangeText={setTitle}
+                onChangeText={v => { setTitle(v); setErrors(e => ({ ...e, title: undefined })); }}
               />
+              {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
             </View>
 
+            {/* Amount */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Amount (₹) *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.amount && styles.inputError]}
                 placeholder="0.00"
                 keyboardType="numeric"
                 value={amount}
-                onChangeText={setAmount}
+                onChangeText={v => { setAmount(v); setErrors(e => ({ ...e, amount: undefined })); }}
               />
+              {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
             </View>
 
+            {/* Category */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Category</Text>
               <View style={styles.categoryRow}>
@@ -224,17 +289,22 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
               </View>
             </View>
 
+            {/* Purchase Date */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Purchase Date</Text>
               <TouchableOpacity
-                style={styles.datePickerInput}
+                style={[styles.datePickerInput, errors.purchaseDate && styles.inputError]}
                 onPress={() => setDatePickerVisible(true)}
               >
-                <Text style={styles.dateValue}>{purchaseDate || 'Select Date'}</Text>
+                <Text style={purchaseDate ? styles.dateValue : styles.placeholderText}>
+                  {purchaseDate || 'Select Date'}
+                </Text>
                 <CalendarIcon size={18} color="#94A3B8" />
               </TouchableOpacity>
+              {errors.purchaseDate && <Text style={styles.errorText}>{errors.purchaseDate}</Text>}
             </View>
 
+            {/* Vendor */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Purchased From / Vendor</Text>
               <TextInput
@@ -245,43 +315,37 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
               />
             </View>
 
+            {/* Project */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Project</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.dropdownToggle}
                 onPress={() => setShowProjectDropdown(!showProjectDropdown)}
               >
                 <Text style={[styles.dropdownValue, !selectedProject && styles.placeholderText]}>
-                  {selectedProject ? selectedProject.name : 'Search Project...'}
+                  {selectedProject ? selectedProject.name : 'Select Project...'}
                 </Text>
                 <ChevronDown size={18} color="#94A3B8" />
               </TouchableOpacity>
-              
               {showProjectDropdown && (
                 <View style={styles.dropdownList}>
                   {projects.length === 0 ? (
                     <Text style={styles.dropdownItemText}>No projects found</Text>
                   ) : (
                     projects.map(p => (
-                      <TouchableOpacity 
-                        key={p.id} 
+                      <TouchableOpacity
+                        key={p.id}
                         style={styles.dropdownItem}
-                        onPress={() => {
-                          setProjectId(p.id);
-                          setShowProjectDropdown(false);
-                        }}
+                        onPress={() => { setProjectId(p.id); setShowProjectDropdown(false); }}
                       >
                         <Text style={styles.dropdownItemText}>{p.name}</Text>
                       </TouchableOpacity>
                     ))
                   )}
                   {projectId !== null && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownItem}
-                      onPress={() => {
-                        setProjectId(null);
-                        setShowProjectDropdown(false);
-                      }}
+                      onPress={() => { setProjectId(null); setShowProjectDropdown(false); }}
                     >
                       <Text style={[styles.dropdownItemText, { color: '#EF4444' }]}>Clear Selection</Text>
                     </TouchableOpacity>
@@ -290,6 +354,7 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
               )}
             </View>
 
+            {/* Description */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Description</Text>
               <TextInput
@@ -302,6 +367,7 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
               />
             </View>
 
+            {/* Receipt Attachment */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Receipt Attachment</Text>
               <View style={styles.attachmentOptions}>
@@ -318,19 +384,64 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
                   <Text style={styles.attachText}>File</Text>
                 </TouchableOpacity>
               </View>
-              
-              {attachment && (
+
+              {errors.receipt && <Text style={[styles.errorText, { marginTop: 6 }]}>{errors.receipt}</Text>}
+
+              {/* New image preview */}
+              {previewImageUri ? (
+                <View style={styles.previewContainer}>
+                  <TouchableOpacity onPress={() => setLightboxVisible(true)} activeOpacity={0.85}>
+                    <Image source={{ uri: previewImageUri }} style={styles.previewImage} resizeMode="cover" />
+                    <View style={styles.previewOverlay}>
+                      <ZoomIn size={20} color="#FFFFFF" />
+                    </View>
+                  </TouchableOpacity>
+                  <View style={styles.previewMeta}>
+                    <Text style={styles.previewFileName} numberOfLines={1}>{attachment!.name}</Text>
+                    <TouchableOpacity onPress={() => setAttachment(null)}>
+                      <X size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : attachment ? (
+                /* Non-image file */
                 <View style={styles.selectedFileBox}>
+                  <FileText size={16} color="#64748B" />
                   <Text style={styles.selectedFileName} numberOfLines={1}>{attachment.name}</Text>
                   <TouchableOpacity onPress={() => setAttachment(null)}>
                     <X size={18} color="#EF4444" />
                   </TouchableOpacity>
                 </View>
-              )}
+              ) : existingIsImage && existingReceiptUrl ? (
+                /* Existing image from edit mode */
+                <View style={styles.previewContainer}>
+                  <TouchableOpacity onPress={() => setLightboxVisible(true)} activeOpacity={0.85}>
+                    <Image source={{ uri: existingReceiptUrl }} style={styles.previewImage} resizeMode="cover" />
+                    <View style={styles.previewOverlay}>
+                      <ZoomIn size={20} color="#FFFFFF" />
+                    </View>
+                  </TouchableOpacity>
+                  <View style={styles.previewMeta}>
+                    <Text style={styles.previewFileName} numberOfLines={1}>Current receipt</Text>
+                    <TouchableOpacity onPress={() => setExistingReceiptUrl(null)}>
+                      <X size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : existingReceiptUrl ? (
+                /* Existing non-image file */
+                <View style={styles.selectedFileBox}>
+                  <FileText size={16} color="#64748B" />
+                  <Text style={styles.selectedFileName} numberOfLines={1}>Current receipt</Text>
+                  <TouchableOpacity onPress={() => setExistingReceiptUrl(null)}>
+                    <X size={18} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
+
           </ScrollView>
 
-          {/* Sticky Submit Button at the bottom */}
           <View style={styles.footer}>
             <TouchableOpacity
               style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
@@ -340,12 +451,12 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
               {isSubmitting ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <Text style={styles.submitBtnText}>Submit Claim</Text>
+                <Text style={styles.submitBtnText}>{isEditing ? 'Save Changes' : 'Submit Claim'}</Text>
               )}
             </TouchableOpacity>
           </View>
         </View>
-        
+
         <DateTimePickerModal
           isVisible={isDatePickerVisible}
           mode="date"
@@ -353,10 +464,35 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess }: Prop
           onConfirm={(d) => {
             setPurchaseDate(d.toISOString().split('T')[0]);
             setDatePickerVisible(false);
+            setErrors(e => ({ ...e, purchaseDate: undefined }));
           }}
           onCancel={() => setDatePickerVisible(false)}
         />
       </KeyboardAvoidingView>
+
+      {/* Fullscreen image lightbox */}
+      <Modal
+        visible={lightboxVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLightboxVisible(false)}
+        statusBarTranslucent
+      >
+        <View style={styles.lightboxOverlay}>
+          <TouchableOpacity
+            style={styles.lightboxClose}
+            onPress={() => setLightboxVisible(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <X size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Image
+            source={{ uri: (previewImageUri || existingReceiptUrl)! }}
+            style={styles.lightboxImage}
+            resizeMode="contain"
+          />
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -384,7 +520,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  title: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: '#0F172A',
@@ -416,6 +552,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#0F172A',
   },
+  inputError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FFF5F5',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
+    marginLeft: 4,
+  },
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
@@ -434,6 +580,10 @@ const styles = StyleSheet.create({
   dateValue: {
     fontSize: 15,
     color: '#0F172A',
+  },
+  placeholderText: {
+    color: '#94A3B8',
+    fontSize: 15,
   },
   categoryRow: {
     flexDirection: 'row',
@@ -475,9 +625,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#0F172A',
   },
-  placeholderText: {
-    color: '#94A3B8',
-  },
   dropdownList: {
     marginTop: 8,
     backgroundColor: '#FFFFFF',
@@ -517,20 +664,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  selectedFileBox: {
+  previewContainer: {
+    marginTop: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  previewImage: {
+    width: '100%',
+    height: 180,
+  },
+  previewOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 20,
+    padding: 6,
+  },
+  previewMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  previewFileName: {
+    fontSize: 13,
+    color: '#334155',
+    flex: 1,
+    marginRight: 12,
+  },
+  selectedFileBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: '#F1F5F9',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     marginTop: 12,
   },
   selectedFileName: {
     fontSize: 13,
     color: '#334155',
     flex: 1,
-    marginRight: 12,
   },
   footer: {
     padding: 20,
@@ -551,5 +730,25 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  // Lightbox
+  lightboxOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lightboxClose: {
+    position: 'absolute',
+    top: 52,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  lightboxImage: {
+    width: '100%',
+    height: '80%',
   },
 });

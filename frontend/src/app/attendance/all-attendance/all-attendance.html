@@ -1,101 +1,511 @@
-<div class="all-attendance-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h2>All People Attendance</h2>
-      <p>Company-wide attendance for the selected month, filterable by employee, department, or status.</p>
+<div class="all-attendance-container page-container">
+
+  <!-- Enhanced Page Header Card -->
+  <div class="page-header-card">
+    <div class="header-title-group">
+      <div class="header-title-row">
+        <h1>All People Attendance</h1>
+        <span class="attendance-count-pill">{{ filteredRecords().length }} Record{{ filteredRecords().length === 1 ? '' : 's' }}</span>
+      </div>
+      <p>Company-wide attendance tracking, work hours, late arrival flags, and monthly logs</p>
+    </div>
+
+    <div class="header-actions-group">
+      <!-- Export CSV Button -->
+      <button class="btn-header-secondary" (click)="exportToCsv()" [disabled]="filteredRecords().length === 0" title="Export current attendance records to CSV">
+        <svg lucideDownload [size]="15"></svg>
+        <span>Export CSV</span>
+      </button>
+
+      <!-- Refresh Button -->
+      <button class="btn-header-secondary" (click)="load()" title="Refresh attendance data">
+        <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading()"></svg>
+        <span>Refresh</span>
+      </button>
     </div>
   </div>
 
-  <div class="filters-card">
-    <div class="filter-group">
-      <label>Month</label>
-      <select class="form-input" [(ngModel)]="filterMonth" (change)="load()">
-        <option *ngFor="let m of months" [value]="m.value">{{ m.label }}</option>
-      </select>
+  <!-- KPI / Stats Row -->
+  <div class="stats-row">
+    <!-- Total Shifts Tracked -->
+    <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && filterFlag === 'ALL'" (click)="filterStatus=''; filterFlag='ALL'; load()" title="Click to show all records">
+      <div class="stat-icon-wrapper">
+        <svg lucideCalendarDays [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Total Shifts</span>
+        <div class="stat-value">{{ stats().total }}</div>
+        <span class="stat-subtext">Logged in {{ getSelectedMonthLabel() }} {{ filterYear }}</span>
+      </div>
     </div>
 
-    <div class="filter-group">
-      <label>Year</label>
-      <select class="form-input" [(ngModel)]="filterYear" (change)="load()">
-        <option *ngFor="let y of years" [value]="y">{{ y }}</option>
-      </select>
+    <!-- Present & On-Time -->
+    <div class="stat-card stat-green" [class.active-card]="filterStatus === 'PRESENT' && filterFlag === 'ALL'" (click)="toggleKpiStatus('PRESENT')" title="Click to filter Present records">
+      <div class="stat-icon-wrapper">
+        <svg lucideUserCheck [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Present</span>
+        <div class="stat-value">{{ stats().present }}</div>
+        <span class="stat-subtext">{{ stats().onTimeRate }}% on-time arrival rate</span>
+      </div>
     </div>
 
-    <div class="filter-group">
-      <label>Employee</label>
-      <select class="form-input" [(ngModel)]="filterEmployeeId" (change)="load()">
-        <option [ngValue]="null">All Employees</option>
-        <option *ngFor="let emp of employees()" [ngValue]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
-      </select>
+    <!-- Late Arrivals -->
+    <div class="stat-card stat-amber" [class.active-card]="filterFlag === 'LATE'" (click)="toggleKpiFlag('LATE')" title="Click to filter Late Arrivals">
+      <div class="stat-icon-wrapper">
+        <svg lucideAlertTriangle [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Late Arrivals</span>
+        <div class="stat-value">{{ stats().late }}</div>
+        <span class="stat-subtext">Clocked in after shift start</span>
+      </div>
     </div>
 
-    <div class="filter-group">
-      <label>Department</label>
-      <select class="form-input" [(ngModel)]="filterDepartmentId" (change)="load()">
-        <option [ngValue]="null">All Departments</option>
-        <option *ngFor="let dept of departments()" [ngValue]="dept.id">{{ dept.name }}</option>
-      </select>
+    <!-- Half Day / Early Leave -->
+    <div class="stat-card stat-rose" [class.active-card]="filterStatus === 'HALF_DAY'" (click)="toggleKpiStatus('HALF_DAY')" title="Click to filter Half Day shifts">
+      <div class="stat-icon-wrapper">
+        <svg lucideTimer [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Half Day</span>
+        <div class="stat-value">{{ stats().halfDay }}</div>
+        <span class="stat-subtext">{{ stats().early }} early departure flags</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Card -->
+  <div class="filter-bar-card">
+    <div class="filter-bar-main-row">
+      <!-- Search Input -->
+      <div class="search-input-wrapper">
+        <svg lucideSearch [size]="16" class="search-icon"></svg>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search by employee name or department…"
+        />
+        <button class="btn-clear-search" *ngIf="searchQuery" (click)="searchQuery = ''" title="Clear search">
+          <svg lucideX [size]="14"></svg>
+        </button>
+      </div>
+
+      <!-- Filter Searchable Dropdowns -->
+      <div class="filter-dropdowns-group">
+
+        <!-- 1. Month Dropdown (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" (click)="showMonthDropdown = !showMonthDropdown; showYearDropdown=false; showEmployeeDropdown=false; showDeptDropdown=false; showStatusDropdown=false; showFlagDropdown=false">
+            <svg lucideCalendarClock [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedMonthLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showMonthDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showMonthDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search months..." [(ngModel)]="monthSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="monthSearchQuery" (click)="monthSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" *ngFor="let m of getFilteredMonths(monthSearchQuery)" (click)="selectMonth(m.value)" [class.selected]="filterMonth === m.value">
+                <span class="option-primary">{{ m.label }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterMonth === m.value"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredMonths(monthSearchQuery).length === 0">
+                No months match "{{ monthSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showMonthDropdown" (click)="showMonthDropdown = false"></div>
+        </div>
+
+        <!-- 2. Year Dropdown (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger mini-trigger" (click)="showYearDropdown = !showYearDropdown; showMonthDropdown=false; showEmployeeDropdown=false; showDeptDropdown=false; showStatusDropdown=false; showFlagDropdown=false">
+            <span class="trigger-text">{{ filterYear }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showYearDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover mini-popover" *ngIf="showYearDropdown">
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" *ngFor="let y of getFilteredYears(yearSearchQuery)" (click)="selectYear(y)" [class.selected]="filterYear === y">
+                <span class="option-primary">{{ y }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterYear === y"></svg>
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showYearDropdown" (click)="showYearDropdown = false"></div>
+        </div>
+
+        <!-- 3. Employee Dropdown (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterEmployeeId" (click)="showEmployeeDropdown = !showEmployeeDropdown; showMonthDropdown=false; showYearDropdown=false; showDeptDropdown=false; showStatusDropdown=false; showFlagDropdown=false">
+            <svg lucideUser [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedEmployeeLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showEmployeeDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showEmployeeDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search employees..." [(ngModel)]="employeeSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="employeeSearchQuery" (click)="employeeSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" (click)="selectEmployee(null)" [class.selected]="!filterEmployeeId">
+                <span class="option-primary">All Employees</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="!filterEmployeeId"></svg>
+              </div>
+              <div class="popover-option-item" *ngFor="let emp of getFilteredEmployees(employeeSearchQuery)" (click)="selectEmployee(emp.id)" [class.selected]="filterEmployeeId === emp.id">
+                <div class="popover-user-cell">
+                  <div class="avatar-circle-sm">{{ (emp.firstName || '?')[0] }}{{ (emp.lastName || '')[0] }}</div>
+                  <div class="popover-user-info">
+                    <span class="option-primary">{{ emp.firstName }} {{ emp.lastName }}</span>
+                    <span class="option-sub" *ngIf="emp.department?.name">{{ emp.department?.name }}</span>
+                  </div>
+                </div>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterEmployeeId === emp.id"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredEmployees(employeeSearchQuery).length === 0">
+                No employees match "{{ employeeSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showEmployeeDropdown" (click)="showEmployeeDropdown = false"></div>
+        </div>
+
+        <!-- 4. Department Dropdown (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterDepartmentId" (click)="showDeptDropdown = !showDeptDropdown; showMonthDropdown=false; showYearDropdown=false; showEmployeeDropdown=false; showStatusDropdown=false; showFlagDropdown=false">
+            <svg lucideBuilding [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedDeptLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showDeptDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showDeptDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search departments..." [(ngModel)]="deptSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="deptSearchQuery" (click)="deptSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" (click)="selectDepartment(null)" [class.selected]="!filterDepartmentId">
+                <span class="option-primary">All Departments</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="!filterDepartmentId"></svg>
+              </div>
+              <div class="popover-option-item" *ngFor="let d of getFilteredDepartments(deptSearchQuery)" (click)="selectDepartment(d.id)" [class.selected]="filterDepartmentId === d.id">
+                <span class="option-primary">{{ d.name }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterDepartmentId === d.id"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredDepartments(deptSearchQuery).length === 0">
+                No departments match "{{ deptSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showDeptDropdown" (click)="showDeptDropdown = false"></div>
+        </div>
+
+        <!-- 5. Status Dropdown (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterStatus" (click)="showStatusDropdown = !showStatusDropdown; showMonthDropdown=false; showYearDropdown=false; showEmployeeDropdown=false; showDeptDropdown=false; showFlagDropdown=false">
+            <svg lucideCheckCircle2 [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedStatusLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showStatusDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showStatusDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search statuses..." [(ngModel)]="statusSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="statusSearchQuery" (click)="statusSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" *ngFor="let s of getFilteredStatuses(statusSearchQuery)" (click)="selectStatus(s.value)" [class.selected]="filterStatus === s.value">
+                <span class="option-primary">{{ s.label }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterStatus === s.value"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredStatuses(statusSearchQuery).length === 0">
+                No status matches "{{ statusSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showStatusDropdown" (click)="showStatusDropdown = false"></div>
+        </div>
+
+        <!-- 6. Attendance Flags Filter (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterFlag !== 'ALL'" (click)="showFlagDropdown = !showFlagDropdown; showMonthDropdown=false; showYearDropdown=false; showEmployeeDropdown=false; showDeptDropdown=false; showStatusDropdown=false">
+            <svg lucideLayers [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedFlagLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showFlagDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showFlagDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search flags..." [(ngModel)]="flagSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="flagSearchQuery" (click)="flagSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" *ngFor="let f of getFilteredFlags(flagSearchQuery)" (click)="selectFlag(f.value)" [class.selected]="filterFlag === f.value">
+                <span class="option-primary">{{ f.label }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterFlag === f.value"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredFlags(flagSearchQuery).length === 0">
+                No flags match "{{ flagSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showFlagDropdown" (click)="showFlagDropdown = false"></div>
+        </div>
+
+        <!-- Reset All Filters Button -->
+        <button class="btn-reset-filters" *ngIf="hasActiveFilters()" (click)="resetFilters()" title="Reset all filters">
+          <svg lucideRotateCcw [size]="13"></svg>
+          <span>Reset</span>
+        </button>
+      </div>
     </div>
 
-    <div class="filter-group">
-      <label>Status</label>
-      <select class="form-input" [(ngModel)]="filterStatus" (change)="load()">
-        <option value="">All Statuses</option>
-        <option value="PRESENT">Present</option>
-        <option value="ABSENT">Absent</option>
-        <option value="HALF_DAY">Half Day</option>
-      </select>
+    <!-- Active Filter Chips -->
+    <div class="active-filter-chips" *ngIf="hasActiveFilters()">
+      <div class="chips-title">
+        <svg lucideFilter [size]="12"></svg>
+        <span>Active Filters:</span>
+      </div>
+      <div class="filter-chips-list">
+        <span class="filter-chip" *ngFor="let chip of getActiveFilterChips()">
+          <span class="chip-text">{{ chip.label }}</span>
+          <button type="button" class="chip-remove-btn" (click)="chip.clear()" title="Remove filter">
+            <svg lucideX [size]="11"></svg>
+          </button>
+        </span>
+      </div>
+      <button type="button" class="btn-clear-all-chips" (click)="resetFilters()">Clear All</button>
     </div>
+  </div>
 
-    <button class="btn-reset" (click)="resetFilters()">
-      <svg lucideRotateCcw size="14"></svg> Reset
+  <!-- Loading State -->
+  <div class="loading-state-card" *ngIf="isLoading()">
+    <div class="spinner"></div>
+    <p>Loading attendance records…</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state-card" *ngIf="!isLoading() && filteredRecords().length === 0">
+    <div class="empty-icon-circle">
+      <svg lucideInbox [size]="36"></svg>
+    </div>
+    <h3 class="empty-title">No attendance records found</h3>
+    <p class="empty-subtitle" *ngIf="hasActiveFilters()">
+      No records match your selected filters for {{ getSelectedMonthLabel() }} {{ filterYear }}.
+    </p>
+    <p class="empty-subtitle" *ngIf="!hasActiveFilters()">
+      No attendance has been recorded for {{ getSelectedMonthLabel() }} {{ filterYear }}.
+    </p>
+    <button class="btn-secondary" *ngIf="hasActiveFilters()" (click)="resetFilters()">
+      <svg lucideRotateCcw [size]="14"></svg>
+      Reset Filters
     </button>
   </div>
 
-  <div class="loading-state" *ngIf="isLoading()">
-    <div class="spinner"></div>
-    <p>Loading attendance…</p>
+  <!-- Enhanced Table Card -->
+  <div class="table-card-container" *ngIf="!isLoading() && filteredRecords().length > 0">
+    <div class="table-scroll-wrapper">
+      <table class="attendance-table">
+        <thead>
+          <tr>
+            <th>EMPLOYEE</th>
+            <th>DEPARTMENT</th>
+            <th>DATE</th>
+            <th>STATUS</th>
+            <th>CLOCK IN</th>
+            <th>CLOCK OUT</th>
+            <th>DURATION</th>
+            <th>FLAGS & ANOMALIES</th>
+            <th class="text-right">ACTION</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of filteredRecords()" (click)="openDetail(r)" class="clickable-row">
+            <!-- Employee -->
+            <td>
+              <div class="employee-cell">
+                <div class="avatar-circle" *ngIf="!r.employee?.avatarUrl">
+                  {{ (r.employee?.firstName || '?')[0] }}{{ (r.employee?.lastName || '')[0] }}
+                </div>
+                <img *ngIf="r.employee?.avatarUrl" [src]="r.employee?.avatarUrl" class="avatar-img" />
+                <div class="employee-info-col">
+                  <span class="employee-name">{{ r.employee?.firstName }} {{ r.employee?.lastName }}</span>
+                  <span class="employee-sub" *ngIf="r.employee?.department?.name">{{ r.employee?.department?.name }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Department -->
+            <td>
+              <span class="dept-text">{{ r.employee?.department?.name || '—' }}</span>
+            </td>
+
+            <!-- Date -->
+            <td>
+              <div class="date-cell">
+                <span class="date-primary">{{ r.date | date:'mediumDate' }}</span>
+                <span class="date-weekday">{{ r.date | date:'EEE' }}</span>
+              </div>
+            </td>
+
+            <!-- Status -->
+            <td>
+              <span class="status-pill" [ngClass]="statusClass(r.status)">
+                <span class="status-indicator-dot"></span>
+                {{ r.status.replace('_', ' ') }}
+              </span>
+            </td>
+
+            <!-- Clock In -->
+            <td>
+              <div class="time-cell">
+                <span class="time-text">{{ formatTime(r.clockIn) }}</span>
+                <span class="time-tag-late" *ngIf="r.isLate">Late</span>
+              </div>
+            </td>
+
+            <!-- Clock Out -->
+            <td>
+              <div class="time-cell">
+                <span class="time-text" *ngIf="r.clockOut">{{ formatTime(r.clockOut) }}</span>
+                <span class="time-tag-active" *ngIf="!r.clockOut && r.clockIn">In Progress</span>
+                <span class="text-muted" *ngIf="!r.clockOut && !r.clockIn">—</span>
+              </div>
+            </td>
+
+            <!-- Duration -->
+            <td>
+              <span class="duration-badge" [class.ongoing]="calculateWorkHours(r.clockIn, r.clockOut).isOngoing">
+                <svg lucideClock [size]="12"></svg>
+                {{ calculateWorkHours(r.clockIn, r.clockOut).text }}
+              </span>
+            </td>
+
+            <!-- Flags -->
+            <td>
+              <div class="flags-group">
+                <span class="flag-badge late" *ngIf="r.isLate">
+                  <svg lucideAlertTriangle [size]="11"></svg> Late
+                </span>
+                <span class="flag-badge early" *ngIf="r.isEarlyLeave">
+                  <svg lucideDoorOpen [size]="11"></svg> Early Leave
+                </span>
+                <span class="flag-badge on-time" *ngIf="r.status === 'PRESENT' && !r.isLate && !r.isEarlyLeave">
+                  <svg lucideCheckCircle2 [size]="11"></svg> On Time
+                </span>
+                <span class="flag-badge empty-dash" *ngIf="!r.isLate && !r.isEarlyLeave && r.status !== 'PRESENT'">—</span>
+              </div>
+            </td>
+
+            <!-- Action -->
+            <td class="text-right" (click)="$event.stopPropagation()">
+              <button type="button" class="btn-table-action" (click)="openDetail(r)" title="View Attendance Log Details">
+                <svg lucideEye [size]="13"></svg>
+                <span>Details</span>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="empty-state" *ngIf="!isLoading() && records().length === 0">
-    <svg lucideCalendarClock size="40"></svg>
-    <h3>No Attendance Records</h3>
-    <p>No attendance found for the selected filters.</p>
-  </div>
+</div>
 
-  <div class="table-wrapper" *ngIf="!isLoading() && records().length > 0">
-    <table class="attendance-table">
-      <thead>
-        <tr>
-          <th>Employee</th>
-          <th>Department</th>
-          <th>Date</th>
-          <th>Status</th>
-          <th>Clock In</th>
-          <th>Clock Out</th>
-          <th>Flags</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let r of records()">
-          <td>
-            <div class="employee-cell">
-              <div class="avatar-circle" *ngIf="!r.employee?.avatarUrl">{{ (r.employee?.firstName || '?')[0] }}</div>
-              <img *ngIf="r.employee?.avatarUrl" [src]="r.employee?.avatarUrl" class="avatar-img" />
-              <span>{{ r.employee?.firstName }} {{ r.employee?.lastName }}</span>
-            </div>
-          </td>
-          <td>{{ r.employee?.department?.name || '—' }}</td>
-          <td>{{ r.date | date:'mediumDate' }}</td>
-          <td><span class="status-round" [ngClass]="statusClass(r.status)"><span class="status-dot"></span>{{ r.status }}</span></td>
-          <td>{{ formatTime(r.clockIn) }}</td>
-          <td>{{ formatTime(r.clockOut) }}</td>
-          <td>
-            <span class="flag-badge late" *ngIf="r.isLate">Late</span>
-            <span class="flag-badge early" *ngIf="r.isEarlyLeave">Early Leave</span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+<!-- Attendance Record Detail Modal -->
+<div class="modal-backdrop" *ngIf="selectedRecord()" (click)="closeDetail()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-header-avatar">
+          <span *ngIf="!selectedRecord()?.employee?.avatarUrl">{{ (selectedRecord()?.employee?.firstName || '?')[0] }}{{ (selectedRecord()?.employee?.lastName || '')[0] }}</span>
+          <img *ngIf="selectedRecord()?.employee?.avatarUrl" [src]="selectedRecord()?.employee?.avatarUrl" />
+        </div>
+        <div>
+          <h2 class="modal-title">{{ selectedRecord()?.employee?.firstName }} {{ selectedRecord()?.employee?.lastName }}</h2>
+          <p class="modal-subtitle">{{ selectedRecord()?.employee?.department?.name || 'General' }} · {{ selectedRecord()?.date | date:'fullDate' }}</p>
+        </div>
+      </div>
+      <button class="btn-icon-close" (click)="closeDetail()" title="Close details">
+        <svg lucideX [size]="18"></svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="modal-body">
+      <!-- Status & Flags Banner -->
+      <div class="modal-status-banner">
+        <div class="banner-left">
+          <span class="status-pill large" [ngClass]="statusClass(selectedRecord()?.status || '')">
+            <span class="status-indicator-dot"></span>
+            {{ (selectedRecord()?.status || '').replace('_', ' ') }}
+          </span>
+        </div>
+        <div class="banner-right">
+          <span class="flag-badge late" *ngIf="selectedRecord()?.isLate">
+            <svg lucideAlertTriangle [size]="12"></svg> Late Arrival
+          </span>
+          <span class="flag-badge early" *ngIf="selectedRecord()?.isEarlyLeave">
+            <svg lucideDoorOpen [size]="12"></svg> Early Departure
+          </span>
+          <span class="flag-badge on-time" *ngIf="selectedRecord()?.status === 'PRESENT' && !selectedRecord()?.isLate && !selectedRecord()?.isEarlyLeave">
+            <svg lucideCheckCircle2 [size]="12"></svg> On Time
+          </span>
+        </div>
+      </div>
+
+      <!-- Time & Metrics Grid -->
+      <div class="detail-metrics-grid">
+        <div class="metric-box">
+          <span class="metric-label">Clock In Time</span>
+          <span class="metric-value">{{ formatTime(selectedRecord()?.clockIn || null) }}</span>
+          <span class="metric-sub" *ngIf="selectedRecord()?.isLate">Logged late arrival</span>
+        </div>
+
+        <div class="metric-box">
+          <span class="metric-label">Clock Out Time</span>
+          <span class="metric-value">{{ formatTime(selectedRecord()?.clockOut || null) }}</span>
+          <span class="metric-sub" *ngIf="!selectedRecord()?.clockOut && selectedRecord()?.clockIn">Still active</span>
+        </div>
+
+        <div class="metric-box">
+          <span class="metric-label">Work Duration</span>
+          <span class="metric-value text-blue">{{ calculateWorkHours(selectedRecord()?.clockIn || null, selectedRecord()?.clockOut || null).text }}</span>
+        </div>
+
+        <div class="metric-box" *ngIf="$any(selectedRecord())?.overtimeHours">
+          <span class="metric-label">Overtime Hours</span>
+          <span class="metric-value text-amber">{{ $any(selectedRecord())?.overtimeHours }} hrs</span>
+        </div>
+      </div>
+
+      <!-- Geolocation / Lat-Lng if available -->
+      <div class="geo-info-card" *ngIf="selectedRecord()?.clockInLat || selectedRecord()?.clockOutLat">
+        <div class="geo-card-header">
+          <svg lucideMapPin [size]="14"></svg>
+          <span>Geolocation Logging</span>
+        </div>
+        <div class="geo-grid">
+          <div class="geo-item" *ngIf="selectedRecord()?.clockInLat">
+            <span class="geo-label">Clock In GPS:</span>
+            <span class="geo-val">{{ selectedRecord()?.clockInLat | number:'1.4-4' }}, {{ selectedRecord()?.clockInLng | number:'1.4-4' }}</span>
+          </div>
+          <div class="geo-item" *ngIf="selectedRecord()?.clockOutLat">
+            <span class="geo-label">Clock Out GPS:</span>
+            <span class="geo-val">{{ selectedRecord()?.clockOutLat | number:'1.4-4' }}, {{ selectedRecord()?.clockOutLng | number:'1.4-4' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeDetail()">Close</button>
+    </div>
   </div>
 </div>

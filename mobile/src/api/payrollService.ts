@@ -71,5 +71,10 @@ export const payrollService = {
 
   deleteExpenseClaim: async (id: number): Promise<void> => {
     await apiClient.delete(`/payroll/expenses/${id}`);
-  }
+  },
+
+  updateExpenseClaim: async (id: number, data: any): Promise<ExpenseClaim> => {
+    const response = await apiClient.put(`/payroll/expenses/${id}`, data);
+    return response.data;
+  },
 };

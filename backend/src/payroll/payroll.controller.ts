@@ -115,6 +115,15 @@ export class PayrollController {
     return this.payrollService.updateExpenseClaimStatus(req.user.companyId, req.user.sub, id, data, req.user.role);
   }
 
+  @Put('expenses/:id')
+  updateExpenseClaim(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { title?: string; description?: string; amount?: number; category?: string; receiptUrl?: string | null; purchaseDate?: string; purchasedFrom?: string; projectCode?: string; projectName?: string; projectId?: number }
+  ) {
+    return this.payrollService.updateExpenseClaim(req.user.companyId, req.user.sub, id, data);
+  }
+
   @Delete('expenses/:id')
   deleteExpenseClaim(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.payrollService.deleteExpenseClaim(req.user.companyId, id, req.user.sub, req.user.role);

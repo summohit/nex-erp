@@ -7,11 +7,12 @@ import { AuthService } from '../../services/auth.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { AttendanceService } from '../../services/attendance';
 import { EmployeeService } from '../../services/employee.service';
+import { TicketService } from '../../services/ticket.service';
 import { SpotlightSearchComponent } from '../../shared/components/spotlight-search/spotlight-search.component';
 import {
   LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut,
   LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
-  LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff
+  LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
@@ -25,7 +26,7 @@ import { HotToastService } from '@ngneat/hot-toast';
     SpotlightSearchComponent,
     LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut,
     LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
-    LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff
+    LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket
   ],
   templateUrl: './header.html',
   styleUrls: ['./header.css']
@@ -35,6 +36,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);
   private employeeService = inject(EmployeeService);
+  private ticketService = inject(TicketService);
   private toast = inject(HotToastService);
   notificationsService = inject(NotificationsService);
 
@@ -63,19 +65,67 @@ export class HeaderComponent implements OnInit, OnDestroy {
   totalHoursStr = signal<string>('');
   private timerInterval: any;
 
+  // Open-ticket indicator — only meaningful for the dev team and management,
+  // who are the ones expected to act on incoming tickets.
+  canSeeTicketAlerts = signal<boolean>(false);
+  openTicketCount = signal<number>(0);
+  hasNewTickets = signal<boolean>(false);
+  private ticketPollInterval: any;
+  private readonly ticketSeenKey = 'tickets_last_seen_count';
+
   ngOnInit() {
     this.updateTitle(this.router.url);
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe((event: any) => {
       this.updateTitle(event.urlAfterRedirects);
+      // Visiting the helpdesk counts as acknowledging what's there now.
+      if (event.urlAfterRedirects?.startsWith('/crm/tickets')) this.acknowledgeTickets();
     });
 
     this.checkTodayAttendance();
+    this.initTicketAlerts();
   }
 
   ngOnDestroy() {
     if (this.timerInterval) clearInterval(this.timerInterval);
+    if (this.ticketPollInterval) clearInterval(this.ticketPollInterval);
+  }
+
+  // ─── Ticket alerts ─────────────────────────────────────────────────────────
+
+  private initTicketAlerts() {
+    this.ticketService.getMyPermissions().subscribe({
+      next: (p) => {
+        if (!p.canManage) return;
+        this.canSeeTicketAlerts.set(true);
+        this.refreshTicketCount();
+        // Light poll so an incoming ticket surfaces without a page reload.
+        this.ticketPollInterval = setInterval(() => this.refreshTicketCount(), 60_000);
+      },
+      error: () => { /* helpdesk unavailable — leave the indicator hidden */ },
+    });
+  }
+
+  private refreshTicketCount() {
+    this.ticketService.getStats().subscribe({
+      next: (s) => {
+        const open = s.open ?? 0;
+        this.openTicketCount.set(open);
+
+        const lastSeen = Number(localStorage.getItem(this.ticketSeenKey) ?? '0');
+        this.hasNewTickets.set(open > lastSeen);
+
+        // Already on the helpdesk? Treat it as seen straight away.
+        if (this.router.url.startsWith('/crm/tickets')) this.acknowledgeTickets();
+      },
+      error: () => { /* keep the last known count */ },
+    });
+  }
+
+  private acknowledgeTickets() {
+    localStorage.setItem(this.ticketSeenKey, String(this.openTicketCount()));
+    this.hasNewTickets.set(false);
   }
 
   checkTodayAttendance() {

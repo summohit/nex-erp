@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Modal, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { IndianRupee, Plus, FileText, Calendar, Trash2 } from 'lucide-react-native';
+import { IndianRupee, Plus, FileText, Calendar, Trash2, Pencil, X, ZoomIn } from 'lucide-react-native';
 import { payrollService, ExpenseClaim } from '../../../api/payrollService';
 import CreateExpenseModal from '../modals/CreateExpenseModal';
 
@@ -10,6 +10,8 @@ export default function ExpensesTab() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingClaim, setEditingClaim] = useState<ExpenseClaim | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const fetchClaims = async () => {
     try {
@@ -68,75 +70,128 @@ export default function ExpensesTab() {
     );
   }
 
+  const renderItem = ({ item }: { item: ExpenseClaim }) => {
+    const s = getStatusColor(item.status);
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{item.title}</Text>
+            <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
+              <Text style={[styles.statusText, { color: s.text }]}>{item.status}</Text>
+            </View>
+          </View>
+          <Text style={styles.amount}>₹{item.amount.toLocaleString('en-IN')}</Text>
+        </View>
+
+        <View style={styles.cardBody}>
+          <Text style={styles.category}>{item.category}</Text>
+          {item.projectName && (
+            <Text style={styles.projectText}>{item.projectName}</Text>
+          )}
+          {item.purchaseDate && (
+            <View style={styles.row}>
+              <Calendar size={14} color="#64748B" />
+              <Text style={styles.dateText}>{item.purchaseDate.split('T')[0]}</Text>
+            </View>
+          )}
+          {item.description && (
+            <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
+          )}
+          {item.status === 'REJECTED' && item.rejectionReason && (
+            <Text style={styles.rejectionReason}>Reason: {item.rejectionReason}</Text>
+          )}
+          {item.receiptUrl && /\.(jpg|jpeg|png|gif|webp)/i.test(item.receiptUrl) && (
+            <TouchableOpacity
+              style={styles.receiptThumbWrap}
+              onPress={() => setLightboxUrl(item.receiptUrl!)}
+              activeOpacity={0.8}
+            >
+              <Image source={{ uri: item.receiptUrl }} style={styles.receiptThumb} resizeMode="cover" />
+              <View style={styles.receiptThumbOverlay}>
+                <ZoomIn size={16} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {item.status === 'PENDING' && (
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() => { setEditingClaim(item); setModalVisible(true); }}
+            >
+              <Pencil size={16} color="#2563EB" />
+              <Text style={styles.editText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.delBtn} onPress={() => handleDelete(item.id)}>
+              <Trash2 size={16} color="#EF4444" />
+              <Text style={styles.delText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.list}>
-        {claims.length === 0 ? (
+      <FlatList
+        data={claims}
+        keyExtractor={item => item.id.toString()}
+        renderItem={renderItem}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />
+        }
+        ListEmptyComponent={
           <View style={styles.emptyBox}>
             <FileText size={48} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Expenses</Text>
             <Text style={styles.emptySub}>You haven't submitted any expense claims.</Text>
           </View>
-        ) : (
-          claims.map((item) => {
-            const s = getStatusColor(item.status);
-            return (
-              <View key={item.id.toString()} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.title}>{item.title}</Text>
-                    <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
-                      <Text style={[styles.statusText, { color: s.text }]}>{item.status}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.amount}>₹{item.amount.toLocaleString('en-IN')}</Text>
-                </View>
+        }
+      />
 
-                <View style={styles.cardBody}>
-                  <Text style={styles.category}>{item.category}</Text>
-                  {item.projectName && (
-                    <Text style={styles.projectText}>{item.projectName}</Text>
-                  )}
-                  {item.purchaseDate && (
-                    <View style={styles.row}>
-                      <Calendar size={14} color="#64748B" />
-                      <Text style={styles.dateText}>{item.purchaseDate.split('T')[0]}</Text>
-                    </View>
-                  )}
-                  {item.description && (
-                    <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
-                  )}
-                  {item.status === 'REJECTED' && item.rejectionReason && (
-                    <Text style={styles.rejectionReason}>Reason: {item.rejectionReason}</Text>
-                  )}
-                </View>
-
-                {item.status === 'PENDING' && (
-                  <View style={styles.actions}>
-                    <TouchableOpacity style={styles.delBtn} onPress={() => handleDelete(item.id)}>
-                      <Trash2 size={16} color="#EF4444" />
-                      <Text style={styles.delText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
-          })
-        )}
-      </View>
-
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => { setEditingClaim(null); setModalVisible(true); }}
+      >
         <Plus size={24} color="#FFF" />
       </TouchableOpacity>
 
       <CreateExpenseModal
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
+        onClose={() => { setModalVisible(false); setEditingClaim(null); }}
         onSuccess={() => {
           setModalVisible(false);
+          setEditingClaim(null);
           fetchClaims();
         }}
+        editingClaim={editingClaim}
       />
+
+      <Modal
+        visible={!!lightboxUrl}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLightboxUrl(null)}
+        statusBarTranslucent
+      >
+        <View style={styles.lightboxOverlay}>
+          <TouchableOpacity
+            style={styles.lightboxClose}
+            onPress={() => setLightboxUrl(null)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <X size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          {lightboxUrl && (
+            <Image source={{ uri: lightboxUrl }} style={styles.lightboxImage} resizeMode="contain" />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -183,6 +238,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 6, marginRight: 8 },
+  editText: { color: '#2563EB', fontSize: 13, fontWeight: '600' },
   delBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 6 },
   delText: { color: '#EF4444', fontSize: 13, fontWeight: '600' },
   fab: {
@@ -210,4 +267,42 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptySub: { fontSize: 13, color: '#94A3B8', marginTop: 4 },
+  receiptThumbWrap: {
+    marginTop: 10,
+    borderRadius: 10,
+    overflow: 'hidden',
+    width: 100,
+    height: 72,
+  },
+  receiptThumb: {
+    width: 100,
+    height: 72,
+  },
+  receiptThumbOverlay: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  lightboxOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lightboxClose: {
+    position: 'absolute',
+    top: 52,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  lightboxImage: {
+    width: '100%',
+    height: '80%',
+  },
 });

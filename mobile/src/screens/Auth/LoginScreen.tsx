@@ -17,7 +17,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../api/apiClient';
 import { theme } from '../../theme/theme';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, X } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, X, MailCheck } from 'lucide-react-native';
 
 export default function LoginScreen() {
   const { login, refreshUserProfile } = useAuthStore();
@@ -30,11 +30,46 @@ export default function LoginScreen() {
   const [errorVisible, setErrorVisible] = useState(false);
   const [errorTitle, setErrorTitle] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  // An unverified account is the one login failure the user can fix from here,
+  // so the modal turns into a resend-verification prompt instead of a dead end.
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
 
-  const showError = (title: string, message: string) => {
+  const showError = (title: string, message: string, canVerify = false) => {
     setErrorTitle(title);
     setErrorMessage(message);
+    setNeedsVerification(canVerify);
+    setResendSent(false);
     setErrorVisible(true);
+  };
+
+  const closeModal = () => {
+    setErrorVisible(false);
+    setNeedsVerification(false);
+    setResendSent(false);
+  };
+
+  const handleResendVerification = async () => {
+    setResending(true);
+    try {
+      await apiClient.post('/auth/resend-verification', { email: email.trim() });
+      setResendSent(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message;
+      // "Email is already verified" comes back as a 401 but is good news — the
+      // user can just log in, so present it as resolved rather than a failure.
+      if (typeof msg === 'string' && /already verified/i.test(msg)) {
+        setErrorTitle('Already Verified');
+        setErrorMessage('Your email is already verified. Please try logging in again.');
+        setNeedsVerification(false);
+      } else {
+        setErrorTitle('Could Not Send');
+        setErrorMessage(msg || 'We could not send the verification email. Please try again shortly.');
+      }
+    } finally {
+      setResending(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -96,7 +131,8 @@ export default function LoginScreen() {
       } else {
         message = `Server error (${status}). Please try again later.`;
       }
-      showError('Login Failed', message);
+      const unverified = typeof serverMsg === 'string' && /verify your email/i.test(serverMsg);
+      showError('Login Failed', message, unverified);
     } finally {
       setLoading(false);
     }
@@ -224,38 +260,67 @@ export default function LoginScreen() {
         transparent
         visible={errorVisible}
         animationType="fade"
-        onRequestClose={() => setErrorVisible(false)}
+        onRequestClose={closeModal}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             {/* Close button */}
             <TouchableOpacity
               style={styles.modalCloseBtn}
-              onPress={() => setErrorVisible(false)}
+              onPress={closeModal}
               activeOpacity={0.7}
             >
               <X size={20} color="#94A3B8" />
             </TouchableOpacity>
 
-            {/* Error Icon */}
-            <View style={styles.modalIconContainer}>
-              <AlertCircle size={32} color="#FFFFFF" />
+            {/* Icon — swaps to a success mark once the email is on its way */}
+            <View style={[styles.modalIconContainer, resendSent && styles.modalIconSuccess]}>
+              {resendSent
+                ? <MailCheck size={32} color="#FFFFFF" />
+                : <AlertCircle size={32} color="#FFFFFF" />}
             </View>
 
-            {/* Title */}
-            <Text style={styles.modalTitle}>{errorTitle}</Text>
+            <Text style={styles.modalTitle}>
+              {resendSent ? 'Check Your Inbox' : errorTitle}
+            </Text>
 
-            {/* Message */}
-            <Text style={styles.modalMessage}>{errorMessage}</Text>
+            <Text style={styles.modalMessage}>
+              {resendSent
+                ? `We sent a verification link to ${email.trim()}. Open it, then come back and sign in.`
+                : errorMessage}
+            </Text>
 
-            {/* Action Button */}
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setErrorVisible(false)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.modalButtonText}>Try Again</Text>
-            </TouchableOpacity>
+            {needsVerification && !resendSent ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.modalButton, resending && styles.modalButtonDisabled]}
+                  onPress={handleResendVerification}
+                  activeOpacity={0.85}
+                  disabled={resending}
+                >
+                  {resending
+                    ? <ActivityIndicator color="#FFFFFF" size="small" />
+                    : <Text style={styles.modalButtonText}>Send Verification Email</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalSecondaryBtn}
+                  onPress={closeModal}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalSecondaryText}>Back to Sign In</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={closeModal}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalButtonText}>
+                  {resendSent ? 'Got It' : 'Try Again'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -456,6 +521,25 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginBottom: 24,
     paddingHorizontal: 8,
+  },
+  modalIconSuccess: {
+    backgroundColor: '#16A34A',
+    shadowColor: '#16A34A',
+  },
+  modalButtonDisabled: {
+    opacity: 0.7,
+  },
+  modalSecondaryBtn: {
+    width: '100%',
+    height: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  modalSecondaryText: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '600',
   },
   modalButton: {
     backgroundColor: theme.colors.primary,

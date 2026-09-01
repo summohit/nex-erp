@@ -60,6 +60,7 @@ remote() {
 sync_to_remote() {
   rsync -avz --delete \
     --exclude node_modules --exclude .git --exclude dist --exclude .angular --exclude .env \
+    --exclude uploads \
     -e "ssh ${SSH_OPTS[*]}" \
     "$1" "$SERVER_USER@$SERVER_IP:$2"
 }

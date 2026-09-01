@@ -18,8 +18,10 @@ import {
   LucideRotateCcw, 
   LucideCalendarClock, 
   LucideSparkles, 
-  LucideInfo, 
-  LucideExternalLink 
+  LucideInfo,
+  LucideExternalLink,
+  LucideTicket,
+  LucideChevronDown
 } from '@lucide/angular';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import {
@@ -28,6 +30,7 @@ import {
   PlaceholderGroup
 } from '../../services/system-settings.service';
 import { AuthService } from '../../services/auth.service';
+import { EmployeeService, Employee } from '../../services/employee.service';
 import { environment } from '../../../environments/environment';
 
 @Component({
@@ -49,8 +52,10 @@ import { environment } from '../../../environments/environment';
     LucideRotateCcw, 
     LucideCalendarClock, 
     LucideSparkles, 
-    LucideInfo, 
-    LucideExternalLink
+    LucideInfo,
+    LucideExternalLink,
+    LucideTicket,
+    LucideChevronDown
   ],
   templateUrl: './system-settings.html',
   styleUrls: ['./system-settings.css']
@@ -61,6 +66,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   private toast = inject(HotToastService);
   private router = inject(Router);
   private auth = inject(AuthService);
+  private employeeService = inject(EmployeeService);
 
   private sanitizer = inject(DomSanitizer);
 
@@ -75,6 +81,11 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   // UI can never drift out of sync with what the renderer actually supports.
   placeholderGroups = signal<PlaceholderGroup[]>([]);
   defaultTemplateHtml = signal<string>('');
+
+  // Default ticket assignee picker
+  employees = signal<Employee[]>([]);
+  showAssigneeDropdown = signal(false);
+  assigneeSearchQuery = signal('');
 
   showTemplateEditor = signal(false);
   showPreview = signal(false);
@@ -103,6 +114,10 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
       return;
     }
     this.load();
+    this.employeeService.getEmployeesBasicList().subscribe({
+      next: (list) => this.employees.set(list),
+      error: () => this.toast.error('Failed to load employees for ticket assignee'),
+    });
   }
 
   load() {
@@ -182,6 +197,33 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ─── Default ticket assignee (software development PM) ────────────────────
+
+  setDefaultTicketAssignee(employeeId: number | null) {
+    const current = this.settings();
+    if (!current) return;
+    this.settings.set({ ...current, defaultTicketAssigneeId: employeeId });
+    this.showAssigneeDropdown.set(false);
+    this.assigneeSearchQuery.set('');
+  }
+
+  getSelectedAssigneeLabel(): string {
+    const id = this.settings()?.defaultTicketAssigneeId;
+    if (!id) return 'No default assignee set';
+    const emp = this.employees().find(e => e.id === id);
+    return emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${id}`;
+  }
+
+  getFilteredEmployees() {
+    const q = this.assigneeSearchQuery().toLowerCase().trim();
+    if (!q) return this.employees();
+    return this.employees().filter(e =>
+      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+      (e.department?.name ?? '').toLowerCase().includes(q) ||
+      (e.designation?.name ?? '').toLowerCase().includes(q)
+    );
+  }
+
   toggleShiftRosterVisible() {
     const current = this.settings();
     if (!current) return;
@@ -199,7 +241,8 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
       shiftRosterVisibleToEmployees: current.shiftRosterVisibleToEmployees,
       offerLetterTemplateHtml: current.offerLetterTemplateHtml,
       offerLetterTemplateDocxUrl: current.offerLetterTemplateDocxUrl,
-      offerLetterConfig: current.offerLetterConfig
+      offerLetterConfig: current.offerLetterConfig,
+      defaultTicketAssigneeId: current.defaultTicketAssigneeId ?? null
     }).subscribe({
       next: (data) => {
         this.settings.set(data);

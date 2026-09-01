@@ -24,6 +24,7 @@ export interface AttendanceRecord {
   isLate: boolean;
   isEarlyLeave: boolean;
   totalHours?: number;
+  overtimeHours?: number;
   employeeId: number;
   employee?: any;
 }

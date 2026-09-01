@@ -113,6 +113,8 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/notifications': { screen: 'Notifications' },
   '/payroll/payslips': { screen: 'Payslips' },
   '/payroll': { screen: 'Payslips' },
+  '/assets/requests': { screen: 'HardwareRequests' },
+  '/assets/hardware-requests': { screen: 'HardwareRequests' },
 };
 
 // Client-side group bucketing so the flat MAIN section gets visual grouping
@@ -143,8 +145,9 @@ const GROUP_ORDER = ['WORKSPACE', 'FINANCE', 'OPERATIONS', 'SYSTEM'];
 
 // Items that are fully implemented and always shown (no WIP badge)
 const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string; route: string }[] = [
-  { group: 'WORKSPACE', id: 'notifications', title: 'Notifications', icon: 'bell', route: '/notifications' },
-  { group: 'FINANCE',   id: 'payslips',       title: 'Payslips',       icon: 'file-text', route: '/payroll/payslips' },
+  { group: 'WORKSPACE', id: 'notifications',      title: 'Notifications',    icon: 'bell',      route: '/notifications' },
+  { group: 'FINANCE',   id: 'payslips',            title: 'Payslips',         icon: 'file-text', route: '/payroll/payslips' },
+  { group: 'FINANCE',   id: 'hardware-requests',   title: 'Hardware Requests', icon: 'package',  route: '/assets/requests' },
 ];
 
 // Items that are always shown as WIP regardless of what the API returns.
@@ -156,7 +159,6 @@ const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string;
 // handleSubItemPress — only the Public Careers Page link is actually live.
 const WIP_ITEMS: { group: string; id: string; title: string; icon: string }[] = [
   { group: 'WORKSPACE', id: 'performance', title: 'Performance', icon: 'target' },
-  { group: 'FINANCE', id: 'assets', title: 'Assets & IT', icon: 'package' },
   { group: 'OPERATIONS', id: 'offboarding', title: 'Offboarding', icon: 'door-open' },
   { group: 'OPERATIONS', id: 'appreciation', title: 'Appreciation', icon: 'trophy' },
 ];
@@ -536,7 +538,7 @@ function StaticMenuFallback({
         { id: 'payslips', title: 'Payslips', icon: 'file-text', screen: 'Payslips' },
         { id: 'payroll', title: 'Payroll', icon: 'banknote', screen: null },
         { id: 'expenses', title: 'Expenses', icon: 'file-text', screen: null },
-        { id: 'assets', title: 'Assets & IT', icon: 'package', screen: null },
+        { id: 'assets', title: 'Hardware Requests', icon: 'package', screen: 'HardwareRequests' },
       ],
     },
     {

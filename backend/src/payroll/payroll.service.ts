@@ -719,6 +719,48 @@ export class PayrollService {
     return this.prisma.expenseClaim.delete({ where: { id } });
   }
 
+  async updateExpenseClaim(
+    companyId: number,
+    userId: number,
+    id: number,
+    data: { title?: string; description?: string; amount?: number; category?: string; receiptUrl?: string | null; purchaseDate?: string; purchasedFrom?: string; projectCode?: string; projectName?: string; projectId?: number }
+  ) {
+    const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    const claim = await this.prisma.expenseClaim.findFirst({ where: { id, companyId } });
+    if (!claim) throw new NotFoundException('Expense claim not found');
+    if (claim.employeeId !== employee.id) throw new BadRequestException('You do not have permission to edit this expense claim');
+    if (claim.status !== 'PENDING') throw new BadRequestException('Only PENDING expense claims can be edited');
+
+    if (data.amount !== undefined) {
+      const amount = Number(data.amount);
+      if (!amount || amount <= 0) throw new BadRequestException('Claim amount must be greater than zero');
+      if (amount > 100000) throw new BadRequestException('Maximum claim limit is ₹1,00,000');
+    }
+
+    if (data.purchaseDate) {
+      const pDate = new Date(data.purchaseDate);
+      if (pDate > new Date()) throw new BadRequestException('Purchase date cannot be in the future');
+    }
+
+    return this.prisma.expenseClaim.update({
+      where: { id },
+      data: {
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.amount !== undefined && { amount: Number(data.amount) }),
+        ...(data.category !== undefined && { category: data.category }),
+        ...(data.receiptUrl !== undefined && { receiptUrl: data.receiptUrl }),
+        ...(data.purchaseDate !== undefined && { purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null }),
+        ...(data.purchasedFrom !== undefined && { purchasedFrom: data.purchasedFrom }),
+        ...(data.projectCode !== undefined && { projectCode: data.projectCode }),
+        ...(data.projectName !== undefined && { projectName: data.projectName }),
+        ...(data.projectId !== undefined && { projectId: data.projectId }),
+      },
+    });
+  }
+
   async batchSendPayslipEmails(companyId: number, month: number, year: number) {
     const payslips = await this.prisma.payslip.findMany({
       where: { companyId, month, year },

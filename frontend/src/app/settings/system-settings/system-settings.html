@@ -45,6 +45,58 @@
       </div>
     </div>
 
+    <!-- Card: Default Ticket Assignee -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap ticket-icon">
+          <svg lucideTicket size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <h3>Default Ticket Assignee</h3>
+          <p>Every new helpdesk ticket is automatically routed to this person — normally the software development project manager. They can then reassign it to anyone else in their department.</p>
+        </div>
+      </div>
+
+      <div class="assignee-picker">
+        <button type="button" class="assignee-trigger" [class.has-selection]="s.defaultTicketAssigneeId" (click)="showAssigneeDropdown.set(!showAssigneeDropdown())">
+          <span>{{ getSelectedAssigneeLabel() }}</span>
+          <svg lucideChevronDown size="15" class="trigger-chevron" [class.rotated]="showAssigneeDropdown()"></svg>
+        </button>
+
+        <div class="assignee-popover" *ngIf="showAssigneeDropdown()">
+          <div class="assignee-search">
+            <input
+              type="text"
+              placeholder="Search by name, department, or role..."
+              [ngModel]="assigneeSearchQuery()"
+              (ngModelChange)="assigneeSearchQuery.set($event)" />
+          </div>
+          <div class="assignee-options">
+            <div class="assignee-option" (click)="setDefaultTicketAssignee(null)" [class.selected]="!s.defaultTicketAssigneeId">
+              <span class="option-none">No default assignee</span>
+              <svg lucideCheck size="14" *ngIf="!s.defaultTicketAssigneeId"></svg>
+            </div>
+            <div class="assignee-option" *ngFor="let e of getFilteredEmployees()" (click)="setDefaultTicketAssignee(e.id)" [class.selected]="s.defaultTicketAssigneeId === e.id">
+              <div class="option-person">
+                <span class="option-name">{{ e.firstName }} {{ e.lastName }}</span>
+                <span class="option-sub">{{ e.designation?.name || 'No designation' }} · {{ e.department?.name || 'No department' }}</span>
+              </div>
+              <svg lucideCheck size="14" *ngIf="s.defaultTicketAssigneeId === e.id"></svg>
+            </div>
+            <div class="assignee-empty" *ngIf="getFilteredEmployees().length === 0">
+              No employees match "{{ assigneeSearchQuery() }}"
+            </div>
+          </div>
+        </div>
+        <div class="assignee-backdrop" *ngIf="showAssigneeDropdown()" (click)="showAssigneeDropdown.set(false)"></div>
+      </div>
+
+      <div class="card-footer-note">
+        <svg lucideInfo size="14"></svg>
+        <span>If left unset, tickets are created unassigned and the development team must pick them up manually.</span>
+      </div>
+    </div>
+
     <!-- Card 2: Offer Letter Template (.docx) -->
     <div class="setting-card">
       <div class="card-top">

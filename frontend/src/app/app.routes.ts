@@ -224,6 +224,12 @@ export const routes: Routes = [
         loadComponent: () => import('./clients/client-profile/client-profile.component').then(m => m.ClientProfileComponent)
       },
       {
+        // Open to every authenticated employee — anyone can raise a ticket.
+        // Which tickets they actually see is scoped server-side.
+        path: 'crm/tickets',
+        loadComponent: () => import('./crm/tickets/tickets').then(m => m.TicketsComponent)
+      },
+      {
         path: 'crm/leads',
         canActivate: [permissionGuard],
         data: { module: 'crm/leads' },

@@ -1,0 +1,577 @@
+<div class="tickets-page page-container">
+
+  <!-- Enhanced Page Header Card -->
+  <div class="page-header-card">
+    <div class="header-title-group">
+      <div class="header-title-row">
+        <h1>Helpdesk & Tickets</h1>
+        <span class="tickets-count-pill">{{ tickets.length }} Ticket{{ tickets.length === 1 ? '' : 's' }}</span>
+      </div>
+      <p>Track, manage, and resolve system issues, bug reports, and feature requests</p>
+    </div>
+
+    <div class="header-actions-group">
+      <!-- Refresh Button -->
+      <button class="btn-header-secondary" (click)="loadAll()" title="Refresh tickets and stats">
+        <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading"></svg>
+        <span>Refresh</span>
+      </button>
+
+      <!-- New Ticket Button -->
+      <button class="btn-header-primary" (click)="openCreateModal()" title="Create New Ticket">
+        <svg lucidePlus [size]="16"></svg>
+        <span>New Ticket</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI / Stats Row -->
+  <div class="stats-row" *ngIf="stats">
+    <!-- Total Tickets -->
+    <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && hasActiveFilters() === false" (click)="toggleStatusCard('')" title="Click to show all tickets">
+      <div class="stat-icon-wrapper">
+        <svg lucideTicket [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Total Tickets</span>
+        <div class="stat-value">{{ stats.total }}</div>
+        <span class="stat-subtext">All registered requests</span>
+      </div>
+    </div>
+
+    <!-- Open Tickets -->
+    <div class="stat-card stat-sky" [class.active-card]="filterStatus === 'OPEN'" (click)="toggleStatusCard('OPEN')" title="Click to filter Open tickets">
+      <div class="stat-icon-wrapper">
+        <svg lucideAlertCircle [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Open / Pending</span>
+        <div class="stat-value">{{ stats.open }}</div>
+        <span class="stat-subtext">Awaiting triage & action</span>
+      </div>
+    </div>
+
+    <!-- In Progress -->
+    <div class="stat-card stat-amber" [class.active-card]="filterStatus === 'IN_PROGRESS'" (click)="toggleStatusCard('IN_PROGRESS')" title="Click to filter In Progress tickets">
+      <div class="stat-icon-wrapper">
+        <svg lucideTimer [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">In Progress</span>
+        <div class="stat-value">{{ stats.inProgress }}</div>
+        <span class="stat-subtext">Under active development</span>
+      </div>
+    </div>
+
+    <!-- Resolved -->
+    <div class="stat-card stat-green" [class.active-card]="filterStatus === 'RESOLVED'" (click)="toggleStatusCard('RESOLVED')" title="Click to filter Resolved tickets">
+      <div class="stat-icon-wrapper">
+        <svg lucideCheckCircle2 [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Resolved</span>
+        <div class="stat-value">{{ stats.resolved }}</div>
+        <span class="stat-subtext">Fixed & verified issues</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Card -->
+  <div class="filter-bar-card">
+    <div class="filter-bar-main-row">
+      <!-- Search Input -->
+      <div class="search-input-wrapper">
+        <svg lucideSearch [size]="16" class="search-icon"></svg>
+        <input
+          type="text"
+          [(ngModel)]="searchTerm"
+          (input)="onSearch()"
+          placeholder="Search by ticket #, title, keyword..."
+        />
+        <button class="btn-clear-search" *ngIf="searchTerm" (click)="searchTerm = ''; onSearch()" title="Clear search">
+          <svg lucideX [size]="14"></svg>
+        </button>
+      </div>
+
+      <!-- Filter Searchable Dropdowns -->
+      <div class="filter-dropdowns-group">
+
+        <!-- 1. Department Filter (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterDept" (click)="showDeptDropdown = !showDeptDropdown; showStatusDropdown=false; showPriorityDropdown=false; showPlatformDropdown=false">
+            <svg lucideBuilding [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedDeptLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showDeptDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showDeptDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search departments..." [(ngModel)]="deptSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="deptSearchQuery" (click)="deptSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" (click)="selectDeptFilter('')" [class.selected]="!filterDept">
+                <span class="option-primary">All Departments</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="!filterDept"></svg>
+              </div>
+              <div class="popover-option-item" *ngFor="let d of getFilteredDepartments(deptSearchQuery)" (click)="selectDeptFilter(d.id)" [class.selected]="filterDept === '' + d.id">
+                <span class="option-primary">{{ d.name }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterDept === '' + d.id"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredDepartments(deptSearchQuery).length === 0">
+                No departments match "{{ deptSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showDeptDropdown" (click)="showDeptDropdown = false"></div>
+        </div>
+
+        <!-- 2. Status Filter (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterStatus" (click)="showStatusDropdown = !showStatusDropdown; showDeptDropdown=false; showPriorityDropdown=false; showPlatformDropdown=false">
+            <svg lucideClock [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedStatusLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showStatusDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showStatusDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search statuses..." [(ngModel)]="statusSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="statusSearchQuery" (click)="statusSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" (click)="selectStatusFilter('')" [class.selected]="!filterStatus">
+                <span class="option-primary">All Statuses</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="!filterStatus"></svg>
+              </div>
+              <div class="popover-option-item" *ngFor="let s of getFilteredStatuses(statusSearchQuery)" (click)="selectStatusFilter(s)" [class.selected]="filterStatus === s">
+                <span class="status-pill {{ statusColors[s] }} mini"><span class="status-indicator-dot"></span>{{ formatLabel(s) }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterStatus === s"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredStatuses(statusSearchQuery).length === 0">
+                No status matches "{{ statusSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showStatusDropdown" (click)="showStatusDropdown = false"></div>
+        </div>
+
+        <!-- 3. Priority Filter (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterPriority" (click)="showPriorityDropdown = !showPriorityDropdown; showDeptDropdown=false; showStatusDropdown=false; showPlatformDropdown=false">
+            <svg lucideFlame [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedPriorityLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showPriorityDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showPriorityDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search priorities..." [(ngModel)]="prioritySearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="prioritySearchQuery" (click)="prioritySearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" (click)="selectPriorityFilter('')" [class.selected]="!filterPriority">
+                <span class="option-primary">All Priorities</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="!filterPriority"></svg>
+              </div>
+              <div class="popover-option-item" *ngFor="let p of getFilteredPriorities(prioritySearchQuery)" (click)="selectPriorityFilter(p)" [class.selected]="filterPriority === p">
+                <span class="priority-pill {{ priorityColors[p] }} mini"><span class="priority-dot" [style.background-color]="priorityDotColors[p]"></span>{{ p }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterPriority === p"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredPriorities(prioritySearchQuery).length === 0">
+                No priority matches "{{ prioritySearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showPriorityDropdown" (click)="showPriorityDropdown = false"></div>
+        </div>
+
+        <!-- 4. Platform Filter (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterPlatform" (click)="showPlatformDropdown = !showPlatformDropdown; showDeptDropdown=false; showStatusDropdown=false; showPriorityDropdown=false">
+            <svg lucideLayers [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedPlatformLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showPlatformDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showPlatformDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search platforms..." [(ngModel)]="platformSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="platformSearchQuery" (click)="platformSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" (click)="selectPlatformFilter('')" [class.selected]="!filterPlatform">
+                <span class="option-primary">All Platforms</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="!filterPlatform"></svg>
+              </div>
+              <div class="popover-option-item" *ngFor="let pl of getFilteredPlatforms(platformSearchQuery)" (click)="selectPlatformFilter(pl)" [class.selected]="filterPlatform === pl">
+                <span class="platform-tag platform-{{ pl.toLowerCase() }}">{{ pl }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterPlatform === pl"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredPlatforms(platformSearchQuery).length === 0">
+                No platform matches "{{ platformSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showPlatformDropdown" (click)="showPlatformDropdown = false"></div>
+        </div>
+
+        <!-- Reset All Filters Button -->
+        <button class="btn-reset-filters" *ngIf="hasActiveFilters()" (click)="clearFilters()" title="Reset all filters">
+          <svg lucideRotateCcw [size]="13"></svg>
+          <span>Reset</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Filter Chips -->
+    <div class="active-filter-chips" *ngIf="hasActiveFilters()">
+      <div class="chips-title">
+        <svg lucideFilter [size]="12"></svg>
+        <span>Active Filters:</span>
+      </div>
+      <div class="filter-chips-list">
+        <span class="filter-chip" *ngFor="let chip of getActiveFilterChips()">
+          <span class="chip-text">{{ chip.label }}</span>
+          <button type="button" class="chip-remove-btn" (click)="chip.clear()" title="Remove filter">
+            <svg lucideX [size]="11"></svg>
+          </button>
+        </span>
+      </div>
+      <button type="button" class="btn-clear-all-chips" (click)="clearFilters()">Clear All</button>
+    </div>
+  </div>
+
+  <!-- Grid Card & Empty State -->
+  <div class="grid-card-container">
+    <!-- Empty State Overlay (when 0 tickets match filters) -->
+    <div class="empty-state-box" *ngIf="tickets.length === 0 && !isLoading">
+      <div class="empty-icon-circle">
+        <svg lucideInbox [size]="36"></svg>
+      </div>
+      <h3 class="empty-title">No tickets found</h3>
+      <p class="empty-subtitle" *ngIf="hasActiveFilters()">
+        We couldn't find any tickets matching your selected filters.
+      </p>
+      <p class="empty-subtitle" *ngIf="!hasActiveFilters()">
+        No tickets have been submitted yet. Create a new ticket to get started.
+      </p>
+      <div class="empty-actions">
+        <button class="btn-secondary" *ngIf="hasActiveFilters()" (click)="clearFilters()">
+          <svg lucideRotateCcw [size]="14"></svg>
+          Reset Filters
+        </button>
+        <button class="btn-primary" (click)="openCreateModal()">
+          <svg lucidePlus [size]="15"></svg>
+          New Ticket
+        </button>
+      </div>
+    </div>
+
+    <!-- AG Grid Table -->
+    <div class="table-container">
+      <ag-grid-angular
+        class="ag-theme-quartz"
+        [theme]="'legacy'"
+        style="width: 100%; height: 560px;"
+        [rowData]="tickets"
+        [columnDefs]="columnDefs"
+        [defaultColDef]="defaultColDef"
+        [rowHeight]="48"
+        [headerHeight]="38"
+        [pagination]="true"
+        [paginationPageSize]="25"
+        [animateRows]="true"
+        (gridReady)="onGridReady($event)"
+        (rowClicked)="onRowClicked($event)">
+      </ag-grid-angular>
+    </div>
+  </div>
+
+</div>
+
+<!-- Create Ticket Modal -->
+<div class="modal-backdrop" *ngIf="showCreateModal" (click)="showCreateModal=false">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <!-- Modal Header (Fixed / Sticky) -->
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-header-icon">
+          <svg lucideTicket [size]="20"></svg>
+        </div>
+        <div>
+          <div class="modal-title-row">
+            <h2 class="modal-title">Create New Ticket</h2>
+            <span class="modal-badge-new">NEW ISSUE</span>
+          </div>
+          <p class="modal-subtitle">Submit a bug report, system issue, or feature request to the engineering team</p>
+        </div>
+      </div>
+      <button class="btn-icon-close" (click)="showCreateModal=false" title="Close modal">
+        <svg lucideX [size]="18"></svg>
+      </button>
+    </div>
+
+    <!-- Modal Form Body (Scrollable with custom scrollbars) -->
+    <div class="modal-body">
+      <!-- Title Input -->
+      <div class="form-group">
+        <div class="form-label-row">
+          <label for="ticketTitle">Ticket Title <span class="required">*</span></label>
+          <span class="form-hint-counter">{{ (newTicket.title || '').length }}/120 chars</span>
+        </div>
+        <input
+          id="ticketTitle"
+          type="text"
+          class="form-input form-input-lg"
+          [(ngModel)]="newTicket.title"
+          maxlength="120"
+          placeholder="Brief summary of the issue (e.g. Navigation menu collapses unexpectedly on iPad)"
+        />
+      </div>
+
+      <!-- Type, Platform & Priority (3-Column Grid) -->
+      <div class="form-grid-3">
+        <!-- 1. Ticket Type (Searchable) -->
+        <div class="form-group">
+          <label>Ticket Type</label>
+          <div class="searchable-filter-dropdown full-width">
+            <button
+              type="button"
+              class="filter-dropdown-trigger modal-select-trigger full-width"
+              (click)="showModalTypeDropdown = !showModalTypeDropdown; showModalPlatformDropdown=false; showModalPriorityDropdown=false">
+              <span class="type-pill {{ typeBadgeClasses[newTicket.type || 'BUG'] }} mini">{{ formatLabel(newTicket.type || 'BUG') }}</span>
+              <svg lucideChevronDown [size]="14" class="trigger-chevron" [class.rotated]="showModalTypeDropdown"></svg>
+            </button>
+
+            <div class="filter-dropdown-popover" *ngIf="showModalTypeDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search ticket types..." [(ngModel)]="modalTypeSearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="modalTypeSearchQuery" (click)="modalTypeSearchQuery = ''">
+                  <svg lucideX [size]="11"></svg>
+                </button>
+              </div>
+              <div class="popover-options-scroll">
+                <div
+                  class="popover-option-item"
+                  *ngFor="let t of getFilteredTypes(modalTypeSearchQuery)"
+                  (click)="selectModalType(t)"
+                  [class.selected]="newTicket.type === t">
+                  <span class="type-pill {{ typeBadgeClasses[t] }}">{{ formatLabel(t) }}</span>
+                  <svg lucideCheck [size]="14" class="check-icon" *ngIf="newTicket.type === t"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredTypes(modalTypeSearchQuery).length === 0">
+                  No type matches "{{ modalTypeSearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showModalTypeDropdown" (click)="showModalTypeDropdown = false"></div>
+          </div>
+        </div>
+
+        <!-- 2. Platform (Searchable) -->
+        <div class="form-group">
+          <label>Platform</label>
+          <div class="searchable-filter-dropdown full-width">
+            <button
+              type="button"
+              class="filter-dropdown-trigger modal-select-trigger full-width"
+              (click)="showModalPlatformDropdown = !showModalPlatformDropdown; showModalTypeDropdown=false; showModalPriorityDropdown=false">
+              <span class="platform-tag platform-{{ (newTicket.platform || 'WEB').toLowerCase() }}">{{ newTicket.platform || 'WEB' }}</span>
+              <svg lucideChevronDown [size]="14" class="trigger-chevron" [class.rotated]="showModalPlatformDropdown"></svg>
+            </button>
+
+            <div class="filter-dropdown-popover" *ngIf="showModalPlatformDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search platforms..." [(ngModel)]="modalPlatformSearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="modalPlatformSearchQuery" (click)="modalPlatformSearchQuery = ''">
+                  <svg lucideX [size]="11"></svg>
+                </button>
+              </div>
+              <div class="popover-options-scroll">
+                <div
+                  class="popover-option-item"
+                  *ngFor="let p of getFilteredPlatforms(modalPlatformSearchQuery)"
+                  (click)="selectModalPlatform(p)"
+                  [class.selected]="newTicket.platform === p">
+                  <span class="platform-tag platform-{{ p.toLowerCase() }}">{{ p }}</span>
+                  <svg lucideCheck [size]="14" class="check-icon" *ngIf="newTicket.platform === p"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredPlatforms(modalPlatformSearchQuery).length === 0">
+                  No platform matches "{{ modalPlatformSearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showModalPlatformDropdown" (click)="showModalPlatformDropdown = false"></div>
+          </div>
+        </div>
+
+        <!-- 3. Priority Level (Searchable) -->
+        <div class="form-group">
+          <label>Priority Level</label>
+          <div class="searchable-filter-dropdown full-width">
+            <button
+              type="button"
+              class="filter-dropdown-trigger modal-select-trigger full-width"
+              (click)="showModalPriorityDropdown = !showModalPriorityDropdown; showModalTypeDropdown=false; showModalPlatformDropdown=false">
+              <span class="priority-pill {{ priorityColors[newTicket.priority || 'MEDIUM'] }} mini">
+                <span class="priority-dot" [style.background-color]="priorityDotColors[newTicket.priority || 'MEDIUM']"></span>
+                {{ newTicket.priority || 'MEDIUM' }}
+              </span>
+              <svg lucideChevronDown [size]="14" class="trigger-chevron" [class.rotated]="showModalPriorityDropdown"></svg>
+            </button>
+
+            <div class="filter-dropdown-popover" *ngIf="showModalPriorityDropdown">
+              <div class="popover-search-box">
+                <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search priorities..." [(ngModel)]="modalPrioritySearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="modalPrioritySearchQuery" (click)="modalPrioritySearchQuery = ''">
+                  <svg lucideX [size]="11"></svg>
+                </button>
+              </div>
+              <div class="popover-options-scroll">
+                <div
+                  class="popover-option-item"
+                  *ngFor="let p of getFilteredPriorities(modalPrioritySearchQuery)"
+                  (click)="selectModalPriority(p)"
+                  [class.selected]="newTicket.priority === p">
+                  <span class="priority-pill {{ priorityColors[p] }} mini">
+                    <span class="priority-dot" [style.background-color]="priorityDotColors[p]"></span>
+                    {{ p }}
+                  </span>
+                  <svg lucideCheck [size]="14" class="check-icon" *ngIf="newTicket.priority === p"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredPriorities(modalPrioritySearchQuery).length === 0">
+                  No priority matches "{{ modalPrioritySearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showModalPriorityDropdown" (click)="showModalPriorityDropdown = false"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Routing notice banner -->
+      <div class="routing-notice-card">
+        <div class="routing-icon-badge">
+          <svg lucideSparkles [size]="15"></svg>
+        </div>
+        <div class="routing-text">
+          <span class="routing-title">Auto-Assigned Routing</span>
+          <p class="routing-desc">This ticket will automatically route to the <strong>Software Development</strong> team lead for triage and dispatch.</p>
+        </div>
+      </div>
+
+      <!-- Description (Rich Text Editor) -->
+      <div class="form-group">
+        <div class="form-label-row">
+          <label>Issue Details & Description</label>
+          <span class="form-hint-optional">Optional details</span>
+        </div>
+        <div class="quill-editor-container">
+          <quill-editor
+            class="ticket-quill"
+            [(ngModel)]="newTicket.description"
+            [modules]="quillModules"
+            [styles]="{ height: '160px' }"
+            placeholder="Provide clear steps to reproduce, expected behavior, actual results, or error messages...">
+          </quill-editor>
+        </div>
+      </div>
+
+      <!-- Image Attachments Dropzone & Preview -->
+      <div class="form-group">
+        <div class="form-label-row">
+          <label>Screenshots & Attachments</label>
+          <span class="label-attachment-counter" [class.has-files]="pendingAttachments.length > 0">
+            {{ pendingAttachments.length }}/{{ maxAttachments }} attached
+          </span>
+        </div>
+
+        <div
+          class="attachment-dropzone"
+          [class.dragging]="isDraggingFiles"
+          (dragover)="onAttachmentDragOver($event)"
+          (dragleave)="onAttachmentDragLeave()"
+          (drop)="onAttachmentDrop($event)">
+          <input
+            #attachmentInput
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            multiple
+            hidden
+            (change)="onAttachmentsPicked($event)" />
+
+          <div class="dropzone-icon-box">
+            <svg lucideImagePlus [size]="22" class="dropzone-icon"></svg>
+          </div>
+          <div class="dropzone-content">
+            <div class="dropzone-main-text">
+              <button type="button" class="dropzone-browse-btn" (click)="attachmentInput.click()">
+                Click to browse
+              </button>
+              <span>or drag & drop screenshots here</span>
+            </div>
+            <span class="dropzone-subtext">PNG, JPG, GIF, WEBP up to 10MB each</span>
+          </div>
+        </div>
+
+        <!-- Thumbnail Grid -->
+        <div class="attachment-grid" *ngIf="pendingAttachments.length || uploadingCount > 0">
+          <div class="attachment-thumb" *ngFor="let a of pendingAttachments; let i = index">
+            <img [src]="a.fileUrl" [alt]="a.fileName" />
+            <button
+              type="button"
+              class="btn-remove-thumb"
+              (click)="removeAttachment(i)"
+              [title]="'Remove ' + a.fileName">
+              <svg lucideTrash2 [size]="12"></svg>
+            </button>
+            <div class="thumb-meta">
+              <span class="thumb-name" [title]="a.fileName">{{ a.fileName }}</span>
+              <span class="thumb-size">{{ formatFileSize(a.fileSize) }}</span>
+            </div>
+          </div>
+
+          <div class="attachment-thumb uploading" *ngFor="let _ of [].constructor(uploadingCount)">
+            <svg lucideLoader2 [size]="20" class="spin-anim"></svg>
+            <span>Uploading…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer (Fixed / Sticky at Bottom) -->
+    <div class="modal-footer">
+      <div class="modal-footer-left">
+        <span class="footer-requirement-hint">
+          <span class="required-dot">*</span> Required: Ticket Title
+        </span>
+      </div>
+
+      <div class="modal-footer-actions">
+        <button type="button" class="btn-cancel" (click)="closeCreateModal()">Cancel</button>
+        <button
+          type="button"
+          class="btn-submit"
+          (click)="submitCreate()"
+          [disabled]="!canSubmit()">
+          <svg lucideTicket [size]="15" *ngIf="!creating && uploadingCount === 0"></svg>
+          <svg lucideLoader2 [size]="15" class="spin-anim" *ngIf="creating || uploadingCount > 0"></svg>
+          <span>{{ creating ? 'Creating Ticket…' : (uploadingCount > 0 ? 'Uploading files…' : 'Submit Ticket') }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ticket Detail Slide-out Drawer -->
+<app-ticket-detail
+  *ngIf="selectedTicket"
+  [ticket]="selectedTicket"
+  [permissions]="permissions"
+  (closed)="onDetailClosed()"
+  (ticketUpdated)="onTicketUpdated($event)">
+</app-ticket-detail>

@@ -11,6 +11,9 @@ const ALLOWED_MIME_TYPES = ['application/pdf'];
 const ALLOWED_EXTENSIONS = ['.pdf'];
 const MAX_RESUME_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_UPLOAD_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_TICKET_IMAGE_SIZE = 10 * 1024 * 1024;
+const TICKET_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const TICKET_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
 function resumeFileFilter(req: any, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) {
   const ext = path.extname(file.originalname).toLowerCase();
@@ -72,6 +75,22 @@ export class UploadController {
   }))
   async uploadImage(@UploadedFile() file: Express.Multer.File) {
     return this.processUpload(file, '/candidate_photos');
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('ticket-attachment')
+  @UseInterceptors(FileInterceptor('file', {
+    fileFilter: (req: any, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!TICKET_IMAGE_MIME_TYPES.includes(file.mimetype) && !TICKET_IMAGE_EXTENSIONS.includes(ext)) {
+        return cb(new HttpException('Only JPG, PNG, GIF, and WEBP images are allowed', HttpStatus.BAD_REQUEST), false);
+      }
+      cb(null, true);
+    },
+    limits: { fileSize: MAX_TICKET_IMAGE_SIZE }
+  }))
+  async uploadTicketAttachment(@UploadedFile() file: Express.Multer.File) {
+    return this.processUpload(file, '/ticket_attachments');
   }
 
   private async processUpload(file: Express.Multer.File, folder: string) {

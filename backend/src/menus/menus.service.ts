@@ -92,6 +92,35 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Sales menu auto-seeded successfully.');
         }
         
+        // Tickets is reached from the header (next to Create), not the sidebar.
+        // Deactivate any Tickets rows left behind by earlier seeds.
+        const { count: deactivated } = await this.prisma.menu.updateMany({
+          where: { route: '/crm/tickets', isActive: true },
+          data: { isActive: false },
+        });
+        if (deactivated > 0) {
+          this.logger.log(`Removed ${deactivated} Tickets menu entry from the sidebar.`);
+        }
+
+        // Ensure Leads stays as a CRM sub-item
+        const crmParent = await this.prisma.menu.findFirst({ where: { title: 'CRM', parentId: parent.id } });
+        if (crmParent) {
+          const leadsSubMenu = await this.prisma.menu.findFirst({ where: { title: 'Leads', parentId: crmParent.id } });
+          if (!leadsSubMenu && crmParent.route) {
+            await this.prisma.menu.create({
+              data: {
+                title: 'Leads',
+                icon: 'funnel',
+                route: '/crm/leads',
+                displayOrder: 1,
+                parentId: crmParent.id,
+                isActive: true,
+              },
+            });
+            await this.prisma.menu.update({ where: { id: crmParent.id }, data: { route: null } });
+          }
+        }
+
         // Follow-Ups menu is now accessible via the CRM Leads Board, not the sidebar
       }
 
@@ -193,12 +222,11 @@ export class MenusService implements OnModuleInit {
     
     const allowedModules = new Set(rolePermissions.map(p => p.module));
     
-    // Always allow overview (dashboard) and profile
+    // Always allow overview (dashboard), profile, and tickets (all employees can raise/view tickets)
     allowedModules.add('overview');
     allowedModules.add('employees/me/profile');
-    // The Dashboard menu item's id is derived from its route ('/dashboard' -> 'dashboard'),
-    // so it must be allowed explicitly for every role.
     allowedModules.add('dashboard');
+    allowedModules.add('crm/tickets');
 
     // If role has NO permissions defined yet, apply a safe default fallback
     if (rolePermissions.length === 0) {

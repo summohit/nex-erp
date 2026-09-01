@@ -42,6 +42,25 @@
     </button>
   </div>
 
+  <!-- Tickets (Helpdesk) -->
+  <button
+    class="btn-header-tickets"
+    [class.has-alert]="canSeeTicketAlerts() && hasNewTickets()"
+    routerLink="/crm/tickets"
+    type="button"
+    [title]="canSeeTicketAlerts() && openTicketCount() > 0
+      ? openTicketCount() + ' open ticket(s) awaiting the team'
+      : 'Helpdesk & Tickets'">
+    <svg lucideTicket size="16"></svg>
+    <span class="hidden sm:inline">Tickets</span>
+
+    <span class="ticket-count-badge"
+          [class.pulse]="hasNewTickets()"
+          *ngIf="canSeeTicketAlerts() && openTicketCount() > 0">
+      {{ openTicketCount() > 99 ? '99+' : openTicketCount() }}
+    </span>
+  </button>
+
   <!-- Quick Create (+ Button) -->
   <div class="relative">
     <button class="btn-quick-create" (click)="toggleQuickCreate()" type="button" title="Quick Actions">
