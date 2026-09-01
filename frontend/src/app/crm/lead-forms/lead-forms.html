@@ -1,0 +1,231 @@
+<div class="lead-forms-page">
+  <!-- PAGE HEADER -->
+  <div class="page-header-card lf-header">
+    <div class="lf-header-left">
+      <button type="button" class="btn-icon lf-back-btn" (click)="backToList()" *ngIf="mode === 'builder'" title="Back to Lead Forms">
+        <svg lucideChevronLeft size="18"></svg>
+      </button>
+      <div class="lf-header-title">
+        <h1>{{ mode === 'builder' ? (isNew ? 'New Lead Form' : 'Lead Form Builder') : 'Lead Forms' }}</h1>
+        <p *ngIf="mode === 'list'">Create and manage lead capture forms that generate Leads.</p>
+        <p *ngIf="mode === 'builder'">Configure fields, order, and requirements. The live preview updates as you edit.</p>
+      </div>
+    </div>
+    <div class="lf-header-actions">
+      <ng-container *ngIf="mode === 'list'">
+        <button type="button" class="btn btn-outline-pill" (click)="newForm()"><svg lucidePlus size="15"></svg> <span>New Lead Form</span></button>
+      </ng-container>
+      <ng-container *ngIf="mode === 'builder'">
+        <button type="button" class="btn btn-outline-pill" (click)="reset()"><svg lucideRotateCcw size="15"></svg> <span>Reset</span></button>
+        <button type="button" class="btn btn-primary-pill" (click)="save()" [disabled]="saving"><svg lucideSave size="15"></svg> <span>{{ saving ? 'Saving...' : 'Save' }}</span></button>
+      </ng-container>
+    </div>
+  </div>
+
+  <!-- ══════════════ LIST VIEW ══════════════ -->
+  <ng-container *ngIf="mode === 'list'">
+    <div class="content-card">
+      <div class="card-header-styled">
+        <div class="header-title-box">
+          <span class="header-icon bg-orange-light text-orange"><svg lucideFileText size="16"></svg></span>
+          <h3>Lead Forms</h3>
+        </div>
+        <div class="deals-toolbar">
+          <div class="toolbar-search">
+            <svg lucideSearch size="15"></svg>
+            <input type="text" placeholder="Search forms..." [(ngModel)]="formSearch" />
+          </div>
+        </div>
+      </div>
+
+      <div class="loading-box" *ngIf="formsLoading"><div class="spinner small"></div><span>Loading lead forms...</span></div>
+
+      <div class="table-scroll" *ngIf="!formsLoading && filteredForms.length">
+        <table class="leads-table">
+          <thead><tr>
+            <th>Name</th>
+            <th>Source</th>
+            <th>Fields</th>
+            <th>Leads</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Action</th>
+          </tr></thead>
+          <tbody>
+            <tr *ngFor="let form of filteredForms">
+              <td><button type="button" class="link-like" (click)="editForm(form.id)">{{ form.name }}</button><div class="table-user-sub" *ngIf="form.description">{{ form.description }}</div></td>
+              <td><span class="table-user-name">{{ form.source || '—' }}</span></td>
+              <td><span class="table-user-name">{{ form.fields?.length ?? 0 }} <span class="table-user-sub">&middot; {{ enabledFieldCount(form) }} enabled</span></span></td>
+              <td><span class="table-user-name">{{ form._count?.leadsCreated ?? 0 }}</span></td>
+              <td><span class="status-pill {{ statusClass(form.status) }}">{{ form.status }}</span></td>
+              <td><div class="table-user-sub">{{ form.createdAt | date:'mediumDate' }}</div></td>
+              <td><div class="table-actions-group lf-actions-wrap">
+                <button type="button" class="btn-action-icon" title="Edit / Build" (click)="editForm(form.id)"><svg lucideEdit2 size="15"></svg></button>
+                <button type="button" class="btn-action-icon" title="Copy public link" (click)="copyText(siteUrl + '/lead-form/' + form.formKey, 'Public link copied.')"><svg lucideLink2 size="15"></svg></button>
+                <button type="button" class="btn-action-icon" title="Copy embed code" (click)="copyText('<iframe src=&quot;' + siteUrl + '/lead-form/' + form.formKey + '&quot; frameborder=&quot;0&quot; scrolling=&quot;yes&quot; style=&quot;display:block; width:100%; height:60vh;&quot;></iframe>', 'Embed code copied.')"><svg lucideCopy size="15"></svg></button>
+                <button type="button" class="btn-action-icon" title="{{ form.status === 'ACTIVE' ? 'Deactivate' : 'Activate' }}" (click)="toggleStatus(form)"><svg *ngIf="form.status === 'ACTIVE'" lucideEyeOff size="15"></svg><svg *ngIf="form.status !== 'ACTIVE'" lucideEye size="15"></svg></button>
+                <button type="button" class="btn-action-icon" title="Duplicate" (click)="duplicateForm(form)"><svg lucideCopyPlus size="15"></svg></button>
+                <button type="button" class="btn-action-icon danger-action" title="Delete" (click)="deleteForm(form)"><svg lucideTrash2 size="15"></svg></button>
+              </div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="empty-state-box" *ngIf="!formsLoading && !forms.length">
+        <svg lucideFileText size="26" class="empty-state-icon"></svg>
+        <div class="empty-state-title">No lead forms yet</div>
+        <div class="empty-state-text">Create your first lead capture form to start generating Leads from your website, campaigns, and landing pages.</div>
+        <button type="button" class="btn btn-primary-pill empty-state-cta" (click)="newForm()"><svg lucidePlus size="15"></svg> <span>Create your first form</span></button>
+      </div>
+      <div class="empty-state-box" *ngIf="!formsLoading && forms.length && !filteredForms.length">
+        <div>No forms match your search.</div>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ══════════════ BUILDER VIEW ══════════════ -->
+  <ng-container *ngIf="mode === 'builder'">
+    <div class="loading-box" *ngIf="loadingForm"><div class="spinner small"></div><span>Loading form...</span></div>
+
+    <div *ngIf="!loadingForm" class="builder-layout">
+      <!-- LEFT: configuration -->
+      <div class="content-card builder-left">
+        <div class="card-header-styled">
+          <div class="header-title-box">
+            <span class="header-icon bg-orange-light text-orange"><svg lucideFileText size="16"></svg></span>
+            <h3>Form Configuration</h3>
+          </div>
+        </div>
+
+        <div class="builder-settings">
+          <div class="builder-settings-grid">
+            <div class="form-group builder-col-2">
+              <label>Form Name <span class="required-asterisk">*</span></label>
+              <input type="text" [(ngModel)]="formName" (ngModelChange)="markDirty()" placeholder="e.g. Website Contact Form" />
+            </div>
+            <div class="form-group builder-col-2">
+              <label>Description</label>
+              <input type="text" [(ngModel)]="formDescription" (ngModelChange)="markDirty()" placeholder="Short description shown on the public form" />
+            </div>
+            <div class="form-group">
+              <label>Source</label>
+              <input type="text" [(ngModel)]="formSource" (ngModelChange)="markDirty()" placeholder="Lead Form" />
+              <span class="builder-hint">Stamped on every lead captured by this form.</span>
+            </div>
+          </div>
+
+          <div class="builder-section-label">Submission Behavior</div>
+
+          <div class="builder-settings-grid">
+            <div class="form-group builder-col-2">
+              <label>Success Message</label>
+              <textarea rows="3" [(ngModel)]="formSuccessMessage" (ngModelChange)="markDirty()" placeholder="Thank you! Your enquiry has been received."></textarea>
+            </div>
+            <div class="form-group builder-col-2">
+              <label>Redirect URL</label>
+              <input type="url" [(ngModel)]="formRedirectUrl" (ngModelChange)="markDirty()" placeholder="https://example.com/thank-you" />
+              <span class="builder-hint">Optional. Visitors are sent here after a successful submission. Leave empty to show the success message instead.</span>
+            </div>
+            <div class="form-group builder-col-2">
+              <div class="captcha-row">
+                <div class="captcha-label-box">
+                  <span class="toggle-title">Enable CAPTCHA</span>
+                  <span class="toggle-subtitle">Adds a checkbox verification to help block spam submissions</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" [(ngModel)]="captchaEnabled" (ngModelChange)="markDirty()" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="builder-fields-head">
+          <span class="builder-fields-title">Fields</span>
+          <span class="builder-fields-hint">Drag to reorder &middot; toggle to show/hide</span>
+        </div>
+
+        <div cdkDropList class="builder-field-list" (cdkDropListDropped)="onFieldListDrop($event)">
+          <div class="builder-field-row" *ngFor="let field of fields" cdkDrag>
+            <div class="builder-drag-handle" cdkDragHandle title="Drag to reorder"><svg lucideGripVertical size="15"></svg></div>
+            <div class="builder-field-name">
+              <span class="builder-field-label">{{ field.label }} <span class="required-asterisk" *ngIf="field.isName || field.required">*</span></span>
+              <span class="builder-field-type">{{ fieldTypeLabel(field.type) }}</span>
+            </div>
+            <div class="builder-field-toggles">
+              <label class="toggle-switch" title="Toggle field in form">
+                <input type="checkbox" [checked]="field.enabled" (change)="toggleFieldEnabled(field)">
+                <span class="toggle-slider"></span>
+              </label>
+              <label class="builder-required-check" title="Mark required">
+                <input type="checkbox" [checked]="field.required" (change)="toggleRequired(field)" [disabled]="field.isName">
+                <span>Required</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="builder-product-options" *ngIf="productFieldEnabled">
+          <label>Product options — comma or line break separated</label>
+          <textarea rows="4" [(ngModel)]="productOptionsText" (ngModelChange)="markDirty()" placeholder="Product A, Product B&#10;Product C (one per line or comma-separated)"></textarea>
+        </div>
+      </div>
+
+      <!-- RIGHT: live preview -->
+      <div class="content-card builder-right">
+        <div class="card-header-styled">
+          <div class="header-title-box">
+            <span class="header-icon bg-emerald-light text-emerald"><svg lucideEye size="16"></svg></span>
+            <h3>Live Preview</h3>
+          </div>
+        </div>
+
+        <div class="builder-preview-card">
+          <div class="preview-form-head">
+            <h4>{{ formName || 'Untitled Form' }}</h4>
+            <p *ngIf="formDescription">{{ formDescription }}</p>
+          </div>
+          <div class="preview-fields">
+            <div class="preview-field" *ngFor="let f of enabledFields">
+              <label>{{ f.label }} <span class="required-asterisk" *ngIf="f.required || f.isName">*</span></label>
+              <ng-container [ngSwitch]="f.type">
+                <input *ngSwitchCase="'email'" type="email" [placeholder]="fieldPlaceholder(f)" />
+                <input *ngSwitchCase="'tel'" type="tel" [placeholder]="fieldPlaceholder(f)" />
+                <input *ngSwitchCase="'url'" type="url" [placeholder]="fieldPlaceholder(f)" />
+                <select *ngSwitchCase="'select'" [ngModel]="''">
+                  <option value="">Select {{ f.label }}...</option>
+                  <option *ngFor="let o of selectOptions(f)" [value]="o">{{ o }}</option>
+                </select>
+                <textarea *ngSwitchCase="'textarea'" rows="3" [placeholder]="fieldPlaceholder(f)"></textarea>
+                <input *ngSwitchDefault type="text" [placeholder]="fieldPlaceholder(f)" />
+              </ng-container>
+            </div>
+            <div class="empty-state-box" *ngIf="!enabledFields.length">No fields enabled.</div>
+          </div>
+          <button type="button" class="preview-submit">Submit Enquiry</button>
+        </div>
+
+        <!-- publish / embed -->
+        <div class="builder-publish" *ngIf="formKey">
+          <div class="publish-section">
+            <span class="publish-label">Direct Link</span>
+            <div class="publish-copy-row">
+              <span class="publish-value">{{ publicUrl }}</span>
+              <button type="button" class="btn-copy" (click)="copyText(publicUrl, 'Public link copied.')"><svg lucideCopy size="15"></svg></button>
+            </div>
+          </div>
+          <div class="publish-section">
+            <span class="publish-label">Embed Code</span>
+            <div class="publish-copy-row">
+              <code class="publish-value embed-value">{{ embedCode }}</code>
+              <button type="button" class="btn-copy" (click)="copyText(embedCode, 'Embed code copied.')"><svg lucideCopy size="15"></svg></button>
+            </div>
+          </div>
+          <a class="publish-open" [href]="publicUrl" target="_blank"><svg lucideExternalLink size="14"></svg> Open public form</a>
+        </div>
+        <div class="builder-publish-hint" *ngIf="!formKey">Save the form to generate its public link and embed code.</div>
+      </div>
+    </div>
+  </ng-container>
+</div>

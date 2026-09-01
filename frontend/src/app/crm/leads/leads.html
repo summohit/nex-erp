@@ -40,13 +40,13 @@
       <!-- Lead Contact Button -->
       <button class="btn-header-secondary" (click)="openLeadContactModal()" title="Add / Manage External Lead Contact">
         <svg lucideUserCheck size="15"></svg>
-        <span>Lead Contact</span>
+        <span>Add Lead Contact</span>
       </button>
 
       <!-- New Lead Button (Primary) -->
       <button class="btn-header-primary" (click)="openModal()" title="Create New Lead Opportunity">
         <svg lucidePlus size="16"></svg>
-        <span>New Lead</span>
+        <span>New Deal</span>
       </button>
     </div>
   </div>
@@ -668,7 +668,7 @@
         <ng-container *ngIf="!isLoading">
           <tr *ngFor="let lead of getFilteredLeads()">
             <td>
-              <div style="font-weight: 600; color: #0f172a;">{{lead.title}}</div>
+              <button type="button" class="lead-title-link" (click)="openLeadProfile(lead.id)">{{lead.title}}</button>
               <div style="display: flex; gap: 6px; align-items: center; margin-top: 3px;" *ngIf="lead.dealCategory">
                 <span class="card-category-pill" [ngStyle]="{'color': getDealCategoryBadge(lead.dealCategory).color, 'background': getDealCategoryBadge(lead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(lead.dealCategory).border}">
                   {{lead.dealCategory}}
@@ -741,9 +741,18 @@
           <svg lucideUsers size="15"></svg>
           <span>{{ getFilteredLeadContacts().length }} Contact{{ getFilteredLeadContacts().length === 1 ? '' : 's' }}</span>
         </div>
-        <button class="btn-primary btn-add-contact" (click)="openLeadContactModal()">
-          <svg lucidePlus size="15"></svg>
-          <span>Add Lead Contact</span>
+        <input type="file" #csvInput accept=".csv" (change)="onCsvImportSelected($event)" style="display:none" />
+        <button type="button" class="btn btn-primary-pill" (click)="openLeadContactModal()">
+          <svg lucidePlus size="15"></svg> Add Lead Contact
+        </button>
+        <button type="button" class="btn btn-outline-pill" (click)="goToLeadForms()">
+          <svg lucideFileText size="15"></svg> Lead Form
+        </button>
+        <button type="button" class="btn btn-outline-pill" (click)="csvInput.click()">
+          <svg lucideUpload size="15"></svg> Import
+        </button>
+        <button type="button" class="btn btn-outline-pill" (click)="exportLeadContactsCsv()">
+          <svg lucideDownload size="15"></svg> Export
         </button>
       </div>
     </div>
@@ -774,7 +783,7 @@
                 <div class="contact-person-info">
                   <div class="contact-person-name">
                     <span class="salutation" *ngIf="contact.salutation">{{ contact.salutation }}</span>
-                    <span class="full-name">{{ contact.name }}</span>
+                    <button type="button" class="contact-name-link" (click)="openLeadContactProfile(contact.id)">{{ contact.name }}</button>
                   </div>
                   <span class="contact-location" *ngIf="contact.city || contact.country">
                     <svg lucideMapPin size="11"></svg> {{ contact.city ? contact.city + (contact.country ? ', ' + contact.country : '') : contact.country }}

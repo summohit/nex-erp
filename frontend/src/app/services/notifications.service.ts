@@ -54,7 +54,7 @@ export class NotificationsService {
     if (!token) return;
 
     const wsUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:3050/ws/notifications'
+      ? `${environment.apiUrl}/ws/notifications`
       : `${window.location.origin}/ws/notifications`;
 
     this.socket = io(wsUrl, {

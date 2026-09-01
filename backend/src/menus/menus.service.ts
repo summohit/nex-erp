@@ -112,6 +112,24 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Payroll Rules menu auto-seeded successfully.');
         }
       }
+
+      // Also ensure Lead Forms is under CRM
+      const crmSection = await this.prisma.menu.findFirst({ where: { title: 'CRM', parentId: { not: null } } });
+      if (crmSection) {
+        const leadFormsMenu = await this.prisma.menu.findFirst({ where: { title: 'Lead Forms', parentId: crmSection.id } });
+        if (!leadFormsMenu) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Lead Forms',
+              route: '/crm/lead-forms',
+              displayOrder: 20,
+              parentId: crmSection.id,
+              isActive: true
+            }
+          });
+          this.logger.log('Lead Forms menu auto-seeded successfully.');
+        }
+      }
     } catch (err) {
       this.logger.error('Failed to auto-seed menus:', err);
     }

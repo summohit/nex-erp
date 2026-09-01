@@ -20,6 +20,7 @@ export const routes: Routes = [
   { path: 'kiosk/:companyId', loadComponent: () => import('./kiosk/kiosk').then(m => m.Kiosk) },
   { path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.OnboardingComponent) },
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
+  { path: 'lead-form/:formId', loadComponent: () => import('./public/lead-form/lead-form.component').then(m => m.PublicLeadFormComponent) },
   { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { path: 'offer/:token', loadComponent: () => import('./public/offer-letter/offer-letter').then(m => m.OfferLetterComponent) },
   { 
@@ -233,6 +234,30 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'crm/leads' },
         loadComponent: () => import('./crm/leads-dashboard/leads-dashboard').then(m => m.LeadsDashboardComponent)
+      },
+      {
+        path: 'crm/lead-forms',
+        canActivate: [permissionGuard],
+        data: { module: 'crm/leads' },
+        loadComponent: () => import('./crm/lead-forms/lead-forms.component').then(m => m.LeadFormsComponent)
+      },
+      {
+        path: 'crm/lead-forms/:id',
+        canActivate: [permissionGuard],
+        data: { module: 'crm/leads' },
+        loadComponent: () => import('./crm/lead-forms/lead-forms.component').then(m => m.LeadFormsComponent)
+      },
+      {
+        path: 'crm/leads/:id',
+        canActivate: [permissionGuard],
+        data: { module: 'crm/leads' },
+        loadComponent: () => import('./crm/lead-profile/lead-profile.component').then(m => m.LeadProfileComponent)
+      },
+      {
+        path: 'crm/lead-contacts/:id',
+        canActivate: [permissionGuard],
+        data: { module: 'crm/leads' },
+        loadComponent: () => import('./crm/lead-contact-profile/lead-contact-profile.component').then(m => m.LeadContactProfileComponent)
       },
       {
         path: 'sales/quotations',

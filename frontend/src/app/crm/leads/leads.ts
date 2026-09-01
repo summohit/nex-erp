@@ -33,7 +33,8 @@ import {
   LucideClock, LucideCalendarClock, LucideVideo, LucideCheck, LucideHistory,
   LucideUsers, LucideAward, LucideExternalLink,
   LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
-  LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles
+  LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
+  LucideUpload, LucideDownload
 } from '@lucide/angular';
 
 export interface FollowUp {
@@ -108,7 +109,8 @@ interface Lead {
     LucideClock, LucideCalendarClock, LucideVideo, LucideCheck, LucideHistory,
     LucideUsers, LucideAward, LucideExternalLink,
     LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
-    LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles
+    LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
+    LucideUpload, LucideDownload
   ],
   templateUrl: './leads.html',
   styleUrls: ['./leads.css']
@@ -305,6 +307,14 @@ export class LeadsComponent implements OnInit {
     this.router.navigate(['/crm/leads/dashboard']);
   }
 
+  openLeadProfile(leadId: number) {
+    this.router.navigate(['/crm/leads', leadId]);
+  }
+
+  openLeadContactProfile(contactId: number) {
+    this.router.navigate(['/crm/lead-contacts', contactId]);
+  }
+
   loadEmployees() {
     this.http.get<any[]>(`${environment.apiUrl}/employees`)
       .subscribe({
@@ -456,6 +466,141 @@ export class LeadsComponent implements OnInit {
       next: (data) => this.leadContacts = data,
       error: (err) => console.error('Failed to load lead contacts', err)
     });
+  }
+
+  goToLeadForms() {
+    this.router.navigate(['/crm/lead-forms']);
+  }
+
+  csvImporting = false;
+
+  onCsvImportSelected(event: any) {
+    const file: File | undefined = event?.target?.files?.[0];
+    event?.target instanceof HTMLInputElement && (event.target.value = '');
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || '');
+      const contacts = this.parseContactCsv(text);
+      if (!contacts.length) {
+        this.toast.error('No valid rows found in the CSV.');
+        return;
+      }
+      if (!window.confirm(`Import ${contacts.length} lead contact${contacts.length === 1 ? '' : 's'}?`)) return;
+      this.csvImporting = true;
+      const currentEmpId = this.auth.currentUser()?.employee?.id || this.auth.currentUser()?.employeeId || null;
+      this.http.post<any>(`${environment.apiUrl}/crm/lead-contacts/import`, { contacts, addedById: currentEmpId }).subscribe({
+        next: (res) => {
+          this.csvImporting = false;
+          this.loadLeadContacts();
+          this.toast.success(`Imported ${res.created ?? contacts.length} contact${(res.created ?? contacts.length) === 1 ? '' : 's'}.`);
+        },
+        error: (err) => {
+          this.csvImporting = false;
+          this.toast.error(err?.error?.message || 'Failed to import contacts.');
+        }
+      });
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  private parseContactCsv(text: string): any[] {
+    const rows = this.parseCsvRows(text);
+    if (!rows.length) return [];
+    const header = rows[0].map((h) => h.trim().toLowerCase().replace(/[^a-z]+/g, ''));
+    const fieldIndex = (key: string) => header.indexOf(key);
+    const contacts: any[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const get = (k: string) => (fieldIndex(k) >= 0 ? (r[fieldIndex(k)] || '').trim() : '');
+      const name = get('name');
+      if (!name) continue;
+      contacts.push({
+        salutation: get('salutation'),
+        name,
+        email: get('email'),
+        phone: get('phone'),
+        leadSource: get('source'),
+        companyName: get('company'),
+        website: get('website'),
+        mobile: get('mobile'),
+        officePhoneNumber: get('officephone'),
+        country: get('country'),
+        state: get('state'),
+        city: get('city'),
+        postalCode: get('postalcode'),
+        address: get('address'),
+      });
+    }
+    return contacts;
+  }
+
+  private parseCsvRows(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += ch;
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        row.push(cur); cur = '';
+      } else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(cur); cur = '';
+        rows.push(row); row = [];
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter((r) => r.some((c) => c.trim() !== ''));
+  }
+
+  exportLeadContactsCsv() {
+    const contacts = this.getFilteredLeadContacts();
+    if (!contacts.length) { this.toast.info('No lead contacts to export.'); return; }
+    const csvRows = [
+      ['Salutation', 'Name', 'Email', 'Phone', 'Source', 'Company', 'Website', 'Mobile', 'Office Phone', 'Country', 'State', 'City', 'Postal Code', 'Address'].join(','),
+      ...contacts.map((c: any) => [
+        this.escapeCsv(c.salutation || ''),
+        this.escapeCsv(c.name || ''),
+        this.escapeCsv(c.email || ''),
+        this.escapeCsv(c.phone || ''),
+        this.escapeCsv(c.leadSource || ''),
+        this.escapeCsv(c.companyName || ''),
+        this.escapeCsv(c.website || ''),
+        this.escapeCsv(c.mobile || ''),
+        this.escapeCsv(c.officePhoneNumber || ''),
+        this.escapeCsv(c.country || ''),
+        this.escapeCsv(c.state || ''),
+        this.escapeCsv(c.city || ''),
+        this.escapeCsv(c.postalCode || ''),
+        this.escapeCsv(c.address || '')
+      ].join(','))
+    ];
+    const csv = '\uFEFF' + csvRows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lead_contacts_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  private escapeCsv(value: string): string {
+    const s = String(value ?? '');
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
   }
 
   getFilteredLeadContacts(): any[] {

@@ -1,0 +1,374 @@
+<div class="client-profile-wrapper">
+  <div class="profile-loading" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <p>Loading deal...</p>
+  </div>
+
+  <ng-container *ngIf="!isLoading && lead">
+    <!-- ══════════════════════════ HEADER ══════════════════════════ -->
+    <div class="hero-card">
+      <div class="hero-top">
+        <div class="client-identity">
+          <div class="avatar-gradient"><span>{{ getInitials(lead.companyName || lead.title) }}</span></div>
+          <div class="identity-info">
+            <div class="title-row">
+              <h1 class="client-title">{{ lead.title }}</h1>
+              <span class="status-pill lead-status {{ statusClass(lead.status) }}"><span class="status-dot"></span> {{ lead.status }}</span>
+            </div>
+            <div class="meta-strip">
+              <span class="meta-pill" *ngIf="lead.companyName"><svg lucideBuilding size="14"></svg> {{ lead.companyName }}</span>
+              <span class="meta-pill" *ngIf="lead.dealCategory"><svg lucideTarget size="14"></svg> {{ lead.dealCategory }}</span>
+              <span class="meta-pill" *ngIf="lead.source"><svg lucideMessageSquare size="14"></svg> {{ lead.source }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-outline-pill" (click)="goBack()"><svg lucideArrowLeft size="16"></svg> Back to Leads</button>
+        </div>
+      </div>
+
+      <div class="hero-stats-grid">
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-balance"><svg lucideDollarSign size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Deal Value</span><span class="chip-value" *ngIf="lead.value != null">{{ lead.value | currency:(lead.currency || 'INR') }}</span><span class="chip-value text-subdued" *ngIf="lead.value == null">Not set</span></div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-projects"><svg lucideBriefcase size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Proposals</span><span class="chip-value">{{ proposals.length }}</span></div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-contact"><svg lucideUserCheck size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Assigned To</span><span class="chip-value">{{ assignedName }}</span></div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-since"><svg lucideCalendar size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Created</span><span class="chip-value">{{ lead.createdAt | date:'mediumDate' }}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ PIPELINE INDICATOR ══════════════════════════ -->
+    <div class="pipeline-section">
+      <div class="pipeline-label-row">
+        <span class="pipeline-title"><svg lucideTarget size="14"></svg> Sales Pipeline</span>
+        <span class="pipeline-current">→ {{ lead.status }}</span>
+      </div>
+      <div class="pipeline-bar">
+        <ng-container *ngFor="let stage of pipelineStages; let i = index">
+          <div class="pipeline-step" [class.active]="isStageActive(stage)" [class.completed]="isStageCompleted(stage)">
+            <div class="pipeline-dot">
+              <svg lucideCheckCircle size="14" *ngIf="isStageCompleted(stage)"></svg>
+            </div>
+            <span class="pipeline-step-label">{{ stage.label }}</span>
+          </div>
+          <div class="pipeline-connector" *ngIf="i < pipelineStages.length - 1" [class.completed]="isStageCompleted(pipelineStages[i + 1])"></div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ MAIN DEAL INFO + LEAD CONTACT ══════════════════════════ -->
+    <div class="overview-grid two-col">
+      <!-- Deal Info -->
+      <div class="content-card deal-info-card">
+        <div class="card-header-styled">
+          <div class="header-title-box">
+            <span class="header-icon bg-orange-light text-orange"><svg lucideBriefcase size="16"></svg></span>
+            <h3>Deal Info</h3>
+          </div>
+        </div>
+        <div class="info-tiles-grid">
+          <div class="info-tile"><div class="tile-icon"><svg lucideBriefcase size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Name</span><span class="tile-value">{{ lead.title || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideUser size="16"></svg></div><div class="tile-content"><span class="tile-label">Lead Contact</span><span class="tile-value">{{ lead.contactName || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideMail size="16"></svg></div><div class="tile-content"><span class="tile-label">Email</span><span class="tile-value">{{ lead.email || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideBuilding size="16"></svg></div><div class="tile-content"><span class="tile-label">Company Name</span><span class="tile-value">{{ lead.companyName || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideTarget size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Category</span><span class="tile-value">{{ lead.dealCategory || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideUserCheck size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Agent</span><span class="tile-value">{{ assignedName }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideUserCheck size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Watcher</span><span class="tile-value watcher-cell"><span class="mini-avatar" *ngIf="lead.addedBy?.avatarUrl"><img [src]="lead.addedBy.avatarUrl" alt=""></span><span class="mini-avatar initials" *ngIf="!lead.addedBy?.avatarUrl">{{ getInitials(addedByName) }}</span><span class="watcher-name">{{ addedByName || '—' }}<span class="watcher-role" *ngIf="lead.addedBy?.designation?.name">{{ lead.addedBy.designation.name }}</span></span></span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideCalendar size="16"></svg></div><div class="tile-content"><span class="tile-label">Close Date</span><span class="tile-value">{{ (lead.expectedCloseDate | date:'mediumDate') || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideDollarSign size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Value</span><span class="tile-value" *ngIf="lead.value != null">{{ lead.value | currency:(lead.currency || 'INR') }}</span><span class="tile-value" *ngIf="lead.value == null">—</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideFileText size="16"></svg></div><div class="tile-content"><span class="tile-label">Products</span><span class="tile-value">{{ lead.subjectLine || lead.description || '—' }}</span></div></div>
+        </div>
+      </div>
+
+      <!-- Lead Contact Detail -->
+      <div class="content-card contact-detail-card">
+        <div class="card-header-styled">
+          <div class="header-title-box">
+            <span class="header-icon bg-blue-light text-blue"><svg lucideUser size="16"></svg></span>
+            <h3>Lead Contact Detail</h3>
+          </div>
+        </div>
+        <div class="info-tiles-grid single-col">
+          <div class="info-tile"><div class="tile-icon"><svg lucideUser size="16"></svg></div><div class="tile-content"><span class="tile-label">Lead Contact</span><span class="tile-value">{{ lead.contactName || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideMail size="16"></svg></div><div class="tile-content"><span class="tile-label">Email</span><span class="tile-value">{{ lead.email || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucidePhone size="16"></svg></div><div class="tile-content"><span class="tile-label">Mobile</span><span class="tile-value"><a *ngIf="lead.phone" [href]="'tel:' + lead.phone" class="meta-link">{{ lead.phone }}</a><span *ngIf="!lead.phone">—</span></span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideBuilding size="16"></svg></div><div class="tile-content"><span class="tile-label">Company Name</span><span class="tile-value">{{ lead.companyName || '—' }}</span></div></div>
+        </div>
+        <div class="contact-action-row">
+          <button class="btn-primary-pill contact-email-btn" (click)="openEmail()" [disabled]="!lead.email">
+            <svg lucideMail size="16"></svg> Send Email
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ TABS ══════════════════════════ -->
+    <div class="segmented-nav">
+      <button class="nav-pill-btn" [class.active]="activeTab === 'files'" (click)="onTabClick('files')"><svg lucidePaperclip size="16"></svg> Files <span class="count-badge">{{ files.length }}</span></button>
+      <button class="nav-pill-btn" [class.active]="activeTab === 'followups'" (click)="onTabClick('followups')"><svg lucideClock size="16"></svg> Follow Up <span class="count-badge">{{ followUps.length }}</span></button>
+      <button class="nav-pill-btn" [class.active]="activeTab === 'proposals'" (click)="onTabClick('proposals')"><svg lucideFileText size="16"></svg> Proposal <span class="count-badge">{{ proposals.length }}</span></button>
+      <button class="nav-pill-btn" [class.active]="activeTab === 'notes'" (click)="onTabClick('notes')"><svg lucideMessageSquare size="16"></svg> Notes <span class="count-badge">{{ notes.length }}</span></button>
+      <button class="nav-pill-btn" [class.active]="activeTab === 'history'" (click)="onTabClick('history')"><svg lucideHistory size="16"></svg> History</button>
+    </div>
+
+    <div class="tab-body">
+      <!-- ══════════ FILES TAB ══════════ -->
+      <div class="tab-pane" *ngIf="activeTab === 'files'">
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-indigo-light text-indigo"><svg lucidePaperclip size="16"></svg></span>
+              <h3>Files</h3>
+            </div>
+            <button class="btn-primary-pill" (click)="triggerFileUpload()"><svg lucidePlus size="16"></svg> Upload File</button>
+          </div>
+          <input type="file" id="dealFileInput" hidden (change)="onFileSelected($event)">
+
+          <div class="loading-box" *ngIf="loadingFiles"><div class="spinner small"></div><span>Loading files...</span></div>
+
+          <div class="table-scroll" *ngIf="!loadingFiles && files.length">
+            <table class="leads-table">
+              <thead><tr><th>File Name</th><th>Type</th><th>Size</th><th>Uploaded By</th><th>Date</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let f of files">
+                  <td><div class="table-user-name file-name-cell"><span class="file-icon-m {{ fileIcon(f) }}"><svg lucideFile size="15"></svg></span> {{ f.fileName }}</div></td>
+                  <td><span class="category-pill">{{ (f.fileType || '—').split('/').pop() }}</span></td>
+                  <td>{{ formatFileSize(f.fileSize) }}</td>
+                  <td><span class="table-user-name">{{ employeeName(f.uploadedBy) }}</span></td>
+                  <td>{{ f.createdAt | date:'mediumDate' }}</td>
+                  <td><div class="table-actions-group">
+                    <button class="btn-action-icon" title="View" (click)="downloadFile(f)"><svg lucideEye size="15"></svg></button>
+                    <button class="btn-action-icon" title="Download" (click)="downloadFile(f)"><svg lucideDownload size="15"></svg></button>
+                    <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFile(f)"><svg lucideTrash2 size="15"></svg></button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state-box" *ngIf="!loadingFiles && !files.length">
+            <svg lucidePaperclip size="24" style="margin-bottom:6px;opacity:.5"></svg>
+            <div>No files uploaded yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ FOLLOW UP TAB ══════════ -->
+      <div class="tab-pane" *ngIf="activeTab === 'followups'">
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-purple-light text-purple"><svg lucideClock size="16"></svg></span>
+              <h3>Follow Ups</h3>
+            </div>
+            <button class="btn-primary-pill" (click)="openNewFollowUp()"><svg lucidePlus size="16"></svg> New Follow Up</button>
+          </div>
+
+          <div class="loading-box" *ngIf="loadingFollowUps"><div class="spinner small"></div><span>Loading follow-ups...</span></div>
+
+          <div class="table-scroll" *ngIf="!loadingFollowUps && followUps.length">
+            <table class="leads-table">
+              <thead><tr><th>Created</th><th>Next Follow Up</th><th>Remark</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let fu of followUps">
+                  <td>{{ fu.createdAt | date:'medium' }}</td>
+                  <td>{{ fu.scheduledAt | date:'medium' }}</td>
+                  <td><div class="table-user-name">{{ fu.title }}</div><div class="table-user-sub" *ngIf="fu.notes">{{ fu.notes }}</div></td>
+                  <td><span class="followup-type-pill {{ followUpStatusClass(fu.status) }}">{{ fu.status || 'PENDING' }}</span></td>
+                  <td><div class="table-actions-group">
+                    <button class="btn-action-icon" title="Edit" (click)="openEditFollowUp(fu)"><svg lucideEdit size="15"></svg></button>
+                    <button class="btn-action-icon" title="Mark as Completed" *ngIf="fu.status !== 'COMPLETED'" (click)="markFollowUpComplete(fu)"><svg lucideCheckCircle size="15"></svg></button>
+                    <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFollowUp(fu)"><svg lucideTrash2 size="15"></svg></button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state-box" *ngIf="!loadingFollowUps && !followUps.length">
+            <svg lucideClock size="24" style="margin-bottom:6px;opacity:.5"></svg>
+            <div>No follow-ups found.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ PROPOSAL TAB ══════════ -->
+      <div class="tab-pane" *ngIf="activeTab === 'proposals'">
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-emerald-light text-emerald"><svg lucideFileText size="16"></svg></span>
+              <h3>Proposals</h3>
+            </div>
+            <button class="btn-primary-pill" (click)="goToQuotations()"><svg lucidePlus size="16"></svg> Create Proposal</button>
+          </div>
+
+          <div class="loading-box" *ngIf="loadingProposals"><div class="spinner small"></div><span>Loading proposals...</span></div>
+
+          <div class="table-scroll" *ngIf="!loadingProposals && proposals.length">
+            <table class="leads-table">
+              <thead><tr><th>Proposal Number</th><th>Total</th><th>Date</th><th>Valid Till</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let q of proposals">
+                  <td><div class="table-user-name">{{ q.quoteNumber }}</div></td>
+                  <td><span class="amount-cell">{{ q.total | currency:(q.currency || 'INR') }}</span></td>
+                  <td>{{ q.date | date:'mediumDate' }}</td>
+                  <td>{{ q.validUntil | date:'mediumDate' }}</td>
+                  <td><span class="followup-type-pill fu-type-call">{{ q.status }}</span></td>
+                  <td><div class="table-actions-group">
+                    <button class="btn-action-icon" title="View" (click)="goToQuotations()"><svg lucideEye size="15"></svg></button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state-box" *ngIf="!loadingProposals && !proposals.length">No record found.</div>
+        </div>
+      </div>
+
+      <!-- ══════════ NOTES TAB ══════════ -->
+      <div class="tab-pane" *ngIf="activeTab === 'notes'">
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-amber-light text-amber"><svg lucideMessageSquare size="16"></svg></span>
+              <h3>Notes</h3>
+            </div>
+            <button class="btn-primary-pill" (click)="openNewNote()"><svg lucidePlus size="16"></svg> Add Note</button>
+          </div>
+
+          <div class="loading-box" *ngIf="loadingNotes"><div class="spinner small"></div><span>Loading notes...</span></div>
+
+          <div class="table-scroll" *ngIf="!loadingNotes && notes.length">
+            <table class="leads-table">
+              <thead><tr><th>Note Detail</th><th>Created</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let n of notes">
+                  <td><div class="table-user-name note-cell">{{ n.content }}</div><div class="table-user-sub">by {{ employeeName(n.createdBy) }}</div></td>
+                  <td>{{ n.createdAt | date:'medium' }}</td>
+                  <td><div class="table-actions-group">
+                    <button class="btn-action-icon" title="View" (click)="openEditNote(n)"><svg lucideEye size="15"></svg></button>
+                    <button class="btn-action-icon" title="Edit" (click)="openEditNote(n)"><svg lucideEdit size="15"></svg></button>
+                    <button class="btn-action-icon danger-action" title="Delete" (click)="deleteNote(n)"><svg lucideTrash2 size="15"></svg></button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state-box" *ngIf="!loadingNotes && !notes.length">
+            <svg lucideMessageSquare size="24" style="margin-bottom:6px;opacity:.5"></svg>
+            <div>No notes added yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ HISTORY TAB ══════════ -->
+      <div class="tab-pane" *ngIf="activeTab === 'history'">
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-orange-light text-orange"><svg lucideHistory size="16"></svg></span>
+              <h3>Deal History</h3>
+            </div>
+          </div>
+
+          <div class="loading-box" *ngIf="loadingHistory"><div class="spinner small"></div><span>Loading history...</span></div>
+
+          <div class="activity-timeline" *ngIf="!loadingHistory && history.length">
+            <div class="activity-entry" *ngFor="let h of history">
+              <div class="activity-avatar">
+                <img *ngIf="h.actor?.avatarUrl" [src]="h.actor.avatarUrl" alt="">
+                <span class="act-initials {{ activityColor(h.action) }}" *ngIf="!h.actor?.avatarUrl">{{ getInitials(h.actor ? (h.actor.firstName + ' ' + h.actor.lastName) : 'System') }}</span>
+              </div>
+              <div class="activity-body">
+                <div class="activity-text">
+                  <strong>{{ employeeName(h.actor) }}</strong>
+                  <span class="activity-desc">{{ h.description }}</span>
+                </div>
+                <div class="activity-meta">
+                  <span class="activity-time">{{ h.createdAt | date:'dd-MM-yyyy hh:mm a' }}</span>
+                  <button class="btn-text-sm" *ngIf="h.metadata" (click)="toggleActivityDetails(h.id)">{{ showActivityDetailsId === h.id ? 'Hide Details' : 'View Details' }}</button>
+                </div>
+                <div class="activity-details" *ngIf="showActivityDetailsId === h.id && h.metadata">
+                  <pre class="activity-json">{{ h.metadata | json }}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="empty-state-box" *ngIf="!loadingHistory && !history.length">
+            <svg lucideHistory size="24" style="margin-bottom:6px;opacity:.5"></svg>
+            <div>No activity recorded yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ FOLLOW-UP MODAL ══════════════════════════ -->
+    <div class="modal-overlay" *ngIf="showFollowUpModal">
+      <div class="modal-card modal-card-md">
+        <div class="modal-header-styled">
+          <div class="modal-header-text"><h3>{{ isEditingFollowUp ? 'Edit Follow Up' : 'New Follow Up' }}</h3><p>Schedule or log an interaction on this deal.</p></div>
+          <button class="close-btn" (click)="closeFollowUpModal()"><svg lucideX size="18"></svg></button>
+        </div>
+        <div class="modal-body-styled modal-body-scroll">
+          <label class="form-label">Title *</label>
+          <input class="modern-form-control" [(ngModel)]="followUpForm.title" placeholder="e.g. Follow-up call regarding pricing">
+
+          <label class="form-label" style="margin-top:16px">Type</label>
+          <select class="modern-form-control" [(ngModel)]="followUpForm.type">
+            <option value="CALL">Call</option>
+            <option value="MEETING">Meeting</option>
+            <option value="DEMO">Demo</option>
+            <option value="EMAIL">Email</option>
+            <option value="FIELD_VISIT">Field Visit</option>
+            <option value="NOTE">Note</option>
+            <option value="OTHER">Other</option>
+          </select>
+
+          <label class="form-label" style="margin-top:16px">Scheduled Date/Time *</label>
+          <input type="datetime-local" class="modern-form-control" [(ngModel)]="followUpForm.scheduledAt">
+
+          <label class="form-label" style="margin-top:16px">Remark</label>
+          <textarea class="modern-form-control" rows="3" [(ngModel)]="followUpForm.notes" placeholder="Agenda or remarks"></textarea>
+
+          <label class="form-label" style="margin-top:16px">Status</label>
+          <select class="modern-form-control" [(ngModel)]="followUpForm.status">
+            <option value="PENDING">Pending</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+        <div class="modal-footer-styled">
+          <button class="btn-outline-pill" (click)="closeFollowUpModal()">Cancel</button>
+          <button class="btn-primary-pill" (click)="saveFollowUp()">{{ isEditingFollowUp ? 'Update' : 'Save' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ NOTE MODAL ══════════════════════════ -->
+    <div class="modal-overlay" *ngIf="showNoteModal">
+      <div class="modal-card modal-card-md">
+        <div class="modal-header-styled">
+          <div class="modal-header-text"><h3>{{ isEditingNote ? 'Edit Note' : 'Add Note' }}</h3><p>Add a note to this deal.</p></div>
+          <button class="close-btn" (click)="closeNoteModal()"><svg lucideX size="18"></svg></button>
+        </div>
+        <div class="modal-body-styled">
+          <label class="form-label">Note Detail *</label>
+          <textarea class="modern-form-control" rows="4" [(ngModel)]="noteForm.content" placeholder="Write a note..."></textarea>
+        </div>
+        <div class="modal-footer-styled">
+          <button class="btn-outline-pill" (click)="closeNoteModal()">Cancel</button>
+          <button class="btn-primary-pill" (click)="saveNote()">{{ isEditingNote ? 'Update' : 'Save' }}</button>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

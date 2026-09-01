@@ -1,0 +1,463 @@
+<div class="client-profile-wrapper">
+  <div class="profile-loading" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <p>Loading lead contact...</p>
+  </div>
+
+  <div class="profile-menu-backdrop" *ngIf="moreMenuOpen" (click)="closeMoreMenu()"></div>
+
+  <ng-container *ngIf="!isLoading && contact">
+    <div class="hero-card">
+      <div class="hero-top">
+        <div class="client-identity">
+          <div class="avatar-gradient"><span>{{ getInitials(contact.name) }}</span></div>
+          <div class="identity-info">
+            <div class="title-row">
+              <h1 class="client-title"><span class="salutation-text" *ngIf="contact.salutation">{{ contact.salutation }}</span> {{ contact.name }}</h1>
+              <span class="status-pill status-active" *ngIf="contact.companyName"><span class="status-dot"></span> {{ contact.companyName }}</span>
+            </div>
+            <div class="meta-strip">
+              <span class="meta-pill" *ngIf="contact.leadSource"><svg lucideAward size="14"></svg> {{ contact.leadSource }}</span>
+              <span class="meta-pill"><svg lucideMapPin size="14"></svg> {{ fullLocation || 'No Location specified' }}</span>
+              <span class="meta-pill" *ngIf="contact.website"><svg lucideGlobe size="14"></svg> <a [href]="formattedWebsiteUrl" target="_blank" class="meta-link">{{ contact.website }} <svg lucideExternalLink size="12"></svg></a></span>
+            </div>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-outline-pill" (click)="goBack()"><svg lucideArrowLeft size="16"></svg> Back to Leads</button>
+          <div class="profile-menu-wrap" (click)="$event.stopPropagation()">
+            <button type="button" class="profile-menu-btn" (click)="toggleMoreMenu()" title="More actions" [class.active]="moreMenuOpen">
+              <svg lucideMoreVertical size="18"></svg>
+            </button>
+            <div class="profile-menu-popover" *ngIf="moreMenuOpen" (click)="$event.stopPropagation()">
+              <button type="button" class="profile-menu-item" (click)="openEditModal()"><svg lucideEdit2 size="15"></svg><span>Edit Details</span></button>
+              <button type="button" class="profile-menu-item" (click)="convertToClient()" [disabled]="isConverting"><svg lucideUserPlus size="15"></svg><span>{{ isConverting ? 'Converting...' : 'Convert to Client' }}</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-stats-grid">
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-projects"><svg lucideBriefcase size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Leads Brought</span><span class="chip-value">{{ leadsBrought.length }}</span></div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-balance"><svg lucideAward size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Won</span><span class="chip-value">{{ wonLeadsCount }}</span></div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-contact"><svg lucideUserCheck size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Total Value</span><span class="chip-value">{{ totalValue | currency:(contact.leadsBrought?.[0]?.currency || 'INR') }}</span></div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-since"><svg lucideCalendar size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Added</span><span class="chip-value">{{ contact.createdAt | date:'mediumDate' }}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="segmented-nav">
+      <button class="nav-pill-btn" [class.active]="activeTab === 'overview'" (click)="setTab('overview')"><svg lucideLayoutList size="16"></svg> Overview</button>
+      <button class="nav-pill-btn" [class.active]="activeTab === 'deals'" (click)="setTab('deals')"><svg lucideBriefcase size="16"></svg> Deals <span class="count-badge">{{ leadsBrought.length }}</span></button>
+      <button class="nav-pill-btn" [class.active]="activeTab === 'notes'" (click)="setTab('notes')"><svg lucideMessageSquare size="16"></svg> Notes <span class="count-badge">{{ notes.length }}</span></button>
+    </div>
+
+    <div class="tab-body">
+      <div class="tab-pane" *ngIf="activeTab === 'overview'">
+        <div class="overview-grid">
+          <div class="content-card" style="grid-column: 1 / -1;">
+            <div class="card-header-styled">
+              <div class="header-title-box">
+                <span class="header-icon bg-orange-light text-orange"><svg lucideUser size="16"></svg></span>
+                <h3>Contact Details</h3>
+              </div>
+            </div>
+            <div class="details-list">
+              <div class="detail-row"><span class="detail-label">Name</span><span class="detail-value">{{ fullName }}</span></div>
+              <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">{{ contact.email || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">Added By</span><span class="detail-value"><span class="person-cell"><img *ngIf="contact.addedBy?.avatarUrl" [src]="contact.addedBy.avatarUrl" class="person-avatar" /><span class="person-avatar-placeholder" *ngIf="!contact.addedBy?.avatarUrl">{{ initialsOf(contact.addedBy) }}</span><span class="person-body"><span class="person-name">{{ addedByName || 'Direct / System' }}</span><span class="person-designation" *ngIf="contact.addedBy">{{ contact.addedBy.designation?.name || contact.addedBy.department?.name }}</span></span></span></span></div>
+              <div class="detail-row"><span class="detail-label">Lead Owner</span><span class="detail-value"><span class="person-cell"><img *ngIf="contact.addedBy?.avatarUrl" [src]="contact.addedBy.avatarUrl" class="person-avatar" /><span class="person-avatar-placeholder" *ngIf="!contact.addedBy?.avatarUrl">{{ initialsOf(contact.addedBy) }}</span><span class="person-body"><span class="person-name">{{ addedByName || 'Direct / System' }}</span><span class="person-designation" *ngIf="contact.addedBy">{{ contact.addedBy.designation?.name || contact.addedBy.department?.name }}</span></span></span></span></div>
+              <div class="detail-row"><span class="detail-label">Source</span><span class="detail-value">{{ contact.leadSource || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">Company Name</span><span class="detail-value">{{ contact.companyName || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">Website</span><span class="detail-value"><a *ngIf="contact.website" [href]="formattedWebsiteUrl" target="_blank" class="meta-link">{{ contact.website }} <svg lucideExternalLink size="12"></svg></a><span *ngIf="!contact.website">—</span></span></div>
+              <div class="detail-row"><span class="detail-label">Mobile</span><span class="detail-value">{{ contact.mobile || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">Office Phone Number</span><span class="detail-value">{{ contact.officePhoneNumber || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">Country</span><span class="detail-value">{{ contact.country || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">State</span><span class="detail-value">{{ contact.state || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">City</span><span class="detail-value">{{ contact.city || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">Postal Code</span><span class="detail-value">{{ contact.postalCode || '—' }}</span></div>
+              <div class="detail-row"><span class="detail-label">Address</span><span class="detail-value">{{ contact.address || '—' }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" *ngIf="activeTab === 'deals'">
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-indigo-light text-indigo"><svg lucideBriefcase size="16"></svg></span>
+              <h3>Leads Brought</h3>
+            </div>
+            <div class="deals-toolbar">
+              <button type="button" class="btn btn-outline-pill" (click)="exportLeadsCsv()"><svg lucideDownload size="15"></svg> Export CSV</button>
+              <button type="button" class="btn btn-primary-pill" (click)="openAddDeal()"><svg lucidePlus size="15"></svg> Add Deal</button>
+            </div>
+          </div>
+          <div class="table-scroll" *ngIf="leadsBrought.length">
+            <table class="leads-table deals-pipeline-table">
+              <thead><tr>
+                <th>Deal Name</th>
+                <th>Lead Name</th>
+                <th>Contact Details</th>
+                <th>Value</th>
+                <th>Close Date</th>
+                <th>Next Follow Up</th>
+                <th>Deal Agent</th>
+                <th>Deal Watcher</th>
+                <th>Stage</th>
+                <th>Action</th>
+              </tr></thead>
+              <tbody>
+                <tr *ngFor="let lead of leadsBrought">
+                  <td><button type="button" class="link-like" (click)="openLead(lead.id)">{{ lead.title }}</button><div class="table-user-sub" *ngIf="lead.dealCategory"><span class="category-pill">{{ lead.dealCategory }}</span></div></td>
+                  <td><div class="table-user-name">{{ lead.contactName || '—' }}</div><div class="table-user-sub" *ngIf="lead.companyName">{{ lead.companyName }}</div></td>
+                  <td><div class="contact-details-cell"><span *ngIf="lead.email">{{ lead.email }}</span><span *ngIf="lead.phone" class="phone-sub">{{ lead.phone }}</span><span class="no-data-dash" *ngIf="!lead.email && !lead.phone">—</span></div></td>
+                  <td><span class="amount-cell" *ngIf="lead.value != null">{{ lead.value | currency:(lead.currency || 'INR') }}</span><span class="no-data-dash" *ngIf="lead.value == null">—</span></td>
+                  <td><div class="table-user-sub">{{ (lead.expectedCloseDate | date:'mediumDate') || '—' }}</div></td>
+                  <td><div class="table-user-sub">{{ nextFollowUp(lead) }}</div></td>
+                  <td><span class="table-user-name">{{ employeeName(lead.assignedTo) }}</span></td>
+                  <td><span class="table-user-name">{{ employeeName(lead.addedBy) }}</span></td>
+                  <td><span class="status-pill lead-status {{ statusClass(lead.status) }}">{{ stageLabel(lead.status) }}</span></td>
+                  <td><div class="table-actions-group">
+                    <button type="button" class="btn-action-icon" (click)="openLead(lead.id)" title="View deal">View</button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state-box" *ngIf="!leadsBrought.length">No leads have been brought by this contact yet.</div>
+        </div>
+      </div>
+
+      <div class="tab-pane" *ngIf="activeTab === 'notes'">
+        <div class="content-card">
+          <div class="card-header-styled">
+            <div class="header-title-box">
+              <span class="header-icon bg-emerald-light text-emerald"><svg lucideMessageSquare size="16"></svg></span>
+              <h3>Notes</h3>
+            </div>
+            <div class="deals-toolbar">
+              <div class="toolbar-search">
+                <svg lucideSearch size="15"></svg>
+                <input type="text" placeholder="Search notes..." [(ngModel)]="noteSearch" (ngModelChange)="onNoteSearch()" />
+              </div>
+              <button type="button" class="btn btn-outline-pill" (click)="exportNotesCsv()"><svg lucideDownload size="15"></svg> {{ selectedNoteIds.size ? 'Export Selected' : 'Export CSV' }}</button>
+              <button type="button" class="btn btn-primary-pill" (click)="openAddNote()"><svg lucidePlus size="15"></svg> Add Note</button>
+            </div>
+          </div>
+
+          <div class="loading-box" *ngIf="loadingNotes"><div class="spinner small"></div><span>Loading notes...</span></div>
+
+          <div class="table-scroll" *ngIf="!loadingNotes && pagedNotes.length">
+            <table class="leads-table notes-table">
+              <thead><tr>
+                <th class="checkbox-col"><input type="checkbox" [checked]="allNotesSelected" (change)="toggleAllNotes()" title="Select all" /></th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Detail</th>
+                <th>Created By</th>
+                <th>Created</th>
+                <th>Action</th>
+              </tr></thead>
+              <tbody>
+                <tr *ngFor="let n of pagedNotes">
+                  <td class="checkbox-col"><input type="checkbox" [checked]="selectedNoteIds.has(n.id)" (change)="toggleNote(n)" /></td>
+                  <td><div class="table-user-name">{{ n.title }}</div></td>
+                  <td><span class="followup-type-pill {{ noteTypeClass(n.type) }}">{{ noteTypeLabel(n.type) }}</span></td>
+                  <td><div class="table-user-sub note-detail-cell">{{ n.content || '—' }}</div></td>
+                  <td><span class="table-user-name">{{ employeeName(n.createdBy) }}</span></td>
+                  <td><div class="table-user-sub">{{ n.createdAt | date:'mediumDate' }}</div></td>
+                  <td><div class="table-actions-group">
+                    <button type="button" class="btn-action-icon" title="View" (click)="openViewNote(n)"><svg lucideEye size="15"></svg></button>
+                    <button type="button" class="btn-action-icon" title="Edit" (click)="openEditNote(n)"><svg lucideEdit size="15"></svg></button>
+                    <button type="button" class="btn-action-icon danger-action" title="Delete" (click)="deleteNote(n)"><svg lucideTrash2 size="15"></svg></button>
+                  </div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination-wrap" *ngIf="!loadingNotes && filteredNotes.length && noteTotalPages > 1">
+            <button type="button" class="page-btn" [disabled]="notePage <= 1" (click)="setNotePage(notePage - 1)"><svg lucideChevronLeft size="15"></svg></button>
+            <span class="page-info">Page {{ notePage }} of {{ noteTotalPages }} ({{ filteredNotes.length }} notes)</span>
+            <button type="button" class="page-btn" [disabled]="notePage >= noteTotalPages" (click)="setNotePage(notePage + 1)"><svg lucideChevronRight size="15"></svg></button>
+          </div>
+
+          <div class="empty-state-box" *ngIf="!loadingNotes && !notes.length">
+            <svg lucideMessageSquare size="24" style="margin-bottom:6px;opacity:.5"></svg>
+            <div>No notes added yet.</div>
+          </div>
+          <div class="empty-state-box" *ngIf="!loadingNotes && notes.length && !filteredNotes.length">
+            <svg lucideSearch size="24" style="margin-bottom:6px;opacity:.5"></svg>
+            <div>No notes match your search.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- Edit Lead Contact Modal -->
+  <div class="modal-overlay" *ngIf="editModalOpen" (click)="closeEditModal()">
+    <div class="edit-modal" (click)="$event.stopPropagation()">
+      <div class="edit-modal-header">
+        <h3>Edit Lead Contact</h3>
+        <button type="button" class="edit-close-btn" (click)="closeEditModal()"><svg lucideX size="18"></svg></button>
+      </div>
+      <form #editFormNg="ngForm" (ngSubmit)="saveEdit(editFormNg)">
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Salutation</label>
+            <select [(ngModel)]="editForm.salutation" name="salutation" class="enhanced-select">
+              <option value="">--</option>
+              <option value="Mr.">Mr.</option>
+              <option value="Mrs.">Mrs.</option>
+              <option value="Ms.">Ms.</option>
+              <option value="Dr.">Dr.</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Name <span class="required-asterisk">*</span></label>
+            <input type="text" [(ngModel)]="editForm.name" name="name" required placeholder="e.g. John Doe" />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" [(ngModel)]="editForm.email" name="email" placeholder="e.g. john@company.com" />
+          </div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" [(ngModel)]="editForm.phone" name="phone" placeholder="e.g. 1234567890" />
+          </div>
+          <div class="form-group">
+            <label>Mobile</label>
+            <input type="text" [(ngModel)]="editForm.mobile" name="mobile" placeholder="e.g. 9876543210" />
+          </div>
+          <div class="form-group">
+            <label>Office Phone Number</label>
+            <input type="text" [(ngModel)]="editForm.officePhoneNumber" name="officePhoneNumber" placeholder="e.g. +1 555 123 4567" />
+          </div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Lead Source</label>
+            <select [(ngModel)]="editForm.leadSource" name="leadSource" class="enhanced-select">
+              <option value="">-- Select Source --</option>
+              <option *ngFor="let src of sourceOptions" [value]="src">{{ src }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Company Name</label>
+            <input type="text" [(ngModel)]="editForm.companyName" name="companyName" placeholder="e.g. Acme Corporation" />
+          </div>
+          <div class="form-group">
+            <label>Website</label>
+            <input type="url" [(ngModel)]="editForm.website" name="website" placeholder="e.g. https://www.example.com" />
+          </div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Country</label>
+            <input type="text" [(ngModel)]="editForm.country" name="country" placeholder="e.g. United Arab Emirates" />
+          </div>
+          <div class="form-group">
+            <label>State</label>
+            <input type="text" [(ngModel)]="editForm.state" name="state" placeholder="e.g. Dubai" />
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <input type="text" [(ngModel)]="editForm.city" name="city" placeholder="e.g. New York" />
+          </div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Postal Code</label>
+            <input type="text" [(ngModel)]="editForm.postalCode" name="postalCode" placeholder="e.g. 90250" />
+          </div>
+          <div class="form-group form-group-wide">
+            <label>Address</label>
+            <input type="text" [(ngModel)]="editForm.address" name="address" placeholder="e.g. Office 402, Business Tower" />
+          </div>
+        </div>
+        <div class="edit-modal-footer">
+          <button type="button" class="btn btn-outline-pill" (click)="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary-pill" [disabled]="isSavingEdit || !editForm.name">{{ isSavingEdit ? 'Saving...' : 'Save Changes' }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Deal Modal -->
+  <div class="modal-overlay" *ngIf="dealModalOpen" (click)="closeAddDeal()">
+    <div class="edit-modal" (click)="$event.stopPropagation()">
+      <div class="edit-modal-header">
+        <h3>Add Deal</h3>
+        <button type="button" class="edit-close-btn" (click)="closeAddDeal()"><svg lucideX size="18"></svg></button>
+      </div>
+      <form #dealFormNg="ngForm" (ngSubmit)="saveDeal(dealFormNg)">
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Deal Name <span class="required-asterisk">*</span></label>
+            <input type="text" [(ngModel)]="dealForm.title" name="title" required placeholder="e.g. New Contract" />
+          </div>
+          <div class="form-group">
+            <label>Lead Name</label>
+            <input type="text" [(ngModel)]="dealForm.contactName" name="contactName" placeholder="e.g. Jane Cooper" />
+          </div>
+          <div class="form-group">
+            <label>Company Name</label>
+            <input type="text" [(ngModel)]="dealForm.companyName" name="companyName" placeholder="e.g. Acme Corp" />
+          </div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" [(ngModel)]="dealForm.email" name="email" placeholder="e.g. jane@company.com" />
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" [(ngModel)]="dealForm.phone" name="phone" placeholder="e.g. 1234567890" />
+          </div>
+          <div class="form-group">
+            <label>Value</label>
+            <input type="number" [(ngModel)]="dealForm.value" name="value" placeholder="e.g. 100000" />
+          </div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Currency</label>
+            <select [(ngModel)]="dealForm.currency" name="currency" class="enhanced-select">
+              <option value="INR">INR</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="AED">AED</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Stage</label>
+            <select [(ngModel)]="dealForm.status" name="status" class="enhanced-select">
+              <option value="NEW">NEW</option>
+              <option value="QUALIFIED">QUALIFIED</option>
+              <option value="PROPOSAL">PROPOSAL</option>
+              <option value="WON">WON</option>
+              <option value="LOST">LOST</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Expected Close Date</label>
+            <input type="date" [(ngModel)]="dealForm.expectedCloseDate" name="expectedCloseDate" />
+          </div>
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>Deal Category</label>
+            <input type="text" [(ngModel)]="dealForm.dealCategory" name="dealCategory" placeholder="e.g. Software" />
+          </div>
+          <div class="form-group">
+            <label>Source</label>
+            <select [(ngModel)]="dealForm.source" name="source" class="enhanced-select">
+              <option value="">-- Select Source --</option>
+              <option *ngFor="let src of sourceOptions" [value]="src">{{ src }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Website</label>
+            <input type="url" [(ngModel)]="dealForm.website" name="website" placeholder="e.g. https://www.example.com" />
+          </div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group">
+            <label>Assigned To (Deal Agent)</label>
+            <select [(ngModel)]="dealForm.assignedToId" name="assignedToId" class="enhanced-select">
+              <option [ngValue]="null">-- Select Agent --</option>
+              <option *ngFor="let emp of employees" [ngValue]="emp.id">{{ employeeName(emp) }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" [(ngModel)]="dealForm.address" name="address" placeholder="e.g. Office 402, Business Tower" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" [(ngModel)]="dealForm.description" name="description" placeholder="Brief description of the deal" />
+          </div>
+        </div>
+        <div class="edit-modal-footer">
+          <button type="button" class="btn btn-outline-pill" (click)="closeAddDeal()">Cancel</button>
+          <button type="submit" class="btn btn-primary-pill" [disabled]="isSavingDeal || !dealForm.title">{{ isSavingDeal ? 'Saving...' : 'Add Deal' }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add / Edit Note Modal -->
+  <div class="modal-overlay" *ngIf="noteModalOpen" (click)="closeNoteModal()">
+    <div class="edit-modal" (click)="$event.stopPropagation()">
+      <div class="edit-modal-header">
+        <h3>{{ isEditingNote ? 'Edit Note' : 'Add Note' }}</h3>
+        <button type="button" class="edit-close-btn" (click)="closeNoteModal()"><svg lucideX size="18"></svg></button>
+      </div>
+      <form (ngSubmit)="saveNote()">
+        <div class="form-row form-row-3">
+          <div class="form-group form-group-wide">
+            <label>Title <span class="required-asterisk">*</span></label>
+            <input type="text" [(ngModel)]="noteForm.title" name="noteTitle" required placeholder="e.g. Pricing discussion follow-up" />
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select [(ngModel)]="noteForm.type" name="noteType" class="enhanced-select">
+              <option *ngFor="let t of NOTE_TYPES" [value]="t">{{ noteTypeLabel(t) }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Detail</label>
+            <textarea [(ngModel)]="noteForm.content" name="noteContent" rows="4" placeholder="Write the note detail..."></textarea>
+          </div>
+        </div>
+        <div class="edit-modal-footer">
+          <button type="button" class="btn btn-outline-pill" (click)="closeNoteModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary-pill" [disabled]="isSavingNote || !noteForm.title">{{ isSavingNote ? 'Saving...' : (isEditingNote ? 'Update' : 'Add Note') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- View Note Modal -->
+  <div class="modal-overlay" *ngIf="viewNoteOpen" (click)="closeViewNote()">
+    <div class="edit-modal" (click)="$event.stopPropagation()">
+      <div class="edit-modal-header">
+        <h3>{{ viewingNote?.title }}</h3>
+        <button type="button" class="edit-close-btn" (click)="closeViewNote()"><svg lucideX size="18"></svg></button>
+      </div>
+      <div class="view-note-body" *ngIf="viewingNote">
+        <div class="view-note-meta">
+          <span class="followup-type-pill {{ noteTypeClass(viewingNote.type) }}">{{ noteTypeLabel(viewingNote.type) }}</span>
+          <span class="view-note-meta-item">by <strong>{{ employeeName(viewingNote.createdBy) }}</strong></span>
+          <span class="view-note-meta-item">{{ viewingNote.createdAt | date:'medium' }}</span>
+        </div>
+        <p class="view-note-content">{{ viewingNote.content || 'No detail provided for this note.' }}</p>
+      </div>
+      <div class="edit-modal-footer">
+        <button type="button" class="btn btn-outline-pill" (click)="closeViewNote()">Close</button>
+        <button type="button" class="btn btn-primary-pill" (click)="openEditNote(viewingNote); closeViewNote()">Edit</button>
+      </div>
+    </div>
+  </div>
+</div>

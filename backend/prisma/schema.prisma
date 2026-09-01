@@ -66,6 +66,11 @@ model Company {
   fieldVisits         FieldVisit[]         @relation("CompanyFieldVisits")
   leadFollowUps       LeadFollowUp[]
   leadContacts        LeadContact[]
+  leadFiles           LeadFile[]
+  leadNotes           LeadNote[]
+  leadActivities      LeadActivity[]
+  leadContactNotes    LeadContactNote[]
+  leadForms           LeadForm[]
   offerLetters        OfferLetter[]
 }
 
@@ -284,6 +289,11 @@ model Employee {
   fieldVisits              FieldVisit[]               @relation("EmployeeFieldVisits")
   followUpsAssigned        LeadFollowUp[]             @relation("FollowUpAssignee")
   leadContactsAdded        LeadContact[]              @relation("LeadContactAddedBy")
+  leadFilesUploaded        LeadFile[]                 @relation("LeadFileUploader")
+  leadNotesCreated         LeadNote[]                 @relation("LeadNoteCreator")
+  leadActivities           LeadActivity[]             @relation("LeadActivityActor")
+  leadContactNotesCreated  LeadContactNote[]          @relation("LeadContactNoteCreator")
+  leadFormsCreated         LeadForm[]                 @relation("LeadFormCreator")
 
   @@unique([companyId, employeeCode])
 }
@@ -663,6 +673,65 @@ model AssetAssignment {
   company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+}
+
+// A standalone note attached to a Lead Contact (broker/partner/referrer).
+// Separate from LeadNote which is scoped to a deal/lead. Supports CRUD and
+// export from the Lead Contact Profile "Notes" tab.
+model LeadContactNote {
+  id           Int       @id @default(autoincrement())
+  contactId    Int
+  contact      LeadContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  title        String
+  type         String    @default("GENERAL") // GENERAL, CALL, MEETING, EMAIL, FOLLOW_UP, OTHER
+  content      String    @db.Text
+  createdById  Int?
+  createdBy    Employee? @relation("LeadContactNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  companyId    Int
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// A configurable public Lead Capture Form (Lead Form Builder). Admins configure
+// which fields are shown, their order, and required status; the form generates
+// Leads into the existing Lead system via a public URL.
+model LeadForm {
+  id              Int             @id @default(autoincrement())
+  formKey         String          @unique // public identifier (e.g. short base64 id) for /lead-form/:formKey
+  name            String
+  description     String?
+  status          String          @default("ACTIVE") // ACTIVE, INACTIVE
+  successMessage  String?         @default("Thank you! Your enquiry has been received.")
+  redirectUrl     String?
+  captchaEnabled  Boolean         @default(false)
+  source          String          @default("Lead Form") // stamped on Lead.source for created leads
+  productOptions  Json? // optional list of product options for the "Product" select field
+  createdById     Int?
+  createdBy       Employee?       @relation("LeadFormCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  companyId       Int
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fields          LeadFormField[]
+  leadsCreated    Lead[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Field configuration for a LeadForm.
+model LeadFormField {
+  id        Int      @id @default(autoincrement())
+  formId    Int
+  form      LeadForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  fieldKey  String // e.g. name, email, companyName, website, address, mobile, message, city, state, country, postalCode, source, product
+  label     String
+  type      String // text, email, tel, url, textarea, select
+  enabled   Boolean  @default(true)
+  required  Boolean  @default(false)
+  isName    Boolean  @default(false) // the canonical Name field -> maps to Lead.title/contactName
+  sortOrder Int      @default(0)
+  options   Json? // for select fields (source, country, product)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model HardwareRequest {
@@ -1983,6 +2052,8 @@ model Lead {
   addedBy             Employee?      @relation("LeadCreator", fields: [addedById], references: [id], onDelete: SetNull)
   broughtByContactId  Int? // External source (e.g. broker/partner) who brought this lead — alternative to addedBy
   broughtByContact    LeadContact?   @relation(fields: [broughtByContactId], references: [id], onDelete: SetNull)
+  leadFormId          Int? // Lead Form that generated this lead (public capture forms)
+  leadForm            LeadForm?      @relation(fields: [leadFormId], references: [id], onDelete: SetNull)
   expectedCloseDate   DateTime?
   website             String?
   address             String?        @db.Text
@@ -1994,6 +2065,9 @@ model Lead {
   updatedAt           DateTime       @updatedAt
   quotations          Quotation[]
   followUps           LeadFollowUp[]
+  files               LeadFile[]
+  notes               LeadNote[]
+  activities          LeadActivity[]
 }
 
 // External contact (broker/partner/referrer) who can be selected as the source
@@ -2021,6 +2095,7 @@ model LeadContact {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   leadsBrought      Lead[]
+  notes             LeadContactNote[]
 }
 
 // A follow-up is a single logged/scheduled interaction on a lead — a running
@@ -2037,12 +2112,55 @@ model LeadFollowUp {
   type          String    @default("CALL") // CALL, MEETING, DEMO, EMAIL, FIELD_VISIT, NOTE, OTHER
   scheduledAt   DateTime // When this interaction is/was planned
   notes         String?   @db.Text // Agenda going in, remarks/outcome coming out — one running note
+  status        String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
   assignedToId  Int? // Responsible rep
   assignedTo    Employee? @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   companyId     Int
   company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+model LeadFile {
+  id           Int       @id @default(autoincrement())
+  leadId       Int
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileType     String?
+  fileSize     Int?
+  uploadedById Int?
+  uploadedBy   Employee? @relation("LeadFileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  companyId    Int
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+}
+
+model LeadNote {
+  id           Int       @id @default(autoincrement())
+  leadId       Int
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  content      String    @db.Text
+  createdById  Int?
+  createdBy    Employee? @relation("LeadNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  companyId    Int
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model LeadActivity {
+  id          Int       @id @default(autoincrement())
+  leadId      Int
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  action      String
+  description String?
+  actorId     Int?
+  actor       Employee? @relation("LeadActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+  metadata    Json?
+  companyId   Int
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
 }
 
 model Quotation {

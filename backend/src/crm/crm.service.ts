@@ -1,10 +1,35 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionsService } from '../permissions/permissions.service';
 
 @Injectable()
 export class CrmService {
   constructor(private prisma: PrismaService, private permissionsService: PermissionsService) {}
+
+  private async logActivity(
+    companyId: number,
+    leadId: number,
+    action: string,
+    description: string,
+    actorId?: number | null,
+    metadata?: any,
+  ) {
+    return this.prisma.leadActivity.create({
+      data: {
+        companyId,
+        leadId,
+        action,
+        description,
+        actorId: actorId ?? null,
+        metadata: metadata || undefined,
+      },
+      include: {
+        actor: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+        },
+      },
+    });
+  }
 
   private sanitizeLead(data: any) {
     const out = { ...data };
@@ -20,7 +45,7 @@ export class CrmService {
 
   async createLead(companyId: number, data: any, creatorEmployeeId?: number | null) {
     const sanitized = this.sanitizeLead(data);
-    return this.prisma.lead.create({
+    const lead = await this.prisma.lead.create({
       data: {
         ...sanitized,
         addedById: sanitized.addedById ?? creatorEmployeeId ?? null,
@@ -36,6 +61,17 @@ export class CrmService {
         broughtByContact: true,
       },
     });
+
+    await this.logActivity(
+      companyId,
+      lead.id,
+      'DEAL_CREATED',
+      `Deal "${lead.title}" created`,
+      lead.addedById ?? creatorEmployeeId,
+      { title: lead.title, status: lead.status, value: lead.value, companyName: lead.companyName },
+    );
+
+    return lead;
   }
 
   async getLeads(companyId: number, user: { role?: string; employeeId?: number | null }) {
@@ -73,6 +109,47 @@ export class CrmService {
     });
   }
 
+  async getLeadById(companyId: number, id: number, user: { role?: string; employeeId?: number | null }) {
+    const lead = await this.prisma.lead.findFirst({
+      where: { id, companyId },
+      include: {
+        assignedTo: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } }, department: { select: { name: true } } },
+        },
+        addedBy: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } }, department: { select: { name: true } } },
+        },
+        broughtByContact: true,
+        client: true,
+        quotations: true,
+        followUps: {
+          orderBy: { scheduledAt: 'asc' },
+          include: {
+            assignedTo: {
+              select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const isUnrestricted = user.role === 'SUPERADMIN' || user.role === 'ADMIN';
+    if (!isUnrestricted) {
+      const canViewAll = await this.permissionsService.hasPermission(
+        companyId, user.role || 'EMPLOYEE', 'crm/leads', 'VIEW_ALL',
+      );
+      if (!canViewAll) {
+        const scoped =
+          (lead.addedById !== null && lead.addedById === user.employeeId) ||
+          (lead.assignedToId !== null && lead.assignedToId === user.employeeId);
+        if (!scoped) throw new NotFoundException('Lead not found');
+      }
+    }
+
+    return lead;
+  }
+
   async updateLeadStatus(companyId: number, leadId: number, status: string) {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -86,6 +163,15 @@ export class CrmService {
         broughtByContact: true,
       }
     });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'STAGE_CHANGED',
+      `Deal stage changed from "${lead.status}" to "${status}"`,
+      updatedLead.addedById,
+      { from: lead.status, to: status, title: lead.title },
+    );
 
     // Automatically create a client if status changed to WON
     if (status === 'WON' && !lead.clientId && lead.companyName) {
@@ -118,7 +204,7 @@ export class CrmService {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
     if (!lead) throw new NotFoundException('Lead not found');
 
-    return this.prisma.lead.update({
+    const updatedLead = await this.prisma.lead.update({
       where: { id: leadId },
       data: this.sanitizeLead(data),
       include: {
@@ -127,6 +213,17 @@ export class CrmService {
         broughtByContact: true,
       }
     });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'DEAL_EDITED',
+      `Deal "${lead.title}" updated`,
+      updatedLead.addedById,
+      { title: lead.title },
+    );
+
+    return updatedLead;
   }
 
   async deleteLead(companyId: number, leadId: number) {
@@ -135,6 +232,175 @@ export class CrmService {
 
     return this.prisma.lead.delete({
       where: { id: leadId },
+    });
+  }
+
+  // ═══════════════════════════════════════════
+  // DEAL FILES
+  // ═══════════════════════════════════════════
+
+  async getLeadFiles(companyId: number, leadId: number) {
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    return this.prisma.leadFile.findMany({
+      where: { leadId, companyId },
+      include: {
+        uploadedBy: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async addLeadFile(companyId: number, leadId: number, file: any, uploaderEmployeeId?: number | null) {
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const leadFile = await this.prisma.leadFile.create({
+      data: {
+        leadId,
+        companyId,
+        fileName: file.originalname || 'file',
+        fileUrl: file.url,
+        fileType: file.mimetype || null,
+        fileSize: file.size || null,
+        uploadedById: uploaderEmployeeId || null,
+      },
+      include: {
+        uploadedBy: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+        },
+      },
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'FILE_UPLOADED',
+      `File "${leadFile.fileName}" uploaded`,
+      uploaderEmployeeId,
+      { fileId: leadFile.id, fileName: leadFile.fileName },
+    );
+
+    return leadFile;
+  }
+
+  async deleteLeadFile(companyId: number, leadId: number, fileId: number) {
+    const file = await this.prisma.leadFile.findFirst({ where: { id: fileId, leadId, companyId } });
+    if (!file) throw new NotFoundException('File not found');
+
+    const deleted = await this.prisma.leadFile.delete({ where: { id: fileId } });
+
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
+    await this.logActivity(
+      companyId,
+      leadId,
+      'FILE_DELETED',
+      `File "${deleted.fileName}" deleted`,
+      lead?.addedById,
+      { fileId, fileName: deleted.fileName },
+    );
+
+    return deleted;
+  }
+
+  // ═══════════════════════════════════════════
+  // DEAL NOTES
+  // ═══════════════════════════════════════════
+
+  async getLeadNotes(companyId: number, leadId: number) {
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    return this.prisma.leadNote.findMany({
+      where: { leadId, companyId },
+      include: {
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createLeadNote(companyId: number, leadId: number, data: any, creatorEmployeeId?: number | null) {
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const note = await this.prisma.leadNote.create({
+      data: {
+        leadId,
+        companyId,
+        content: data.content,
+        createdById: creatorEmployeeId || null,
+      },
+      include: {
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+        },
+      },
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'NOTE_ADDED',
+      `Note added by ${note.createdBy ? `${note.createdBy.firstName} ${note.createdBy.lastName}`.trim() : 'user'}`,
+      creatorEmployeeId,
+      { noteId: note.id },
+    );
+
+    return note;
+  }
+
+  async updateLeadNote(companyId: number, leadId: number, noteId: number, data: any, actorEmployeeId?: number | null) {
+    const note = await this.prisma.leadNote.findFirst({ where: { id: noteId, leadId, companyId } });
+    if (!note) throw new NotFoundException('Note not found');
+
+    const updated = await this.prisma.leadNote.update({
+      where: { id: noteId },
+      data: { content: data.content },
+      include: {
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+        },
+      },
+    });
+
+    await this.logActivity(companyId, leadId, 'NOTE_UPDATED', `Note updated`, actorEmployeeId, { noteId });
+
+    return updated;
+  }
+
+  async deleteLeadNote(companyId: number, leadId: number, noteId: number, actorEmployeeId?: number | null) {
+    const note = await this.prisma.leadNote.findFirst({ where: { id: noteId, leadId, companyId } });
+    if (!note) throw new NotFoundException('Note not found');
+
+    const deleted = await this.prisma.leadNote.delete({ where: { id: noteId } });
+
+    await this.logActivity(companyId, leadId, 'NOTE_DELETED', `Note deleted`, actorEmployeeId, { noteId });
+
+    return deleted;
+  }
+
+  // ═══════════════════════════════════════════
+  // DEAL HISTORY / ACTIVITY
+  // ═══════════════════════════════════════════
+
+  async getLeadHistory(companyId: number, leadId: number) {
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    return this.prisma.leadActivity.findMany({
+      where: { leadId, companyId },
+      include: {
+        actor: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -371,7 +637,7 @@ export class CrmService {
     // No manual rep picker on creation — default to the lead's own owner.
     const assignedToId = data.assignedToId ? parseInt(data.assignedToId, 10) : (lead.assignedToId || null);
 
-    return this.prisma.leadFollowUp.create({
+    const followUp = await this.prisma.leadFollowUp.create({
       data: {
         leadId,
         companyId,
@@ -382,6 +648,7 @@ export class CrmService {
         type: data.type || 'CALL',
         scheduledAt,
         notes: data.notes || null,
+        status: data.status || 'PENDING',
         assignedToId,
       },
       include: {
@@ -390,6 +657,17 @@ export class CrmService {
         },
       },
     });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'FOLLOW_UP_CREATED',
+      `Follow-up "${followUp.title}" created`,
+      lead.addedById,
+      { followUpId: followUp.id, scheduledAt: followUp.scheduledAt, title: followUp.title },
+    );
+
+    return followUp;
   }
 
   async updateFollowUp(companyId: number, leadId: number, followUpId: number, data: any) {
@@ -406,11 +684,12 @@ export class CrmService {
     if (data.type !== undefined) updateData.type = data.type;
     if (data.scheduledAt !== undefined) updateData.scheduledAt = new Date(data.scheduledAt);
     if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.status !== undefined) updateData.status = data.status;
     if (data.assignedToId !== undefined) {
       updateData.assignedToId = data.assignedToId ? parseInt(data.assignedToId, 10) : null;
     }
 
-    return this.prisma.leadFollowUp.update({
+    const updatedFollowUp = await this.prisma.leadFollowUp.update({
       where: { id: followUpId },
       data: updateData,
       include: {
@@ -419,6 +698,18 @@ export class CrmService {
         },
       },
     });
+
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
+    await this.logActivity(
+      companyId,
+      leadId,
+      'FOLLOW_UP_UPDATED',
+      `Follow-up "${updatedFollowUp.title}" updated`,
+      lead?.addedById,
+      { followUpId, status: data.status, title: updatedFollowUp.title },
+    );
+
+    return updatedFollowUp;
   }
 
   async deleteFollowUp(companyId: number, leadId: number, followUpId: number) {
@@ -427,9 +718,21 @@ export class CrmService {
     });
     if (!followUp) throw new NotFoundException('Follow-up not found');
 
-    return this.prisma.leadFollowUp.delete({
+    const deleted = await this.prisma.leadFollowUp.delete({
       where: { id: followUpId },
     });
+
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
+    await this.logActivity(
+      companyId,
+      leadId,
+      'FOLLOW_UP_DELETED',
+      `Follow-up "${deleted.title}" deleted`,
+      lead?.addedById,
+      { followUpId, title: deleted.title },
+    );
+
+    return deleted;
   }
   
   // A user sees a follow-up if they're unrestricted (admin/superadmin or granted
@@ -569,6 +872,39 @@ export class CrmService {
     });
   }
 
+  async getLeadContactById(companyId: number, id: number) {
+    const contact = await this.prisma.leadContact.findFirst({
+      where: { id, companyId },
+      include: {
+        addedBy: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } }, department: { select: { name: true } } },
+        },
+        leadsBrought: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            assignedTo: {
+              select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } }, department: { select: { name: true } } },
+            },
+            addedBy: {
+              select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } }, department: { select: { name: true } } },
+            },
+            followUps: {
+              orderBy: { scheduledAt: 'desc' },
+              include: {
+                assignedTo: {
+                  select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+                },
+              },
+            },
+          },
+        },
+        _count: { select: { leadsBrought: true } },
+      },
+    });
+    if (!contact) throw new NotFoundException('Lead Contact not found');
+    return contact;
+  }
+
   async createLeadContact(companyId: number, userId: number, data: any) {
     let addedById: number | null = data.addedById || null;
     if (!addedById) {
@@ -604,6 +940,20 @@ export class CrmService {
         }
       },
     });
+  }
+
+  async importLeadContacts(companyId: number, userId: number, contacts: any[], addedById: number | null) {
+    if (!Array.isArray(contacts) || contacts.length === 0) {
+      throw new BadRequestException('A non-empty contacts array is required.');
+    }
+    const created: any[] = [];
+    let skipped = 0;
+    for (const raw of contacts) {
+      const name = raw && raw.name ? String(raw.name).trim() : '';
+      if (!name) { skipped++; continue; }
+      created.push(await this.createLeadContact(companyId, userId, { ...raw, name, addedById }));
+    }
+    return { created: created.length, skipped, total: created.length + skipped };
   }
 
   async updateLeadContact(companyId: number, id: number, data: any) {
@@ -650,5 +1000,112 @@ export class CrmService {
     return this.prisma.leadContact.delete({
       where: { id },
     });
+  }
+
+  async convertLeadContactToClient(companyId: number, id: number) {
+    const contact = await this.prisma.leadContact.findFirst({ where: { id, companyId } });
+    if (!contact) throw new NotFoundException('Lead Contact not found');
+
+    const clientName = (contact.companyName || contact.name || '').trim();
+    if (!clientName) throw new BadRequestException('Cannot convert: contact has no company or name.');
+
+    const existing = await this.prisma.client.findFirst({
+      where: { companyId, name: clientName },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `A client named "${clientName}" already exists.`,
+      );
+    }
+
+    return this.prisma.client.create({
+      data: {
+        companyId,
+        name: clientName,
+        website: contact.website || null,
+        status: 'LEAD',
+        currency: 'INR',
+        billingAddressLine1: contact.address || null,
+        billingCity: contact.city || null,
+        billingState: contact.state || null,
+        billingZipCode: contact.postalCode || null,
+        billingCountry: contact.country || null,
+        contacts: contact.email ? {
+          create: [{
+            firstName: (contact.name || '').split(' ')[0] || 'Unknown',
+            lastName: (contact.name || '').split(' ').slice(1).join(' ') || null,
+            email: contact.email,
+            phone: contact.phone || null,
+            mobile: contact.mobile || null,
+            isPrimary: true,
+          }],
+        } : undefined,
+      },
+      include: {
+        contacts: true,
+      },
+    });
+  }
+
+  // ═══════════════════════════════════════════
+  // LEAD CONTACT NOTES
+  // ═══════════════════════════════════════════
+
+  private leadContactNoteInclude = {
+    createdBy: {
+      select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+    },
+  } as const;
+
+  async getLeadContactNotes(companyId: number, contactId: number) {
+    const contact = await this.prisma.leadContact.findFirst({ where: { id: contactId, companyId } });
+    if (!contact) throw new NotFoundException('Lead Contact not found');
+
+    return this.prisma.leadContactNote.findMany({
+      where: { contactId, companyId },
+      include: this.leadContactNoteInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createLeadContactNote(companyId: number, contactId: number, data: any, creatorEmployeeId?: number | null) {
+    const contact = await this.prisma.leadContact.findFirst({ where: { id: contactId, companyId } });
+    if (!contact) throw new NotFoundException('Lead Contact not found');
+    if (!data.title || !data.title.trim()) throw new BadRequestException('Note title is required');
+
+    return this.prisma.leadContactNote.create({
+      data: {
+        contactId,
+        companyId,
+        title: data.title,
+        type: data.type || 'GENERAL',
+        content: data.content || '',
+        createdById: creatorEmployeeId || null,
+      },
+      include: this.leadContactNoteInclude,
+    });
+  }
+
+  async updateLeadContactNote(companyId: number, contactId: number, noteId: number, data: any) {
+    const note = await this.prisma.leadContactNote.findFirst({ where: { id: noteId, contactId, companyId } });
+    if (!note) throw new NotFoundException('Note not found');
+    if (data.title !== undefined && !data.title.trim()) throw new BadRequestException('Note title is required');
+
+    return this.prisma.leadContactNote.update({
+      where: { id: noteId },
+      data: {
+        ...(data.title !== undefined ? { title: data.title } : {}),
+        ...(data.type !== undefined ? { type: data.type } : {}),
+        ...(data.content !== undefined ? { content: data.content } : {}),
+      },
+      include: this.leadContactNoteInclude,
+    });
+  }
+
+  async deleteLeadContactNote(companyId: number, contactId: number, noteId: number) {
+    const note = await this.prisma.leadContactNote.findFirst({ where: { id: noteId, contactId, companyId } });
+    if (!note) throw new NotFoundException('Note not found');
+
+    return this.prisma.leadContactNote.delete({ where: { id: noteId } });
   }
 }

@@ -1,0 +1,67 @@
+<div class="public-lead-form">
+  <div class="plf-shell">
+    <!-- Loading -->
+    <div class="plf-state" *ngIf="status === 'loading'">
+      <svg lucideLoader2 class="plf-spinner" size="32"></svg>
+      <p>Loading form...</p>
+    </div>
+
+    <!-- Not found -->
+    <div class="plf-state" *ngIf="status === 'notfound'">
+      <span class="plf-state-icon plf-error-icon"><svg lucideAlertCircle size="30"></svg></span>
+      <h3>Form not found</h3>
+      <p>This form may have been removed or is no longer active.</p>
+    </div>
+
+    <!-- Error -->
+    <div class="plf-state" *ngIf="status === 'error'">
+      <span class="plf-state-icon plf-error-icon"><svg lucideAlertCircle size="30"></svg></span>
+      <h3>Something went wrong</h3>
+      <p>We could not load this form. Please try again later.</p>
+    </div>
+
+    <!-- Success -->
+    <div class="plf-state" *ngIf="status === 'success'">
+      <span class="plf-state-icon plf-success-icon"><svg lucideCheckCircle2 size="30"></svg></span>
+      <h3>Thank you!</h3>
+      <p>{{ successMessage }}</p>
+    </div>
+
+    <!-- Ready -->
+    <form class="plf-form" *ngIf="status === 'ready'" (ngSubmit)="onSubmit()" novalidate>
+      <div class="plf-head">
+        <h1>{{ name }}</h1>
+        <p *ngIf="description">{{ description }}</p>
+      </div>
+
+      <div class="plf-body">
+        <div class="plf-field" *ngFor="let field of fields">
+          <label>{{ field.label }} <span class="plf-required" *ngIf="field.required || field.isName">*</span></label>
+          <ng-container [ngSwitch]="field.type">
+            <input *ngSwitchCase="'email'" type="email" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)" />
+            <input *ngSwitchCase="'tel'" type="tel" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)" />
+            <input *ngSwitchCase="'url'" type="url" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)" />
+            <select *ngSwitchCase="'select'" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]">
+              <option value="">Select {{ field.label }}...</option>
+              <option *ngFor="let o of (field.options || [])" [value]="o">{{ o }}</option>
+            </select>
+            <textarea *ngSwitchCase="'textarea'" rows="4" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)"></textarea>
+            <input *ngSwitchDefault type="text" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)" />
+          </ng-container>
+          <span class="plf-error" *ngIf="errors[field.fieldKey]">{{ errors[field.fieldKey] }}</span>
+        </div>
+
+        <div class="plf-server-error" *ngIf="serverError">
+          {{ serverError }}
+        </div>
+      </div>
+
+      <div class="plf-footer">
+        <button type="submit" class="plf-submit" [disabled]="submitting">
+          <svg *ngIf="!submitting" lucideSend size="16"></svg>
+          <span>{{ submitting ? 'Submitting...' : 'Submit' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
