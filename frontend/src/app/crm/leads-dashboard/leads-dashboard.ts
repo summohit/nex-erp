@@ -27,7 +27,8 @@ import {
   LucideFilter,
   LucideCheckCircle2,
   LucideBarChart3,
-  LucideHourglass
+  LucideHourglass,
+  LucideBuilding2
 } from '@lucide/angular';
 
 interface RepStat {
@@ -75,6 +76,23 @@ interface DashboardData {
   funnel: Record<string, number>;
   bySource: BucketStat[];
   byCategory: BucketStat[];
+  topContacts: {
+    name: string;
+    email: string | null;
+    leadsOwned: number;
+    leadsWon: number;
+    winRate: number;
+    valueWon: number;
+    avgDealSize: number;
+  }[];
+  topCompanies: {
+    name: string;
+    deals: number;
+    leadsWon: number;
+    winRate: number;
+    valueWon: number;
+    avgDealSize: number;
+  }[];
   leaderboard: RepStat[];
   agingLeads: AgingLead[];
   trend: { weekStart: string; created: number; won: number }[];
@@ -108,7 +126,8 @@ interface DashboardData {
     LucideFilter,
     LucideCheckCircle2,
     LucideBarChart3,
-    LucideHourglass
+    LucideHourglass,
+    LucideBuilding2
   ],
   templateUrl: './leads-dashboard.html',
   styleUrls: ['./leads-dashboard.css']
@@ -193,6 +212,12 @@ export class LeadsDashboardComponent implements OnInit {
 
   formatDays(v: number): string {
     return `${Math.round(v || 0)} day${Math.round(v) === 1 ? '' : 's'}`;
+  }
+
+  // --- Contact / avatar helpers ---
+  initialsOf(name: string | null | undefined): string {
+    if (!name) return '?';
+    return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   }
 
   // --- Chart series builders ---

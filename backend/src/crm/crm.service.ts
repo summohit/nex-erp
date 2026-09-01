@@ -447,9 +447,11 @@ export class CrmService {
         where: { companyId, createdAt: { gte: start, lte: end } },
         select: {
           id: true, status: true, source: true, dealCategory: true, value: true,
+          contactName: true, companyName: true, email: true,
           createdAt: true, updatedAt: true, qualificationReason: true,
           assignedToId: true,
           assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+          broughtByContact: { select: { id: true, name: true, email: true, companyName: true } },
         },
       }),
       this.prisma.lead.count({ where: { companyId, createdAt: { gte: prevStart, lte: prevEnd } } }),
@@ -514,6 +516,51 @@ export class CrmService {
     };
     const bySource = bucketBy('source');
     const byCategory = bucketBy('dealCategory');
+
+    // --- Top lead contacts: lead contact persons with the most / best deals ---
+    const contactBucket = new Map<string, { name: string; email: string | null; count: number; won: number; lost: number; valueWon: number }>();
+    for (const l of periodLeads) {
+      const name = (l.contactName && String(l.contactName).trim()) || 'Unknown';
+      if (!contactBucket.has(name)) contactBucket.set(name, { name, email: l.email || null, count: 0, won: 0, lost: 0, valueWon: 0 });
+      const g = contactBucket.get(name)!;
+      g.count++;
+      if (l.status === WON) { g.won++; g.valueWon += Number(l.value) || 0; }
+      if (l.status === LOST) g.lost++;
+    }
+    const topContacts = Array.from(contactBucket.values())
+      .map(g => ({
+        name: g.name,
+        email: g.email,
+        leadsOwned: g.count,
+        leadsWon: g.won,
+        winRate: (g.won + g.lost) > 0 ? (g.won / (g.won + g.lost)) * 100 : 0,
+        valueWon: g.valueWon,
+        avgDealSize: g.won > 0 ? g.valueWon / g.won : 0,
+      }))
+      .sort((a, b) => b.valueWon - a.valueWon)
+      .slice(0, 8);
+
+    // --- Top companies: which companies have given the most / best deals ---
+    const companyBucket = new Map<string, { name: string; count: number; won: number; lost: number; valueWon: number }>();
+    for (const l of periodLeads) {
+      const name = (l.companyName && String(l.companyName).trim()) || 'Unknown';
+      if (!companyBucket.has(name)) companyBucket.set(name, { name, count: 0, won: 0, lost: 0, valueWon: 0 });
+      const g = companyBucket.get(name)!;
+      g.count++;
+      if (l.status === WON) { g.won++; g.valueWon += Number(l.value) || 0; }
+      if (l.status === LOST) g.lost++;
+    }
+    const topCompanies = Array.from(companyBucket.values())
+      .map(g => ({
+        name: g.name,
+        deals: g.count,
+        leadsWon: g.won,
+        winRate: (g.won + g.lost) > 0 ? (g.won / (g.won + g.lost)) * 100 : 0,
+        valueWon: g.valueWon,
+        avgDealSize: g.won > 0 ? g.valueWon / g.won : 0,
+      }))
+      .sort((a, b) => b.valueWon - a.valueWon)
+      .slice(0, 8);
 
     // --- Top performers leaderboard ---
     const followUpCountByRep = new Map<number, number>();
@@ -584,6 +631,8 @@ export class CrmService {
       funnel,
       bySource,
       byCategory,
+      topContacts,
+      topCompanies,
       leaderboard,
       agingLeads,
       trend,

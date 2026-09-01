@@ -249,6 +249,109 @@
       </div>
     </div>
 
+    <!-- Top Lead Contacts & Top Companies -->
+    <div class="chart-row-2">
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-header-icon bg-blue-light">
+              <svg lucideUsers size="16"></svg>
+            </div>
+            <div>
+              <h3>Top Lead Contacts</h3>
+              <span class="card-subtitle">Best performing lead contact persons by revenue</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <table class="lda-table">
+            <thead>
+              <tr>
+                <th>Rank & Contact</th>
+                <th>Leads</th>
+                <th>Won</th>
+                <th>Win Rate</th>
+                <th class="text-right">Value Won</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of d.topContacts; let i = index">
+                <td class="person-cell">
+                  <span class="rank-badge" [class.rank-1]="i === 0" [class.rank-2]="i === 1" [class.rank-3]="i === 2">
+                    {{ i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1))) }}
+                  </span>
+                  <span class="contact-avatar">{{ initialsOf(c.name) }}</span>
+                  <div class="person-info-col">
+                    <span class="rep-name">{{ c.name }}</span>
+                    <span class="person-sub" *ngIf="c.email">{{ c.email }}</span>
+                  </div>
+                </td>
+                <td><span class="metric-pill">{{ c.leadsOwned }}</span></td>
+                <td><span class="metric-pill won">{{ c.leadsWon }}</span></td>
+                <td>
+                  <span class="winrate-badge" [class.rate-high]="c.winRate >= 30" [class.rate-mid]="c.winRate >= 15 && c.winRate < 30" [class.rate-low]="c.winRate > 0 && c.winRate < 15">
+                    {{ formatPct(c.winRate) }}
+                  </span>
+                </td>
+                <td class="text-right text-value">{{ formatCurrency(c.valueWon) }}</td>
+              </tr>
+              <tr *ngIf="d.topContacts.length === 0"><td colspan="5" class="lda-empty-row">No lead contact activity in this period.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-header-icon bg-emerald-light">
+              <svg lucideBuilding2 size="16"></svg>
+            </div>
+            <div>
+              <h3>Top Companies</h3>
+              <span class="card-subtitle">Most deals and revenue given by each company</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <table class="lda-table">
+            <thead>
+              <tr>
+                <th>Rank & Company</th>
+                <th>Deals</th>
+                <th>Won</th>
+                <th>Win Rate</th>
+                <th class="text-right">Value Won</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let co of d.topCompanies; let i = index">
+                <td class="person-cell">
+                  <span class="rank-badge" [class.rank-1]="i === 0" [class.rank-2]="i === 1" [class.rank-3]="i === 2">
+                    {{ i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1))) }}
+                  </span>
+                  <span class="company-logo">{{ initialsOf(co.name) }}</span>
+                  <div class="person-info-col">
+                    <span class="rep-name">{{ co.name }}</span>
+                    <span class="person-sub">{{ co.deals }} deal{{ co.deals === 1 ? '' : 's' }} · avg {{ formatCurrency(co.avgDealSize) }}</span>
+                  </div>
+                </td>
+                <td><span class="metric-pill">{{ co.deals }}</span></td>
+                <td><span class="metric-pill won">{{ co.leadsWon }}</span></td>
+                <td>
+                  <span class="winrate-badge" [class.rate-high]="co.winRate >= 30" [class.rate-mid]="co.winRate >= 15 && co.winRate < 30" [class.rate-low]="co.winRate > 0 && co.winRate < 15">
+                    {{ formatPct(co.winRate) }}
+                  </span>
+                </td>
+                <td class="text-right text-value">{{ formatCurrency(co.valueWon) }}</td>
+              </tr>
+              <tr *ngIf="d.topCompanies.length === 0"><td colspan="5" class="lda-empty-row">No company deal activity in this period.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Top Performers Leaderboard -->
     <div class="dashboard-card">
       <div class="card-header">
