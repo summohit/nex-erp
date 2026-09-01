@@ -109,11 +109,11 @@
           </div>
         </div>
 
-        <!-- Department -->
+        <!-- Which department reported the issue -->
         <div class="meta-item">
-          <span class="meta-label">Department</span>
+          <span class="meta-label">Raised By Dept</span>
           <div class="meta-value-box">
-            <span class="meta-value-text">{{ ticket.department?.name ?? 'General' }}</span>
+            <span class="dept-pill">{{ ticket.raisedByDepartment?.name ?? ticket.reporter?.department?.name ?? '—' }}</span>
           </div>
         </div>
 
@@ -228,96 +228,106 @@
           target="_blank"
           rel="noopener noreferrer"
           [title]="a.fileName">
-          <img [src]="a.fileUrl" [alt]="a.fileName" />
+          <img *ngIf="isImageAttachment(a.fileName)" [src]="a.fileUrl" [alt]="a.fileName" />
+          <!-- Non-images have no preview, so show a typed badge instead. -->
+          <div *ngIf="!isImageAttachment(a.fileName)" class="file-badge" [ngClass]="fileTypeClass(a.fileName)">
+            <span class="file-badge-ext">{{ fileTypeLabel(a.fileName) }}</span>
+          </div>
           <span class="gallery-name">{{ a.fileName }}</span>
         </a>
       </div>
     </div>
 
-    <!-- Activity Log Card -->
-    <div class="detail-section-card" *ngIf="ticket.activities && ticket.activities.length">
+    <!-- Time Tracker Widget -->
+    <div class="detail-section-card time-tracker-card" *ngIf="ticket.status !== 'CLOSED' && ticket.status !== 'REJECTED'">
       <div class="section-card-header">
-        <svg lucideHistory [size]="14"></svg>
-        <span>Activity Log</span>
+        <svg lucideClock [size]="14"></svg>
+        <span>Time Tracking</span>
       </div>
-
-      <div class="activity-timeline">
-        <div class="timeline-item" *ngFor="let a of ticket.activities">
-          <div class="timeline-line"></div>
-          <div class="timeline-dot"></div>
-          <div class="timeline-content">
-            <div class="timeline-header">
-              <div class="timeline-actor-badge">
-                <img *ngIf="a.actor?.avatarUrl" [src]="a.actor.avatarUrl" class="avatar-img micro" alt="" />
-                <span *ngIf="!a.actor?.avatarUrl" class="avatar-circle micro">{{ a.actor?.firstName?.[0] }}{{ a.actor?.lastName?.[0] }}</span>
-                <span class="actor-name">{{ a.actor?.firstName }} {{ a.actor?.lastName }}</span>
-              </div>
-              <span class="activity-time">{{ a.createdAt | date:'short' }}</span>
-            </div>
-            <div class="timeline-desc">
-              <span class="action-tag">{{ formatLabel(a.action) }}</span>
-              <span class="change-diff" *ngIf="a.oldValue && a.newValue">
-                {{ formatLabel(a.oldValue) }} <svg lucideArrowRight [size]="11"></svg> {{ formatLabel(a.newValue) }}
-              </span>
-            </div>
-          </div>
+      <div class="time-tracker-content">
+        <div class="tracker-readout">
+          <span class="tracker-time">{{ formatDuration(totalTrackedTime) }}</span>
+          <span class="tracker-label">Total Time Logged</span>
         </div>
+        <button class="btn-timer" [class.btn-timer-active]="activeTimeEntry" (click)="toggleTimer()">
+          {{ activeTimeEntry ? 'Stop Timer' : 'Start Timer' }}
+        </button>
       </div>
     </div>
 
-    <!-- Comments & Discussion Card -->
+    <!-- Unified History Timeline -->
     <div class="detail-section-card comments-section">
       <div class="section-card-header">
         <div class="comments-header-title">
-          <svg lucideMessageSquare [size]="15"></svg>
-          <span>Discussion</span>
-          <span class="comments-count-pill">{{ ticket.comments?.length ?? 0 }}</span>
+          <svg lucideHistory [size]="15"></svg>
+          <span>History & Discussion</span>
+          <span class="comments-count-pill">{{ historyTimeline.length }}</span>
         </div>
       </div>
 
-      <!-- Comments Stream -->
       <div class="comments-stream">
-        <div class="comment-card" *ngFor="let c of ticket.comments">
+        <div class="comment-card" *ngFor="let item of historyTimeline">
+          <!-- Common avatar for both comment and activity -->
           <div class="comment-avatar">
-            <img *ngIf="c.author?.avatarUrl" [src]="c.author.avatarUrl" class="avatar-img-cover" alt="" />
-            <span *ngIf="!c.author?.avatarUrl">{{ c.author?.firstName?.charAt(0) }}{{ c.author?.lastName?.charAt(0) }}</span>
+            <ng-container *ngIf="item.isComment">
+              <img *ngIf="item.author?.avatarUrl" [src]="item.author?.avatarUrl" class="avatar-img-cover" alt="" />
+              <span *ngIf="!item.author?.avatarUrl">{{ item.author?.firstName?.charAt(0) }}{{ item.author?.lastName?.charAt(0) }}</span>
+            </ng-container>
+            <ng-container *ngIf="item.isActivity">
+              <img *ngIf="item.actor?.avatarUrl" [src]="item.actor?.avatarUrl" class="avatar-img-cover" alt="" />
+              <span *ngIf="!item.actor?.avatarUrl">{{ item.actor?.firstName?.charAt(0) }}{{ item.actor?.lastName?.charAt(0) }}</span>
+            </ng-container>
           </div>
 
           <div class="comment-content-box">
             <div class="comment-top-bar">
               <div class="comment-author-info">
-                <span class="comment-author-name">{{ c.author?.firstName }} {{ c.author?.lastName }}</span>
-                <span class="comment-date">{{ c.createdAt | date:'MMM d, h:mm a' }}</span>
+                <span class="comment-author-name" *ngIf="item.isComment">{{ item.author?.firstName }} {{ item.author?.lastName }}</span>
+                <span class="comment-author-name" *ngIf="item.isActivity">{{ item.actor?.firstName }} {{ item.actor?.lastName }}</span>
+                <span class="comment-date">{{ item.createdAt | date:'MMM d, h:mm a' }}</span>
               </div>
 
-              <div class="comment-actions" *ngIf="canEditComment(c) || canDeleteComment(c)">
-                <button class="btn-micro" *ngIf="canEditComment(c)" (click)="startEditComment(c)" title="Edit comment">
+              <div class="comment-actions" *ngIf="item.isComment && (canEditComment(item) || canDeleteComment(item))">
+                <button class="btn-micro" *ngIf="canEditComment(item)" (click)="startEditComment(item)" title="Edit comment">
                   <svg lucideEdit2 [size]="12"></svg>
                 </button>
-                <button class="btn-micro btn-micro-danger" *ngIf="canDeleteComment(c)" (click)="deleteComment(c)" title="Delete comment">
+                <button class="btn-micro btn-micro-danger" *ngIf="canDeleteComment(item)" (click)="deleteComment(item)" title="Delete comment">
                   <svg lucideTrash2 [size]="12"></svg>
                 </button>
               </div>
             </div>
 
-            <!-- View Comment -->
-            <div *ngIf="editingCommentId !== c.id" class="comment-body-text">
-              {{ c.body }}
-            </div>
-
-            <!-- Inline Edit Comment -->
-            <div *ngIf="editingCommentId === c.id" class="inline-edit-box">
-              <textarea class="edit-textarea" [(ngModel)]="editCommentBody" rows="2"></textarea>
-              <div class="edit-actions-row">
-                <button class="btn-primary-sm" (click)="saveEditComment(c)">Save</button>
-                <button class="btn-secondary-sm" (click)="editingCommentId=null">Cancel</button>
+            <!-- Comment Body -->
+            <ng-container *ngIf="item.isComment">
+              <div *ngIf="editingCommentId !== item.id" class="comment-body-text">
+                {{ item.body }}
               </div>
-            </div>
+              <div *ngIf="editingCommentId === item.id" class="inline-edit-box">
+                <textarea class="edit-textarea" [(ngModel)]="editCommentBody" rows="2"></textarea>
+                <div class="edit-actions-row">
+                  <button class="btn-primary-sm" (click)="saveEditComment(item)">Save</button>
+                  <button class="btn-secondary-sm" (click)="editingCommentId=null">Cancel</button>
+                </div>
+              </div>
+            </ng-container>
+
+            <!-- Activity Body -->
+            <ng-container *ngIf="item.isActivity">
+              <div class="activity-timeline">
+                <div class="timeline-desc">
+                  <span class="action-tag">{{ formatLabel(item.action) }}</span>
+                  <span class="change-diff" *ngIf="item.oldValue && item.newValue">
+                    {{ formatLabel(item.oldValue) }} <svg lucideArrowRight [size]="11"></svg> {{ formatLabel(item.newValue) }}
+                  </span>
+                </div>
+              </div>
+            </ng-container>
+
           </div>
         </div>
 
-        <div class="empty-comments-state" *ngIf="!ticket.comments?.length">
-          <p>No comments yet. Be the first to leave a message.</p>
+        <div class="empty-comments-state" *ngIf="!historyTimeline.length">
+          <p>No activity yet.</p>
         </div>
       </div>
 
@@ -330,6 +340,10 @@
           rows="3">
         </textarea>
         <div class="composer-footer">
+          <label class="btn-attach" title="Attach an image">
+            <svg lucideImagePlus [size]="14"></svg>
+            <input type="file" (change)="onAttachmentPicked($event)" accept="image/*" hidden />
+          </label>
           <button class="btn-send-comment" (click)="submitComment()" [disabled]="submittingComment || !commentBody.trim()">
             <svg lucideSend [size]="14"></svg>
             <span>{{ submittingComment ? 'Posting…' : 'Send' }}</span>

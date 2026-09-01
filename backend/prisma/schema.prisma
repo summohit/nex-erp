@@ -140,7 +140,8 @@ model Department {
   employees     Employee[]
   jobs          Job[]
   blackoutDates BlackoutDate[]
-  tickets       Ticket[]
+  tickets       Ticket[]  @relation("TicketOwningTeam")
+  raisedTickets Ticket[]  @relation("TicketRaisedByDept")
 }
 
 model Designation {
@@ -301,6 +302,7 @@ model Employee {
   ticketComments           TicketComment[]            @relation("TicketCommentAuthor")
   ticketAttachments        TicketAttachment[]         @relation("TicketAttachmentUploader")
   ticketActivities         TicketActivity[]           @relation("TicketActivityActor")
+  ticketTimeEntries        TicketTimeEntry[]
 
   @@unique([companyId, employeeCode])
 }
@@ -2344,8 +2346,14 @@ model Ticket {
   companyId    Int
   company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  // The team that works the ticket — always software development.
   departmentId Int
-  department   Department     @relation(fields: [departmentId], references: [id])
+  department   Department     @relation("TicketOwningTeam", fields: [departmentId], references: [id])
+
+  // The department the issue was raised on behalf of. Defaults to the reporter's
+  // own department but is selectable, so IT can log a bug for Finance.
+  raisedByDepartmentId Int?
+  raisedByDepartment   Department? @relation("TicketRaisedByDept", fields: [raisedByDepartmentId], references: [id])
 
   reporterId   Int
   reporter     Employee       @relation("TicketReporter", fields: [reporterId], references: [id])
@@ -2360,6 +2368,7 @@ model Ticket {
   comments     TicketComment[]
   attachments  TicketAttachment[]
   activities   TicketActivity[]
+  timeEntries  TicketTimeEntry[]
 
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -2404,4 +2413,21 @@ model TicketActivity {
   actorId   Int
   actor     Employee @relation("TicketActivityActor", fields: [actorId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model TicketTimeEntry {
+  id          Int       @id @default(autoincrement())
+  ticketId    Int
+  ticket      Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        Employee  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?      // duration in seconds
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ticketId])
+  @@index([userId])
 }

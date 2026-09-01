@@ -16,6 +16,11 @@
         <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading"></svg>
         <span>Refresh</span>
       </button>
+      <!-- Export Button -->
+      <button class="btn-header-secondary" (click)="exportToCSV()" title="Export Tickets to CSV">
+        <svg lucideInbox [size]="15"></svg>
+        <span>Export CSV</span>
+      </button>
 
       <!-- New Ticket Button -->
       <button class="btn-header-primary" (click)="openCreateModal()" title="Create New Ticket">
@@ -25,7 +30,18 @@
     </div>
   </div>
 
-  <!-- KPI / Stats Row -->
+  <!-- KPI / Stats Row — skeleton mirrors the real card shape so nothing jumps -->
+  <div class="stats-row" *ngIf="!stats">
+    <div class="stat-card skeleton-card" *ngFor="let i of [1,2,3,4]">
+      <app-skeleton width="44px" height="44px" radius="12px"></app-skeleton>
+      <div class="stat-info">
+        <app-skeleton width="72px" height="10px"></app-skeleton>
+        <app-skeleton width="46px" height="24px" radius="6px"></app-skeleton>
+        <app-skeleton width="104px" height="10px"></app-skeleton>
+      </div>
+    </div>
+  </div>
+
   <div class="stats-row" *ngIf="stats">
     <!-- Total Tickets -->
     <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && hasActiveFilters() === false" (click)="toggleStatusCard('')" title="Click to show all tickets">
@@ -76,6 +92,288 @@
     </div>
   </div>
 
+  <!-- View Tabs -->
+  <div class="view-tabs">
+    <button class="view-tab-btn" [class.active]="activeTab === 'list'" (click)="setTab('list')">
+      Ticket List
+    </button>
+    <button class="view-tab-btn" [class.active]="activeTab === 'reports'" (click)="setTab('reports')">
+      Analytics & Reports
+    </button>
+  </div>
+
+  <div *ngIf="activeTab === 'reports'" class="reports-container">
+
+    <!-- Range selector -->
+    <div class="reports-toolbar">
+      <div class="reports-toolbar-left">
+        <h2 class="reports-title">Helpdesk Analytics</h2>
+        <p class="reports-subtitle" *ngIf="analytics">
+          Trend covers the last {{ analytics.windowDays }} days · totals are all-time
+        </p>
+      </div>
+      <div class="range-toggle">
+        <button
+          *ngFor="let r of analyticsRanges"
+          class="range-btn"
+          [class.active]="analyticsDays === r.days"
+          (click)="setAnalyticsRange(r.days)">
+          {{ r.label }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Analytics skeleton — same grid shape as the loaded dashboard -->
+    <ng-container *ngIf="analyticsLoading">
+      <div class="kpi-row">
+        <div class="kpi-tile" *ngFor="let i of [1,2,3,4,5,6]">
+          <app-skeleton width="76px" height="10px"></app-skeleton>
+          <app-skeleton width="58px" height="26px" radius="6px"></app-skeleton>
+          <app-skeleton width="92px" height="10px"></app-skeleton>
+        </div>
+      </div>
+
+      <div class="chart-panel chart-panel-wide">
+        <div class="chart-panel-head">
+          <div class="sk-stack">
+            <app-skeleton width="120px" height="14px"></app-skeleton>
+            <app-skeleton width="170px" height="11px"></app-skeleton>
+          </div>
+        </div>
+        <app-skeleton width="100%" height="260px" radius="10px"></app-skeleton>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-panel" *ngFor="let i of [1,2,3,4]">
+          <div class="chart-panel-head">
+            <div class="sk-stack">
+              <app-skeleton width="130px" height="14px"></app-skeleton>
+              <app-skeleton width="160px" height="11px"></app-skeleton>
+            </div>
+          </div>
+          <app-skeleton width="100%" height="240px" radius="10px"></app-skeleton>
+        </div>
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="analytics && !analyticsLoading">
+
+      <!-- KPI Row -->
+      <div class="kpi-row">
+        <div class="kpi-tile">
+          <span class="kpi-label">Total Tickets</span>
+          <span class="kpi-value">{{ analytics.kpis?.totalTickets }}</span>
+          <span class="kpi-sub">All time</span>
+        </div>
+        <div class="kpi-tile kpi-accent-blue">
+          <span class="kpi-label">Active Backlog</span>
+          <span class="kpi-value">{{ analytics.kpis?.backlog }}</span>
+          <span class="kpi-sub">Open + In progress</span>
+        </div>
+        <div class="kpi-tile kpi-accent-amber">
+          <span class="kpi-label">Unassigned</span>
+          <span class="kpi-value">{{ analytics.kpis?.unassigned }}</span>
+          <span class="kpi-sub">Awaiting an owner</span>
+        </div>
+        <div class="kpi-tile kpi-accent-green">
+          <span class="kpi-label">Resolution Rate</span>
+          <span class="kpi-value">{{ analytics.kpis?.resolutionRate }}%</span>
+          <span class="kpi-sub">Resolved or closed</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">Avg Resolution</span>
+          <span class="kpi-value">{{ formatHours(analytics.kpis?.avgResolutionHours) }}</span>
+          <span class="kpi-sub">Across {{ analytics.kpis?.resolvedCount }} resolved</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">Median Resolution</span>
+          <span class="kpi-value">{{ formatHours(analytics.kpis?.medianResolutionHours) }}</span>
+          <span class="kpi-sub">Typical case</span>
+        </div>
+      </div>
+
+      <!-- Volume trend — full width -->
+      <div class="chart-panel chart-panel-wide">
+        <div class="chart-panel-head">
+          <div>
+            <h3>Ticket Volume</h3>
+            <p>Raised vs resolved per day</p>
+          </div>
+        </div>
+        <app-chart-card
+          type="area"
+          [series]="trendSeries"
+          [categories]="trendCategories"
+          [colors]="trendPalette"
+          [height]="280"
+          [showLegend]="true"
+          emptyMessage="No ticket activity in this range">
+        </app-chart-card>
+      </div>
+
+      <!-- Two-up charts -->
+      <div class="chart-grid">
+
+        <div class="chart-panel">
+          <div class="chart-panel-head">
+            <div><h3>Status Breakdown</h3><p>Where tickets currently sit</p></div>
+          </div>
+          <app-chart-card
+            type="donut"
+            [series]="statusValues"
+            [labels]="statusLabels"
+            [colors]="statusColors2"
+            [height]="260"
+            emptyMessage="No tickets yet">
+          </app-chart-card>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-panel-head">
+            <div><h3>Priority Mix</h3><p>How urgent the queue is</p></div>
+          </div>
+          <app-chart-card
+            type="bar"
+            [series]="prioritySeries"
+            [categories]="priorityCategories"
+            [colors]="priorityColors2"
+            [height]="260"
+            [showLegend]="false"
+            emptyMessage="No tickets yet">
+          </app-chart-card>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-panel-head">
+            <div><h3>Raised By Department</h3><p>Which teams report the most issues</p></div>
+          </div>
+          <app-chart-card
+            type="bar"
+            [series]="deptSeries"
+            [categories]="deptCategories"
+            [colors]="singleHue"
+            [horizontal]="true"
+            [height]="280"
+            [showLegend]="false"
+            emptyMessage="No tickets yet">
+          </app-chart-card>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-panel-head">
+            <div><h3>Backlog Ageing</h3><p>How long open tickets have been waiting</p></div>
+          </div>
+          <app-chart-card
+            type="bar"
+            [series]="ageingSeries"
+            [categories]="ageingCategories"
+            [colors]="singleHue"
+            [height]="260"
+            [showLegend]="false"
+            emptyMessage="Nothing in the backlog"
+            emptyHint="Every ticket is resolved or closed.">
+          </app-chart-card>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-panel-head">
+            <div><h3>Ticket Types</h3><p>Bugs vs requests vs questions</p></div>
+          </div>
+          <app-chart-card
+            type="donut"
+            [series]="typeValues"
+            [labels]="typeLabels"
+            [colors]="catPalette"
+            [height]="260"
+            emptyMessage="No tickets yet">
+          </app-chart-card>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-panel-head">
+            <div><h3>Team Workload</h3><p>Tickets per assignee</p></div>
+          </div>
+          <app-chart-card
+            type="bar"
+            [series]="assigneeSeries"
+            [categories]="assigneeCategories"
+            [colors]="singleHue"
+            [horizontal]="true"
+            [height]="280"
+            [showLegend]="false"
+            emptyMessage="Nothing assigned yet"
+            emptyHint="Set a default assignee in System Settings.">
+          </app-chart-card>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-panel-head">
+            <div><h3>Avg Resolution by Priority</h3><p>Hours from raised to resolved</p></div>
+          </div>
+          <app-chart-card
+            type="bar"
+            [series]="resolutionSeries"
+            [categories]="resolutionCategories"
+            [colors]="singleHue"
+            [height]="260"
+            [showLegend]="false"
+            emptyMessage="Nothing resolved yet"
+            emptyHint="Resolve a ticket to start measuring.">
+          </app-chart-card>
+        </div>
+
+        <div class="chart-panel">
+          <div class="chart-panel-head">
+            <div><h3>Platform</h3><p>Where issues are reported</p></div>
+          </div>
+          <app-chart-card
+            type="bar"
+            [series]="platformSeries"
+            [categories]="platformCategories"
+            [colors]="singleHue"
+            [height]="260"
+            [showLegend]="false"
+            emptyMessage="No tickets yet">
+          </app-chart-card>
+        </div>
+      </div>
+
+      <!-- Table view — the accessible fallback for every chart above -->
+      <div class="chart-panel chart-panel-wide">
+        <div class="chart-panel-head">
+          <div><h3>Breakdown Table</h3><p>The same figures in text form</p></div>
+        </div>
+        <div class="analytics-table-scroll">
+          <table class="analytics-table">
+            <thead>
+              <tr><th>Dimension</th><th>Value</th><th class="num">Tickets</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of analytics.byStatus">
+                <td>Status</td><td>{{ formatLabel(r.label) }}</td><td class="num">{{ r.value }}</td>
+              </tr>
+              <tr *ngFor="let r of analytics.byPriority">
+                <td>Priority</td><td>{{ r.label }}</td><td class="num">{{ r.value }}</td>
+              </tr>
+              <tr *ngFor="let r of analytics.byDepartment">
+                <td>Raised by</td><td>{{ r.label }}</td><td class="num">{{ r.value }}</td>
+              </tr>
+              <tr *ngFor="let r of analytics.byType">
+                <td>Type</td><td>{{ formatLabel(r.label) }}</td><td class="num">{{ r.value }}</td>
+              </tr>
+              <tr *ngFor="let r of analytics.topAssignees">
+                <td>Assignee</td><td>{{ r.label }}</td><td class="num">{{ r.value }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </ng-container>
+  </div>
+
+  <ng-container *ngIf="activeTab === 'list'">
+  <div class="unified-table-card">
   <!-- Search & Filter Card -->
   <div class="filter-bar-card">
     <div class="filter-bar-main-row">
@@ -91,6 +389,17 @@
         <button class="btn-clear-search" *ngIf="searchTerm" (click)="searchTerm = ''; onSearch()" title="Clear search">
           <svg lucideX [size]="14"></svg>
         </button>
+      </div>
+
+
+      <!-- Month Filter -->
+      <div class="month-filter-wrapper">
+        <select class="form-select month-select" [(ngModel)]="filterMonth" (change)="loadTickets()">
+          <option value="all">All Time</option>
+          <option value="1_month">Past 1 Month</option>
+          <option value="3_months">Past 3 Months</option>
+          <option value="6_months">Past 6 Months</option>
+        </select>
       </div>
 
       <!-- Filter Searchable Dropdowns -->
@@ -269,7 +578,28 @@
     </div>
 
     <!-- AG Grid Table -->
-    <div class="table-container">
+    <!-- Skeleton rows while the first page loads -->
+    <div class="table-container" *ngIf="isLoading">
+      <div class="sk-table-head">
+        <app-skeleton *ngFor="let h of [1,2,3,4,5,6]" width="82px" height="10px"></app-skeleton>
+      </div>
+      <div class="sk-table-row" *ngFor="let r of [1,2,3,4,5,6,7,8]">
+        <app-skeleton width="64px" height="20px" radius="6px"></app-skeleton>
+        <div class="sk-stack">
+          <app-skeleton width="72%" height="12px"></app-skeleton>
+          <app-skeleton width="54px" height="10px"></app-skeleton>
+        </div>
+        <app-skeleton width="52px" height="18px" radius="5px"></app-skeleton>
+        <app-skeleton width="96px" height="18px" radius="5px"></app-skeleton>
+        <app-skeleton width="70px" height="18px" radius="9px"></app-skeleton>
+        <div class="sk-user">
+          <app-skeleton width="26px" [circle]="true"></app-skeleton>
+          <app-skeleton width="82px" height="11px"></app-skeleton>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-container" [hidden]="isLoading">
       <ag-grid-angular
         class="ag-theme-quartz"
         [theme]="'legacy'"
@@ -287,6 +617,9 @@
       </ag-grid-angular>
     </div>
   </div>
+
+  </div> <!-- Closing unified-table-card -->
+  </ng-container>
 
 </div>
 
@@ -330,8 +663,53 @@
         />
       </div>
 
-      <!-- Type, Platform & Priority (3-Column Grid) -->
-      <div class="form-grid-3">
+      <!-- Raised By — which department the issue is being reported for.
+           Defaults to the reporter's own; changeable when logging on another
+           team's behalf. Options come from the departments API. -->
+      <div class="form-group">
+        <label>
+          Raised By Department
+          <span class="label-hint">Defaults to your own department</span>
+        </label>
+        <div class="searchable-filter-dropdown full-width">
+          <button
+            type="button"
+            class="filter-dropdown-trigger modal-select-trigger full-width"
+            (click)="showModalRaisedByDropdown = !showModalRaisedByDropdown; showModalTypeDropdown=false; showModalPlatformDropdown=false; showModalPriorityDropdown=false">
+            <svg lucideBuilding [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getModalRaisedByLabel() }}</span>
+            <svg lucideChevronDown [size]="14" class="trigger-chevron" [class.rotated]="showModalRaisedByDropdown"></svg>
+          </button>
+
+          <div class="filter-dropdown-popover" *ngIf="showModalRaisedByDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search departments..." [(ngModel)]="modalRaisedBySearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="modalRaisedBySearchQuery" (click)="modalRaisedBySearchQuery = ''">
+                <svg lucideX [size]="11"></svg>
+              </button>
+            </div>
+            <div class="popover-options-scroll">
+              <div
+                class="popover-option-item"
+                *ngFor="let d of getFilteredDepartments(modalRaisedBySearchQuery)"
+                (click)="selectModalRaisedBy(d.id)"
+                [class.selected]="newTicket.raisedByDepartmentId === d.id">
+                <span class="option-primary">{{ d.name }}</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="newTicket.raisedByDepartmentId === d.id"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredDepartments(modalRaisedBySearchQuery).length === 0">
+                No department matches "{{ modalRaisedBySearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showModalRaisedByDropdown" (click)="showModalRaisedByDropdown = false"></div>
+        </div>
+      </div>
+
+      <!-- Type, Platform, Priority & Department (2-Column Grid) -->
+      <div class="form-grid-2">
+
         <!-- 1. Ticket Type (Searchable) -->
         <div class="form-group">
           <label>Ticket Type</label>
@@ -460,7 +838,10 @@
         </div>
         <div class="routing-text">
           <span class="routing-title">Auto-Assigned Routing</span>
-          <p class="routing-desc">This ticket will automatically route to the <strong>Software Development</strong> team lead for triage and dispatch.</p>
+          <p class="routing-desc">
+            This ticket routes to the <strong>Software Development</strong> team lead for triage and dispatch.
+            It will be tagged as raised by <strong>{{ myDepartmentName() }}</strong> so they know where it came from.
+          </p>
         </div>
       </div>
 
@@ -499,7 +880,7 @@
           <input
             #attachmentInput
             type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
+            accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.svg,.heic,.pdf,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.csv,.ppt,.pptx,.odp,.txt,.log,.json,.xml,.md,.zip,.rar,.7z"
             multiple
             hidden
             (change)="onAttachmentsPicked($event)" />
@@ -512,16 +893,20 @@
               <button type="button" class="dropzone-browse-btn" (click)="attachmentInput.click()">
                 Click to browse
               </button>
-              <span>or drag & drop screenshots here</span>
+              <span>or drag & drop files here</span>
             </div>
-            <span class="dropzone-subtext">PNG, JPG, GIF, WEBP up to 10MB each</span>
+            <span class="dropzone-subtext">Images, PDF, Word, Excel, PowerPoint, CSV, text or archives — up to 20MB each</span>
           </div>
         </div>
 
         <!-- Thumbnail Grid -->
         <div class="attachment-grid" *ngIf="pendingAttachments.length || uploadingCount > 0">
           <div class="attachment-thumb" *ngFor="let a of pendingAttachments; let i = index">
-            <img [src]="a.fileUrl" [alt]="a.fileName" />
+            <img *ngIf="isImageAttachment(a.fileName)" [src]="a.fileUrl" [alt]="a.fileName" />
+            <!-- Non-images have no preview, so show a typed badge instead. -->
+            <div *ngIf="!isImageAttachment(a.fileName)" class="file-badge" [ngClass]="fileTypeClass(a.fileName)">
+              <span class="file-badge-ext">{{ fileTypeLabel(a.fileName) }}</span>
+            </div>
             <button
               type="button"
               class="btn-remove-thumb"

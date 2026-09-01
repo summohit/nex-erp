@@ -5,6 +5,20 @@
   bottom: 0;
   width: 260px;
   z-index: 100;
+  /* The inner .sidebar is itself position:fixed and paints the whole rail, so
+     the host is only a wrapper. Without this it swallows clicks over whatever
+     it overlaps — and when collapsed it is wider than the visible rail. */
+  pointer-events: none;
+}
+
+/* Follow the collapsed state so the host never overhangs the visible rail.
+   body.sidebar-collapsed is toggled in SidebarComponent. */
+:host-context(body.sidebar-collapsed) {
+  width: 80px;
+}
+
+:host > * {
+  pointer-events: auto;
 }
 
 .sidebar {

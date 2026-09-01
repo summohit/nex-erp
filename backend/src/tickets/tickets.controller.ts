@@ -32,6 +32,13 @@ export class TicketsController {
     return this.ticketsService.findAll(req.user.companyId, req.user, query);
   }
 
+  // ─── ANALYTICS ─────────────────────────────────────────────────────────────
+
+  @Get('analytics/summary')
+  getAnalytics(@Request() req, @Query('days') days?: string) {
+    return this.ticketsService.getAnalytics(req.user.companyId, days ? Number(days) : 30);
+  }
+
   @Get(':id')
   findOne(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.ticketsService.findOne(req.user.companyId, id);
@@ -76,5 +83,33 @@ export class TicketsController {
     @Param('cid', ParseIntPipe) cid: number,
   ) {
     return this.ticketsService.deleteComment(req.user.companyId, id, cid, req.user.employeeId, req.user.role);
+  }
+
+  // ─── ATTACHMENTS ───────────────────────────────────────────────────────────
+
+  @Post(':id/attachments')
+  addAttachment(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { fileName: string; fileUrl: string; fileSize?: number }
+  ) {
+    return this.ticketsService.addAttachment(req.user.companyId, id, req.user.employeeId, body);
+  }
+
+  // ─── TIME TRACKING ─────────────────────────────────────────────────────────
+
+  @Get(':id/time-entries')
+  getTimeEntries(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.ticketsService.getTimeEntries(req.user.companyId, id);
+  }
+
+  @Post(':id/timer/start')
+  startTimer(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.ticketsService.startTimer(req.user.companyId, id, req.user.employeeId);
+  }
+
+  @Post(':id/timer/stop')
+  stopTimer(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('notes') notes?: string) {
+    return this.ticketsService.stopTimer(req.user.companyId, id, req.user.employeeId, notes);
   }
 }

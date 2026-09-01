@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 
 /**
  * Department-name fragments that identify the software development team,
@@ -26,7 +27,7 @@ const EMPLOYEE_SELECT = {
 
 @Injectable()
 export class TicketsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private mailService: MailService) {}
 
   private async nextTicketNumber(companyId: number): Promise<string> {
     const count = await this.prisma.ticket.count({ where: { companyId } });
@@ -72,12 +73,47 @@ export class TicketsService {
     return departments[0].id;
   }
 
+  /**
+   * The department a ticket is raised on behalf of. A supplied value is honoured
+   * only if it is a real department in this company; otherwise we fall back to
+   * the reporter's own, so the field can never be forged into a bogus id.
+   */
+  private async resolveRaisedByDept(
+    companyId: number,
+    reporterId: number,
+    supplied?: number | string | null,
+  ): Promise<number | null> {
+    if (supplied) {
+      const dept = await this.prisma.department.findFirst({
+        where: { id: Number(supplied), companyId },
+        select: { id: true },
+      });
+      if (dept) return dept.id;
+    }
+
+    const reporter = await this.prisma.employee.findFirst({
+      where: { id: reporterId, companyId },
+      select: { departmentId: true },
+    });
+    return reporter?.departmentId ?? null;
+  }
+
   // ─── CREATE ────────────────────────────────────────────────────────────────
 
   async create(companyId: number, reporterId: number, data: any) {
     const ticketNumber = await this.nextTicketNumber(companyId);
     const assigneeId = await this.defaultAssigneeId(companyId);
+    
+    // The owning team is always software development — the reporter never picks it.
     const departmentId = await this.devDepartmentId(companyId, assigneeId);
+
+    // Which department the issue is raised on behalf of. Selectable (IT may log a
+    // bug for Finance), defaulting to the reporter's own department.
+    const raisedByDepartmentId = await this.resolveRaisedByDept(
+      companyId,
+      reporterId,
+      data.raisedByDepartmentId,
+    );
 
     const attachments: { fileName: string; fileUrl: string; fileSize?: number | null }[] =
       Array.isArray(data.attachments) ? data.attachments : [];
@@ -93,6 +129,7 @@ export class TicketsService {
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         companyId,
         departmentId,
+        raisedByDepartmentId,
         reporterId,
         assigneeId: assigneeId ? Number(assigneeId) : null,
         attachments: attachments.length
@@ -110,6 +147,7 @@ export class TicketsService {
         reporter: { select: EMPLOYEE_SELECT },
         assignee: { select: EMPLOYEE_SELECT },
         department: true,
+        raisedByDepartment: { select: { id: true, name: true } },
         attachments: true,
         _count: { select: { comments: true } },
       },
@@ -125,6 +163,14 @@ export class TicketsService {
           newValue: String(assigneeId),
         },
       });
+      
+      const newAssignee = await this.prisma.employee.findFirst({
+        where: { id: Number(assigneeId) },
+        select: { user: { select: { email: true } } }
+      });
+      if (newAssignee?.user?.email) {
+        this.mailService.sendTicketAssignedEmail(newAssignee.user.email, ticket.ticketNumber, ticket.title).catch(console.error);
+      }
     }
 
     return ticket;
@@ -211,7 +257,11 @@ export class TicketsService {
       where.reporterId = user.employeeId;
     }
 
-    if (filters.departmentId) where.departmentId = Number(filters.departmentId);
+    // "Department" means the one the ticket was raised BY — the owning team is
+    // always software development, so filtering on it would be meaningless.
+    if (filters.departmentId) {
+      where.raisedByDepartmentId = Number(filters.departmentId);
+    }
     if (filters.status) where.status = filters.status;
     if (filters.priority) where.priority = filters.priority;
     if (filters.platform) where.platform = filters.platform;
@@ -288,6 +338,7 @@ export class TicketsService {
         reporter: { select: EMPLOYEE_SELECT },
         assignee: { select: EMPLOYEE_SELECT },
         department: true,
+        raisedByDepartment: { select: { id: true, name: true } },
         comments: {
           include: { author: { select: EMPLOYEE_SELECT } },
           orderBy: { createdAt: 'asc' },
@@ -397,6 +448,16 @@ export class TicketsService {
       ...activities.map((a) => this.prisma.ticketActivity.create({ data: a })),
     ]);
 
+    if (data.assigneeId && String(ticket.assigneeId) !== String(data.assigneeId)) {
+      const newAssignee = await this.prisma.employee.findFirst({
+        where: { id: Number(data.assigneeId) },
+        select: { user: { select: { email: true } } }
+      });
+      if (newAssignee?.user?.email) {
+        this.mailService.sendTicketAssignedEmail(newAssignee.user.email, updated.ticketNumber, updated.title).catch(console.error);
+      }
+    }
+
     return updated;
   }
 
@@ -456,5 +517,213 @@ export class TicketsService {
   private async ensureTicketExists(companyId: number, ticketId: number) {
     const ticket = await this.prisma.ticket.findFirst({ where: { id: ticketId, companyId } });
     if (!ticket) throw new NotFoundException('Ticket not found');
+  }
+
+  // ─── ATTACHMENTS ───────────────────────────────────────────────────────────
+
+  async addAttachment(companyId: number, ticketId: number, actorId: number, data: { fileName: string; fileUrl: string; fileSize?: number }) {
+    await this.ensureTicketExists(companyId, ticketId);
+    
+    const [attachment] = await this.prisma.$transaction([
+      this.prisma.ticketAttachment.create({
+        data: {
+          ticketId,
+          fileName: data.fileName,
+          fileUrl: data.fileUrl,
+          fileSize: data.fileSize ?? null,
+          uploadedById: actorId,
+        }
+      }),
+      this.prisma.ticketActivity.create({
+        data: { ticketId, actorId, action: 'ATTACHMENT_ADDED', newValue: data.fileName },
+      }),
+    ]);
+    return attachment;
+  }
+
+  // ─── TIME TRACKING ─────────────────────────────────────────────────────────
+
+  async startTimer(companyId: number, ticketId: number, userId: number) {
+    await this.ensureTicketExists(companyId, ticketId);
+    
+    // Check if a timer is already running for this user and ticket
+    const runningTimer = await this.prisma.ticketTimeEntry.findFirst({
+      where: { ticketId, userId, endTime: null }
+    });
+    
+    if (runningTimer) {
+      throw new BadRequestException('Timer is already running for this ticket');
+    }
+
+    return this.prisma.ticketTimeEntry.create({
+      data: { ticketId, userId, startTime: new Date() }
+    });
+  }
+
+  async stopTimer(companyId: number, ticketId: number, userId: number, notes?: string) {
+    await this.ensureTicketExists(companyId, ticketId);
+    
+    const runningTimer = await this.prisma.ticketTimeEntry.findFirst({
+      where: { ticketId, userId, endTime: null }
+    });
+    
+    if (!runningTimer) {
+      throw new BadRequestException('No running timer found for this ticket');
+    }
+
+    const endTime = new Date();
+    const duration = Math.floor((endTime.getTime() - runningTimer.startTime.getTime()) / 1000);
+
+    return this.prisma.ticketTimeEntry.update({
+      where: { id: runningTimer.id },
+      data: { endTime, duration, notes }
+    });
+  }
+
+  async getTimeEntries(companyId: number, ticketId: number) {
+    await this.ensureTicketExists(companyId, ticketId);
+    return this.prisma.ticketTimeEntry.findMany({
+      where: { ticketId },
+      include: { user: { select: EMPLOYEE_SELECT } },
+      orderBy: { startTime: 'desc' }
+    });
+  }
+
+  // ─── ANALYTICS ─────────────────────────────────────────────────────────────
+
+  async getAnalytics(companyId: number, days = 30) {
+    const windowDays = Math.min(Math.max(Number(days) || 30, 7), 365);
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - (windowDays - 1));
+
+    const tickets = await this.prisma.ticket.findMany({
+      where: { companyId },
+      include: {
+        department: { select: { name: true } },
+        raisedByDepartment: { select: { id: true, name: true } },
+        reporter: { select: { firstName: true, lastName: true, department: { select: { name: true } } } },
+        assignee: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    const HOUR = 1000 * 60 * 60;
+    const tally = (map: Record<string, number>, key: string) => { map[key] = (map[key] || 0) + 1; };
+
+    const byStatus: Record<string, number> = {};
+    const byPriority: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+    const byPlatform: Record<string, number> = {};
+    const byDepartment: Record<string, number> = {};
+    const assigneeLoad: Record<string, number> = {};
+    const resolutionByPriority: Record<string, number[]> = {};
+    const resolutionHours: number[] = [];
+
+    // Open-ticket ageing, in days since it was raised.
+    const ageing = { '< 1 day': 0, '1-3 days': 0, '3-7 days': 0, '7-14 days': 0, '> 14 days': 0 };
+    const OPEN_STATES = ['OPEN', 'IN_PROGRESS'];
+
+    // Daily created/resolved series across the window.
+    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    const created: Record<string, number> = {};
+    const resolved: Record<string, number> = {};
+    for (let i = 0; i < windowDays; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      created[dayKey(d)] = 0;
+      resolved[dayKey(d)] = 0;
+    }
+
+    const now = Date.now();
+    let unassigned = 0;
+    let backlog = 0;
+
+    for (const t of tickets) {
+      tally(byStatus, t.status);
+      tally(byPriority, t.priority);
+      tally(byType, t.type);
+      tally(byPlatform, t.platform);
+
+      // Prefer the stored raising department; fall back to the reporter's own.
+      const dept = t.raisedByDepartment?.name ?? t.reporter?.department?.name ?? 'Unassigned';
+      tally(byDepartment, dept);
+
+      if (t.assignee) {
+        tally(assigneeLoad, `${t.assignee.firstName} ${t.assignee.lastName}`);
+      } else {
+        unassigned++;
+      }
+
+      const createdKey = dayKey(new Date(t.createdAt));
+      if (createdKey in created) created[createdKey]++;
+
+      if (t.resolvedAt) {
+        const resolvedKey = dayKey(new Date(t.resolvedAt));
+        if (resolvedKey in resolved) resolved[resolvedKey]++;
+
+        const hrs = (new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()) / HOUR;
+        resolutionHours.push(hrs);
+        (resolutionByPriority[t.priority] ||= []).push(hrs);
+      }
+
+      if (OPEN_STATES.includes(t.status)) {
+        backlog++;
+        const ageDays = (now - new Date(t.createdAt).getTime()) / (HOUR * 24);
+        if (ageDays < 1) ageing['< 1 day']++;
+        else if (ageDays < 3) ageing['1-3 days']++;
+        else if (ageDays < 7) ageing['3-7 days']++;
+        else if (ageDays < 14) ageing['7-14 days']++;
+        else ageing['> 14 days']++;
+      }
+    }
+
+    const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+    const median = (xs: number[]) => {
+      if (!xs.length) return 0;
+      const s = [...xs].sort((a, b) => a - b);
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    };
+    const round = (n: number) => Number(n.toFixed(1));
+
+    // Sorted, capped leaderboards — the client renders these as-is.
+    const topN = (map: Record<string, number>, n: number) =>
+      Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, n)
+        .map(([label, value]) => ({ label, value }));
+
+    const totalTickets = tickets.length;
+    const closedCount = (byStatus['CLOSED'] ?? 0) + (byStatus['RESOLVED'] ?? 0);
+
+    return {
+      windowDays,
+      kpis: {
+        totalTickets,
+        open: byStatus['OPEN'] ?? 0,
+        inProgress: byStatus['IN_PROGRESS'] ?? 0,
+        resolved: byStatus['RESOLVED'] ?? 0,
+        closed: byStatus['CLOSED'] ?? 0,
+        rejected: byStatus['REJECTED'] ?? 0,
+        backlog,
+        unassigned,
+        resolvedCount: resolutionHours.length,
+        avgResolutionHours: round(mean(resolutionHours)),
+        medianResolutionHours: round(median(resolutionHours)),
+        resolutionRate: totalTickets ? round((closedCount / totalTickets) * 100) : 0,
+      },
+      trend: Object.keys(created).map((d) => ({
+        date: d,
+        created: created[d],
+        resolved: resolved[d],
+      })),
+      byStatus: topN(byStatus, 8),
+      byPriority: topN(byPriority, 8),
+      byType: topN(byType, 8),
+      byPlatform: topN(byPlatform, 8),
+      byDepartment: topN(byDepartment, 8),
+      topAssignees: topN(assigneeLoad, 8),
+      ageing: Object.entries(ageing).map(([label, value]) => ({ label, value })),
+      resolutionByPriority: Object.entries(resolutionByPriority)
+        .map(([label, xs]) => ({ label, value: round(mean(xs)), count: xs.length })),
+    };
   }
 }

@@ -7,6 +7,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
+import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { AuthService } from '../../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
@@ -83,6 +84,7 @@ interface Lead {
   selector: 'app-leads',
   standalone: true,
   imports: [
+    SkeletonComponent,
     CommonModule, 
     FormsModule, 
     DragDropModule, 

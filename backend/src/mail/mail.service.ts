@@ -327,4 +327,46 @@ export class MailService {
       throw error;
     }
   }
+
+  async sendTicketAssignedEmail(email: string, ticketNumber: string, ticketTitle: string) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const ticketLink = `${baseUrl}/crm/tickets`;
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #1e3a8a; text-align: center;">New Ticket Assigned</h2>
+        <p style="color: #475569; font-size: 16px;">Hello,</p>
+        <p style="color: #475569; font-size: 16px;">A new ticket has been assigned to you.</p>
+        <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 4px 0; color: #1e293b;"><strong>Ticket:</strong> ${ticketNumber}</p>
+          <p style="margin: 4px 0; color: #1e293b;"><strong>Title:</strong> ${ticketTitle}</p>
+        </div>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${ticketLink}" style="background-color: #3b82f6; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">View Ticket</a>
+        </div>
+      </div>
+    `;
+
+    try {
+      if (this.brevoApiKey) {
+        this.logger.log(`Sending ticket assignment email to ${email} via Brevo HTTP API.`);
+        await this.sendBrevoEmail({
+          to: email,
+          subject: `Ticket Assigned: ${ticketNumber} - ${ticketTitle}`,
+          html: htmlContent,
+        });
+        return;
+      }
+      this.logger.log(`Sending ticket assignment email to ${email} via SMTP transport.`);
+      await this.sendWithRetry({
+        from: `"NEX ERP Support" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        subject: `Ticket Assigned: ${ticketNumber} - ${ticketTitle}`,
+        html: htmlContent,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send ticket assignment email to ${email}: ${this.errorDetail(error)}`);
+    }
+  }
 }

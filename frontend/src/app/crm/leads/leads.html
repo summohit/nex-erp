@@ -659,8 +659,27 @@
         </tr>
       </thead>
       <tbody>
+        <!-- Skeleton rows mirror the real columns so the table doesn't jump -->
         <ng-container *ngIf="isLoading">
-          <tr><td colspan="7" style="text-align: center; padding: 20px;">Loading leads...</td></tr>
+          <tr class="sk-lead-row" *ngFor="let r of [1,2,3,4,5,6,7,8]">
+            <td>
+              <div class="sk-stack">
+                <app-skeleton width="66%" height="12px"></app-skeleton>
+                <app-skeleton width="48px" height="10px"></app-skeleton>
+              </div>
+            </td>
+            <td><app-skeleton width="72%" height="12px"></app-skeleton></td>
+            <td><app-skeleton width="80px" height="18px" radius="9px"></app-skeleton></td>
+            <td><app-skeleton width="64px" height="12px"></app-skeleton></td>
+            <td>
+              <div class="sk-user">
+                <app-skeleton width="26px" [circle]="true"></app-skeleton>
+                <app-skeleton width="78px" height="11px"></app-skeleton>
+              </div>
+            </td>
+            <td><app-skeleton width="70px" height="12px"></app-skeleton></td>
+            <td><app-skeleton width="56px" height="26px" radius="6px"></app-skeleton></td>
+          </tr>
         </ng-container>
         <ng-container *ngIf="!isLoading && getFilteredLeads().length === 0">
           <tr><td colspan="7" style="text-align: center; padding: 20px;">No leads match your filters.</td></tr>

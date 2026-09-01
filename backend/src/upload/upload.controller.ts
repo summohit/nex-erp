@@ -11,9 +11,42 @@ const ALLOWED_MIME_TYPES = ['application/pdf'];
 const ALLOWED_EXTENSIONS = ['.pdf'];
 const MAX_RESUME_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_UPLOAD_FILE_SIZE = 20 * 1024 * 1024;
-const MAX_TICKET_IMAGE_SIZE = 10 * 1024 * 1024;
-const TICKET_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const TICKET_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+// Ticket attachments accept screenshots and documents alike. Allowlisted rather
+// than blocklisted: anything executable or scriptable stays out by construction.
+const MAX_TICKET_FILE_SIZE = 20 * 1024 * 1024;
+const TICKET_FILE_EXTENSIONS = [
+  // Images
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic',
+  // Documents
+  '.pdf', '.doc', '.docx', '.odt', '.rtf',
+  // Spreadsheets
+  '.xls', '.xlsx', '.ods', '.csv',
+  // Presentations
+  '.ppt', '.pptx', '.odp',
+  // Text & logs
+  '.txt', '.log', '.json', '.xml', '.md',
+  // Archives
+  '.zip', '.rar', '.7z',
+];
+const TICKET_FILE_MIME_TYPES = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml', 'image/heic',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.oasis.opendocument.text',
+  'application/rtf', 'text/rtf',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'text/csv',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.presentation',
+  'text/plain', 'application/json', 'application/xml', 'text/xml', 'text/markdown',
+  'application/zip', 'application/x-zip-compressed',
+  'application/vnd.rar', 'application/x-rar-compressed',
+  'application/x-7z-compressed',
+];
 
 function resumeFileFilter(req: any, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) {
   const ext = path.extname(file.originalname).toLowerCase();
@@ -81,13 +114,21 @@ export class UploadController {
   @Post('ticket-attachment')
   @UseInterceptors(FileInterceptor('file', {
     fileFilter: (req: any, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+      // The extension is the gate: MIME is client-supplied and browsers send
+      // application/octet-stream for plenty of legitimate types, so trusting it
+      // alone would let an executable through under a generic content type.
       const ext = path.extname(file.originalname).toLowerCase();
-      if (!TICKET_IMAGE_MIME_TYPES.includes(file.mimetype) && !TICKET_IMAGE_EXTENSIONS.includes(ext)) {
-        return cb(new HttpException('Only JPG, PNG, GIF, and WEBP images are allowed', HttpStatus.BAD_REQUEST), false);
+      if (!TICKET_FILE_EXTENSIONS.includes(ext)) {
+        return cb(new HttpException(`File type "${ext || 'unknown'}" is not allowed`, HttpStatus.BAD_REQUEST), false);
+      }
+      // When the browser does send a specific type, it must agree with the allowlist.
+      if (file.mimetype && file.mimetype !== 'application/octet-stream'
+          && !TICKET_FILE_MIME_TYPES.includes(file.mimetype)) {
+        return cb(new HttpException(`Content type "${file.mimetype}" is not allowed`, HttpStatus.BAD_REQUEST), false);
       }
       cb(null, true);
     },
-    limits: { fileSize: MAX_TICKET_IMAGE_SIZE }
+    limits: { fileSize: MAX_TICKET_FILE_SIZE }
   }))
   async uploadTicketAttachment(@UploadedFile() file: Express.Multer.File) {
     return this.processUpload(file, '/ticket_attachments');

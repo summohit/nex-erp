@@ -47,6 +47,18 @@ export interface TicketActivity {
   createdAt: string;
 }
 
+export interface TicketTimeEntry {
+  id: number;
+  ticketId: number;
+  userId: number;
+  user?: TicketEmployee;
+  startTime: string;
+  endTime?: string;
+  duration?: number;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Ticket {
   id: number;
   ticketNumber: string;
@@ -58,18 +70,22 @@ export interface Ticket {
   platform: 'WEB' | 'MOBILE' | 'BOTH';
   departmentId: number | null;
   department?: { id: number; name: string };
+  /** The department the issue was raised on behalf of. */
+  raisedByDepartmentId?: number | null;
+  raisedByDepartment?: { id: number; name: string };
   reporterId: number;
   reporter?: TicketEmployee;
-  assigneeId?: number;
+  assigneeId?: number | null;
   assignee?: TicketEmployee;
-  dueDate?: string;
-  resolvedAt?: string;
-  closedAt?: string;
+  dueDate?: string | null;
+  resolvedAt?: string | null;
+  closedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   comments?: TicketComment[];
   activities?: TicketActivity[];
   attachments?: TicketAttachment[];
+  timeEntries?: TicketTimeEntry[];
   _count?: { comments: number };
 }
 
@@ -149,5 +165,27 @@ export class TicketService {
 
   deleteComment(ticketId: number, commentId: number): Observable<{ success: boolean }> {
     return this.http.delete<{ success: boolean }>(`${this.apiUrl}/${ticketId}/comments/${commentId}`);
+  }
+
+  // --- Attachments ---
+  addAttachment(id: number, fileData: { fileName: string; fileUrl: string; fileSize?: number }): Observable<TicketAttachment> {
+    return this.http.post<TicketAttachment>(`${this.apiUrl}/${id}/attachments`, fileData);
+  }
+
+  // --- Time Tracking ---
+  getTimeEntries(id: number): Observable<TicketTimeEntry[]> {
+    return this.http.get<TicketTimeEntry[]>(`${this.apiUrl}/${id}/time-entries`);
+  }
+
+  startTimer(id: number): Observable<TicketTimeEntry> {
+    return this.http.post<TicketTimeEntry>(`${this.apiUrl}/${id}/timer/start`, {});
+  }
+
+  stopTimer(id: number, notes?: string): Observable<TicketTimeEntry> {
+    return this.http.post<TicketTimeEntry>(`${this.apiUrl}/${id}/timer/stop`, { notes });
+  }
+
+  getAnalytics(days = 30): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/analytics/summary`, { params: { days: String(days) } });
   }
 }

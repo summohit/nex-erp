@@ -18,6 +18,8 @@ import { TicketService, Ticket, TicketStats, NewTicketAttachment, TicketPermissi
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { AuthService } from '../../services/auth.service';
 import { TicketDetailComponent } from './ticket-detail/ticket-detail';
+import { ChartCardComponent } from '../../shared/components/chart-card/chart-card.component';
+import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 
 // AG Grid v33+ renders nothing unless its modules are registered.
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -34,7 +36,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideInbox, LucideCheck, LucideSlidersHorizontal, LucideSparkles,
     LucideLaptop, LucideSmartphone, LucideHelpCircle, LucideClock,
     LucideImagePlus, LucideTrash2, LucideLoader2,
-    TicketDetailComponent,
+    TicketDetailComponent, ChartCardComponent, SkeletonComponent,
   ],
   templateUrl: './tickets.html',
   styleUrls: ['./tickets.css'],
@@ -60,7 +62,19 @@ export class TicketsComponent implements OnInit {
   filterStatus = '';
   filterPriority = '';
   filterPlatform = '';
+  filterMonth = 'all'; // all, 1_month, 3_months, 6_months
   searchTerm = '';
+  
+  activeTab: 'list' | 'reports' = 'list';
+  analytics: any = null;
+  analyticsLoading = false;
+  analyticsDays = 30;
+  readonly analyticsRanges = [
+    { days: 7, label: '7 days' },
+    { days: 30, label: '30 days' },
+    { days: 90, label: '90 days' },
+    { days: 365, label: '1 year' },
+  ];
 
   // Filter Searchable Dropdown States
   showDeptDropdown = false;
@@ -85,6 +99,10 @@ export class TicketsComponent implements OnInit {
   showModalPriorityDropdown = false;
   modalPrioritySearchQuery = '';
 
+  showModalRaisedByDropdown = false;
+  modalRaisedBySearchQuery = '';
+
+
   // Create form — department is resolved server-side (always the software dev team),
   // so the reporter only supplies the issue itself.
   newTicket: Partial<Ticket> = {
@@ -102,7 +120,17 @@ export class TicketsComponent implements OnInit {
   isDraggingFiles = false;
 
   readonly maxAttachments = 8;
-  private readonly maxAttachmentBytes = 10 * 1024 * 1024;
+  private readonly maxAttachmentBytes = 20 * 1024 * 1024;
+
+  /** Mirrors the server allowlist in upload.controller.ts. */
+  readonly allowedAttachmentExtensions = [
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic',
+    '.pdf', '.doc', '.docx', '.odt', '.rtf',
+    '.xls', '.xlsx', '.ods', '.csv',
+    '.ppt', '.pptx', '.odp',
+    '.txt', '.log', '.json', '.xml', '.md',
+    '.zip', '.rar', '.7z',
+  ];
 
   readonly quillModules = {
     toolbar: [
@@ -188,11 +216,14 @@ export class TicketsComponent implements OnInit {
       },
     },
     {
-      field: 'department',
-      headerName: 'DEPARTMENT',
-      width: 130,
-      valueGetter: (p: any) => p.data?.department?.name ?? 'General',
-      cellRenderer: (p: any) => `<span class="dept-cell">${this.escapeHtml(p.value)}</span>`,
+      // Which department the issue came FROM. Every ticket is worked by the dev
+      // team, so the owning department says nothing — the raising one does.
+      colId: 'raisedByDept',
+      headerName: 'RAISED BY DEPT',
+      width: 150,
+      valueGetter: (p: any) =>
+        p.data?.raisedByDepartment?.name ?? p.data?.reporter?.department?.name ?? '—',
+      cellRenderer: (p: any) => `<span class="dept-pill">${this.escapeHtml(p.value)}</span>`,
     },
     {
       field: 'priority',
@@ -239,8 +270,8 @@ export class TicketsComponent implements OnInit {
     },
     {
       field: 'reporter',
-      headerName: 'REPORTER',
-      width: 145,
+      headerName: 'RAISED BY',
+      width: 175,
       cellRenderer: (p: any) => {
         const r = p.data?.reporter;
         if (!r) return `<span class="text-muted">—</span>`;
@@ -253,6 +284,7 @@ export class TicketsComponent implements OnInit {
             ${avatarHtml}
             <div class="user-info">
               <span class="user-name-text">${this.escapeHtml(r.firstName)} ${this.escapeHtml(r.lastName)}</span>
+              <span class="user-sub-text">${this.escapeHtml(r.department?.name ?? '—')}</span>
             </div>
           </div>
         `;
@@ -305,10 +337,21 @@ export class TicketsComponent implements OnInit {
     if (this.filterPriority) filters['priority'] = this.filterPriority;
     if (this.filterPlatform) filters['platform'] = this.filterPlatform;
 
+    if (this.filterMonth && this.filterMonth !== 'all') {
+      const date = new Date();
+      if (this.filterMonth === '1_month') date.setMonth(date.getMonth() - 1);
+      else if (this.filterMonth === '3_months') date.setMonth(date.getMonth() - 3);
+      else if (this.filterMonth === '6_months') date.setMonth(date.getMonth() - 6);
+      filters['fromDate'] = date.toISOString();
+    }
+
     this.ticketService.getTickets(filters).subscribe({
       next: (t) => {
         this.tickets = t;
         this.isLoading = false;
+        // The grid is display:none behind the skeleton, so it can lay out at
+        // zero width. Re-measure once it is visible again.
+        setTimeout(() => this.gridApi?.sizeColumnsToFit());
         if (this.searchTerm) {
           setTimeout(() => this.onSearch(), 50);
         }
@@ -318,6 +361,143 @@ export class TicketsComponent implements OnInit {
         this.isLoading = false;
       },
     });
+  }
+
+  loadAnalytics() {
+    this.analyticsLoading = true;
+    this.ticketService.getAnalytics(this.analyticsDays).subscribe({
+      next: (data) => {
+        this.analytics = data;
+        this.buildChartData();
+        this.analyticsLoading = false;
+      },
+      error: () => { this.toast.error('Failed to load analytics'); this.analyticsLoading = false; },
+    });
+  }
+
+  setAnalyticsRange(days: number) {
+    this.analyticsDays = days;
+    this.loadAnalytics();
+  }
+
+  setTab(tab: 'list' | 'reports') {
+    this.activeTab = tab;
+    if (tab === 'reports' && !this.analytics) {
+      this.loadAnalytics();
+    }
+  }
+
+  // ─── Analytics chart data ──────────────────────────────────────────────────
+  // Palettes validated with the dataviz colour checks (CVD separation, chroma,
+  // lightness band). Magnitude charts use one hue; identity charts use the
+  // categorical order; state/severity charts use the reserved status colours.
+
+  readonly catPalette = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];
+  readonly singleHue = ['#2a78d6'];
+  readonly trendPalette = ['#2a78d6', '#1baf7a'];
+
+  private readonly statusPalette: Record<string, string> = {
+    OPEN: '#2a78d6',
+    IN_PROGRESS: '#eda100',
+    RESOLVED: '#0ca30c',
+    CLOSED: '#64748b',
+    REJECTED: '#d03b3b',
+  };
+
+  private readonly priorityPalette: Record<string, string> = {
+    CRITICAL: '#d03b3b',
+    HIGH: '#ec835a',
+    MEDIUM: '#fab219',
+    LOW: '#64748b',
+  };
+
+  /** Short weekday/day label so a 30-day axis stays readable. */
+  private shortDate(iso: string): string {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+
+  private labelsOf(rows: any[]): string[] {
+    return (rows ?? []).map((r) => this.formatLabel(r.label));
+  }
+
+  private valuesOf(rows: any[]): number[] {
+    return (rows ?? []).map((r) => r.value);
+  }
+
+  // Chart inputs are built ONCE per analytics load, never in getters. A getter
+  // returns a fresh array on every change-detection pass, which ng-apexcharts
+  // reads as a changed input and re-renders — with eight charts that pins the
+  // main thread and the page stops responding to clicks.
+  trendCategories: string[] = [];
+  trendSeries: any[] = [];
+  statusLabels: string[] = [];
+  statusValues: number[] = [];
+  statusColors2: string[] = [];
+  priorityCategories: string[] = [];
+  prioritySeries: any[] = [];
+  priorityColors2: string[] = [];
+  typeLabels: string[] = [];
+  typeValues: number[] = [];
+  deptCategories: string[] = [];
+  deptSeries: any[] = [];
+  ageingCategories: string[] = [];
+  ageingSeries: any[] = [];
+  assigneeCategories: string[] = [];
+  assigneeSeries: any[] = [];
+  resolutionCategories: string[] = [];
+  resolutionSeries: any[] = [];
+  platformCategories: string[] = [];
+  platformSeries: any[] = [];
+
+  private buildChartData() {
+    const a = this.analytics;
+    if (!a) return;
+
+    this.trendCategories = (a.trend ?? []).map((p: any) => this.shortDate(p.date));
+    this.trendSeries = [
+      { name: 'Raised', data: (a.trend ?? []).map((p: any) => p.created) },
+      { name: 'Resolved', data: (a.trend ?? []).map((p: any) => p.resolved) },
+    ];
+
+    this.statusLabels = this.labelsOf(a.byStatus);
+    this.statusValues = this.valuesOf(a.byStatus);
+    this.statusColors2 = (a.byStatus ?? []).map((r: any) => this.statusPalette[r.label] ?? '#64748b');
+
+    this.priorityCategories = this.labelsOf(a.byPriority);
+    this.prioritySeries = [{ name: 'Tickets', data: this.valuesOf(a.byPriority) }];
+    this.priorityColors2 = (a.byPriority ?? []).map((r: any) => this.priorityPalette[r.label] ?? '#64748b');
+
+    this.typeLabels = this.labelsOf(a.byType);
+    this.typeValues = this.valuesOf(a.byType);
+
+    this.deptCategories = this.labelsOf(a.byDepartment);
+    this.deptSeries = [{ name: 'Tickets raised', data: this.valuesOf(a.byDepartment) }];
+
+    this.ageingCategories = this.labelsOf(a.ageing);
+    this.ageingSeries = [{ name: 'Open tickets', data: this.valuesOf(a.ageing) }];
+
+    this.assigneeCategories = this.labelsOf(a.topAssignees);
+    this.assigneeSeries = [{ name: 'Assigned', data: this.valuesOf(a.topAssignees) }];
+
+    this.resolutionCategories = this.labelsOf(a.resolutionByPriority);
+    this.resolutionSeries = [{ name: 'Avg hours', data: this.valuesOf(a.resolutionByPriority) }];
+
+    this.platformCategories = this.labelsOf(a.byPlatform);
+    this.platformSeries = [{ name: 'Tickets', data: this.valuesOf(a.byPlatform) }];
+  }
+
+  /** Hours read badly past a day — promote to days once it crosses 24h. */
+  formatHours(hours: number | undefined | null): string {
+    const h = hours ?? 0;
+    if (h <= 0) return '—';
+    if (h < 1) return `${Math.round(h * 60)}m`;
+    if (h < 24) return `${h.toFixed(1)}h`;
+    return `${(h / 24).toFixed(1)}d`;
+  }
+
+  exportToCSV() {
+    this.gridApi?.exportDataAsCsv({ fileName: 'nex-erp-tickets.csv' });
   }
 
   loadStats() {
@@ -349,6 +529,7 @@ export class TicketsComponent implements OnInit {
     this.showModalTypeDropdown = false;
     this.showModalPlatformDropdown = false;
     this.showModalPriorityDropdown = false;
+    this.showModalRaisedByDropdown = false;
   }
 
   // Filter Dropdown Handlers
@@ -383,10 +564,11 @@ export class TicketsComponent implements OnInit {
   }
 
   // Label Getters for Filters
+  /** Filters on the department that raised the ticket, not the team working it. */
   getSelectedDeptLabel(): string {
     if (!this.filterDept) return 'All Departments';
     const dept = this.departments.find(d => String(d.id) === String(this.filterDept));
-    return dept ? dept.name : 'All Departments';
+    return dept ? `From: ${dept.name}` : 'All Departments';
   }
 
   getSelectedStatusLabel(): string {
@@ -405,10 +587,28 @@ export class TicketsComponent implements OnInit {
   }
 
   // Select Action Handlers for Filters
-  selectDeptFilter(deptId: any) {
-    this.filterDept = deptId ? String(deptId) : '';
+  selectDeptFilter(id: string | number) {
+    this.filterDept = id ? String(id) : '';
     this.showDeptDropdown = false;
     this.loadTickets();
+  }
+
+  /** The reporter's own department — the default "raised by" value. */
+  myDepartmentName(): string {
+    return this.permissions?.departmentName ?? 'your department';
+  }
+
+  getModalRaisedByLabel(): string {
+    const id = this.newTicket.raisedByDepartmentId;
+    if (!id) return this.myDepartmentName();
+    const d = this.departments.find(x => x.id === id);
+    return d ? d.name : this.myDepartmentName();
+  }
+
+  selectModalRaisedBy(id: number | null) {
+    this.newTicket.raisedByDepartmentId = id;
+    this.showModalRaisedByDropdown = false;
+    this.modalRaisedBySearchQuery = '';
   }
 
   selectStatusFilter(status: string) {
@@ -521,6 +721,9 @@ export class TicketsComponent implements OnInit {
       type: 'BUG',
       priority: 'MEDIUM',
       platform: 'WEB',
+      // Defaults to the reporter's own department; they can change it if the
+      // issue is being raised on another team's behalf.
+      raisedByDepartmentId: this.permissions?.departmentId ?? null,
     };
     this.pendingAttachments = [];
     this.uploadingCount = 0;
@@ -528,6 +731,7 @@ export class TicketsComponent implements OnInit {
     this.modalTypeSearchQuery = '';
     this.modalPlatformSearchQuery = '';
     this.modalPrioritySearchQuery = '';
+    this.modalRaisedBySearchQuery = '';
     this.closeAllDropdowns();
     this.showCreateModal = true;
   }
@@ -549,7 +753,7 @@ export class TicketsComponent implements OnInit {
   onAttachmentDrop(event: DragEvent) {
     event.preventDefault();
     this.isDraggingFiles = false;
-    const files = Array.from(event.dataTransfer?.files ?? []).filter(f => f.type.startsWith('image/'));
+    const files = Array.from(event.dataTransfer?.files ?? []);
     if (files.length) this.uploadFiles(files);
   }
 
@@ -565,18 +769,23 @@ export class TicketsComponent implements OnInit {
   private uploadFiles(files: File[]) {
     const remaining = this.maxAttachments - this.pendingAttachments.length - this.uploadingCount;
     if (remaining <= 0) {
-      this.toast.error(`You can attach at most ${this.maxAttachments} images`);
+      this.toast.error(`You can attach at most ${this.maxAttachments} files`);
       return;
     }
 
     const accepted = files.slice(0, remaining);
     if (files.length > remaining) {
-      this.toast.error(`Only ${remaining} more image${remaining === 1 ? '' : 's'} can be attached`);
+      this.toast.error(`Only ${remaining} more file${remaining === 1 ? '' : 's'} can be attached`);
     }
 
     for (const file of accepted) {
+      const ext = this.fileExtension(file.name);
+      if (!this.allowedAttachmentExtensions.includes(ext)) {
+        this.toast.error(`"${file.name}" is not an allowed file type`);
+        continue;
+      }
       if (file.size > this.maxAttachmentBytes) {
-        this.toast.error(`"${file.name}" is larger than 10MB`);
+        this.toast.error(`"${file.name}" is larger than 20MB`);
         continue;
       }
 
@@ -595,6 +804,34 @@ export class TicketsComponent implements OnInit {
         },
       });
     }
+  }
+
+  /** Lowercased extension including the dot, e.g. ".pdf". */
+  fileExtension(name: string): string {
+    const i = (name || '').lastIndexOf('.');
+    return i === -1 ? '' : name.slice(i).toLowerCase();
+  }
+
+  /** Only images get a thumbnail preview; everything else shows a typed badge. */
+  isImageAttachment(fileName: string): boolean {
+    return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic']
+      .includes(this.fileExtension(fileName));
+  }
+
+  /** Short uppercase label for a non-image file, e.g. "PDF", "XLSX". */
+  fileTypeLabel(fileName: string): string {
+    return this.fileExtension(fileName).replace('.', '').toUpperCase() || 'FILE';
+  }
+
+  /** Groups extensions so the badge can be colour-coded by kind. */
+  fileTypeClass(fileName: string): string {
+    const ext = this.fileExtension(fileName);
+    if (['.pdf'].includes(ext)) return 'file-pdf';
+    if (['.doc', '.docx', '.odt', '.rtf'].includes(ext)) return 'file-doc';
+    if (['.xls', '.xlsx', '.ods', '.csv'].includes(ext)) return 'file-sheet';
+    if (['.ppt', '.pptx', '.odp'].includes(ext)) return 'file-slide';
+    if (['.zip', '.rar', '.7z'].includes(ext)) return 'file-archive';
+    return 'file-generic';
   }
 
   removeAttachment(index: number) {

@@ -5078,3 +5078,26 @@ textarea:focus {
     justify-content: center;
   }
 }
+
+/* Skeleton loading rows */
+.sk-lead-row td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.sk-lead-row:hover td { background: transparent; }
+
+.sk-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sk-user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
