@@ -34,7 +34,25 @@
     </div>
   </div>
 
-  <div class="grid-container">
+  <!-- Skeleton mirrors the grid's columns so the layout does not shift -->
+  <div class="grid-container" *ngIf="isLoading()">
+    <div class="sk-job-head">
+      <app-skeleton *ngFor="let h of [1,2,3,4,5,6]" width="84px" height="10px"></app-skeleton>
+    </div>
+    <div class="sk-job-row" *ngFor="let r of [1,2,3,4,5,6,7]">
+      <div class="sk-stack">
+        <app-skeleton width="70%" height="12px"></app-skeleton>
+        <app-skeleton width="46%" height="10px"></app-skeleton>
+      </div>
+      <app-skeleton width="86px" height="12px"></app-skeleton>
+      <app-skeleton width="72px" height="12px"></app-skeleton>
+      <app-skeleton width="64px" height="20px" radius="9px"></app-skeleton>
+      <app-skeleton width="52px" height="12px"></app-skeleton>
+      <app-skeleton width="70px" height="12px"></app-skeleton>
+    </div>
+  </div>
+
+  <div class="grid-container" [hidden]="isLoading()">
     <ag-grid-angular
       style="width: 100%; height: 100%;"
       class="ag-theme-quartz"
@@ -43,7 +61,8 @@
       [columnDefs]="colDefs"
       [defaultColDef]="defaultColDef"
       [gridOptions]="gridOptions"
-      (gridReady)="onGridReady($event)">
+      (gridReady)="onGridReady($event)"
+      (rowClicked)="onRowClicked($event)">
     </ag-grid-angular>
   </div>
 </div>
@@ -288,7 +307,7 @@
 
         <div class="form-group">
           <label>Total Openings</label>
-          <input type="number" class="form-control" [(ngModel)]="jobForm.totalOpenings" min="1" placeholder="e.g. 1">
+          <input type="number" class="form-control" [(ngModel)]="jobForm.totalOpenings" min="0" placeholder="e.g. 1 (0 = unlimited)">
         </div>
 
         <div class="form-group">
@@ -298,7 +317,33 @@
 
         <div class="form-group">
           <label>End Date (Optional)</label>
-          <input type="date" class="form-control" [(ngModel)]="jobForm.endDate">
+          <input type="date" class="form-control"
+                 [(ngModel)]="jobForm.endDate"
+                 [disabled]="jobForm.neverExpires">
+
+          <!-- Never expires == no end date. The auto-close job already skips
+               date checks when endDate is null, so this needs no backend rule. -->
+          <label class="never-expires-toggle">
+            <input type="checkbox"
+                   [(ngModel)]="jobForm.neverExpires"
+                   (ngModelChange)="onNeverExpiresChange($event)">
+            <span>This job never expires</span>
+          </label>
+          <!-- Always visible, so the closing rule is clear before choosing. -->
+          <small class="field-hint">
+            <ng-container *ngIf="jobForm.endDate && !jobForm.neverExpires">
+              Closes automatically after {{ jobForm.endDate | date:'mediumDate' }}.
+            </ng-container>
+            <ng-container *ngIf="!jobForm.endDate || jobForm.neverExpires">
+              No end date — the posting stays open until you close it manually.
+            </ng-container>
+            <ng-container *ngIf="+jobForm.totalOpenings > 0">
+              It will also close once all {{ jobForm.totalOpenings }} opening(s) are filled — set openings to <strong>0</strong> to keep it open indefinitely.
+            </ng-container>
+            <ng-container *ngIf="+jobForm.totalOpenings === 0">
+              Openings are unlimited, so it will not close on its own.
+            </ng-container>
+          </small>
         </div>
 
         <div class="form-group">

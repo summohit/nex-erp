@@ -32,7 +32,7 @@
 
   <!-- KPI / Stats Row — skeleton mirrors the real card shape so nothing jumps -->
   <div class="stats-row" *ngIf="!stats">
-    <div class="stat-card skeleton-card" *ngFor="let i of [1,2,3,4]">
+    <div class="stat-card skeleton-card" *ngFor="let i of [1,2,3,4,5]">
       <app-skeleton width="44px" height="44px" radius="12px"></app-skeleton>
       <div class="stat-info">
         <app-skeleton width="72px" height="10px"></app-skeleton>
@@ -88,6 +88,18 @@
         <span class="stat-label">Resolved</span>
         <div class="stat-value">{{ stats.resolved }}</div>
         <span class="stat-subtext">Fixed & verified issues</span>
+      </div>
+    </div>
+
+    <!-- Closed -->
+    <div class="stat-card stat-slate" [class.active-card]="filterStatus === 'CLOSED'" (click)="toggleStatusCard('CLOSED')" title="Click to filter Closed tickets">
+      <div class="stat-icon-wrapper">
+        <svg lucideCheck [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Closed</span>
+        <div class="stat-value">{{ stats.closed }}</div>
+        <span class="stat-subtext">Confirmed & signed off</span>
       </div>
     </div>
   </div>
@@ -514,7 +526,7 @@
                 <svg lucideCheck [size]="14" class="check-icon" *ngIf="!filterPlatform"></svg>
               </div>
               <div class="popover-option-item" *ngFor="let pl of getFilteredPlatforms(platformSearchQuery)" (click)="selectPlatformFilter(pl)" [class.selected]="filterPlatform === pl">
-                <span class="platform-tag platform-{{ pl.toLowerCase() }}">{{ pl }}</span>
+                <span class="platform-tag platform-{{ pl.toLowerCase() }}">{{ platformLabel(pl) }}</span>
                 <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterPlatform === pl"></svg>
               </div>
               <div class="popover-empty" *ngIf="getFilteredPlatforms(platformSearchQuery).length === 0">
@@ -607,6 +619,7 @@
         [rowData]="tickets"
         [columnDefs]="columnDefs"
         [defaultColDef]="defaultColDef"
+        [rowClassRules]="rowClassRules"
         [rowHeight]="48"
         [headerHeight]="38"
         [pagination]="true"
@@ -756,7 +769,7 @@
               type="button"
               class="filter-dropdown-trigger modal-select-trigger full-width"
               (click)="showModalPlatformDropdown = !showModalPlatformDropdown; showModalTypeDropdown=false; showModalPriorityDropdown=false">
-              <span class="platform-tag platform-{{ (newTicket.platform || 'WEB').toLowerCase() }}">{{ newTicket.platform || 'WEB' }}</span>
+              <span class="platform-tag platform-{{ (newTicket.platform || 'WEB').toLowerCase() }}">{{ platformLabel(newTicket.platform || 'WEB') }}</span>
               <svg lucideChevronDown [size]="14" class="trigger-chevron" [class.rotated]="showModalPlatformDropdown"></svg>
             </button>
 
@@ -774,7 +787,7 @@
                   *ngFor="let p of getFilteredPlatforms(modalPlatformSearchQuery)"
                   (click)="selectModalPlatform(p)"
                   [class.selected]="newTicket.platform === p">
-                  <span class="platform-tag platform-{{ p.toLowerCase() }}">{{ p }}</span>
+                  <span class="platform-tag platform-{{ p.toLowerCase() }}">{{ platformLabel(p) }}</span>
                   <svg lucideCheck [size]="14" class="check-icon" *ngIf="newTicket.platform === p"></svg>
                 </div>
                 <div class="popover-empty" *ngIf="getFilteredPlatforms(modalPlatformSearchQuery).length === 0">

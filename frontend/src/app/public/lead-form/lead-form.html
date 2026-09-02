@@ -1,67 +1,191 @@
 <div class="public-lead-form">
+  <!-- Decorative Ambient Glows -->
+  <div class="plf-bg-orb plf-bg-orb-1" aria-hidden="true"></div>
+  <div class="plf-bg-orb plf-bg-orb-2" aria-hidden="true"></div>
+
   <div class="plf-shell">
-    <!-- Loading -->
-    <div class="plf-state" *ngIf="status === 'loading'">
-      <svg lucideLoader2 class="plf-spinner" size="32"></svg>
-      <p>Loading form...</p>
+    <!-- Top Accent Brand Gradient Line -->
+    <div class="plf-brand-bar"></div>
+
+    <!-- ══════════════ LOADING STATE ══════════════ -->
+    <div class="plf-state plf-loading-state" *ngIf="status === 'loading'">
+      <div class="plf-loader-icon-wrap">
+        <svg lucideLoader2 class="plf-spinner" size="36"></svg>
+      </div>
+      <h3>Loading Form</h3>
+      <p>Preparing your deal request portal...</p>
+      <div class="plf-skeleton-box">
+        <div class="plf-skeleton plf-sk-title"></div>
+        <div class="plf-skeleton plf-sk-input"></div>
+        <div class="plf-skeleton plf-sk-input"></div>
+      </div>
     </div>
 
-    <!-- Not found -->
+    <!-- ══════════════ NOT FOUND STATE ══════════════ -->
     <div class="plf-state" *ngIf="status === 'notfound'">
-      <span class="plf-state-icon plf-error-icon"><svg lucideAlertCircle size="30"></svg></span>
-      <h3>Form not found</h3>
-      <p>This form may have been removed or is no longer active.</p>
+      <div class="plf-state-icon-circle plf-error-circle">
+        <svg lucideAlertCircle size="32"></svg>
+      </div>
+      <h3>Form Unavailable</h3>
+      <p>This form may have been deactivated or the link is incorrect. Please contact your account representative.</p>
     </div>
 
-    <!-- Error -->
+    <!-- ══════════════ ERROR STATE ══════════════ -->
     <div class="plf-state" *ngIf="status === 'error'">
-      <span class="plf-state-icon plf-error-icon"><svg lucideAlertCircle size="30"></svg></span>
-      <h3>Something went wrong</h3>
-      <p>We could not load this form. Please try again later.</p>
+      <div class="plf-state-icon-circle plf-error-circle">
+        <svg lucideAlertCircle size="32"></svg>
+      </div>
+      <h3>Unable to Load Form</h3>
+      <p>We ran into a connection problem. Please check your network and try again.</p>
+      <button type="button" class="plf-btn-secondary" (click)="loadForm()">
+        <svg lucideRotateCcw size="15"></svg>
+        <span>Try Again</span>
+      </button>
     </div>
 
-    <!-- Success -->
-    <div class="plf-state" *ngIf="status === 'success'">
-      <span class="plf-state-icon plf-success-icon"><svg lucideCheckCircle2 size="30"></svg></span>
-      <h3>Thank you!</h3>
-      <p>{{ successMessage }}</p>
+    <!-- ══════════════ SUCCESS STATE ══════════════ -->
+    <div class="plf-state plf-success-state" *ngIf="status === 'success'">
+      <div class="plf-state-icon-circle plf-success-circle">
+        <svg lucideCheckCircle2 size="36"></svg>
+      </div>
+      <h3>Request Submitted!</h3>
+      <p class="plf-success-msg">{{ successMessage }}</p>
     </div>
 
-    <!-- Ready -->
+    <!-- ══════════════ READY STATE (THE FORM) ══════════════ -->
     <form class="plf-form" *ngIf="status === 'ready'" (ngSubmit)="onSubmit()" novalidate>
+      
+      <!-- HEADER -->
       <div class="plf-head">
-        <h1>{{ name }}</h1>
-        <p *ngIf="description">{{ description }}</p>
+        <div class="plf-header-icon-wrap">
+          <div class="plf-header-icon">
+            <svg lucideBriefcase size="26"></svg>
+          </div>
+        </div>
+
+        <h1 class="plf-title">{{ name || 'Raise a Deal Request' }}</h1>
+        <p class="plf-subtitle" *ngIf="description">{{ description }}</p>
+        <p class="plf-subtitle" *ngIf="!description">Please provide the details below. Our team will review your deal request and get back to you promptly.</p>
       </div>
 
+      <!-- FORM BODY / GRID -->
       <div class="plf-body">
-        <div class="plf-field" *ngFor="let field of fields">
-          <label>{{ field.label }} <span class="plf-required" *ngIf="field.required || field.isName">*</span></label>
-          <ng-container [ngSwitch]="field.type">
-            <input *ngSwitchCase="'email'" type="email" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)" />
-            <input *ngSwitchCase="'tel'" type="tel" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)" />
-            <input *ngSwitchCase="'url'" type="url" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)" />
-            <select *ngSwitchCase="'select'" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]">
-              <option value="">Select {{ field.label }}...</option>
-              <option *ngFor="let o of (field.options || [])" [value]="o">{{ o }}</option>
-            </select>
-            <textarea *ngSwitchCase="'textarea'" rows="4" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)"></textarea>
-            <input *ngSwitchDefault type="text" name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]" [placeholder]="placeholderFor(field)" />
-          </ng-container>
-          <span class="plf-error" *ngIf="errors[field.fieldKey]">{{ errors[field.fieldKey] }}</span>
+        <div class="plf-grid">
+          <div 
+            class="plf-field" 
+            *ngFor="let field of fields" 
+            [class.plf-field-full]="isFullWidth(field)">
+            
+            <label class="plf-label">
+              <span class="plf-label-title">{{ field.label }}</span>
+              <span class="plf-required-pill" *ngIf="field.required || field.isName">Required</span>
+            </label>
+
+            <div 
+              class="plf-input-box" 
+              [class.has-error]="errors[field.fieldKey]"
+              [class.is-select]="field.type === 'select'"
+              [class.is-textarea]="field.type === 'textarea'">
+              
+              <!-- Leading Field Icon -->
+              <span class="plf-input-icon">
+                <svg *ngIf="getFieldIconType(field) === 'user'" lucideUser size="16"></svg>
+                <svg *ngIf="getFieldIconType(field) === 'mail'" lucideMail size="16"></svg>
+                <svg *ngIf="getFieldIconType(field) === 'building'" lucideBuilding size="16"></svg>
+                <svg *ngIf="getFieldIconType(field) === 'phone'" lucidePhone size="16"></svg>
+                <svg *ngIf="getFieldIconType(field) === 'globe'" lucideGlobe size="16"></svg>
+                <svg *ngIf="getFieldIconType(field) === 'message'" lucideMessageSquare size="16"></svg>
+                <svg *ngIf="getFieldIconType(field) === 'map-pin'" lucideMapPin size="16"></svg>
+                <svg *ngIf="getFieldIconType(field) === 'sparkles'" lucideSparkles size="16"></svg>
+                <svg *ngIf="getFieldIconType(field) === 'default' || getFieldIconType(field) === 'select'" lucideBriefcase size="16"></svg>
+              </span>
+
+              <!-- Field Input Elements -->
+              <ng-container [ngSwitch]="field.type">
+                
+                <input 
+                  *ngSwitchCase="'email'" 
+                  type="email" 
+                  name="{{ field.fieldKey }}" 
+                  [(ngModel)]="values[field.fieldKey]" 
+                  [placeholder]="placeholderFor(field)" 
+                  autocomplete="email" />
+
+                <input 
+                  *ngSwitchCase="'tel'" 
+                  type="tel" 
+                  name="{{ field.fieldKey }}" 
+                  [(ngModel)]="values[field.fieldKey]" 
+                  [placeholder]="placeholderFor(field)" 
+                  autocomplete="tel" />
+
+                <input 
+                  *ngSwitchCase="'url'" 
+                  type="url" 
+                  name="{{ field.fieldKey }}" 
+                  [(ngModel)]="values[field.fieldKey]" 
+                  [placeholder]="placeholderFor(field)" />
+
+                <div *ngSwitchCase="'select'" class="plf-select-container">
+                  <select name="{{ field.fieldKey }}" [(ngModel)]="values[field.fieldKey]">
+                    <option value="">Select {{ field.label }}...</option>
+                    <option *ngFor="let o of (field.options || [])" [value]="o">{{ o }}</option>
+                  </select>
+                  <svg lucideChevronDown size="15" class="plf-select-arrow"></svg>
+                </div>
+
+                <textarea 
+                  *ngSwitchCase="'textarea'" 
+                  rows="4" 
+                  name="{{ field.fieldKey }}" 
+                  [(ngModel)]="values[field.fieldKey]" 
+                  [placeholder]="placeholderFor(field)"></textarea>
+
+                <input 
+                  *ngSwitchDefault 
+                  type="text" 
+                  name="{{ field.fieldKey }}" 
+                  [(ngModel)]="values[field.fieldKey]" 
+                  [placeholder]="placeholderFor(field)" />
+
+              </ng-container>
+            </div>
+
+            <!-- Error Message -->
+            <div class="plf-error" *ngIf="errors[field.fieldKey]">
+              <svg lucideAlertCircle size="13"></svg>
+              <span>{{ errors[field.fieldKey] }}</span>
+            </div>
+          </div>
         </div>
 
+        <!-- Global Server Error Banner -->
         <div class="plf-server-error" *ngIf="serverError">
-          {{ serverError }}
+          <svg lucideAlertCircle size="18"></svg>
+          <div class="plf-server-error-text">{{ serverError }}</div>
         </div>
       </div>
 
+      <!-- FOOTER -->
       <div class="plf-footer">
         <button type="submit" class="plf-submit" [disabled]="submitting">
           <svg *ngIf="!submitting" lucideSend size="16"></svg>
-          <span>{{ submitting ? 'Submitting...' : 'Submit' }}</span>
+          <svg *ngIf="submitting" lucideLoader2 size="16" class="plf-spinner"></svg>
+          <span>{{ submitting ? 'Submitting Request...' : 'Submit Deal Request' }}</span>
         </button>
+
+        <div class="plf-footer-meta">
+          <div class="plf-footer-security">
+            <svg lucideShieldCheck size="13"></svg>
+            <span>Information submitted is protected under our standard enterprise privacy terms.</span>
+          </div>
+          <div class="plf-powered-badge">
+            Powered by <strong>NEX ERP</strong>
+          </div>
+        </div>
       </div>
+
     </form>
   </div>
 </div>
+

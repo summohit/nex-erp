@@ -22,7 +22,7 @@
         <button class="tab-btn" [class.active]="activeTab() === 'contacts'" (click)="setTab('contacts')">
           Emergency Contacts
         </button>
-        <button class="tab-btn" [class.active]="activeTab() === 'documents'" (click)="setTab('documents')" *ngIf="isOwner()">
+        <button class="tab-btn" [class.active]="activeTab() === 'documents'" (click)="setTab('documents')" *ngIf="canManageDocuments()">
           Documents
         </button>
       </div>
@@ -44,7 +44,7 @@
         (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
       </app-emergency-contacts-tab>
 
-      <app-documents-tab *ngIf="activeTab() === 'documents' && isOwner()" 
+      <app-documents-tab *ngIf="activeTab() === 'documents' && canManageDocuments()" 
         [employeeData]="employeeData()" 
         (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
       </app-documents-tab>

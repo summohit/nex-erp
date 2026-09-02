@@ -20,6 +20,23 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 export class EmergencyContactsTabComponent implements OnInit {
   @Input() employeeData: any;
   @Input() isOwner: boolean = false;
+
+  /**
+   * Contacts can be managed by the employee and by HR/admins — the backend
+   * already permits both (addContact/deleteContact run through
+   * checkProfileEditPermission), so the UI must not be stricter.
+   */
+  get canManageContacts(): boolean {
+    if (this.isOwner) return true;
+    const token = localStorage.getItem('access_token');
+    if (!token) return false;
+    try {
+      const role = JSON.parse(atob(token.split('.')[1])).role;
+      return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN';
+    } catch {
+      return false;
+    }
+  }
   @Output() refreshProfile = new EventEmitter<void>();
 
   showModal = false;
@@ -63,7 +80,7 @@ export class EmergencyContactsTabComponent implements OnInit {
       { field: 'relationship', headerName: 'Relationship', flex: 1, minWidth: 150 }
     ];
 
-    if (this.isOwner) {
+    if (this.canManageContacts) {
       this.columnDefs.push({
         headerName: 'Action',
         width: 100,

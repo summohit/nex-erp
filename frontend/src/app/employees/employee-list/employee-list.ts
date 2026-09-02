@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal, HostListener, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
 import { MasterDataService, Department, Designation } from '../../services/master-data.service';
@@ -28,6 +28,7 @@ export class EmployeeListComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private toast = inject(HotToastService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   public authService = inject(AuthService);
 
   employees = signal<Employee[]>([]);
@@ -152,7 +153,10 @@ export class EmployeeListComponent implements OnInit {
         if (!params.data) return '';
         const fn = params.data.firstName || '';
         const ln = params.data.lastName || '';
-        const toTitle = (s: string) => s.replace(/\b\w/g, c => c.toUpperCase());
+        // Lowercase first, then capitalise each word — otherwise names typed in
+        // caps ("JOHN DOE") stay shouting, since \b\w alone only touches the
+        // leading letter of each word.
+        const toTitle = (s: string) => s.toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase());
         const initials = `${fn.charAt(0)}${ln.charAt(0)}`.toUpperCase();
         const fullName = toTitle(`${fn} ${ln}`.trim());
         const email = params.data.user?.email || '';
@@ -263,20 +267,49 @@ export class EmployeeListComponent implements OnInit {
         onDelete: (data: any) => this.deleteEmployee(data),
         deleteLabel: (data: any) => data?.user?.status === 'SUSPENDED' ? 'Activate' : 'Deactivate',
         onViewProfile: (data: any) => this.router.navigate(['/employees', data.id, 'profile']),
-        onResendVerification: (data: any) => {
-          if (!data.user?.email) return;
-          this.authService.resendVerification(data.user.email).subscribe({
-            next: () => this.toast.success(`Verification email sent to ${data.user.email}`),
-            error: () => this.toast.error('Failed to send verification email')
-          });
-        }
+        onResendVerification: (data: any) => this.resendVerification(data)
       }
     }
   ];
 
+  /** Shared by the grid row menu and the directory search modal. */
+  resendVerification(emp: any) {
+    if (!emp?.user?.email) return;
+    this.authService.resendVerification(emp.user.email).subscribe({
+      next: () => this.toast.success(`Verification email sent to ${emp.user.email}`),
+      error: () => this.toast.error('Failed to send verification email')
+    });
+  }
+
+  viewProfile(emp: any) {
+    this.closeSearchModal();
+    this.router.navigate(['/employees', emp.id, 'profile']);
+  }
+
+  /** Opens the edit drawer for a search-modal result. */
+  editFromSearch(emp: any) {
+    this.closeSearchModal();
+    this.openDrawer(emp);
+  }
+
   ngOnInit() {
     this.loadEmployees();
     this.loadMasterData();
+  }
+
+  /**
+   * Spotlight search sends `?edit=<id>` when someone picks Edit on a result.
+   * Runs after the list loads, since the drawer needs the full employee record.
+   */
+  private openPendingEditFromQuery() {
+    const id = this.route.snapshot.queryParamMap.get('edit');
+    if (!id) return;
+
+    const match = this.employees().find((e: any) => String(e.id) === String(id));
+    if (match) this.openDrawer(match);
+
+    // Clear it so a refresh does not reopen the drawer.
+    this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
   }
 
   loadMasterData() {
@@ -348,6 +381,7 @@ export class EmployeeListComponent implements OnInit {
       next: (data) => {
         this.employees.set(data);
         this.isLoading.set(false);
+        this.openPendingEditFromQuery();
       },
       error: (err) => {
         this.toast.error('Failed to load employees');

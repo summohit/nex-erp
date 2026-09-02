@@ -72,7 +72,8 @@ export class TicketsComponent implements OnInit {
   readonly analyticsRanges = [
     { days: 7, label: '7 days' },
     { days: 30, label: '30 days' },
-    { days: 90, label: '90 days' },
+    { days: 90, label: '3 months' },
+    { days: 180, label: '6 months' },
     { days: 365, label: '1 year' },
   ];
 
@@ -149,6 +150,20 @@ export class TicketsComponent implements OnInit {
   readonly priorityOptions = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
   readonly typeOptions = ['BUG', 'FEATURE_REQUEST', 'IMPROVEMENT', 'QUESTION'];
   readonly platformOptions = ['WEB', 'MOBILE', 'BOTH'];
+
+  /**
+   * Display names for platforms. The stored enum stays WEB/MOBILE/BOTH — only
+   * the label changes, so existing tickets and filters keep working.
+   */
+  readonly platformLabels: Record<string, string> = {
+    WEB: 'Website',
+    MOBILE: 'Mobile',
+    BOTH: 'Both',
+  };
+
+  platformLabel(value?: string): string {
+    return this.platformLabels[value ?? ''] ?? value ?? '—';
+  }
 
   readonly typeBadgeClasses: Record<string, string> = {
     BUG: 'type-bug',
@@ -297,6 +312,12 @@ export class TicketsComponent implements OnInit {
       valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
     },
     {
+      field: 'closedAt',
+      headerName: 'CLOSED',
+      width: 110,
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+    },
+    {
       headerName: 'ACTIONS',
       width: 95,
       sortable: false,
@@ -310,6 +331,15 @@ export class TicketsComponent implements OnInit {
     sortable: true,
     filter: false,
     resizable: true,
+  };
+
+  /** Tints each row by status so the queue is scannable at a glance. */
+  rowClassRules = {
+    'row-status-open':        (p: any) => p.data?.status === 'OPEN',
+    'row-status-in-progress': (p: any) => p.data?.status === 'IN_PROGRESS',
+    'row-status-resolved':    (p: any) => p.data?.status === 'RESOLVED',
+    'row-status-closed':      (p: any) => p.data?.status === 'CLOSED',
+    'row-status-rejected':    (p: any) => p.data?.status === 'REJECTED',
   };
 
   ngOnInit() {

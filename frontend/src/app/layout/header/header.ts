@@ -10,8 +10,8 @@ import { EmployeeService } from '../../services/employee.service';
 import { TicketService } from '../../services/ticket.service';
 import { SpotlightSearchComponent } from '../../shared/components/spotlight-search/spotlight-search.component';
 import {
-  LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut,
-  LucideSettings, LucideCheck, LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
+  LucideSearch, LucideBell, LucideUser, LucideLogOut,
+  LucideSettings, LucideCheck, LucideChevronDown, LucideX, LucideKanban, LucideClock,
   LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -24,8 +24,8 @@ import { HotToastService } from '@ngneat/hot-toast';
     FormsModule,
     RouterModule,
     SpotlightSearchComponent,
-    LucideSearch, LucideBell, LucidePlus, LucideUser, LucideLogOut,
-    LucideChevronDown, LucideFileText, LucideBriefcase, LucideX, LucideKanban, LucideClock,
+    LucideSearch, LucideBell, LucideUser, LucideLogOut,
+    LucideChevronDown, LucideX, LucideKanban, LucideClock,
     LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket
   ],
   templateUrl: './header.html',
@@ -55,7 +55,6 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
   isNotificationOpen = signal<boolean>(false);
   isProfileMenuOpen = signal<boolean>(false);
-  isQuickCreateOpen = signal<boolean>(false);
 
   // Systray Attendance
   isClockedIn = signal<boolean>(false);
@@ -252,19 +251,11 @@ export class HeaderComponent implements OnInit, OnDestroy {
   toggleNotifications() {
     this.isNotificationOpen.set(!this.isNotificationOpen());
     this.isProfileMenuOpen.set(false);
-    this.isQuickCreateOpen.set(false);
   }
 
   toggleProfileMenu() {
     this.isProfileMenuOpen.set(!this.isProfileMenuOpen());
     this.isNotificationOpen.set(false);
-    this.isQuickCreateOpen.set(false);
-  }
-
-  toggleQuickCreate() {
-    this.isQuickCreateOpen.set(!this.isQuickCreateOpen());
-    this.isNotificationOpen.set(false);
-    this.isProfileMenuOpen.set(false);
   }
 
   markAllAsRead() {
@@ -292,11 +283,6 @@ export class HeaderComponent implements OnInit, OnDestroy {
     if (r === 'FINANCE') return 'Finance';
     if (r === 'SALES') return 'Sales';
     return 'Team Member';
-  }
-
-  hasAccessToDirectory(): boolean {
-    const role = this.currentUser()?.role || '';
-    return ['ADMIN', 'SUPERADMIN', 'HR'].includes(role);
   }
 
   logout() {

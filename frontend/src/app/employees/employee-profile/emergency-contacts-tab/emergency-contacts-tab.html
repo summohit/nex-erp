@@ -1,6 +1,6 @@
 <div class="contacts-tab-container">
   
-  <div class="header-actions" *ngIf="isOwner">
+  <div class="header-actions" *ngIf="canManageContacts">
     <button class="btn-primary" (click)="openModal()">
       <svg lucidePlus size="16"></svg>
       Create New

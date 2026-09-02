@@ -4,9 +4,27 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { LucideLoader2, LucideCheckCircle2, LucideAlertCircle, LucideSend } from '@lucide/angular';
+import { 
+  LucideLoader2, 
+  LucideCheckCircle2, 
+  LucideAlertCircle, 
+  LucideSend,
+  LucideUser,
+  LucideMail,
+  LucideBuilding,
+  LucidePhone,
+  LucideGlobe,
+  LucideMessageSquare,
+  LucideMapPin,
+  LucideBriefcase,
+  LucideShieldCheck,
+  LucideSparkles,
+  LucideChevronDown,
+  LucideArrowRight,
+  LucideRotateCcw
+} from '@lucide/angular';
 
-interface PublicField {
+export interface PublicField {
   fieldKey: string;
   label: string;
   type: string;
@@ -20,7 +38,27 @@ type Status = 'loading' | 'ready' | 'success' | 'notfound' | 'error';
 @Component({
   selector: 'app-public-lead-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideLoader2, LucideCheckCircle2, LucideAlertCircle, LucideSend],
+  imports: [
+    CommonModule, 
+    FormsModule, 
+    LucideLoader2, 
+    LucideCheckCircle2, 
+    LucideAlertCircle, 
+    LucideSend,
+    LucideUser,
+    LucideMail,
+    LucideBuilding,
+    LucidePhone,
+    LucideGlobe,
+    LucideMessageSquare,
+    LucideMapPin,
+    LucideBriefcase,
+    LucideShieldCheck,
+    LucideSparkles,
+    LucideChevronDown,
+    LucideArrowRight,
+    LucideRotateCcw
+  ],
   templateUrl: './lead-form.html',
   styleUrls: ['./lead-form.css']
 })
@@ -65,8 +103,40 @@ export class PublicLeadFormComponent implements OnInit {
   }
 
   private isLikelyNotFound(): boolean {
-    // A 404 from the server means the form was not found or inactive.
     return true;
+  }
+
+  isFullWidth(field: PublicField): boolean {
+    if (field.type === 'textarea') return true;
+    const key = (field.fieldKey || '').toLowerCase();
+    return key === 'message' || key === 'address' || key === 'description' || key === 'notes' || key === 'comments';
+  }
+
+  getFieldIconType(field: PublicField): string {
+    const key = (field.fieldKey || '').toLowerCase();
+    const type = (field.type || '').toLowerCase();
+
+    if (key.includes('name') || field.isName) return 'user';
+    if (key.includes('email') || type === 'email') return 'mail';
+    if (key.includes('company') || key.includes('org') || key.includes('business')) return 'building';
+    if (key.includes('phone') || key.includes('mobile') || key.includes('tel') || type === 'tel') return 'phone';
+    if (key.includes('web') || key.includes('url') || key.includes('site') || type === 'url') return 'globe';
+    if (key.includes('message') || key.includes('desc') || key.includes('note') || type === 'textarea') return 'message';
+    if (key.includes('city') || key.includes('state') || key.includes('country') || key.includes('postal') || key.includes('zip') || key.includes('address')) return 'map-pin';
+    if (key.includes('source') || key.includes('lead') || key.includes('referral') || key.includes('campaign')) return 'sparkles';
+    if (type === 'select') return 'select';
+    return 'default';
+  }
+
+  resetForm() {
+    this.values = {};
+    this.errors = {};
+    this.serverError = '';
+    this.status = 'ready';
+  }
+
+  get completedFieldsCount(): number {
+    return Object.keys(this.values).filter(k => (this.values[k] || '').trim().length > 0).length;
   }
 
   onSubmit() {
@@ -75,7 +145,7 @@ export class PublicLeadFormComponent implements OnInit {
     let valid = true;
     for (const field of this.fields) {
       const v = (this.values[field.fieldKey] || '').trim();
-      if (field.required && !v) {
+      if ((field.required || field.isName) && !v) {
         this.errors[field.fieldKey] = `${field.label} is required.`;
         valid = false;
         continue;
@@ -117,17 +187,18 @@ export class PublicLeadFormComponent implements OnInit {
 
   placeholderFor(field: PublicField): string {
     switch (field.fieldKey) {
-      case 'name': return 'Your full name';
-      case 'email': return 'you@company.com';
-      case 'companyName': return 'Company name';
-      case 'website': return 'https://example.com';
-      case 'mobile': return 'Phone number';
-      case 'message': return 'Write your message...';
-      case 'city': return 'City';
-      case 'state': return 'State';
-      case 'postalCode': return 'Postal code';
-      case 'address': return 'Street address';
-      default: return '';
+      case 'name': return 'e.g. Alexander Pierce';
+      case 'email': return 'alexander@company.com';
+      case 'companyName': return 'e.g. Acme Innovations Ltd.';
+      case 'website': return 'https://company.com';
+      case 'mobile': return '+1 (555) 019-2834';
+      case 'message': return 'Please outline your deal size, requirements, target timeline, or any specific questions...';
+      case 'city': return 'e.g. New York';
+      case 'state': return 'e.g. NY';
+      case 'postalCode': return 'e.g. 10001';
+      case 'address': return 'e.g. 120 Broadway, Suite 300';
+      case 'source': return 'e.g. Website, Partner Referral, Conference';
+      default: return `Enter ${field.label.toLowerCase()}...`;
     }
   }
 }

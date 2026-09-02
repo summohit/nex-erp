@@ -195,6 +195,14 @@
           </div>
         </div>
 
+        <!-- Closed At — sits directly after Created so the lifecycle reads in order -->
+        <div class="meta-item" *ngIf="ticket.closedAt">
+          <span class="meta-label">Closed Date</span>
+          <div class="meta-value-box">
+            <span class="meta-value-text">{{ ticket.closedAt | date:'mediumDate' }}</span>
+          </div>
+        </div>
+
         <!-- Resolved At -->
         <div class="meta-item" *ngIf="ticket.resolvedAt">
           <span class="meta-label">Resolved Date</span>

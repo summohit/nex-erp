@@ -649,10 +649,11 @@
     <table class="leads-table">
       <thead>
         <tr>
+          <!-- Client-side columns first, our own tracking after. -->
           <th>Lead / Opportunity</th>
           <th>Company</th>
-          <th>Lead Owner</th>
           <th>Contact</th>
+          <th>Lead Owner</th>
           <th>Status</th>
           <th>Value</th>
           <th>Actions</th>
@@ -669,14 +670,19 @@
               </div>
             </td>
             <td><app-skeleton width="72%" height="12px"></app-skeleton></td>
-            <td><app-skeleton width="80px" height="18px" radius="9px"></app-skeleton></td>
-            <td><app-skeleton width="64px" height="12px"></app-skeleton></td>
+            <td>
+              <div class="sk-stack">
+                <app-skeleton width="64px" height="12px"></app-skeleton>
+                <app-skeleton width="86px" height="10px"></app-skeleton>
+              </div>
+            </td>
             <td>
               <div class="sk-user">
                 <app-skeleton width="26px" [circle]="true"></app-skeleton>
                 <app-skeleton width="78px" height="11px"></app-skeleton>
               </div>
             </td>
+            <td><app-skeleton width="80px" height="18px" radius="9px"></app-skeleton></td>
             <td><app-skeleton width="70px" height="12px"></app-skeleton></td>
             <td><app-skeleton width="56px" height="26px" radius="6px"></app-skeleton></td>
           </tr>
@@ -696,6 +702,10 @@
             </td>
             <td>{{lead.companyName || '-'}}</td>
             <td>
+              <div *ngIf="lead.contactName" style="font-weight: 500;">{{lead.contactName}}</div>
+              <div *ngIf="lead.email" style="color: #64748b; font-size: 11px;">{{lead.email}}</div>
+            </td>
+            <td>
               <div class="table-user-cell" *ngIf="lead.assignedTo">
                 <img *ngIf="lead.assignedTo.avatarUrl" [src]="lead.assignedTo.avatarUrl" class="table-avatar-img" />
                 <div *ngIf="!lead.assignedTo.avatarUrl" class="table-avatar-circle">
@@ -707,10 +717,6 @@
                 </div>
               </div>
               <span *ngIf="!lead.assignedTo" class="unassigned-text">Unassigned</span>
-            </td>
-            <td>
-              <div *ngIf="lead.contactName" style="font-weight: 500;">{{lead.contactName}}</div>
-              <div *ngIf="lead.email" style="color: #64748b; font-size: 11px;">{{lead.email}}</div>
             </td>
             <td>
               <span class="ldm-status-badge ldm-status-{{lead.status | lowercase}}">

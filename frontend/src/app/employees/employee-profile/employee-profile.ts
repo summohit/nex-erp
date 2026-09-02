@@ -23,6 +23,8 @@ export class EmployeeProfileComponent implements OnInit {
   employeeData = signal<any>(null);
   isLoading = signal(true);
   isOwner = signal(false);
+  /** Server-resolved: the owner, HR, admins and designation-level profile editors. */
+  canManageDocuments = signal(false);
 
   ngOnInit() {
     this.route.paramMap.subscribe(params => {
@@ -39,6 +41,9 @@ export class EmployeeProfileComponent implements OnInit {
       next: (data) => {
         this.employeeData.set(data);
         this.isOwner.set(data.isOwner);
+        // Fall back to isOwner: an endpoint that forgets the flag must never
+        // hide someone's own documents from them.
+        this.canManageDocuments.set(!!data.canManageDocuments || !!data.isOwner);
         this.isLoading.set(false);
       },
       error: (err) => {

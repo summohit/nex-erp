@@ -11,6 +11,7 @@ import {
   LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
+import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { MasterDataService, Department, Designation, Branch } from '../../services/master-data.service';
 import { JobsService, Job } from '../../services/jobs.service';
@@ -30,7 +31,7 @@ declare var Quill: any;
     LucideSparkles, LucideX, LucideSearch,
     LucideHelpCircle, LucideTrash2, LucideBuilding,
     LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff,
-    AgGridAngular, DatePipe
+    AgGridAngular, DatePipe, SkeletonComponent
   ],
   templateUrl: './job-postings.html',
   styleUrls: ['./job-postings.css'],
@@ -46,6 +47,7 @@ export class JobPostingsComponent implements OnInit {
   @ViewChild('quillContainer') quillContainer!: ElementRef;
   private quillInstance: any = null;
 
+  isLoading = signal<boolean>(true);
   departments = signal<Department[]>([]);
   designations = signal<Designation[]>([]);
   filteredDesignations = signal<Designation[]>([]);
@@ -78,6 +80,7 @@ export class JobPostingsComponent implements OnInit {
   }
 
   loadJobs() {
+    this.isLoading.set(true);
     this.jobsService.getJobs().subscribe({
       next: (res) => {
         const mappedJobs = res.map(j => {
@@ -96,9 +99,18 @@ export class JobPostingsComponent implements OnInit {
           };
         });
         this.jobs.set(mappedJobs);
+        this.isLoading.set(false);
       },
-      error: (err) => console.error('Error fetching jobs', err)
+      error: (err) => {
+        console.error('Error fetching jobs', err);
+        this.isLoading.set(false);
+      }
     });
+  }
+
+  /** Ticking "never expires" clears any date already chosen. */
+  onNeverExpiresChange(checked: boolean) {
+    if (checked) this.jobForm.endDate = '';
   }
 
   onDesignationInput() {
@@ -241,6 +253,15 @@ export class JobPostingsComponent implements OnInit {
     }
   ];
 
+  /**
+   * Opening details from anywhere on the row. Clicks inside the pinned Actions
+   * column are ignored so the row handler does not fire alongside a menu choice.
+   */
+  onRowClicked(event: any) {
+    if (event?.column?.getColDef()?.headerName === 'Actions') return;
+    if (event?.data) this.viewJobDetails(event.data);
+  }
+
   onGridReady(params: any) {
     this.gridApi = params.api;
     // Apply default Open filter after grid is ready
@@ -298,6 +319,7 @@ export class JobPostingsComponent implements OnInit {
     totalOpenings: 1,
     startDate: '',
     endDate: '',
+    neverExpires: false,
     discloseSalary: false,
     status: 'Open',
     location: '',
@@ -410,6 +432,7 @@ export class JobPostingsComponent implements OnInit {
       totalOpenings: 1,
       startDate: '',
       endDate: '',
+    neverExpires: false,
       discloseSalary: false,
       status: 'Open',
       location: '',
@@ -462,6 +485,8 @@ export class JobPostingsComponent implements OnInit {
       totalOpenings: (job as any).totalOpenings || 1,
       startDate: (job as any).startDate ? new Date((job as any).startDate).toISOString().split('T')[0] : '',
       endDate: (job as any).endDate ? new Date((job as any).endDate).toISOString().split('T')[0] : '',
+      // No end date stored means the posting was set to never expire.
+      neverExpires: !(job as any).endDate,
       discloseSalary: (job as any).discloseSalary || false,
       status: job.status || 'Open',
       location: job.location || '',
@@ -512,7 +537,7 @@ export class JobPostingsComponent implements OnInit {
       recruiterId: hr ? hr.id : null,
       totalOpenings: this.jobForm.totalOpenings ? Number(this.jobForm.totalOpenings) : 1,
       startDate: this.jobForm.startDate || null,
-      endDate: this.jobForm.endDate || null,
+      endDate: this.jobForm.neverExpires ? null : (this.jobForm.endDate || null),
       discloseSalary: this.jobForm.discloseSalary,
       status: this.jobForm.status,
       minSalary: this.jobForm.minSalary ? Number(this.jobForm.minSalary) : null,

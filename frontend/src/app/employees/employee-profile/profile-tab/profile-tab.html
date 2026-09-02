@@ -9,7 +9,12 @@
         
         <!-- SECTION: WORK -->
         <div class="field-section">
-          <h3 class="section-title">WORK</h3>
+          <div class="section-header-bar">
+            <div class="card-icon-badge orange">
+              <svg lucideBriefcase size="16"></svg>
+            </div>
+            <h3 class="section-title">WORK</h3>
+          </div>
           <div class="form-grid-stack">
 
             <div class="form-row-item">
@@ -73,7 +78,12 @@
 
         <!-- SECTION: LOCATION -->
         <div class="field-section">
-          <h3 class="section-title">LOCATION</h3>
+          <div class="section-header-bar">
+            <div class="card-icon-badge blue">
+              <svg lucideMapPin size="16"></svg>
+            </div>
+            <h3 class="section-title">LOCATION</h3>
+          </div>
           <div class="form-grid-stack">
             
             <div class="form-row-item">
@@ -91,69 +101,34 @@
 
         <!-- SECTION: USUAL WORK LOCATION -->
         <div class="field-section">
-          <h3 class="section-title">USUAL WORK LOCATION</h3>
+          <div class="section-header-bar">
+            <div class="card-icon-badge green">
+              <svg lucideClock size="16"></svg>
+            </div>
+            <h3 class="section-title">USUAL WORK LOCATION</h3>
+          </div>
           <div class="form-grid-stack">
-            
-            <div class="form-row-item">
-              <label class="item-label">Monday</label>
-              <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.monday" [disabled]="!canEditWorkDetails">
+            <!-- One row per day: where they work, and which shift applies. -->
+            <div class="form-row-item" *ngFor="let d of weekDays">
+              <label class="item-label">{{ d.label }}</label>
+              <div class="item-value day-schedule-row">
+                <select class="form-control select-location"
+                        [(ngModel)]="formData.usualWorkLocation[d.key]"
+                        [disabled]="!canEditWorkDetails">
                   <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
                 </select>
-              </div>
-            </div>
 
-            <div class="form-row-item">
-              <label class="item-label">Tuesday</label>
-              <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.tuesday" [disabled]="!canEditWorkDetails">
-                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row-item">
-              <label class="item-label">Wednesday</label>
-              <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.wednesday" [disabled]="!canEditWorkDetails">
-                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row-item">
-              <label class="item-label">Thursday</label>
-              <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.thursday" [disabled]="!canEditWorkDetails">
-                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row-item">
-              <label class="item-label">Friday</label>
-              <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.friday" [disabled]="!canEditWorkDetails">
-                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row-item">
-              <label class="item-label">Saturday</label>
-              <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.saturday" [disabled]="!canEditWorkDetails">
-                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row-item">
-              <label class="item-label">Sunday</label>
-              <div class="item-value">
-                <select class="form-control select-location" [(ngModel)]="formData.usualWorkLocation.sunday" [disabled]="!canEditWorkDetails">
-                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
-                </select>
+                <div class="day-shift-wrap">
+                  <select class="form-control select-shift"
+                          [(ngModel)]="formData.usualWorkLocation.shifts[d.key]"
+                          [disabled]="!canEditWorkDetails">
+                    <option [ngValue]="undefined">{{ defaultShiftLabel() }}</option>
+                    <option *ngFor="let s of companyShifts" [ngValue]="s.id">{{ s.name }}</option>
+                  </select>
+                  <small class="shift-time-hint" *ngIf="formData.usualWorkLocation.shifts[d.key]">
+                    {{ shiftTimeRange(formData.usualWorkLocation.shifts[d.key]) }}
+                  </small>
+                </div>
               </div>
             </div>
 
@@ -162,7 +137,12 @@
 
         <!-- SECTION: NOTE -->
         <div class="field-section">
-          <h3 class="section-title">NOTE</h3>
+          <div class="section-header-bar">
+            <div class="card-icon-badge purple">
+              <svg lucideFileText size="16"></svg>
+            </div>
+            <h3 class="section-title">NOTE</h3>
+          </div>
           <div class="form-group full-width">
             <textarea 
               class="form-control note-textarea" 
@@ -180,7 +160,12 @@
       <div class="work-right-panel">
         <div class="org-chart-card">
           <div class="org-header-row">
-            <h3 class="section-title">ORGANIZATION CHART</h3>
+            <div class="section-header-bar mb-0">
+              <div class="card-icon-badge purple">
+                <svg lucideUsers size="16"></svg>
+              </div>
+              <h3 class="section-title">ORGANIZATION CHART</h3>
+            </div>
             <span class="org-badge">Hierarchical</span>
           </div>
           <p class="org-chart-subtitle">Set a manager or reports to show in org chart.</p>
@@ -266,12 +251,16 @@
 
       <!-- LEFT COLUMN: RESUME -->
       <div class="resume-left-panel">
-        <h3 class="section-title mb-2">RESUME</h3>
-        <hr class="section-divider">
+        <div class="section-header-bar">
+          <div class="card-icon-badge indigo">
+            <svg lucideFileText size="16"></svg>
+          </div>
+          <h3 class="section-title">RESUME</h3>
+        </div>
 
         <div class="empty-resume-state" *ngIf="formData.resumeLines.length === 0">
           <p class="empty-text">There are no resume lines on this employee.</p>
-          <button type="button" class="btn-odoo-action mt-3" (click)="openCreateResumeModal()" *ngIf="isOwner">
+          <button type="button" class="btn-odoo-action mt-3" (click)="openCreateResumeModal()" *ngIf="canEditPersonalDetails">
             Create Resume Lines
           </button>
         </div>
@@ -280,7 +269,7 @@
           <div class="resume-line-card" *ngFor="let item of formData.resumeLines; let i = index">
             <div class="resume-card-header">
               <span class="type-pill" [ngClass]="item.type?.toLowerCase()">{{ item.type }}</span>
-              <div class="card-actions" *ngIf="isOwner">
+              <div class="card-actions" *ngIf="canEditPersonalDetails">
                 <button type="button" class="btn-icon-edit" (click)="openCreateResumeModal(item, i)" title="Edit">
                   <svg lucideEdit2 size="14"></svg>
                 </button>
@@ -306,7 +295,7 @@
             </div>
           </div>
 
-          <button type="button" class="btn-odoo-action mt-4" (click)="openCreateResumeModal()" *ngIf="isOwner">
+          <button type="button" class="btn-odoo-action mt-4" (click)="openCreateResumeModal()" *ngIf="canEditPersonalDetails">
             <svg lucidePlus size="14"></svg> Create Resume Lines
           </button>
         </div>
@@ -314,8 +303,12 @@
 
       <!-- RIGHT COLUMN: SKILLS & CERTIFICATIONS -->
       <div class="skills-right-panel">
-        <h3 class="section-title mb-2">SKILLS & CERTIFICATIONS</h3>
-        <hr class="section-divider">
+        <div class="section-header-bar">
+          <div class="card-icon-badge orange">
+            <svg lucideGraduationCap size="16"></svg>
+          </div>
+          <h3 class="section-title">SKILLS & CERTIFICATIONS</h3>
+        </div>
         
         <p class="skills-subtitle">
           You can add skills from our library to the employee profile. If skills are missing, they can be created by an HR officer.
@@ -326,7 +319,7 @@
             <span class="skill-category-label">{{ sk.category }}:</span>
             <span class="skill-name-label">{{ sk.name }}</span>
             <span class="skill-level-pill">{{ sk.level }}</span>
-            <button type="button" class="skill-remove-btn" (click)="removeSkill(idx)" *ngIf="isOwner">
+            <button type="button" class="skill-remove-btn" (click)="removeSkill(idx)" *ngIf="canEditPersonalDetails">
               &times;
             </button>
           </div>
@@ -337,7 +330,7 @@
         </div>
 
         <div class="mt-4">
-          <button type="button" class="btn-odoo-action" (click)="openUpdateSkillsModal()" *ngIf="isOwner">
+          <button type="button" class="btn-odoo-action" (click)="openUpdateSkillsModal()" *ngIf="canEditPersonalDetails">
             Pick a skill from the list
           </button>
         </div>
@@ -712,7 +705,7 @@
               <div class="resume-line-card" *ngFor="let item of formData.resumeLines; let i = index">
                 <div class="resume-card-header">
                   <span class="type-pill" [ngClass]="item.type?.toLowerCase()">{{ item.type }}</span>
-                  <div class="card-actions" *ngIf="isOwner">
+                  <div class="card-actions" *ngIf="canEditPersonalDetails">
                     <button type="button" class="btn-icon-edit" (click)="openCreateResumeModal(item, i)" title="Edit">
                       <svg lucideEdit2 size="14"></svg>
                     </button>
@@ -737,15 +730,19 @@
                   </a>
                 </div>
               </div>
-              <button type="button" class="btn-odoo-action mt-4" (click)="openCreateResumeModal()" *ngIf="isOwner">
+              <button type="button" class="btn-odoo-action mt-4" (click)="openCreateResumeModal()" *ngIf="canEditPersonalDetails">
                 <svg lucidePlus size="14"></svg> Create Resume Lines
               </button>
             </div>
           </div>
           <!-- RIGHT COLUMN: SKILLS & CERTIFICATIONS -->
           <div class="skills-right-panel">
-            <h3 class="section-title mb-2">SKILLS & CERTIFICATIONS</h3>
-            <hr class="section-divider">
+            <div class="section-header-bar">
+              <div class="card-icon-badge orange">
+                <svg lucideGraduationCap size="16"></svg>
+              </div>
+              <h3 class="section-title">SKILLS & CERTIFICATIONS</h3>
+            </div>
             <p class="skills-subtitle">
               You can add skills from our library to the employee profile. If skills are missing, they can be created by an HR officer.
             </p>
@@ -754,11 +751,11 @@
                 <span class="skill-category-label">{{ sk.category }}:</span>
                 <span class="skill-name-label">{{ sk.name }}</span>
                 <span class="skill-level-pill">{{ sk.level }}</span>
-                <button type="button" class="remove-skill-btn" (click)="removeSkill(idx)" *ngIf="isOwner">
+                <button type="button" class="remove-skill-btn" (click)="removeSkill(idx)" *ngIf="canEditPersonalDetails">
                   <svg lucideX size="12"></svg>
                 </button>
               </div>
-              <button type="button" class="btn-odoo-action mt-3" (click)="openUpdateSkillsModal()" *ngIf="isOwner">
+              <button type="button" class="btn-odoo-action mt-3" (click)="openUpdateSkillsModal()" *ngIf="canEditPersonalDetails">
                 Pick a skill from the list
               </button>
             </div>

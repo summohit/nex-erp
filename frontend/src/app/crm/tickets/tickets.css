@@ -139,7 +139,8 @@
    -------------------------------------------------------------------------- */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Auto-fit so the row absorbs a new KPI card without a hardcoded count. */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
   width: 100%;
 }
@@ -2257,4 +2258,56 @@ label {
   }
   .sk-table-head > *:nth-child(n+4),
   .sk-table-row > *:nth-child(n+4) { display: none; }
+}
+
+/* Closed KPI card */
+.stat-slate .stat-icon-wrapper {
+  background: #e2e8f0;
+  color: #475569;
+}
+.stat-slate.active-card {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+/* ═══════════════════════════════════════════
+   STATUS ROW HIGHLIGHTING
+   AG Grid renders its own DOM, so these must pierce encapsulation.
+   A left accent bar plus a faint tint — strong enough to scan, faint
+   enough not to fight the status pills or the hover state.
+   ═══════════════════════════════════════════ */
+
+.table-container ::ng-deep .ag-row {
+  border-left: 3px solid transparent;
+  transition: background-color 0.12s ease;
+}
+
+.table-container ::ng-deep .ag-row.row-status-open {
+  border-left-color: #3b82f6;
+  background-color: #f5f9ff;
+}
+
+.table-container ::ng-deep .ag-row.row-status-in-progress {
+  border-left-color: #f59e0b;
+  background-color: #fffbf2;
+}
+
+.table-container ::ng-deep .ag-row.row-status-resolved {
+  border-left-color: #16a34a;
+  background-color: #f4fdf7;
+}
+
+.table-container ::ng-deep .ag-row.row-status-closed {
+  border-left-color: #94a3b8;
+  background-color: #fafbfc;
+}
+
+.table-container ::ng-deep .ag-row.row-status-rejected {
+  border-left-color: #ef4444;
+  background-color: #fff6f6;
+}
+
+/* Hover must still win over the status tint. */
+.table-container ::ng-deep .ag-row.ag-row-hover {
+  background-color: #eef2f7 !important;
 }

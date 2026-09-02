@@ -339,24 +339,43 @@ export class LeadFormsService {
     const title = (nameField && values[nameField.fieldKey]) || form.name;
     if (!title) throw new BadRequestException('Name is required.');
 
-    const leadData: any = {
-      title,
-      contactName: values.name || (nameField ? values[nameField.fieldKey] : undefined) || null,
+    // A public enquiry is a contact, not a qualified deal — it lands in the Lead
+    // Contacts table and the team promotes it to a deal when it qualifies.
+    const contactData: any = {
+      name: values.name || (nameField ? values[nameField.fieldKey] : undefined) || title,
       email: values.email || null,
-      phone: values.mobile || values.phone || null,
+      phone: values.phone || null,
+      mobile: values.mobile || null,
       companyName: values.companyName || null,
       website: values.website || null,
       address: values.address || null,
-      source: values.source || form.source,
-      leadFormId: form.id,
-      description: values.message || null,
+      country: values.country || null,
+      state: values.state || null,
+      city: values.city || null,
+      postalCode: values.postalCode || null,
+      leadSource: values.source || form.source || null,
+      addedById: null, // nobody is signed in on a public form
     };
 
-    const created = await this.crmService.createLead(form.companyId, leadData, null);
+    const created = await this.crmService.createLeadContact(form.companyId, null, contactData);
+
+    // The enquiry message has nowhere to live on LeadContact, so keep it as the
+    // contact's first note rather than dropping it.
+    if (values.message) {
+      await this.crmService
+        .createLeadContactNote(
+          form.companyId,
+          created.id,
+          { title: `Enquiry via ${form.name}`, type: 'GENERAL', content: values.message },
+          null,
+        )
+        .catch(() => { /* the contact matters more than the note */ });
+    }
+
     return {
       success: true,
       message: form.successMessage || 'Thank you! Your enquiry has been received.',
-      leadId: created.id,
+      contactId: created.id,
       redirectUrl: form.redirectUrl || null,
     };
   }

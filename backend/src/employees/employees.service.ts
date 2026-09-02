@@ -352,8 +352,10 @@ export class EmployeesService {
       }
     });
     if (!employee) throw new NotFoundException('Employee profile not found');
-    
-    return { ...employee, isOwner: true };
+
+    // Own profile: always allowed to see and manage their own documents. This
+    // must stay in step with getProfile(), which returns the same flag.
+    return { ...employee, isOwner: true, canManageDocuments: true };
   }
 
   async getProfile(id: number, companyId: number, currentUserId: number, role: string) {
@@ -379,12 +381,31 @@ export class EmployeesService {
       await this.assertDirectoryAccess(companyId, role);
     }
 
-    // Filter documents if not owner
-    if (!isOwner) {
+    // Personal documents (ID proofs, contracts) stay private. They are exposed to
+    // the owner and to the people who are already allowed to add and delete them
+    // — HR, admins and designation-level profile editors — but not to every
+    // colleague who merely has directory access.
+    const canViewDocuments = isOwner || (await this.canManageEmployeeDocuments(companyId, currentUserId, role));
+    if (!canViewDocuments) {
       employee.documents = [];
     }
 
-    return { ...employee, isOwner };
+    return { ...employee, isOwner, canManageDocuments: canViewDocuments };
+  }
+
+  /**
+   * Whether the caller may see and manage another employee's personal documents.
+   * Deliberately narrower than checkProfileEditPermission, whose fallback admits
+   * anyone with directory VIEW — too broad for ID proofs and contracts.
+   */
+  private async canManageEmployeeDocuments(companyId: number, currentUserId: number, role: string): Promise<boolean> {
+    if (role === 'SUPERADMIN' || role === 'HR' || role === 'ADMIN') return true;
+
+    const requestor = await this.prisma.employee.findFirst({
+      where: { userId: currentUserId, companyId },
+      include: { designation: true },
+    });
+    return !!requestor?.designation?.canEditProfiles;
   }
 
   private async checkProfileEditPermission(employeeId: number, companyId: number, currentUserId: number, role: string) {

@@ -51,7 +51,21 @@
           </div>
           <p class="item-subtitle" *ngIf="item.subtitle">{{ item.subtitle }}</p>
         </div>
-        <svg lucideArrowRight size="16" class="item-arrow"></svg>
+        <!-- Row actions, mirroring the Employee Directory menu. stopPropagation
+             keeps a button click from also triggering the row's navigate. -->
+        <div class="item-actions" *ngIf="item.actions?.length" (click)="$event.stopPropagation()">
+          <button
+            *ngFor="let a of item.actions"
+            type="button"
+            class="row-action-btn"
+            [class.tone-primary]="a.tone === 'primary'"
+            [class.tone-danger]="a.tone === 'danger'"
+            (click)="a.run()">
+            {{ a.label }}
+          </button>
+        </div>
+
+        <svg lucideArrowRight size="16" class="item-arrow" *ngIf="!item.actions?.length"></svg>
       </div>
     </div>
 

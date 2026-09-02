@@ -3,11 +3,20 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { EmployeeService } from '../../../services/employee.service';
+import { AuthService } from '../../../services/auth.service';
+import { HotToastService } from '@ngneat/hot-toast';
 import { ProjectsService } from '../../../services/projects';
 import { MenusService } from '../../../services/menus.service';
 import {
   LucideSearch, LucideArrowRight
 } from '@lucide/angular';
+
+/** A secondary action rendered as a button on a result row. */
+export interface SearchRowAction {
+  label: string;
+  run: () => void;
+  tone?: 'default' | 'primary' | 'danger';
+}
 
 export interface SearchResultItem {
   id: string;
@@ -18,6 +27,8 @@ export interface SearchResultItem {
   action: () => void;
   /** Permission module key (or prefix) required to show this item. Omit for always-visible items. */
   requiresModule?: string;
+  /** Row buttons mirroring the Employee Directory's action menu. */
+  actions?: SearchRowAction[];
 }
 
 @Component({
@@ -36,6 +47,8 @@ export class SpotlightSearchComponent {
   private employeeService = inject(EmployeeService);
   private projectsService = inject(ProjectsService);
   private menusService = inject(MenusService);
+  private authService = inject(AuthService);
+  private toast = inject(HotToastService);
 
   @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
 
@@ -175,7 +188,8 @@ export class SpotlightSearchComponent {
         title: `${e.firstName} ${e.lastName}`,
         subtitle: `${e.designation?.name || 'Staff'} • ${e.department?.name || 'General'}`,
         iconName: 'user',
-        action: () => this.navigate(`/employees/${e.id}/profile`)
+        action: () => this.navigate(`/employees/${e.id}/profile`),
+        actions: this.employeeRowActions(e),
       }));
 
     // Dynamic Project Search Results
@@ -205,5 +219,72 @@ export class SpotlightSearchComponent {
   private navigate(path: string) {
     this.close();
     this.router.navigate([path]);
+  }
+
+  /**
+   * Only staff who administer people get the management actions. Everyone else
+   * still gets the row itself, which opens the profile.
+   */
+  private get canManageEmployees(): boolean {
+    const token = localStorage.getItem('access_token');
+    if (!token) return false;
+    try {
+      const role = JSON.parse(atob(token.split('.')[1])).role;
+      return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN';
+    } catch {
+      return false;
+    }
+  }
+
+  /** Mirrors the Employee Directory row menu: View Profile, Edit, Resend, Deactivate. */
+  private employeeRowActions(e: any): SearchRowAction[] {
+    const actions: SearchRowAction[] = [
+      { label: 'View Profile', run: () => this.navigate(`/employees/${e.id}/profile`) },
+    ];
+    if (!this.canManageEmployees) return actions;
+
+    actions.push({
+      label: 'Edit',
+      // The edit drawer lives on the directory, so hand it the id to open.
+      run: () => {
+        this.close();
+        this.router.navigate(['/employees/directory'], { queryParams: { edit: e.id } });
+      },
+    });
+
+    if (e.user?.email && e.user?.status === 'PENDING') {
+      actions.push({
+        label: 'Resend Verification',
+        tone: 'primary',
+        run: () => {
+          this.authService.resendVerification(e.user.email).subscribe({
+            next: () => this.toast.success(`Verification email sent to ${e.user.email}`),
+            error: () => this.toast.error('Failed to send verification email'),
+          });
+        },
+      });
+    }
+
+    const isSuspended = e.user?.status === 'SUSPENDED';
+    actions.push({
+      label: isSuspended ? 'Activate' : 'Deactivate',
+      tone: isSuspended ? 'primary' : 'danger',
+      run: () => {
+        const verb = isSuspended ? 'activate' : 'deactivate';
+        if (!confirm(`Are you sure you want to ${verb} ${e.firstName} ${e.lastName}?`)) return;
+        this.employeeService.deleteEmployee(e.id).subscribe({
+          next: (res: any) => {
+            this.toast.success(`Employee ${res.newStatus === 'SUSPENDED' ? 'deactivated' : 'activated'} successfully`);
+            // Refresh the cached list so the row's label flips.
+            this.employeeService.getEmployees().subscribe({
+              next: (r: any) => this.employeesList.set(r.data || r || []),
+            });
+          },
+          error: () => this.toast.error(`Failed to ${verb} employee`),
+        });
+      },
+    });
+
+    return actions;
   }
 }

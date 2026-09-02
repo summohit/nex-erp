@@ -8,10 +8,13 @@ import {
   LucideTrash2, LucideLayoutGrid,
   LucideCreditCard, LucideUser, LucideShieldCheck, LucideGraduationCap,
   LucidePlane, LucideUsers, LucideSettings, LucideEdit2, LucidePaperclip, LucideMapPin,
-  LucideUploadCloud, LucideFileText, LucideCheckCircle2, LucideMail
+  LucideUploadCloud, LucideFileText, LucideCheckCircle2, LucideMail,
+  LucideBriefcase, LucideCalendar, LucideClock
 } from '@lucide/angular';
 import { EmployeeService, Employee } from '../../../services/employee.service';
 import { MasterDataService, Branch, Department, Designation } from '../../../services/master-data.service';
+import { ShiftsService } from '../../../services/shifts.service';
+import { Shift } from '../../../services/attendance';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../../services/auth.service';
 import { Country, State, City } from 'country-state-city';
@@ -66,7 +69,10 @@ export interface ProfileFormErrors {
     LucideUploadCloud,
     LucideFileText,
     LucideCheckCircle2,
-    LucideMail
+    LucideMail,
+    LucideBriefcase,
+    LucideCalendar,
+    LucideClock
   ],
   templateUrl: './profile-tab.html',
   styleUrls: ['./profile-tab.css']
@@ -190,7 +196,8 @@ export class ProfileTabComponent implements OnInit {
     private masterDataService: MasterDataService,
     private toast: HotToastService, 
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private shiftsService: ShiftsService
   ) {}
 
   ngOnInit() {
@@ -198,6 +205,7 @@ export class ProfileTabComponent implements OnInit {
     this.loadBranches();
     this.loadDepartments();
     this.loadDesignations();
+    this.loadShifts();
   }
 
   loadDepartments() {
@@ -212,6 +220,51 @@ export class ProfileTabComponent implements OnInit {
       next: (desgs) => this.companyDesignations = desgs || [],
       error: (err) => console.error('Failed to load designations', err)
     });
+  }
+
+  readonly weekDays = [
+    { key: 'monday',    label: 'Monday' },
+    { key: 'tuesday',   label: 'Tuesday' },
+    { key: 'wednesday', label: 'Wednesday' },
+    { key: 'thursday',  label: 'Thursday' },
+    { key: 'friday',    label: 'Friday' },
+    { key: 'saturday',  label: 'Saturday' },
+    { key: 'sunday',    label: 'Sunday' },
+  ];
+
+  companyShifts: Shift[] = [];
+
+  /**
+   * Older records stored only `{ monday: 'Home', ... }`. Bring them forward by
+   * adding the `shifts` map rather than rewriting the shape, so nothing that
+   * already reads the day keys breaks.
+   */
+  private normaliseWorkLocation(raw: any) {
+    const base: any = raw && typeof raw === 'object' ? { ...raw } : {};
+    for (const d of this.weekDays) {
+      if (!base[d.key]) base[d.key] = 'Unspecified';
+    }
+    base.shifts = base.shifts && typeof base.shifts === 'object' ? { ...base.shifts } : {};
+    return base;
+  }
+
+  loadShifts() {
+    this.shiftsService.getShifts().subscribe({
+      next: (shifts) => this.companyShifts = shifts || [],
+      error: (err) => console.error('Failed to load shifts', err)
+    });
+  }
+
+  /** Label for the "use the employee's default" option. */
+  defaultShiftLabel(): string {
+    const s = this.employeeData?.shift;
+    return s?.name ? `Default (${s.name})` : 'Default shift';
+  }
+
+  /** Time range shown under a day when an override is picked. */
+  shiftTimeRange(shiftId: any): string {
+    const s = this.companyShifts.find(x => String(x.id) === String(shiftId));
+    return s ? `${s.startTime} – ${s.endTime}` : '';
   }
 
   loadBranches() {
@@ -280,16 +333,9 @@ export class ProfileTabComponent implements OnInit {
           ? new Date(this.employeeData.nextAppraisalDate).toISOString().split('T')[0] 
           : '',
 
-        // Usual work location mapping per day (screenshot 2 & 3)
-        usualWorkLocation: this.employeeData.usualWorkLocation || {
-          monday: 'Unspecified',
-          tuesday: 'Unspecified',
-          wednesday: 'Unspecified',
-          thursday: 'Unspecified',
-          friday: 'Unspecified',
-          saturday: 'Unspecified',
-          sunday: 'Unspecified'
-        },
+        // Usual work location mapping per day. Per-day shift overrides live in a
+        // nested `shifts` key so records saved before this existed still load.
+        usualWorkLocation: this.normaliseWorkLocation(this.employeeData.usualWorkLocation),
         workNotes: this.employeeData.workNotes || '',
 
         // Bank Details

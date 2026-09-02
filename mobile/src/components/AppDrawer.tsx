@@ -66,6 +66,7 @@ import {
   UserCircle,
   Monitor,
   Package,
+  Ticket,
   Rocket,
   LayoutDashboard,
 } from 'lucide-react-native';
@@ -99,6 +100,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'user': UserCircle,
   'file-text': FileText,
   'package': Package,
+  'ticket': Ticket,
   'rocket': Rocket,
 };
 
@@ -113,6 +115,7 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/notifications': { screen: 'Notifications' },
   '/payroll/payslips': { screen: 'Payslips' },
   '/payroll': { screen: 'Payslips' },
+  '/crm/tickets': { screen: 'Tickets' },
   '/assets/requests': { screen: 'HardwareRequests' },
   '/assets/hardware-requests': { screen: 'HardwareRequests' },
 };
@@ -539,6 +542,7 @@ function StaticMenuFallback({
         { id: 'payroll', title: 'Payroll', icon: 'banknote', screen: null },
         { id: 'expenses', title: 'Expenses', icon: 'file-text', screen: null },
         { id: 'assets', title: 'Hardware Requests', icon: 'package', screen: 'HardwareRequests' },
+        { id: 'tickets', title: 'Helpdesk & Tickets', icon: 'ticket', screen: 'Tickets' },
       ],
     },
     {

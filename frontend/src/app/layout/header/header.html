@@ -12,6 +12,9 @@
     <span class="search-kbd">⌘K</span>
   </div>
 
+  <!-- Every action sits in one right-aligned group -->
+  <div class="topbar-actions">
+
   <!-- Global Systray Clock-in Widget -->
   <div class="clock-systray-widget" [class.is-active]="isClockedIn()">
     <div class="clock-timer-display">
@@ -60,45 +63,6 @@
       {{ openTicketCount() > 99 ? '99+' : openTicketCount() }}
     </span>
   </button>
-
-  <!-- Quick Create (+ Button) -->
-  <div class="relative">
-    <button class="btn-quick-create" (click)="toggleQuickCreate()" type="button" title="Quick Actions">
-      <svg lucidePlus size="16"></svg>
-      <span class="hidden sm:inline">Create</span>
-    </button>
-
-    <!-- Quick Create Dropdown Menu -->
-    <div class="header-popover quick-create-popover" *ngIf="isQuickCreateOpen()" (click)="$event.stopPropagation()">
-      <div class="popover-title-row">
-        <span>Quick Actions</span>
-        <button class="btn-close-popover" (click)="isQuickCreateOpen.set(false)"><svg lucideX size="14"></svg></button>
-      </div>
-      <div class="popover-menu-list">
-        <a *ngIf="hasAccessToDirectory()" routerLink="/employees/directory" (click)="isQuickCreateOpen.set(false)" class="menu-item">
-          <svg lucideUser size="16" class="text-blue-600"></svg>
-          <div class="menu-item-text">
-            <span class="item-title">Add New Employee</span>
-            <span class="item-desc">Onboard team member</span>
-          </div>
-        </a>
-        <a routerLink="/attendance" (click)="isQuickCreateOpen.set(false)" class="menu-item">
-          <svg lucideBriefcase size="16" class="text-emerald-600"></svg>
-          <div class="menu-item-text">
-            <span class="item-title">Apply for Leave</span>
-            <span class="item-desc">Request time off</span>
-          </div>
-        </a>
-        <a routerLink="/employees/documents" (click)="isQuickCreateOpen.set(false)" class="menu-item">
-          <svg lucideFileText size="16" class="text-amber-600"></svg>
-          <div class="menu-item-text">
-            <span class="item-title">Upload Document</span>
-            <span class="item-desc">Add employee file</span>
-          </div>
-        </a>
-      </div>
-    </div>
-  </div>
 
   <!-- Notifications Bell -->
   <div class="relative">
@@ -182,6 +146,8 @@
       </div>
     </div>
   </div>
+
+  </div><!-- /.topbar-actions -->
 </header>
 
 <!-- Change Password Modal -->

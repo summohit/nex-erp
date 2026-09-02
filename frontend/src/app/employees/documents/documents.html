@@ -25,8 +25,9 @@
         <svg lucideFileText size="20"></svg>
       </div>
       <div class="stat-info">
-        <span class="stat-label">Total Documents</span>
+        <span class="stat-label">{{ hasActiveFilters() ? 'Matching Documents' : 'Total Documents' }}</span>
         <span class="stat-value">{{ totalDocsCount() }}</span>
+        <span class="stat-hint" *ngIf="hasActiveFilters()">of {{ allDocuments().length }} total</span>
       </div>
     </div>
 
@@ -37,6 +38,7 @@
       <div class="stat-info">
         <span class="stat-label">Employees with Files</span>
         <span class="stat-value">{{ employeesWithDocsCount() }} / {{ employees().length }}</span>
+        <span class="stat-hint" *ngIf="hasActiveFilters()">in current results</span>
       </div>
     </div>
 
@@ -46,7 +48,8 @@
       </div>
       <div class="stat-info">
         <span class="stat-label">Active Departments</span>
-        <span class="stat-value">{{ departments().length }}</span>
+        <span class="stat-value">{{ activeDeptCount() }}</span>
+        <span class="stat-hint" *ngIf="hasActiveFilters()">of {{ departments().length }} total</span>
       </div>
     </div>
   </div>
@@ -58,7 +61,7 @@
       <input type="text" 
              [ngModel]="searchQuery()" 
              (ngModelChange)="searchQuery.set($event)" 
-             placeholder="Search by document name or employee...">
+             placeholder="Search by document, name, email, phone or employee ID...">
     </div>
 
     <div class="filter-box">
@@ -75,6 +78,12 @@
       [value]="selectedEmployeeFilterId()"
       (valueChange)="selectedEmployeeFilterId.set($event)">
     </app-searchable-select>
+
+    <!-- Only offered once something is actually filtered. -->
+    <button type="button" class="btn-reset-filters" *ngIf="hasActiveFilters()" (click)="resetFilters()" title="Clear all filters">
+      <svg lucideX size="15"></svg>
+      <span>Reset</span>
+    </button>
   </div>
 
   <!-- Loading State -->

@@ -954,9 +954,11 @@ export class CrmService {
     return contact;
   }
 
-  async createLeadContact(companyId: number, userId: number, data: any) {
+  async createLeadContact(companyId: number, userId: number | null, data: any) {
     let addedById: number | null = data.addedById || null;
-    if (!addedById) {
+    // Public form submissions have no signed-in user. Without this guard the
+    // lookup would run with userId undefined and attach an arbitrary employee.
+    if (!addedById && userId) {
       const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
       addedById = employee?.id || null;
     }

@@ -162,7 +162,23 @@
             </div>
             <div class="cmd-k-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }}</div>
           </div>
-          <svg lucideChevronRight size="16" class="cmd-k-arrow"></svg>
+          <!-- Same actions as the grid row menu. stopPropagation stops a button
+               click from also firing the row's own select handler. -->
+          <div class="cmd-k-actions" *ngIf="isAdmin()" (click)="$event.stopPropagation()">
+            <button type="button" class="cmd-k-action" (click)="viewProfile(emp)">View Profile</button>
+            <button type="button" class="cmd-k-action" (click)="editFromSearch(emp)">Edit</button>
+            <button type="button" class="cmd-k-action tone-primary"
+                    *ngIf="emp.user?.email && emp.user?.status === 'PENDING'"
+                    (click)="resendVerification(emp)">Resend Verification</button>
+            <button type="button" class="cmd-k-action"
+                    [class.tone-danger]="emp.user?.status !== 'SUSPENDED'"
+                    [class.tone-primary]="emp.user?.status === 'SUSPENDED'"
+                    (click)="deleteEmployee(emp)">
+              {{ emp.user?.status === 'SUSPENDED' ? 'Activate' : 'Deactivate' }}
+            </button>
+          </div>
+
+          <svg lucideChevronRight size="16" class="cmd-k-arrow" *ngIf="!isAdmin()"></svg>
         </div>
       </div>
     </div>

@@ -90,11 +90,27 @@ export class EmployeeDocumentsComponent implements OnInit {
     const empFilterId = this.selectedEmployeeFilterId();
 
     return this.allDocuments().filter(doc => {
-      const empName = `${doc.employee?.firstName || ''} ${doc.employee?.lastName || ''}`.toLowerCase();
-      const docName = (doc.fileName || '').toLowerCase();
-      const matchesSearch = !q || empName.includes(q) || docName.includes(q);
-      const matchesDept = dept === 'ALL' || doc.employee?.department?.name === dept;
-      const matchesEmployee = !empFilterId || doc.employee?.id === empFilterId;
+      const e = doc.employee;
+      // Search across the document and every way someone might identify the
+      // employee it belongs to: name, email, phone, or employee ID.
+      const haystack = [
+        doc.fileName,
+        doc.documentType,
+        `${e?.firstName || ''} ${e?.lastName || ''}`,
+        e?.email,
+        e?.user?.email,
+        e?.phone,
+        e?.employeeCode,
+        e?.department?.name,
+        e?.designation?.name,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch = !q || haystack.includes(q);
+      const matchesDept = dept === 'ALL' || e?.department?.name === dept;
+      const matchesEmployee = !empFilterId || e?.id === empFilterId;
       return matchesSearch && matchesDept && matchesEmployee;
     });
   });
@@ -105,10 +121,33 @@ export class EmployeeDocumentsComponent implements OnInit {
       .map(e => ({ id: e.id, name: `${e.firstName} ${e.lastName}` }))
   );
 
-  totalDocsCount = computed(() => this.allDocuments().length);
+  // KPIs describe the current result set, so they move with the filters. When
+  // nothing is filtered they equal the totals, as before.
+  totalDocsCount = computed(() => this.filteredDocuments().length);
+
   employeesWithDocsCount = computed(() => {
-    return this.employees().filter(e => e.documents && e.documents.length > 0).length;
+    const ids = new Set(this.filteredDocuments().map(d => d.employee?.id).filter(Boolean));
+    return ids.size;
   });
+
+  /** Departments represented in the filtered results. */
+  activeDeptCount = computed(() => {
+    const names = new Set(
+      this.filteredDocuments().map(d => d.employee?.department?.name).filter(Boolean)
+    );
+    return names.size;
+  });
+
+  resetFilters() {
+    this.searchQuery.set('');
+    this.selectedDepartment.set('ALL');
+    this.selectedEmployeeFilterId.set(null);
+  }
+
+  /** True when any filter narrows the view — drives the "of N" hint on the tiles. */
+  hasActiveFilters = computed(() =>
+    !!this.searchQuery().trim() || this.selectedDepartment() !== 'ALL' || !!this.selectedEmployeeFilterId()
+  );
 
   modalEmployeeSearch = signal<string>('');
   isEmployeeDropdownOpen = signal<boolean>(false);
