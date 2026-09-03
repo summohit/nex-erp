@@ -5,12 +5,12 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { MenusService } from '../../services/menus.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug } from '@lucide/angular';
+import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug, LucideMapPin } from '@lucide/angular';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug],
+  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug, LucideMapPin],
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css']
 })
@@ -75,6 +75,7 @@ export class SidebarComponent implements OnInit {
       'Dashboard', 'Employees', 'Recruitment', 'Projects', 'Attendance & Leave',
       'Performance', 'CRM', 'Sales', 'Settings',
       'Appreciation', 'Offboarding', 'Payroll & Expenses', 'Clients', 'Assets & IT',
+      'Field Visits',
     ];
     if (doneModules.includes(title)) return 'DONE';
     return 'WIP';

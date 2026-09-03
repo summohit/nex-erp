@@ -56,6 +56,11 @@ export class ProjectsController {
     return this.projectsService.kickoffProject(req.user.companyId, id);
   }
 
+  @Get(':id/activity')
+  getProjectActivity(@Req() req, @Param('id', ParseIntPipe) id: number, @Query('limit') limit?: string) {
+    return this.projectsService.getProjectActivity(req.user.companyId, id, limit ? +limit : 50);
+  }
+
   @Get('timesheets/my-week')
   getMyTimesheets(@Req() req, @Query('startDate') startDate: string, @Query('endDate') endDate: string) {
     return this.projectsService.getMyTimesheets(req.user.companyId, req.user.sub, startDate, endDate);

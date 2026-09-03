@@ -236,6 +236,28 @@ export class JobDetailComponent implements OnInit {
     this.showJobModal.set(false);
   }
 
+  /** Same story for the job's own question list — a JSON string on the wire. */
+  parseQuestions(raw: string | null | undefined): string[] {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((q: any) => typeof q === 'string' && q.trim()) : [];
+    } catch {
+      return [raw];
+    }
+  }
+
+  /** `answers` is stored as a JSON string; render it as Q/A pairs, not raw JSON. */
+  parseAnswers(raw: string | null | undefined): { question: string; answer: string }[] {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter(qa => qa?.question) : [];
+    } catch {
+      return [];
+    }
+  }
+
   copyJobLink() {
     const url = `${window.location.origin}/careers/${this.jobId}`;
     navigator.clipboard.writeText(url).then(() => {

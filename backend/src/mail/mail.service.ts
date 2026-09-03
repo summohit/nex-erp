@@ -328,6 +328,79 @@ export class MailService {
     }
   }
 
+  async sendOfferAcceptedEmail(email: string, candidateName: string, jobTitle: string, applicationId: number) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const link = `${baseUrl}/recruitment/candidates?applicationId=${applicationId}`;
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #059669; text-align: center;">Offer Accepted! 🎉</h2>
+        <p style="color: #475569; font-size: 16px;">Great news!</p>
+        <p style="color: #475569; font-size: 16px;"><strong>${candidateName}</strong> has electronically signed and accepted the offer for the <strong>${jobTitle}</strong> position.</p>
+        <p style="color: #475569; font-size: 16px;">The countersigned Certificate of Completion PDF has been generated and securely attached to their profile.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${link}" style="background-color: #ff5a1f; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">View Application</a>
+        </div>
+      </div>
+    `;
+
+    try {
+      if (this.brevoApiKey) {
+        await this.sendBrevoEmail({
+          to: email,
+          subject: `Offer Accepted: ${candidateName} (${jobTitle})`,
+          html: htmlContent,
+        });
+        return;
+      }
+      await this.sendWithRetry({
+        from: `"NEX ERP Recruitment" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        subject: `Offer Accepted: ${candidateName} (${jobTitle})`,
+        html: htmlContent,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send offer accepted email to ${email}`, error);
+    }
+  }
+
+  async sendOfferDeclinedEmail(email: string, candidateName: string, jobTitle: string, applicationId: number) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const link = `${baseUrl}/recruitment/candidates?applicationId=${applicationId}`;
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #dc2626; text-align: center;">Offer Declined</h2>
+        <p style="color: #475569; font-size: 16px;">Hello,</p>
+        <p style="color: #475569; font-size: 16px;"><strong>${candidateName}</strong> has declined the offer for the <strong>${jobTitle}</strong> position.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${link}" style="background-color: #ff5a1f; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">View Application</a>
+        </div>
+      </div>
+    `;
+
+    try {
+      if (this.brevoApiKey) {
+        await this.sendBrevoEmail({
+          to: email,
+          subject: `Offer Declined: ${candidateName} (${jobTitle})`,
+          html: htmlContent,
+        });
+        return;
+      }
+      await this.sendWithRetry({
+        from: `"NEX ERP Recruitment" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        subject: `Offer Declined: ${candidateName} (${jobTitle})`,
+        html: htmlContent,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send offer declined email to ${email}`, error);
+    }
+  }
+
   async sendTicketAssignedEmail(email: string, ticketNumber: string, ticketTitle: string) {
     const baseUrl = process.env.APP_URL || 'http://localhost:4200';
     const ticketLink = `${baseUrl}/crm/tickets`;
@@ -368,5 +441,119 @@ export class MailService {
     } catch (error) {
       this.logger.error(`Failed to send ticket assignment email to ${email}: ${this.errorDetail(error)}`);
     }
+  }
+
+  /**
+   * Confirms to a public lead-form submitter that their enquiry arrived.
+   * Goes to an address typed by an anonymous visitor, so every value is escaped
+   * before it reaches the HTML, and failures are swallowed — the enquiry is
+   * already saved and must not be lost to a mail outage.
+   */
+  async sendLeadEnquiryAcknowledgementEmail(params: {
+    email: string;
+    name?: string | null;
+    companyName: string;
+    formName?: string | null;
+    message?: string | null;
+    supportEmail?: string | null;
+  }) {
+    const { email } = params;
+    const company = this.escapeHtml(params.companyName) || 'our team';
+    const greetingName = this.escapeHtml((params.name || '').trim().split(/\s+/)[0]);
+    const greeting = greetingName ? `Hi ${greetingName},` : 'Hello,';
+    const subject = `We've received your enquiry — ${params.companyName}`;
+
+    const messageBlock = params.message
+      ? `
+        <tr>
+          <td style="padding: 0 32px 4px;">
+            <p style="margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8;">Your message</p>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #f97316; border-radius: 8px; padding: 14px 16px; font-size: 14px; line-height: 1.6; color: #475569; white-space: pre-wrap;">${this.escapeHtml(params.message)}</div>
+          </td>
+        </tr>`
+      : '';
+
+    const contactLine = params.supportEmail
+      ? `You can reply directly to this email or reach us at <a href="mailto:${this.escapeHtml(params.supportEmail)}" style="color: #f97316; text-decoration: none; font-weight: 600;">${this.escapeHtml(params.supportEmail)}</a>.`
+      : 'You can simply reply to this email if you have anything to add.';
+
+    const htmlContent = `
+<div style="background-color: #f1f5f9; padding: 32px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; width: 100%; background-color: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);">
+    <tr>
+      <td style="height: 4px; background-color: #f97316; font-size: 0; line-height: 0;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="padding: 36px 32px 8px; text-align: center;">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px;">Thank you for reaching out</h1>
+        <p style="margin: 10px 0 0; font-size: 15px; line-height: 1.6; color: #64748b;">We have received your enquiry and it is now with our team.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 24px 32px 0;">
+        <p style="margin: 0 0 14px; font-size: 15px; color: #334155;">${greeting}</p>
+        <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.65; color: #475569;">
+          Thank you for getting in touch with <strong style="color: #0f172a;">${company}</strong>. Your request has been logged and a member of our team will review the details and get back to you shortly, typically within one business day.
+        </p>
+      </td>
+    </tr>
+    ${messageBlock}
+    <tr>
+      <td style="padding: 22px 32px 0;">
+        <p style="margin: 0; font-size: 15px; line-height: 1.65; color: #475569;">
+          There is nothing further you need to do right now. ${contactLine}
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 26px 32px 32px;">
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #475569;">
+          Kind regards,<br />
+          <strong style="color: #0f172a;">The ${company} Team</strong>
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 18px 32px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+        <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #94a3b8; text-align: center;">
+          This is an automated confirmation of an enquiry submitted to ${company}.<br />
+          If you did not submit this request, you can safely ignore this message.
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>`;
+
+    try {
+      if (this.brevoApiKey) {
+        this.logger.log(`Sending lead enquiry acknowledgement to ${email} via Brevo HTTP API.`);
+        await this.sendBrevoEmail({ to: email, subject, html: htmlContent });
+        return;
+      }
+      this.logger.log(`Sending lead enquiry acknowledgement to ${email} via SMTP transport.`);
+      await this.sendWithRetry({
+        from: `"${params.companyName}" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        replyTo: params.supportEmail || undefined,
+        subject,
+        html: htmlContent,
+      });
+    } catch (error) {
+      // Never rethrow: the enquiry is already stored and the visitor has been
+      // shown a success screen.
+      this.logger.error(`Failed to send lead enquiry acknowledgement to ${email}: ${this.errorDetail(error)}`);
+    }
+  }
+
+  /** Submitter-supplied values land inside an HTML email, so escape them. */
+  private escapeHtml(value: string | null | undefined): string {
+    if (!value) return '';
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }

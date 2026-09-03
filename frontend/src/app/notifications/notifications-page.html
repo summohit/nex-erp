@@ -1,0 +1,166 @@
+<div class="notifications-page">
+
+  <div class="page-header-card">
+    <div class="header-title-group">
+      <div class="header-title-row">
+        <h1>Notifications</h1>
+        <span class="unread-pill" *ngIf="unreadCount() > 0">{{ unreadCount() }} unread</span>
+      </div>
+      <p>Everything the system has sent you, newest first.</p>
+    </div>
+
+    <div class="header-actions-group">
+      <button class="btn-secondary" [class.is-on]="showPrefs()" (click)="togglePrefs()">
+        <svg lucideSettings [size]="15"></svg>
+        <span>Settings</span>
+      </button>
+      <button class="btn-secondary" (click)="load()" title="Refresh">
+        <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading()"></svg>
+        <span>Refresh</span>
+      </button>
+      <button class="btn-primary" (click)="markAllRead()" [disabled]="unreadCount() === 0">
+        <svg lucideCheckCheck [size]="16"></svg>
+        <span>Mark all read</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Preferences -->
+  <div class="prefs-card" *ngIf="showPrefs()">
+    <div class="prefs-head">
+      <div>
+        <h2>What you get notified about</h2>
+        <p>Turning a type off stops new notifications of that kind. It doesn't delete anything you already have.</p>
+      </div>
+      <button class="btn-icon" (click)="togglePrefs()" title="Close">
+        <svg lucideX [size]="16"></svg>
+      </button>
+    </div>
+
+    <div class="prefs-warning" *ngIf="!prefsAvailable()">
+      <svg lucideLock [size]="14"></svg>
+      <span>
+        Preferences aren't set up on this server yet, so these switches are read-only.
+        Run <code>prisma/manual-sql/2026-09-03-notification-preferences.sql</code> to enable them.
+      </span>
+    </div>
+
+    <div class="prefs-list" [class.is-disabled]="!prefsAvailable()">
+      <div class="pref-row" *ngFor="let t of allTypes" [class.is-locked]="isLocked(t.type)">
+        <div class="pref-text">
+          <div class="pref-label">
+            {{ t.label }}
+            <span class="lock-tag" *ngIf="isLocked(t.type)">
+              <svg lucideLock [size]="10"></svg> Always on
+            </span>
+          </div>
+          <div class="pref-hint">{{ t.hint }}</div>
+        </div>
+
+        <button
+          class="switch"
+          type="button"
+          role="switch"
+          [attr.aria-checked]="!isMuted(t.type)"
+          [attr.aria-label]="t.label"
+          [class.on]="!isMuted(t.type)"
+          [disabled]="isLocked(t.type) || !prefsAvailable() || savingType() === t.type"
+          (click)="toggleMute(t.type)">
+          <span class="knob"></span>
+        </button>
+      </div>
+    </div>
+
+    <p class="prefs-foot">
+      <svg lucideBellOff [size]="13"></svg>
+      Muted types are skipped when they are created, so they won't appear here or in the bell.
+    </p>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <div class="chip-row">
+      <button class="chip" [class.active]="filterType() === ''" (click)="setType('')">
+        All
+      </button>
+      <button
+        class="chip"
+        *ngFor="let t of types()"
+        [class.active]="filterType() === t.type"
+        (click)="setType(t.type)">
+        {{ formatType(t.type) }} <span class="chip-count">{{ t.count }}</span>
+      </button>
+    </div>
+
+    <button class="chip chip-toggle" [class.active]="unreadOnly()" (click)="toggleUnreadOnly()">
+      Unread only
+    </button>
+  </div>
+
+  <!-- Skeleton mirrors a real row so nothing jumps -->
+  <div class="list-card" *ngIf="isLoading()">
+    <div class="notif-row" *ngFor="let r of [1,2,3,4,5,6,7,8]">
+      <app-skeleton width="8px" height="8px" [circle]="true"></app-skeleton>
+      <div class="notif-body">
+        <app-skeleton width="42%" height="12px"></app-skeleton>
+        <app-skeleton width="68%" height="11px"></app-skeleton>
+      </div>
+      <app-skeleton width="76px" height="18px" radius="9px"></app-skeleton>
+    </div>
+  </div>
+
+  <div class="list-card" *ngIf="!isLoading()">
+    <div class="empty-state" *ngIf="items().length === 0">
+      <svg lucideInbox [size]="34"></svg>
+      <h3>Nothing here</h3>
+      <p>
+        {{ filterType() || unreadOnly()
+            ? 'No notifications match these filters.'
+            : 'You have no notifications yet.' }}
+      </p>
+    </div>
+
+    <div
+      class="notif-row"
+      *ngFor="let n of items()"
+      [class.is-unread]="!n.isRead"
+      [class.is-clickable]="n.linkUrl"
+      (click)="open(n)">
+      <span class="unread-dot" [class.visible]="!n.isRead"></span>
+
+      <div class="notif-body">
+        <div class="notif-title-row">
+          <span class="notif-title">{{ n.title }}</span>
+          <span class="type-tag" [ngClass]="typeClass(n.type)">{{ formatType(n.type) }}</span>
+        </div>
+        <p class="notif-message">{{ n.message }}</p>
+        <span class="notif-time">{{ n.createdAt | date:'MMM d, y · h:mm a' }}</span>
+      </div>
+
+      <button
+        class="btn-mark-read"
+        *ngIf="!n.isRead"
+        (click)="markRead(n, $event)"
+        title="Mark as read">
+        <svg lucideCheck [size]="14"></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Pager -->
+  <div class="pager" *ngIf="!isLoading() && total() > pageSize">
+    <span class="pager-info">
+      Showing {{ skip() + 1 }}–{{ skip() + items().length }} of {{ total() }}
+    </span>
+    <div class="pager-controls">
+      <button class="btn-page" [disabled]="!hasPrev()" (click)="prevPage()">
+        <svg lucideChevronLeft [size]="15"></svg>
+      </button>
+      <span class="pager-page">Page {{ page() }} of {{ pageCount() }}</span>
+      <button class="btn-page" [disabled]="!hasNext()" (click)="nextPage()">
+        <svg lucideChevronRight [size]="15"></svg>
+      </button>
+    </div>
+  </div>
+
+</div>

@@ -130,7 +130,7 @@
         <div class="view-desc-section" *ngIf="job.screeningQuestions && job.screeningQuestions.length > 0">
           <h4 class="questions-card-header">
             <svg lucideHelpCircle size="16" class="text-orange"></svg>
-            Suggested Screening Questions ({{ job.screeningQuestions.length }})
+            Application Questions ({{ job.screeningQuestions.length }})
           </h4>
           <ol class="questions-view-list">
             <li *ngFor="let q of job.screeningQuestions">{{ q }}</li>
@@ -460,11 +460,22 @@
               <svg lucideHelpCircle size="18"></svg>
             </div>
             <div class="header-title-text">
-              <h3 class="section-heading">Suggested Screening Questions</h3>
-              <p class="section-sub-text">These questions will be automatically assigned to interviewers for candidate screening.</p>
+              <h3 class="section-heading">Application Questions</h3>
+              <p class="section-sub-text">Tick the questions applicants must answer when they apply. Every selected question is required on the application form.</p>
             </div>
           </div>
           <span class="count-pill pill-amber">{{ screeningQuestions().length }} Questions</span>
+        </div>
+
+        <!-- Pick from the standard set -->
+        <div class="q-library-grid">
+          <label class="q-library-option" *ngFor="let q of questionLibrary">
+            <input
+              type="checkbox"
+              [checked]="isQuestionSelected(q)"
+              (change)="toggleLibraryQuestion(q)">
+            <span>{{ q }}</span>
+          </label>
         </div>
 
         <!-- Question List -->

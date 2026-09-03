@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { HttpClient } from '@angular/common/http';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ProjectsService, ProjectSummary } from '../../services/projects';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
@@ -64,6 +65,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private socketService = inject(SocketService);
   private fieldVisitsService = inject(FieldVisitsService);
+  private http = inject(HttpClient);
 
   Math = Math;
   paginationPageSizeSelector = [10, 25, 50, 100];
@@ -364,6 +366,47 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   activeTab = signal<'board'|'backlog'|'analytics'|'settings'>('board');
   activeProjectTab = signal<string>('board');
   projectSummary = signal<ProjectSummary | null>(null);
+
+  // Project activity feed. IssueActivity rows were already being written on
+  // every status change, comment and timer action — nothing surfaced them.
+  activity = signal<any[]>([]);
+  activityLoading = signal(false);
+
+  loadActivity() {
+    this.activityLoading.set(true);
+    this.http.get<any[]>(`${environment.apiUrl}/projects/${this.projectId}/activity`)
+      .subscribe({
+        next: (rows) => {
+          this.activity.set(rows || []);
+          this.activityLoading.set(false);
+        },
+        error: () => {
+          this.activity.set([]);
+          this.activityLoading.set(false);
+        },
+      });
+  }
+
+  /** Turns a raw action + field change into a readable sentence. */
+  formatActivityAction(a: any): string {
+    const pretty = (v?: string) => (v || '').replace(/_/g, ' ').toLowerCase();
+    const verb: Record<string, string> = {
+      CREATED: 'created this issue',
+      STATUS_CHANGED: 'changed status',
+      PRIORITY_CHANGED: 'changed priority',
+      ASSIGNED: 'reassigned it',
+      COMMENT_ADDED: 'added a comment',
+      WORK_STARTED: 'started the timer',
+      WORK_STOPPED: 'stopped the timer',
+      TIME_LOGGED: 'logged time',
+      APPROVED: 'approved it',
+      REJECTED: 'rejected it',
+    };
+    const base = verb[a?.action] ?? pretty(a?.action);
+    return a?.oldValue && a?.newValue
+      ? `${base} from ${pretty(a.oldValue)} to ${pretty(a.newValue)}`
+      : base;
+  }
 
   // Field Visits tab
   fieldVisits = signal<FieldVisit[]>([]);
@@ -1184,6 +1227,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.hasAccess.set(true);
         this.loadProjectDetails();
         this.loadBoardAndIssues();
+        this.loadActivity();
         
         // Socket integration for the whole project
         this.socketService.joinProject(this.projectId);

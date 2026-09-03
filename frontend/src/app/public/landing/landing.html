@@ -1,45 +1,61 @@
 <div class="lp-root">
 
   <!-- ================= NAVBAR ================= -->
-  <header class="lp-nav">
+  <header class="lp-nav" [class.is-scrolled]="isScrolled()">
     <div class="lp-nav-inner">
-      <a class="lp-brand" routerLink="/">
+      <a class="lp-brand" routerLink="/" title="NEX ERP Home">
         <img src="/logo.png" alt="NEX ERP" class="lp-logo" />
       </a>
 
       <nav class="lp-nav-links">
-        <button type="button" (click)="scrollTo('tour')">Product Tour</button>
-        <button type="button" (click)="scrollTo('modules')">All Modules</button>
-        <button type="button" (click)="scrollTo('mobile')">Mobile App</button>
-        <button type="button" (click)="scrollTo('why')">Why NEX</button>
-        <button type="button" (click)="scrollTo('faq')">FAQ</button>
+        <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'tour'" (click)="scrollTo('tour')">
+          <span>Product Tour</span>
+        </button>
+        <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'modules'" (click)="scrollTo('modules')">
+          <span>All Modules</span>
+        </button>
+        <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'mobile'" (click)="scrollTo('mobile')">
+          <span>Mobile App</span>
+          <span class="nav-badge-pill">APK</span>
+        </button>
+        <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'why'" (click)="scrollTo('why')">
+          <span>Why NEX</span>
+        </button>
+        <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'faq'" (click)="scrollTo('faq')">
+          <span>FAQ</span>
+        </button>
       </nav>
 
       <div class="lp-nav-actions">
-        <button type="button" class="lp-btn-ghost" (click)="goToLogin()">Sign In</button>
-        <button type="button" class="lp-btn-primary" (click)="goToSignup()">
-          Sign Up Free
-          <svg lucideArrowRight size="15"></svg>
+        <button type="button" class="lp-btn-login" (click)="goToLogin()">
+          Sign In
+        </button>
+        <button type="button" class="lp-btn-signup" (click)="goToSignup()">
+          <span>Sign Up Free</span>
+          <svg lucideArrowRight size="15" class="nav-arrow"></svg>
         </button>
       </div>
 
       <button type="button" class="lp-burger" (click)="toggleMobileNav()" aria-label="Toggle menu">
-        <svg *ngIf="!mobileNavOpen()" lucideMenu size="22"></svg>
-        <svg *ngIf="mobileNavOpen()" lucideX size="22"></svg>
+        <svg *ngIf="!mobileNavOpen()" lucideMenu size="20"></svg>
+        <svg *ngIf="mobileNavOpen()" lucideX size="20"></svg>
       </button>
     </div>
 
     <!-- Mobile dropdown -->
     <div class="lp-mobile-menu" *ngIf="mobileNavOpen()">
-      <button type="button" (click)="scrollTo('tour')">Product Tour</button>
-      <button type="button" (click)="scrollTo('modules')">All Modules</button>
-      <button type="button" (click)="scrollTo('mobile')">Mobile App</button>
-      <button type="button" (click)="scrollTo('why')">Why NEX</button>
-      <button type="button" (click)="scrollTo('faq')">FAQ</button>
+      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'tour'" (click)="scrollTo('tour')">Product Tour</button>
+      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'modules'" (click)="scrollTo('modules')">All Modules</button>
+      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'mobile'" (click)="scrollTo('mobile')">
+        <span>Mobile App</span>
+        <span class="nav-badge-pill">APK</span>
+      </button>
+      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'why'" (click)="scrollTo('why')">Why NEX</button>
+      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'faq'" (click)="scrollTo('faq')">FAQ</button>
       <div class="lp-mobile-actions">
-        <button type="button" class="lp-btn-ghost full" (click)="goToLogin()">Sign In</button>
-        <button type="button" class="lp-btn-primary full" (click)="goToSignup()">
-          Sign Up Free
+        <button type="button" class="lp-btn-login full" (click)="goToLogin()">Sign In</button>
+        <button type="button" class="lp-btn-signup full" (click)="goToSignup()">
+          <span>Sign Up Free</span>
           <svg lucideArrowRight size="15"></svg>
         </button>
       </div>
@@ -48,7 +64,10 @@
 
   <!-- ================= HERO SECTION ================= -->
   <section class="lp-hero">
-    <div class="lp-hero-bg-glow"></div>
+    <div class="lp-hero-bg-glow glow-1"></div>
+    <div class="lp-hero-bg-glow glow-2"></div>
+    <div class="lp-hero-grid-pattern"></div>
+
     <div class="lp-hero-inner">
       <div class="lp-hero-copy">
         <h1>
@@ -61,7 +80,7 @@
           CRM Deals, and Agile Projects into a single high-velocity platform.
         </p>
 
-        <!-- Monday.com-style Interactive "What would you like to manage?" Hero Switcher -->
+        <!-- "What would you like to manage?" Hero Switcher -->
         <div class="lp-hero-pill-selector">
           <div class="pill-prompt-row">
             <span class="pill-prompt-label">What would you like to manage?</span>
@@ -72,7 +91,7 @@
               class="hero-pill-btn" 
               [class.active]="heroSelectedModule() === 'crm'"
               (click)="selectHeroModule('crm')">
-              <svg lucideTrendingUp size="16"></svg>
+              <svg lucideTrendingUp size="15"></svg>
               <span>CRM & Sales</span>
               <span class="pill-check" *ngIf="heroSelectedModule() === 'crm'">✓</span>
             </button>
@@ -82,7 +101,7 @@
               class="hero-pill-btn" 
               [class.active]="heroSelectedModule() === 'attendance'"
               (click)="selectHeroModule('attendance')">
-              <svg lucideCalendarClock size="16"></svg>
+              <svg lucideCalendarClock size="15"></svg>
               <span>Attendance</span>
               <span class="pill-check" *ngIf="heroSelectedModule() === 'attendance'">✓</span>
             </button>
@@ -92,7 +111,7 @@
               class="hero-pill-btn" 
               [class.active]="heroSelectedModule() === 'payroll'"
               (click)="selectHeroModule('payroll')">
-              <svg lucideBanknote size="16"></svg>
+              <svg lucideBanknote size="15"></svg>
               <span>Payroll</span>
               <span class="pill-check" *ngIf="heroSelectedModule() === 'payroll'">✓</span>
             </button>
@@ -102,7 +121,7 @@
               class="hero-pill-btn" 
               [class.active]="heroSelectedModule() === 'recruitment'"
               (click)="selectHeroModule('recruitment')">
-              <svg lucideBriefcase size="16"></svg>
+              <svg lucideBriefcase size="15"></svg>
               <span>Recruitment</span>
               <span class="pill-check" *ngIf="heroSelectedModule() === 'recruitment'">✓</span>
             </button>
@@ -112,7 +131,7 @@
               class="hero-pill-btn" 
               [class.active]="heroSelectedModule() === 'projects'"
               (click)="selectHeroModule('projects')">
-              <svg lucideFolderKanban size="16"></svg>
+              <svg lucideFolderKanban size="15"></svg>
               <span>Projects</span>
               <span class="pill-check" *ngIf="heroSelectedModule() === 'projects'">✓</span>
             </button>
@@ -120,13 +139,13 @@
         </div>
 
         <div class="lp-hero-cta">
-          <button type="button" class="lp-btn-primary lg" (click)="goToSignup()">
-            Start Free 14-Day Trial
-            <svg lucideArrowRight size="17"></svg>
+          <button type="button" class="lp-hero-btn-primary" (click)="goToSignup()">
+            <span>Start Free 14-Day Trial</span>
+            <svg lucideArrowRight size="17" class="hero-cta-arrow"></svg>
           </button>
-          <button type="button" class="lp-btn-outline lg" (click)="scrollTo('tour')">
+          <button type="button" class="lp-hero-btn-secondary" (click)="scrollTo('tour')">
             <svg lucideEye size="17"></svg>
-            Explore Live Tour
+            <span>Explore Live Tour</span>
           </button>
         </div>
 
@@ -717,46 +736,48 @@
 
     <!-- Tour Tabs Selector -->
     <div class="lp-tour-tabs">
-      <button 
-        type="button" 
-        class="tour-tab-btn" 
-        [class.active]="activeModuleTab() === 'crm'"
-        (click)="setModuleTab('crm')">
-        <svg lucideTrendingUp size="16"></svg>
-        <span>CRM & Pipeline</span>
-      </button>
-      <button 
-        type="button" 
-        class="tour-tab-btn" 
-        [class.active]="activeModuleTab() === 'attendance'"
-        (click)="setModuleTab('attendance')">
-        <svg lucideCalendarClock size="16"></svg>
-        <span>Attendance & Kiosk</span>
-      </button>
-      <button 
-        type="button" 
-        class="tour-tab-btn" 
-        [class.active]="activeModuleTab() === 'payroll'"
-        (click)="setModuleTab('payroll')">
-        <svg lucideBanknote size="16"></svg>
-        <span>1-Click Payroll</span>
-      </button>
-      <button 
-        type="button" 
-        class="tour-tab-btn" 
-        [class.active]="activeModuleTab() === 'recruitment'"
-        (click)="setModuleTab('recruitment')">
-        <svg lucideBriefcase size="16"></svg>
-        <span>Recruitment & ATS</span>
-      </button>
-      <button 
-        type="button" 
-        class="tour-tab-btn" 
-        [class.active]="activeModuleTab() === 'projects'"
-        (click)="setModuleTab('projects')">
-        <svg lucideFolderKanban size="16"></svg>
-        <span>Projects & Sprints</span>
-      </button>
+      <div class="lp-tour-tabs-dock">
+        <button 
+          type="button" 
+          class="tour-tab-btn" 
+          [class.active]="activeModuleTab() === 'crm'"
+          (click)="setModuleTab('crm')">
+          <svg lucideTrendingUp size="16"></svg>
+          <span>CRM & Pipeline</span>
+        </button>
+        <button 
+          type="button" 
+          class="tour-tab-btn" 
+          [class.active]="activeModuleTab() === 'attendance'"
+          (click)="setModuleTab('attendance')">
+          <svg lucideCalendarClock size="16"></svg>
+          <span>Attendance & Kiosk</span>
+        </button>
+        <button 
+          type="button" 
+          class="tour-tab-btn" 
+          [class.active]="activeModuleTab() === 'payroll'"
+          (click)="setModuleTab('payroll')">
+          <svg lucideBanknote size="16"></svg>
+          <span>1-Click Payroll</span>
+        </button>
+        <button 
+          type="button" 
+          class="tour-tab-btn" 
+          [class.active]="activeModuleTab() === 'recruitment'"
+          (click)="setModuleTab('recruitment')">
+          <svg lucideBriefcase size="16"></svg>
+          <span>Recruitment & ATS</span>
+        </button>
+        <button 
+          type="button" 
+          class="tour-tab-btn" 
+          [class.active]="activeModuleTab() === 'projects'"
+          (click)="setModuleTab('projects')">
+          <svg lucideFolderKanban size="16"></svg>
+          <span>Projects & Sprints</span>
+        </button>
+      </div>
     </div>
 
     <!-- Interactive Tab Previews -->
@@ -1152,6 +1173,17 @@
             </span>
           </button>
 
+          <!-- Fast Mobile Install QR Code Widget -->
+          <div class="lp-qr-widget" *ngIf="hasAndroidBuild">
+            <div class="qr-code-box">
+              <svg lucideQrCode size="26"></svg>
+            </div>
+            <div class="qr-meta">
+              <strong>Scan to Install</strong>
+              <small>Direct to Phone</small>
+            </div>
+          </div>
+
           <span class="lp-ios-note">
             <svg lucideShieldCheck size="14"></svg>
             Includes Offline Sync &amp; Biometric Lock
@@ -1284,6 +1316,10 @@
         <p>
           Attendance feeds payroll. Recruitment feeds HR. CRM feeds projects and invoices. Enter employee or deal data once and it flows everywhere without duplicate entry or sync failures.
         </p>
+        <div class="lp-why-highlight">
+          <svg lucideZap size="14"></svg>
+          <span>Zero API Integration Fees</span>
+        </div>
       </div>
       <div class="lp-why-card">
         <div class="lp-why-icon-wrap emerald"><svg lucideShieldCheck size="22"></svg></div>
@@ -1291,6 +1327,10 @@
         <p>
           Granular permission matrix prevents unauthorized data access. Sales reps see their own deals, HR manages sensitive salaries securely, and department leads manage their team rosters.
         </p>
+        <div class="lp-why-highlight">
+          <svg lucideShieldCheck size="14"></svg>
+          <span>256-Bit SSL &amp; Audit Logs</span>
+        </div>
       </div>
       <div class="lp-why-card">
         <div class="lp-why-icon-wrap orange"><svg lucideTrendingUp size="22"></svg></div>
@@ -1298,6 +1338,10 @@
         <p>
           Live dashboards for pipeline velocity, hiring funnels, attendance trends, and payroll disbursal. Make executive decisions based on live company data rather than manual weekly reports.
         </p>
+        <div class="lp-why-highlight">
+          <svg lucideBarChart3 size="14"></svg>
+          <span>Live Executive Dashboards</span>
+        </div>
       </div>
     </div>
   </section>
@@ -1314,14 +1358,19 @@
       <div class="lp-faq-item" *ngFor="let f of faqs; let i = index" [class.open]="activeFaq() === i">
         <button type="button" class="faq-question-btn" (click)="toggleFaq(i)">
           <span class="faq-q-text">{{ f.question }}</span>
-          <span class="faq-chevron">
-            <svg *ngIf="activeFaq() !== i" lucideChevronDown size="18"></svg>
-            <svg *ngIf="activeFaq() === i" lucideChevronUp size="18"></svg>
+          <span class="faq-chevron-pill">
+            <svg *ngIf="activeFaq() !== i" lucideChevronDown size="16"></svg>
+            <svg *ngIf="activeFaq() === i" lucideChevronUp size="16"></svg>
           </span>
         </button>
         <div class="faq-answer-body" *ngIf="activeFaq() === i">
           <p>{{ f.answer }}</p>
-          <span class="faq-cat-badge">Category: {{ f.category }}</span>
+          <div class="faq-footer-meta">
+            <span class="faq-cat-badge">
+              <svg lucideCheckCircle2 size="12"></svg>
+              {{ f.category }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -1329,22 +1378,27 @@
 
   <!-- ================= FINAL HIGH-CONVERSION CTA ================= -->
   <section class="lp-cta">
-    <div class="lp-cta-glow"></div>
+    <div class="lp-cta-glow glow-left"></div>
+    <div class="lp-cta-glow glow-right"></div>
+    <div class="lp-cta-grid-pattern"></div>
     <div class="lp-cta-inner">
-      <div class="lp-cta-badge">Instant Setup</div>
+      <div class="lp-cta-badge">
+        <svg lucideSparkles size="13"></svg>
+        <span>Instant Enterprise Setup</span>
+      </div>
       <h2>Ready to unify your entire company?</h2>
       <p>Join hundreds of forward-thinking teams streamlining their operations with NEX ERP today.</p>
       <div class="lp-cta-buttons">
-        <button type="button" class="lp-btn-white lg" (click)="goToSignup()">
-          Start Your Free Account
+        <button type="button" class="lp-btn-cta-primary" (click)="goToSignup()">
+          <span>Start Your Free Account</span>
           <svg lucideArrowRight size="17"></svg>
         </button>
-        <button type="button" class="lp-btn-ghost-light lg" (click)="goToLogin()">
-          Sign In to Workspace
+        <button type="button" class="lp-btn-cta-secondary" (click)="goToLogin()">
+          <span>Sign In to Workspace</span>
         </button>
       </div>
       <div class="lp-cta-footer-note">
-        <span>✓ 14-day free trial</span>
+        <span>✓ Instant Workspace Setup</span>
         <span>✓ No credit card required</span>
         <span>✓ Cancel anytime</span>
       </div>
@@ -1358,29 +1412,30 @@
         <img src="/logo.png" alt="NEX ERP" class="lp-logo" />
         <p>The all-in-one business operating system for high-performance companies.</p>
         <div class="system-status-pill">
-          <span class="status-dot"></span>
+          <span class="status-dot-pulse"></span>
           <span>All Cloud Systems Operational (99.98% SLA)</span>
         </div>
       </div>
 
       <div class="lp-footer-col">
         <h4>Product Modules</h4>
-        <button type="button" (click)="scrollTo('tour')">CRM & Sales Deals</button>
-        <button type="button" (click)="scrollTo('tour')">Attendance & Biometrics</button>
+        <button type="button" (click)="scrollTo('tour')">CRM &amp; Sales Deals</button>
+        <button type="button" (click)="scrollTo('tour')">Attendance &amp; Biometrics</button>
         <button type="button" (click)="scrollTo('tour')">Automated Payroll</button>
-        <button type="button" (click)="scrollTo('tour')">Recruitment & ATS</button>
+        <button type="button" (click)="scrollTo('tour')">Recruitment &amp; ATS</button>
         <button type="button" (click)="scrollTo('tour')">Agile Projects</button>
       </div>
 
       <div class="lp-footer-col">
         <h4>Platform</h4>
-        <button type="button" (click)="scrollTo('mobile')">Android App</button>
+        <button type="button" (click)="scrollTo('mobile')">Android App (APK)</button>
         <button type="button" (click)="scrollTo('why')">Why NEX ERP</button>
         <button type="button" (click)="scrollTo('faq')">FAQ</button>
+        <button type="button" (click)="scrollTo('modules')">All Modules</button>
       </div>
 
       <div class="lp-footer-col">
-        <h4>Account & Careers</h4>
+        <h4>Account &amp; Access</h4>
         <button type="button" (click)="goToLogin()">Sign In</button>
         <button type="button" (click)="goToSignup()">Create Company</button>
         <a routerLink="/careers" class="footer-link">Careers at CES</a>
@@ -1388,7 +1443,7 @@
     </div>
 
     <div class="lp-footer-bottom">
-      <span>&copy; {{ currentYear }} NEX ERP & CES Technologies. All rights reserved.</span>
+      <span>&copy; {{ currentYear }} NEX ERP &amp; CES Technologies. All rights reserved.</span>
       <div class="legal-links">
         <span>Privacy Policy</span>
         <span>Terms of Service</span>

@@ -1,13 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PayrollSettingsService } from '../payroll/payroll-settings.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class ApplicationsService {
   constructor(
     private prisma: PrismaService,
-    private payrollSettingsService: PayrollSettingsService
+    private payrollSettingsService: PayrollSettingsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async findAll(companyId: number, jobId?: number) {
@@ -280,7 +282,7 @@ export class ApplicationsService {
 
   async scheduleInterview(applicationId: number, companyId: number, data: any) {
     const app = await this.findOne(applicationId, companyId);
-    return this.prisma.interview.create({
+    const interview = await this.prisma.interview.create({
       data: {
         applicationId: app.id,
         title: data.title,
@@ -294,6 +296,25 @@ export class ApplicationsService {
         interviewer: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
       }
     });
+
+    // Being booked to interview someone is the clearest case of "you have been
+    // given work" in the whole recruitment flow, and it was entirely silent.
+    if (interview.interviewerId) {
+      const when = interview.scheduledAt.toLocaleString('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Kolkata',
+      });
+      await this.notificationsService.notifyEmployees([interview.interviewerId], {
+        companyId,
+        title: 'Interview Scheduled',
+        message: `You are interviewing ${app.fullName} for ${app.job?.title ?? 'a role'} on ${when}.`,
+        type: 'ASSIGNMENT',
+        linkUrl: '/recruitment/interviews',
+      });
+    }
+
+    return interview;
   }
 
   async updateInterview(interviewId: number, companyId: number, data: any) {

@@ -104,7 +104,14 @@ deploy_backend() {
   log "Dependencies installed."
 
   info "Running Prisma migrations..."
-  remote "cd $REMOTE_DIR/backend && export DIRECT_URL=\$(grep DATABASE_URL .env | cut -d'\"' -f2 | sed 's/6543/5432/' | sed 's/?pgbouncer=true//') && DATABASE_URL=\"\$DIRECT_URL\" npx prisma db push --accept-data-loss && npx prisma generate"
+  # `grep DATABASE_URL` previously matched EVERY line containing that substring.
+  # With a duplicate or commented entry that yielded two URLs joined by a
+  # newline, so Prisma connected to the first host and appended the rest as the
+  # database name — which is why the last deploy reported a database called
+  # "postgrespostgresql://..." on an ap-southeast-1 host. Anchor to the first
+  # real assignment, strip optional quotes (\042 = " and \047 = ' , avoiding
+  # nested-quote escaping), and refuse to push anywhere unexpected.
+  remote "cd $REMOTE_DIR/backend && DIRECT_URL=\$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '\042\047' | sed 's/6543/5432/; s/?pgbouncer=true//') && { [ -n \"\$DIRECT_URL\" ] || { echo 'ERROR: no DATABASE_URL= line in backend/.env'; exit 1; }; } && { case \"\$DIRECT_URL\" in postgres*) ;; *) echo 'ERROR: DATABASE_URL is not a postgres URL'; exit 1;; esac; } && { printf '%s' \"\$DIRECT_URL\" | grep -q '[[:space:]]' && { echo 'ERROR: DATABASE_URL contains whitespace - duplicate lines in .env?'; exit 1; } || true; } && echo \"Target DB host: \$(printf '%s' \"\$DIRECT_URL\" | sed -E 's|.*@||; s|/.*||')\" && DATABASE_URL=\"\$DIRECT_URL\" npx prisma db push && npx prisma generate"
   log "Database synced."
 
   info "Building backend on server..."

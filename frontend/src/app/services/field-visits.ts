@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 
 export interface FieldVisitEmployee {
@@ -47,6 +47,30 @@ export interface FieldVisit {
   photos?: FieldVisitPhoto[];
 }
 
+export interface FieldVisitSummary {
+  total: number;
+  active: number;
+  completed: number;
+  cancelled: number;
+  totalDistanceKm: number;
+  totalDurationMins: number;
+  photoCount: number;
+  employeesOut: number;
+}
+
+export interface FieldVisitPage {
+  visits: FieldVisit[];
+  summary: FieldVisitSummary;
+}
+
+export interface FieldVisitFilters {
+  from?: string;
+  to?: string;
+  employeeId?: number;
+  projectId?: number;
+  status?: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -69,5 +93,20 @@ export class FieldVisitsService {
     return this.http.get<FieldVisit[]>(`${this.apiUrl}/company/recent`, {
       params: { limit: String(limit) },
     });
+  }
+
+  /** Filtered company-wide log + matching KPI summary — the Field Visits page. */
+  getCompanyVisits(filters: FieldVisitFilters = {}) {
+    let params = new HttpParams();
+    if (filters.from) params = params.set('from', filters.from);
+    if (filters.to) params = params.set('to', filters.to);
+    if (filters.employeeId) params = params.set('employeeId', String(filters.employeeId));
+    if (filters.projectId) params = params.set('projectId', String(filters.projectId));
+    if (filters.status) params = params.set('status', filters.status);
+    return this.http.get<FieldVisitPage>(`${this.apiUrl}/company`, { params });
+  }
+
+  getVisit(id: number) {
+    return this.http.get<FieldVisit>(`${this.apiUrl}/${id}`);
   }
 }

@@ -42,6 +42,7 @@
           <div class="nav-section">
             <a href="#"
                class="nav-item"
+               [class.has-sub]="item.subItems && item.subItems.length > 0"
                [class.active]="isMainItemActive(item)"
                [class.expanded]="expandedMenu() === item.id"
                [attr.title]="isCollapsed() ? item.title : null"
@@ -65,9 +66,9 @@
                   <ng-container *ngSwitchCase="'funnel'"><svg lucideFunnel class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'shopping-cart'"><svg lucideShoppingCart class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'bug'"><svg lucideBug class="nav-icon" size="20"></svg></ng-container>
+                  <ng-container *ngSwitchCase="'map-pin'"><svg lucideMapPin class="nav-icon" size="20"></svg></ng-container>
                 </ng-container>
                 <span class="nav-label">{{ item.title }}</span>
-                <span class="module-status-badge badge-done" *ngIf="getModuleStatus(item.title) === 'DONE'">Done</span>
                 <span class="module-status-badge badge-wip" *ngIf="getModuleStatus(item.title) === 'WIP'">WIP</span>
               </div>
               <div *ngIf="item.subItems" class="chevron-icon">

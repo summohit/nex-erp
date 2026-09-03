@@ -510,13 +510,22 @@
 
       <!-- Documents Link -->
       <div class="section-block" *ngIf="app.resumeUrl">
-        <h4>Candidate Documents</h4>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <a [href]="app.resumeUrl" target="_blank" class="resume-link" style="flex: 1;">
-            <svg lucideFileText size="18"></svg>
+        <h4 class="section-heading">Candidate Documents</h4>
+        <a [href]="app.resumeUrl" target="_blank" class="resume-card-link">
+          <div class="resume-card-left">
+            <div class="resume-icon-badge">
+              <svg lucideFileText size="18"></svg>
+            </div>
+            <div class="resume-text">
+              <span class="resume-title">Curriculum Vitae / Resume</span>
+              <span class="resume-subtitle">Click to preview candidate document</span>
+            </div>
+          </div>
+          <span class="resume-action-badge">
             <span>View Resume</span>
-          </a>
-        </div>
+            <svg lucideExternalLink size="13"></svg>
+          </span>
+        </a>
       </div>
 
       <!-- Offer Package & Compensation Card -->
@@ -830,17 +839,20 @@
   <!-- Redesigned Drawer Footer -->
   <div class="drawer-footer-enhanced" *ngIf="selectedApp() as app">
     <div class="footer-stage-selector">
-      <span class="stage-prefix">Status:</span>
-      <select class="form-select status-dropdown" [ngModel]="app.status" (ngModelChange)="updateDrawerStatus($event)">
-        <option value="NEW">New</option>
-        <option value="REVIEWING">Reviewing</option>
-        <option value="SHORTLISTED">Shortlisted</option>
-        <option value="INTERVIEWING">Interviewing</option>
-        <option value="OFFERED">Offered</option>
-        <option value="HIRED">Hired</option>
-        <option value="ONBOARDED">Onboarded</option>
-        <option value="REJECTED">Rejected</option>
-      </select>
+      <span class="stage-prefix">Status</span>
+      <div class="stage-select-wrapper">
+        <select class="form-select status-dropdown" [ngModel]="app.status" (ngModelChange)="updateDrawerStatus($event)">
+          <option value="NEW">New</option>
+          <option value="REVIEWING">Reviewing</option>
+          <option value="SHORTLISTED">Shortlisted</option>
+          <option value="INTERVIEWING">Interviewing</option>
+          <option value="OFFERED">Offered</option>
+          <option value="HIRED">Hired</option>
+          <option value="ONBOARDED">Onboarded</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+        <svg lucideChevronDown size="14" class="stage-chevron"></svg>
+      </div>
     </div>
     
     <div class="footer-actions-group">

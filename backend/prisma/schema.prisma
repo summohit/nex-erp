@@ -93,6 +93,7 @@ model User {
   approvedHardwareRequests HardwareRequest[]          @relation("HardwareApprover")
   createdInventoryTxns     InventoryTransaction[]     @relation("InventoryCreatedBy")
   notifications            Notification[]
+  notificationPrefs        NotificationPreference[]
   userRoles                UserRole[]
   userMenuBookmarks        UserMenuBookmark[]
   approvedResignations     Resignation[]              @relation("ResignationApprover")
@@ -1590,13 +1591,30 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String
-  type      String   @default("INFO") // INFO, SUCCESS, WARNING, LEAVE_REQUEST, ASSIGNMENT, PAYROLL
+  type      String   @default("INFO") // INFO, SUCCESS, WARNING, ACTION_REQUIRED, LEAVE, ASSIGNMENT, PAYROLL
   linkUrl   String?
   isRead    Boolean  @default(false)
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId, isRead])
+}
+
+// Per-user mute list. Only rows for MUTED types are stored — an absent row means
+// the type is on, so a new notification type is enabled for everyone by default
+// rather than silently off until each user opts in.
+model NotificationPreference {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  muted     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, type])
 }
 
 // --- NEW RBAC & DYNAMIC MENUS (Architecture V2) ---

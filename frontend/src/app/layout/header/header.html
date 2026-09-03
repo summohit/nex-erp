@@ -48,7 +48,6 @@
   <!-- Tickets (Helpdesk) -->
   <button
     class="btn-header-tickets"
-    [class.has-alert]="canSeeTicketAlerts() && hasNewTickets()"
     routerLink="/crm/tickets"
     type="button"
     [title]="canSeeTicketAlerts() && openTicketCount() > 0
@@ -58,7 +57,6 @@
     <span class="hidden sm:inline">Tickets</span>
 
     <span class="ticket-count-badge"
-          [class.pulse]="hasNewTickets()"
           *ngIf="canSeeTicketAlerts() && openTicketCount() > 0">
       {{ openTicketCount() > 99 ? '99+' : openTicketCount() }}
     </span>
@@ -99,6 +97,12 @@
           </div>
         </div>
       </div>
+
+      <!-- The popover only holds the latest few; the page has filters + history. -->
+      <a class="notifications-footer" routerLink="/notifications" (click)="isNotificationOpen.set(false)">
+        View all notifications
+        <svg lucideArrowRight size="14"></svg>
+      </a>
     </div>
   </div>
 

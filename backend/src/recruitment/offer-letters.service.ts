@@ -1,3 +1,6 @@
+import { NotificationsService } from "../notifications/notifications.service";
+import { MailService } from "../mail/mail.service";
+
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
@@ -434,11 +437,16 @@ const DEFAULT_OFFER_LETTER_TEMPLATE = `
 </div>
 `.trim();
 
+
 @Injectable()
 export class OfferLettersService {
   private readonly logger = new Logger(OfferLettersService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+    private mailService: MailService,
+  ) {}
 
   /**
    * Recruiter-facing view of the letter. Includes the derived document password so
@@ -558,7 +566,7 @@ export class OfferLettersService {
 
     const accessToken = crypto.randomBytes(24).toString('hex');
 
-    return this.prisma.offerLetter.upsert({
+    const letter = await this.prisma.offerLetter.upsert({
       where: { applicationId },
       create: {
         applicationId,
@@ -576,6 +584,12 @@ export class OfferLettersService {
         respondedAt: null,
       },
     });
+
+    return {
+      ...letter,
+      signingPath: `/offer/${letter.accessToken}`,
+      documentPassword: this.derivePassword(application),
+    };
   }
 
   // ═══════════════════════════════════════════
@@ -760,7 +774,7 @@ export class OfferLettersService {
       where: { accessToken: token },
       include: { 
         application: { 
-          include: { job: { include: { company: true } } } 
+          include: { job: { include: { company: true, recruiter: { include: { user: true } } } } } 
         } 
       }
     });
@@ -842,14 +856,57 @@ export class OfferLettersService {
         this.logger.error('Failed to generate countersigned PDF', e);
       }
 
+      // ─── NOTIFY RECRUITER ──────────────────────────────────────
+      const recruiterUser = letter.application.job.recruiter?.user;
+      if (recruiterUser) {
+        // 1. In-app notification
+        await this.notificationsService.createNotification(
+          recruiterUser.id,
+          'Offer Accepted',
+          `${letter.application.fullName} has signed and accepted the offer for ${letter.application.job.title}.`,
+          'SUCCESS',
+          `/recruitment/candidates?applicationId=${letter.applicationId}`,
+          letter.companyId
+        ).catch(e => this.logger.error('Failed to create in-app notification', e));
+
+        // 2. Email notification
+        await this.mailService.sendOfferAcceptedEmail(
+          recruiterUser.email,
+          letter.application.fullName,
+          letter.application.job.title,
+          letter.applicationId
+        ).catch(e => this.logger.error('Failed to send email notification', e));
+      }
+
       return updatedLetter;
     }
 
     // Handle Decline
-    return this.prisma.offerLetter.update({
+    const updatedLetter = await this.prisma.offerLetter.update({
       where: { id: letter.id },
       data: { status: decision, respondedAt: new Date() },
     });
+
+    const recruiterUser = letter.application.job.recruiter?.user;
+    if (recruiterUser) {
+      await this.notificationsService.createNotification(
+        recruiterUser.id,
+        'Offer Declined',
+        `${letter.application.fullName} has declined the offer for ${letter.application.job.title}.`,
+        'WARNING',
+        `/recruitment/candidates?applicationId=${letter.applicationId}`,
+        letter.companyId
+      ).catch(e => this.logger.error('Failed to create in-app notification', e));
+
+      await this.mailService.sendOfferDeclinedEmail(
+        recruiterUser.email,
+        letter.application.fullName,
+        letter.application.job.title,
+        letter.applicationId
+      ).catch(e => this.logger.error('Failed to send email notification', e));
+    }
+
+    return updatedLetter;
   }
   private async generateHtmlFromSettings(
     settings: any,

@@ -2,14 +2,43 @@ import { Component, inject, ChangeDetectorRef, signal, OnInit } from '@angular/c
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
-import { LucideEye, LucideEyeOff } from '@lucide/angular';
+import { 
+  LucideEye, 
+  LucideEyeOff, 
+  LucideMail, 
+  LucideLock, 
+  LucideArrowRight, 
+  LucideShieldCheck, 
+  LucideSparkles,
+  LucideUser,
+  LucidePhone,
+  LucideBriefcase,
+  LucideCheckCircle2,
+  LucideTrendingUp
+} from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-auth',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink, LucideEye, LucideEyeOff],
+  imports: [
+    CommonModule, 
+    ReactiveFormsModule, 
+    RouterLink, 
+    LucideEye, 
+    LucideEyeOff,
+    LucideMail,
+    LucideLock,
+    LucideArrowRight,
+    LucideShieldCheck,
+    LucideSparkles,
+    LucideUser,
+    LucidePhone,
+    LucideBriefcase,
+    LucideCheckCircle2,
+    LucideTrendingUp
+  ],
   templateUrl: './auth.component.html',
   styleUrls: ['./auth.component.css']
 })
@@ -43,7 +72,8 @@ export class AuthComponent implements OnInit {
 
     this.loginForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
-      password: ['', Validators.required]
+      password: ['', Validators.required],
+      rememberMe: [true]
     });
   }
 
@@ -105,7 +135,8 @@ export class AuthComponent implements OnInit {
     this.isSubmitting.set(true);
     this.apiError = '';
 
-    this.authService.login(this.loginForm.value).subscribe({
+    const { email, password } = this.loginForm.value;
+    this.authService.login({ email, password }).subscribe({
       next: (res) => {
         this.toast.success('Login successful! Loading workspace...');
         

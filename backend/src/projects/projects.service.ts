@@ -894,6 +894,28 @@ export class ProjectsService {
     });
   }
 
+  /**
+   * Project-wide activity feed: every issue activity in the project, newest
+   * first. The rows were already being written on every status change, comment
+   * and timer action — nothing surfaced them until now.
+   */
+  async getProjectActivity(companyId: number, projectId: number, limit = 50) {
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    const activities = await this.prisma.issueActivity.findMany({
+      where: { issue: { projectId, companyId } },
+      include: {
+        actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        issue: { select: { id: true, title: true, key: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(Number(limit) || 50, 1), 200),
+    });
+
+    return activities;
+  }
+
   async getMyTimesheets(companyId: number, employeeUserId: number, startDateStr: string, endDateStr: string) {
     const employee = await this.prisma.employee.findUnique({ where: { userId: employeeUserId, companyId } });
     if (!employee) throw new NotFoundException('Employee not found');

@@ -5,6 +5,28 @@ import { AuthService } from './auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { environment } from '../../environments/environment';
 
+export interface NotificationPage {
+  notifications: NotificationItem[];
+  unreadCount: number;
+  total: number;
+  skip: number;
+  take: number;
+}
+
+export interface NotificationPrefs {
+  /** False when the preferences table hasn't been created yet. */
+  available?: boolean;
+  /** Types this user has switched off. Anything absent is on. */
+  muted: string[];
+  /** Types the server refuses to mute, so the UI can show them locked. */
+  unmutable: string[];
+}
+
+export interface NotificationTypeCount {
+  type: string;
+  count: number;
+}
+
 export interface NotificationItem {
   id: number;
   userId: number;
@@ -84,6 +106,31 @@ export class NotificationsService {
         },
       });
     });
+  }
+
+  /**
+   * Paged/filtered fetch for the history page. Kept separate from the signal
+   * the bell reads, so browsing history never rewrites the bell's list.
+   */
+  fetchPage(opts: { type?: string; unreadOnly?: boolean; skip?: number; take?: number } = {}) {
+    let params: any = {};
+    if (opts.type) params.type = opts.type;
+    if (opts.unreadOnly) params.unreadOnly = 'true';
+    if (opts.skip) params.skip = String(opts.skip);
+    if (opts.take) params.take = String(opts.take);
+    return this.http.get<NotificationPage>(`${environment.apiUrl}/notifications`, { params });
+  }
+
+  getPreferences() {
+    return this.http.get<NotificationPrefs>(`${environment.apiUrl}/notifications/preferences`);
+  }
+
+  setPreference(type: string, muted: boolean) {
+    return this.http.put<NotificationPrefs>(`${environment.apiUrl}/notifications/preferences`, { type, muted });
+  }
+
+  getTypes() {
+    return this.http.get<NotificationTypeCount[]>(`${environment.apiUrl}/notifications/types`);
   }
 
   markAsRead(id: number) {

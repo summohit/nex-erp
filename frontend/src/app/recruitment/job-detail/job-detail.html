@@ -508,10 +508,13 @@
     </div>
 
     <!-- SCREENING QUESTIONS ANSWERS (IF ANY) -->
-    <div class="drawer-section" *ngIf="candidate.answers">
+    <div class="drawer-section" *ngIf="parseAnswers(candidate.answers).length > 0">
       <div class="section-heading">Screening Answers</div>
       <div class="screening-answers-box">
-        <p class="screening-text">{{ candidate.answers }}</p>
+        <div class="qa-pair" *ngFor="let qa of parseAnswers(candidate.answers); let i = index">
+          <div class="qa-question">{{ i + 1 }}. {{ qa.question }}</div>
+          <div class="qa-answer">{{ qa.answer }}</div>
+        </div>
       </div>
     </div>
 
@@ -575,9 +578,11 @@
         <div class="job-html-content" [innerHTML]="job()?.descriptionHtml"></div>
       </div>
 
-      <div class="spec-desc-section" *ngIf="job()?.screeningQuestions">
-        <h3>Screening Questions</h3>
-        <p class="screening-questions-text">{{ job()?.screeningQuestions }}</p>
+      <div class="spec-desc-section" *ngIf="parseQuestions(job()?.screeningQuestions).length > 0">
+        <h3>Application Questions</h3>
+        <ol class="screening-questions-list">
+          <li *ngFor="let q of parseQuestions(job()?.screeningQuestions)">{{ q }}</li>
+        </ol>
       </div>
     </div>
 

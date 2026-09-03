@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CrmService } from '../crm/crm.service';
+import { MailService } from '../mail/mail.service';
 import * as crypto from 'crypto';
 
 export interface LeadFormFieldDef {
@@ -63,6 +64,7 @@ export class LeadFormsService {
   constructor(
     private prisma: PrismaService,
     private crmService: CrmService,
+    private mailService: MailService,
   ) {}
 
   // ─────────────────────────────────────────────
@@ -311,7 +313,10 @@ export class LeadFormsService {
     if (!Number.isFinite(id)) throw new NotFoundException('Lead Form not found');
     const form = await this.prisma.leadForm.findUnique({
       where: { id },
-      include: { fields: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        fields: { orderBy: { sortOrder: 'asc' } },
+        company: { select: { name: true } },
+      },
     });
     if (!form || form.status !== 'ACTIVE') throw new NotFoundException('Lead Form not found');
 
@@ -370,6 +375,22 @@ export class LeadFormsService {
           null,
         )
         .catch(() => { /* the contact matters more than the note */ });
+    }
+
+    // Acknowledge the submitter, but only if they actually gave an email —
+    // it is an optional field on most forms. Not awaited: the visitor should
+    // see their success screen immediately, and a mail outage must not turn a
+    // captured enquiry into an error.
+    if (values.email) {
+      this.mailService
+        .sendLeadEnquiryAcknowledgementEmail({
+          email: values.email,
+          name: contactData.name,
+          companyName: form.company?.name || 'our team',
+          formName: form.name,
+          message: values.message || null,
+        })
+        .catch(() => { /* already logged inside the mail service */ });
     }
 
     return {

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /**
  * Department-name fragments that identify the software development team,
@@ -27,7 +28,11 @@ const EMPLOYEE_SELECT = {
 
 @Injectable()
 export class TicketsService {
-  constructor(private prisma: PrismaService, private mailService: MailService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   private async nextTicketNumber(companyId: number): Promise<string> {
     const count = await this.prisma.ticket.count({ where: { companyId } });
@@ -171,6 +176,12 @@ export class TicketsService {
       if (newAssignee?.user?.email) {
         this.mailService.sendTicketAssignedEmail(newAssignee.user.email, ticket.ticketNumber, ticket.title).catch(console.error);
       }
+
+      await this.notifyTicketParticipants([Number(assigneeId)], reporterId, companyId, {
+        title: 'New Ticket Assigned',
+        message: `${ticket.ticketNumber}: ${ticket.title}`,
+        type: 'ASSIGNMENT',
+      });
     }
 
     return ticket;
@@ -456,6 +467,38 @@ export class TicketsService {
       if (newAssignee?.user?.email) {
         this.mailService.sendTicketAssignedEmail(newAssignee.user.email, updated.ticketNumber, updated.title).catch(console.error);
       }
+
+      await this.notifyTicketParticipants([Number(data.assigneeId)], actorId, companyId, {
+        title: 'Ticket Assigned to You',
+        message: `${updated.ticketNumber}: ${updated.title}`,
+        type: 'ASSIGNMENT',
+      });
+    }
+
+    // Status moves are what the reporter is actually waiting on. RESOLVED is
+    // special: only the reporter can close it from there, so the notification
+    // has to say so or the ticket sits resolved-but-open indefinitely.
+    if (data.status !== undefined && data.status !== ticket.status) {
+      const resolvedForReporter = data.status === 'RESOLVED';
+      const label = String(data.status).replace('_', ' ').toLowerCase();
+
+      await this.notifyTicketParticipants([ticket.reporterId], actorId, companyId, {
+        title: resolvedForReporter ? 'Your Ticket Is Resolved' : `Ticket ${label}`,
+        message: resolvedForReporter
+          ? `${updated.ticketNumber}: ${updated.title} — please confirm and close it if you are happy with the fix.`
+          : `${updated.ticketNumber}: ${updated.title} is now ${label}.`,
+        type: resolvedForReporter ? 'ACTION_REQUIRED' : 'INFO',
+      });
+
+      // The assignee also needs to know when someone else moves their ticket —
+      // most often the reporter closing it after a fix.
+      if (updated.assigneeId && updated.assigneeId !== ticket.reporterId) {
+        await this.notifyTicketParticipants([updated.assigneeId], actorId, companyId, {
+          title: `Ticket ${label}`,
+          message: `${updated.ticketNumber}: ${updated.title} is now ${label}.`,
+          type: 'INFO',
+        });
+      }
     }
 
     return updated;
@@ -479,7 +522,14 @@ export class TicketsService {
   // ─── COMMENTS ──────────────────────────────────────────────────────────────
 
   async addComment(companyId: number, ticketId: number, authorId: number, body: string) {
-    await this.ensureTicketExists(companyId, ticketId);
+    // Needs the participants, not just existence — a reply is pointless if the
+    // other side is never told about it.
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id: ticketId, companyId },
+      select: { ticketNumber: true, title: true, reporterId: true, assigneeId: true },
+    });
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
     const [comment] = await this.prisma.$transaction([
       this.prisma.ticketComment.create({
         data: { ticketId, authorId, body },
@@ -489,6 +539,20 @@ export class TicketsService {
         data: { ticketId, actorId: authorId, action: 'COMMENT_ADDED' },
       }),
     ]);
+
+    const author = TicketsService.ticketActorName(comment.author);
+    const excerpt = body.length > 80 ? `${body.slice(0, 80).trimEnd()}…` : body;
+    await this.notifyTicketParticipants(
+      [ticket.reporterId, ticket.assigneeId],
+      authorId,
+      companyId,
+      {
+        title: `New reply on ${ticket.ticketNumber}`,
+        message: `${author}: ${excerpt}`,
+        type: 'INFO',
+      },
+    );
+
     return comment;
   }
 
@@ -517,6 +581,30 @@ export class TicketsService {
   private async ensureTicketExists(companyId: number, ticketId: number) {
     const ticket = await this.prisma.ticket.findFirst({ where: { id: ticketId, companyId } });
     if (!ticket) throw new NotFoundException('Ticket not found');
+  }
+
+  // ─── NOTIFICATIONS ─────────────────────────────────────────────────────────
+
+  /** Thin wrapper over the shared helper, defaulting the link to the helpdesk. */
+  private async notifyTicketParticipants(
+    employeeIds: (number | null | undefined)[],
+    actorEmployeeId: number | null | undefined,
+    companyId: number,
+    payload: { title: string; message: string; type?: string; linkUrl?: string },
+  ) {
+    await this.notificationsService.notifyEmployees(employeeIds, {
+      companyId,
+      excludeEmployeeId: actorEmployeeId,
+      title: payload.title,
+      message: payload.message,
+      type: payload.type,
+      linkUrl: payload.linkUrl ?? '/crm/tickets',
+    });
+  }
+
+  private static ticketActorName(actor?: { firstName?: string | null; lastName?: string | null } | null): string {
+    const name = `${actor?.firstName ?? ''} ${actor?.lastName ?? ''}`.trim();
+    return name || 'Someone';
   }
 
   // ─── ATTACHMENTS ───────────────────────────────────────────────────────────

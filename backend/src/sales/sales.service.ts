@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SalesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   // ================= QUOTATIONS =================
 
@@ -40,7 +44,7 @@ export class SalesService {
       status = 'PENDING_APPROVAL';
     }
 
-    return this.prisma.quotation.create({
+    const created = await this.prisma.quotation.create({
       data: {
         ...quoteData,
         quoteNumber,
@@ -68,6 +72,24 @@ export class SalesService {
       },
       include: { items: true, client: true, attachments: true }
     });
+
+    // Crossing the approval threshold silently parked the quote in a queue with
+    // no alert — the salesperson would wait on an approver who never knew.
+    if (approvalStatus === 'PENDING') {
+      await this.notificationsService
+        .notifyApprovers({
+          companyId,
+          roles: ['SUPERADMIN', 'ADMIN', 'FINANCE'],
+          excludeUserId: userId,
+          title: 'Quotation Awaiting Approval',
+          message: `${created.quoteNumber} for ${created.client?.name ?? 'a client'} totals ${total.toFixed(2)} and needs approval.`,
+          type: 'ACTION_REQUIRED',
+          linkUrl: '/sales/quotations',
+        })
+        .catch(() => { /* the quote is saved; the alert is best-effort */ });
+    }
+
+    return created;
   }
 
   async getQuotations(companyId: number) {
@@ -138,6 +160,122 @@ export class SalesService {
       },
       include: { items: true, client: true }
     });
+  }
+
+  /**
+   * Quotation status moves. The model documents five states but only DRAFT,
+   * PENDING_APPROVAL and ACCEPTED were ever set — SENT and REJECTED were
+   * unreachable, so a quote could not be marked as sent or declined.
+   *
+   * ACCEPTED is terminal: it means an order exists. Correcting an accepted
+   * quote is a new quote, not an edit.
+   */
+  private static readonly QUOTE_STATUS_FLOW: Record<string, string[]> = {
+    DRAFT: ['SENT', 'REJECTED'],
+    PENDING_APPROVAL: ['SENT', 'REJECTED'],
+    SENT: ['ACCEPTED', 'REJECTED'],
+    REJECTED: ['DRAFT'],
+    ACCEPTED: [],
+  };
+
+  /** Statuses whose line items and totals may still be corrected. */
+  private static readonly QUOTE_EDITABLE = ['DRAFT', 'PENDING_APPROVAL', 'SENT', 'REJECTED'];
+
+  private async findQuotation(companyId: number, quoteId: number) {
+    const quote = await this.prisma.quotation.findFirst({ where: { id: quoteId, companyId } });
+    if (!quote) throw new NotFoundException('Quotation not found');
+    return quote;
+  }
+
+  async updateQuotationStatus(companyId: number, quoteId: number, status: string) {
+    const quote = await this.findQuotation(companyId, quoteId);
+
+    const allowed = SalesService.QUOTE_STATUS_FLOW[quote.status] ?? [];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException(
+        allowed.length
+          ? `A ${quote.status} quotation can only move to ${allowed.join(' or ')}.`
+          : `A ${quote.status} quotation is final and cannot be changed.`,
+      );
+    }
+
+    return this.prisma.quotation.update({
+      where: { id: quoteId },
+      data: { status },
+      include: { client: true, items: true },
+    });
+  }
+
+  /**
+   * Rewrites a quotation's line items and recalculates totals. Items are
+   * replaced wholesale rather than diffed — a quote is a snapshot, and
+   * reconciling partial edits would risk totals drifting from the lines.
+   */
+  async updateQuotation(companyId: number, quoteId: number, data: any) {
+    const quote = await this.findQuotation(companyId, quoteId);
+
+    if (!SalesService.QUOTE_EDITABLE.includes(quote.status)) {
+      throw new BadRequestException(
+        `A ${quote.status} quotation cannot be edited. Raise a new quotation instead.`,
+      );
+    }
+
+    const { items, attachments, ...quoteData } = data;
+    if (quoteData.date) quoteData.date = new Date(quoteData.date);
+    if (quoteData.validUntil) quoteData.validUntil = new Date(quoteData.validUntil);
+
+    // Never let the client dictate identity or derived money fields.
+    delete quoteData.id;
+    delete quoteData.quoteNumber;
+    delete quoteData.companyId;
+    delete quoteData.subtotal;
+    delete quoteData.tax;
+    delete quoteData.total;
+    delete quoteData.status;
+    delete quoteData.approvalStatus;
+
+    const updateData: any = { ...quoteData };
+
+    if (Array.isArray(items)) {
+      if (!items.length) throw new BadRequestException('A quotation needs at least one line item');
+
+      let subtotal = 0;
+      const priced = items.map((i: any) => {
+        const total = Number(i.quantity) * Number(i.unitPrice);
+        subtotal += total;
+        return { ...i, total };
+      });
+
+      const taxRate = Number(data.taxRate ?? quote.taxRate ?? 18);
+      const tax = subtotal * (taxRate / 100);
+
+      updateData.subtotal = subtotal;
+      updateData.taxRate = taxRate;
+      updateData.tax = tax;
+      updateData.total = subtotal + tax;
+      updateData.items = { deleteMany: {}, create: priced };
+    }
+
+    return this.prisma.quotation.update({
+      where: { id: quoteId },
+      data: updateData,
+      include: { client: true, items: true },
+    });
+  }
+
+  async deleteQuotation(companyId: number, quoteId: number) {
+    const quote = await this.findQuotation(companyId, quoteId);
+
+    // A converted quote is the paper trail behind a real order.
+    const orderCount = await this.prisma.salesOrder.count({ where: { quotationId: quoteId } });
+    if (quote.status === 'ACCEPTED' || orderCount > 0) {
+      throw new BadRequestException(
+        'This quotation has been converted to an order and cannot be deleted.',
+      );
+    }
+
+    await this.prisma.quotation.delete({ where: { id: quoteId } });
+    return { success: true };
   }
 
   async getSalesOrders(companyId: number, isRental?: boolean) {

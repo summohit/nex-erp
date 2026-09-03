@@ -1,108 +1,312 @@
 <!-- REGISTER VIEW -->
-<div *ngIf="currentView === 'register'" class="auth-split">
+<div *ngIf="currentView === 'register'" class="signup-wrapper">
   
-  <div class="auth-split-left">
-    <div class="brand-header mb-8">
-      <a routerLink="/" title="Back to home">
-        <img src="/logo.png" class="brand-logo" alt="NEX ERP logo">
-      </a>
-    </div>
+  <!-- Ambient background glow elements -->
+  <div class="auth-ambient-glow glow-top-left"></div>
+  <div class="auth-ambient-glow glow-bottom-right"></div>
+  <div class="auth-pattern-overlay"></div>
 
-    <div class="hero-image-container mb-8">
-      <div class="mock-browser">
-         <div class="mock-browser-header">
-            <div class="mock-dot red"></div>
-            <div class="mock-dot yellow"></div>
-            <div class="mock-dot green"></div>
-         </div>
-         <div class="mock-browser-body">
-            <div class="mock-card"></div>
-            <div class="mock-card"></div>
-            <div class="mock-card"></div>
-         </div>
+  <div class="signup-layout">
+    
+    <!-- LEFT COLUMN: PRODUCT SHOWCASE & SOCIAL PROOF -->
+    <div class="signup-showcase-panel">
+      
+      <div class="brand-logo-wrap mb-4">
+        <a routerLink="/" title="Back to home">
+          <img src="/logo.png" class="brand-logo" alt="NEX ERP logo">
+        </a>
       </div>
-    </div>
 
-    <h2 class="fs-3xl mb-6">Sign up for a 14-day free trial</h2>
-    <ul class="feature-list">
-      <li>> 60% faster ticket resolution with AI agents</li>
-      <li>59% deflection in tickets with AI bots</li>
-      <li>< 3 month payback period</li>
-    </ul>
-  </div>
-
-  <div class="auth-split-right">
-    <div style="width: 100%; max-width: 480px; margin: 0 auto;">
-      <h2 class="fs-4xl fw-bold" style="letter-spacing: -0.5px; margin-bottom: 0.5rem;">
-        Try <span class="text-primary">NEX ERP</span> for free
-      </h2>
-      <p class="fs-md fw-medium mb-8">
-        No credit card required. No strings attached.
+      <h1 class="showcase-title">
+        Empower your business with <span class="text-gradient">NEX ERP</span>
+      </h1>
+      
+      <p class="showcase-subtitle">
+        Everything your organization needs — CRM, HRMS, Projects, Attendance & Payroll — unified in one intelligent workspace.
       </p>
 
-      <form [formGroup]="registerForm" (ngSubmit)="onRegister()">
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label>First name *</label>
-            <input type="text" formControlName="firstName" placeholder="Enter your first name" [class.error]="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched">
-            <div class="error-text" *ngIf="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched">First name is required</div>
+      <!-- MODERN PRODUCT PREVIEW WIDGET -->
+      <div class="preview-browser-card">
+        <div class="preview-browser-header">
+          <div class="mock-dots">
+            <span class="mock-dot dot-red"></span>
+            <span class="mock-dot dot-yellow"></span>
+            <span class="mock-dot dot-green"></span>
           </div>
-          <div class="form-group">
-            <label>Last name *</label>
-            <input type="text" formControlName="lastName" placeholder="Enter your last name" [class.error]="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched">
-            <div class="error-text" *ngIf="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched">Last name is required</div>
+          <div class="browser-url-pill">
+            <span class="url-lock">🔒</span> app.nex-erp.com/dashboard
+          </div>
+          <div class="live-status-badge">
+            <span class="live-dot"></span>
+            <span>Live</span>
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Work email *</label>
-          <input type="email" formControlName="email" placeholder="Enter your work email" [class.error]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
-          <div class="error-text" *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">A valid email is required</div>
-        </div>
+        <div class="preview-browser-body">
+          <!-- Mini metrics grid -->
+          <div class="preview-metrics-grid">
+            <div class="mini-stat-card">
+              <div class="stat-icon-wrap orange">
+                <svg lucideTrendingUp size="15"></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-num">60% Faster</span>
+                <span class="stat-lbl">AI Operations</span>
+              </div>
+            </div>
 
-        <div class="form-group">
-          <label>Company name *</label>
-          <input type="text" formControlName="companyName" placeholder="Enter your company" [class.error]="registerForm.get('companyName')?.invalid && registerForm.get('companyName')?.touched">
-          <div class="error-text" *ngIf="registerForm.get('companyName')?.invalid && registerForm.get('companyName')?.touched">Company name is required</div>
-        </div>
+            <div class="mini-stat-card">
+              <div class="stat-icon-wrap blue">
+                <svg lucideShieldCheck size="15"></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-num">99.99%</span>
+                <span class="stat-lbl">System Uptime</span>
+              </div>
+            </div>
 
-        <div class="form-group">
-          <label>Phone number</label>
-          <input type="text" formControlName="phone" placeholder="Enter your phone number">
-        </div>
-
-        <!-- NEW PASSWORD FIELD -->
-        <div class="form-group relative">
-          <label>Password *</label>
-          <div class="password-wrapper">
-            <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="Create a secure password" [class.error]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
-            <button type="button" class="password-toggle" (click)="togglePassword()">
-              <svg *ngIf="!showPassword" lucideEye size="20" strokeWidth="2" color="#64748b"></svg>
-              <svg *ngIf="showPassword" lucideEyeOff size="20" strokeWidth="2" color="#64748b"></svg>
-            </button>
+            <div class="mini-stat-card">
+              <div class="stat-icon-wrap green">
+                <svg lucideBriefcase size="15"></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-num">&lt; 3 Months</span>
+                <span class="stat-lbl">Payback Period</span>
+              </div>
+            </div>
           </div>
-          <div class="error-text" *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">Password must be at least 8 characters</div>
+
+          <!-- Mini activity row -->
+          <div class="preview-activity-bar">
+            <div class="activity-chip">
+              <span class="activity-dot"></span>
+              <span>CRM & Lead Pipelines: Active</span>
+            </div>
+            <div class="activity-chip">
+              <span class="activity-dot blue"></span>
+              <span>Attendance & Payroll: Synced</span>
+            </div>
+          </div>
         </div>
-
-        <div class="checkbox-group mb-8">
-          <input type="checkbox" id="terms" formControlName="terms">
-          <label for="terms">By checking this box you agree to NEX ERP <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a> which govern the terms of this Free Trial.</label>
-        </div>
-        <div class="error-text mb-4" *ngIf="registerForm.get('terms')?.invalid && registerForm.get('terms')?.touched">You must accept the terms to continue</div>
-
-        <button type="submit" class="btn-primary mb-6" [disabled]="isSubmitting()">
-          <span *ngIf="!isSubmitting()">Try it free</span>
-          <span *ngIf="isSubmitting()" class="loader"></span>
-        </button>
-
-      </form>
-
-      <div class="text-center">
-        <span class="fs-sm text-muted">Already have an account? </span>
-        <a class="link" (click)="toggleView()">Log in here</a>
       </div>
+
+      <!-- VALUE HIGHLIGHTS -->
+      <div class="showcase-features-list">
+        <div class="feature-item">
+          <div class="feature-icon-box">
+            <svg lucideCheckCircle2 size="16"></svg>
+          </div>
+          <div class="feature-text">
+            <strong>Full Enterprise Access</strong> — CRM, HRMS, Timesheets, Shifts & Payroll.
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon-box">
+            <svg lucideCheckCircle2 size="16"></svg>
+          </div>
+          <div class="feature-text">
+            <strong>Autonomous AI Agents</strong> — Fast deflection and automated workflows.
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon-box">
+            <svg lucideCheckCircle2 size="16"></svg>
+          </div>
+          <div class="feature-text">
+            <strong>Instant Onboarding</strong> — Zero credit card required. Setup in 2 minutes.
+          </div>
+        </div>
+      </div>
+
     </div>
+
+    <!-- RIGHT COLUMN: REGISTRATION FORM CARD -->
+    <div class="signup-form-panel">
+      <div class="signup-card">
+        <div class="card-accent-bar"></div>
+
+        <div class="form-card-header">
+          <h2 class="form-card-title">
+            Try <span class="brand-text">NEX ERP</span> for free
+          </h2>
+          <p class="form-card-subtitle">
+            No credit card required. No strings attached.
+          </p>
+        </div>
+
+        <form [formGroup]="registerForm" (ngSubmit)="onRegister()" class="signup-form">
+          
+          <!-- FIRST NAME & LAST NAME ROW -->
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label class="form-label" for="reg-firstName">First Name *</label>
+              <div class="input-wrapper" [class.has-error]="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched">
+                <div class="input-icon-left">
+                  <svg lucideUser size="17"></svg>
+                </div>
+                <input 
+                  id="reg-firstName"
+                  type="text" 
+                  formControlName="firstName" 
+                  placeholder="John" 
+                  class="auth-input">
+              </div>
+              <div class="error-msg" *ngIf="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched">
+                First name is required
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="reg-lastName">Last Name *</label>
+              <div class="input-wrapper" [class.has-error]="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched">
+                <div class="input-icon-left">
+                  <svg lucideUser size="17"></svg>
+                </div>
+                <input 
+                  id="reg-lastName"
+                  type="text" 
+                  formControlName="lastName" 
+                  placeholder="Doe" 
+                  class="auth-input">
+              </div>
+              <div class="error-msg" *ngIf="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched">
+                Last name is required
+              </div>
+            </div>
+          </div>
+
+          <!-- WORK EMAIL -->
+          <div class="form-group">
+            <label class="form-label" for="reg-email">Work Email *</label>
+            <div class="input-wrapper" [class.has-error]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+              <div class="input-icon-left">
+                <svg lucideMail size="17"></svg>
+              </div>
+              <input 
+                id="reg-email"
+                type="email" 
+                formControlName="email" 
+                placeholder="name@company.com" 
+                autocomplete="email"
+                class="auth-input">
+            </div>
+            <div class="error-msg" *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+              Please enter a valid work email
+            </div>
+          </div>
+
+          <!-- COMPANY NAME -->
+          <div class="form-group">
+            <label class="form-label" for="reg-company">Company Name *</label>
+            <div class="input-wrapper" [class.has-error]="registerForm.get('companyName')?.invalid && registerForm.get('companyName')?.touched">
+              <div class="input-icon-left">
+                <svg lucideBriefcase size="17"></svg>
+              </div>
+              <input 
+                id="reg-company"
+                type="text" 
+                formControlName="companyName" 
+                placeholder="Acme Technologies Inc." 
+                class="auth-input">
+            </div>
+            <div class="error-msg" *ngIf="registerForm.get('companyName')?.invalid && registerForm.get('companyName')?.touched">
+              Company name is required
+            </div>
+          </div>
+
+          <!-- PHONE NUMBER -->
+          <div class="form-group">
+            <label class="form-label" for="reg-phone">Phone Number</label>
+            <div class="input-wrapper">
+              <div class="input-icon-left">
+                <svg lucidePhone size="17"></svg>
+              </div>
+              <input 
+                id="reg-phone"
+                type="tel" 
+                formControlName="phone" 
+                placeholder="+1 (555) 000-0000" 
+                class="auth-input">
+            </div>
+          </div>
+
+          <!-- PASSWORD FIELD -->
+          <div class="form-group">
+            <label class="form-label" for="reg-password">Password *</label>
+            <div class="input-wrapper" [class.has-error]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+              <div class="input-icon-left">
+                <svg lucideLock size="17"></svg>
+              </div>
+              <input 
+                id="reg-password"
+                [type]="showPassword ? 'text' : 'password'" 
+                formControlName="password" 
+                placeholder="Create a secure password (min. 8 chars)" 
+                autocomplete="new-password"
+                class="auth-input">
+              <button 
+                type="button" 
+                class="password-toggle-btn" 
+                (click)="togglePassword()"
+                [title]="showPassword ? 'Hide password' : 'Show password'"
+                tabindex="-1">
+                <svg *ngIf="!showPassword" lucideEye size="18"></svg>
+                <svg *ngIf="showPassword" lucideEyeOff size="18"></svg>
+              </button>
+            </div>
+            <div class="error-msg" *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+              Password must be at least 8 characters
+            </div>
+          </div>
+
+          <!-- TERMS CHECKBOX -->
+          <div class="terms-group">
+            <label class="terms-label">
+              <input type="checkbox" id="terms" formControlName="terms" class="custom-checkbox">
+              <span class="terms-text">
+                I agree to the NEX ERP <a href="#" class="legal-link">Terms & Conditions</a> and <a href="#" class="legal-link">Privacy Policy</a> governing this free trial.
+              </span>
+            </label>
+            <div class="error-msg" *ngIf="registerForm.get('terms')?.invalid && registerForm.get('terms')?.touched">
+              You must accept the terms to continue
+            </div>
+          </div>
+
+          <!-- SUBMIT BUTTON -->
+          <button type="submit" class="auth-submit-btn" [disabled]="isSubmitting()">
+            <span *ngIf="!isSubmitting()" class="btn-content">
+              <span>Start 14-Day Free Trial</span>
+              <svg lucideArrowRight size="18" class="btn-arrow"></svg>
+            </span>
+            <span *ngIf="isSubmitting()" class="btn-loader">
+              <span class="spinner-ring"></span>
+              <span>Creating your workspace...</span>
+            </span>
+          </button>
+
+        </form>
+
+        <!-- CARD FOOTER: LOGIN LINK -->
+        <div class="card-footer">
+          <span class="footer-text">Already have an account?</span>
+          <a class="signup-link" (click)="toggleView()">
+            <span>Log in here</span>
+            <svg lucideArrowRight size="14" class="inline-arrow"></svg>
+          </a>
+        </div>
+
+      </div>
+
+      <!-- TRUST BADGE -->
+      <div class="security-badge mt-3">
+        <svg lucideShieldCheck size="15" class="shield-icon"></svg>
+        <span>Instant Activation • No Credit Card Required</span>
+      </div>
+
+    </div>
+
   </div>
 </div>
 
@@ -110,53 +314,127 @@
 <!-- LOGIN VIEW -->
 <div *ngIf="currentView === 'login'" class="auth-centered">
   
-  <div class="brand-header mb-4 justify-center">
-    <a routerLink="/" title="Back to home">
-      <img src="/logo.png" class="brand-logo" alt="NEX ERP logo">
-    </a>
-  </div>
+  <!-- Ambient background glow elements -->
+  <div class="auth-ambient-glow glow-top-left"></div>
+  <div class="auth-ambient-glow glow-bottom-right"></div>
+  <div class="auth-ambient-glow glow-center"></div>
+  <div class="auth-pattern-overlay"></div>
 
-  <h2 class="fs-2xl mb-4">Sign into your NEX ERP account</h2>
+  <div class="auth-container">
+    <!-- BRAND LOGO & HEADER -->
+    <div class="brand-section">
+      <a routerLink="/" title="Back to home" class="brand-logo-wrap">
+        <img src="/logo.png" class="brand-logo" alt="NEX ERP logo">
+      </a>
 
-  <div class="login-card">
-    <form [formGroup]="loginForm" (ngSubmit)="onLogin()">
-      
-      <div class="form-group">
-        <label class="text-muted fw-medium">Email</label>
-        <input type="email" formControlName="email" [class.error]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched">
-        <div *ngIf="loginForm.get('email')?.invalid && loginForm.get('email')?.touched" class="error-text">Please enter a valid email</div>
-      </div>
-
-      <!-- NEW PASSWORD FIELD -->
-      <div class="form-group mb-6 relative">
-        <label class="text-muted fw-medium">Password</label>
-        <div class="password-wrapper">
-          <input [type]="showPassword ? 'text' : 'password'" formControlName="password" [class.error]="loginForm.get('password')?.invalid && loginForm.get('password')?.touched">
-          <button type="button" class="password-toggle" (click)="togglePassword()">
-            <svg *ngIf="!showPassword" lucideEye size="20" strokeWidth="2" color="#64748b"></svg>
-            <svg *ngIf="showPassword" lucideEyeOff size="20" strokeWidth="2" color="#64748b"></svg>
-          </button>
-        </div>
-        <div *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched" class="error-text">Please enter your password</div>
-        <div class="forgot-row">
-          <a class="link forgot-link" (click)="goToForgotPassword()">Forgot password?</a>
-        </div>
-      </div>
-
-      <button type="submit" class="btn-primary mb-4" [disabled]="isSubmitting()">
-        <span *ngIf="!isSubmitting()">Continue</span>
-        <span *ngIf="isSubmitting()" class="loader"></span>
-      </button>
-
-    </form>
-
-    <div class="text-center">
-      <span class="fs-sm">New user? </span>
-      <a class="link" (click)="toggleView()">Create an account</a>
+      <h1 class="auth-title">Sign into your account</h1>
+      <p class="auth-subtitle">Enter your work credentials to access your workspace</p>
     </div>
-  </div>
 
-  <div class="text-center mt-4 text-muted" style="font-size: 0.75rem; max-width: 400px; line-height: 1.5;">
-    By clicking 'Continue', I accept the NEX ERP <a href="#" class="link">Terms of Service</a> and <a href="#" class="link">Privacy Notice</a>
+    <!-- MAIN LOGIN CARD -->
+    <div class="login-card">
+      <div class="card-accent-bar"></div>
+
+      <form [formGroup]="loginForm" (ngSubmit)="onLogin()" class="login-form">
+        
+        <!-- EMAIL FIELD -->
+        <div class="form-group">
+          <label class="form-label" for="login-email">
+            <span>Work Email</span>
+          </label>
+          <div class="input-wrapper" [class.has-error]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched">
+            <div class="input-icon-left">
+              <svg lucideMail size="18"></svg>
+            </div>
+            <input 
+              id="login-email"
+              type="email" 
+              formControlName="email" 
+              placeholder="name@company.com"
+              autocomplete="email"
+              class="auth-input">
+          </div>
+          <div *ngIf="loginForm.get('email')?.invalid && loginForm.get('email')?.touched" class="error-msg">
+            Please enter a valid work email address
+          </div>
+        </div>
+
+        <!-- PASSWORD FIELD -->
+        <div class="form-group">
+          <label class="form-label" for="login-password">
+            <span>Password</span>
+          </label>
+          <div class="input-wrapper" [class.has-error]="loginForm.get('password')?.invalid && loginForm.get('password')?.touched">
+            <div class="input-icon-left">
+              <svg lucideLock size="18"></svg>
+            </div>
+            <input 
+              id="login-password"
+              [type]="showPassword ? 'text' : 'password'" 
+              formControlName="password" 
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              class="auth-input">
+            <button 
+              type="button" 
+              class="password-toggle-btn" 
+              (click)="togglePassword()" 
+              [title]="showPassword ? 'Hide password' : 'Show password'"
+              tabindex="-1">
+              <svg *ngIf="!showPassword" lucideEye size="18"></svg>
+              <svg *ngIf="showPassword" lucideEyeOff size="18"></svg>
+            </button>
+          </div>
+          <div *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched" class="error-msg">
+            Please enter your password
+          </div>
+        </div>
+
+        <!-- REMEMBER ME & FORGOT PASSWORD ROW -->
+        <div class="auth-options-row">
+          <label class="remember-label">
+            <input type="checkbox" formControlName="rememberMe" class="custom-checkbox">
+            <span class="remember-text">Remember me</span>
+          </label>
+          <a class="forgot-link" (click)="goToForgotPassword()" tabindex="0">Forgot password?</a>
+        </div>
+
+        <!-- SUBMIT BUTTON -->
+        <button type="submit" class="auth-submit-btn" [disabled]="isSubmitting()">
+          <span *ngIf="!isSubmitting()" class="btn-content">
+            <span>Continue to Workspace</span>
+            <svg lucideArrowRight size="18" class="btn-arrow"></svg>
+          </span>
+          <span *ngIf="isSubmitting()" class="btn-loader">
+            <span class="spinner-ring"></span>
+            <span>Signing in...</span>
+          </span>
+        </button>
+
+      </form>
+
+      <!-- CARD FOOTER: CREATE ACCOUNT -->
+      <div class="card-footer">
+        <span class="footer-text">New to NEX ERP?</span>
+        <a class="signup-link" (click)="toggleView()">
+          <span>Create an account</span>
+          <svg lucideArrowRight size="14" class="inline-arrow"></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- SECURITY TRUST BADGE -->
+    <div class="security-badge">
+      <svg lucideShieldCheck size="15" class="shield-icon"></svg>
+      <span>256-bit SSL Encrypted • Single Sign-On Ready</span>
+    </div>
+
+    <!-- LEGAL / TERMS -->
+    <div class="legal-notice">
+      By clicking 'Continue', you agree to NEX ERP's 
+      <a href="#" class="legal-link">Terms of Service</a> and 
+      <a href="#" class="legal-link">Privacy Notice</a>.
+    </div>
+
   </div>
 </div>

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Body, Param, Request, UseGuards, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Request, UseGuards, ParseIntPipe, Query } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -35,6 +35,24 @@ export class SalesController {
   }
 
   // --- Sales Orders & Rentals ---
+  @Patch('quotations/:id')
+  @Permissions('sales/quotations')
+  updateQuotation(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return this.salesService.updateQuotation(req.user.companyId, id, body);
+  }
+
+  @Patch('quotations/:id/status')
+  @Permissions('sales/quotations')
+  updateQuotationStatus(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('status') status: string) {
+    return this.salesService.updateQuotationStatus(req.user.companyId, id, status);
+  }
+
+  @Delete('quotations/:id')
+  @Permissions('sales/quotations')
+  deleteQuotation(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.salesService.deleteQuotation(req.user.companyId, id);
+  }
+
   @Patch('orders/:id/status')
   @Permissions('sales/orders')
   updateOrderStatus(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('status') status: string) {

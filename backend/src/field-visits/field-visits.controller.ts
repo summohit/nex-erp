@@ -71,13 +71,31 @@ export class FieldVisitsController {
     return this.fieldVisitsService.getCompanyRecentVisits(req.user.companyId, limit ? parseInt(limit, 10) : 10);
   }
 
+  @Get('company')
+  getCompanyVisits(
+    @Request() req,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('employeeId') employeeId?: string,
+    @Query('projectId') projectId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.fieldVisitsService.getCompanyVisits(req.user.companyId, {
+      from,
+      to,
+      employeeId: employeeId ? parseInt(employeeId, 10) : undefined,
+      projectId: projectId ? parseInt(projectId, 10) : undefined,
+      status: status || undefined,
+    });
+  }
+
   @Get('project/:projectId')
   getByProject(@Request() req, @Param('projectId', ParseIntPipe) projectId: number) {
     return this.fieldVisitsService.getProjectVisits(projectId, req.user.companyId);
   }
 
   @Get(':id')
-  getOne(@Param('id', ParseIntPipe) id: number) {
-    return this.fieldVisitsService.getVisitById(id);
+  getOne(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.fieldVisitsService.getVisitById(id, req.user.companyId);
   }
 }

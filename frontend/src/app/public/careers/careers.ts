@@ -314,8 +314,18 @@ export class CareersComponent implements OnInit {
     }
   }
 
+  isAnswered(question: string): boolean {
+    return !!(this.answersMap[question] || '').trim();
+  }
+
+  private unansweredQuestions(): string[] {
+    return (this.selectedJob()?.screeningQuestions || []).filter(q => !this.isAnswered(q));
+  }
+
   async submitApplication() {
-    if (!this.candidateForm.fullName || !this.candidateForm.email || !this.candidateForm.phone || !this.candidateForm.resumeUrl) {
+    const missingAnswers = this.unansweredQuestions().length > 0;
+
+    if (!this.candidateForm.fullName || !this.candidateForm.email || !this.candidateForm.phone || !this.candidateForm.resumeUrl || missingAnswers) {
       this.showValidationErrors.set(true);
       
       // Wait a tick for Angular to apply the error classes to the DOM, then scroll to the first error
@@ -334,9 +344,9 @@ export class CareersComponent implements OnInit {
 
     this.isSubmitting.set(true);
 
-    const answersArray = Object.keys(this.answersMap).map(q => ({
+    const answersArray = (job.screeningQuestions || []).map(q => ({
       question: q,
-      answer: this.answersMap[q]
+      answer: (this.answersMap[q] || '').trim()
     }));
 
     const payload = {

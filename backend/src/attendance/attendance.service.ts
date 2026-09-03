@@ -2,10 +2,14 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
 import { haversineKm } from '../common/geo.util';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AttendanceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async getTodayAttendance(userId: number) {
     const employee = await this.prisma.employee.findUnique({ where: { userId } });
@@ -254,10 +258,13 @@ export class AttendanceService {
   }
 
   async requestRegularization(userId: number, data: { date: string, proposedClockIn?: string, proposedClockOut?: string, reason: string }) {
-    const employee = await this.prisma.employee.findUnique({ where: { userId } });
+    const employee = await this.prisma.employee.findUnique({
+      where: { userId },
+      include: { manager: { select: { userId: true } } },
+    });
     if (!employee) throw new BadRequestException('Employee not found');
     const date = new Date(data.date);
-    return this.prisma.attendanceRegularization.create({
+    const created = await this.prisma.attendanceRegularization.create({
       data: {
         employeeId: employee.id,
         date,
@@ -266,6 +273,24 @@ export class AttendanceService {
         reason: data.reason
       }
     });
+
+    // The request lands in a queue nobody polls, so tell the approvers it exists.
+    // Never let a notification failure roll back a saved request.
+    const name = `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim() || 'An employee';
+    await this.notificationsService
+      .notifyApprovers({
+        companyId: employee.companyId,
+        roles: ['SUPERADMIN', 'ADMIN', 'HR'],
+        managerUserId: employee.manager?.userId ?? null,
+        excludeUserId: userId,
+        title: 'Attendance Regularization Request',
+        message: `${name} has requested a correction for ${date.toISOString().split('T')[0]}.`,
+        type: 'ACTION_REQUIRED',
+        linkUrl: '/attendance/approvals',
+      })
+      .catch(() => { /* the request is saved; the alert is best-effort */ });
+
+    return created;
   }
 
   async resolveRegularization(id: number, approverUserId: number, status: string, rejectionReason?: string) {
@@ -300,7 +325,7 @@ export class AttendanceService {
       }
     }
     
-    return this.prisma.attendanceRegularization.update({
+    const updated = await this.prisma.attendanceRegularization.update({
       where: { id },
       data: {
         status,
@@ -308,6 +333,27 @@ export class AttendanceService {
         approvedById: approverUserId
       }
     });
+
+    // Close the loop: the requester has no other way of learning the outcome.
+    const requesterUserId = regularization.employee?.userId;
+    if (requesterUserId && requesterUserId !== approverUserId) {
+      const day = regularization.date.toISOString().split('T')[0];
+      const label = status === 'APPROVED' ? 'approved' : 'rejected';
+      await this.notificationsService
+        .createNotification(
+          requesterUserId,
+          `Regularization ${status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+          rejectionReason
+            ? `Your attendance correction for ${day} was ${label}: ${rejectionReason}`
+            : `Your attendance correction for ${day} was ${label}.`,
+          status === 'APPROVED' ? 'SUCCESS' : 'WARNING',
+          '/attendance/attendance',
+          regularization.employee.companyId,
+        )
+        .catch(() => { /* the decision is recorded; the alert is best-effort */ });
+    }
+
+    return updated;
   }
 
   async getTeamTimeline(companyId: number, startDateStr: string, endDateStr: string) {

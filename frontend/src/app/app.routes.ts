@@ -212,6 +212,14 @@ export const routes: Routes = [
         loadComponent: () => import('./projects/projects').then(m => m.ProjectsComponent)
       },
       {
+        // Shares the projects permission — field visits are always logged
+        // against a project, so anyone who can see projects can see the visits.
+        path: 'field-visits',
+        canActivate: [permissionGuard],
+        data: { module: 'projects' },
+        loadComponent: () => import('./field-visits/field-visits-page').then(m => m.FieldVisitsPageComponent)
+      },
+      {
         path: 'clients',
         canActivate: [permissionGuard],
         data: { module: 'clients' },
@@ -222,6 +230,11 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'clients' },
         loadComponent: () => import('./clients/client-profile/client-profile.component').then(m => m.ClientProfileComponent)
+      },
+      {
+        // Open to every authenticated user — notifications are personal.
+        path: 'notifications',
+        loadComponent: () => import('./notifications/notifications-page').then(m => m.NotificationsPageComponent)
       },
       {
         // Open to every authenticated employee — anyone can raise a ticket.

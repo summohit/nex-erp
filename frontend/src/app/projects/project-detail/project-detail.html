@@ -2802,8 +2802,33 @@
         </div>
       </div>
       <hr class="border-gray-300 my-4">
-      <div class="text-xs text-gray-500 text-center">
-        Activity Log coming soon
+      <div class="activity-log-panel">
+        <div class="activity-log-head">
+          <span>Activity Log</span>
+          <button type="button" class="activity-refresh" (click)="loadActivity()" [disabled]="activityLoading()">
+            {{ activityLoading() ? 'Loading…' : 'Refresh' }}
+          </button>
+        </div>
+
+        <div class="activity-empty" *ngIf="!activityLoading() && activity().length === 0">
+          No activity recorded on this project yet.
+        </div>
+
+        <div class="activity-feed" *ngIf="activity().length > 0">
+          <div class="activity-entry" *ngFor="let a of activity()">
+            <div class="activity-dot"></div>
+            <div class="activity-body">
+              <div class="activity-line">
+                <span class="activity-actor">{{ a.actor?.firstName }} {{ a.actor?.lastName }}</span>
+                <span class="activity-action">{{ formatActivityAction(a) }}</span>
+              </div>
+              <div class="activity-meta">
+                <span class="activity-issue">{{ a.issue?.key }}</span>
+                <span class="activity-time">{{ a.createdAt | date:'MMM d, h:mm a' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

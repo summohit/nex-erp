@@ -44,7 +44,9 @@
             <span class="badge" [ngClass]="{
               'badge-secondary': q.status === 'DRAFT',
               'badge-info': q.status === 'SENT',
-              'badge-success': q.status === 'ACCEPTED'
+              'badge-success': q.status === 'ACCEPTED',
+              'badge-warning': q.status === 'PENDING_APPROVAL',
+              'badge-danger': q.status === 'REJECTED'
             }">{{q.status}}</span>
           </td>
           <td class="actions-cell text-right">
@@ -53,6 +55,24 @@
             </button>
             <button class="btn-action" *ngIf="q.approvalStatus === 'APPROVED' && q.status !== 'ACCEPTED'" (click)="convertToOrder(q.id)">
               Convert to Order <svg lucideArrowRight size="14"></svg>
+            </button>
+
+            <!-- SENT and REJECTED were unreachable until now. -->
+            <button
+              *ngFor="let st of nextQuoteStatuses(q)"
+              class="btn-quote-move"
+              [class.is-reject]="st === 'REJECTED'"
+              [disabled]="busyQuoteId === q.id"
+              (click)="setQuoteStatus(q, st)">
+              {{ st === 'REJECTED' ? 'Reject' : st === 'DRAFT' ? 'Reopen' : 'Mark ' + (st | titlecase) }}
+            </button>
+
+            <button
+              *ngIf="canDeleteQuote(q)"
+              class="btn-quote-move is-reject"
+              [disabled]="busyQuoteId === q.id"
+              (click)="deleteQuote(q)">
+              Delete
             </button>
           </td>
         </tr>

@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, ViewChild, OnDestroy } from '@angular/core';
+import { Component, inject, signal, effect, OnInit, ViewChild, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd, RouterModule } from '@angular/router';
@@ -12,7 +12,8 @@ import { SpotlightSearchComponent } from '../../shared/components/spotlight-sear
 import {
   LucideSearch, LucideBell, LucideUser, LucideLogOut,
   LucideSettings, LucideCheck, LucideChevronDown, LucideX, LucideKanban, LucideClock,
-  LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket
+  LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket,
+  LucideArrowRight
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
@@ -26,7 +27,8 @@ import { HotToastService } from '@ngneat/hot-toast';
     SpotlightSearchComponent,
     LucideSearch, LucideBell, LucideUser, LucideLogOut,
     LucideChevronDown, LucideX, LucideKanban, LucideClock,
-    LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket
+    LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket,
+    LucideArrowRight
   ],
   templateUrl: './header.html',
   styleUrls: ['./header.css']
@@ -68,9 +70,19 @@ export class HeaderComponent implements OnInit, OnDestroy {
   // who are the ones expected to act on incoming tickets.
   canSeeTicketAlerts = signal<boolean>(false);
   openTicketCount = signal<number>(0);
-  hasNewTickets = signal<boolean>(false);
-  private ticketPollInterval: any;
-  private readonly ticketSeenKey = 'tickets_last_seen_count';
+
+  /**
+   * Ticket events now produce real notifications, so an arriving notification is
+   * the cue that the open count may have moved. This replaces the old 60-second
+   * poll and reacts faster than it did. Declared as a field so it runs inside
+   * the injection context — effect() throws NG0203 from ngOnInit.
+   */
+  private seenNotificationCount = 0;
+  private notificationWatcher = effect(() => {
+    const count = this.notificationsService.notifications().length;
+    if (count > this.seenNotificationCount) this.refreshTicketCount();
+    this.seenNotificationCount = count;
+  });
 
   ngOnInit() {
     this.updateTitle(this.router.url);
@@ -78,8 +90,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
       filter(event => event instanceof NavigationEnd)
     ).subscribe((event: any) => {
       this.updateTitle(event.urlAfterRedirects);
-      // Visiting the helpdesk counts as acknowledging what's there now.
-      if (event.urlAfterRedirects?.startsWith('/crm/tickets')) this.acknowledgeTickets();
+      // Leaving the helpdesk is when the count is most likely stale.
+      if (event.urlAfterRedirects?.startsWith('/crm/tickets')) this.refreshTicketCount();
     });
 
     this.checkTodayAttendance();
@@ -88,7 +100,6 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     if (this.timerInterval) clearInterval(this.timerInterval);
-    if (this.ticketPollInterval) clearInterval(this.ticketPollInterval);
   }
 
   // ─── Ticket alerts ─────────────────────────────────────────────────────────
@@ -99,32 +110,17 @@ export class HeaderComponent implements OnInit, OnDestroy {
         if (!p.canManage) return;
         this.canSeeTicketAlerts.set(true);
         this.refreshTicketCount();
-        // Light poll so an incoming ticket surfaces without a page reload.
-        this.ticketPollInterval = setInterval(() => this.refreshTicketCount(), 60_000);
       },
       error: () => { /* helpdesk unavailable — leave the indicator hidden */ },
     });
   }
 
   private refreshTicketCount() {
+    if (!this.canSeeTicketAlerts()) return;
     this.ticketService.getStats().subscribe({
-      next: (s) => {
-        const open = s.open ?? 0;
-        this.openTicketCount.set(open);
-
-        const lastSeen = Number(localStorage.getItem(this.ticketSeenKey) ?? '0');
-        this.hasNewTickets.set(open > lastSeen);
-
-        // Already on the helpdesk? Treat it as seen straight away.
-        if (this.router.url.startsWith('/crm/tickets')) this.acknowledgeTickets();
-      },
+      next: (s) => this.openTicketCount.set(s.open ?? 0),
       error: () => { /* keep the last known count */ },
     });
-  }
-
-  private acknowledgeTickets() {
-    localStorage.setItem(this.ticketSeenKey, String(this.openTicketCount()));
-    this.hasNewTickets.set(false);
   }
 
   checkTodayAttendance() {

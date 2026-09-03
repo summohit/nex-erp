@@ -92,7 +92,7 @@ export class CrmController {
     if (data.addedById !== undefined) data.addedById = data.addedById ? parseInt(data.addedById, 10) : null;
     if (data.assignedToId !== undefined) data.assignedToId = data.assignedToId ? parseInt(data.assignedToId, 10) : null;
     if (data.broughtByContactId !== undefined) data.broughtByContactId = data.broughtByContactId ? parseInt(data.broughtByContactId, 10) : null;
-    return this.crmService.updateLead(req.user.companyId, id, data);
+    return this.crmService.updateLead(req.user.companyId, id, data, req.user.employeeId);
   }
 
   @Delete('leads/:id')

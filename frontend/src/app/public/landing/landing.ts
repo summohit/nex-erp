@@ -1,4 +1,4 @@
-import { Component, signal, AfterViewInit, OnDestroy, ElementRef } from '@angular/core';
+import { Component, signal, AfterViewInit, OnDestroy, ElementRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
@@ -36,7 +36,8 @@ import {
   LucideHelpCircle,
   LucideFolderKanban,
   LucideEye,
-  LucideUserPlus
+  LucideUserPlus,
+  LucideQrCode
 } from '@lucide/angular';
 
 interface FeatureCard {
@@ -103,14 +104,25 @@ interface FaqItem {
     LucideHelpCircle,
     LucideFolderKanban,
     LucideEye,
-    LucideUserPlus
+    LucideUserPlus,
+    LucideQrCode
   ],
   templateUrl: './landing.html',
   styleUrls: ['./landing.css']
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
   mobileNavOpen = signal(false);
+  isScrolled = signal(false);
+  activeSection = signal<string>('');
   heroSelectedModule = signal<'crm' | 'attendance' | 'payroll' | 'recruitment' | 'projects'>('crm');
+
+  @HostListener('window:scroll')
+  onWindowScroll() {
+    if (typeof window !== 'undefined') {
+      this.isScrolled.set(window.scrollY > 20);
+      this.updateActiveSectionOnScroll();
+    }
+  }
   activeModuleTab = signal<'crm' | 'attendance' | 'payroll' | 'recruitment' | 'projects'>('crm');
   activeFaq = signal<number | null>(0);
   billingCycle = signal<'monthly' | 'yearly'>('yearly');
@@ -143,6 +155,9 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit() {
     this.initScrollAnimations();
     this.probeAndroidBuild();
+    if (typeof window !== 'undefined') {
+      this.updateActiveSectionOnScroll();
+    }
   }
 
   ngOnDestroy() {
@@ -224,7 +239,39 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   scrollTo(sectionId: string) {
     this.closeMobileNav();
+    this.activeSection.set(sectionId);
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  private updateActiveSectionOnScroll() {
+    if (typeof window === 'undefined') return;
+
+    // Scrolled near top hero
+    if (window.scrollY < 300) {
+      this.activeSection.set('');
+      return;
+    }
+
+    // Scrolled near the bottom of page
+    const isAtBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100);
+    if (isAtBottom) {
+      this.activeSection.set('faq');
+      return;
+    }
+
+    const sectionIds = ['tour', 'modules', 'mobile', 'why', 'faq'];
+    const navOffset = 130;
+
+    for (const id of sectionIds) {
+      const el = document.getElementById(id);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= navOffset && rect.bottom > navOffset) {
+          this.activeSection.set(id);
+          return;
+        }
+      }
+    }
   }
 
   setModuleTab(tab: 'crm' | 'attendance' | 'payroll' | 'recruitment' | 'projects') {

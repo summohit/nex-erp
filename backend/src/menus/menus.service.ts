@@ -92,6 +92,21 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Sales menu auto-seeded successfully.');
         }
         
+        const fieldVisitsMenu = await this.prisma.menu.findFirst({ where: { title: 'Field Visits', parentId: parent.id } });
+        if (!fieldVisitsMenu) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Field Visits',
+              icon: 'map-pin',
+              route: '/field-visits',
+              displayOrder: 9,
+              parentId: parent.id,
+              isActive: true,
+            },
+          });
+          this.logger.log('Field Visits menu auto-seeded successfully.');
+        }
+
         // Tickets is reached from the header (next to Create), not the sidebar.
         // Deactivate any Tickets rows left behind by earlier seeds.
         const { count: deactivated } = await this.prisma.menu.updateMany({
@@ -227,6 +242,10 @@ export class MenusService implements OnModuleInit {
     allowedModules.add('employees/me/profile');
     allowedModules.add('dashboard');
     allowedModules.add('crm/tickets');
+
+    // Field Visits rides on the projects permission — a visit is always logged
+    // against a project, so there is no separate module for an admin to grant.
+    if (allowedModules.has('projects')) allowedModules.add('field-visits');
 
     // If role has NO permissions defined yet, apply a safe default fallback
     if (rolePermissions.length === 0) {

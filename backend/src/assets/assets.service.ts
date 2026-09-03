@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AssetsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   // ==========================================
   // 1. ASSET INVENTORY
@@ -281,7 +285,7 @@ export class AssetsService {
 
     const imagesStr = data.images && data.images.length > 0 ? (Array.isArray(data.images) ? JSON.stringify(data.images) : data.images) : null;
 
-    return this.prisma.hardwareRequest.create({
+    const created = await this.prisma.hardwareRequest.create({
       data: {
         companyId,
         employeeId: employee.id,
@@ -293,6 +297,22 @@ export class AssetsService {
         status: 'PENDING'
       }
     });
+
+    const name = `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim() || 'An employee';
+    const urgent = (data.urgency || '').toUpperCase() === 'HIGH';
+    await this.notificationsService
+      .notifyApprovers({
+        companyId,
+        roles: ['SUPERADMIN', 'ADMIN', 'HR'],
+        excludeUserId: userId,
+        title: urgent ? 'Urgent Hardware Request' : 'New Hardware Request',
+        message: `${name} requested ${(data.category || 'hardware').toLowerCase()}: ${data.reason}`,
+        type: 'ACTION_REQUIRED',
+        linkUrl: '/assets/requests',
+      })
+      .catch(() => { /* the request is saved; the alert is best-effort */ });
+
+    return created;
   }
 
   async updateHardwareRequest(companyId: number, id: number, userId: number, data: { requestType?: string; category?: string; urgency?: string; reason?: string; images?: string[] }) {
@@ -375,6 +395,24 @@ export class AssetsService {
         conditionOnAssign: 'GOOD',
         notes: `Fulfilled via Hardware Request #${request.id}`
       });
+    }
+
+    // Tell the requester what happened — the request list is the only other
+    // place this shows up, and nobody refreshes it on the off chance.
+    if (request.employee.userId && request.employee.userId !== userId) {
+      const item = `${request.category || 'hardware'} request`.toLowerCase();
+      const copy: Record<string, { title: string; body: string; type: string }> = {
+        APPROVED:  { title: 'Hardware Request Approved',  body: `Your ${item} has been approved.`, type: 'SUCCESS' },
+        REJECTED:  { title: 'Hardware Request Rejected',  body: `Your ${item} was rejected.`,      type: 'WARNING' },
+        FULFILLED: { title: 'Hardware Request Fulfilled', body: `Your ${item} has been fulfilled and the asset assigned to you.`, type: 'SUCCESS' },
+      };
+      const entry = copy[data.status];
+      if (entry) {
+        const body = data.rejectionReason ? `${entry.body} Reason: ${data.rejectionReason}` : entry.body;
+        await this.notificationsService
+          .createNotification(request.employee.userId, entry.title, body, entry.type, '/assets/requests', companyId)
+          .catch(() => { /* the decision is recorded; the alert is best-effort */ });
+      }
     }
 
     return updated;

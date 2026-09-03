@@ -5,9 +5,10 @@ import { LeadFormsService } from './lead-forms.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CrmModule } from '../crm/crm.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [PrismaModule, CrmModule, PermissionsModule],
+  imports: [PrismaModule, CrmModule, PermissionsModule, MailModule],
   controllers: [LeadFormsController, PublicLeadFormController],
   providers: [LeadFormsService],
   exports: [LeadFormsService],

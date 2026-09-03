@@ -189,7 +189,67 @@ export class FieldVisitsService {
     });
   }
 
-  async getVisitById(visitId: number) {
+  /**
+   * Company-wide visit log with filters, for the web Field Visits page.
+   * Returns the rows plus a summary computed over the SAME filter set, so the
+   * KPI cards always describe what the table is showing.
+   */
+  async getCompanyVisits(
+    companyId: number,
+    filters: {
+      from?: string;
+      to?: string;
+      employeeId?: number;
+      projectId?: number;
+      status?: string;
+    },
+  ) {
+    const where: any = { companyId };
+
+    if (filters.employeeId) where.employeeId = filters.employeeId;
+    if (filters.projectId) where.projectId = filters.projectId;
+    if (filters.status) where.status = filters.status;
+
+    if (filters.from || filters.to) {
+      where.startTime = {};
+      if (filters.from) where.startTime.gte = new Date(filters.from);
+      if (filters.to) {
+        // `to` arrives as a plain date; include the whole of that day.
+        const end = new Date(filters.to);
+        end.setHours(23, 59, 59, 999);
+        where.startTime.lte = end;
+      }
+    }
+
+    const visits = await this.prisma.fieldVisit.findMany({
+      where,
+      orderBy: { startTime: 'desc' },
+      include: {
+        employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        project: { select: { id: true, name: true, key: true, color: true } },
+        photos: { select: { id: true, url: true, takenAt: true, caption: true } },
+      },
+    });
+
+    const completed = visits.filter((v) => v.status === 'COMPLETED');
+
+    return {
+      visits,
+      summary: {
+        total: visits.length,
+        active: visits.filter((v) => v.status === 'IN_PROGRESS').length,
+        completed: completed.length,
+        cancelled: visits.filter((v) => v.status === 'CANCELLED').length,
+        totalDistanceKm: completed.reduce((sum, v) => sum + (v.distanceKm ?? 0), 0),
+        totalDurationMins: completed.reduce((sum, v) => sum + (v.durationMins ?? 0), 0),
+        photoCount: visits.reduce((sum, v) => sum + v.photos.length, 0),
+        // Distinct people who actually went out in this window.
+        employeesOut: new Set(visits.map((v) => v.employeeId)).size,
+      },
+    };
+  }
+
+  async getVisitById(visitId: number, companyId: number) {
     const visit = await this.prisma.fieldVisit.findUnique({
       where: { id: visitId },
       include: {
@@ -198,7 +258,9 @@ export class FieldVisitsService {
         photos: { orderBy: { takenAt: 'asc' } },
       },
     });
-    if (!visit) throw new NotFoundException('Field visit not found');
+    // Same 404 for "missing" and "another company's" — an id probe should not be
+    // able to tell the two apart.
+    if (!visit || visit.companyId !== companyId) throw new NotFoundException('Field visit not found');
     return visit;
   }
 }

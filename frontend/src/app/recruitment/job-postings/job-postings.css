@@ -492,6 +492,45 @@ select.form-control:disabled {
   border: 1px solid #c7d2fe;
 }
 
+/* Standard question picker */
+.q-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 6px 18px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.q-library-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 5px 2px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #475569;
+  cursor: pointer;
+  border-radius: 7px;
+  transition: color 0.15s ease;
+}
+
+.q-library-option:hover { color: #0f172a; }
+
+.q-library-option input {
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  accent-color: #2563eb;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.q-library-option input:checked + span {
+  color: #0f172a;
+  font-weight: 600;
+}
+
 /* Question List & Items */
 .questions-list {
   display: flex;

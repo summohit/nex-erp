@@ -253,6 +253,58 @@ export class QuotationsComponent implements OnInit {
     });
   }
 
+  /** Mirrors the server's transition table so only valid moves are offered. */
+  private readonly quoteStatusFlow: Record<string, string[]> = {
+    DRAFT: ['SENT', 'REJECTED'],
+    PENDING_APPROVAL: ['SENT', 'REJECTED'],
+    SENT: ['ACCEPTED', 'REJECTED'],
+    REJECTED: ['DRAFT'],
+    ACCEPTED: [],
+  };
+
+  private readonly quoteEditable = ['DRAFT', 'PENDING_APPROVAL', 'SENT', 'REJECTED'];
+
+  busyQuoteId: number | null = null;
+
+  nextQuoteStatuses(q: any): string[] {
+    return this.quoteStatusFlow[q?.status] ?? [];
+  }
+
+  canEditQuote(q: any): boolean {
+    return this.quoteEditable.includes(q?.status);
+  }
+
+  canDeleteQuote(q: any): boolean {
+    return q?.status !== 'ACCEPTED';
+  }
+
+  setQuoteStatus(q: any, status: string) {
+    this.busyQuoteId = q.id;
+    this.http.patch(`${environment.apiUrl}/sales/quotations/${q.id}/status`, { status })
+      .subscribe({
+        next: () => { this.busyQuoteId = null; this.loadQuotations(); },
+        error: (err) => {
+          this.busyQuoteId = null;
+          this.dialog.error(err?.error?.message || 'Could not update the quotation.');
+        },
+      });
+  }
+
+  async deleteQuote(q: any) {
+    const ok = await this.dialog.confirm(
+      `Delete quotation ${q.quoteNumber}? This cannot be undone.`, 'Delete Quotation', 'Delete');
+    if (!ok) return;
+
+    this.busyQuoteId = q.id;
+    this.http.delete(`${environment.apiUrl}/sales/quotations/${q.id}`).subscribe({
+      next: () => { this.busyQuoteId = null; this.loadQuotations(); },
+      error: (err) => {
+        this.busyQuoteId = null;
+        this.dialog.error(err?.error?.message || 'Could not delete the quotation.');
+      },
+    });
+  }
+
   approveQuote(id: number) {
     this.http.put(`${environment.apiUrl}/sales/quotations/${id}/approve`, {}).subscribe(() => this.loadQuotations());
   }

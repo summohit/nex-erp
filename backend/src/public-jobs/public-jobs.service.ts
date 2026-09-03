@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface PublicJob {
@@ -144,6 +144,23 @@ export class PublicJobsService {
       throw new ConflictException('You have already applied for this position with this email.');
     }
 
+    // Screening questions are mandatory. Validate here as well as in the form —
+    // the apply endpoint is public, so anything client-side can be skipped.
+    const questions = this.parseScreeningQuestions(job.screeningQuestions);
+    const submitted = new Map(
+      (dto.answers || []).map((a) => [a.question, (a.answer || '').trim()]),
+    );
+    const unanswered = questions.filter((q) => !submitted.get(q));
+    if (unanswered.length > 0) {
+      throw new BadRequestException(
+        `Please answer all screening questions: ${unanswered.join(' | ')}`,
+      );
+    }
+
+    // Rebuild from the job's own question list so a crafted payload cannot store
+    // extra question/answer pairs that were never asked.
+    const answers = questions.map((q) => ({ question: q, answer: submitted.get(q)! }));
+
     const application = await this.prisma.jobApplication.create({
       data: {
         jobId: job.id,
@@ -157,7 +174,7 @@ export class PublicJobsService {
         experienceYears: dto.experienceYears,
         noticePeriod: dto.noticePeriod,
         skills: Array.isArray(dto.skills) ? dto.skills : [],
-        answers: dto.answers ? JSON.stringify(dto.answers) : null,
+        answers: answers.length > 0 ? JSON.stringify(answers) : null,
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null,
         gender: dto.gender,
         currentLocation: dto.currentLocation,
@@ -176,15 +193,27 @@ export class PublicJobsService {
     };
   }
 
-  private mapToPublicJob(j: any): PublicJob {
-    let questions: string[] = [];
-    if (j.screeningQuestions) {
-      try {
-        questions = JSON.parse(j.screeningQuestions);
-      } catch (e) {
-        questions = [j.screeningQuestions];
-      }
+  /**
+   * `screeningQuestions` is a JSON array of strings, but older rows hold a bare
+   * string. Tolerate both, and drop blanks so an empty entry never becomes a
+   * question nobody can answer.
+   */
+  private parseScreeningQuestions(raw: string | null): string[] {
+    if (!raw) return [];
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = [raw];
     }
+    if (!Array.isArray(parsed)) parsed = [parsed];
+    return (parsed as unknown[])
+      .map((q) => (typeof q === 'string' ? q.trim() : ''))
+      .filter((q) => q.length > 0);
+  }
+
+  private mapToPublicJob(j: any): PublicJob {
+    const questions = this.parseScreeningQuestions(j.screeningQuestions);
     const publicJob: PublicJob = {
       id: j.id,
       title: j.title,

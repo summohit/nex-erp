@@ -4,9 +4,10 @@ import { SalesService } from './sales.service';
 
 import { PrismaModule } from '../prisma/prisma.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, PermissionsModule],
+  imports: [PrismaModule, PermissionsModule, NotificationsModule],
   controllers: [SalesController],
   providers: [SalesService],
   exports: [SalesService]

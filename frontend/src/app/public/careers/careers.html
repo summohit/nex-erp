@@ -302,11 +302,16 @@
                 <svg lucideHelpCircle size="18" class="text-orange"></svg>
                 <h5>Screening Questions</h5>
               </div>
-              <p class="sq-help">Please answer the questions below to complete your application.</p>
+              <p class="sq-help">All questions below are required to complete your application.</p>
 
               <div *ngFor="let q of job.screeningQuestions; let idx = index" class="sq-item">
-                <label>{{ idx + 1 }}. {{ q }}</label>
-                <textarea class="form-control sq-textarea" [(ngModel)]="answersMap[q]" placeholder="Type your answer here..."></textarea>
+                <label>{{ idx + 1 }}. {{ q }} <span class="required">*</span></label>
+                <textarea
+                  class="form-control sq-textarea"
+                  [class.input-error]="showValidationErrors() && !isAnswered(q)"
+                  [(ngModel)]="answersMap[q]"
+                  placeholder="Type your answer here..."></textarea>
+                <span class="error-text" *ngIf="showValidationErrors() && !isAnswered(q)">This answer is required</span>
               </div>
             </div>
 

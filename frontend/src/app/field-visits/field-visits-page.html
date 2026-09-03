@@ -1,0 +1,307 @@
+<div class="fv-page">
+
+  <!-- Header -->
+  <div class="page-header-card">
+    <div>
+      <div class="header-title-row">
+        <h1>Field Visits</h1>
+        <span class="live-pill" *ngIf="summary().active > 0">
+          <span class="live-dot"></span>{{ summary().active }} out now
+        </span>
+      </div>
+      <p>Every visit logged from the mobile app, across all projects.</p>
+    </div>
+
+    <div class="header-actions-group">
+      <button class="btn-secondary" (click)="resetFilters()" *ngIf="hasActiveFilters()">
+        <svg lucideRotateCcw [size]="15"></svg>
+        <span>Reset</span>
+      </button>
+      <button class="btn-secondary" (click)="load()" title="Refresh">
+        <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading()"></svg>
+        <span>Refresh</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- KPIs — computed over the same filters as the table below -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon ic-blue"><svg lucideMapPin [size]="17"></svg></div>
+      <div>
+        <div class="kpi-value" *ngIf="!isLoading()">{{ summary().total }}</div>
+        <app-skeleton *ngIf="isLoading()" width="46px" height="20px"></app-skeleton>
+        <div class="kpi-label">Total visits</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon ic-green"><svg lucideCheckCircle [size]="17"></svg></div>
+      <div>
+        <div class="kpi-value" *ngIf="!isLoading()">{{ summary().completed }}</div>
+        <app-skeleton *ngIf="isLoading()" width="46px" height="20px"></app-skeleton>
+        <div class="kpi-label">Completed</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon ic-orange"><svg lucideRuler [size]="17"></svg></div>
+      <div>
+        <div class="kpi-value" *ngIf="!isLoading()">{{ summary().totalDistanceKm | number:'1.0-1' }} km</div>
+        <app-skeleton *ngIf="isLoading()" width="70px" height="20px"></app-skeleton>
+        <div class="kpi-label">Distance · avg {{ avgDistance() | number:'1.0-1' }} km</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon ic-purple"><svg lucideClock [size]="17"></svg></div>
+      <div>
+        <div class="kpi-value" *ngIf="!isLoading()">{{ totalHours() | number:'1.0-1' }} h</div>
+        <app-skeleton *ngIf="isLoading()" width="60px" height="20px"></app-skeleton>
+        <div class="kpi-label">Time on the road</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon ic-teal"><svg lucideUsers [size]="17"></svg></div>
+      <div>
+        <div class="kpi-value" *ngIf="!isLoading()">{{ summary().employeesOut }}</div>
+        <app-skeleton *ngIf="isLoading()" width="46px" height="20px"></app-skeleton>
+        <div class="kpi-label">People out</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon ic-pink"><svg lucideCamera [size]="17"></svg></div>
+      <div>
+        <div class="kpi-value" *ngIf="!isLoading()">{{ summary().photoCount }}</div>
+        <app-skeleton *ngIf="isLoading()" width="46px" height="20px"></app-skeleton>
+        <div class="kpi-label">Photos captured</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-card">
+    <div class="chip-row">
+      <button
+        class="chip"
+        *ngFor="let r of ranges"
+        [class.active]="range() === r.key"
+        (click)="applyRange(r.key)">
+        {{ r.label }}
+      </button>
+    </div>
+
+    <div class="filter-row">
+      <div class="search-wrap">
+        <svg lucideSearch [size]="15"></svg>
+        <input
+          type="text"
+          placeholder="Search person, project, purpose, address or notes…"
+          [ngModel]="search()"
+          (ngModelChange)="search.set($event)" />
+      </div>
+
+      <select [ngModel]="employeeId()" (ngModelChange)="employeeId.set($event); load()">
+        <option [ngValue]="null">All employees</option>
+        <option *ngFor="let e of employees()" [ngValue]="e.id">{{ e.label }}</option>
+      </select>
+
+      <select [ngModel]="projectId()" (ngModelChange)="projectId.set($event); load()">
+        <option [ngValue]="null">All projects</option>
+        <option *ngFor="let p of projects()" [ngValue]="p.id">{{ p.label }}</option>
+      </select>
+
+      <select [ngModel]="status()" (ngModelChange)="status.set($event); load()">
+        <option value="">Any status</option>
+        <option value="IN_PROGRESS">In progress</option>
+        <option value="COMPLETED">Completed</option>
+        <option value="CANCELLED">Cancelled</option>
+      </select>
+
+      <div class="date-pair">
+        <input type="date" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event); onCustomDateChange()" />
+        <span class="date-sep">to</span>
+        <input type="date" [ngModel]="toDate()" (ngModelChange)="toDate.set($event); onCustomDateChange()" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="fv-table" *ngIf="isLoading()">
+      <div class="fv-row fv-head">
+        <span>Employee</span><span>Project</span><span>Started</span>
+        <span>Duration</span><span>Distance</span><span>Route</span><span>Status</span>
+      </div>
+      <div class="fv-row" *ngFor="let r of [1,2,3,4,5,6,7,8]">
+        <app-skeleton width="70%" height="12px"></app-skeleton>
+        <app-skeleton width="60%" height="12px"></app-skeleton>
+        <app-skeleton width="80%" height="12px"></app-skeleton>
+        <app-skeleton width="50%" height="12px"></app-skeleton>
+        <app-skeleton width="50%" height="12px"></app-skeleton>
+        <app-skeleton width="60%" height="12px"></app-skeleton>
+        <app-skeleton width="72px" height="18px" radius="9px"></app-skeleton>
+      </div>
+    </div>
+
+    <div *ngIf="!isLoading()">
+      <div class="empty-state" *ngIf="filteredVisits().length === 0">
+        <svg lucideMapPin [size]="34"></svg>
+        <h3>No field visits</h3>
+        <p>
+          {{ hasActiveFilters()
+              ? 'Nothing matches these filters. Try widening the date range.'
+              : 'When someone starts a visit from the mobile app, it will show up here.' }}
+        </p>
+      </div>
+
+      <div class="fv-table" *ngIf="filteredVisits().length > 0">
+        <div class="fv-row fv-head">
+          <span>Employee</span><span>Project</span><span>Started</span>
+          <span>Duration</span><span>Distance</span><span>Route</span><span>Status</span>
+        </div>
+
+        <div
+          class="fv-row fv-body-row"
+          *ngFor="let v of filteredVisits()"
+          (click)="openVisit(v)">
+          <div class="cell-employee">
+            <img *ngIf="v.employee?.avatarUrl" [src]="v.employee?.avatarUrl" class="avatar" alt="" />
+            <span *ngIf="!v.employee?.avatarUrl" class="avatar avatar-fallback">{{ initials(v) }}</span>
+            <span class="cell-name">{{ v.employee?.firstName }} {{ v.employee?.lastName }}</span>
+          </div>
+
+          <span class="cell-project">
+            <span class="project-dot" [style.background]="v.project?.color || '#94a3b8'"></span>
+            {{ v.project?.name || '—' }}
+          </span>
+
+          <span class="cell-muted">{{ v.startTime | date:'MMM d · h:mm a' }}</span>
+          <span class="cell-num">{{ v.durationMins != null ? v.durationMins + ' min' : '—' }}</span>
+          <span class="cell-num">{{ v.distanceKm != null ? (v.distanceKm | number:'1.1-2') + ' km' : '—' }}</span>
+          <span class="cell-muted">{{ pointCount(v) }} pts · {{ v.photos?.length || 0 }} photos</span>
+
+          <span class="status-tag" [ngClass]="statusClass(v.status)">
+            {{ v.status === 'IN_PROGRESS' ? 'In progress' : (v.status === 'COMPLETED' ? 'Completed' : 'Cancelled') }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Detail drawer -->
+<div class="drawer-backdrop" *ngIf="selected() as visit" (click)="closeVisit()">
+  <aside class="drawer" (click)="$event.stopPropagation()">
+    <div class="drawer-accent" [ngClass]="statusClass(visit.status)"></div>
+
+    <header class="drawer-header">
+      <div class="drawer-person">
+        <img *ngIf="visit.employee?.avatarUrl" [src]="visit.employee?.avatarUrl" class="avatar-lg" alt="" />
+        <span *ngIf="!visit.employee?.avatarUrl" class="avatar-lg avatar-fallback">{{ initials(visit) }}</span>
+        <div>
+          <div class="drawer-name">{{ visit.employee?.firstName }} {{ visit.employee?.lastName }}</div>
+          <div class="drawer-sub">{{ visit.startTime | date:'EEE, MMM d, y' }}</div>
+        </div>
+      </div>
+      <div class="drawer-header-right">
+        <span class="status-tag" [ngClass]="statusClass(visit.status)">
+          {{ visit.status === 'IN_PROGRESS' ? 'In progress' : (visit.status === 'COMPLETED' ? 'Completed' : 'Cancelled') }}
+        </span>
+        <button class="btn-icon" (click)="closeVisit()"><svg lucideX [size]="17"></svg></button>
+      </div>
+    </header>
+
+    <div class="drawer-body">
+      <a class="project-link" *ngIf="visit.project" [routerLink]="['/projects', visit.projectId]">
+        <span class="project-dot" [style.background]="visit.project.color || '#94a3b8'"></span>
+        {{ visit.project.name }}
+        <svg lucideExternalLink [size]="13"></svg>
+      </a>
+
+      <div class="section" *ngIf="visit.purpose">
+        <div class="section-label">Purpose</div>
+        <div class="section-text">{{ visit.purpose }}</div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <svg lucideRuler [size]="16" class="ic-blue-text"></svg>
+          <div class="metric-value">{{ visit.distanceKm != null ? (visit.distanceKm | number:'1.1-2') : '—' }}</div>
+          <div class="metric-label">Kilometers</div>
+        </div>
+        <div class="metric">
+          <svg lucideClock [size]="16" class="ic-orange-text"></svg>
+          <div class="metric-value">{{ visit.durationMins != null ? visit.durationMins : '—' }}</div>
+          <div class="metric-label">Minutes</div>
+        </div>
+        <div class="metric">
+          <svg lucideNavigation [size]="16" class="ic-purple-text"></svg>
+          <div class="metric-value">{{ pointCount(visit) }}</div>
+          <div class="metric-label">GPS points</div>
+        </div>
+      </div>
+
+      <div class="section-label">Route</div>
+      <div class="route">
+        <div class="route-leg">
+          <div class="route-rail">
+            <span class="route-dot dot-start"></span>
+            <span class="route-line"></span>
+          </div>
+          <div class="route-content">
+            <div class="route-head">
+              <span class="route-time">
+                {{ visit.startTime | date:'h:mm a' }} <span class="route-tag">· Started</span>
+              </span>
+              <a [href]="mapUrl(visit.startLat, visit.startLng)" target="_blank" rel="noopener" class="map-link">Map ›</a>
+            </div>
+            <div class="route-address">{{ visit.startAddress || (visit.startLat + ', ' + visit.startLng) }}</div>
+          </div>
+        </div>
+
+        <div class="route-leg">
+          <div class="route-rail">
+            <span class="route-dot" [class.dot-end]="visit.endTime" [class.dot-pending]="!visit.endTime"></span>
+          </div>
+          <div class="route-content">
+            <div class="route-head">
+              <span class="route-time">
+                {{ visit.endTime ? (visit.endTime | date:'h:mm a') : '—' }}
+                <span class="route-tag">· {{ visit.status === 'CANCELLED' ? 'Cancelled' : (visit.endTime ? 'Ended' : 'In progress') }}</span>
+              </span>
+              <a *ngIf="visit.endLat != null" [href]="mapUrl(visit.endLat, visit.endLng)" target="_blank" rel="noopener" class="map-link">Map ›</a>
+            </div>
+            <div class="route-address">
+              {{ visit.endAddress || (visit.endLat != null ? (visit.endLat + ', ' + visit.endLng) : 'Not recorded yet') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" *ngIf="visit.notes">
+        <div class="section-label">Notes</div>
+        <div class="notes-box">
+          <svg lucideFileText [size]="14"></svg>
+          <span>{{ visit.notes }}</span>
+        </div>
+      </div>
+
+      <div class="section" *ngIf="visit.photos && visit.photos.length > 0">
+        <div class="section-label">Photos ({{ visit.photos.length }})</div>
+        <div class="photo-grid">
+          <div *ngFor="let photo of visit.photos">
+            <a [href]="photo.url" target="_blank" rel="noopener" class="photo-link">
+              <img [src]="photo.url" alt="" />
+            </a>
+            <div class="photo-caption" *ngIf="photo.caption">{{ photo.caption }}</div>
+            <div class="photo-time">{{ photo.takenAt | date:'h:mm a' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>

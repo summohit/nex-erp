@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CrmService {
-  constructor(private prisma: PrismaService, private permissionsService: PermissionsService) {}
+  constructor(
+    private prisma: PrismaService,
+    private permissionsService: PermissionsService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   private async logActivity(
     companyId: number,
@@ -70,6 +75,17 @@ export class CrmService {
       lead.addedById ?? creatorEmployeeId,
       { title: lead.title, status: lead.status, value: lead.value, companyName: lead.companyName },
     );
+
+    if (lead.assignedToId) {
+      await this.notificationsService.notifyEmployees([lead.assignedToId], {
+        companyId,
+        excludeEmployeeId: creatorEmployeeId,
+        title: 'New Deal Assigned to You',
+        message: `"${lead.title}"${lead.companyName ? ` — ${lead.companyName}` : ''} is now yours.`,
+        type: 'ASSIGNMENT',
+        linkUrl: `/crm/leads/${lead.id}`,
+      });
+    }
 
     return lead;
   }
@@ -200,7 +216,7 @@ export class CrmService {
     return updatedLead;
   }
   
-  async updateLead(companyId: number, leadId: number, data: any) {
+  async updateLead(companyId: number, leadId: number, data: any, actorEmployeeId?: number | null) {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
     if (!lead) throw new NotFoundException('Lead not found');
 
@@ -222,6 +238,23 @@ export class CrmService {
       updatedLead.addedById,
       { title: lead.title },
     );
+
+    // Only on a genuine handover — an edit that leaves the owner alone should
+    // not re-notify them, or every field change becomes a ping.
+    if (
+      data.assignedToId !== undefined &&
+      Number(data.assignedToId) !== lead.assignedToId &&
+      updatedLead.assignedToId
+    ) {
+      await this.notificationsService.notifyEmployees([updatedLead.assignedToId], {
+        companyId,
+        excludeEmployeeId: actorEmployeeId,
+        title: 'Deal Assigned to You',
+        message: `You are now the owner of "${updatedLead.title}".`,
+        type: 'ASSIGNMENT',
+        linkUrl: `/crm/leads/${leadId}`,
+      });
+    }
 
     return updatedLead;
   }

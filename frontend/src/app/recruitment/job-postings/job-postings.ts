@@ -18,6 +18,7 @@ import { JobsService, Job } from '../../services/jobs.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
 import { environment } from '../../../environments/environment';
+import { HotToastService } from '@ngneat/hot-toast';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -43,6 +44,7 @@ export class JobPostingsComponent implements OnInit {
   private http = inject(HttpClient);
   private jobsService = inject(JobsService);
   private employeeService = inject(EmployeeService);
+  private toast = inject(HotToastService);
   
   @ViewChild('quillContainer') quillContainer!: ElementRef;
   private quillInstance: any = null;
@@ -553,25 +555,66 @@ export class JobPostingsComponent implements OnInit {
         next: () => {
           this.loadJobs();
           this.closeCreateModal();
+          this.toast.success('Job updated!');
         },
-        error: (err) => console.error('Error updating job', err)
+        error: (err) => {
+          console.error('Error updating job', err);
+          this.toast.error('Could not update the job. Please try again.');
+        }
       });
     } else {
       this.jobsService.createJob(payload).subscribe({
         next: () => {
           this.loadJobs();
           this.closeCreateModal();
+          this.toast.success('Job created!');
         },
-        error: (err) => console.error('Error creating job', err)
+        error: (err) => {
+          console.error('Error creating job', err);
+          this.toast.error('Could not create the job. Please try again.');
+        }
       });
     }
   }
 
+  /**
+   * Ready-made questions the recruiter can tick instead of typing. They are
+   * stored as plain strings like custom ones, so nothing downstream has to know
+   * whether a question came from this list or was written by hand.
+   */
+  readonly questionLibrary: string[] = [
+    'Tell us about a recent project you are proud of.',
+    'What motivates you to do your best work?',
+    'Where do you see your career in the next two years?',
+    'Why are you interested in this role?',
+    'When can you start if selected?',
+    'What are your top three technical skills?',
+    'What are your salary expectations?',
+    'Describe a time you solved a complex problem.',
+    'Have you ever led a team? Briefly explain.',
+    'Any questions for us?',
+  ];
+
+  isQuestionSelected(question: string): boolean {
+    return this.screeningQuestions().includes(question);
+  }
+
+  toggleLibraryQuestion(question: string) {
+    this.screeningQuestions.update(list =>
+      list.includes(question)
+        ? list.filter(q => q !== question)
+        : [...list, question]
+    );
+  }
+
   addScreeningQuestion() {
-    if (this.newQuestionInput.trim()) {
-      this.screeningQuestions.update(q => [...q, this.newQuestionInput.trim()]);
-      this.newQuestionInput = '';
+    const text = this.newQuestionInput.trim();
+    // Silently ignore a duplicate — two identical questions would collide in the
+    // answers map, which is keyed by question text.
+    if (text && !this.screeningQuestions().includes(text)) {
+      this.screeningQuestions.update(q => [...q, text]);
     }
+    this.newQuestionInput = '';
   }
 
   removeScreeningQuestion(index: number) {
