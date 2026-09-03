@@ -20,6 +20,9 @@ export interface Employee {
   createdAt?: string;
   employeeCode?: string;
   employmentCategory?: string;
+  pfNumber?: string;
+  esiNumber?: string;
+  workLocation?: string;
 }
 
 @Injectable({

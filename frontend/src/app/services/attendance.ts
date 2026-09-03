@@ -27,6 +27,7 @@ export interface AttendanceRecord {
   overtimeHours?: number;
   employeeId: number;
   employee?: any;
+  logs?: any[];
 }
 
 @Injectable({

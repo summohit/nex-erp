@@ -202,7 +202,11 @@ export class LeadsComponent implements OnInit {
   
   viewMode: 'kanban' | 'table' = 'kanban';
 
-  kanbanColumns: { id: string, name: string, leads: Lead[] }[] = [];
+  kanbanColumns: { id: string, name: string, leads: Lead[] }[] = this.LEAD_STATUSES.map(status => ({
+    id: status,
+    name: status,
+    leads: []
+  }));
   highlightedLeadId: number | null = null;
 
   // Lead Form

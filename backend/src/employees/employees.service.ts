@@ -117,8 +117,12 @@ export class EmployeesService {
         lastName: true,
         avatarUrl: true,
         managerId: true,
-        designation: { select: { name: true } },
-        department: { select: { name: true } }
+        employeeCode: true,
+        phone: true,
+        workLocation: true,
+        designation: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+        user: { select: { email: true, role: true, status: true } }
       }
     });
 
@@ -468,7 +472,10 @@ export class EmployeesService {
         designationId: data.designationId || null,
         
         usualWorkLocation: data.usualWorkLocation ? data.usualWorkLocation : null,
+        workLocation: data.workLocation || null,
         workNotes: data.workNotes || null,
+        pfNumber: data.pfNumber || null,
+        esiNumber: data.esiNumber || null,
 
         // Work Details Additions
         joiningDate: data.joiningDate ? new Date(data.joiningDate) : undefined,

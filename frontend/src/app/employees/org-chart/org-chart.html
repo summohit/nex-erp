@@ -1,103 +1,512 @@
-<div class="org-chart-container" *ngIf="!isLoading">
+<div class="org-page-container">
   
-  <div class="org-chart-wrapper" *ngIf="rootNodes.length > 0; else noData">
-    
-    <!-- Toolbar -->
-    <div class="graph-toolbar">
-      <button class="toolbar-btn" (click)="zoomIn()" title="Zoom In">
-        <svg lucideZoomIn size="18"></svg>
-      </button>
-      <button class="toolbar-btn" (click)="zoomOut()" title="Zoom Out">
-        <svg lucideZoomOut size="18"></svg>
-      </button>
-      <button class="toolbar-btn" (click)="centerGraph()" title="Fit to Screen">
-        <svg lucideMaximize size="18"></svg>
-      </button>
+  <!-- Page Header Card -->
+  <div class="page-header-card">
+    <div class="header-main-info">
+      <div class="header-badge">
+        <svg lucideNetwork size="15"></svg>
+        <span>Organization Hierarchy</span>
+      </div>
+      <div class="header-text-block">
+        <h1 class="page-title">Organization Chart</h1>
+        <p class="page-subtitle">Visualize workforce reporting lines, management tiers, and team structures.</p>
+      </div>
     </div>
 
+    <!-- Quick Stats Strip -->
+    <div class="header-stats-strip" *ngIf="!isLoading && totalEmployees > 0">
+      <div class="stat-pill">
+        <div class="stat-icon-circle stat-blue">
+          <svg lucideUsers size="16"></svg>
+        </div>
+        <div class="stat-data">
+          <span class="stat-count">{{ totalEmployees }}</span>
+          <span class="stat-name">Members</span>
+        </div>
+      </div>
+
+      <div class="stat-pill">
+        <div class="stat-icon-circle stat-purple">
+          <svg lucideBuilding size="16"></svg>
+        </div>
+        <div class="stat-data">
+          <span class="stat-count">{{ totalDepartments }}</span>
+          <span class="stat-name">Departments</span>
+        </div>
+      </div>
+
+      <div class="stat-pill">
+        <div class="stat-icon-circle stat-emerald">
+          <svg lucideLayers size="16"></svg>
+        </div>
+        <div class="stat-data">
+          <span class="stat-count">{{ maxDepth }}</span>
+          <span class="stat-name">Tier Depth</span>
+        </div>
+      </div>
+
+      <div class="stat-pill">
+        <div class="stat-icon-circle stat-amber">
+          <svg lucideCrown size="16"></svg>
+        </div>
+        <div class="stat-data">
+          <span class="stat-count">{{ rootCount }}</span>
+          <span class="stat-name">Leadership</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Control Bar -->
+  <div class="chart-control-bar" *ngIf="!isLoading && totalEmployees > 0">
+    <!-- Search Bar with Live Dropdown -->
+    <div class="search-box-wrapper">
+      <div class="search-input-box">
+        <svg lucideSearch size="16" class="search-icon"></svg>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Search employee by name, title, or code..."
+          [ngModel]="searchQuery"
+          (ngModelChange)="onSearchInput($event)"
+        />
+        <button class="clear-search-btn" *ngIf="searchQuery" (click)="onSearchInput('')" title="Clear search">
+          <svg lucideX size="14"></svg>
+        </button>
+      </div>
+
+      <!-- Autocomplete Dropdown -->
+      <div class="search-results-dropdown" *ngIf="searchResults.length > 0">
+        <div class="dropdown-header">
+          <span>Matching Employees ({{ searchResults.length }})</span>
+        </div>
+        <div
+          class="search-result-item"
+          *ngFor="let emp of searchResults"
+          (click)="selectAndFocusEmployee(emp)"
+        >
+          <div class="result-avatar">
+            <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName">
+            <span *ngIf="!emp.avatarUrl">{{ getInitials(emp.firstName, emp.lastName) }}</span>
+          </div>
+          <div class="result-info">
+            <div class="result-name">
+              {{ emp.firstName }} {{ emp.lastName }}
+              <span class="emp-code-badge" *ngIf="emp.employeeCode">#{{ emp.employeeCode }}</span>
+            </div>
+            <div class="result-meta">
+              <span>{{ emp.designation?.name || 'Employee' }}</span>
+              <span class="meta-dot" *ngIf="emp.department?.name">•</span>
+              <span class="dept-text" *ngIf="emp.department?.name">{{ emp.department?.name }}</span>
+            </div>
+          </div>
+          <div class="result-jump-arrow">
+            <svg lucideChevronRight size="16"></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Controls: Orientation, Tree Expansion -->
+    <div class="toolbar-actions">
+      <!-- Layout Orientation Switcher -->
+      <div class="orientation-switch-group">
+        <button
+          class="switch-btn"
+          [class.active]="orientation === 'TB'"
+          (click)="setOrientation('TB')"
+          title="Top-Down Tree Layout"
+        >
+          <svg lucideSlidersHorizontal size="14" style="transform: rotate(90deg);"></svg>
+          <span>Top-Down</span>
+        </button>
+        <button
+          class="switch-btn"
+          [class.active]="orientation === 'LR'"
+          (click)="setOrientation('LR')"
+          title="Left-to-Right Horizontal Layout"
+        >
+          <svg lucideSlidersHorizontal size="14"></svg>
+          <span>Horizontal</span>
+        </button>
+      </div>
+
+      <!-- Expand / Collapse All -->
+      <div class="tree-action-group">
+        <button class="action-btn" (click)="expandAll()" title="Expand all reporting branches">
+          <svg lucideChevronDown size="14"></svg>
+          <span>Expand All</span>
+        </button>
+        <button class="action-btn" (click)="collapseAll()" title="Collapse to top management only">
+          <svg lucideChevronUp size="14"></svg>
+          <span>Collapse All</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Department Filter Pills Bar -->
+  <div class="department-filter-bar" *ngIf="!isLoading && uniqueDepartments.length > 0">
+    <span class="filter-label">Filter:</span>
+    <button
+      class="dept-filter-pill"
+      [class.active]="selectedDepartment === null"
+      (click)="toggleDepartmentFilter(null)"
+    >
+      All Departments
+    </button>
+    <button
+      class="dept-filter-pill"
+      *ngFor="let dept of uniqueDepartments"
+      [class.active]="selectedDepartment === dept"
+      [style.--dept-color]="getDepartmentTheme(dept).accent"
+      (click)="toggleDepartmentFilter(dept)"
+    >
+      <span class="dept-dot" [style.background]="getDepartmentTheme(dept).bar"></span>
+      {{ dept }}
+    </button>
+  </div>
+
+  <!-- Main Canvas Section -->
+  <div class="org-canvas-viewport" *ngIf="!isLoading && rootNodes.length > 0; else noDataOrLoading">
+    
     <ngx-graph
-      class="chart-container"
+      class="ngx-org-chart"
       [links]="links"
       [nodes]="nodes"
       [layout]="layout"
       [layoutSettings]="layoutSettings"
-      [nodeWidth]="260"
-      [nodeHeight]="140"
-      [enableDrag]="true"
+      [nodeWidth]="280"
+      [nodeHeight]="150"
+      [enableDrag]="false"
       [enablePan]="true"
       [zoomLevel]="zoomLevel"
-      [minZoomLevel]="0.1"
+      [minZoomLevel]="0.2"
       [maxZoomLevel]="2.0"
       [panOnZoom]="true"
       [autoZoom]="false"
-      [autoCenter]="true"
+      [autoCenter]="false"
       [zoomToFit$]="zoomToFit$"
       [center$]="center$"
       [panToNode$]="panToNode$"
-      (zoomChange)="onZoomChange($event)">
-
-      <!-- TEMPLATE FOR LINKS (SVG Paths) -->
+      (zoomChange)="onZoomChange($event)"
+    >
+      <!-- Connecting Links (SVG Paths) -->
       <ng-template #linkTemplate let-link>
-        <svg:g class="edge">
-          <svg:path class="line" stroke-width="2" marker-end="url(#arrow)" />
+        <svg:g class="org-edge-group">
           <svg:path
-            class="edge-path"
+            class="org-edge-path"
             fill="none"
-            stroke="#cbd5e1"
+            stroke="#94a3b8"
             stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
             [attr.d]="link.line"
           ></svg:path>
         </svg:g>
       </ng-template>
 
-      <!-- TEMPLATE FOR NODES -->
+      <!-- Node Card Template -->
       <ng-template #nodeTemplate let-node>
-        <svg:g class="node">
-          <!-- Width 280, Height 140 -> Need to wrap HTML carefully -->
-          <svg:foreignObject width="260" height="130" x="0" y="0">
-            <!-- Ensure xmlns namespace is present in foreignObject -->
-            <div xmlns="http://www.w3.org/1999/xhtml" class="org-node-container" style="width: 100%; height: 100%; padding: 4px;">
-              <div class="org-node-card">
-                <div class="node-avatar">
-                  <img *ngIf="node.data.avatarUrl" [src]="node.data.avatarUrl" alt="Avatar">
-                  <div *ngIf="!node.data.avatarUrl" class="avatar-placeholder">
-                    {{ node.data.firstName.charAt(0) }}{{ node.data.lastName.charAt(0) }}
+        <svg:g class="org-node-group">
+          <svg:foreignObject width="280" height="150" x="0" y="0">
+            <div
+              xmlns="http://www.w3.org/1999/xhtml"
+              class="node-card-container"
+              [class.node-is-highlighted]="node.id === highlightedNodeId"
+              [class.node-is-dimmed]="isNodeFiltered(node.data)"
+              [class.node-is-root]="node.data.level === 0"
+              (click)="openDrawer(node.data, $event)"
+            >
+              <!-- Department Top Accent Bar -->
+              <div
+                class="node-top-bar"
+                [style.background]="getDepartmentTheme(node.data.department?.name).bar"
+              ></div>
+
+              <div class="node-card-inner">
+                <!-- Top Tags Row -->
+                <div class="node-tags-row">
+                  <span
+                    class="node-dept-tag"
+                    [style.background]="getDepartmentTheme(node.data.department?.name).bg"
+                    [style.color]="getDepartmentTheme(node.data.department?.name).text"
+                    [style.borderColor]="getDepartmentTheme(node.data.department?.name).border"
+                  >
+                    {{ node.data.department?.name || 'General' }}
+                  </span>
+
+                  <span class="node-root-badge" *ngIf="node.data.level === 0" title="Executive Leadership">
+                    <svg lucideCrown size="12"></svg>
+                    <span>Leader</span>
+                  </span>
+
+                  <span class="node-code-tag" *ngIf="node.data.level !== 0 && node.data.employeeCode">
+                    #{{ node.data.employeeCode }}
+                  </span>
+                </div>
+
+                <!-- Main Employee Profile Row -->
+                <div class="node-profile-row">
+                  <div class="node-avatar-box">
+                    <img *ngIf="node.data.avatarUrl" [src]="node.data.avatarUrl" [alt]="node.data.firstName">
+                    <div *ngIf="!node.data.avatarUrl" class="node-avatar-initials">
+                      {{ getInitials(node.data.firstName, node.data.lastName) }}
+                    </div>
+                    <span class="status-indicator-dot" title="Active Workforce"></span>
+                  </div>
+
+                  <div class="node-text-details">
+                    <div class="node-fullname" [title]="node.data.firstName + ' ' + node.data.lastName">
+                      {{ node.data.firstName }} {{ node.data.lastName }}
+                    </div>
+                    <div class="node-title" [title]="node.data.designation?.name || 'Team Member'">
+                      {{ node.data.designation?.name || 'Team Member' }}
+                    </div>
                   </div>
                 </div>
-                <div class="node-details">
-                  <div class="node-name">{{ node.data.firstName }} {{ node.data.lastName }}</div>
-                  <div class="node-designation" *ngIf="node.data.designation">{{ node.data.designation.name }}</div>
-                  <div class="node-department" *ngIf="node.data.department">{{ node.data.department.name }}</div>
-                </div>
-                
-                <!-- Expand/Collapse Button (only if children exist) -->
-                <div 
-                  class="node-expand-btn" 
-                  *ngIf="node.data.children.length > 0" 
-                  (click)="toggleExpand(node.data, $event)"
-                  style="cursor: pointer;">
-                  <svg *ngIf="!node.data.isExpanded" lucideChevronDown size="16"></svg>
-                  <svg *ngIf="node.data.isExpanded" lucideChevronUp size="16"></svg>
+
+                <!-- Footer Row: Team Reports & Expand Button -->
+                <div class="node-footer-row">
+                  <div class="team-count-badge" *ngIf="node.data.children.length > 0">
+                    <svg lucideUsers size="13"></svg>
+                    <span>{{ node.data.children.length }} direct reports</span>
+                  </div>
+                  <div class="team-count-badge ic-badge" *ngIf="node.data.children.length === 0">
+                    <svg lucideUser size="12"></svg>
+                    <span>Individual Contributor</span>
+                  </div>
                 </div>
               </div>
+
+              <!-- Interactive Expand/Collapse Toggle Button -->
+              <div
+                class="node-collapse-handle"
+                *ngIf="node.data.children.length > 0"
+                [class.is-collapsed]="!node.data.isExpanded"
+                (click)="toggleExpand(node.data, $event)"
+                [title]="node.data.isExpanded ? 'Collapse subordinates' : 'Expand ' + node.data.children.length + ' subordinates'"
+              >
+                <ng-container *ngIf="!node.data.isExpanded">
+                  <svg lucideChevronDown size="14"></svg>
+                  <span class="collapsed-count">+{{ node.data.children.length }}</span>
+                </ng-container>
+                <ng-container *ngIf="node.data.isExpanded">
+                  <svg lucideChevronUp size="14"></svg>
+                </ng-container>
+              </div>
+
             </div>
           </svg:foreignObject>
         </svg:g>
       </ng-template>
     </ngx-graph>
+
+    <!-- Floating Canvas Control Dock -->
+    <div class="canvas-floating-dock">
+      <button class="dock-btn" (click)="zoomIn()" title="Zoom In (+15%)">
+        <svg lucideZoomIn size="17"></svg>
+      </button>
+      <div class="dock-zoom-indicator" title="Current Zoom Level">
+        {{ Math.round(zoomLevel * 100) }}%
+      </div>
+      <button class="dock-btn" (click)="zoomOut()" title="Zoom Out (-15%)">
+        <svg lucideZoomOut size="17"></svg>
+      </button>
+      <div class="dock-separator"></div>
+      <button class="dock-btn" (click)="resetZoom()" title="Reset to 100% and Center">
+        <svg lucideRotateCcw size="15"></svg>
+      </button>
+      <button class="dock-btn" (click)="fitToScreen()" title="Fit Chart to Screen">
+        <svg lucideMaximize size="15"></svg>
+      </button>
+      <button class="dock-btn" (click)="centerRoot()" title="Center on Leadership">
+        <svg lucideCompass size="16"></svg>
+      </button>
+    </div>
+
   </div>
 
-  <ng-template #noData>
-    <div class="empty-state">
-      <svg lucideUser size="48" style="color: #94a3b8; margin-bottom: 16px;"></svg>
-      <h3>No Organization Chart Data</h3>
-      <p>Assign managers to employees to build the chart.</p>
+  <!-- Loading / Empty Fallback -->
+  <ng-template #noDataOrLoading>
+    <div class="loading-state-card" *ngIf="isLoading">
+      <div class="state-spinner"></div>
+      <h3>Loading Organizational Hierarchy...</h3>
+      <p>Mapping reporting lines, departmental groups, and team structures.</p>
+    </div>
+
+    <div class="empty-state-card" *ngIf="!isLoading && totalEmployees === 0">
+      <div class="empty-icon-circle">
+        <svg lucideNetwork size="36"></svg>
+      </div>
+      <h3>No Organization Chart Available</h3>
+      <p>To view your organization chart, add employees and configure their managers in the Employee Directory.</p>
+      <a routerLink="/employees/directory" class="empty-cta-btn">
+        <svg lucideUsers size="16"></svg>
+        <span>Go to Employee Directory</span>
+      </a>
     </div>
   </ng-template>
 
+  <!-- Slide-Over Employee Quick-View Drawer -->
+  <div class="drawer-overlay" *ngIf="isDrawerOpen" (click)="closeDrawer()">
+    <div class="drawer-panel" (click)="$event.stopPropagation()">
+      <!-- Drawer Header -->
+      <div class="drawer-header">
+        <div class="drawer-header-title">
+          <svg lucideUser size="16"></svg>
+          <span>Employee Details</span>
+        </div>
+        <button class="drawer-close-btn" (click)="closeDrawer()" title="Close details">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
+
+      <!-- Drawer Content -->
+      <div class="drawer-body" *ngIf="selectedEmployee">
+        <!-- Hero Section -->
+        <div class="drawer-hero">
+          <div
+            class="drawer-avatar-wrapper"
+            [style.borderColor]="getDepartmentTheme(selectedEmployee.department?.name).bar"
+          >
+            <img *ngIf="selectedEmployee.avatarUrl" [src]="selectedEmployee.avatarUrl" [alt]="selectedEmployee.firstName">
+            <div *ngIf="!selectedEmployee.avatarUrl" class="drawer-initials">
+              {{ getInitials(selectedEmployee.firstName, selectedEmployee.lastName) }}
+            </div>
+          </div>
+          <h2 class="drawer-name">
+            {{ selectedEmployee.firstName }} {{ selectedEmployee.lastName }}
+            <span class="drawer-crown" *ngIf="selectedEmployee.level === 0" title="Executive Leader">
+              <svg lucideCrown size="16"></svg>
+            </span>
+          </h2>
+          <p class="drawer-designation">{{ selectedEmployee.designation?.name || 'Team Member' }}</p>
+
+          <div class="drawer-badge-group">
+            <span
+              class="drawer-dept-badge"
+              [style.background]="getDepartmentTheme(selectedEmployee.department?.name).bg"
+              [style.color]="getDepartmentTheme(selectedEmployee.department?.name).text"
+              [style.borderColor]="getDepartmentTheme(selectedEmployee.department?.name).border"
+            >
+              <svg lucideBuilding size="13"></svg>
+              {{ selectedEmployee.department?.name || 'Department' }}
+            </span>
+            <span class="drawer-code-badge" *ngIf="selectedEmployee.employeeCode">
+              ID: {{ selectedEmployee.employeeCode }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Contact Information Card -->
+        <div class="drawer-section-card">
+          <h4 class="section-title">
+            <svg lucideMail size="14"></svg>
+            <span>Contact Information</span>
+          </h4>
+
+          <div class="info-item-row" *ngIf="selectedEmployee.user?.email">
+            <span class="info-label">Email:</span>
+            <a [href]="'mailto:' + selectedEmployee.user?.email" class="info-value link-value">
+              {{ selectedEmployee.user?.email }}
+              <svg lucideExternalLink size="12"></svg>
+            </a>
+          </div>
+
+          <div class="info-item-row" *ngIf="selectedEmployee.phone">
+            <span class="info-label">Phone:</span>
+            <a [href]="'tel:' + selectedEmployee.phone" class="info-value link-value">
+              {{ selectedEmployee.phone }}
+            </a>
+          </div>
+
+          <div class="info-item-row" *ngIf="selectedEmployee.workLocation">
+            <span class="info-label">Location:</span>
+            <span class="info-value">{{ selectedEmployee.workLocation }}</span>
+          </div>
+
+          <div class="info-item-row" *ngIf="selectedEmployee.user?.role">
+            <span class="info-label">System Role:</span>
+            <span class="info-value role-pill">{{ selectedEmployee.user?.role }}</span>
+          </div>
+        </div>
+
+        <!-- Reporting Manager Section -->
+        <div class="drawer-section-card">
+          <h4 class="section-title">
+            <svg lucideBriefcase size="14"></svg>
+            <span>Reports To</span>
+          </h4>
+
+          <div
+            class="manager-nav-card"
+            *ngIf="selectedEmployee.manager; else noManager"
+            (click)="jumpToEmployeeFromDrawer(selectedEmployee.manager)"
+          >
+            <div class="manager-avatar">
+              <img *ngIf="selectedEmployee.manager.avatarUrl" [src]="selectedEmployee.manager.avatarUrl">
+              <span *ngIf="!selectedEmployee.manager.avatarUrl">
+                {{ getInitials(selectedEmployee.manager.firstName, selectedEmployee.manager.lastName) }}
+              </span>
+            </div>
+            <div class="manager-details">
+              <span class="mgr-name">{{ selectedEmployee.manager.firstName }} {{ selectedEmployee.manager.lastName }}</span>
+              <span class="mgr-role">{{ selectedEmployee.manager.designation?.name || 'Manager' }}</span>
+            </div>
+            <button class="jump-node-btn" title="Focus in org chart">
+              <svg lucideChevronRight size="16"></svg>
+            </button>
+          </div>
+
+          <ng-template #noManager>
+            <div class="top-leader-notice">
+              <svg lucideCrown size="16"></svg>
+              <span>Top of Organization Hierarchy (No Manager)</span>
+            </div>
+          </ng-template>
+        </div>
+
+        <!-- Direct Reports Section -->
+        <div class="drawer-section-card">
+          <h4 class="section-title">
+            <svg lucideUsers size="14"></svg>
+            <span>Direct Reports ({{ selectedEmployee.children.length }})</span>
+          </h4>
+
+          <div class="reports-list" *ngIf="selectedEmployee.children.length > 0; else noReports">
+            <div
+              class="report-nav-item"
+              *ngFor="let report of selectedEmployee.children"
+              (click)="jumpToEmployeeFromDrawer(report)"
+            >
+              <div class="report-avatar">
+                <img *ngIf="report.avatarUrl" [src]="report.avatarUrl">
+                <span *ngIf="!report.avatarUrl">{{ getInitials(report.firstName, report.lastName) }}</span>
+              </div>
+              <div class="report-details">
+                <span class="rpt-name">{{ report.firstName }} {{ report.lastName }}</span>
+                <span class="rpt-role">{{ report.designation?.name || 'Team Member' }}</span>
+              </div>
+              <svg lucideChevronRight size="15" class="rpt-arrow"></svg>
+            </div>
+          </div>
+
+          <ng-template #noReports>
+            <p class="empty-reports-msg">No direct reports assigned.</p>
+          </ng-template>
+        </div>
+
+        <!-- Actions -->
+        <div class="drawer-footer-actions">
+          <a routerLink="/employees/directory" class="profile-link-btn" (click)="closeDrawer()">
+            <svg lucideExternalLink size="15"></svg>
+            <span>View Full Directory Profile</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<div class="loading-state" *ngIf="isLoading">
-  <div class="spinner"></div>
-  <p>Loading Organization Chart...</p>
-</div>

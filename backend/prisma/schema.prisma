@@ -244,7 +244,12 @@ model Employee {
   currency  String? @default("USD")
 
   // Work Location & Notes
+  workLocation      String?
   usualWorkLocation Json?
+  
+  // Statutory Details
+  pfNumber          String?
+  esiNumber         String?
   workNotes         String?
   nextAppraisalDate DateTime?
   offboardingStatus String    @default("NONE") // NONE, IN_PROGRESS, SEPARATED

@@ -11,6 +11,18 @@
     </div>
 
     <div class="header-actions-group">
+      <!-- View Mode Toggle -->
+      <div class="view-mode-toggle-group">
+        <button type="button" class="btn-toggle-view" [class.active]="viewMode() === 'grid'" (click)="viewMode.set('grid')" title="Monthly Matrix Grid View">
+          <svg lucideLayoutGrid [size]="14"></svg>
+          <span>Grid</span>
+        </button>
+        <button type="button" class="btn-toggle-view" [class.active]="viewMode() === 'table'" (click)="viewMode.set('table')" title="Tabular Shift Logs View">
+          <svg lucideList [size]="14"></svg>
+          <span>Table</span>
+        </button>
+      </div>
+
       <!-- Export CSV Button -->
       <button class="btn-header-secondary" (click)="exportToCsv()" [disabled]="filteredRecords().length === 0" title="Export current attendance records to CSV">
         <svg lucideDownload [size]="15"></svg>
@@ -76,18 +88,20 @@
     </div>
   </div>
 
-  <!-- Search & Filter Card -->
-  <div class="filter-bar-card">
+  <!-- Sticky Controls Section (Filter Bar + Status Legend) -->
+  <div class="sticky-controls-section">
+    <!-- Search & Filter Card -->
+    <div class="filter-bar-card">
     <div class="filter-bar-main-row">
       <!-- Search Input -->
       <div class="search-input-wrapper">
         <svg lucideSearch [size]="16" class="search-icon"></svg>
         <input
           type="text"
-          [(ngModel)]="searchQuery"
-          placeholder="Search by employee name or department…"
-        />
-        <button class="btn-clear-search" *ngIf="searchQuery" (click)="searchQuery = ''" title="Clear search">
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+          placeholder="Search by employee name or department…" />
+        <button class="btn-clear-search" *ngIf="searchQuery()" (click)="searchQuery.set('')" title="Clear search">
           <svg lucideX [size]="14"></svg>
         </button>
       </div>
@@ -282,14 +296,136 @@
     </div>
   </div>
 
+  <!-- Status Legend (matching Screenshot 1) -->
+  <div class="status-legend" *ngIf="viewMode() === 'grid' && !isLoading()">
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-present"><svg lucideCheck class="status-present status-icon"></svg></div>
+      <span>Present</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-half-day"><svg lucideStarHalf class="status-half-day status-icon"></svg></div>
+      <span>Half Day</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-late"><svg lucideAlertCircle class="status-late status-icon"></svg></div>
+      <span>Late</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-absent"><svg lucideX class="status-absent status-icon"></svg></div>
+      <span>Absent</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-leave"><svg lucidePlane class="status-leave status-icon"></svg></div>
+      <span>On Leave</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-holiday"><svg lucideStar class="status-holiday status-icon"></svg></div>
+      <span>Holiday</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-day-off"><svg lucideCalendar class="status-day-off status-icon"></svg></div>
+      <span>Day Off</span>
+    </div>
+  </div>
+  </div>
+
   <!-- Loading State -->
   <div class="loading-state-card" *ngIf="isLoading()">
     <div class="spinner"></div>
     <p>Loading attendance records…</p>
   </div>
 
-  <!-- Empty State -->
-  <div class="empty-state-card" *ngIf="!isLoading() && filteredRecords().length === 0">
+  <!-- Monthly Grid View for All Employees -->
+  <div class="matrix-card-container" *ngIf="viewMode() === 'grid' && !isLoading()">
+    <div class="matrix-scroll-wrapper" *ngIf="employeeGridRows().length > 0; else noMatrixData">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th class="col-employee-header sticky-left">EMPLOYEE</th>
+            <th *ngFor="let day of daysOfMonth()" class="col-day-header" [class.is-weekend]="day.isWeekend">
+              <div class="day-header-inner">
+                <span class="day-num">{{ day.dayNumber }}</span>
+                <span class="day-week">{{ day.weekdayStr }}</span>
+              </div>
+            </th>
+            <th class="col-total-header sticky-right">TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of employeeGridRows()" class="matrix-row">
+            <!-- Employee Header Cell (Sticky Left) -->
+            <td class="col-employee-cell sticky-left">
+              <div class="emp-profile-lockup">
+                <div class="avatar-circle-sm" *ngIf="!row.employee?.avatarUrl">
+                  {{ (row.employee?.firstName || '?')[0] }}{{ (row.employee?.lastName || '')[0] }}
+                </div>
+                <img *ngIf="row.employee?.avatarUrl" [src]="row.employee?.avatarUrl" class="avatar-img-sm" />
+                <div class="emp-text-meta">
+                  <span class="emp-name" [title]="(row.employee?.firstName || '') + ' ' + (row.employee?.lastName || '')">
+                    {{ row.employee?.firstName }} {{ row.employee?.lastName || '' }}
+                  </span>
+                  <span class="emp-dept" [title]="row.employee?.department?.name || 'Staff'">
+                    {{ row.employee?.department?.name || row.employee?.designation?.name || 'Staff' }}
+                  </span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Day Badges (1..31) -->
+            <td *ngFor="let day of row.days" class="col-day-cell" [class.is-weekend]="day.isWeekend">
+              <div class="day-cell-badge"
+                   [class.is-empty]="day.isFuture"
+                   [title]="day.tooltip"
+                   (click)="openDayDetails(row.employee, day, day.record)"
+                   [ngClass]="{
+                     'bg-present': day.status === 'Present',
+                     'bg-half-day': day.status === 'Half Day',
+                     'bg-late': day.status === 'Late',
+                     'bg-absent': day.status === 'Absent',
+                     'bg-leave': day.status === 'On Leave',
+                     'bg-holiday': day.status === 'Holiday',
+                     'bg-day-off': day.status === 'Day Off'
+                   }">
+                <ng-container *ngIf="!day.isFuture">
+                  <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
+                  <svg *ngIf="day.status === 'Half Day'" lucideStarHalf class="status-half-day status-icon"></svg>
+                  <svg *ngIf="day.status === 'Late'" lucideAlertCircle class="status-late status-icon"></svg>
+                  <svg *ngIf="day.status === 'Absent'" lucideX class="status-absent status-icon"></svg>
+                  <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
+                  <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
+                  <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
+                  <span *ngIf="day.record?.clockInLat" class="day-location-pin" title="GPS location logged">📍</span>
+                </ng-container>
+                <span *ngIf="day.isFuture" class="future-dot">·</span>
+              </div>
+            </td>
+
+            <!-- Total Cell (Sticky Right) -->
+            <td class="col-total-cell sticky-right">
+              <span class="total-badge">{{ row.totalPresent }}/{{ row.totalWorkingDays }}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #noMatrixData>
+      <div class="empty-state-card">
+        <div class="empty-icon-circle">
+          <svg lucideInbox [size]="36"></svg>
+        </div>
+        <h3 class="empty-title">No employees found</h3>
+        <p class="empty-subtitle">No employees matched your selected filters or search query.</p>
+        <button class="btn-secondary" *ngIf="hasActiveFilters()" (click)="resetFilters()">
+          <svg lucideRotateCcw [size]="14"></svg>
+          Reset Filters
+        </button>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- Table View: Empty State -->
+  <div class="empty-state-card" *ngIf="viewMode() === 'table' && !isLoading() && filteredRecords().length === 0">
     <div class="empty-icon-circle">
       <svg lucideInbox [size]="36"></svg>
     </div>
@@ -306,8 +442,8 @@
     </button>
   </div>
 
-  <!-- Enhanced Table Card -->
-  <div class="table-card-container" *ngIf="!isLoading() && filteredRecords().length > 0">
+  <!-- Table View: Enhanced Table Card -->
+  <div class="table-card-container" *ngIf="viewMode() === 'table' && !isLoading() && filteredRecords().length > 0">
     <div class="table-scroll-wrapper">
       <table class="attendance-table">
         <thead>
@@ -416,96 +552,115 @@
 
 </div>
 
-<!-- Attendance Record Detail Modal -->
-<div class="modal-backdrop" *ngIf="selectedRecord()" (click)="closeDetail()">
-  <div class="modal-box" (click)="$event.stopPropagation()">
+<!-- DETAILED SESSION ATTENDANCE MODAL (Screenshot 3) -->
+<div class="viewer-overlay" *ngIf="isDetailsModalOpen() && selectedDayDetails()" (click)="closeDayDetailsModal()">
+  <div class="session-modal-card" (click)="$event.stopPropagation()">
     <!-- Modal Header -->
-    <div class="modal-header">
-      <div class="modal-header-left">
-        <div class="modal-header-avatar">
-          <span *ngIf="!selectedRecord()?.employee?.avatarUrl">{{ (selectedRecord()?.employee?.firstName || '?')[0] }}{{ (selectedRecord()?.employee?.lastName || '')[0] }}</span>
-          <img *ngIf="selectedRecord()?.employee?.avatarUrl" [src]="selectedRecord()?.employee?.avatarUrl" />
+    <div class="session-modal-header">
+      <div class="session-header-profile">
+        <div *ngIf="!selectedDayDetails()?.employeeAvatarUrl" class="avatar-circle-md">
+          {{ (selectedDayDetails()?.employeeName || 'E').charAt(0) }}
         </div>
-        <div>
-          <h2 class="modal-title">{{ selectedRecord()?.employee?.firstName }} {{ selectedRecord()?.employee?.lastName }}</h2>
-          <p class="modal-subtitle">{{ selectedRecord()?.employee?.department?.name || 'General' }} · {{ selectedRecord()?.date | date:'fullDate' }}</p>
+        <img *ngIf="selectedDayDetails()?.employeeAvatarUrl" [src]="selectedDayDetails()?.employeeAvatarUrl" [alt]="selectedDayDetails()?.employeeName" class="avatar-img-md" />
+        <div class="session-header-text">
+          <h3 class="session-emp-name">{{ selectedDayDetails()?.employeeEmail }}</h3>
+          <span class="session-emp-role">{{ selectedDayDetails()?.employeeRole }}</span>
         </div>
       </div>
-      <button class="btn-icon-close" (click)="closeDetail()" title="Close details">
+      <button type="button" class="btn-modal-close" (click)="closeDayDetailsModal()" title="Close details">
         <svg lucideX [size]="18"></svg>
       </button>
     </div>
 
     <!-- Modal Body -->
-    <div class="modal-body">
-      <!-- Status & Flags Banner -->
-      <div class="modal-status-banner">
-        <div class="banner-left">
-          <span class="status-pill large" [ngClass]="statusClass(selectedRecord()?.status || '')">
-            <span class="status-indicator-dot"></span>
-            {{ (selectedRecord()?.status || '').replace('_', ' ') }}
-          </span>
+    <div class="session-modal-body">
+      <!-- Date & Status Bar -->
+      <div class="session-date-status-bar">
+        <div class="date-info">
+          <span class="date-label">Date</span>
+          <span class="date-val">{{ selectedDayDetails()?.date | date:'fullDate' }}</span>
         </div>
-        <div class="banner-right">
-          <span class="flag-badge late" *ngIf="selectedRecord()?.isLate">
-            <svg lucideAlertTriangle [size]="12"></svg> Late Arrival
-          </span>
-          <span class="flag-badge early" *ngIf="selectedRecord()?.isEarlyLeave">
-            <svg lucideDoorOpen [size]="12"></svg> Early Departure
-          </span>
-          <span class="flag-badge on-time" *ngIf="selectedRecord()?.status === 'PRESENT' && !selectedRecord()?.isLate && !selectedRecord()?.isEarlyLeave">
-            <svg lucideCheckCircle2 [size]="12"></svg> On Time
-          </span>
-        </div>
+        <span class="status-round" [ngClass]="{
+          'status-approved': selectedDayDetails()?.status === 'Present',
+          'status-pending': selectedDayDetails()?.status === 'Late' || selectedDayDetails()?.status === 'Half Day',
+          'status-rejected': selectedDayDetails()?.status === 'Absent',
+          'status-leave-badge': selectedDayDetails()?.status === 'On Leave',
+          'status-holiday-badge': selectedDayDetails()?.status === 'Holiday',
+          'status-dayoff-badge': selectedDayDetails()?.status === 'Day Off'
+        }">
+          <span class="status-dot"></span>
+          {{ selectedDayDetails()?.status }}
+        </span>
       </div>
 
-      <!-- Time & Metrics Grid -->
-      <div class="detail-metrics-grid">
-        <div class="metric-box">
-          <span class="metric-label">Clock In Time</span>
-          <span class="metric-value">{{ formatTime(selectedRecord()?.clockIn || null) }}</span>
-          <span class="metric-sub" *ngIf="selectedRecord()?.isLate">Logged late arrival</span>
-        </div>
+      <!-- Punch History Timeline -->
+      <div class="punch-sessions-container">
+        <ng-container *ngIf="selectedDayDetails()?.logs && selectedDayDetails()!.logs.length > 0; else noPunches">
+          <div *ngFor="let punch of selectedDayDetails()?.logs; let i = index" class="session-punch-card">
+            <div class="session-card-title">
+              SESSION {{ i + 1 }}
+            </div>
+            <div class="session-card-grid">
+              <!-- Clock In -->
+              <div class="session-cell clock-in-col">
+                <div class="session-type-label in">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  CLOCK IN
+                </div>
+                <div class="session-time-val">
+                  {{ punch.clockIn ? (punch.clockIn | date:'shortTime') : '--' }}
+                </div>
+                <div *ngIf="punch.clockInLat" class="session-geo-meta">
+                  <span class="geo-coords">Lat: {{ punch.clockInLat | number:'1.4-4' }}<br>Lng: {{ punch.clockInLng | number:'1.4-4' }}</span>
+                  <a [href]="'https://www.google.com/maps?q=' + punch.clockInLat + ',' + punch.clockInLng" target="_blank" class="geo-map-link">
+                    View on Map
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                  </a>
+                </div>
+              </div>
 
-        <div class="metric-box">
-          <span class="metric-label">Clock Out Time</span>
-          <span class="metric-value">{{ formatTime(selectedRecord()?.clockOut || null) }}</span>
-          <span class="metric-sub" *ngIf="!selectedRecord()?.clockOut && selectedRecord()?.clockIn">Still active</span>
-        </div>
+              <!-- Clock Out -->
+              <div class="session-cell clock-out-col">
+                <div class="session-type-label out">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  CLOCK OUT
+                </div>
+                <div class="session-time-val">
+                  {{ punch.clockOut ? (punch.clockOut | date:'shortTime') : 'Ongoing...' }}
+                </div>
+                <div *ngIf="punch.clockOutLat" class="session-geo-meta">
+                  <span class="geo-coords">Lat: {{ punch.clockOutLat | number:'1.4-4' }}<br>Lng: {{ punch.clockOutLng | number:'1.4-4' }}</span>
+                  <a [href]="'https://www.google.com/maps?q=' + punch.clockOutLat + ',' + punch.clockOutLng" target="_blank" class="geo-map-link">
+                    View on Map
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
 
-        <div class="metric-box">
-          <span class="metric-label">Work Duration</span>
-          <span class="metric-value text-blue">{{ calculateWorkHours(selectedRecord()?.clockIn || null, selectedRecord()?.clockOut || null).text }}</span>
-        </div>
-
-        <div class="metric-box" *ngIf="$any(selectedRecord())?.overtimeHours">
-          <span class="metric-label">Overtime Hours</span>
-          <span class="metric-value text-amber">{{ $any(selectedRecord())?.overtimeHours }} hrs</span>
-        </div>
+        <ng-template #noPunches>
+          <div class="session-empty-state">
+            <span *ngIf="selectedDayDetails()?.status === 'Absent'">No punch records found for this date. Employee was marked Absent.</span>
+            <span *ngIf="selectedDayDetails()?.status === 'Holiday'">Official Company Holiday</span>
+            <span *ngIf="selectedDayDetails()?.status === 'Day Off'">Weekend / Scheduled Day Off</span>
+            <span *ngIf="selectedDayDetails()?.status === 'On Leave'">Approved Employee Leave</span>
+            <span *ngIf="selectedDayDetails()?.status !== 'Absent' && selectedDayDetails()?.status !== 'Holiday' && selectedDayDetails()?.status !== 'Day Off' && selectedDayDetails()?.status !== 'On Leave'">No punch records found for this date.</span>
+          </div>
+        </ng-template>
       </div>
 
-      <!-- Geolocation / Lat-Lng if available -->
-      <div class="geo-info-card" *ngIf="selectedRecord()?.clockInLat || selectedRecord()?.clockOutLat">
-        <div class="geo-card-header">
-          <svg lucideMapPin [size]="14"></svg>
-          <span>Geolocation Logging</span>
-        </div>
-        <div class="geo-grid">
-          <div class="geo-item" *ngIf="selectedRecord()?.clockInLat">
-            <span class="geo-label">Clock In GPS:</span>
-            <span class="geo-val">{{ selectedRecord()?.clockInLat | number:'1.4-4' }}, {{ selectedRecord()?.clockInLng | number:'1.4-4' }}</span>
-          </div>
-          <div class="geo-item" *ngIf="selectedRecord()?.clockOutLat">
-            <span class="geo-label">Clock Out GPS:</span>
-            <span class="geo-val">{{ selectedRecord()?.clockOutLat | number:'1.4-4' }}, {{ selectedRecord()?.clockOutLng | number:'1.4-4' }}</span>
-          </div>
-        </div>
+      <!-- Total Duration Worked Box -->
+      <div class="session-duration-summary">
+        <span class="duration-title">⏱️ Total Duration Worked:</span>
+        <span class="duration-highlight">{{ selectedDayDetails()?.durationStr }}</span>
       </div>
     </div>
 
     <!-- Modal Footer -->
-    <div class="modal-footer">
-      <button class="btn-cancel" (click)="closeDetail()">Close</button>
+    <div class="session-modal-footer">
+      <button type="button" class="btn btn-outline" (click)="closeDayDetailsModal()">Close Log</button>
     </div>
   </div>
 </div>

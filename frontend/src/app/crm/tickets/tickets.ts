@@ -63,6 +63,7 @@ export class TicketsComponent implements OnInit {
   filterPriority = '';
   filterPlatform = '';
   filterMonth = 'all'; // all, 1_month, 3_months, 6_months
+  filterDeadline = 'all'; // all, overdue, today, this_week, next_week
   searchTerm = '';
   
   activeTab: 'list' | 'reports' = 'list';
@@ -306,6 +307,22 @@ export class TicketsComponent implements OnInit {
       },
     },
     {
+      field: 'dueDate',
+      headerName: 'DEADLINE',
+      width: 110,
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      cellRenderer: (p: any) => {
+        if (!p.value) return '—';
+        const date = new Date(p.value);
+        const today = new Date();
+        const str = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        if (date < today && p.data?.status !== 'RESOLVED' && p.data?.status !== 'CLOSED') {
+          return `<span style="color: #dc2626; font-weight: 600;">${str}</span>`;
+        }
+        return str;
+      }
+    },
+    {
       field: 'createdAt',
       headerName: 'CREATED',
       width: 110,
@@ -368,11 +385,77 @@ export class TicketsComponent implements OnInit {
     if (this.filterPlatform) filters['platform'] = this.filterPlatform;
 
     if (this.filterMonth && this.filterMonth !== 'all') {
-      const date = new Date();
-      if (this.filterMonth === '1_month') date.setMonth(date.getMonth() - 1);
-      else if (this.filterMonth === '3_months') date.setMonth(date.getMonth() - 3);
-      else if (this.filterMonth === '6_months') date.setMonth(date.getMonth() - 6);
-      filters['fromDate'] = date.toISOString();
+      const now = new Date();
+      let fromDate: Date | null = null;
+      let toDate: Date | null = null;
+      
+      switch (this.filterMonth) {
+        case 'today':
+          fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'this_week':
+          fromDate = new Date(now);
+          fromDate.setDate(now.getDate() - now.getDay());
+          fromDate.setHours(0,0,0,0);
+          break;
+        case 'last_month':
+          fromDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          toDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+          break;
+        case 'last_year':
+          fromDate = new Date(now.getFullYear() - 1, 0, 1);
+          toDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+          break;
+        case '1_month':
+          fromDate = new Date(now);
+          fromDate.setMonth(now.getMonth() - 1);
+          break;
+        case '3_months':
+          fromDate = new Date(now);
+          fromDate.setMonth(now.getMonth() - 3);
+          break;
+        case '6_months':
+          fromDate = new Date(now);
+          fromDate.setMonth(now.getMonth() - 6);
+          break;
+      }
+      if (fromDate) filters['fromDate'] = fromDate.toISOString();
+      if (toDate) filters['toDate'] = toDate.toISOString();
+    }
+
+    if (this.filterDeadline && this.filterDeadline !== 'all') {
+      if (this.filterDeadline === 'overdue') {
+        filters['deadline'] = 'overdue';
+      } else {
+        const now = new Date();
+        let fromDate: Date | null = null;
+        let toDate: Date | null = null;
+        
+        switch (this.filterDeadline) {
+          case 'today':
+            fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+            break;
+          case 'this_week':
+            fromDate = new Date(now);
+            fromDate.setDate(now.getDate() - now.getDay());
+            fromDate.setHours(0,0,0,0);
+            toDate = new Date(fromDate);
+            toDate.setDate(fromDate.getDate() + 6);
+            toDate.setHours(23,59,59,999);
+            break;
+          case 'next_week':
+            fromDate = new Date(now);
+            fromDate.setDate(now.getDate() - now.getDay() + 7);
+            fromDate.setHours(0,0,0,0);
+            toDate = new Date(fromDate);
+            toDate.setDate(fromDate.getDate() + 6);
+            toDate.setHours(23,59,59,999);
+            break;
+        }
+        if (fromDate) filters['dueDateFrom'] = fromDate.toISOString();
+        if (toDate) filters['dueDateTo'] = toDate.toISOString();
+      }
     }
 
     this.ticketService.getTickets(filters).subscribe({
@@ -698,6 +781,22 @@ export class TicketsComponent implements OnInit {
       });
     }
 
+    if (this.filterMonth && this.filterMonth !== 'all') {
+      chips.push({
+        key: 'date',
+        label: `Date: ${this.formatLabel(this.filterMonth)}`,
+        clear: () => { this.filterMonth = 'all'; this.loadTickets(); },
+      });
+    }
+
+    if (this.filterDeadline && this.filterDeadline !== 'all') {
+      chips.push({
+        key: 'deadline',
+        label: `Deadline: ${this.formatLabel(this.filterDeadline)}`,
+        clear: () => { this.filterDeadline = 'all'; this.loadTickets(); },
+      });
+    }
+
     if (this.filterDept) {
       const dept = this.departments.find(d => String(d.id) === String(this.filterDept));
       chips.push({
@@ -739,6 +838,8 @@ export class TicketsComponent implements OnInit {
     this.filterStatus = '';
     this.filterPriority = '';
     this.filterPlatform = '';
+    this.filterMonth = 'all';
+    this.filterDeadline = 'all';
     this.searchTerm = '';
     this.gridApi?.setGridOption('quickFilterText', '');
     this.loadTickets();

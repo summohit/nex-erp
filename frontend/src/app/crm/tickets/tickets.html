@@ -404,18 +404,33 @@
       </div>
 
 
-      <!-- Month Filter -->
-      <div class="month-filter-wrapper">
-        <select class="form-select month-select" [(ngModel)]="filterMonth" (change)="loadTickets()">
-          <option value="all">All Time</option>
-          <option value="1_month">Past 1 Month</option>
-          <option value="3_months">Past 3 Months</option>
-          <option value="6_months">Past 6 Months</option>
-        </select>
-      </div>
-
-      <!-- Filter Searchable Dropdowns -->
+      <!-- Filter Dropdowns Group -->
       <div class="filter-dropdowns-group">
+
+        <!-- Date Filter -->
+        <div class="month-filter-wrapper">
+          <select class="form-select month-select" [(ngModel)]="filterMonth" (change)="loadTickets()">
+            <option value="all">All Dates</option>
+            <option value="today">Today</option>
+            <option value="this_week">This Week</option>
+            <option value="last_month">Last Month</option>
+            <option value="last_year">Last Year</option>
+            <option value="1_month">Past 1 Month</option>
+            <option value="3_months">Past 3 Months</option>
+            <option value="6_months">Past 6 Months</option>
+          </select>
+        </div>
+
+        <!-- Deadline Filter -->
+        <div class="month-filter-wrapper">
+          <select class="form-select month-select" [(ngModel)]="filterDeadline" (change)="loadTickets()">
+            <option value="all">Any Deadline</option>
+            <option value="overdue">Overdue</option>
+            <option value="today">Due Today</option>
+            <option value="this_week">Due This Week</option>
+            <option value="next_week">Due Next Week</option>
+          </select>
+        </div>
 
         <!-- 1. Department Filter (Searchable) -->
         <div class="searchable-filter-dropdown">
@@ -538,7 +553,7 @@
         </div>
 
         <!-- Reset All Filters Button -->
-        <button class="btn-reset-filters" *ngIf="hasActiveFilters()" (click)="clearFilters()" title="Reset all filters">
+        <button class="btn-reset-filters" [disabled]="!hasActiveFilters()" [class.disabled-reset]="!hasActiveFilters()" (click)="clearFilters()" title="Reset all filters">
           <svg lucideRotateCcw [size]="13"></svg>
           <span>Reset</span>
         </button>
@@ -839,8 +854,18 @@
                 </div>
               </div>
             </div>
-            <div class="dropdown-backdrop-transparent" *ngIf="showModalPriorityDropdown" (click)="showModalPriorityDropdown = false"></div>
           </div>
+        </div>
+
+        <!-- 4. Deadline -->
+        <div class="form-group">
+          <label for="ticketDeadline">Deadline (Optional)</label>
+          <input
+            id="ticketDeadline"
+            type="date"
+            class="form-input form-input-lg"
+            [(ngModel)]="newTicket.dueDate"
+          />
         </div>
       </div>
 

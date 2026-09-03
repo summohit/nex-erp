@@ -2,8 +2,9 @@ import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MasterDataService, Department, Designation, Branch, LeaveType, Holiday } from '../../services/master-data.service';
+import { ShiftsService } from '../../services/shifts.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucidePlus, LucideX, LucideCalendar, LucideList, LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
+import { LucidePlus, LucideX, LucideCalendar, LucideList, LucideChevronLeft, LucideChevronRight, LucideClock } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
@@ -11,7 +12,7 @@ import { StatusToggleRendererComponent } from '../../shared/components/status-to
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'holidays' | 'blackout-dates';
+type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'holidays' | 'blackout-dates' | 'shifts';
 
 export interface BlackoutDate {
   id: number;
@@ -23,12 +24,13 @@ export interface BlackoutDate {
 @Component({
   selector: 'app-master-data',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucidePlus, LucideX, LucideCalendar, LucideList, LucideChevronLeft, LucideChevronRight, AgGridAngular],
+  imports: [CommonModule, FormsModule, LucidePlus, LucideX, LucideCalendar, LucideList, LucideChevronLeft, LucideChevronRight, LucideClock, AgGridAngular],
   templateUrl: './master-data.html',
   styleUrls: ['./master-data.css']
 })
 export class MasterDataComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
+  private shiftsService = inject(ShiftsService);
   private toast = inject(HotToastService);
 
   activeTab = signal<Tab>('departments');
@@ -39,6 +41,7 @@ export class MasterDataComponent implements OnInit {
   leaveTypes = signal<LeaveType[]>([]);
   holidays = signal<Holiday[]>([]);
   blackoutDates = signal<BlackoutDate[]>([]);
+  shifts = signal<any[]>([]);
 
   holidayView = signal<'table' | 'calendar'>('table');
   calendarDate = signal(new Date());
@@ -132,6 +135,25 @@ export class MasterDataComponent implements OnInit {
       enableClickSelection: false
     }
   };
+
+  // --- Shifts ---
+  shiftColDefs: ColDef[] = [
+    { field: 'name', headerName: 'Shift Name', minWidth: 200 },
+    { field: 'startTime', headerName: 'Start Time', width: 120 },
+    { field: 'endTime', headerName: 'End Time', width: 120 },
+    { field: 'bufferTimeMinutes', headerName: 'Buffer Time (mins)', width: 150 },
+    {
+      headerName: 'Actions',
+      cellRenderer: ActionCellRendererComponent,
+      cellRendererParams: {
+        onEdit: (data: any) => this.openModal('edit', data),
+        onDelete: (data: any) => this.deleteItem(data.id)
+      },
+      width: 100,
+      sortable: false,
+      filter: false
+    }
+  ];
 
   deptColDefs: ColDef[] = [
     { 
@@ -374,6 +396,7 @@ export class MasterDataComponent implements OnInit {
     this.masterDataService.getLeaveTypes().subscribe({ next: (data) => this.leaveTypes.set(data) });
     this.masterDataService.getHolidays().subscribe({ next: (data) => this.holidays.set(data) });
     this.masterDataService.getBlackoutDates().subscribe({ next: (data) => this.blackoutDates.set(data) });
+    this.shiftsService.getShifts().subscribe({ next: (data) => this.shifts.set(data) });
   }
 
   switchTab(tab: Tab) {
@@ -405,7 +428,8 @@ export class MasterDataComponent implements OnInit {
         defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
         accrualFrequency: 'NONE', accrualAmount: 0,
         allowHalfDay: true,
-        date: ''
+        date: '',
+        bufferTimeMinutes: 15
       };
       if (this.activeTab() === 'branches') {
         this.weeklyOffConditions = { '0': 'all' }; // Default Sunday off
@@ -477,6 +501,9 @@ export class MasterDataComponent implements OnInit {
     } else if (tab === 'blackout-dates') {
       if (mode === 'create') this.masterDataService.createBlackoutDate(this.formData).subscribe({ next: () => onSuccess('Blackout date created'), error: onError });
       else this.masterDataService.updateBlackoutDate(id, this.formData).subscribe({ next: () => onSuccess('Blackout date updated'), error: onError });
+    } else if (tab === 'shifts') {
+      if (mode === 'create') this.shiftsService.createShift(this.formData).subscribe({ next: () => onSuccess('Shift created'), error: onError });
+      else this.shiftsService.updateShift(id, this.formData).subscribe({ next: () => onSuccess('Shift updated'), error: onError });
     }
   }
 
@@ -492,6 +519,7 @@ export class MasterDataComponent implements OnInit {
     else if (tab === 'leave-types') deleteSub = this.masterDataService.deleteLeaveType(id);
     else if (tab === 'holidays') deleteSub = this.masterDataService.deleteHoliday(id);
     else if (tab === 'blackout-dates') deleteSub = this.masterDataService.deleteBlackoutDate(id);
+    else if (tab === 'shifts') deleteSub = this.shiftsService.deleteShift(id);
 
     deleteSub.subscribe({
       next: () => {

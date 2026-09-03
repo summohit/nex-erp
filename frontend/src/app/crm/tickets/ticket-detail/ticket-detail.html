@@ -187,6 +187,14 @@
           </div>
         </div>
 
+        <!-- Deadline -->
+        <div class="meta-item" *ngIf="ticket.dueDate">
+          <span class="meta-label">Deadline</span>
+          <div class="meta-value-box">
+            <span class="meta-value-text" [class.text-danger]="isOverdue(ticket.dueDate)">{{ ticket.dueDate | date:'mediumDate' }}</span>
+          </div>
+        </div>
+
         <!-- Created At -->
         <div class="meta-item">
           <span class="meta-label">Created Date</span>

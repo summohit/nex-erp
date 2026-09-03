@@ -4,16 +4,37 @@ import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideCalendarClock, LucideRotateCcw, LucideSearch, LucideX,
-  LucideChevronDown, LucideCheck, LucideFilter, LucideDownload,
+  LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideCheck, LucideFilter, LucideDownload,
   LucideRefreshCw, LucideUserCheck, LucideUserX, LucideClock,
   LucideAlertTriangle, LucideDoorOpen, LucideCalendarDays,
   LucideBuilding, LucideUser, LucideTimer, LucideCheckCircle2,
   LucideLayers, LucideEye, LucideMapPin, LucideInbox,
-  LucideArrowUpDown, LucideSparkles
+  LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
+  LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
+  LucideExternalLink
 } from '@lucide/angular';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
+
+export interface DayMatrixStatus {
+  dayNumber: number;
+  weekdayStr: string;
+  date: Date;
+  dateStr: string;
+  isWeekend: boolean;
+  isFuture: boolean;
+  status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty';
+  tooltip: string;
+  record?: AttendanceRecord;
+}
+
+export interface EmployeeMatrixRow {
+  employee: any;
+  days: DayMatrixStatus[];
+  totalPresent: number;
+  totalWorkingDays: number;
+}
 
 @Component({
   selector: 'app-all-attendance',
@@ -21,12 +42,14 @@ import { EmployeeService, Employee } from '../../services/employee.service';
   imports: [
     CommonModule, FormsModule,
     LucideCalendarClock, LucideRotateCcw, LucideSearch, LucideX,
-    LucideChevronDown, LucideCheck, LucideFilter, LucideDownload,
+    LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideCheck, LucideFilter, LucideDownload,
     LucideRefreshCw, LucideUserCheck, LucideUserX, LucideClock,
     LucideAlertTriangle, LucideDoorOpen, LucideCalendarDays,
     LucideBuilding, LucideUser, LucideTimer, LucideCheckCircle2,
     LucideLayers, LucideEye, LucideMapPin, LucideInbox,
-    LucideArrowUpDown, LucideSparkles
+    LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
+    LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
+    LucideExternalLink
   ],
   templateUrl: './all-attendance.html',
   styleUrls: ['./all-attendance.css']
@@ -37,11 +60,27 @@ export class AllAttendanceComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private toast = inject(HotToastService);
 
+  viewMode = signal<'grid' | 'table'>('grid');
   records = signal<AttendanceRecord[]>([]);
   employees = signal<Employee[]>([]);
   departments = signal<Department[]>([]);
+  holidays = signal<any[]>([]);
   isLoading = signal(false);
   selectedRecord = signal<AttendanceRecord | null>(null);
+
+  // Selected Day Details for Modal (matching Screenshot 3)
+  selectedDayDetails = signal<{
+    employeeName: string;
+    employeeEmail: string;
+    employeeDept: string;
+    employeeRole: string;
+    employeeAvatarUrl: string | null;
+    date: Date;
+    status: string;
+    logs: any[];
+    durationStr: string;
+  } | null>(null);
+  isDetailsModalOpen = signal(false);
 
   months = [
     { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
@@ -58,7 +97,7 @@ export class AllAttendanceComponent implements OnInit {
   filterDepartmentId: number | null = null;
   filterStatus = '';
   filterFlag: 'ALL' | 'LATE' | 'EARLY' | 'ON_TIME' | 'MISSING_OUT' = 'ALL';
-  searchQuery = '';
+  searchQuery = signal('');
   sortBy: 'date_desc' | 'date_asc' | 'name_asc' | 'hours_desc' = 'date_desc';
 
   // Searchable Dropdown state
@@ -101,8 +140,9 @@ export class AllAttendanceComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.employeeService.getEmployeesBasicList().subscribe({ next: (res) => this.employees.set(res) });
-    this.masterDataService.getDepartments(true).subscribe({ next: (res) => this.departments.set(res) });
+    this.employeeService.getEmployeesBasicList().subscribe({ next: (res) => this.employees.set(res || []) });
+    this.masterDataService.getDepartments(true).subscribe({ next: (res) => this.departments.set(res || []) });
+    this.masterDataService.getHolidays().subscribe({ next: (res: any) => this.holidays.set(res || []) });
     this.load();
   }
 
@@ -116,7 +156,7 @@ export class AllAttendanceComponent implements OnInit {
       status: this.filterStatus || undefined
     }).subscribe({
       next: (res) => {
-        this.records.set(res);
+        this.records.set(res || []);
         this.isLoading.set(false);
       },
       error: () => {
@@ -125,6 +165,186 @@ export class AllAttendanceComponent implements OnInit {
       }
     });
   }
+
+  // Month navigation
+  prevMonth() {
+    if (this.filterMonth === 1) {
+      this.filterMonth = 12;
+      this.filterYear--;
+    } else {
+      this.filterMonth--;
+    }
+    this.load();
+  }
+
+  nextMonth() {
+    if (this.filterMonth === 12) {
+      this.filterMonth = 1;
+      this.filterYear++;
+    } else {
+      this.filterMonth++;
+    }
+    this.load();
+  }
+
+  jumpToCurrentMonth() {
+    const now = new Date();
+    this.filterMonth = now.getMonth() + 1;
+    this.filterYear = now.getFullYear();
+    this.load();
+  }
+
+  getBackendDateString(date: Date | string): string {
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
+  }
+
+  getLocalDateString(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Days in month calculation for the grid header
+  daysOfMonth = computed(() => {
+    const year = this.filterYear;
+    const month = this.filterMonth;
+    const totalDays = new Date(year, month, 0).getDate();
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const days = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
+      const date = new Date(year, month - 1, dayNum);
+      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+      const isFuture = date > today;
+      const weekdayStr = weekdays[date.getDay()];
+      const dateStr = this.getLocalDateString(date);
+
+      days.push({
+        dayNumber: dayNum,
+        weekdayStr,
+        date,
+        dateStr,
+        isWeekend,
+        isFuture
+      });
+    }
+    return days;
+  });
+
+  // Employee rows for the Monthly Matrix Grid
+  employeeGridRows = computed<EmployeeMatrixRow[]>(() => {
+    const records = this.records();
+    const allEmps = this.employees();
+    const holidays = this.holidays();
+    const days = this.daysOfMonth();
+    const q = this.searchQuery().toLowerCase().trim();
+
+    const recordMap = new Map<string, AttendanceRecord>();
+    records.forEach(r => {
+      const dateStr = this.getBackendDateString(r.date);
+      recordMap.set(`${r.employeeId}_${dateStr}`, r);
+    });
+
+    const empMap = new Map<number, any>();
+    allEmps.forEach(e => empMap.set(e.id, e));
+    records.forEach(r => {
+      if (r.employee && !empMap.has(r.employeeId)) {
+        empMap.set(r.employeeId, r.employee);
+      }
+    });
+
+    let emps = Array.from(empMap.values());
+
+    if (this.filterEmployeeId) {
+      emps = emps.filter(e => e.id === this.filterEmployeeId);
+    }
+    if (this.filterDepartmentId) {
+      emps = emps.filter(e => e.departmentId === this.filterDepartmentId || e.department?.id === this.filterDepartmentId);
+    }
+    if (q) {
+      emps = emps.filter(e => {
+        const name = `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase();
+        const dept = (e.department?.name || '').toLowerCase();
+        const desig = (e.designation?.name || '').toLowerCase();
+        const code = (e.employeeCode || '').toLowerCase();
+        return name.includes(q) || dept.includes(q) || desig.includes(q) || code.includes(q);
+      });
+    }
+
+    return emps.map(emp => {
+      let workingDaysCount = 0;
+      let presentCount = 0;
+
+      const dayCells: DayMatrixStatus[] = days.map(day => {
+        const key = `${emp.id}_${day.dateStr}`;
+        const record = recordMap.get(key);
+        const holiday = holidays.find(h => this.getBackendDateString(h.date) === day.dateStr);
+
+        let status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty' = 'Empty';
+        let tooltip = '';
+
+        if (day.isFuture) {
+          status = 'Empty';
+          tooltip = `${day.dayNumber} ${day.weekdayStr} - Upcoming`;
+        } else if (record && record.clockIn) {
+          if (record.status === 'HALF_DAY') {
+            status = 'Half Day';
+          } else if (record.isLate) {
+            status = 'Late';
+          } else if (record.status === 'PRESENT') {
+            status = 'Present';
+          } else if (record.status === 'ABSENT') {
+            status = 'Absent';
+          } else {
+            status = 'Present';
+          }
+
+          const inTime = this.formatTime(record.clockIn);
+          const outTime = record.clockOut ? this.formatTime(record.clockOut) : '...';
+          tooltip = `In: ${inTime} · Out: ${outTime}`;
+          if (['Present', 'Late', 'Half Day'].includes(status)) {
+            presentCount++;
+          }
+          if (!day.isWeekend && !holiday) {
+            workingDaysCount++;
+          }
+        } else if (holiday) {
+          status = 'Holiday';
+          tooltip = holiday.name || 'Company Holiday';
+        } else if (day.isWeekend) {
+          status = 'Day Off';
+          tooltip = 'Weekend Day Off';
+        } else {
+          status = 'Absent';
+          tooltip = 'Absent (No punch recorded)';
+          workingDaysCount++;
+        }
+
+        return {
+          dayNumber: day.dayNumber,
+          weekdayStr: day.weekdayStr,
+          date: day.date,
+          dateStr: day.dateStr,
+          isWeekend: day.isWeekend,
+          isFuture: day.isFuture,
+          status,
+          tooltip,
+          record
+        };
+      });
+
+      return {
+        employee: emp,
+        days: dayCells,
+        totalPresent: presentCount,
+        totalWorkingDays: workingDaysCount || 1
+      };
+    });
+  });
 
   // Computed metrics
   stats = computed(() => {
@@ -153,7 +373,7 @@ export class AllAttendanceComponent implements OnInit {
   // Filtered & Sorted Records
   filteredRecords = computed(() => {
     let list = [...this.records()];
-    const q = this.searchQuery.toLowerCase().trim();
+    const q = this.searchQuery().toLowerCase().trim();
 
     // 1. Text Search (Employee name, department)
     if (q) {
@@ -337,7 +557,7 @@ export class AllAttendanceComponent implements OnInit {
 
   hasActiveFilters(): boolean {
     return !!(
-      this.searchQuery ||
+      this.searchQuery() ||
       this.filterEmployeeId ||
       this.filterDepartmentId ||
       this.filterStatus ||
@@ -348,11 +568,11 @@ export class AllAttendanceComponent implements OnInit {
   getActiveFilterChips(): { key: string; label: string; clear: () => void }[] {
     const chips: { key: string; label: string; clear: () => void }[] = [];
 
-    if (this.searchQuery) {
+    if (this.searchQuery()) {
       chips.push({
         key: 'search',
-        label: `Search: "${this.searchQuery}"`,
-        clear: () => { this.searchQuery = ''; }
+        label: `Search: "${this.searchQuery()}"`,
+        clear: () => { this.searchQuery.set(''); }
       });
     }
 
@@ -399,7 +619,7 @@ export class AllAttendanceComponent implements OnInit {
     this.filterDepartmentId = null;
     this.filterStatus = '';
     this.filterFlag = 'ALL';
-    this.searchQuery = '';
+    this.searchQuery.set('');
     this.closeAllDropdowns();
     this.load();
   }
@@ -462,8 +682,73 @@ export class AllAttendanceComponent implements OnInit {
     this.toast.success('Attendance report exported successfully!');
   }
 
+  // Open Detailed Session Modal (Screenshot 3)
+  openDayDetails(emp: any, day: any, record?: AttendanceRecord) {
+    if (day.isFuture) return;
+
+    const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.name || 'Employee';
+    const empEmail = emp.user?.email || emp.email || 'employee@company.com';
+    const empDept = emp.department?.name || emp.designation?.name || 'Staff';
+    const empRole = emp.user?.role || 'EMPLOYEE';
+    const empAvatar = emp.avatarUrl || null;
+
+    let logs: any[] = [];
+    let durationStr = '—';
+
+    if (record) {
+      if (record.logs && record.logs.length > 0) {
+        logs = record.logs;
+      } else if (record.clockIn) {
+        logs = [{
+          clockIn: record.clockIn,
+          clockOut: record.clockOut,
+          clockInLat: record.clockInLat,
+          clockInLng: record.clockInLng,
+          clockOutLat: record.clockOutLat,
+          clockOutLng: record.clockOutLng
+        }];
+      }
+
+      if (record.clockIn && record.clockOut) {
+        const diffMs = new Date(record.clockOut).getTime() - new Date(record.clockIn).getTime();
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        durationStr = `${hours} hrs ${mins} mins`;
+      } else if (record.clockIn) {
+        const diffMs = new Date().getTime() - new Date(record.clockIn).getTime();
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        durationStr = `${hours} hrs ${mins} mins (Active)`;
+      }
+    }
+
+    this.selectedDayDetails.set({
+      employeeName: empName,
+      employeeEmail: empEmail,
+      employeeDept: empDept,
+      employeeRole: empRole,
+      employeeAvatarUrl: empAvatar,
+      date: day.date,
+      status: day.status,
+      logs,
+      durationStr
+    });
+
+    this.isDetailsModalOpen.set(true);
+  }
+
+  closeDayDetailsModal() {
+    this.isDetailsModalOpen.set(false);
+    this.selectedDayDetails.set(null);
+  }
+
   openDetail(record: AttendanceRecord) {
-    this.selectedRecord.set(record);
+    const day = {
+      date: new Date(record.date),
+      status: record.status === 'HALF_DAY' ? 'Half Day' : record.isLate ? 'Late' : record.status === 'PRESENT' ? 'Present' : 'Absent',
+      isFuture: false
+    };
+    this.openDayDetails(record.employee, day, record);
   }
 
   closeDetail() {

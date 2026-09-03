@@ -336,7 +336,11 @@ export class ProfileTabComponent implements OnInit {
         // Usual work location mapping per day. Per-day shift overrides live in a
         // nested `shifts` key so records saved before this existed still load.
         usualWorkLocation: this.normaliseWorkLocation(this.employeeData.usualWorkLocation),
+        workLocation: this.employeeData.workLocation || null,
         workNotes: this.employeeData.workNotes || '',
+        
+        pfNumber: this.employeeData.pfNumber || '',
+        esiNumber: this.employeeData.esiNumber || '',
 
         // Bank Details
         bankName: this.employeeData.bankName || '',

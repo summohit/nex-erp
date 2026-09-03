@@ -286,6 +286,17 @@ export class TicketsService {
       if (filters.toDate) where.createdAt.lte = new Date(filters.toDate);
     }
 
+    if (filters.dueDateFrom || filters.dueDateTo) {
+      where.dueDate = {};
+      if (filters.dueDateFrom) where.dueDate.gte = new Date(filters.dueDateFrom);
+      if (filters.dueDateTo) where.dueDate.lte = new Date(filters.dueDateTo);
+    }
+    
+    if (filters.deadline === 'overdue') {
+      where.dueDate = { lt: new Date() };
+      where.status = { notIn: ['RESOLVED', 'CLOSED'] };
+    }
+
     return this.prisma.ticket.findMany({
       where,
       include: {

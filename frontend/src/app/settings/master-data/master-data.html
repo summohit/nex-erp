@@ -6,7 +6,7 @@
     </div>
     <button class="btn-primary" (click)="openModal('create')">
       <svg lucidePlus size="18"></svg>
-      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : 'Holiday' }}
+      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
     </button>
   </div>
 
@@ -24,6 +24,7 @@
       Designations
     </button>
     <button class="tab-btn" [class.active]="activeTab() === 'branches'" (click)="switchTab('branches')">Branches</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'shifts'" (click)="switchTab('shifts')">Shifts</button>
     <button class="tab-btn" [class.active]="activeTab() === 'leave-types'" (click)="switchTab('leave-types')">Leave Types</button>
     <button class="tab-btn" [class.active]="activeTab() === 'holidays'" (click)="switchTab('holidays')">Holidays</button>
     <button class="tab-btn" [class.active]="activeTab() === 'blackout-dates'" (click)="switchTab('blackout-dates')">Blackout Dates</button>
@@ -59,6 +60,17 @@
       style="width: 100%; height: 500px;"
       [rowData]="branches()"
       [columnDefs]="branchColDefs"
+      [defaultColDef]="defaultColDef"
+      [gridOptions]="gridOptions">
+    </ag-grid-angular>
+
+    <ag-grid-angular
+      *ngIf="activeTab() === 'shifts'"
+      class="ag-theme-quartz"
+      [theme]="'legacy'"
+      style="width: 100%; height: 500px;"
+      [rowData]="shifts()"
+      [columnDefs]="shiftColDefs"
       [defaultColDef]="defaultColDef"
       [gridOptions]="gridOptions">
     </ag-grid-angular>
@@ -157,7 +169,7 @@
   <div class="modal-content slide-in">
     <div class="modal-header">
       <div class="header-titles">
-        <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'holidays' ? 'Holiday' : 'Blackout Date' }}</h2>
+        <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
         <p class="subtitle">Enter the details to keep your master data organized</p>
       </div>
       <button class="btn-icon close-btn" (click)="closeModal()">
@@ -167,7 +179,7 @@
     
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-group" [class.full-width]="activeTab() === 'departments'" *ngIf="activeTab() !== 'holidays' && activeTab() !== 'blackout-dates'">
+        <div class="form-group" [class.full-width]="activeTab() === 'departments'" *ngIf="activeTab() !== 'holidays' && activeTab() !== 'blackout-dates' && activeTab() !== 'shifts'">
           <label>Name</label>
           <input type="text" class="form-control" [(ngModel)]="formData.name" placeholder="Enter name">
         </div>
@@ -191,6 +203,25 @@
             <input type="checkbox" [(ngModel)]="formData.canEditProfiles">
             <span class="slider"></span>
           </label>
+        </div>
+
+        <!-- Shifts -->
+        <div class="form-group full-width" *ngIf="activeTab() === 'shifts'">
+          <label>Shift Name</label>
+          <input type="text" class="form-control" [(ngModel)]="formData.name" placeholder="e.g. Morning Shift">
+        </div>
+        <div class="form-group" *ngIf="activeTab() === 'shifts'">
+          <label>Start Time</label>
+          <input type="time" class="form-control" [(ngModel)]="formData.startTime">
+        </div>
+        <div class="form-group" *ngIf="activeTab() === 'shifts'">
+          <label>End Time</label>
+          <input type="time" class="form-control" [(ngModel)]="formData.endTime">
+        </div>
+        <div class="form-group full-width" *ngIf="activeTab() === 'shifts'">
+          <label>Buffer Time (minutes)</label>
+          <input type="number" class="form-control" [(ngModel)]="formData.bufferTimeMinutes" placeholder="e.g. 15">
+          <p class="help-text">Grace period allowed before marking as late.</p>
         </div>
 
         <!-- Branches -->

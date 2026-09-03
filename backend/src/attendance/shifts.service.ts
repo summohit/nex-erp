@@ -58,7 +58,12 @@ export class ShiftsService {
 
     return this.prisma.shift.update({
       where: { id },
-      data
+      data: {
+        name: data.name,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        bufferTimeMinutes: data.bufferTimeMinutes,
+      }
     });
   }
 

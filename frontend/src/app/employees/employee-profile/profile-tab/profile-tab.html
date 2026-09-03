@@ -87,11 +87,23 @@
           <div class="form-grid-stack">
             
             <div class="form-row-item">
-              <label class="item-label">Branch (Work Location)</label>
+              <label class="item-label">Branch</label>
               <div class="item-value">
                 <select class="form-control select-location" [(ngModel)]="formData.branchId" [disabled]="!canEditWorkDetails">
                   <option [ngValue]="null">Select a branch</option>
                   <option *ngFor="let branch of companyBranches" [ngValue]="branch.id">{{ branch.name }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row-item">
+              <label class="item-label">Work Location</label>
+              <div class="item-value">
+                <select class="form-control" [(ngModel)]="formData.workLocation" [disabled]="!canEditWorkDetails">
+                  <option [ngValue]="null">Select Location</option>
+                  <option value="Work from Home">Work from Home</option>
+                  <option value="Sector 135">Sector 135</option>
+                  <option value="On Site">On Site</option>
                 </select>
               </div>
             </div>
@@ -524,6 +536,16 @@
           <div class="form-group">
             <label>Identification No (Govt ID / Aadhaar)</label>
             <input type="text" class="form-control" [(ngModel)]="formData.identificationNo" [disabled]="!canEditPersonalDetails" placeholder="Issued by Government">
+          </div>
+
+          <div class="form-group">
+            <label>PF Number (Provident Fund)</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.pfNumber" [disabled]="!canEditPersonalDetails" placeholder="PF Number">
+          </div>
+
+          <div class="form-group">
+            <label>ESI Number</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.esiNumber" [disabled]="!canEditPersonalDetails" placeholder="ESI Number">
           </div>
 
           <div class="form-group">

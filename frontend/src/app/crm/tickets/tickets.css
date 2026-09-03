@@ -545,9 +545,17 @@
   transition: all 0.15s ease;
 }
 
-.btn-reset-filters:hover {
+.btn-reset-filters:hover:not(:disabled) {
   background: #fca5a5;
   color: #7f1d1d;
+}
+
+.btn-reset-filters:disabled,
+.btn-reset-filters.disabled-reset {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 /* Active Chips */

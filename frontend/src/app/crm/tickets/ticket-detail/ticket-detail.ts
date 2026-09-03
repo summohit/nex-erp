@@ -111,6 +111,15 @@ export class TicketDetailComponent implements OnInit {
   timerInterval: any = null;
   elapsedSeconds = 0;
 
+  isOverdue(dateString?: string): boolean {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    date.setHours(0,0,0,0);
+    return date < today && this.ticket.status !== 'RESOLVED' && this.ticket.status !== 'CLOSED';
+  }
+
   ngOnInit() {
     this.refreshTicket();
   }

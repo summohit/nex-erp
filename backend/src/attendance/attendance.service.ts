@@ -418,7 +418,19 @@ export class AttendanceService {
       where,
       include: {
         employee: {
-          select: { id: true, firstName: true, lastName: true, avatarUrl: true, department: { select: { id: true, name: true } } },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            employeeCode: true,
+            department: { select: { id: true, name: true } },
+            designation: { select: { id: true, name: true } },
+            user: { select: { email: true, role: true } },
+          },
+        },
+        logs: {
+          orderBy: { clockIn: 'asc' },
         },
       },
       orderBy: [{ date: 'desc' }, { employeeId: 'asc' }],
