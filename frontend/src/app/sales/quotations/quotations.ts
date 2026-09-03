@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { LucidePlus, LucideFileText, LucideCheck, LucideTrash2, LucideArrowRight, LucideX, LucideIndianRupee } from '@lucide/angular';
+import { LucidePlus, LucideFileText, LucideCheck, LucideTrash2, LucideArrowRight, LucideX, LucideIndianRupee, LucideUpload } from '@lucide/angular';
 import { ClientsService } from '../../services/clients';
 import { SearchableSelectComponent } from '../../shared/components/searchable-select/searchable-select.component';
 import { DialogHostComponent } from '../../shared/components/dialog-host/dialog-host.component';
@@ -14,6 +14,12 @@ interface QuotationItem {
   quantity: number;
   unit: string;
   unitPrice: number;
+}
+
+interface QuotationAttachment {
+  fileName: string;
+  fileUrl: string;
+  fileSize?: number;
 }
 
 interface Quotation {
@@ -27,12 +33,22 @@ interface Quotation {
   approvalStatus: string;
 }
 
+const DEFAULT_TERMS = `1. Validity: This quotation is valid for the period stated above.
+2. Payment Terms: 50% advance against Purchase Order and balance before dispatch / on delivery.
+3. Taxes: Prices are exclusive of GST unless stated otherwise. GST will be charged at the applicable rate.
+4. Delivery: Delivery/implementation timelines will be communicated upon order confirmation.
+5. Warranty: Standard manufacturer warranty applies from the date of delivery.
+6. Force Majeure: Neither party shall be liable for delays caused by events beyond reasonable control.
+7. Acceptance: This proposal is subject to our standard terms of sale and acceptance of a Purchase Order.
+8. Governing Law: This proposal shall be governed by the laws of India and subject to jurisdiction of the courts.`;
+
 @Component({
   selector: 'app-quotations',
   standalone: true,
   imports: [
     CommonModule, FormsModule,
     LucidePlus, LucideFileText, LucideCheck, LucideTrash2, LucideArrowRight, LucideX, LucideIndianRupee,
+    LucideUpload,
     SearchableSelectComponent, DialogHostComponent
   ],
   templateUrl: './quotations.html',
@@ -53,6 +69,10 @@ export class QuotationsComponent implements OnInit {
   readonly unitOptions = ['number', 'piece', 'hour', 'day', 'kg', 'litre', 'meter', 'roll', 'box', 'bundle'];
   readonly taxOptions = [0, 5, 12, 18, 28];
 
+  readonly maxAttachments = 8;
+  readonly maxAttachmentBytes = 20 * 1024 * 1024;
+  uploadingCount = 0;
+
   newQuoteData: {
     clientId: number | null;
     leadId: number | null;
@@ -61,7 +81,9 @@ export class QuotationsComponent implements OnInit {
     currency: string;
     taxRate: number;
     notes: string;
+    terms: string;
     items: QuotationItem[];
+    attachments: QuotationAttachment[];
   } = this.freshForm();
 
   private freshForm() {
@@ -73,7 +95,9 @@ export class QuotationsComponent implements OnInit {
       currency: 'INR',
       taxRate: 18,
       notes: '',
-      items: [{ description: '', quantity: 1, unit: 'number', unitPrice: 0 }] as QuotationItem[]
+      terms: DEFAULT_TERMS,
+      items: [{ description: '', quantity: 1, unit: 'number', unitPrice: 0 }] as QuotationItem[],
+      attachments: [] as QuotationAttachment[]
     };
   }
 
@@ -139,9 +163,88 @@ export class QuotationsComponent implements OnInit {
     return map[this.newQuoteData.currency] || '₹';
   }
 
+  /** Lowercased extension including the dot, e.g. ".pdf". */
+  fileExtension(name: string): string {
+    const i = (name || '').lastIndexOf('.');
+    return i === -1 ? '' : name.slice(i).toLowerCase();
+  }
+
+  /** Only images get a thumbnail preview; everything else shows a typed badge. */
+  isImageAttachment(fileName: string): boolean {
+    return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic']
+      .includes(this.fileExtension(fileName).toLowerCase());
+  }
+
+  /** Short uppercase label for a non-image file, e.g. "PDF", "XLSX". */
+  fileTypeLabel(fileName: string): string {
+    return this.fileExtension(fileName).replace('.', '').toUpperCase() || 'FILE';
+  }
+
+  /** Groups extensions so the badge can be colour-coded by kind. */
+  fileTypeClass(fileName: string): string {
+    const ext = this.fileExtension(fileName);
+    if (['.pdf'].includes(ext)) return 'file-pdf';
+    if (['.doc', '.docx', '.odt', '.rtf'].includes(ext)) return 'file-doc';
+    if (['.xls', '.xlsx', '.ods', '.csv'].includes(ext)) return 'file-sheet';
+    if (['.ppt', '.pptx', '.odp'].includes(ext)) return 'file-slide';
+    if (['.zip', '.rar', '.7z'].includes(ext)) return 'file-archive';
+    return 'file-generic';
+  }
+
+  onAttachmentsSelected(event: any) {
+    const files: File[] = Array.from(event?.target?.files || []);
+    if (!files.length) return;
+    this.uploadAttachmentFiles(files);
+    if (event?.target) event.target.value = '';
+  }
+
+  removeAttachment(index: number) {
+    if (this.uploadingCount > 0) return;
+    this.newQuoteData.attachments.splice(index, 1);
+  }
+
+  private uploadAttachmentFiles(files: File[]) {
+    const remaining = this.maxAttachments - this.newQuoteData.attachments.length - this.uploadingCount;
+    if (remaining <= 0) {
+      this.dialog.error(`You can attach at most ${this.maxAttachments} files.`);
+      return;
+    }
+    const accepted = files.slice(0, remaining);
+    if (files.length > remaining) {
+      this.dialog.error(`Only ${remaining} more file${remaining === 1 ? '' : 's'} can be attached.`);
+    }
+
+    for (const file of accepted) {
+      if (file.size > this.maxAttachmentBytes) {
+        this.dialog.error(`"${file.name}" is larger than 20MB.`);
+        continue;
+      }
+      this.uploadingCount++;
+      const form = new FormData();
+      form.append('file', file);
+      this.http.post<{ url: string }>(`${environment.apiUrl}/upload`, form).subscribe({
+        next: (res) => {
+          this.newQuoteData.attachments = [
+            ...this.newQuoteData.attachments,
+            { fileName: file.name, fileUrl: res.url, fileSize: file.size },
+          ];
+          this.uploadingCount--;
+        },
+        error: () => {
+          this.dialog.error(`Failed to upload "${file.name}".`);
+          this.uploadingCount--;
+        },
+      });
+    }
+  }
+
   createQuotation() {
     this.isSubmitted = true;
     if (!this.newQuoteData.clientId || this.newQuoteData.items.length === 0) return;
+    if (this.uploadingCount > 0) {
+      this.dialog.error('Please wait for all attachments to finish uploading.');
+      return;
+    }
 
     this.isSaving = true;
     this.http.post(`${environment.apiUrl}/sales/quotations`, this.newQuoteData).subscribe({

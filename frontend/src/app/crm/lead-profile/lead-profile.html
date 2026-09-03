@@ -44,6 +44,10 @@
           <div class="stat-chip-icon icon-since"><svg lucideCalendar size="18"></svg></div>
           <div class="stat-chip-body"><span class="chip-label">Created</span><span class="chip-value">{{ lead.createdAt | date:'mediumDate' }}</span></div>
         </div>
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-lost"><svg lucideX size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Lost / Rejected</span><span class="chip-value chip-lost">{{ lostDeals }}<span class="chip-sub" *ngIf="lostDealValue">{{ lostDealValue | currency:(lead.currency || 'INR') }}</span></span></div>
+        </div>
       </div>
     </div>
 
@@ -215,14 +219,15 @@
 
           <div class="table-scroll" *ngIf="!loadingProposals && proposals.length">
             <table class="leads-table">
-              <thead><tr><th>Proposal Number</th><th>Total</th><th>Date</th><th>Valid Till</th><th>Status</th><th>Action</th></tr></thead>
+              <thead><tr><th>Proposal Number</th><th>Total</th><th>Date</th><th>Valid Till</th><th>Status</th><th>Deal Status</th><th>Action</th></tr></thead>
               <tbody>
                 <tr *ngFor="let q of proposals">
                   <td><div class="table-user-name">{{ q.quoteNumber }}</div></td>
                   <td><span class="amount-cell">{{ q.total | currency:(q.currency || 'INR') }}</span></td>
                   <td>{{ q.date | date:'mediumDate' }}</td>
                   <td>{{ q.validUntil | date:'mediumDate' }}</td>
-                  <td><span class="followup-type-pill fu-type-call">{{ q.status }}</span></td>
+                  <td><span class="followup-type-pill {{ dealStatusPill(q.status) }}">{{ q.status }}</span></td>
+                  <td><span class="deal-status-badge {{ dealStatusPill(q.status) }}">{{ dealStatusLabel(q.status) }}</span></td>
                   <td><div class="table-actions-group">
                     <button class="btn-action-icon" title="View" (click)="goToQuotations()"><svg lucideEye size="15"></svg></button>
                   </div></td>
@@ -319,10 +324,7 @@
           <button class="close-btn" (click)="closeFollowUpModal()"><svg lucideX size="18"></svg></button>
         </div>
         <div class="modal-body-styled modal-body-scroll">
-          <label class="form-label">Title *</label>
-          <input class="modern-form-control" [(ngModel)]="followUpForm.title" placeholder="e.g. Follow-up call regarding pricing">
-
-          <label class="form-label" style="margin-top:16px">Type</label>
+          <label class="form-label">Type</label>
           <select class="modern-form-control" [(ngModel)]="followUpForm.type">
             <option value="CALL">Call</option>
             <option value="MEETING">Meeting</option>
@@ -338,13 +340,6 @@
 
           <label class="form-label" style="margin-top:16px">Remark</label>
           <textarea class="modern-form-control" rows="3" [(ngModel)]="followUpForm.notes" placeholder="Agenda or remarks"></textarea>
-
-          <label class="form-label" style="margin-top:16px">Status</label>
-          <select class="modern-form-control" [(ngModel)]="followUpForm.status">
-            <option value="PENDING">Pending</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
         </div>
         <div class="modal-footer-styled">
           <button class="btn-outline-pill" (click)="closeFollowUpModal()">Cancel</button>

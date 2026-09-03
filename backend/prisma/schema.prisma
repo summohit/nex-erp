@@ -2188,6 +2188,7 @@ model Quotation {
   total          Float
   currency       String
   notes          String?
+  terms          String?
   status         String          @default("DRAFT") // DRAFT, PENDING_APPROVAL, SENT, ACCEPTED, REJECTED
   approvalStatus String          @default("APPROVED") // PENDING, APPROVED, REJECTED
   approvedById   Int?
@@ -2195,6 +2196,7 @@ model Quotation {
   companyId      Int
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   items          QuotationItem[]
+  attachments    QuotationAttachment[]
   salesOrders    SalesOrder[]
 
   createdAt DateTime @default(now())
@@ -2210,6 +2212,16 @@ model QuotationItem {
   unit        String?
   unitPrice   Float
   total       Float
+}
+
+model QuotationAttachment {
+  id           Int       @id @default(autoincrement())
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  quotationId  Int
+  quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
 }
 
 model SalesOrder {

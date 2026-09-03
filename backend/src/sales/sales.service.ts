@@ -8,7 +8,7 @@ export class SalesService {
   // ================= QUOTATIONS =================
 
   async createQuotation(companyId: number, data: any, userId: number) {
-    const { items, ...quoteData } = data;
+    const { items, attachments, ...quoteData } = data;
 
     // Convert date strings to DateTime
     if (quoteData.date && typeof quoteData.date === 'string') {
@@ -53,9 +53,20 @@ export class SalesService {
         approvalStatus,
         items: {
           create: items,
-        }
+        },
+        ...(Array.isArray(attachments) && attachments.length
+          ? {
+              attachments: {
+                create: attachments.map((a: any) => ({
+                  fileName: a.fileName || 'attachment',
+                  fileUrl: a.fileUrl,
+                  fileSize: a.fileSize ? Number(a.fileSize) : null,
+                })),
+              },
+            }
+          : {}),
       },
-      include: { items: true, client: true }
+      include: { items: true, client: true, attachments: true }
     });
   }
 
@@ -64,6 +75,8 @@ export class SalesService {
       where: { companyId },
       include: {
         client: true,
+        items: true,
+        attachments: true,
         approvedBy: { select: { employee: { select: { firstName: true, lastName: true } } } }
       },
       orderBy: { date: 'desc' }

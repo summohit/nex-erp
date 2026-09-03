@@ -6,7 +6,6 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
-import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { AuthService } from '../../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -158,8 +157,8 @@ export class LeadsComponent implements OnInit {
 
   minValue: number | null = null;
   maxValue: number | null = null;
-  dateField: 'createdAt' | 'expectedCloseDate' = 'createdAt';
-  datePreset: 'ALL' | 'TODAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'NEXT_MONTH' | 'THIS_QUARTER' | 'CUSTOM' = 'ALL';
+  dateField: 'createdAt' | 'expectedCloseDate' | 'nextFollowUp' = 'createdAt';
+  datePreset: 'ALL' | 'TODAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'NEXT_MONTH' | 'THIS_QUARTER' | 'THIS_YEAR' | 'CUSTOM' = 'ALL';
   dateStart = '';
   dateEnd = '';
   sortBy: 'newest' | 'oldest' | 'value_desc' | 'value_asc' | 'closing_soon' = 'newest';
@@ -283,20 +282,11 @@ export class LeadsComponent implements OnInit {
   };
 
   // Field Visits
-  selectedFieldVisit: FieldVisit | null = null;
 
-
-  // Field Visits widget — company-wide "who's travelling" panel
-  activeFieldVisits: FieldVisit[] = [];
-  recentFieldVisits: FieldVisit[] = [];
-  fieldVisitsLoading = true;
-  fieldVisitsExpanded = false;
-
-  constructor(private http: HttpClient, private fieldVisitsService: FieldVisitsService, private router: Router, public auth: AuthService, private toast: HotToastService) {}
+  constructor(private http: HttpClient, private router: Router, public auth: AuthService, private toast: HotToastService) {}
 
   ngOnInit() {
     this.loadLeads();
-    this.loadFieldVisitsWidget();
     this.loadEmployees();
     this.loadLeadContacts();
   }
@@ -323,38 +313,6 @@ export class LeadsComponent implements OnInit {
         next: (data) => this.employees = data,
         error: (err) => console.error('Failed to load employees', err)
       });
-  }
-
-  loadFieldVisitsWidget() {
-    this.fieldVisitsLoading = true;
-    this.fieldVisitsService.getCompanyActiveVisits().subscribe({
-      next: (visits) => this.activeFieldVisits = visits,
-      error: (err) => console.error('Failed to load active field visits', err),
-    });
-    this.fieldVisitsService.getCompanyRecentVisits(6).subscribe({
-      next: (visits) => {
-        this.recentFieldVisits = visits;
-        this.fieldVisitsLoading = false;
-      },
-      error: (err) => {
-        console.error('Failed to load recent field visits', err);
-        this.fieldVisitsLoading = false;
-      },
-    });
-  }
-
-  openFieldVisit(visit: FieldVisit) {
-    this.selectedFieldVisit = visit;
-  }
-
-  closeFieldVisit() {
-    this.selectedFieldVisit = null;
-  }
-
-  fieldVisitStatusColor(status: string) {
-    if (status === 'COMPLETED') return { bg: '#dcfce7', text: '#166534' };
-    if (status === 'CANCELLED') return { bg: '#fee2e2', text: '#991b1b' };
-    return { bg: '#fef9c3', text: '#854d0e' };
   }
 
   loadLeads(onLoaded?: () => void) {
@@ -854,6 +812,11 @@ export class LeadsComponent implements OnInit {
       const last = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59, 999);
       return { start: first, end: last };
     }
+    if (this.datePreset === 'THIS_YEAR') {
+      const first = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const last = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+      return { start: first, end: last };
+    }
     return { start: null, end: null };
   }
 
@@ -866,6 +829,23 @@ export class LeadsComponent implements OnInit {
     const now = new Date();
     const hasOverdue = followUps.some(f => new Date(f.scheduledAt) < now);
     return hasOverdue ? 'OVERDUE' : 'SCHEDULED';
+  }
+
+  // Soonest upcoming follow-up date; falls back to the most recent one if there
+  // are no upcoming follow-ups. Returns null when the lead has no follow-ups.
+  getNextFollowUpDate(lead: Lead): Date | null {
+    const followUps = lead.followUps || [];
+    if (followUps.length === 0) return null;
+    const now = new Date().getTime();
+    let next: Date | null = null;
+    let latest: Date | null = null;
+    for (const f of followUps) {
+      const t = new Date(f.scheduledAt).getTime();
+      if (isNaN(t)) continue;
+      if (latest === null || t > latest.getTime()) latest = new Date(t);
+      if (t >= now && (next === null || t < next.getTime())) next = new Date(t);
+    }
+    return next || latest;
   }
 
   getFilteredLeads(): Lead[] {
@@ -915,7 +895,10 @@ export class LeadsComponent implements OnInit {
 
       let matchesDate = true;
       if (start || end) {
-        const raw = this.dateField === 'expectedCloseDate' ? lead.expectedCloseDate : lead.createdAt;
+        let raw: string | Date | null | undefined = null;
+        if (this.dateField === 'expectedCloseDate') raw = lead.expectedCloseDate;
+        else if (this.dateField === 'nextFollowUp') raw = this.getNextFollowUpDate(lead);
+        else raw = lead.createdAt;
         if (!raw) {
           matchesDate = false;
         } else {
@@ -1173,7 +1156,7 @@ export class LeadsComponent implements OnInit {
       chips.push({ key: 'value', label: `Value: ${min} - ${max}`, clear: () => { this.minValue = null; this.maxValue = null; this.onFilterChange(); } });
     }
     if (this.datePreset !== 'ALL') {
-      const fieldLabel = this.dateField === 'expectedCloseDate' ? 'Closing' : 'Created';
+      const fieldLabel = this.dateField === 'expectedCloseDate' ? 'Closing' : this.dateField === 'nextFollowUp' ? 'Next Follow-Up' : 'Created';
       const presetLabel = this.datePreset === 'CUSTOM' ? `${this.dateStart || '…'} to ${this.dateEnd || '…'}` : this.datePreset.replace('_', ' ');
       chips.push({ key: 'date', label: `${fieldLabel}: ${presetLabel}`, clear: () => { this.datePreset = 'ALL'; this.dateStart = ''; this.dateEnd = ''; this.onFilterChange(); } });
     }
@@ -1559,7 +1542,7 @@ export class LeadsComponent implements OnInit {
       .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
   }
 
-  isFollowUpOverdue(scheduledAt: string): boolean {
+  isFollowUpOverdue(scheduledAt: string | Date): boolean {
     return new Date(scheduledAt) < new Date();
   }
 

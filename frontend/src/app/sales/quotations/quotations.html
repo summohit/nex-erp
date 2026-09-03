@@ -184,6 +184,49 @@
           placeholder="Terms, conditions, or additional notes..."></textarea>
       </div>
 
+      <!-- Terms & Conditions -->
+      <div class="form-section">
+        <div class="form-section-label">
+          <span>Terms & Conditions</span>
+          <span class="tc-hint">Pre-filled with standard terms — edit as needed for this proposal</span>
+        </div>
+        <textarea class="form-control tc-textarea" [(ngModel)]="newQuoteData.terms" name="terms"
+          placeholder="Enter terms and conditions..."></textarea>
+      </div>
+
+      <!-- Attachments -->
+      <div class="form-section">
+        <div class="form-section-label">
+          <span>Attachments</span>
+          <span class="label-attachment-counter" [class.has-files]="newQuoteData.attachments.length > 0">
+            {{ newQuoteData.attachments.length }}/{{ maxAttachments }} attached
+          </span>
+        </div>
+        <div class="att-dropzone" (click)="attFileInput.click()">
+          <svg lucideUpload size="18"></svg>
+          <span>Click to upload files&nbsp;<em>(up to {{ maxAttachments }}, 20MB each)</em></span>
+          <input #attFileInput type="file" multiple (change)="onAttachmentsSelected($event)" hidden />
+        </div>
+        <div class="att-grid" *ngIf="newQuoteData.attachments.length || uploadingCount > 0">
+          <div class="att-thumb" *ngFor="let a of newQuoteData.attachments; let i = index">
+            <img *ngIf="isImageAttachment(a.fileName)" [src]="a.fileUrl" [alt]="a.fileName" />
+            <div *ngIf="!isImageAttachment(a.fileName)" class="att-file-badge" [ngClass]="fileTypeClass(a.fileName)">
+              {{ fileTypeLabel(a.fileName) }}
+            </div>
+            <div class="att-meta">
+              <span class="att-name" [title]="a.fileName">{{ a.fileName }}</span>
+              <button type="button" class="att-remove" (click)="removeAttachment(i)" title="Remove">
+                <svg lucideX size="14"></svg>
+              </button>
+            </div>
+          </div>
+          <div class="att-thumb att-uploading" *ngFor="let n of [1,2,3,4,5,6,7,8].slice(0, uploadingCount)">
+            <div class="att-spinner"></div>
+            <span class="att-uploading-label">Uploading…</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Summary -->
       <div class="quote-summary">
         <div class="summary-row">

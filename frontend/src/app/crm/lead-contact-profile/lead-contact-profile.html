@@ -44,7 +44,11 @@
         </div>
         <div class="stat-chip">
           <div class="stat-chip-icon icon-balance"><svg lucideAward size="18"></svg></div>
-          <div class="stat-chip-body"><span class="chip-label">Won</span><span class="chip-value">{{ wonLeadsCount }}</span></div>
+          <div class="stat-chip-body"><span class="chip-label">Won</span><span class="chip-value chip-won">{{ wonLeadsCount }}</span></div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-icon icon-lost"><svg lucideX size="18"></svg></div>
+          <div class="stat-chip-body"><span class="chip-label">Lost</span><span class="chip-value chip-lost">{{ lostLeadsCount }}<span class="chip-sub" *ngIf="lostLeadsValue">{{ lostLeadsValue | currency:(contact.leadsBrought?.[0]?.currency || 'INR') }}</span></span></div>
         </div>
         <div class="stat-chip">
           <div class="stat-chip-icon icon-contact"><svg lucideUserCheck size="18"></svg></div>
@@ -53,6 +57,24 @@
         <div class="stat-chip">
           <div class="stat-chip-icon icon-since"><svg lucideCalendar size="18"></svg></div>
           <div class="stat-chip-body"><span class="chip-label">Added</span><span class="chip-value">{{ contact.createdAt | date:'mediumDate' }}</span></div>
+        </div>
+      </div>
+
+      <!-- Conversion Rate KPI -->
+      <div class="kpi-row" *ngIf="leadsBrought.length">
+        <div class="kpi-card kpi-conversion">
+          <div class="kpi-main">
+            <div class="kpi-icon-wrap"><svg lucideTrendingUp size="22"></svg></div>
+            <div class="kpi-text">
+              <span class="kpi-label">Conversion Rate</span>
+              <span class="kpi-value">{{ conversionRate | number:'1.0-1' }}%</span>
+            </div>
+          </div>
+          <div class="kpi-meta">
+            <span class="kpi-meta-chip win"><span class="kpi-dot"></span> {{ wonLeadsCount }} Won</span>
+            <span class="kpi-meta-chip lose"><span class="kpi-dot"></span> {{ lostLeadsCount }} Lost</span>
+            <span class="kpi-meta-chip total"><span class="kpi-dot"></span> {{ leadsBrought.length }} Total</span>
+          </div>
         </div>
       </div>
     </div>
@@ -91,6 +113,49 @@
             </div>
           </div>
         </div>
+
+        <!-- Deals Summary -->
+        <div class="overview-grid" *ngIf="leadsBrought.length">
+          <div class="content-card summary-card" style="grid-column: 1 / -1;">
+            <div class="card-header-styled">
+              <div class="header-title-box">
+                <span class="header-icon bg-indigo-light text-indigo"><svg lucideBriefcase size="16"></svg></span>
+                <h3>Deals Summary</h3>
+              </div>
+            </div>
+            <p class="summary-prose">
+              <span *ngIf="wonLeadsCount > 0">
+                <span class="prose-em prose-green">{{ fullName }}</span> has brought
+                <span class="prose-em">{{ leadsBrought.length }}</span> deal{{ leadsBrought.length === 1 ? '' : 's' }}
+                worth a total of <span class="prose-em">{{ totalValue | currency:(contact.leadsBrought?.[0]?.currency || 'INR') }}</span>,
+                of which <span class="prose-em prose-green">{{ wonLeadsCount }}</span>
+                worth {{ wonDealsValue | currency:(contact.leadsBrought?.[0]?.currency || 'INR') }}
+                {{ wonLeadsCount === 1 ? 'has been won' : 'have been won' }}.
+              </span>
+              <span *ngIf="wonLeadsCount === 0">
+                <span class="prose-em prose-green">{{ fullName }}</span> has brought
+                <span class="prose-em">{{ leadsBrought.length }}</span> deal{{ leadsBrought.length === 1 ? '' : 's' }}
+                worth a total of <span class="prose-em">{{ totalValue | currency:(contact.leadsBrought?.[0]?.currency || 'INR') }}</span>,
+                but none have been won yet.
+              </span>
+              <ng-container *ngIf="lostLeadsCount > 0">
+                <span *ngIf="wonLeadsCount > 0"> On the other hand,</span>
+                <span *ngIf="wonLeadsCount === 0"> So far,</span>
+                <span class="prose-em prose-red">{{ lostLeadsCount }}</span> deal{{ lostLeadsCount === 1 ? '' : 's' }}
+                worth {{ lostLeadsValue | currency:(contact.leadsBrought?.[0]?.currency || 'INR') }}
+                {{ lostLeadsCount === 1 ? 'was' : 'were' }} <span class="prose-em prose-red">lost</span>.
+              </ng-container>
+              <ng-container *ngIf="openLeadsCount > 0">
+                <span> There {{ openLeadsCount === 1 ? 'is' : 'are' }} currently
+                <span class="prose-em prose-amber">{{ openLeadsCount }}</span> open deal{{ openLeadsCount === 1 ? '' : 's' }}
+                worth {{ openDealsValue | currency:(contact.leadsBrought?.[0]?.currency || 'INR') }} still in the pipeline.</span>
+              </ng-container>
+              <span> Overall, the conversion rate stands at
+                <span class="prose-em prose-purple">{{ conversionRate | number:'1.0-1' }}%</span>
+                ({{ wonLeadsCount }} won out of {{ leadsBrought.length }} deal{{ leadsBrought.length === 1 ? '' : 's' }}).</span>
+            </p>
+          </div>
+        </div>
       </div>
 
       <div class="tab-pane" *ngIf="activeTab === 'deals'">
@@ -117,6 +182,7 @@
                 <th>Deal Agent</th>
                 <th>Deal Watcher</th>
                 <th>Stage</th>
+                <th>Deal Status</th>
                 <th>Action</th>
               </tr></thead>
               <tbody>
@@ -129,7 +195,8 @@
                   <td><div class="table-user-sub">{{ nextFollowUp(lead) }}</div></td>
                   <td><span class="table-user-name">{{ employeeName(lead.assignedTo) }}</span></td>
                   <td><span class="table-user-name">{{ employeeName(lead.addedBy) }}</span></td>
-                  <td><span class="status-pill lead-status {{ statusClass(lead.status) }}">{{ stageLabel(lead.status) }}</span></td>
+                  <td><span class="stage-select-wrap"><select class="stage-select {{ stageClass(lead.status) }}" [value]="lead.status" (change)="changeLeadStage(lead, $event)"><option value="NEW">NEW</option><option value="QUALIFIED">QUALIFIED</option><option value="PROPOSAL">PROPOSAL</option><option value="WON">WON</option><option value="LOST">LOST</option></select></span></td>
+                  <td><span class="deal-status-badge {{ dealStatusClass(lead.status) }}">{{ dealStatusLabel(lead.status) }}</span></td>
                   <td><div class="table-actions-group">
                     <button type="button" class="btn-action-icon" (click)="openLead(lead.id)" title="View deal">View</button>
                   </div></td>

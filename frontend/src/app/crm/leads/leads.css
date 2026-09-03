@@ -2484,6 +2484,27 @@ textarea:focus {
   font-size: 13px;
 }
 
+/* Next Follow Up cell in the Deals table */
+.table-followup-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+}
+.table-followup-cell svg {
+  color: #64748b;
+  flex-shrink: 0;
+}
+.table-followup-cell.overdue {
+  color: #dc2626;
+}
+.table-followup-cell.overdue svg {
+  color: #dc2626;
+}
+
 /* Leads Brought Pill */
 .leads-brought-pill {
   display: inline-flex;
@@ -3098,11 +3119,46 @@ textarea:focus {
 .leads-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 1300px;
+}
+.leads-table-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+
+/* Custom styled bottom scrollbar for the deals table */
+.leads-table-scroll::-webkit-scrollbar {
+  height: 12px;
+}
+.leads-table-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+.leads-table-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+  border: 3px solid #f1f5f9;
+}
+.leads-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.leads-table-scroll::-webkit-scrollbar-corner {
+  background: #f1f5f9;
+}
+.leads-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
 }
 .leads-table th, .leads-table td {
-  padding: 12px 16px;
+  padding: 13px 16px;
   text-align: left;
   border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
 }
 .leads-table th {
   background: #f8fafc;
@@ -3110,6 +3166,25 @@ textarea:focus {
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+/* Sticky Actions column so action buttons stay visible while scrolling */
+.leads-table .col-actions-sticky {
+  position: sticky;
+  right: 0;
+  background: #f8fafc;
+  box-shadow: -4px 0 8px rgba(16, 24, 40, 0.06);
+  z-index: 2;
+  text-align: right;
+}
+.leads-table td.col-actions-sticky {
+  background: #ffffff;
+  white-space: nowrap;
+}
+.leads-table tr:hover td.col-actions-sticky {
+  background: #f8fafc;
 }
 .leads-table td {
   color: #1e293b;

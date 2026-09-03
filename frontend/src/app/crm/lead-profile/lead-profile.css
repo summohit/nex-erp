@@ -239,10 +239,16 @@
 /* Quick Stats Grid inside Hero */
 .hero-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   padding-top: 20px;
   border-top: 1px solid #f1f5f9;
+}
+
+@media (max-width: 1200px) {
+  .hero-stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 900px) {
@@ -275,6 +281,8 @@
 .icon-projects { background: #eff6ff; color: #2563eb; }
 .icon-contact { background: #faf5ff; color: #9333ea; }
 .icon-since { background: #ecfdf5; color: #059669; }
+.icon-won { background: #dcfce7; color: #16a34a; }
+.icon-lost { background: #fee2e2; color: #dc2626; }
 
 .stat-chip-body {
   display: flex;
@@ -294,6 +302,16 @@
   font-size: 16px;
   font-weight: 700;
   color: #0f172a;
+}
+
+.chip-won { color: #16a34a; }
+.chip-lost { color: #dc2626; }
+.chip-sub {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  margin-top: 2px;
 }
 
 .value-danger {
@@ -1680,6 +1698,45 @@ input:checked + .toggle-slider:before {
 .fu-status-pending { background: #fef3c7; color: #b45309; }
 .fu-status-completed { background: #dcfce7; color: #15803d; }
 .fu-status-cancelled { background: #fee2e2; color: #b91c1c; }
+
+/* ─── Deal status badge ─── */
+.deal-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.deal-status-badge.deal-won {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+.deal-status-badge.deal-rejected {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.deal-status-badge.deal-open {
+  background: #dbeafe;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+.deal-status-badge.deal-draft {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* Deal status pill for proposals table */
+.deal-won { background: #dcfce7; color: #15803d; }
+.deal-rejected { background: #fee2e2; color: #b91c1c; }
+.deal-open { background: #dbeafe; color: #1d4ed8; }
+.deal-draft { background: #f1f5f9; color: #475569; }
 
 /* Note cell */
 .note-cell { white-space: pre-wrap; }

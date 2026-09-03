@@ -83,11 +83,10 @@ export class LeadProfileComponent implements OnInit {
   // Follow-up form
   followUpForm: any = {
     id: null,
-    title: '',
+    stage: '',
     type: 'CALL',
     scheduledAt: '',
-    notes: '',
-    status: 'PENDING'
+    notes: ''
   };
   isEditingFollowUp = false;
 
@@ -277,12 +276,12 @@ export class LeadProfileComponent implements OnInit {
 
   saveFollowUp() {
     if (this.leadId == null) return;
-    if (!this.followUpForm.title || !this.followUpForm.scheduledAt) {
-      this.dialog.error('Please fill in title and date.');
+    if (!this.followUpForm.scheduledAt) {
+      this.dialog.error('Please fill in the scheduled date and time.');
       return;
     }
     const payload = {
-      title: this.followUpForm.title,
+      title: this.followUpForm.type,
       type: this.followUpForm.type,
       scheduledAt: new Date(this.followUpForm.scheduledAt).toISOString(),
       notes: this.followUpForm.notes,
@@ -529,6 +528,37 @@ export class LeadProfileComponent implements OnInit {
     return this.lead?.quotations || [];
   }
 
+  get totalDeals(): number {
+    return this.proposals.length;
+  }
+
+  get wonDeals(): number {
+    return this.proposals.filter(p => (p.status || '').toUpperCase() === 'ACCEPTED').length;
+  }
+
+  get lostDeals(): number {
+    return this.proposals.filter(p => (p.status || '').toUpperCase() === 'REJECTED').length;
+  }
+
+  get openDeals(): number {
+    return this.proposals.filter(p => {
+      const s = (p.status || '').toUpperCase();
+      return s === 'DRAFT' || s === 'PENDING_APPROVAL' || s === 'SENT';
+    }).length;
+  }
+
+  get wonDealValue(): number {
+    return this.proposals
+      .filter(p => (p.status || '').toUpperCase() === 'ACCEPTED')
+      .reduce((sum, p) => sum + (p.total || 0), 0);
+  }
+
+  get lostDealValue(): number {
+    return this.proposals
+      .filter(p => (p.status || '').toUpperCase() === 'REJECTED')
+      .reduce((sum, p) => sum + (p.total || 0), 0);
+  }
+
   get followUpItems(): any[] {
     return this.lead?.followUps || [];
   }
@@ -562,6 +592,23 @@ export class LeadProfileComponent implements OnInit {
 
   isUpcoming(fu: any): boolean {
     return new Date(fu.scheduledAt).getTime() > Date.now();
+  }
+
+  dealStatusPill(status: string): string {
+    const s = (status || '').toUpperCase();
+    if (s === 'ACCEPTED') return 'deal-won';
+    if (s === 'REJECTED') return 'deal-rejected';
+    if (s === 'SENT' || s === 'PENDING_APPROVAL') return 'deal-open';
+    return 'deal-draft';
+  }
+
+  dealStatusLabel(status: string): string {
+    const s = (status || '').toUpperCase();
+    if (s === 'ACCEPTED') return 'Won';
+    if (s === 'REJECTED') return 'Rejected';
+    if (s === 'SENT') return 'Sent';
+    if (s === 'PENDING_APPROVAL') return 'Pending';
+    return 'Open';
   }
 
   employeeName(emp: any): string {

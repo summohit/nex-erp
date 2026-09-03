@@ -9,7 +9,8 @@ import {
   LucideGlobe, LucideExternalLink, LucideCalendar, LucideAward, LucideUser,
   LucideUserCheck, LucideBriefcase, LucideLayoutList, LucideMessageSquare,
   LucideMoreVertical, LucideEdit2, LucideUserPlus, LucideX, LucidePlus, LucideDownload,
-  LucideEye, LucideEdit, LucideTrash2, LucideSearch, LucideChevronLeft, LucideChevronRight
+  LucideEye, LucideEdit, LucideTrash2, LucideSearch, LucideChevronLeft, LucideChevronRight,
+  LucideTrendingUp, LucideCheckCircle, LucideClock
 } from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
 
@@ -27,7 +28,8 @@ const LEAD_SOURCES = [
     LucideGlobe, LucideExternalLink, LucideCalendar, LucideAward, LucideUser,
     LucideUserCheck, LucideBriefcase, LucideLayoutList, LucideMessageSquare,
     LucideMoreVertical, LucideEdit2, LucideUserPlus, LucideX, LucidePlus, LucideDownload,
-    LucideEye, LucideEdit, LucideTrash2, LucideSearch, LucideChevronLeft, LucideChevronRight
+    LucideEye, LucideEdit, LucideTrash2, LucideSearch, LucideChevronLeft, LucideChevronRight,
+    LucideTrendingUp, LucideCheckCircle, LucideClock
   ],
   templateUrl: './lead-contact-profile.html',
   styleUrls: ['./lead-contact-profile.css']
@@ -165,6 +167,37 @@ export class LeadContactProfileComponent implements OnInit {
     return this.leadsBrought.filter((l: any) => l.status === 'WON').length;
   }
 
+  get lostLeadsCount(): number {
+    return this.leadsBrought.filter((l: any) => l.status === 'LOST').length;
+  }
+
+  get lostLeadsValue(): number {
+    return this.leadsBrought
+      .filter((l: any) => l.status === 'LOST')
+      .reduce((sum: number, l: any) => sum + (l.value || 0), 0);
+  }
+
+  get wonDealsValue(): number {
+    return this.leadsBrought
+      .filter((l: any) => l.status === 'WON')
+      .reduce((sum: number, l: any) => sum + (l.value || 0), 0);
+  }
+
+  get openLeadsCount(): number {
+    return this.leadsBrought.filter((l: any) => l.status !== 'WON' && l.status !== 'LOST').length;
+  }
+
+  get openDealsValue(): number {
+    return this.leadsBrought
+      .filter((l: any) => l.status !== 'WON' && l.status !== 'LOST')
+      .reduce((sum: number, l: any) => sum + (l.value || 0), 0);
+  }
+
+  get conversionRate(): number {
+    if (!this.leadsBrought.length) return 0;
+    return (this.wonLeadsCount / this.leadsBrought.length) * 100;
+  }
+
   get totalValue(): number {
     return this.leadsBrought.reduce((sum: number, l: any) => sum + (l.value || 0), 0);
   }
@@ -199,6 +232,50 @@ export class LeadContactProfileComponent implements OnInit {
 
   stageLabel(status: string): string {
     return (status || '—').toUpperCase();
+  }
+
+  dealStatusClass(status: string): string {
+    const s = (status || '').toUpperCase();
+    if (s === 'WON') return 'deal-won';
+    if (s === 'LOST') return 'deal-rejected';
+    if (s === 'PROPOSAL') return 'deal-open';
+    return 'deal-draft';
+  }
+
+  dealStatusLabel(status: string): string {
+    const s = (status || '').toUpperCase();
+    if (s === 'WON') return 'Won';
+    if (s === 'LOST') return 'Lost';
+    if (s === 'PROPOSAL') return 'Open';
+    if (s === 'QUALIFIED') return 'Open';
+    return 'Open';
+  }
+
+  stageClass(status: string): string {
+    const s = (status || '').toUpperCase();
+    if (s === 'NEW') return 'stg-new';
+    if (s === 'QUALIFIED') return 'stg-qualified';
+    if (s === 'PROPOSAL') return 'stg-proposal';
+    if (s === 'WON') return 'stg-won';
+    if (s === 'LOST') return 'stg-lost';
+    return 'stg-default';
+  }
+
+  changeLeadStage(lead: any, event: Event): void {
+    const newStatus = (event.target as HTMLSelectElement).value;
+    if (!lead || newStatus === lead.status) return;
+    const prevStatus = lead.status;
+    this.http.put(`${environment.apiUrl}/crm/leads/${lead.id}/status`, { status: newStatus }).subscribe({
+      next: () => {
+        lead.status = newStatus;
+        this.dialog.success(`Deal moved to ${newStatus}.`);
+      },
+      error: (err) => {
+        console.error(err);
+        lead.status = prevStatus;
+        this.dialog.error('Failed to update deal stage.');
+      }
+    });
   }
 
   nextFollowUp(lead: any): string {
@@ -455,7 +532,7 @@ export class LeadContactProfileComponent implements OnInit {
     const leads = this.leadsBrought;
     const currency = leads[0]?.currency || 'INR';
     const csvRows = [
-      ['Deal Name', 'Lead Name', 'Contact Details', 'Value', 'Close Date', 'Next Follow Up', 'Deal Agent', 'Deal Watcher', 'Stage'].join(','),
+      ['Deal Name', 'Lead Name', 'Contact Details', 'Value', 'Close Date', 'Next Follow Up', 'Deal Agent', 'Deal Watcher', 'Stage', 'Deal Status'].join(','),
       ...leads.map((l: any) => [
         this.escapeCsv(l.title || ''),
         this.escapeCsv(l.contactName || ''),
@@ -465,7 +542,8 @@ export class LeadContactProfileComponent implements OnInit {
         this.nextFollowUp(l),
         this.escapeCsv(this.employeeName(l.assignedTo)),
         this.escapeCsv(this.employeeName(l.addedBy)),
-        this.stageLabel(l.status)
+        this.stageLabel(l.status),
+        this.dealStatusLabel(l.status)
       ].join(','))
     ];
     const csv = '\uFEFF' + csvRows.join('\n');

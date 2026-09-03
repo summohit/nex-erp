@@ -1,4 +1,4 @@
-<div class="leads-container page-container">
+﻿<div class="leads-container page-container">
   <!-- Enhanced Page Header Card -->
   <div class="page-header-card">
     <div class="header-title-group">
@@ -54,7 +54,7 @@
   <!-- Main Tab Switcher -->
   <div class="main-tab-switcher">
     <button type="button" [class.active]="activeMainTab === 'leads'" (click)="activeMainTab = 'leads'">
-      Leads
+      Deals
     </button>
     <button type="button" [class.active]="activeMainTab === 'contacts'" (click)="activeMainTab = 'contacts'">
       Lead Contacts
@@ -399,15 +399,15 @@
 
         <!-- 9. Deal Value Range -->
         <div class="adv-filter-item value-range-item">
-          <label><svg lucideIndianRupee size="13"></svg> Deal Value (₹)</label>
+          <label><svg lucideIndianRupee size="13"></svg> Deal Value (â‚¹)</label>
           <div class="value-range-inputs">
             <div class="value-input-box">
-              <span class="curr-prefix">₹</span>
+              <span class="curr-prefix">â‚¹</span>
               <input type="number" min="0" placeholder="Min" [(ngModel)]="minValue" (ngModelChange)="onFilterChange()" />
             </div>
-            <span class="range-sep">—</span>
+            <span class="range-sep">â€”</span>
             <div class="value-input-box">
-              <span class="curr-prefix">₹</span>
+              <span class="curr-prefix">â‚¹</span>
               <input type="number" min="0" placeholder="Max" [(ngModel)]="maxValue" (ngModelChange)="onFilterChange()" />
             </div>
           </div>
@@ -421,6 +421,7 @@
               <select [(ngModel)]="dateField" (change)="onFilterChange()">
                 <option value="createdAt">Created Date</option>
                 <option value="expectedCloseDate">Expected Close</option>
+                <option value="nextFollowUp">Next Follow Up</option>
               </select>
               <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
             </div>
@@ -432,6 +433,7 @@
                 <option value="THIS_MONTH">This Month</option>
                 <option value="NEXT_MONTH">Next Month</option>
                 <option value="THIS_QUARTER">This Quarter</option>
+                <option value="THIS_YEAR">This Year</option>
                 <option value="CUSTOM">Custom Range</option>
               </select>
               <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
@@ -461,83 +463,6 @@
         </span>
       </div>
       <button type="button" class="btn-clear-all-chips" (click)="clearFilters()">Reset All</button>
-    </div>
-  </div>
-
-  <!-- Field Visits Widget -->
-  <div style="background: white; border: 1px solid #dfe1e6; border-radius: 10px; margin-bottom: 20px; overflow: hidden;">
-    <button (click)="fieldVisitsExpanded = !fieldVisitsExpanded" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: none; border: none; cursor: pointer; text-align: left;" class="hover:bg-gray-50">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <div style="width: 30px; height: 30px; border-radius: 8px; background: #eff6ff; display: flex; align-items: center; justify-content: center;">
-          <svg lucideMapPin size="16" style="color: #2563eb;"></svg>
-        </div>
-        <span style="font-size: 14.5px; font-weight: 700; color: #172b4d;">Field Visits</span>
-        <span *ngIf="activeFieldVisits.length > 0" style="display: inline-flex; align-items: center; gap: 5px; background: #0f172a; color: #22c55e; font-size: 10.5px; font-weight: 800; letter-spacing: 0.4px; padding: 3px 9px; border-radius: 20px;">
-          <span style="width: 5px; height: 5px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
-          {{ activeFieldVisits.length }} travelling now
-        </span>
-      </div>
-      <svg *ngIf="!fieldVisitsExpanded" lucideChevronDown size="16" style="color: #6b7280;"></svg>
-      <svg *ngIf="fieldVisitsExpanded" lucideChevronUp size="16" style="color: #6b7280;"></svg>
-    </button>
-
-    <div *ngIf="fieldVisitsExpanded" style="border-top: 1px solid #f1f5f9; padding: 16px 18px;">
-
-      <!-- Loading -->
-      <div *ngIf="fieldVisitsLoading" style="font-size: 13px; color: #94a3b8; padding: 8px 0;">Loading&hellip;</div>
-
-      <ng-container *ngIf="!fieldVisitsLoading">
-
-        <!-- Nobody travelling + nothing recent -->
-        <div *ngIf="activeFieldVisits.length === 0 && recentFieldVisits.length === 0" style="font-size: 13px; color: #94a3b8; padding: 8px 0;">
-          No field visits recorded yet.
-        </div>
-
-        <!-- Currently travelling -->
-        <div *ngIf="activeFieldVisits.length > 0" [style.marginBottom.px]="recentFieldVisits.length > 0 ? 16 : 0" style="display: flex; flex-direction: column; gap: 10px;">
-          <div *ngFor="let visit of activeFieldVisits" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
-            <img *ngIf="visit.employee?.avatarUrl" [src]="visit.employee?.avatarUrl" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
-            <div *ngIf="!visit.employee?.avatarUrl" style="width: 30px; height: 30px; border-radius: 50%; background: #dcfce7; color: #166534; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; flex-shrink: 0;">
-              {{ (visit.employee?.firstName?.[0] || '') + (visit.employee?.lastName?.[0] || '') }}
-            </div>
-            <div style="min-width: 0; flex: 1;">
-              <div style="font-size: 13px; font-weight: 700; color: #172b4d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                {{ visit.employee?.firstName }} {{ visit.employee?.lastName }}
-              </div>
-              <div style="font-size: 12px; color: #5e6c84; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                {{ visit.project?.name }}{{ visit.purpose ? ' · ' + visit.purpose : '' }}
-              </div>
-            </div>
-            <div style="font-size: 11px; color: #16a34a; font-weight: 700; flex-shrink: 0;">
-              since {{ visit.startTime | date:'h:mm a' }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Recent visits -->
-        <div *ngIf="recentFieldVisits.length > 0">
-          <div *ngIf="activeFieldVisits.length > 0" style="font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.6px; margin: 4px 0 10px;">Recent</div>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <div *ngFor="let visit of recentFieldVisits" style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px;" class="hover:bg-gray-50">
-              <img *ngIf="visit.employee?.avatarUrl" [src]="visit.employee?.avatarUrl" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
-              <div *ngIf="!visit.employee?.avatarUrl" style="width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; flex-shrink: 0;">
-                {{ (visit.employee?.firstName?.[0] || '') + (visit.employee?.lastName?.[0] || '') }}
-              </div>
-              <div style="min-width: 0; flex: 1;">
-                <span style="font-size: 12.5px; font-weight: 600; color: #334155;">{{ visit.employee?.firstName }} {{ visit.employee?.lastName }}</span>
-                <span style="font-size: 12.5px; color: #94a3b8;"> visited </span>
-                <span style="font-size: 12.5px; font-weight: 600; color: #334155;">{{ visit.project?.name }}</span>
-              </div>
-              <span [style.background]="fieldVisitStatusColor(visit.status).bg" [style.color]="fieldVisitStatusColor(visit.status).text" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; flex-shrink: 0;">
-                {{ visit.status.replace('_', ' ') }}
-              </span>
-              <span style="font-size: 11px; color: #94a3b8; flex-shrink: 0; width: 76px; text-align: right;">
-                {{ visit.startTime | date:'MMM d, h:mm a' }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </ng-container>
     </div>
   </div>
 
@@ -646,6 +571,7 @@
 
   <!-- Table View -->
   <div class="table-view-container" *ngIf="viewMode === 'table'">
+    <div class="leads-table-scroll">
     <table class="leads-table">
       <thead>
         <tr>
@@ -656,7 +582,8 @@
           <th>Lead Owner</th>
           <th>Status</th>
           <th>Value</th>
-          <th>Actions</th>
+          <th>Next Follow Up</th>
+          <th class="col-actions-sticky">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -684,11 +611,12 @@
             </td>
             <td><app-skeleton width="80px" height="18px" radius="9px"></app-skeleton></td>
             <td><app-skeleton width="70px" height="12px"></app-skeleton></td>
+            <td><app-skeleton width="72px" height="12px"></app-skeleton></td>
             <td><app-skeleton width="56px" height="26px" radius="6px"></app-skeleton></td>
           </tr>
         </ng-container>
         <ng-container *ngIf="!isLoading && getFilteredLeads().length === 0">
-          <tr><td colspan="7" style="text-align: center; padding: 20px;">No leads match your filters.</td></tr>
+          <tr>            <td colspan="8" style="text-align: center; padding: 20px;">No leads match your filters.</td></tr>
         </ng-container>
         <ng-container *ngIf="!isLoading">
           <tr *ngFor="let lead of getFilteredLeads()">
@@ -725,6 +653,13 @@
             </td>
             <td style="font-weight: 700; color: #059669;">{{lead.value | currency:lead.currency||'INR'}}</td>
             <td>
+              <div *ngIf="getNextFollowUpDate(lead) as fuDate" class="table-followup-cell" [class.overdue]="isFollowUpOverdue(fuDate)">
+                <svg lucideCalendarClock size="12"></svg>
+                <span>{{ fuDate | date:'dd MMM yyyy' }}</span>
+              </div>
+              <span *ngIf="!getNextFollowUpDate(lead)" class="no-data-dash">&mdash;</span>
+            </td>
+            <td class="col-actions-sticky">
               <div class="table-actions-group">
                 <button type="button" class="btn-table-action btn-table-details" (click)="openDetailModal(lead)" title="View Details">
                   <svg lucideEye size="12"></svg> <span>Details</span>
@@ -741,6 +676,7 @@
         </ng-container>
       </tbody>
     </table>
+    </div>
   </div>
 
   </ng-container>
@@ -824,7 +760,7 @@
                   <svg lucideBuilding size="13"></svg>
                   <span>{{ contact.companyName }}</span>
                 </div>
-                <span class="no-data-dash" *ngIf="!contact.companyName">—</span>
+                <span class="no-data-dash" *ngIf="!contact.companyName">â€”</span>
                 <a *ngIf="contact.website" [href]="contact.website.startsWith('http') ? contact.website : 'https://' + contact.website" target="_blank" class="contact-web-link">
                   <svg lucideGlobe size="11"></svg>
                   <span>{{ contact.website.replace('https://', '').replace('http://', '').replace('www.', '') }}</span>
@@ -844,7 +780,7 @@
                   <svg lucidePhone size="12"></svg>
                   <span>{{ contact.phone || contact.mobile }}</span>
                 </a>
-                <span class="no-data-dash" *ngIf="!contact.email && !contact.phone && !contact.mobile">—</span>
+                <span class="no-data-dash" *ngIf="!contact.email && !contact.phone && !contact.mobile">â€”</span>
               </div>
             </td>
 
@@ -853,7 +789,7 @@
               <span class="source-tag" *ngIf="contact.leadSource">
                 {{ contact.leadSource }}
               </span>
-              <span class="no-data-dash" *ngIf="!contact.leadSource">—</span>
+              <span class="no-data-dash" *ngIf="!contact.leadSource">â€”</span>
             </td>
 
             <!-- Added By -->
@@ -1199,8 +1135,8 @@
           <svg lucideUser size="20" style="color: #ea580c;"></svg>
         </div>
         <div>
-          <h3>{{ isEditing ? 'Edit Opportunity / Lead' : 'Add New Lead' }}</h3>
-          <p class="modal-subtitle">{{ isEditing ? 'Update details, assignment, and pipeline stages for this lead.' : 'Enter details to add a new opportunity to your pipeline.' }}</p>
+          <h3>{{ isEditing ? 'Edit Opportunity / Deal' : 'Add New Deal' }}</h3>
+          <p class="modal-subtitle">{{ isEditing ? 'Update details, assignment, and pipeline stages for this deal.' : 'Enter details to add a new deal to your pipeline.' }}</p>
         </div>
       </div>
       <button class="btn-icon-close" (click)="closeModal()" [disabled]="isSaving">
@@ -1281,63 +1217,6 @@
             Also save <strong style="color:var(--text-primary,#111827)">{{newLeadData.contactName}}</strong> as a Lead Contact
           </label>
         </div>
-      </div>
-
-      <!-- Step 2: Deal & Pipeline Tracking -->
-      <div *ngIf="activeTab === 2" class="step-content-anim">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Initial Pipeline Status</label>
-            <select [(ngModel)]="newLeadData.status" [disabled]="isSaving" class="enhanced-select">
-              <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Deal Category</label>
-            <select [(ngModel)]="newLeadData.dealCategory" [disabled]="isSaving" class="enhanced-select">
-              <option *ngFor="let cat of DEAL_CATEGORIES" [value]="cat.id">{{cat.name}}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Lead Source</label>
-            <select [(ngModel)]="newLeadData.source" [disabled]="isSaving" class="enhanced-select">
-              <option *ngFor="let src of LEAD_SOURCES" [value]="src">{{src}}</option>
-            </select>
-            <input 
-              *ngIf="newLeadData.source === 'Other'" 
-              type="text" 
-              [(ngModel)]="customSource" 
-              placeholder="Specify custom source channel..." 
-              style="margin-top: 8px;" 
-              [disabled]="isSaving" 
-            />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Expected Deal Value</label>
-            <div class="input-with-prefix">
-              <span class="currency-symbol-addon">$</span>
-              <input 
-                type="number" 
-                min="0" 
-                step="any"
-                [(ngModel)]="newLeadData.value" 
-                (keydown)="preventNegative($event)"
-                (input)="validateDealValue()"
-                placeholder="0.00" 
-                [disabled]="isSaving" 
-                class="currency-input" 
-              />
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Expected Close Date</label>
-            <input type="date" [(ngModel)]="newLeadData.expectedCloseDate" [disabled]="isSaving" />
-          </div>
-        </div>
-
         <div class="form-row">
           <!-- 1. Lead Brought By -->
           <div class="form-group custom-select-group">
@@ -1504,6 +1383,64 @@
             </div>
           </div>
         </div>
+
+      </div>
+
+      <!-- Step 2: Deal & Pipeline Tracking -->
+      <div *ngIf="activeTab === 2" class="step-content-anim">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Initial Pipeline Status</label>
+            <select [(ngModel)]="newLeadData.status" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Deal Category</label>
+            <select [(ngModel)]="newLeadData.dealCategory" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let cat of DEAL_CATEGORIES" [value]="cat.id">{{cat.name}}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Lead Source</label>
+            <select [(ngModel)]="newLeadData.source" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let src of LEAD_SOURCES" [value]="src">{{src}}</option>
+            </select>
+            <input 
+              *ngIf="newLeadData.source === 'Other'" 
+              type="text" 
+              [(ngModel)]="customSource" 
+              placeholder="Specify custom source channel..." 
+              style="margin-top: 8px;" 
+              [disabled]="isSaving" 
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Expected Deal Value</label>
+            <div class="input-with-prefix">
+              <span class="currency-symbol-addon">$</span>
+              <input 
+                type="number" 
+                min="0" 
+                step="any"
+                [(ngModel)]="newLeadData.value" 
+                (keydown)="preventNegative($event)"
+                (input)="validateDealValue()"
+                placeholder="0.00" 
+                [disabled]="isSaving" 
+                class="currency-input" 
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Expected Close Date</label>
+            <input type="date" [(ngModel)]="newLeadData.expectedCloseDate" [disabled]="isSaving" />
+          </div>
+        </div>
+
       </div>
 
       <!-- Step 3: Additional Details -->
@@ -1538,7 +1475,7 @@
         </button>
         <button class="btn-primary btn-save" (click)="createLead()" *ngIf="activeTab === 3" [disabled]="isSaving">
           <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving"></svg>
-          <span>{{ isSaving ? (isEditing ? 'Updating Lead...' : 'Creating Lead...') : (isEditing ? 'Save Changes' : 'Submit & Save Lead') }}</span>
+          <span>{{ isSaving ? (isEditing ? 'Updating Deal...' : 'Creating Deal...') : (isEditing ? 'Save Changes' : 'Submit & Save Deal') }}</span>
         </button>
       </div>
     </div>
@@ -1737,57 +1674,6 @@
 </div>
 
 <!-- ==================== FIELD VISIT MODAL ==================== -->
-<div class="modal-backdrop" *ngIf="selectedFieldVisit" (click)="closeFieldVisit()">
-  <div class="modal-box fv-modal" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h2>Field Visit Details</h2>
-      <button type="button" class="close-btn" (click)="closeFieldVisit()">
-        <svg lucideX size="18"></svg>
-      </button>
-    </div>
-    <div class="modal-body p-4">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
-          <img *ngIf="selectedFieldVisit.employee?.avatarUrl" [src]="selectedFieldVisit.employee?.avatarUrl" class="w-full h-full object-cover">
-          <svg *ngIf="!selectedFieldVisit.employee?.avatarUrl" lucideUser class="text-gray-400"></svg>
-        </div>
-        <div>
-          <h3 class="text-lg font-bold text-gray-900">{{selectedFieldVisit.employee?.firstName}} {{selectedFieldVisit.employee?.lastName}}</h3>
-          <p class="text-sm text-gray-500">Sales Representative</p>
-        </div>
-      </div>
-      
-      <div class="grid grid-cols-2 gap-4 mb-4">
-        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Project / Purpose</span>
-          <span class="text-sm font-medium text-slate-800">{{selectedFieldVisit.project?.name || selectedFieldVisit.purpose || 'Unknown'}}</span>
-        </div>
-        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Status</span>
-          <span class="text-xs font-bold px-2 py-1 rounded" [ngStyle]="fieldVisitStatusColor(selectedFieldVisit.status)">
-            {{selectedFieldVisit.status}}
-          </span>
-        </div>
-        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Date & Time</span>
-          <span class="text-sm font-medium text-slate-800">{{selectedFieldVisit.startTime | date:'medium'}}</span>
-        </div>
-        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Location Address</span>
-          <span class="text-sm font-medium text-slate-800">{{selectedFieldVisit.startAddress || 'Not specified'}}</span>
-        </div>
-      </div>
-
-      <div class="mb-4" *ngIf="selectedFieldVisit.notes">
-        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">Visit Notes & Outcome</span>
-        <div class="bg-white p-3 rounded-lg border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap">
-          {{selectedFieldVisit.notes}}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ==================== FOLLOW-UP MANAGEMENT MODAL ==================== -->
 <div class="modal-backdrop" *ngIf="showFollowUpModal && selectedLead" (click)="closeFollowUpModal()">
   <div class="followup-modal-card" (click)="$event.stopPropagation()">
@@ -2228,7 +2114,7 @@
                     <div class="blm-contact-sub" *ngIf="lead.contactName">
                       <svg lucideUser size="12"></svg>
                       <span>{{ lead.contactName }}</span>
-                      <span class="blm-dot-separator" *ngIf="lead.email || lead.phone">•</span>
+                      <span class="blm-dot-separator" *ngIf="lead.email || lead.phone">â€¢</span>
                       <span *ngIf="lead.phone || lead.email">{{ lead.phone || lead.email }}</span>
                     </div>
                   </div>
@@ -2242,7 +2128,7 @@
                 <td>
                   <div class="blm-deal-value">
                     <span class="currency-amt" *ngIf="lead.expectedDealValue">{{ lead.expectedDealValue | currency:'INR':'symbol':'1.0-0' }}</span>
-                    <span class="no-data-dash" *ngIf="!lead.expectedDealValue">—</span>
+                    <span class="no-data-dash" *ngIf="!lead.expectedDealValue">â€”</span>
                   </div>
                 </td>
                 <td>
@@ -2250,7 +2136,7 @@
                     <svg lucideCalendar size="12"></svg>
                     <span>{{ lead.expectedCloseDate | date:'mediumDate' }}</span>
                   </div>
-                  <span class="no-data-dash" *ngIf="!lead.expectedCloseDate">—</span>
+                  <span class="no-data-dash" *ngIf="!lead.expectedCloseDate">â€”</span>
                 </td>
                 <td>
                   <div class="blm-rep-cell" *ngIf="lead.assignedTo">
