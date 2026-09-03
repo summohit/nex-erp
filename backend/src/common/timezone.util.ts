@@ -31,6 +31,11 @@ export function istDateKey(date: Date): Date {
   return new Date(Date.UTC(year, month, day) - IST_OFFSET_MS);
 }
 
+/** The hour (0-23) on IST's clock for `date`, independent of the server's timezone. */
+export function istHour(date: Date): number {
+  return toISTFields(date).hours;
+}
+
 /**
  * The real UTC instant corresponding to `"HH:mm"` IST on the same IST
  * calendar day as `reference`. Use this to build a shift's expected

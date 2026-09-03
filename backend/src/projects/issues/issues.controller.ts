@@ -86,6 +86,17 @@ export class IssuesController {
     return this.issuesService.addManualTimeLog(req.user.companyId, req.user.sub, projectId, id, body);
   }
 
+  /** Sets the caller's total minutes for this issue on one day (timesheet grid). */
+  @Put(':id/time-log/day')
+  setDayTimeTotal(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { date: string; durationMin: number }
+  ) {
+    return this.issuesService.setDayTimeTotal(req.user.companyId, req.user.sub, projectId, id, body);
+  }
+
   @Get(':id/comments')
   getComments(
     @Req() req,

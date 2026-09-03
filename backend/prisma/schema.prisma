@@ -1488,7 +1488,13 @@ model IssueTimeLog {
   startedAt   DateTime
   endedAt     DateTime?
   durationMin Int? // Calculated duration in minutes
+  // TIMER rows are evidence of tracked work and are never rewritten. MANUAL rows
+  // are the timesheet grid's own entry — one per employee/issue/day, upserted.
+  // Defaults to TIMER so pre-existing rows are never eligible for deletion.
+  source      String    @default("TIMER") // TIMER, MANUAL
   createdAt   DateTime  @default(now())
+
+  @@index([employeeId, issueId, startedAt])
 }
 
 model IssueComment {

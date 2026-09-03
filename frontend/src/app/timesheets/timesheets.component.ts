@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { HotToastService } from '@ngneat/hot-toast';
 import { LucideChevronLeft, LucideChevronRight, LucideClock } from '@lucide/angular';
 import { environment } from '../../environments/environment';
 
@@ -37,6 +38,7 @@ interface TimesheetRow {
 })
 export class TimesheetsComponent implements OnInit {
   private http = inject(HttpClient);
+  private toast = inject(HotToastService);
   
   startDate!: Date;
   endDate!: Date;
@@ -174,20 +176,29 @@ export class TimesheetsComponent implements OnInit {
     const oldMinutes = row.days[dateString] || 0;
     
     if (newMinutes !== oldMinutes) {
-      // Typically we'd call the API here to save a new manual time log
-      // For this demo, we'll just optimistically update the UI.
       const diff = newMinutes - oldMinutes;
-      row.days[dateString] = newMinutes;
-      row.total += diff;
-      this.dailyTotals[dateString] += diff;
-      this.grandTotal += diff;
-      
-      // Call API
-      this.http.post(`${environment.apiUrl}/projects/${row.projectId}/issues/${row.issueId}/time-log`, {
-        durationMin: diff // In reality, we might need a specific endpoint to sync a day's total
-      }).subscribe({
-        next: () => console.log('Time updated'),
-        error: (err) => console.error('Failed to update time', err)
+
+      // Apply optimistically so typing stays responsive, then roll back if the
+      // server rejects it — a failed save must never look like a successful one.
+      const applyDelta = (d: number) => {
+        row.days[dateString] = (row.days[dateString] || 0) + d;
+        row.total += d;
+        this.dailyTotals[dateString] = (this.dailyTotals[dateString] || 0) + d;
+        this.grandTotal += d;
+      };
+      applyDelta(diff);
+
+      // Sends the day's TOTAL for this issue, not a delta: the grid buckets logs
+      // by date, so the server must know which day the value belongs to.
+      this.http.put(
+        `${environment.apiUrl}/projects/${row.projectId}/issues/${row.issueId}/time-log/day`,
+        { date: dateString, durationMin: newMinutes }
+      ).subscribe({
+        error: (err) => {
+          applyDelta(-diff);
+          input.value = this.formatDuration(oldMinutes);
+          this.toast.error(err?.error?.message || 'Could not save that time entry.');
+        }
       });
     }
     

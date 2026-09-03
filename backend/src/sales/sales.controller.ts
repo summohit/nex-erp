@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Request, UseGuards, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, Request, UseGuards, ParseIntPipe, Query } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -35,6 +35,18 @@ export class SalesController {
   }
 
   // --- Sales Orders & Rentals ---
+  @Patch('orders/:id/status')
+  @Permissions('sales/orders')
+  updateOrderStatus(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('status') status: string) {
+    return this.salesService.updateOrderStatus(req.user.companyId, id, status);
+  }
+
+  @Patch('orders/:id/return')
+  @Permissions('sales/orders')
+  returnRental(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.salesService.returnRental(req.user.companyId, id);
+  }
+
   @Get('orders')
   @Permissions('sales/orders')
   getSalesOrders(@Request() req, @Query('isRental') isRental: string) {

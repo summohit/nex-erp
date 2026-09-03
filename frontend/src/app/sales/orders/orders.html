@@ -34,8 +34,28 @@
               'badge-success': o.status === 'DELIVERED',
               'badge-danger': o.status === 'CANCELLED'
             }">{{o.status}}</span>
+            <span class="badge badge-rental" *ngIf="o.isRental && o.rentalStatus"
+                  [class.badge-danger]="o.rentalStatus === 'OVERDUE'">{{ o.rentalStatus }}</span>
           </td>
           <td class="actions-cell text-right">
+            <!-- Only transitions the server accepts are offered. -->
+            <button
+              *ngFor="let s of nextStatuses(o)"
+              class="btn-status-move"
+              [class.is-cancel]="s === 'CANCELLED'"
+              [disabled]="updatingId === o.id"
+              (click)="setStatus(o, s, $event)">
+              {{ s === 'CANCELLED' ? 'Cancel' : 'Mark ' + (s | titlecase) }}
+            </button>
+
+            <button
+              *ngIf="o.isRental && o.rentalStatus && o.rentalStatus !== 'RETURNED'"
+              class="btn-status-move"
+              [disabled]="updatingId === o.id"
+              (click)="returnRental(o, $event)">
+              Mark Returned
+            </button>
+
             <button class="btn-icon" title="View Order" (click)="viewOrder(o)">
               <svg lucidePackage size="18" class="text-secondary"></svg>
             </button>

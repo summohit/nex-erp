@@ -411,9 +411,25 @@ export class IssuesService {
     return issue;
   }
 
-  async startTimeTracking(companyId: number, employeeId: number, projectId: number, issueId: number) {
+  /**
+   * Time-tracking endpoints receive the JWT `sub` (a User id). Every read path
+   * queries IssueTimeLog by Employee id. Those currently coincide only because
+   * users and employees were created in lockstep — resolve properly so the two
+   * cannot drift apart.
+   */
+  private async resolveEmployeeId(companyId: number, userId: number): Promise<number> {
+    const employee = await this.prisma.employee.findFirst({
+      where: { userId, companyId },
+      select: { id: true },
+    });
+    if (!employee) throw new NotFoundException('No employee profile for this user');
+    return employee.id;
+  }
+
+  async startTimeTracking(companyId: number, userId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
+    const employeeId = await this.resolveEmployeeId(companyId, userId);
 
     const now = new Date();
     await this.prisma.issue.update({
@@ -432,9 +448,10 @@ export class IssuesService {
     return { success: true, startedAt: now };
   }
 
-  async stopTimeTracking(companyId: number, employeeId: number, projectId: number, issueId: number) {
+  async stopTimeTracking(companyId: number, userId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
+    const employeeId = await this.resolveEmployeeId(companyId, userId);
 
     const now = new Date();
     
@@ -464,9 +481,13 @@ export class IssuesService {
     return { success: true, completedAt: now };
   }
 
-  async addManualTimeLog(companyId: number, employeeId: number, projectId: number, issueId: number, data: { durationMin: number }) {
+  async addManualTimeLog(companyId: number, userId: number, projectId: number, issueId: number, data: { durationMin: number }) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
+    if (!data?.durationMin || data.durationMin <= 0) {
+      throw new BadRequestException('durationMin must be a positive number of minutes');
+    }
+    const employeeId = await this.resolveEmployeeId(companyId, userId);
 
     const now = new Date();
     const startedAt = new Date(now.getTime() - data.durationMin * 60000);
@@ -486,6 +507,82 @@ export class IssuesService {
     });
 
     return { success: true, log };
+  }
+
+  /**
+   * Sets the caller's TOTAL logged minutes for one issue on one calendar day —
+   * the contract the weekly timesheet grid needs.
+   *
+   * Timer rows are evidence of tracked work and are never rewritten; the manual
+   * row absorbs the difference. A target below the tracked total is refused
+   * rather than silently discarding timer records.
+   */
+  async setDayTimeTotal(
+    companyId: number,
+    userId: number,
+    projectId: number,
+    issueId: number,
+    data: { date: string; durationMin: number },
+  ) {
+    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    const target = Math.round(Number(data?.durationMin));
+    if (!Number.isFinite(target) || target < 0) {
+      throw new BadRequestException('durationMin must be zero or a positive number of minutes');
+    }
+
+    const dayStart = new Date(`${data?.date}T00:00:00`);
+    if (isNaN(dayStart.getTime())) {
+      throw new BadRequestException('A valid date (YYYY-MM-DD) is required');
+    }
+    const dayEnd = new Date(dayStart);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const employeeId = await this.resolveEmployeeId(companyId, userId);
+
+    const sameDay = { employeeId, issueId, startedAt: { gte: dayStart, lte: dayEnd } };
+
+    const [timerLogs, manualLog] = await Promise.all([
+      this.prisma.issueTimeLog.findMany({ where: { ...sameDay, source: 'TIMER' } }),
+      this.prisma.issueTimeLog.findFirst({ where: { ...sameDay, source: 'MANUAL' } }),
+    ]);
+
+    const trackedMin = timerLogs.reduce((sum, l) => sum + (l.durationMin ?? 0), 0);
+    if (target < trackedMin) {
+      throw new BadRequestException(
+        `You have ${(trackedMin / 60).toFixed(2)}h tracked by timer on this day; the total cannot be lower.`,
+      );
+    }
+
+    const manualMin = target - trackedMin;
+
+    if (manualMin <= 0) {
+      if (manualLog) await this.prisma.issueTimeLog.delete({ where: { id: manualLog.id } });
+    } else if (manualLog) {
+      await this.prisma.issueTimeLog.update({
+        where: { id: manualLog.id },
+        // Anchor the row inside the target day so the grid reads it back there.
+        data: { durationMin: manualMin, startedAt: dayStart, endedAt: new Date(dayStart.getTime() + manualMin * 60000) },
+      });
+    } else {
+      await this.prisma.issueTimeLog.create({
+        data: {
+          issueId,
+          employeeId,
+          source: 'MANUAL',
+          startedAt: dayStart,
+          endedAt: new Date(dayStart.getTime() + manualMin * 60000),
+          durationMin: manualMin,
+        },
+      });
+    }
+
+    await this.prisma.issueActivity.create({
+      data: { action: 'TIME_LOGGED', issueId, actorId: employeeId },
+    });
+
+    return { success: true, date: data.date, totalMin: target, trackedMin, manualMin: Math.max(manualMin, 0) };
   }
 
   async getComments(companyId: number, projectId: number, issueId: number) {

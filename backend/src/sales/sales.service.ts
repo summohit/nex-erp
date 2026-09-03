@@ -146,10 +146,75 @@ export class SalesService {
       whereClause.isRental = isRental;
     }
 
-    return this.prisma.salesOrder.findMany({
+    const orders = await this.prisma.salesOrder.findMany({
       where: whereClause,
       include: { client: true, items: true },
       orderBy: { date: 'desc' }
+    });
+
+    // OVERDUE is a function of the end date, so derive it on read instead of
+    // relying on a scheduled job to stamp every rental at the right moment.
+    const now = new Date();
+    return orders.map((o) => {
+      const overdue =
+        o.isRental && o.rentalStatus === 'ACTIVE' && o.rentalEndDate && o.rentalEndDate < now;
+      return overdue ? { ...o, rentalStatus: 'OVERDUE' } : o;
+    });
+  }
+
+  /**
+   * Allowed order status moves. Orders are created CONFIRMED (quotation
+   * conversion) or DELIVERED (POS), and previously had no way to move at all —
+   * the four states the schema and UI both model were unreachable.
+   *
+   * DELIVERED and CANCELLED are terminal: a delivered order is done, and
+   * reviving a cancelled one would leave its stock/invoice side effects
+   * ambiguous. Reversing either is a new order, not a status flip.
+   */
+  private static readonly ORDER_STATUS_FLOW: Record<string, string[]> = {
+    DRAFT: ['CONFIRMED', 'CANCELLED'],
+    PENDING_APPROVAL: ['CONFIRMED', 'CANCELLED'],
+    CONFIRMED: ['DELIVERED', 'CANCELLED'],
+    DELIVERED: [],
+    CANCELLED: [],
+  };
+
+  async updateOrderStatus(companyId: number, orderId: number, status: string) {
+    const order = await this.prisma.salesOrder.findFirst({ where: { id: orderId, companyId } });
+    if (!order) throw new NotFoundException('Sales order not found');
+
+    const allowed = SalesService.ORDER_STATUS_FLOW[order.status] ?? [];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException(
+        allowed.length
+          ? `A ${order.status} order can only move to ${allowed.join(' or ')}.`
+          : `A ${order.status} order is final and cannot be changed.`,
+      );
+    }
+
+    return this.prisma.salesOrder.update({
+      where: { id: orderId },
+      data: {
+        status,
+        // Delivering a rental starts its hire period; cancelling ends any claim.
+        ...(order.isRental && status === 'DELIVERED' ? { rentalStatus: 'ACTIVE' } : {}),
+        ...(status === 'CANCELLED' ? { rentalStatus: null } : {}),
+      },
+      include: { client: true, items: true },
+    });
+  }
+
+  /** Marks a rented order as returned, closing its hire period. */
+  async returnRental(companyId: number, orderId: number) {
+    const order = await this.prisma.salesOrder.findFirst({ where: { id: orderId, companyId } });
+    if (!order) throw new NotFoundException('Sales order not found');
+    if (!order.isRental) throw new BadRequestException('This order is not a rental');
+    if (order.rentalStatus === 'RETURNED') throw new BadRequestException('This rental is already returned');
+
+    return this.prisma.salesOrder.update({
+      where: { id: orderId },
+      data: { rentalStatus: 'RETURNED' },
+      include: { client: true, items: true },
     });
   }
 

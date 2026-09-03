@@ -62,8 +62,20 @@ export class SidebarComponent implements OnInit {
     return section.items && section.items.length > 0;
   }
 
+  /**
+   * Roadmap badge shown beside each sidebar module. This is a hand-maintained
+   * list, not something derived from the code — update it when a module ships,
+   * otherwise it quietly misreports the state of the project.
+   *
+   * Assets, Payroll, Clients, Offboarding and Appreciation were added here in
+   * Sep 2026: all five were fully built but still displaying WIP.
+   */
   getModuleStatus(title: string): 'DONE' | 'WIP' | null {
-    const doneModules = ['Dashboard', 'Employees', 'Recruitment', 'Attendance & Leave', 'CRM', 'Sales', 'Settings', 'Projects', 'Performance'];
+    const doneModules = [
+      'Dashboard', 'Employees', 'Recruitment', 'Projects', 'Attendance & Leave',
+      'Performance', 'CRM', 'Sales', 'Settings',
+      'Appreciation', 'Offboarding', 'Payroll & Expenses', 'Clients', 'Assets & IT',
+    ];
     if (doneModules.includes(title)) return 'DONE';
     return 'WIP';
   }
