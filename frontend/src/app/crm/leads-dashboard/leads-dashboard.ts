@@ -146,8 +146,8 @@ export class LeadsDashboardComponent implements OnInit {
   customEnd = '';
 
   LEAD_STATUSES = [
-    'New', 'Interested', 'Proposal Sent', 'Negotiation',
-    'On Hold', 'Converted', 'Lost', 'Junk'
+    'New', 'Interested', 'Schedule Meeting', 'Proposal Sent', 'Negotiation',
+    'On Hold', 'Win', 'Lost'
   ];
 
   ngOnInit() {

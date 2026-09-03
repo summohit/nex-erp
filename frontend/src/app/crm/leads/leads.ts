@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { CommonModule } from '@angular/common';
@@ -26,6 +26,7 @@ import {
   LucideCalendar,
   LucideFileText,
   LucideEdit2,
+  LucideMoreVertical,
   LucideMapPin,
   LucideChevronDown,
   LucideChevronUp, LucideLayoutGrid, LucideList,
@@ -34,7 +35,7 @@ import {
   LucideUsers, LucideAward, LucideExternalLink,
   LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
   LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
-  LucideUpload, LucideDownload
+  LucideUpload, LucideDownload, LucideCalendarRange, LucideFolder
 } from '@lucide/angular';
 
 export interface FollowUp {
@@ -47,6 +48,7 @@ export interface FollowUp {
   type: 'CALL' | 'MEETING' | 'DEMO' | 'EMAIL' | 'FIELD_VISIT' | 'NOTE' | 'OTHER';
   scheduledAt: string;
   notes?: string;
+  status?: string;
   assignedToId?: number;
   assignedTo?: { id: number, firstName: string, lastName: string, avatarUrl?: string, designation?: { name: string } };
   createdAt: string;
@@ -103,6 +105,7 @@ interface Lead {
     LucideCalendar,
     LucideFileText,
     LucideEdit2,
+  LucideMoreVertical,
     LucideMapPin,
     LucideChevronDown,
     LucideChevronUp, LucideLayoutGrid, LucideList,
@@ -155,6 +158,17 @@ export class LeadsComponent implements OnInit {
   selectedQuotationStatus: 'ALL' | 'QUOTED' | 'NOT_QUOTED' = 'ALL';
   selectedFollowUpStatus: 'ALL' | 'OVERDUE' | 'SCHEDULED' | 'NONE' = 'ALL';
 
+  selectedCategoryService: string = 'ALL';
+  SERVICE_CATEGORIES = [
+    'Implementation Services',
+    'FMS',
+    'POC',
+    'Business Expansion',
+    'Product (Devices)',
+    'Passive Materials',
+    'Product (SFP)',
+  ];
+
   minValue: number | null = null;
   maxValue: number | null = null;
   dateField: 'createdAt' | 'expectedCloseDate' | 'nextFollowUp' = 'createdAt';
@@ -172,8 +186,8 @@ export class LeadsComponent implements OnInit {
 
   // All 17 Statuses
   LEAD_STATUSES = [
-    'New', 'Interested', 'Proposal Sent', 'Negotiation', 
-    'On Hold', 'Converted', 'Lost', 'Junk'
+    'New', 'Interested', 'Schedule Meeting', 'Proposal Sent', 'Negotiation', 
+    'On Hold', 'Win', 'Lost'
   ];
 
   // Standard Lead Sources
@@ -274,7 +288,19 @@ export class LeadsComponent implements OnInit {
   isLoadingFollowUps = false;
   isSavingFollowUp = false;
   followUpTab: 'schedule' | 'history' = 'schedule';
-  
+
+  // Expandable follow-ups inside the leads table
+  expandedLeadId: number | null = null;
+  leadFollowUpsCache: Record<number, FollowUp[]> = {};
+  leadFollowUpsLoading: Record<number, boolean> = {};
+  followUpStatusSaving: Record<number, boolean> = {};
+  leadFollowUpsExpandedIds: number[] = [];
+
+  // Follow-up date filter (filters follow-ups shown inside expanded rows)
+  followUpDateFilter = 'all'; // all | today | thisWeek | lastMonth | lastQuarter | lastYear | custom
+  followUpStartDate = '';
+  followUpEndDate = '';
+
   newFollowUp = {
     title: '',
     contactPerson: '',
@@ -298,6 +324,7 @@ export class LeadsComponent implements OnInit {
   goToFollowUps() {
     this.router.navigate(['/sales/follow-ups']);
   }
+
 
   goToLeadsDashboard() {
     this.router.navigate(['/crm/leads/dashboard']);
@@ -421,9 +448,9 @@ export class LeadsComponent implements OnInit {
     this.broughtBySearchQuery = '';
   }
 
-  // ═══════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // LEAD CONTACTS ("Lead Brought By" source records)
-  // ═══════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   loadLeadContacts() {
     this.http.get<any[]>(`${environment.apiUrl}/crm/lead-contacts`).subscribe({
@@ -764,9 +791,9 @@ export class LeadsComponent implements OnInit {
     if (s === 'PROPOSAL' || s === 'PROPOSAL SENT' || s === 'PROPOSAL_SENT' || s === 'DEMO SCHEDULED' || s === 'DEMO COMPLETED') return 'Proposal Sent';
     if (s === 'NEGOTIATION') return 'Negotiation';
     if (s === 'ON HOLD' || s === 'ON_HOLD') return 'On Hold';
-    if (s === 'CONVERTED' || s === 'WON') return 'Converted';
+    if (s === 'CONVERTED' || s === 'WON' || s === 'WIN') return 'Win';
     if (s === 'LOST') return 'Lost';
-    if (s === 'JUNK') return 'Junk';
+    if (s === 'SCHEDULE MEETING' || s === 'SCHEDULE_MEETING') return 'Schedule Meeting';
     
     // Direct match from active statuses
     const directMatch = this.LEAD_STATUSES.find(st => st.toLowerCase() === status.toLowerCase());
@@ -824,7 +851,7 @@ export class LeadsComponent implements OnInit {
     return { start: null, end: null };
   }
 
-  // Follow-up status is derived from `scheduledAt` on the lead's follow-ups — there's
+  // Follow-up status is derived from `scheduledAt` on the lead's follow-ups â€” there's
   // no separate status field (removed from the model; a follow-up is just a logged
   // interaction). "Overdue" = earliest upcoming follow-up already in the past.
   private getLeadFollowUpStatus(lead: Lead): 'OVERDUE' | 'SCHEDULED' | 'NONE' {
@@ -852,6 +879,12 @@ export class LeadsComponent implements OnInit {
     return next || latest;
   }
 
+  // Only show a "Next Follow Up" date in the table once a lead has reached the
+  // negotiation stage or later (Negotiation, Converted, On Hold).
+  showNextFollowUpInTable(lead: Lead): boolean {
+    return lead.status === 'Negotiation' || lead.status === 'Converted' || lead.status === 'On Hold';
+  }
+
   getFilteredLeads(): Lead[] {
     const q = this.searchQuery.trim().toLowerCase();
     const { start, end } = this.getDateRangeForPreset();
@@ -875,6 +908,9 @@ export class LeadsComponent implements OnInit {
 
       const matchesCategory =
         this.selectedCategory === 'ALL' || lead.dealCategory === this.selectedCategory;
+
+      const matchesServiceCategory =
+        this.selectedCategoryService === 'ALL' || lead.dealCategory === this.selectedCategoryService;
 
       const matchesSource =
         this.selectedSource === 'ALL' || lead.source === this.selectedSource;
@@ -912,7 +948,7 @@ export class LeadsComponent implements OnInit {
       }
 
       return matchesSearch && matchesStage && matchesRep && matchesCategory &&
-        matchesSource && matchesContact && matchesAddedBy && matchesQuotation &&
+        matchesServiceCategory && matchesSource && matchesContact && matchesAddedBy && matchesQuotation &&
         matchesFollowUpStatus && matchesMin && matchesMax && matchesDate;
     });
 
@@ -1137,6 +1173,9 @@ export class LeadsComponent implements OnInit {
     if (this.selectedCategory !== 'ALL') {
       chips.push({ key: 'category', label: `Category: ${this.selectedCategory}`, clear: () => { this.selectedCategory = 'ALL'; this.onFilterChange(); } });
     }
+    if (this.selectedCategoryService !== 'ALL') {
+      chips.push({ key: 'serviceCategory', label: `Category: ${this.selectedCategoryService}`, clear: () => { this.selectedCategoryService = 'ALL'; this.onFilterChange(); } });
+    }
     if (this.selectedSource !== 'ALL') {
       chips.push({ key: 'source', label: `Source: ${this.selectedSource}`, clear: () => { this.selectedSource = 'ALL'; this.onFilterChange(); } });
     }
@@ -1156,12 +1195,12 @@ export class LeadsComponent implements OnInit {
     }
     if (this.minValue !== null || this.maxValue !== null) {
       const min = this.minValue !== null ? this.minValue.toLocaleString() : '0';
-      const max = this.maxValue !== null ? this.maxValue.toLocaleString() : '∞';
+      const max = this.maxValue !== null ? this.maxValue.toLocaleString() : 'âˆž';
       chips.push({ key: 'value', label: `Value: ${min} - ${max}`, clear: () => { this.minValue = null; this.maxValue = null; this.onFilterChange(); } });
     }
     if (this.datePreset !== 'ALL') {
       const fieldLabel = this.dateField === 'expectedCloseDate' ? 'Closing' : this.dateField === 'nextFollowUp' ? 'Next Follow-Up' : 'Created';
-      const presetLabel = this.datePreset === 'CUSTOM' ? `${this.dateStart || '…'} to ${this.dateEnd || '…'}` : this.datePreset.replace('_', ' ');
+      const presetLabel = this.datePreset === 'CUSTOM' ? `${this.dateStart || 'â€¦'} to ${this.dateEnd || 'â€¦'}` : this.datePreset.replace('_', ' ');
       chips.push({ key: 'date', label: `${fieldLabel}: ${presetLabel}`, clear: () => { this.datePreset = 'ALL'; this.dateStart = ''; this.dateEnd = ''; this.onFilterChange(); } });
     }
 
@@ -1188,6 +1227,7 @@ export class LeadsComponent implements OnInit {
     this.selectedAddedById = 'ALL';
     this.selectedQuotationStatus = 'ALL';
     this.selectedFollowUpStatus = 'ALL';
+    this.selectedCategoryService = 'ALL';
     this.minValue = null;
     this.maxValue = null;
     this.datePreset = 'ALL';
@@ -1200,6 +1240,14 @@ export class LeadsComponent implements OnInit {
 
   getTotalPipelineValue(): number {
     return this.leads.reduce((sum, lead) => sum + (Number(lead.value) || 0), 0);
+  }
+
+  getFilteredCount(): number {
+    return this.getFilteredLeads().length;
+  }
+
+  getFilteredValue(): number {
+    return this.getFilteredLeads().reduce((sum, lead) => sum + (Number(lead.value) || 0), 0);
   }
 
   drop(event: CdkDragDrop<Lead[]>) {
@@ -1398,6 +1446,70 @@ export class LeadsComponent implements OnInit {
     return this.normalizeStatus(status);
   }
 
+  // Status dot colours keyed by raw pipeline stage (lowercase, spaces -> '-').
+  private readonly statusColorMap: Record<string, string> = {
+    'new': '#2563eb',
+    'interested': '#7c3aed',
+    'schedule-meeting': '#0891b2',
+    'proposal-sent': '#6d28d9',
+    'negotiation': '#b45309',
+    'on-hold': '#64748b',
+    'win': '#059669',
+    'lost': '#dc2626',
+  };
+
+  statusDotColor(status: string): string {
+    const key = (status || '').toLowerCase().replace(/\s+/g, '-');
+    return this.statusColorMap[key] || '#64748b';
+  }
+
+  // The lead id whose status menu is currently open (null = all closed).
+  statusMenuOpen: number | null = null;
+
+  toggleStatusMenu(lead: Lead, event: Event) {
+    if (event) event.stopPropagation();
+    this.statusMenuOpen = this.statusMenuOpen === lead.id ? null : lead.id;
+  }
+
+  selectStatus(lead: Lead, newStatus: string, event: Event) {
+    if (event) event.stopPropagation();
+    this.statusMenuOpen = null;
+    this.updateLeadStatus(lead, newStatus, event);
+  }
+
+  @HostListener('document:click')
+  onDocumentClick() {
+    this.statusMenuOpen = null;
+    this.actionMenuOpen = null;
+  }
+
+  // The lead id whose row action menu is currently open (null = all closed).
+  actionMenuOpen: number | null = null;
+
+  toggleActionMenu(lead: Lead, event: Event) {
+    if (event) event.stopPropagation();
+    this.actionMenuOpen = this.actionMenuOpen === lead.id ? null : lead.id;
+  }
+
+  closeActionMenu() {
+    this.actionMenuOpen = null;
+  }
+
+  updateLeadStatus(lead: Lead, newStatus: string, event: Event) {
+    if (event) event.stopPropagation();
+    if (!newStatus || newStatus === lead.status) return;
+    const previous = lead.status;
+    lead.status = newStatus;
+    this.http.put(`${environment.apiUrl}/crm/leads/${lead.id}/status`, { status: newStatus }).subscribe({
+      next: () => {
+        if (this.viewMode === 'kanban') this.loadLeads();
+      },
+      error: () => {
+        lead.status = previous;
+      }
+    });
+  }
+
   deleteLead(id: number, event: Event) {
     event.stopPropagation();
     if (confirm('Are you sure you want to delete this lead?')) {
@@ -1407,9 +1519,9 @@ export class LeadsComponent implements OnInit {
     }
   }
 
-  // ═══════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FOLLOW-UP MANAGEMENT METHODS
-  // ═══════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   openFollowUpModal(lead: Lead, event?: Event) {
     if (event) event.stopPropagation();
@@ -1441,7 +1553,7 @@ export class LeadsComponent implements OnInit {
     this.showFollowUpModal = false;
   }
 
-  // Most recently scheduled follow-up already on file for this lead — shown as
+  // Most recently scheduled follow-up already on file for this lead â€” shown as
   // read-only context when scheduling the next one, since there's no separate
   // "outcome" step anymore to surface it from.
   getPreviousFollowUpNote(): FollowUp | null {
@@ -1562,14 +1674,195 @@ export class LeadsComponent implements OnInit {
     }
   }
 
-  getDealCategoryBadge(category?: string): { label: string, color: string, bg: string, border: string } {
-    switch (category) {
-      case 'Inbound': return { label: 'Inbound', color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' };
-      case 'Outbound': return { label: 'Outbound', color: '#7c3aed', bg: '#faf5ff', border: '#e9d5ff' };
-      case 'Referral': return { label: 'Referral', color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' };
-      case 'Enterprise': return { label: 'Enterprise', color: '#d97706', bg: '#fffbeb', border: '#fde68a' };
-      case 'Retainer': return { label: 'Retainer', color: '#4338ca', bg: '#eef2ff', border: '#c7d2fe' };
-      default: return { label: category || 'Inbound', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
+  getFollowUpTypeClass(type: string): string {
+    switch (type) {
+      case 'CALL': return 'type-badge-call';
+      case 'EMAIL': return 'type-badge-email';
+      case 'MEETING': return 'type-badge-meeting';
+      case 'DEMO': return 'type-badge-demo';
+      case 'FIELD_VISIT': return 'type-badge-visit';
+      default: return 'type-badge-default';
     }
+  }
+
+  getFollowUpStatusLabel(status?: string): string {
+    if (!status) return 'Pending';
+    return status.charAt(0) + status.slice(1).toLowerCase();
+  }
+
+  getFollowUpStatusClass(status?: string): string {
+    switch ((status || 'PENDING').toUpperCase()) {
+      case 'COMPLETED': return 'fup-status-completed';
+      case 'CANCELLED': return 'fup-status-cancelled';
+      default: return 'fup-status-pending';
+    }
+  }
+
+  isFollowUpStatusSaving(fuId: number): boolean {
+    return !!this.followUpStatusSaving[fuId];
+  }
+
+  updateFollowUpStatus(lead: Lead, fu: FollowUp, status: string) {
+    if (!fu || !fu.id || !status) return;
+    this.followUpStatusSaving[fu.id] = true;
+    this.http.put<FollowUp>(`${environment.apiUrl}/crm/leads/${lead.id}/follow-ups/${fu.id}`, { status }).subscribe({
+      next: (updated) => {
+        const cache = this.leadFollowUpsCache[lead.id] || [];
+        this.leadFollowUpsCache[lead.id] = cache.map(x => x.id === updated.id ? { ...x, status: updated.status } : x);
+        this.followUpStatusSaving[fu.id] = false;
+      },
+      error: (err) => {
+        this.followUpStatusSaving[fu.id] = false;
+        console.error('Failed to update follow-up status', err);
+      },
+    });
+  }
+
+  isLeadExpanded(lead: Lead): boolean {
+    return this.expandedLeadId === lead.id;
+  }
+
+  toggleLeadFollowUps(lead: Lead, event: Event) {
+    if (event) event.stopPropagation();
+    if (this.isLeadExpanded(lead)) {
+      this.expandedLeadId = null;
+      return;
+    }
+    this.expandedLeadId = lead.id;
+    if (!this.leadFollowUpsCache[lead.id] && !this.leadFollowUpsLoading[lead.id]) {
+      this.loadLeadFollowUpsForTable(lead.id);
+    }
+    const i = this.leadFollowUpsExpandedIds.indexOf(lead.id);
+    if (i === -1) this.leadFollowUpsExpandedIds.push(lead.id);
+  }
+
+  loadLeadFollowUpsForTable(leadId: number) {
+    this.leadFollowUpsLoading[leadId] = true;
+    this.http.get<FollowUp[]>(`${environment.apiUrl}/crm/leads/${leadId}/follow-ups`).subscribe({
+      next: (data) => {
+        this.leadFollowUpsCache[leadId] = data || [];
+        this.leadFollowUpsLoading[leadId] = false;
+      },
+      error: () => {
+        this.leadFollowUpsCache[leadId] = [];
+        this.leadFollowUpsLoading[leadId] = false;
+      }
+    });
+  }
+
+  isLeadFollowUpsLoading(leadId: number): boolean {
+    return !!this.leadFollowUpsLoading[leadId];
+  }
+
+  leadFollowUpsLoaded(leadId: number): boolean {
+    return this.leadFollowUpsCache[leadId] !== undefined;
+  }
+
+  private followUpInRange(fu: FollowUp): boolean {
+    const d = +new Date(fu.scheduledAt);
+    if (!d) return false;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    switch (this.followUpDateFilter) {
+      case 'today': {
+        const end = new Date(startOfToday);
+        end.setDate(end.getDate() + 1);
+        return d >= +startOfToday && d < +end;
+      }
+      case 'thisWeek': {
+        const ws = new Date(startOfToday);
+        ws.setDate(ws.getDate() - ((ws.getDay() + 6) % 7));
+        const we = new Date(ws);
+        we.setDate(we.getDate() + 7);
+        return d >= +ws && d < +we;
+      }
+      case 'lastMonth': {
+        const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const e = new Date(now.getFullYear(), now.getMonth(), 1);
+        return d >= +s && d < +e;
+      }
+      case 'lastQuarter': {
+        const qi = Math.floor(now.getMonth() / 3);
+        const s = new Date(now.getFullYear(), (qi - 1) * 3, 1);
+        const e = new Date(now.getFullYear(), qi * 3, 1);
+        return d >= +s && d < +e;
+      }
+      case 'lastYear': {
+        const s = new Date(now.getFullYear() - 1, 0, 1);
+        const e = new Date(now.getFullYear(), 0, 1);
+        return d >= +s && d < +e;
+      }
+      case 'custom': {
+        let ok = true;
+        if (this.followUpStartDate) {
+          const s = new Date(this.followUpStartDate);
+          s.setHours(0, 0, 0, 0);
+          ok = ok && d >= +s;
+        }
+        if (this.followUpEndDate) {
+          const e = new Date(this.followUpEndDate);
+          e.setHours(23, 59, 59, 999);
+          ok = ok && d <= +e;
+        }
+        return ok;
+      }
+      default:
+        return true;
+    }
+  }
+
+  getLeadFollowUps(lead: Lead): FollowUp[] {
+    const all = this.leadFollowUpsCache[lead.id] || [];
+    return all.filter((fu) => this.followUpInRange(fu));
+  }
+
+  getLeadFollowUpCount(lead: Lead): number {
+    return (this.leadFollowUpsCache[lead.id] || []).length;
+  }
+
+  // True when the lead has at least one overdue (past-dated) follow-up.
+  hasOverdueFollowUp(lead: Lead): boolean {
+    const followUps = this.leadFollowUpsCache[lead.id] || [];
+    if (followUps.length === 0) return false;
+    const now = new Date().getTime();
+    return followUps.some(f => {
+      const t = new Date(f.scheduledAt).getTime();
+      return !isNaN(t) && t < now;
+    });
+  }
+
+  setFollowUpDateFilter(filter: string) {
+    this.followUpDateFilter = filter;
+    if (filter === 'custom' && (!this.followUpStartDate || !this.followUpEndDate)) {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - 30);
+      this.followUpStartDate = this.followUpStartDate || start.toISOString().slice(0, 10);
+      this.followUpEndDate = this.followUpEndDate || end.toISOString().slice(0, 10);
+    }
+  }
+
+  clearFollowUpDateFilter() {
+    this.followUpDateFilter = 'all';
+    this.followUpStartDate = '';
+    this.followUpEndDate = '';
+  }
+
+  isFollowUpToday(dateStr: string): boolean {
+    if (!dateStr) return false;
+    return new Date(dateStr).toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+  }
+
+  isFollowUpTomorrow(dateStr: string): boolean {
+    if (!dateStr) return false;
+    const d = new Date(dateStr).toISOString().slice(0, 10);
+    const t = new Date();
+    t.setDate(t.getDate() + 1);
+    return d === t.toISOString().slice(0, 10);
+  }
+
+  getAssignedName(assignedTo?: FollowUp['assignedTo']): string {
+    if (!assignedTo) return '';
+    return `${assignedTo.firstName || ''} ${assignedTo.lastName || ''}`.trim();
   }
 }

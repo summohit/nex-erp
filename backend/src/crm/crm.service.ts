@@ -873,7 +873,7 @@ export class CrmService {
     if (query.assignedToId) {
       where.assignedToId = parseInt(query.assignedToId, 10);
     }
-    if (query.dateFilter) {
+    if (query.dateFilter && query.dateFilter !== 'all') {
       const now = new Date();
       now.setHours(0, 0, 0, 0); // start of today
       const tomorrow = new Date(now);
@@ -881,8 +881,36 @@ export class CrmService {
       const nextWeek = new Date(now);
       nextWeek.setDate(nextWeek.getDate() + 7);
 
+      // 'thisWeek' — Monday of the current week through end of the week (Sunday)
+      const weekStart = new Date(now);
+      const day = (weekStart.getDay() + 6) % 7; // ISO weekday (Mon=0 ... Sun=6)
+      weekStart.setDate(weekStart.getDate() - day);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+
+      // 'lastMonth' — first day of previous calendar month through its last day
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      // 'lastQuarter' — previous calendar quarter (inclusive)
+      const quarterIndex = Math.floor(now.getMonth() / 3); // 0,1,2,3
+      const lastQuarterStart = new Date(now.getFullYear(), (quarterIndex - 1) * 3, 1);
+      const lastQuarterEnd = new Date(now.getFullYear(), quarterIndex * 3, 1);
+
+      // 'lastYear' — previous calendar year (inclusive)
+      const lastYearStart = new Date(now.getFullYear() - 1, 0, 1);
+      const lastYearEnd = new Date(now.getFullYear(), 0, 1);
+
       if (query.dateFilter === 'today') {
         where.scheduledAt = { gte: now, lt: tomorrow };
+      } else if (query.dateFilter === 'thisWeek') {
+        where.scheduledAt = { gte: weekStart, lt: weekEnd };
+      } else if (query.dateFilter === 'lastMonth') {
+        where.scheduledAt = { gte: lastMonthStart, lt: lastMonthEnd };
+      } else if (query.dateFilter === 'lastQuarter') {
+        where.scheduledAt = { gte: lastQuarterStart, lt: lastQuarterEnd };
+      } else if (query.dateFilter === 'lastYear') {
+        where.scheduledAt = { gte: lastYearStart, lt: lastYearEnd };
       } else if (query.dateFilter === 'tomorrow') {
         const dayAfter = new Date(tomorrow);
         dayAfter.setDate(dayAfter.getDate() + 1);

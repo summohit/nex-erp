@@ -46,7 +46,7 @@
       <!-- New Lead Button (Primary) -->
       <button class="btn-header-primary" (click)="openModal()" title="Create New Lead Opportunity">
         <svg lucidePlus size="16"></svg>
-        <span>New Deal</span>
+        <span>New Lead</span>
       </button>
     </div>
   </div>
@@ -54,7 +54,7 @@
   <!-- Main Tab Switcher -->
   <div class="main-tab-switcher">
     <button type="button" [class.active]="activeMainTab === 'leads'" (click)="activeMainTab = 'leads'">
-      Deals
+      Leads
     </button>
     <button type="button" [class.active]="activeMainTab === 'contacts'" (click)="activeMainTab = 'contacts'">
       Lead Contacts
@@ -138,7 +138,7 @@
 
       <div class="adv-filters-grid">
         <!-- 1. Stage (multi-select with search) -->
-        <div class="adv-filter-item">
+        <div class="adv-filter-item stage">
           <label><svg lucideLayers size="13"></svg> Stage</label>
           <div class="searchable-filter-dropdown">
             <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedStages.length > 0" (click)="showStageDropdown = !showStageDropdown; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
@@ -170,8 +170,8 @@
         </div>
 
         <!-- 2. Sales Rep (searchable) -->
-        <div class="adv-filter-item">
-          <label><svg lucideUser size="13"></svg> Sales Rep</label>
+        <div class="adv-filter-item rep">
+          <label><svg lucideUser size="13"></svg> Sales Representative</label>
           <div class="searchable-filter-dropdown">
             <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedRepId !== 'ALL'" (click)="showRepDropdown = !showRepDropdown; showStageDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
               <span class="trigger-text">{{ getSelectedRepLabel() }}</span>
@@ -221,7 +221,7 @@
         </div>
 
         <!-- 3. Deal Category (searchable) -->
-        <div class="adv-filter-item">
+        <div class="adv-filter-item category">
           <label><svg lucideTag size="13"></svg> Deal Category</label>
           <div class="searchable-filter-dropdown">
             <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedCategory !== 'ALL'" (click)="showCategoryDropdown = !showCategoryDropdown; showStageDropdown=false; showRepDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
@@ -253,7 +253,7 @@
         </div>
 
         <!-- 4. Lead Source (searchable) -->
-        <div class="adv-filter-item">
+        <div class="adv-filter-item source">
           <label><svg lucideGlobe size="13"></svg> Lead Source</label>
           <div class="searchable-filter-dropdown">
             <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedSource !== 'ALL'" (click)="showSourceDropdown = !showSourceDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
@@ -285,7 +285,7 @@
         </div>
 
         <!-- 5. Lead Contact (searchable) -->
-        <div class="adv-filter-item">
+        <div class="adv-filter-item contact">
           <label><svg lucideUserCheck size="13"></svg> Lead Contact</label>
           <div class="searchable-filter-dropdown">
             <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedContactId !== 'ALL'" (click)="showContactDropdown = !showContactDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showAddedByDropdown=false">
@@ -327,7 +327,7 @@
         </div>
 
         <!-- 6. Added By (searchable) -->
-        <div class="adv-filter-item">
+        <div class="adv-filter-item added">
           <label><svg lucideUserCheck size="13"></svg> Added By</label>
           <div class="searchable-filter-dropdown">
             <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedAddedById !== 'ALL'" (click)="showAddedByDropdown = !showAddedByDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false">
@@ -371,7 +371,7 @@
         </div>
 
         <!-- 7. Quotation Status -->
-        <div class="adv-filter-item">
+        <div class="adv-filter-item quotation">
           <label><svg lucideFileText size="13"></svg> Quotation Status</label>
           <div class="custom-select-wrapper">
             <select [(ngModel)]="selectedQuotationStatus" (change)="onFilterChange()" [class.has-selection]="selectedQuotationStatus !== 'ALL'">
@@ -384,7 +384,7 @@
         </div>
 
         <!-- 8. Follow-Up Status -->
-        <div class="adv-filter-item">
+        <div class="adv-filter-item fupstatus">
           <label><svg lucideCalendarClock size="13"></svg> Follow-Up Status</label>
           <div class="custom-select-wrapper">
             <select [(ngModel)]="selectedFollowUpStatus" (change)="onFilterChange()" [class.has-selection]="selectedFollowUpStatus !== 'ALL'">
@@ -397,24 +397,63 @@
           </div>
         </div>
 
+        <!-- 8b. Follow-Up Date -->
+        <div class="adv-filter-item followup-date-filter-item fupdate">
+          <label><svg lucideCalendarRange size="13"></svg> Follow-Up Date</label>
+          <div class="followup-date-filter-row">
+            <div class="custom-select-wrapper">
+              <select [(ngModel)]="followUpDateFilter" (change)="setFollowUpDateFilter(followUpDateFilter)" [class.has-selection]="followUpDateFilter !== 'all'">
+                <option value="all">All</option>
+                <option value="today">Today</option>
+                <option value="thisWeek">This Week</option>
+                <option value="lastMonth">Last Month</option>
+                <option value="lastQuarter">Last Quarter</option>
+                <option value="lastYear">Last 1 Year</option>
+                <option value="custom">Custom Dates</option>
+              </select>
+              <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+            </div>
+            <div class="followup-custom-dates" *ngIf="followUpDateFilter === 'custom'">
+              <input type="date" [(ngModel)]="followUpStartDate" (change)="onFilterChange()" title="Start date" />
+              <span class="followup-date-sep">&ndash;</span>
+              <input type="date" [(ngModel)]="followUpEndDate" (change)="onFilterChange()" title="End date" />
+              <button type="button" class="followup-date-clear" (click)="clearFollowUpDateFilter()" title="Clear">
+                <svg lucideX size="13"></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 8c. Category -->
+        <div class="adv-filter-item service-category">
+          <label><svg lucideFolder size="13"></svg> Category</label>
+          <div class="custom-select-wrapper">
+            <select [(ngModel)]="selectedCategoryService" (change)="onFilterChange()" [class.has-selection]="selectedCategoryService !== 'ALL'">
+              <option value="ALL">All Categories</option>
+              <option *ngFor="let cat of SERVICE_CATEGORIES" [value]="cat">{{ cat }}</option>
+            </select>
+            <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+          </div>
+        </div>
+
         <!-- 9. Deal Value Range -->
-        <div class="adv-filter-item value-range-item">
-          <label><svg lucideIndianRupee size="13"></svg> Deal Value (â‚¹)</label>
+        <div class="adv-filter-item value-range-item value-range">
+          <label><svg lucideIndianRupee size="13"></svg> Deal Value (₹)</label>
           <div class="value-range-inputs">
             <div class="value-input-box">
-              <span class="curr-prefix">â‚¹</span>
+              <span class="curr-prefix">₹</span>
               <input type="number" min="0" placeholder="Min" [(ngModel)]="minValue" (ngModelChange)="onFilterChange()" />
             </div>
-            <span class="range-sep">â€”</span>
+            <span class="range-sep">—</span>
             <div class="value-input-box">
-              <span class="curr-prefix">â‚¹</span>
+              <span class="curr-prefix">₹</span>
               <input type="number" min="0" placeholder="Max" [(ngModel)]="maxValue" (ngModelChange)="onFilterChange()" />
             </div>
           </div>
         </div>
 
         <!-- 7. Date Filter -->
-        <div class="adv-filter-item date-filter-item">
+        <div class="adv-filter-item date-filter-item date-filter">
           <label><svg lucideCalendar size="13"></svg> Date Filter</label>
           <div class="date-filter-row">
             <div class="custom-select-wrapper date-field-select">
@@ -464,6 +503,18 @@
       </div>
       <button type="button" class="btn-clear-all-chips" (click)="clearFilters()">Reset All</button>
     </div>
+
+    <!-- Filtered Summary Bar -->
+    <div class="filter-summary-bar" *ngIf="hasActiveFilters()">
+      <div class="filter-summary-item">
+        <span class="filter-summary-label">Filtered Deals</span>
+        <span class="filter-summary-value">{{ getFilteredCount() }}</span>
+      </div>
+      <div class="filter-summary-item">
+        <span class="filter-summary-label">Filtered Value</span>
+        <span class="filter-summary-value">{{ getFilteredValue() | currency:'INR' }}</span>
+      </div>
+    </div>
   </div>
 
   <!-- Skeleton Card Template -->
@@ -512,7 +563,7 @@
             
             <div class="card-body">
               <div class="card-header-row">
-                <h4 class="lead-title" [class.strike-through]="col.id === 'Lost' || col.id === 'Junk'">{{lead.title}}</h4>
+                <h4 class="lead-title" [class.strike-through]="col.id === 'Lost'">{{lead.title}}</h4>
                 <div class="card-actions-group">
                   <button type="button" class="btn-card-action btn-card-edit" (click)="openEditModal(lead, $event)" title="Edit Lead">
                     <svg lucideEdit2 size="13"></svg>
@@ -527,9 +578,6 @@
                 <span class="card-company-pill" *ngIf="lead.companyName">
                   <svg lucideBuilding size="12"></svg>
                   <span>{{lead.companyName}}</span>
-                </span>
-                <span class="card-category-pill" *ngIf="lead.dealCategory" [ngStyle]="{'color': getDealCategoryBadge(lead.dealCategory).color, 'background': getDealCategoryBadge(lead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(lead.dealCategory).border}">
-                  {{lead.dealCategory}}
                 </span>
               </div>
 
@@ -616,22 +664,33 @@
           </tr>
         </ng-container>
         <ng-container *ngIf="!isLoading && getFilteredLeads().length === 0">
-          <tr>            <td colspan="8" style="text-align: center; padding: 20px;">No leads match your filters.</td></tr>
+          <tr>
+            <td colspan="8" class="table-empty-cell">No leads match your filters.</td>
+          </tr>
         </ng-container>
         <ng-container *ngIf="!isLoading">
-          <tr *ngFor="let lead of getFilteredLeads()">
+          <ng-container *ngFor="let lead of getFilteredLeads()">
+          <tr class="lead-row">
             <td>
-              <button type="button" class="lead-title-link" (click)="openLeadProfile(lead.id)">{{lead.title}}</button>
-              <div style="display: flex; gap: 6px; align-items: center; margin-top: 3px;" *ngIf="lead.dealCategory">
-                <span class="card-category-pill" [ngStyle]="{'color': getDealCategoryBadge(lead.dealCategory).color, 'background': getDealCategoryBadge(lead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(lead.dealCategory).border}">
-                  {{lead.dealCategory}}
+              <div class="lead-title-cell">
+                <button type="button" class="lead-expand-btn" [class.expanded]="isLeadExpanded(lead)"
+                        (click)="toggleLeadFollowUps(lead, $event)"
+                        [title]="isLeadExpanded(lead) ? 'Hide follow-ups' : 'Show follow-ups'">
+                  <svg lucideChevronRight size="14"></svg>
+                </button>
+                <button type="button" class="lead-title-link" (click)="openLeadProfile(lead.id)">{{lead.title}}</button>
+                <span *ngIf="getLeadFollowUpCount(lead) > 0" class="lead-followup-count-pill"
+                      [class.overdue]="hasOverdueFollowUp(lead)"
+                      [title]="(hasOverdueFollowUp(lead) ? 'Overdue follow-up - ' : '') + getLeadFollowUpCount(lead) + ' follow-up' + (getLeadFollowUpCount(lead) === 1 ? '' : 's')">
+                  <svg lucideCalendarClock size="12"></svg>
+                  {{getLeadFollowUpCount(lead)}}
                 </span>
               </div>
             </td>
             <td>{{lead.companyName || '-'}}</td>
-            <td>
-              <div *ngIf="lead.contactName" style="font-weight: 500;">{{lead.contactName}}</div>
-              <div *ngIf="lead.email" style="color: #64748b; font-size: 11px;">{{lead.email}}</div>
+            <td class="lead-contact-cell">
+              <div class="lead-contact-name" *ngIf="lead.contactName">{{lead.contactName}}</div>
+              <div class="lead-contact-email" *ngIf="lead.email">{{lead.email}}</div>
             </td>
             <td>
               <div class="table-user-cell" *ngIf="lead.assignedTo">
@@ -647,32 +706,163 @@
               <span *ngIf="!lead.assignedTo" class="unassigned-text">Unassigned</span>
             </td>
             <td>
-              <span class="ldm-status-badge ldm-status-{{lead.status | lowercase}}">
-                {{getStatusLabel(lead.status)}}
-              </span>
-            </td>
-            <td style="font-weight: 700; color: #059669;">{{lead.value | currency:lead.currency||'INR'}}</td>
-            <td>
-              <div *ngIf="getNextFollowUpDate(lead) as fuDate" class="table-followup-cell" [class.overdue]="isFollowUpOverdue(fuDate)">
-                <svg lucideCalendarClock size="12"></svg>
-                <span>{{ fuDate | date:'dd MMM yyyy' }}</span>
+              <div class="status-dropdown" [class.open]="statusMenuOpen === lead.id">
+                <button type="button" class="table-status-trigger ldm-status-badge ldm-status-{{lead.status | lowercase}}"
+                        (click)="toggleStatusMenu(lead, $event)">
+                  <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(lead.status)}"></span>
+                  <span class="table-status-text">{{getStatusLabel(lead.status)}}</span>
+                  <svg lucideChevronDown size="12" class="table-status-caret"></svg>
+                </button>
+                <div class="status-menu" *ngIf="statusMenuOpen === lead.id">
+                  <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES"
+                          [class.selected]="st === lead.status"
+                          (click)="selectStatus(lead, st, $event)">
+                    <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
+                    <span class="status-menu-label">{{st}}</span>
+                    <svg lucideCheck size="14" class="status-menu-check" *ngIf="st === lead.status"></svg>
+                  </button>
+                </div>
               </div>
-              <span *ngIf="!getNextFollowUpDate(lead)" class="no-data-dash">&mdash;</span>
+            </td>
+            <td class="lead-value-cell">{{lead.value | currency:lead.currency||'INR'}}</td>
+            <td>
+              <ng-container *ngIf="showNextFollowUpInTable(lead)">
+                <div *ngIf="getNextFollowUpDate(lead) as fuDate" class="table-followup-cell" [class.overdue]="isFollowUpOverdue(fuDate)">
+                  <svg lucideCalendarClock size="12"></svg>
+                  <span>{{ fuDate | date:'dd MMM yyyy' }}</span>
+                </div>
+                <span *ngIf="!getNextFollowUpDate(lead)" class="no-data-dash">&mdash;</span>
+              </ng-container>
+              <span *ngIf="!showNextFollowUpInTable(lead)" class="no-data-dash">&mdash;</span>
             </td>
             <td class="col-actions-sticky">
-              <div class="table-actions-group">
-                <button type="button" class="btn-table-action btn-table-details" (click)="openDetailModal(lead)" title="View Details">
-                  <svg lucideEye size="12"></svg> <span>Details</span>
+              <div class="action-dropdown" [class.open]="actionMenuOpen === lead.id">
+                <button type="button" class="btn-action-trigger" title="Actions"
+                        (click)="toggleActionMenu(lead, $event)">
+                  <svg lucideMoreVertical size="16"></svg>
                 </button>
-                <button type="button" class="btn-table-action btn-table-edit" (click)="openEditModal(lead, $event)" title="Edit Lead">
-                  <svg lucideEdit2 size="12"></svg> <span>Edit</span>
-                </button>
-                <button type="button" class="btn-table-action btn-table-delete" (click)="deleteLead(lead.id, $event)" title="Delete Lead">
-                  <svg lucideTrash2 size="12"></svg>
-                </button>
+                <div class="action-menu" *ngIf="actionMenuOpen === lead.id">
+                  <button type="button" class="action-menu-item" (click)="openDetailModal(lead)">
+                    <svg lucideEye size="14"></svg> View Details
+                  </button>
+                  <button type="button" class="action-menu-item" (click)="openEditModal(lead, $event)">
+                    <svg lucideEdit2 size="14"></svg> Edit
+                  </button>
+                  <div class="action-menu-divider"></div>
+                  <button type="button" class="action-menu-item action-menu-danger" (click)="deleteLead(lead.id, $event)">
+                    <svg lucideTrash2 size="14"></svg> Delete
+                  </button>
+                </div>
               </div>
             </td>
           </tr>
+          <tr class="lead-followups-row" *ngIf="isLeadExpanded(lead)">
+            <td colspan="8">
+              <div class="lead-followups-panel">
+                <div class="lead-followups-panel-header">
+                  <span class="lead-followups-panel-title">Follow-ups</span>
+                  <div class="lead-followups-panel-actions">
+                    <button type="button" class="btn-add-followup" (click)="openFollowUpModal(lead, $event)">
+                      <svg lucidePlus size="14"></svg> Add Follow-Up
+                    </button>
+                  </div>
+                </div>
+
+                <div class="lead-followups-loading" *ngIf="isLeadFollowUpsLoading(lead.id)">
+                  Loading follow-ups...
+                </div>
+
+                <ng-container *ngIf="leadFollowUpsLoaded(lead.id)">
+                  <div class="lead-followups-empty" *ngIf="getLeadFollowUps(lead).length === 0">
+                    {{ getLeadFollowUpCount(lead) === 0 ? 'No follow-ups recorded for this lead yet.' : 'No follow-ups match the current date filter.' }}
+                  </div>
+                  <div class="lead-followups-table-wrap" *ngIf="getLeadFollowUps(lead).length > 0">
+                    <table class="fu-table">
+                      <thead>
+                        <tr>
+                          <th style="width: 140px;">Type</th>
+                          <th style="width: 240px;">Objective / Notes</th>
+                          <th style="width: 240px;">Contact Details</th>
+                          <th style="width: 250px;">Scheduled For</th>
+                          <th style="width: 160px;">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let fu of getLeadFollowUps(lead)"
+                            [class.row-overdue]="isFollowUpOverdue(fu.scheduledAt)"
+                            [class.row-today]="isFollowUpToday(fu.scheduledAt)">
+                          <td>
+                            <span class="fu-type-badge" [ngClass]="getFollowUpTypeClass(fu.type)">
+                              <span [ngSwitch]="fu.type">
+                                <svg *ngSwitchCase="'CALL'" lucidePhone size="13"></svg>
+                                <svg *ngSwitchCase="'EMAIL'" lucideMail size="13"></svg>
+                                <svg *ngSwitchCase="'MEETING'" lucideVideo size="13"></svg>
+                                <svg *ngSwitchCase="'DEMO'" lucideVideo size="13"></svg>
+                                <svg *ngSwitchCase="'FIELD_VISIT'" lucideMapPin size="13"></svg>
+                                <svg *ngSwitchDefault lucideCalendarClock size="13"></svg>
+                              </span>
+                              <span>{{ getFollowUpTypeBadge(fu.type).label }}</span>
+                            </span>
+                          </td>
+                          <td>
+                            <div class="objective-cell">
+                              <span class="fu-title-text" [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)">{{ fu.title || 'Follow-up' }}</span>
+                              <span class="fu-notes-snippet" *ngIf="fu.notes" [title]="fu.notes">"{{ fu.notes }}"</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="contact-details-cell">
+                              <span class="contact-name" *ngIf="fu.contactPerson">
+                                <svg lucideUser size="12"></svg> {{ fu.contactPerson }}
+                              </span>
+                              <a class="contact-link" *ngIf="fu.contactPhone" [href]="'tel:' + fu.contactPhone">
+                                <svg lucidePhone size="12"></svg> {{ fu.contactPhone }}
+                              </a>
+                              <a class="contact-link" *ngIf="fu.contactEmail" [href]="'mailto:' + fu.contactEmail">
+                                <svg lucideMail size="12"></svg> {{ fu.contactEmail }}
+                              </a>
+                              <span class="unassigned-text" *ngIf="!fu.contactPerson && !fu.contactPhone && !fu.contactEmail">No Contact Info</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="time-cell">
+                              <div class="schedule-time-row"
+                                   [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)"
+                                   [class.text-today]="isFollowUpToday(fu.scheduledAt)">
+                                <svg lucideClock size="14"></svg>
+                                <span class="time-text">{{ fu.scheduledAt | date:'mediumDate' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
+                              </div>
+                              <span class="relative-pill pill-overdue" *ngIf="isFollowUpOverdue(fu.scheduledAt)">Overdue</span>
+                              <span class="relative-pill pill-today" *ngIf="isFollowUpToday(fu.scheduledAt)">Today</span>
+                              <span class="relative-pill pill-tomorrow" *ngIf="isFollowUpTomorrow(fu.scheduledAt)">Tomorrow</span>
+                            </div>
+                          </td>
+                          <td (click)="$event.stopPropagation()">
+                            <div class="fup-status-cell">
+                              <select
+                                class="fup-status-select"
+                                [ngClass]="getFollowUpStatusClass(fu.status)"
+                                [disabled]="isFollowUpStatusSaving(fu.id)"
+                                [ngModel]="fu.status || 'PENDING'"
+                                (ngModelChange)="updateFollowUpStatus(lead, fu, $event)">
+                                <option value="PENDING">Pending</option>
+                                <option value="COMPLETED">Completed</option>
+                                <option value="CANCELLED">Cancelled</option>
+                              </select>
+                              <span class="fup-status-saving" *ngIf="isFollowUpStatusSaving(fu.id)">
+                                <svg lucideLoader2 size="13" class="spin-icon"></svg>
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </ng-container>
+              </div>
+            </td>
+          </tr>
+          </ng-container>
         </ng-container>
       </tbody>
     </table>
@@ -860,7 +1050,8 @@
     </ng-template>
   </div>
 
-<!-- Lead Detail Modal -->
+
+
 <div class="modal-backdrop" *ngIf="showDetailModal && selectedLead" (click)="closeDetailModal()">
   <div class="lead-detail-modal enhanced-detail-modal" (click)="$event.stopPropagation()">
     <div class="ldm-header-v2">
@@ -872,10 +1063,6 @@
           </div>
           <span class="ldm-subject-badge" *ngIf="selectedLead.subjectLine">
             <svg lucideTag size="11"></svg> {{selectedLead.subjectLine}}
-          </span>
-          <span class="ldm-deal-cat-chip" *ngIf="selectedLead.dealCategory"
-            [ngStyle]="{'color': getDealCategoryBadge(selectedLead.dealCategory).color, 'background': getDealCategoryBadge(selectedLead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(selectedLead.dealCategory).border}">
-            {{selectedLead.dealCategory}}
           </span>
         </div>
         <div class="ldm-header-actions">
@@ -931,15 +1118,6 @@
         <div class="ldm-metric-item">
           <div class="ldm-value-label">Estimated Deal Value</div>
           <div class="ldm-value-amount">{{selectedLead.value | currency:selectedLead.currency||'INR':'symbol-narrow':'1.0-0'}}</div>
-        </div>
-        <div class="ldm-metric-divider" *ngIf="selectedLead.dealCategory"></div>
-        <div class="ldm-metric-item" *ngIf="selectedLead.dealCategory">
-          <div class="ldm-value-label">Deal Category</div>
-          <div class="ldm-metric-val">
-            <span class="deal-category-pill" [ngStyle]="{'color': getDealCategoryBadge(selectedLead.dealCategory).color, 'background': getDealCategoryBadge(selectedLead.dealCategory).bg, 'border': '1px solid ' + getDealCategoryBadge(selectedLead.dealCategory).border}">
-              {{selectedLead.dealCategory}}
-            </span>
-          </div>
         </div>
         <div class="ldm-metric-divider" *ngIf="selectedLead.expectedCloseDate"></div>
         <div class="ldm-metric-item" *ngIf="selectedLead.expectedCloseDate">
@@ -1135,8 +1313,8 @@
           <svg lucideUser size="20" style="color: #ea580c;"></svg>
         </div>
         <div>
-          <h3>{{ isEditing ? 'Edit Opportunity / Deal' : 'Add New Deal' }}</h3>
-          <p class="modal-subtitle">{{ isEditing ? 'Update details, assignment, and pipeline stages for this deal.' : 'Enter details to add a new deal to your pipeline.' }}</p>
+          <h3>{{ isEditing ? 'Edit Opportunity / Lead' : 'Add New Lead' }}</h3>
+          <p class="modal-subtitle">{{ isEditing ? 'Update details, assignment, and pipeline stages for this lead.' : 'Enter details to add a new lead to your pipeline.' }}</p>
         </div>
       </div>
       <button class="btn-icon-close" (click)="closeModal()" [disabled]="isSaving">
@@ -1393,12 +1571,6 @@
             <label>Initial Pipeline Status</label>
             <select [(ngModel)]="newLeadData.status" [disabled]="isSaving" class="enhanced-select">
               <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Deal Category</label>
-            <select [(ngModel)]="newLeadData.dealCategory" [disabled]="isSaving" class="enhanced-select">
-              <option *ngFor="let cat of DEAL_CATEGORIES" [value]="cat.id">{{cat.name}}</option>
             </select>
           </div>
           <div class="form-group">
