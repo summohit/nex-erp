@@ -64,13 +64,17 @@ export class LeadProfileComponent implements OnInit {
   loadingHistory = false;
 
   // Pipeline
+  // Must stay in step with LEAD_STATUSES on the leads board — this list had
+  // drifted (it still said "Converted" for Win, and had no Schedule Meeting),
+  // so the progress bar skipped stages the board could actually set.
   pipelineStages: PipelineStage[] = [
     { key: 'New', label: 'New' },
     { key: 'Interested', label: 'Interested' },
     { key: 'Proposal Sent', label: 'Proposal Sent' },
+    { key: 'Schedule Meeting', label: 'Schedule Meeting' },
     { key: 'Negotiation', label: 'Negotiation' },
+    { key: 'Win', label: 'Win' },
     { key: 'On Hold', label: 'On Hold' },
-    { key: 'Converted', label: 'Converted' },
     { key: 'Lost', label: 'Lost' },
   ];
 
@@ -279,6 +283,20 @@ export class LeadProfileComponent implements OnInit {
     if (!this.followUpForm.scheduledAt) {
       this.dialog.error('Please fill in the scheduled date and time.');
       return;
+    }
+
+    // Logging a follow-up is usually the moment the deal actually moves, so the
+    // form can change the stage too. Fired alongside the save rather than as
+    // part of it — a stage that fails to stick must not lose the follow-up.
+    const newStage = this.followUpForm.stage;
+    if (newStage && newStage !== this.lead?.status) {
+      this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}`, { status: newStage }).subscribe({
+        next: (updated) => {
+          if (this.lead) this.lead.status = updated?.status ?? newStage;
+          this.loadHistory();
+        },
+        error: () => this.dialog.error('Follow-up saved, but the stage could not be updated.'),
+      });
     }
     const payload = {
       title: this.followUpForm.type,

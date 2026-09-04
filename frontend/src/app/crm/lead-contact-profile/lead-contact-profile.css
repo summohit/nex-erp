@@ -2087,3 +2087,28 @@ input:checked + .toggle-slider:before {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+
+/* Human-readable contact reference, e.g. LC0926-001 */
+.entity-code-pill {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Fields carried from the contact record — shown, but not editable here. */
+.is-locked {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  cursor: not-allowed;
+}
+
+.locked-hint {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}

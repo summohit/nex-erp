@@ -561,40 +561,38 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   column-gap: 16px;
-  row-gap: 16px;
-  align-items: end;
-  grid-template-areas:
-    "stage rep category source contact"
-    "added quo fupstat fupdate category2"
-    "value value date date date";
+  row-gap: 18px;
+  /* `end` bottom-aligned cells of differing heights, which pushed a taller
+     item's label ABOVE its neighbours' labels — that was the orphaned
+     "Follow-Up Date" caption floating in empty space. Labels belong on one
+     line across the row, so align to the start and let controls follow. */
+  align-items: start;
 }
+
+/* Auto-flow in DOM order fills 5 + 5 + 5 exactly, so no named areas to keep in
+   sync when a filter is added or removed. */
+.adv-filter-item.fupdate { grid-column: span 2; }
+.adv-filter-item.value-range { grid-column: span 2; }
+.adv-filter-item.date-filter { grid-column: span 3; }
 
 .adv-filter-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  grid-area: auto;
+  align-self: start;
 }
 
-.adv-filter-item.stage { grid-area: stage; }
-.adv-filter-item.rep { grid-area: rep; }
-.adv-filter-item.category { grid-area: category; }
-.adv-filter-item.source { grid-area: source; }
-.adv-filter-item.contact { grid-area: contact; }
-.adv-filter-item.added { grid-area: added; }
-.adv-filter-item.quotation { grid-area: quo; }
-.adv-filter-item.fupstatus { grid-area: fupstat; }
-.adv-filter-item.fupdate { grid-area: fupdate; }
-.adv-filter-item.service-category { grid-area: category2; }
-.adv-filter-item.value-range { grid-area: value; }
-.adv-filter-item.date-filter { grid-area: date; }
 
 .adv-filter-item label {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
+  /* One line, always. A wrapped caption is what pushed this row out of
+     alignment; the columns are wide enough that none of these need to wrap. */
+  white-space: nowrap;
+  min-height: 16px;
   font-size: 0.6875rem;
   font-weight: 700;
   color: #475569;
@@ -629,14 +627,8 @@
 .adv-filter-item .searchable-filter-dropdown,
 .adv-filter-item > .custom-select-wrapper,
 .adv-filter-item > .value-range-inputs,
-.adv-filter-item > .date-filter-row,
-.adv-filter-item > .followup-date-filter-row {
+.adv-filter-item > .date-filter-row {
   width: 100%;
-}
-/* Follow-Up Date custom range sits below the main dropdown in the same column */
-.advanced-filters-panel .followup-date-filter-row {
-  flex-direction: column;
-  align-items: stretch;
 }
 .advanced-filters-panel .followup-custom-dates {
   justify-content: space-between;
@@ -655,49 +647,25 @@
   width: 100%;
 }
 
+/* Narrower viewports just reduce the column count — auto-flow re-packs the
+   items, and the spans below shrink so nothing can exceed the track count. */
 @media (max-width: 1200px) {
-  .adv-filters-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-areas:
-      "stage rep category"
-      "source contact added"
-      "quo fupstat category2"
-      "fupdate value value"
-      "date date date";
-  }
-}
-
-@media (max-width: 768px) {
-  .adv-filters-grid {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "stage"
-      "rep"
-      "category"
-      "source"
-      "contact"
-      "added"
-      "quo"
-      "fupstat"
-      "fupdate"
-      "category2"
-      "value"
-      "date";
-  }
+  .adv-filters-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .adv-filter-item.date-filter { grid-column: span 3; }
 }
 
 @media (min-width: 769px) and (max-width: 990px) {
-  .adv-filters-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      "stage rep"
-      "category source"
-      "contact added"
-      "quo fupstat"
-      "fupdate category2"
-      "value value"
-      "date date";
-  }
+  .adv-filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adv-filter-item.fupdate,
+  .adv-filter-item.value-range,
+  .adv-filter-item.date-filter { grid-column: span 2; }
+}
+
+@media (max-width: 768px) {
+  .adv-filters-grid { grid-template-columns: 1fr; }
+  .adv-filter-item.fupdate,
+  .adv-filter-item.value-range,
+  .adv-filter-item.date-filter { grid-column: span 1; }
 }
 
 /* Searchable Filter Dropdowns */
@@ -5481,12 +5449,36 @@ textarea:focus {
   border-color: #c7d2fe;
   color: #4f46e5;
 }
+/* Deal names run long ("AMC: Airtel 5811 devices (Servers) 3 Years"), and with
+   white-space: nowrap on every cell that one column was stretching the whole
+   table. Cap it and let the title ellipsis instead — the full name stays
+   available on hover and on the detail page. */
+.leads-table th.col-lead-title,
+.leads-table td.col-lead-title {
+  max-width: 260px;
+  width: 260px;
+}
+
 .lead-title-cell {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.col-lead-title .lead-title-link {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* The chevron and the follow-up pill must keep their size; only the name gives
+   way, otherwise the count pill gets squeezed to nothing. */
+.col-lead-title .lead-expand-btn,
+.col-lead-title .lead-followup-count-pill {
+  flex-shrink: 0;
 }
 .lead-followup-count-pill {
   display: inline-flex;
@@ -5855,15 +5847,6 @@ textarea:focus {
 }
 
 /* Follow-Up Date filter in the filter bar */
-.followup-date-filter-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.followup-date-filter-item .custom-select-wrapper {
-  flex-shrink: 0;
-}
 .followup-custom-dates {
   display: flex;
   align-items: center;
@@ -5901,4 +5884,61 @@ textarea:focus {
   background: #fef2f2;
   border-color: #fecaca;
   color: #dc2626;
+}
+
+
+/* Human-readable Lead ID — monospaced so the codes line up down the column. */
+.entity-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+.lead-code-cell { white-space: nowrap; }
+
+.lead-phone-cell a {
+  font-size: 12.5px;
+  color: #334155;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.lead-phone-cell a:hover { color: #2563eb; text-decoration: underline; }
+
+
+/* Fields carried from a lead contact — visible, but owned by that record. */
+.is-locked {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  cursor: not-allowed;
+}
+
+.locked-hint {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+
+/* Lead reference on a Kanban card — sits above the title as its identifier.
+   Slightly smaller than the table variant, which has more room to breathe. */
+.card-code-row {
+  display: flex;
+  margin-bottom: 6px;
+}
+
+.card-code-row .entity-code {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  letter-spacing: 0;
 }

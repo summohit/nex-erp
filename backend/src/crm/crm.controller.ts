@@ -222,7 +222,10 @@ export class CrmController {
 
   @Get('lead-contacts')
   getLeadContacts(@Request() req) {
-    return this.crmService.getLeadContacts(req.user.companyId);
+    return this.crmService.getLeadContacts(req.user.companyId, {
+      role: req.user.role,
+      employeeId: req.user.employeeId,
+    });
   }
 
   @Get('lead-contacts/:id')

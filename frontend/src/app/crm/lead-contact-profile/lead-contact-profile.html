@@ -17,6 +17,7 @@
               <span class="status-pill status-active" *ngIf="contact.companyName"><span class="status-dot"></span> {{ contact.companyName }}</span>
             </div>
             <div class="meta-strip">
+              <span class="meta-pill entity-code-pill" *ngIf="contact.contactCode">{{ contact.contactCode }}</span>
               <span class="meta-pill" *ngIf="contact.leadSource"><svg lucideAward size="14"></svg> {{ contact.leadSource }}</span>
               <span class="meta-pill"><svg lucideMapPin size="14"></svg> {{ fullLocation || 'No Location specified' }}</span>
               <span class="meta-pill" *ngIf="contact.website"><svg lucideGlobe size="14"></svg> <a [href]="formattedWebsiteUrl" target="_blank" class="meta-link">{{ contact.website }} <svg lucideExternalLink size="12"></svg></a></span>
@@ -379,23 +380,26 @@
             <label>Deal Name <span class="required-asterisk">*</span></label>
             <input type="text" [(ngModel)]="dealForm.title" name="title" required placeholder="e.g. New Contract" />
           </div>
+          <!-- Carried from this lead contact and locked: the deal belongs to
+               them, so editing these here would silently disagree with the
+               contact record it was raised from. -->
           <div class="form-group">
-            <label>Lead Name</label>
-            <input type="text" [(ngModel)]="dealForm.contactName" name="contactName" placeholder="e.g. Jane Cooper" />
+            <label>Lead Name <span class="locked-hint">from contact</span></label>
+            <input type="text" [(ngModel)]="dealForm.contactName" name="contactName" readonly class="is-locked" />
           </div>
           <div class="form-group">
-            <label>Company Name</label>
-            <input type="text" [(ngModel)]="dealForm.companyName" name="companyName" placeholder="e.g. Acme Corp" />
+            <label>Company Name <span class="locked-hint">from contact</span></label>
+            <input type="text" [(ngModel)]="dealForm.companyName" name="companyName" readonly class="is-locked" />
           </div>
         </div>
         <div class="form-row form-row-3">
           <div class="form-group">
-            <label>Email</label>
-            <input type="email" [(ngModel)]="dealForm.email" name="email" placeholder="e.g. jane@company.com" />
+            <label>Email <span class="locked-hint">from contact</span></label>
+            <input type="email" [(ngModel)]="dealForm.email" name="email" readonly class="is-locked" />
           </div>
           <div class="form-group">
-            <label>Phone</label>
-            <input type="text" [(ngModel)]="dealForm.phone" name="phone" placeholder="e.g. 1234567890" />
+            <label>Phone <span class="locked-hint">from contact</span></label>
+            <input type="text" [(ngModel)]="dealForm.phone" name="phone" readonly class="is-locked" />
           </div>
           <div class="form-group">
             <label>Value</label>

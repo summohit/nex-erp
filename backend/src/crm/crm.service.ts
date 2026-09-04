@@ -48,11 +48,74 @@ export class CrmService {
     return out;
   }
 
+  /**
+   * Builds the next human-readable reference, e.g. L0926-001 / LC0926-001:
+   * prefix + MMYY + a sequence that restarts each month.
+   *
+   * The sequence comes from the highest existing code for this month rather than
+   * a counter table, so it stays correct if rows are deleted or backfilled. Two
+   * simultaneous creates can still compute the same number, which is why the
+   * column is UNIQUE and the caller retries — the constraint is the real guard,
+   * not this read.
+   */
+  private async nextEntityCode(
+    kind: 'LEAD' | 'CONTACT',
+    companyId: number,
+  ): Promise<string> {
+    const prefix = kind === 'LEAD' ? 'L' : 'LC';
+    const now = new Date();
+    const mmyy = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getFullYear()).slice(-2)}`;
+    const stem = `${prefix}${mmyy}-`;
+
+    // Scoped by company: two companies each get their own -001 for the month.
+    const latest =
+      kind === 'LEAD'
+        ? await this.prisma.lead.findFirst({
+            where: { companyId, leadCode: { startsWith: stem } },
+            orderBy: { leadCode: 'desc' },
+            select: { leadCode: true },
+          })
+        : await this.prisma.leadContact.findFirst({
+            where: { companyId, contactCode: { startsWith: stem } },
+            orderBy: { contactCode: 'desc' },
+            select: { contactCode: true },
+          });
+
+    const current = (latest as any)?.leadCode ?? (latest as any)?.contactCode ?? null;
+    const seq = current ? parseInt(String(current).slice(stem.length), 10) : 0;
+    const next = (Number.isFinite(seq) ? seq : 0) + 1;
+    return `${stem}${String(next).padStart(3, '0')}`;
+  }
+
+  /**
+   * Retries on a unique-constraint clash so two concurrent creates can't both
+   * fail — the second simply recomputes and takes the next number.
+   */
+  private async withEntityCode<T>(
+    kind: 'LEAD' | 'CONTACT',
+    companyId: number,
+    create: (code: string) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = await this.nextEntityCode(kind, companyId);
+      try {
+        return await create(code);
+      } catch (error: any) {
+        // P2002 = unique constraint violation; anything else is a real failure.
+        if (error?.code !== 'P2002') throw error;
+      }
+    }
+    // Never block the record itself on the label.
+    return create(`${kind === 'LEAD' ? 'L' : 'LC'}-${Date.now()}`);
+  }
+
   async createLead(companyId: number, data: any, creatorEmployeeId?: number | null) {
     const sanitized = this.sanitizeLead(data);
-    const lead = await this.prisma.lead.create({
+    const lead = await this.withEntityCode('LEAD', companyId, (leadCode) =>
+      this.prisma.lead.create({
       data: {
         ...sanitized,
+        leadCode,
         addedById: sanitized.addedById ?? creatorEmployeeId ?? null,
         companyId,
       },
@@ -65,7 +128,8 @@ export class CrmService {
         },
         broughtByContact: true,
       },
-    });
+      }),
+    );
 
     await this.logActivity(
       companyId,
@@ -139,7 +203,7 @@ export class CrmService {
         client: true,
         quotations: true,
         followUps: {
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { scheduledAt: 'desc' },
           include: {
             assignedTo: {
               select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
@@ -707,7 +771,7 @@ export class CrmService {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
         },
       },
-      orderBy: { scheduledAt: 'asc' },
+      orderBy: { scheduledAt: 'desc' },
     });
   }
 
@@ -967,9 +1031,27 @@ export class CrmService {
   // LEAD CONTACT OPERATIONS
   // ═══════════════════════════════════════════
 
-  async getLeadContacts(companyId: number) {
+  /**
+   * Scoped the same way as getLeads: a sales rep sees only the contacts they
+   * added, while SUPERADMIN/ADMIN and anyone with VIEW_ALL see everything.
+   * LeadContact has no assignee, so ownership is `addedById` alone.
+   */
+  async getLeadContacts(companyId: number, user?: { role?: string; employeeId?: number | null }) {
+    const where: any = { companyId };
+
+    // No user means an internal caller (e.g. the public lead form) — unscoped.
+    if (user) {
+      const isUnrestricted = user.role === 'SUPERADMIN' || user.role === 'ADMIN';
+      if (!isUnrestricted) {
+        const canViewAll = await this.permissionsService.hasPermission(
+          companyId, user.role || 'EMPLOYEE', 'crm/leads', 'VIEW_ALL',
+        );
+        if (!canViewAll) where.addedById = user.employeeId ?? -1;
+      }
+    }
+
     return this.prisma.leadContact.findMany({
-      where: { companyId },
+      where,
       include: {
         addedBy: {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } }, department: { select: { name: true } } },
@@ -1024,9 +1106,11 @@ export class CrmService {
       addedById = employee?.id || null;
     }
 
-    return this.prisma.leadContact.create({
+    return this.withEntityCode('CONTACT', companyId, (contactCode) =>
+      this.prisma.leadContact.create({
       data: {
         companyId,
+        contactCode,
         salutation: data.salutation || null,
         name: data.name,
         email: data.email || null,
@@ -1051,7 +1135,8 @@ export class CrmService {
           select: { leadsBrought: true }
         }
       },
-    });
+      }),
+    );
   }
 
   async importLeadContacts(companyId: number, userId: number, contacts: any[], addedById: number | null) {

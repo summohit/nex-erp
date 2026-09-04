@@ -16,6 +16,7 @@
               <span class="status-pill lead-status {{ statusClass(lead.status) }}"><span class="status-dot"></span> {{ lead.status }}</span>
             </div>
             <div class="meta-strip">
+              <span class="meta-pill entity-code-pill" *ngIf="lead.leadCode">{{ lead.leadCode }}</span>
               <span class="meta-pill" *ngIf="lead.companyName"><svg lucideBuilding size="14"></svg> {{ lead.companyName }}</span>
               <span class="meta-pill" *ngIf="lead.dealCategory"><svg lucideTarget size="14"></svg> {{ lead.dealCategory }}</span>
               <span class="meta-pill" *ngIf="lead.source"><svg lucideMessageSquare size="14"></svg> {{ lead.source }}</span>
@@ -340,6 +341,14 @@
 
           <label class="form-label" style="margin-top:16px">Remark</label>
           <textarea class="modern-form-control" rows="3" [(ngModel)]="followUpForm.notes" placeholder="Agenda or remarks"></textarea>
+
+          <!-- Logging the interaction is usually when the deal actually moves,
+               so the stage can be changed from here instead of a second trip. -->
+          <label class="form-label" style="margin-top:16px">Move stage to</label>
+          <select class="modern-form-control" [(ngModel)]="followUpForm.stage">
+            <option value="">Leave unchanged ({{ lead?.status || 'New' }})</option>
+            <option *ngFor="let s of pipelineStages" [value]="s.key">{{ s.label }}</option>
+          </select>
         </div>
         <div class="modal-footer-styled">
           <button class="btn-outline-pill" (click)="closeFollowUpModal()">Cancel</button>

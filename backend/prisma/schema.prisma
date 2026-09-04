@@ -2071,6 +2071,9 @@ model SystemSetting {
 
 model Lead {
   id                  Int            @id @default(autoincrement())
+  // Human-readable reference shown to users, e.g. L0926-001 (L + MMYY + monthly
+  // sequence). Nullable so rows created before this existed stay valid.
+  leadCode            String?        @unique
   title               String
   subjectLine         String?
   dealCategory        String?        @default("Inbound") // Inbound, Outbound, Referral, Enterprise, Retainer
@@ -2113,6 +2116,8 @@ model Lead {
 // of a lead via the "Lead Brought By" field, as an alternative to an internal Employee.
 model LeadContact {
   id                Int       @id @default(autoincrement())
+  // e.g. LC0926-001 — same scheme as Lead.leadCode.
+  contactCode       String?   @unique
   salutation        String?
   name              String
   email             String?

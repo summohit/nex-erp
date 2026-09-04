@@ -398,41 +398,30 @@
         </div>
 
         <!-- 8b. Follow-Up Date -->
+        <!-- Same shape as every other filter: label + select. The custom range
+             is a sibling below, shown only when "Custom Dates" is picked, so
+             this item needs no bespoke flex container of its own. -->
         <div class="adv-filter-item followup-date-filter-item fupdate">
           <label><svg lucideCalendarRange size="13"></svg> Follow-Up Date</label>
-          <div class="followup-date-filter-row">
-            <div class="custom-select-wrapper">
-              <select [(ngModel)]="followUpDateFilter" (change)="setFollowUpDateFilter(followUpDateFilter)" [class.has-selection]="followUpDateFilter !== 'all'">
-                <option value="all">All</option>
-                <option value="today">Today</option>
-                <option value="thisWeek">This Week</option>
-                <option value="lastMonth">Last Month</option>
-                <option value="lastQuarter">Last Quarter</option>
-                <option value="lastYear">Last 1 Year</option>
-                <option value="custom">Custom Dates</option>
-              </select>
-              <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
-            </div>
-            <div class="followup-custom-dates" *ngIf="followUpDateFilter === 'custom'">
-              <input type="date" [(ngModel)]="followUpStartDate" (change)="onFilterChange()" title="Start date" />
-              <span class="followup-date-sep">&ndash;</span>
-              <input type="date" [(ngModel)]="followUpEndDate" (change)="onFilterChange()" title="End date" />
-              <button type="button" class="followup-date-clear" (click)="clearFollowUpDateFilter()" title="Clear">
-                <svg lucideX size="13"></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 8c. Category -->
-        <div class="adv-filter-item service-category">
-          <label><svg lucideFolder size="13"></svg> Category</label>
           <div class="custom-select-wrapper">
-            <select [(ngModel)]="selectedCategoryService" (change)="onFilterChange()" [class.has-selection]="selectedCategoryService !== 'ALL'">
-              <option value="ALL">All Categories</option>
-              <option *ngFor="let cat of SERVICE_CATEGORIES" [value]="cat">{{ cat }}</option>
+            <select [(ngModel)]="followUpDateFilter" (change)="setFollowUpDateFilter(followUpDateFilter)" [class.has-selection]="followUpDateFilter !== 'all'">
+              <option value="all">All</option>
+              <option value="today">Today</option>
+              <option value="thisWeek">This Week</option>
+              <option value="lastMonth">Last Month</option>
+              <option value="lastQuarter">Last Quarter</option>
+              <option value="lastYear">Last 1 Year</option>
+              <option value="custom">Custom Dates</option>
             </select>
             <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+          </div>
+          <div class="followup-custom-dates" *ngIf="followUpDateFilter === 'custom'">
+            <input type="date" [(ngModel)]="followUpStartDate" (change)="onFilterChange()" title="Start date" />
+            <span class="followup-date-sep">&ndash;</span>
+            <input type="date" [(ngModel)]="followUpEndDate" (change)="onFilterChange()" title="End date" />
+            <button type="button" class="followup-date-clear" (click)="clearFollowUpDateFilter()" title="Clear">
+              <svg lucideX size="13"></svg>
+            </button>
           </div>
         </div>
 
@@ -562,6 +551,12 @@
             </div>
             
             <div class="card-body">
+              <!-- Reference sits above the title, the way an issue key does — it
+                   identifies the card rather than describing it. -->
+              <div class="card-code-row" *ngIf="lead.leadCode">
+                <span class="entity-code">{{lead.leadCode}}</span>
+              </div>
+
               <div class="card-header-row">
                 <h4 class="lead-title" [class.strike-through]="col.id === 'Lost'">{{lead.title}}</h4>
                 <div class="card-actions-group">
@@ -624,9 +619,11 @@
       <thead>
         <tr>
           <!-- Client-side columns first, our own tracking after. -->
-          <th>Lead / Opportunity</th>
+          <th>Lead ID</th>
+          <th class="col-lead-title">Lead / Opportunity</th>
           <th>Company</th>
           <th>Contact</th>
+          <th>Phone</th>
           <th>Lead Owner</th>
           <th>Status</th>
           <th>Value</th>
@@ -638,6 +635,7 @@
         <!-- Skeleton rows mirror the real columns so the table doesn't jump -->
         <ng-container *ngIf="isLoading">
           <tr class="sk-lead-row" *ngFor="let r of [1,2,3,4,5,6,7,8]">
+            <td><app-skeleton width="74px" height="12px"></app-skeleton></td>
             <td>
               <div class="sk-stack">
                 <app-skeleton width="66%" height="12px"></app-skeleton>
@@ -651,6 +649,7 @@
                 <app-skeleton width="86px" height="10px"></app-skeleton>
               </div>
             </td>
+            <td><app-skeleton width="88px" height="12px"></app-skeleton></td>
             <td>
               <div class="sk-user">
                 <app-skeleton width="26px" [circle]="true"></app-skeleton>
@@ -665,20 +664,24 @@
         </ng-container>
         <ng-container *ngIf="!isLoading && getFilteredLeads().length === 0">
           <tr>
-            <td colspan="8" class="table-empty-cell">No leads match your filters.</td>
+            <td colspan="10" class="table-empty-cell">No leads match your filters.</td>
           </tr>
         </ng-container>
         <ng-container *ngIf="!isLoading">
           <ng-container *ngFor="let lead of getFilteredLeads()">
           <tr class="lead-row">
-            <td>
+            <td class="lead-code-cell">
+              <span *ngIf="lead.leadCode" class="entity-code">{{lead.leadCode}}</span>
+              <span *ngIf="!lead.leadCode" class="no-data-dash">&mdash;</span>
+            </td>
+            <td class="col-lead-title">
               <div class="lead-title-cell">
                 <button type="button" class="lead-expand-btn" [class.expanded]="isLeadExpanded(lead)"
                         (click)="toggleLeadFollowUps(lead, $event)"
                         [title]="isLeadExpanded(lead) ? 'Hide follow-ups' : 'Show follow-ups'">
                   <svg lucideChevronRight size="14"></svg>
                 </button>
-                <button type="button" class="lead-title-link" (click)="openLeadProfile(lead.id)">{{lead.title}}</button>
+                <button type="button" class="lead-title-link" [title]="lead.title" (click)="openLeadProfile(lead.id)">{{lead.title}}</button>
                 <span *ngIf="getLeadFollowUpCount(lead) > 0" class="lead-followup-count-pill"
                       [class.overdue]="hasOverdueFollowUp(lead)"
                       [title]="(hasOverdueFollowUp(lead) ? 'Overdue follow-up - ' : '') + getLeadFollowUpCount(lead) + ' follow-up' + (getLeadFollowUpCount(lead) === 1 ? '' : 's')">
@@ -691,6 +694,10 @@
             <td class="lead-contact-cell">
               <div class="lead-contact-name" *ngIf="lead.contactName">{{lead.contactName}}</div>
               <div class="lead-contact-email" *ngIf="lead.email">{{lead.email}}</div>
+            </td>
+            <td class="lead-phone-cell">
+              <a *ngIf="lead.phone" [href]="'tel:' + lead.phone" (click)="$event.stopPropagation()">{{lead.phone}}</a>
+              <span *ngIf="!lead.phone" class="no-data-dash">&mdash;</span>
             </td>
             <td>
               <div class="table-user-cell" *ngIf="lead.assignedTo">
@@ -757,7 +764,7 @@
             </td>
           </tr>
           <tr class="lead-followups-row" *ngIf="isLeadExpanded(lead)">
-            <td colspan="8">
+            <td colspan="10">
               <div class="lead-followups-panel">
                 <div class="lead-followups-panel-header">
                   <span class="lead-followups-panel-title">Follow-ups</span>
@@ -1366,25 +1373,25 @@
 
         <div class="form-row">
           <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.companyName.trim()">
-            <label>Company Name <span class="required-asterisk">*</span></label>
-            <input type="text" [(ngModel)]="newLeadData.companyName" placeholder="e.g., Acme Technologies Inc." [disabled]="isSaving" />
+            <label>Company Name <span class="required-asterisk">*</span> <span class="locked-hint" *ngIf="lockedFromContact">from contact</span></label>
+            <input type="text" [(ngModel)]="newLeadData.companyName" placeholder="e.g., Acme Technologies Inc." [disabled]="isSaving" [readonly]="lockedFromContact" [class.is-locked]="lockedFromContact" />
             <span class="error-msg" *ngIf="isSubmitted && !newLeadData.companyName.trim()">Company Name is required.</span>
           </div>
           <div class="form-group">
-            <label>Primary Contact Name</label>
-            <input type="text" [(ngModel)]="newLeadData.contactName" placeholder="e.g., John Doe" [disabled]="isSaving" />
+            <label>Primary Contact Name <span class="locked-hint" *ngIf="lockedFromContact">from contact</span></label>
+            <input type="text" [(ngModel)]="newLeadData.contactName" placeholder="e.g., John Doe" [disabled]="isSaving" [readonly]="lockedFromContact" [class.is-locked]="lockedFromContact" />
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.email.trim()">
-            <label>Email Address <span class="required-asterisk">*</span></label>
-            <input type="email" [(ngModel)]="newLeadData.email" placeholder="john@acme.com" [disabled]="isSaving" />
+            <label>Email Address <span class="required-asterisk">*</span> <span class="locked-hint" *ngIf="lockedFromContact">from contact</span></label>
+            <input type="email" [(ngModel)]="newLeadData.email" placeholder="john@acme.com" [disabled]="isSaving" [readonly]="lockedFromContact" [class.is-locked]="lockedFromContact" />
             <span class="error-msg" *ngIf="isSubmitted && !newLeadData.email.trim()">Email is required.</span>
           </div>
           <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.phone.trim()">
-            <label>WhatsApp / Phone Number <span class="required-asterisk">*</span></label>
-            <input type="text" [(ngModel)]="newLeadData.phone" placeholder="+1 (555) 000-0000" [disabled]="isSaving" />
+            <label>WhatsApp / Phone Number <span class="required-asterisk">*</span> <span class="locked-hint" *ngIf="lockedFromContact">from contact</span></label>
+            <input type="text" [(ngModel)]="newLeadData.phone" placeholder="+1 (555) 000-0000" [disabled]="isSaving" [readonly]="lockedFromContact" [class.is-locked]="lockedFromContact" />
             <span class="error-msg" *ngIf="isSubmitted && !newLeadData.phone.trim()">WhatsApp/Phone is required.</span>
           </div>
         </div>

@@ -15,7 +15,9 @@ import {
   LucideInbox, LucideEye, LucideStar, LucideUsers, LucideAward,
   LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
   LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
-  LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown
+  LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown,
+  LucideCheck, LucideMapPin,
+  LucideEdit2
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
@@ -33,7 +35,9 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideInbox, LucideEye, LucideStar, LucideUsers, LucideAward,
     LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
     LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
-    LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown
+    LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown,
+    LucideCheck, LucideMapPin,
+    LucideEdit2,
   ],
   templateUrl: './candidates.html',
   styleUrls: ['./candidates.css'],

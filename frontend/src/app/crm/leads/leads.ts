@@ -35,7 +35,7 @@ import {
   LucideUsers, LucideAward, LucideExternalLink,
   LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
   LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
-  LucideUpload, LucideDownload, LucideCalendarRange, LucideFolder
+  LucideUpload, LucideDownload, LucideCalendarRange, LucideFolder, LucideChevronRight, LucideBriefcase
 } from '@lucide/angular';
 
 export interface FollowUp {
@@ -56,6 +56,8 @@ export interface FollowUp {
 
 interface Lead {
   id: number;
+  /** Human-readable reference, e.g. L0926-001. Null for rows predating codes. */
+  leadCode?: string | null;
   title: string;
   subjectLine?: string;
   dealCategory?: string;
@@ -114,7 +116,8 @@ interface Lead {
     LucideUsers, LucideAward, LucideExternalLink,
     LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
     LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
-    LucideUpload, LucideDownload
+    LucideUpload, LucideDownload,
+    LucideBriefcase, LucideCalendarRange, LucideChevronRight,
   ],
   templateUrl: './leads.html',
   styleUrls: ['./leads.css']
@@ -158,16 +161,10 @@ export class LeadsComponent implements OnInit {
   selectedQuotationStatus: 'ALL' | 'QUOTED' | 'NOT_QUOTED' = 'ALL';
   selectedFollowUpStatus: 'ALL' | 'OVERDUE' | 'SCHEDULED' | 'NONE' = 'ALL';
 
-  selectedCategoryService: string = 'ALL';
-  SERVICE_CATEGORIES = [
-    'Implementation Services',
-    'FMS',
-    'POC',
-    'Business Expansion',
-    'Product (Devices)',
-    'Passive Materials',
-    'Product (SFP)',
-  ];
+  // NOTE: the "Category" filter that used these was removed. It compared service
+  // names against Lead.dealCategory, which only ever holds a DEAL_CATEGORIES
+  // value (Inbound/Outbound/...), so it could never match a row. Restoring it
+  // needs a real serviceCategory field on Lead plus a control on the lead form.
 
   minValue: number | null = null;
   maxValue: number | null = null;
@@ -184,10 +181,12 @@ export class LeadsComponent implements OnInit {
   showBroughtByDropdown = false;
 
 
-  // All 17 Statuses
+  // Pipeline order, left to right on the Kanban board. Two deliberate choices
+  // here: Proposal Sent comes BEFORE Schedule Meeting, and Win comes BEFORE
+  // On Hold — both per the pipeline spec, not the usual funnel intuition.
   LEAD_STATUSES = [
-    'New', 'Interested', 'Schedule Meeting', 'Proposal Sent', 'Negotiation', 
-    'On Hold', 'Win', 'Lost'
+    'New', 'Interested', 'Proposal Sent', 'Schedule Meeting', 'Negotiation',
+    'Win', 'On Hold', 'Lost'
   ];
 
   // Standard Lead Sources
@@ -441,12 +440,41 @@ export class LeadsComponent implements OnInit {
     this.broughtBySearchQuery = '';
   }
 
+  /**
+   * Picking the source contact carries their details onto the deal and locks
+   * those fields — the deal belongs to that contact, so letting them be edited
+   * here would produce a deal that quietly disagrees with the contact record.
+   * Clearing the contact unlocks them and wipes what was carried over.
+   */
   selectBroughtByContact(contact: any) {
     this.newLeadData.broughtByContactId = contact ? contact.id : null;
     this.newLeadData.addedById = null;
     this.showBroughtByDropdown = false;
     this.broughtBySearchQuery = '';
+
+    if (contact) {
+      this.newLeadData.contactName = contact.name || '';
+      this.newLeadData.companyName = contact.companyName || '';
+      this.newLeadData.email = contact.email || '';
+      this.newLeadData.phone = contact.phone || contact.mobile || '';
+      this.newLeadData.website = contact.website || this.newLeadData.website;
+      this.newLeadData.address = contact.address || this.newLeadData.address;
+      if (!this.newLeadData.source) this.newLeadData.source = contact.leadSource || '';
+      this.lockedFromContact = true;
+      this.selectedContactCode = contact.contactCode || null;
+    } else {
+      this.newLeadData.contactName = '';
+      this.newLeadData.companyName = '';
+      this.newLeadData.email = '';
+      this.newLeadData.phone = '';
+      this.lockedFromContact = false;
+      this.selectedContactCode = null;
+    }
   }
+
+  /** True while the deal form's contact fields are carried from a lead contact. */
+  lockedFromContact = false;
+  selectedContactCode: string | null = null;
 
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // LEAD CONTACTS ("Lead Brought By" source records)
@@ -892,6 +920,7 @@ export class LeadsComponent implements OnInit {
     const filtered = this.leads.filter(lead => {
       const matchesSearch =
         !q ||
+        lead.leadCode?.toLowerCase().includes(q) ||
         lead.title?.toLowerCase().includes(q) ||
         lead.companyName?.toLowerCase().includes(q) ||
         lead.contactName?.toLowerCase().includes(q) ||
@@ -909,9 +938,6 @@ export class LeadsComponent implements OnInit {
       const matchesCategory =
         this.selectedCategory === 'ALL' || lead.dealCategory === this.selectedCategory;
 
-      const matchesServiceCategory =
-        this.selectedCategoryService === 'ALL' || lead.dealCategory === this.selectedCategoryService;
-
       const matchesSource =
         this.selectedSource === 'ALL' || lead.source === this.selectedSource;
 
@@ -928,6 +954,13 @@ export class LeadsComponent implements OnInit {
 
       const matchesFollowUpStatus =
         this.selectedFollowUpStatus === 'ALL' || this.getLeadFollowUpStatus(lead) === this.selectedFollowUpStatus;
+
+      // Previously this only trimmed the rows inside an expanded lead, so the
+      // panel's Follow-Up Date control appeared to do nothing to the board.
+      // A lead matches when it has at least one follow-up in the chosen window.
+      const matchesFollowUpDate =
+        this.followUpDateFilter === 'all' ||
+        (lead.followUps || []).some((fu: any) => this.followUpInRange(fu));
 
       const value = Number(lead.value) || 0;
       const matchesMin = this.minValue === null || this.minValue === undefined || value >= this.minValue;
@@ -948,8 +981,8 @@ export class LeadsComponent implements OnInit {
       }
 
       return matchesSearch && matchesStage && matchesRep && matchesCategory &&
-        matchesServiceCategory && matchesSource && matchesContact && matchesAddedBy && matchesQuotation &&
-        matchesFollowUpStatus && matchesMin && matchesMax && matchesDate;
+        matchesSource && matchesContact && matchesAddedBy && matchesQuotation &&
+        matchesFollowUpStatus && matchesFollowUpDate && matchesMin && matchesMax && matchesDate;
     });
 
     return this.sortLeads(filtered);
@@ -1173,9 +1206,6 @@ export class LeadsComponent implements OnInit {
     if (this.selectedCategory !== 'ALL') {
       chips.push({ key: 'category', label: `Category: ${this.selectedCategory}`, clear: () => { this.selectedCategory = 'ALL'; this.onFilterChange(); } });
     }
-    if (this.selectedCategoryService !== 'ALL') {
-      chips.push({ key: 'serviceCategory', label: `Category: ${this.selectedCategoryService}`, clear: () => { this.selectedCategoryService = 'ALL'; this.onFilterChange(); } });
-    }
     if (this.selectedSource !== 'ALL') {
       chips.push({ key: 'source', label: `Source: ${this.selectedSource}`, clear: () => { this.selectedSource = 'ALL'; this.onFilterChange(); } });
     }
@@ -1197,6 +1227,20 @@ export class LeadsComponent implements OnInit {
       const min = this.minValue !== null ? this.minValue.toLocaleString() : '0';
       const max = this.maxValue !== null ? this.maxValue.toLocaleString() : 'âˆž';
       chips.push({ key: 'value', label: `Value: ${min} - ${max}`, clear: () => { this.minValue = null; this.maxValue = null; this.onFilterChange(); } });
+    }
+    if (this.followUpDateFilter !== 'all') {
+      const labels: Record<string, string> = {
+        today: 'Today', thisWeek: 'This Week', lastMonth: 'Last Month',
+        lastQuarter: 'Last Quarter', lastYear: 'Last 1 Year',
+      };
+      const label = this.followUpDateFilter === 'custom'
+        ? `${this.followUpStartDate || '…'} to ${this.followUpEndDate || '…'}`
+        : labels[this.followUpDateFilter] || this.followUpDateFilter;
+      chips.push({
+        key: 'followUpDate',
+        label: `Follow-Up Date: ${label}`,
+        clear: () => this.clearFollowUpDateFilter(),
+      });
     }
     if (this.datePreset !== 'ALL') {
       const fieldLabel = this.dateField === 'expectedCloseDate' ? 'Closing' : this.dateField === 'nextFollowUp' ? 'Next Follow-Up' : 'Created';
@@ -1227,13 +1271,15 @@ export class LeadsComponent implements OnInit {
     this.selectedAddedById = 'ALL';
     this.selectedQuotationStatus = 'ALL';
     this.selectedFollowUpStatus = 'ALL';
-    this.selectedCategoryService = 'ALL';
     this.minValue = null;
     this.maxValue = null;
     this.datePreset = 'ALL';
     this.dateField = 'createdAt';
     this.dateStart = '';
     this.dateEnd = '';
+    this.followUpDateFilter = 'all';
+    this.followUpStartDate = '';
+    this.followUpEndDate = '';
     this.sortBy = 'newest';
     this.distributeLeads();
   }
@@ -1286,6 +1332,9 @@ export class LeadsComponent implements OnInit {
       value: 0, currency: 'INR', status: 'New', source: 'Website / Inbound', assignedToId: null, addedById: null, broughtByContactId: null,
       description: '', qualificationReason: '', expectedCloseDate: ''
     };
+    // Otherwise the next deal opens with fields still locked from the last one.
+    this.lockedFromContact = false;
+    this.selectedContactCode = null;
   }
 
   openEditModal(lead: Lead, event?: Event) {
@@ -1837,15 +1886,25 @@ export class LeadsComponent implements OnInit {
       const end = new Date();
       const start = new Date();
       start.setDate(start.getDate() - 30);
-      this.followUpStartDate = this.followUpStartDate || start.toISOString().slice(0, 10);
-      this.followUpEndDate = this.followUpEndDate || end.toISOString().slice(0, 10);
+      // Local Y-M-D. toISOString() shifts to UTC and lands on the previous day
+      // for anyone east of Greenwich, which is everyone here.
+      this.followUpStartDate = this.followUpStartDate || this.toLocalDateInput(start);
+      this.followUpEndDate = this.followUpEndDate || this.toLocalDateInput(end);
     }
+    // Without this the board keeps showing the previous result set.
+    this.onFilterChange();
+  }
+
+  private toLocalDateInput(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
   clearFollowUpDateFilter() {
     this.followUpDateFilter = 'all';
     this.followUpStartDate = '';
     this.followUpEndDate = '';
+    this.onFilterChange();
   }
 
   isFollowUpToday(dateStr: string): boolean {

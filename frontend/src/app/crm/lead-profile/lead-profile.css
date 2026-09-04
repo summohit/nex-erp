@@ -1810,3 +1810,12 @@ input:checked + .toggle-slider:before {
 }
 
 
+
+
+/* Human-readable lead reference, e.g. L0926-001 */
+.entity-code-pill {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
