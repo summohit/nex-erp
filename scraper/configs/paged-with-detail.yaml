@@ -1,0 +1,44 @@
+# Template for the other common shape: numbered result pages, where each row
+# links to a detail page carrying the fields you actually want.
+# Replace the selectors with real ones (find them with:
+#   python scraper/scrape.py --inspect --url "https://example.com/listings")
+name: listings
+
+start_urls:
+  - https://example.com/listings
+
+item_selector: .result-card
+
+fields:
+  title:
+    selector: h3 a
+    required: true        # drop rows where this is empty
+  url:
+    selector: h3 a
+    attr: href
+  price:
+    selector: .price
+    regex: '([\d,.]+)'    # keep only the number
+    cast: float
+
+pagination:
+  mode: url_template
+  template: "https://example.com/listings?page={page}"
+  start_page: 1
+  step: 1
+  max_pages: 20
+
+# Open each row's `url` and pull more fields from that page.
+detail:
+  link_field: url
+  wait_for: .listing-body
+  fields:
+    description: .listing-body
+    posted: time@datetime
+    contact_email: a[href^='mailto:']@href
+
+wait_for: .result-card
+delay_ms: 1500
+max_items: 500
+dedupe_on: [url]
+output: out/listings.json

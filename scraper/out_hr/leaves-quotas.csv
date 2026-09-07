@@ -1,0 +1,349 @@
+﻿workway_employee_id,email,leave_type,no_of_leaves,monthly_limit,total_leaves_taken,remaining_leaves,over_utilized,unused_leaves
+1252,surajs@ces-pl.com,Casual Leave,10,,0,10,0,0
+1252,surajs@ces-pl.com,Sick Leave,8,,0,8,0,0
+1252,surajs@ces-pl.com,Comp-Off,0,,0,0,0,0
+1252,surajs@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+1252,surajs@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1252,surajs@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1252,surajs@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+1252,surajs@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1405,hr@ces-pl.com,Casual Leave,10,,5,5,0,0
+1405,hr@ces-pl.com,Sick Leave,8,,1,7,0,0
+1405,hr@ces-pl.com,Comp-Off,0,,0,0,0,0
+1405,hr@ces-pl.com,Unpaid Leaves,0,,1,0,0,-1
+1405,hr@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1405,hr@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1405,hr@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+1405,hr@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1519,shailab@ces-pl.com,Casual Leave,10,,2,8,0,0
+1519,shailab@ces-pl.com,Sick Leave,8,,0,8,0,0
+1519,shailab@ces-pl.com,Comp-Off,0,,0,0,0,0
+1519,shailab@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+1519,shailab@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1519,shailab@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1519,shailab@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+1519,shailab@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1568,Afnana@ces-pl.com,Casual Leave,10,,2.5,7.5,0,0
+1568,Afnana@ces-pl.com,Sick Leave,8,,0,8,0,0
+1568,Afnana@ces-pl.com,Comp-Off,9,,2,7,0,0
+1568,Afnana@ces-pl.com,Unpaid Leaves,0,,0,0,1,1
+1568,Afnana@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1568,Afnana@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1568,Afnana@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+1568,Afnana@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1569,Karanv@ces-pl.com,Casual Leave,10,,4.5,5.5,0,0
+1569,Karanv@ces-pl.com,Sick Leave,8,,6,2,0,0
+1569,Karanv@ces-pl.com,Comp-Off,3,,3,0,0,0
+1569,Karanv@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+1569,Karanv@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1569,Karanv@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1569,Karanv@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+1569,Karanv@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1573,gauravn@ces-pl.com,Casual Leave,10,,10,0,0,0
+1573,gauravn@ces-pl.com,Sick Leave,8,,5,3,0,0
+1573,gauravn@ces-pl.com,Comp-Off,6,,3,3,0,0
+1573,gauravn@ces-pl.com,Unpaid Leaves,0,,1,0,0,-1
+1573,gauravn@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1573,gauravn@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1573,gauravn@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+1573,gauravn@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1575,vipula@ces-pl.com,Casual Leave,10,,3,7,0,0
+1575,vipula@ces-pl.com,Sick Leave,8,,5,3,0,0
+1575,vipula@ces-pl.com,Comp-Off,0,,0,0,0,0
+1575,vipula@ces-pl.com,Unpaid Leaves,0,,1,0,0,-1
+1575,vipula@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1575,vipula@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1575,vipula@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+1575,vipula@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1602,sudeepj@ces-pl.com,Casual Leave,10,,0,10,0,0
+1602,sudeepj@ces-pl.com,Sick Leave,8,,0,8,0,0
+1602,sudeepj@ces-pl.com,Comp-Off,0,,0,0,0,0
+1602,sudeepj@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+1602,sudeepj@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1602,sudeepj@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1602,sudeepj@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+1602,sudeepj@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1603,sunils@ces-pl.com,Casual Leave,10,,0,10,0,0
+1603,sunils@ces-pl.com,Sick Leave,8,,0,8,0,0
+1603,sunils@ces-pl.com,Comp-Off,0,,0,0,0,0
+1603,sunils@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+1603,sunils@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1603,sunils@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1603,sunils@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+1603,sunils@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1679,lalitmodi1695@gmail.com,Casual Leave,10,,2,8,0,0
+1679,lalitmodi1695@gmail.com,Sick Leave,8,,4.5,3.5,0,0
+1679,lalitmodi1695@gmail.com,Comp-Off,0,,0,0,0,0
+1679,lalitmodi1695@gmail.com,Unpaid Leaves,0,,3,0,0,-3
+1679,lalitmodi1695@gmail.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1679,lalitmodi1695@gmail.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1679,lalitmodi1695@gmail.com,Rakha Bandhan (Optional),1,,1,0,0,0
+1679,lalitmodi1695@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+1689,rohityadav.18032006@gmail.com,Casual Leave,10,,8.5,1.5,0,0
+1689,rohityadav.18032006@gmail.com,Sick Leave,8,,1,7,0,0
+1689,rohityadav.18032006@gmail.com,Comp-Off,1,,1,0,0,0
+1689,rohityadav.18032006@gmail.com,Unpaid Leaves,0,,0,0,0,0
+1689,rohityadav.18032006@gmail.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1689,rohityadav.18032006@gmail.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1689,rohityadav.18032006@gmail.com,Rakha Bandhan (Optional),1,,1,0,0,0
+1689,rohityadav.18032006@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+1701,20.himan.singh@gmail.com,Casual Leave,10,,3,7,0,0
+1701,20.himan.singh@gmail.com,Sick Leave,8,,2,6,0,0
+1701,20.himan.singh@gmail.com,Comp-Off,0,,0,0,0,0
+1701,20.himan.singh@gmail.com,Unpaid Leaves,0,,0,0,14,14
+1701,20.himan.singh@gmail.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1701,20.himan.singh@gmail.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1701,20.himan.singh@gmail.com,Rakha Bandhan (Optional),1,,0,1,0,0
+1701,20.himan.singh@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+1718,riyazs@ces-pl.com,Casual Leave,10,,2,8,0,0
+1718,riyazs@ces-pl.com,Sick Leave,8,,1,7,0,0
+1718,riyazs@ces-pl.com,Comp-Off,0,,0,0,0,0
+1718,riyazs@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+1718,riyazs@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1718,riyazs@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1718,riyazs@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+1718,riyazs@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1798,Piyushis@ces-pl.com,Casual Leave,7,,6,1,0,0
+1798,Piyushis@ces-pl.com,Sick Leave,6.5,,0,6.5,0,0
+1798,Piyushis@ces-pl.com,Comp-Off,0,,0,0,0,0
+1798,Piyushis@ces-pl.com,Unpaid Leaves,0,,5,0,1.5,-3.5
+1798,Piyushis@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1798,Piyushis@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1798,Piyushis@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+1798,Piyushis@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+1842,jatins@ces-pl.com,Casual Leave,8,,3,5,0,0
+1842,jatins@ces-pl.com,Sick Leave,7,,1,6,0,0
+1842,jatins@ces-pl.com,Comp-Off,3,,1,2,0,0
+1842,jatins@ces-pl.com,Unpaid Leaves,0,,2,0,0,-2
+1842,jatins@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1842,jatins@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1842,jatins@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+1842,jatins@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+2048,nabin_dey@yahoo.com,Casual Leave,10,,0,10,0,0
+2048,nabin_dey@yahoo.com,Sick Leave,8,,0,8,0,0
+2048,nabin_dey@yahoo.com,Comp-Off,0,,0,0,0,0
+2048,nabin_dey@yahoo.com,Unpaid Leaves,0,,0,0,0,0
+2048,nabin_dey@yahoo.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+2048,nabin_dey@yahoo.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+2048,nabin_dey@yahoo.com,Rakha Bandhan (Optional),1,,0,1,0,0
+2048,nabin_dey@yahoo.com,Half Day (Comp-Off),0,,0,0,0,0
+2132,prao62022@gmail.com,Casual Leave,10,,3,7,0,0
+2132,prao62022@gmail.com,Sick Leave,8,,6.5,1.5,0,0
+2132,prao62022@gmail.com,Comp-Off,0,,0,0,0,0
+2132,prao62022@gmail.com,Unpaid Leaves,0,,0,0,0,0
+2132,prao62022@gmail.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+2132,prao62022@gmail.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+2132,prao62022@gmail.com,Rakha Bandhan (Optional),1,,0,1,0,0
+2132,prao62022@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+2133,anshusoninitin14@gmail.com,Casual Leave,10,,8,2,0,0
+2133,anshusoninitin14@gmail.com,Sick Leave,8,,3,5,0,0
+2133,anshusoninitin14@gmail.com,Comp-Off,0,,0,0,0,0
+2133,anshusoninitin14@gmail.com,Unpaid Leaves,0,,0,0,4,4
+2133,anshusoninitin14@gmail.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+2133,anshusoninitin14@gmail.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2133,anshusoninitin14@gmail.com,Rakha Bandhan (Optional),1,,1,0,0,0
+2133,anshusoninitin14@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+2155,sunitk@ces-pl.com,Casual Leave,10,,1,9,0,0
+2155,sunitk@ces-pl.com,Sick Leave,8,,0,8,0,0
+2155,sunitk@ces-pl.com,Comp-Off,0,,0,0,0,0
+2155,sunitk@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+2155,sunitk@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+2155,sunitk@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+2155,sunitk@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+2155,sunitk@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+2454,amanurk@ces-pl.com,Casual Leave,7,,6,1,0,0
+2454,amanurk@ces-pl.com,Sick Leave,6.5,,6,0.5,0,0
+2454,amanurk@ces-pl.com,Comp-Off,0,,0,0,0,0
+2454,amanurk@ces-pl.com,Unpaid Leaves,0,,6.5,0,0,-6.5
+2454,amanurk@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+2454,amanurk@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2454,amanurk@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+2454,amanurk@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+2868,sandeepk@ces-pl.com,Casual Leave,5,,2,3,0,0
+2868,sandeepk@ces-pl.com,Sick Leave,4,,4,0,0,0
+2868,sandeepk@ces-pl.com,Comp-Off,3,,2,1,0,0
+2868,sandeepk@ces-pl.com,Unpaid Leaves,0,,3,0,0,-3
+2868,sandeepk@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+2868,sandeepk@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2868,sandeepk@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+2868,sandeepk@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+2950,ajays@ces-pl.com,Casual Leave,5,,0,5,0,0
+2950,ajays@ces-pl.com,Sick Leave,4,,1,3,0,0
+2950,ajays@ces-pl.com,Comp-Off,0,,0,0,0,0
+2950,ajays@ces-pl.com,Unpaid Leaves,0,,5,0,0,-5
+2950,ajays@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+2950,ajays@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2950,ajays@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+2950,ajays@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+2980,amitk@ces-pl.com,Casual Leave,5,,1,4,0,0
+2980,amitk@ces-pl.com,Sick Leave,4,,4,0,0,0
+2980,amitk@ces-pl.com,Comp-Off,10,,6,4,0,0
+2980,amitk@ces-pl.com,Unpaid Leaves,0,,1,0,0,-1
+2980,amitk@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+2980,amitk@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2980,amitk@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+2980,amitk@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+3031,accounts@ces-pl.com,Casual Leave,5,,3,2,0,0
+3031,accounts@ces-pl.com,Sick Leave,4,,3,1,0,0
+3031,accounts@ces-pl.com,Comp-Off,0,,0,0,0,0
+3031,accounts@ces-pl.com,Unpaid Leaves,0,,8,0,0,-8
+3031,accounts@ces-pl.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+3031,accounts@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+3031,accounts@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+3031,accounts@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+3140,jhanaksharmaaa@gmail.com,Comp-Off,0,,0,0,0,0
+3140,jhanaksharmaaa@gmail.com,Unpaid Leaves,0,,18,0,0,-18
+3140,jhanaksharmaaa@gmail.com,Eid-ul-Fitr (Optional),0.5,,1,0,0.5,0
+3140,jhanaksharmaaa@gmail.com,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3140,jhanaksharmaaa@gmail.com,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3140,jhanaksharmaaa@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3141,sakeshi92@gmail.com,Casual Leave,9.5,,0,9.5,0,0
+3141,sakeshi92@gmail.com,Sick Leave,7.5,,0,7.5,0,0
+3141,sakeshi92@gmail.com,Comp-Off,0,,0,0,0,0
+3141,sakeshi92@gmail.com,Unpaid Leaves,0,,0,0,0,0
+3141,sakeshi92@gmail.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+3141,sakeshi92@gmail.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+3141,sakeshi92@gmail.com,Rakha Bandhan (Optional),1,,0,1,0,0
+3141,sakeshi92@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3155,Mohits@ces-pl.com,Casual Leave,9,,2,7,0,0
+3155,Mohits@ces-pl.com,Sick Leave,7,,0,7,0,0
+3155,Mohits@ces-pl.com,Comp-Off,0,,0,0,0,0
+3155,Mohits@ces-pl.com,Unpaid Leaves,0,,5,0,0,-5
+3155,Mohits@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+3155,Mohits@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+3155,Mohits@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+3155,Mohits@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+3188,shubhamv@ces-pl.com,Comp-Off,0,,0,0,0,0
+3188,shubhamv@ces-pl.com,Unpaid Leaves,0,,2.5,0,0,-2.5
+3188,shubhamv@ces-pl.com,Eid-ul-Fitr (Optional),1,,1,0,0,0
+3188,shubhamv@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+3188,shubhamv@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+3188,shubhamv@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+3189,rahisansari60899@gmail.com,Casual Leave,10,,0,10,0,0
+3189,rahisansari60899@gmail.com,Sick Leave,8,,0,8,0,0
+3189,rahisansari60899@gmail.com,Comp-Off,0,,0,0,0,0
+3189,rahisansari60899@gmail.com,Unpaid Leaves,0,,0,0,0,0
+3189,rahisansari60899@gmail.com,Eid-ul-Fitr (Optional),1,,0,1,0,0
+3189,rahisansari60899@gmail.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+3189,rahisansari60899@gmail.com,Rakha Bandhan (Optional),1,,0,1,0,0
+3189,rahisansari60899@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3270,pritish.agnihotri@gmail.com,Comp-Off,0,,0,0,0,0
+3270,pritish.agnihotri@gmail.com,Unpaid Leaves,0,,14.5,0,0,-14.5
+3270,pritish.agnihotri@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3270,pritish.agnihotri@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3270,pritish.agnihotri@gmail.com,Rakha Bandhan (Optional),0,,0,0,0,0
+3270,pritish.agnihotri@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3272,yashc@ces-pl.com,Comp-Off,0,,0,0,0,0
+3272,yashc@ces-pl.com,Unpaid Leaves,0,,7.5,0,0,-7.5
+3272,yashc@ces-pl.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3272,yashc@ces-pl.com,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+3272,yashc@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+3272,yashc@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+3353,khanqudsia424@gmail.com,Comp-Off,0,,0,0,0,0
+3353,khanqudsia424@gmail.com,Unpaid Leaves,0,,6.5,0,0,-6.5
+3353,khanqudsia424@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3353,khanqudsia424@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3353,khanqudsia424@gmail.com,Rakha Bandhan (Optional),0,,0,0,0,0
+3353,khanqudsia424@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3358,rakeshak@ces-pl.com,Comp-Off,2,,2,0,0,0
+3358,rakeshak@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+3358,rakeshak@ces-pl.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3358,rakeshak@ces-pl.com,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+3358,rakeshak@ces-pl.com,Rakha Bandhan (Optional),1,,1,0,0,0
+3358,rakeshak@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+3361,mayanksinghkarki5@gmail.com,Comp-Off,1,,0,1,0,0
+3361,mayanksinghkarki5@gmail.com,Unpaid Leaves,0,,3,0,0,-3
+3361,mayanksinghkarki5@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3361,mayanksinghkarki5@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3361,mayanksinghkarki5@gmail.com,Rakha Bandhan (Optional),0,,0,0,0,0
+3361,mayanksinghkarki5@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3385,kishorep@ces-pl.com,Comp-Off,0,,0,0,0,0
+3385,kishorep@ces-pl.com,Unpaid Leaves,0,,0,0,0,0
+3385,kishorep@ces-pl.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3385,kishorep@ces-pl.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3385,kishorep@ces-pl.com,Rakha Bandhan (Optional),1,,0,1,0,0
+3385,kishorep@ces-pl.com,Half Day (Comp-Off),0,,0,0,0,0
+3397,bheemsharma0111@gmail.com,Comp-Off,0,,0,0,0,0
+3397,bheemsharma0111@gmail.com,Unpaid Leaves,0,,8,0,0,-8
+3397,bheemsharma0111@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3397,bheemsharma0111@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3397,bheemsharma0111@gmail.com,Rakha Bandhan (Optional),0,,0,0,0,0
+3397,bheemsharma0111@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3413,mandalashish15890@gmail.com,Comp-Off,0,,0,0,0,0
+3413,mandalashish15890@gmail.com,Unpaid Leaves,0,,1,0,0,-1
+3413,mandalashish15890@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3413,mandalashish15890@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3413,mandalashish15890@gmail.com,Rakha Bandhan (Optional),0,,0,0,0,0
+3413,mandalashish15890@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3414,pyadav841428@gmail.com,Comp-Off,0,,0,0,0,0
+3414,pyadav841428@gmail.com,Unpaid Leaves,0,,1,0,0,-1
+3414,pyadav841428@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3414,pyadav841428@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3414,pyadav841428@gmail.com,Rakha Bandhan (Optional),0,,0,0,0,0
+3414,pyadav841428@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3415,anshshankar239@gmail.com,Casual Leave,0,,0,0,0,0
+3415,anshshankar239@gmail.com,Sick Leave,0,,0,0,0,0
+3415,anshshankar239@gmail.com,Comp-Off,0,,0,0,0,0
+3415,anshshankar239@gmail.com,Unpaid Leaves,0,,1,0,0,-1
+3415,anshshankar239@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3415,anshshankar239@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3415,anshshankar239@gmail.com,Rakha Bandhan (Optional),1,,1,0,0,0
+3415,anshshankar239@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3417,nitinchourey2006@gmail.com,Comp-Off,0,,0,0,0,0
+3417,nitinchourey2006@gmail.com,Unpaid Leaves,0,,0,0,0,0
+3417,nitinchourey2006@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3417,nitinchourey2006@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3417,nitinchourey2006@gmail.com,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3417,nitinchourey2006@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3418,arshibadar5@gmail.com,Casual Leave,5,,2,3,0,0
+3418,arshibadar5@gmail.com,Sick Leave,4,,1,3,0,0
+3418,arshibadar5@gmail.com,Comp-Off,0,,0,0,0,0
+3418,arshibadar5@gmail.com,Unpaid Leaves,0,,0,0,0,0
+3418,arshibadar5@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3418,arshibadar5@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3418,arshibadar5@gmail.com,Rakha Bandhan (Optional),1,,0,1,0,0
+3418,arshibadar5@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3431,khushbuparveen602@gmail.com,Casual Leave,8.5,,0,8.5,0,0
+3431,khushbuparveen602@gmail.com,Sick Leave,7,,0,7,0,0
+3431,khushbuparveen602@gmail.com,Comp-Off,0,,0,0,0,0
+3431,khushbuparveen602@gmail.com,Unpaid Leaves,0,,3,0,0,-3
+3431,khushbuparveen602@gmail.com,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3431,khushbuparveen602@gmail.com,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3431,khushbuparveen602@gmail.com,Rakha Bandhan (Optional),1,,1,0,0,0
+3431,khushbuparveen602@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3450,rrudargautam@gmail.com,Comp-Off,0,,0,0,0,0
+3450,rrudargautam@gmail.com,Unpaid Leaves,0,,0.5,0,0,-0.5
+3450,rrudargautam@gmail.com,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3450,rrudargautam@gmail.com,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3450,rrudargautam@gmail.com,Rakha Bandhan (Optional),0.5,,0.5,0,0,0
+3450,rrudargautam@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3457,amritthakur9080@gmail.com,Comp-Off,0,,0,0,0,0
+3457,amritthakur9080@gmail.com,Unpaid Leaves,0,,3.5,0,0,-3.5
+3457,amritthakur9080@gmail.com,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3457,amritthakur9080@gmail.com,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3457,amritthakur9080@gmail.com,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3457,amritthakur9080@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3458,bhanusinghnasira@gmail.com,Comp-Off,0,,0,0,0,0
+3458,bhanusinghnasira@gmail.com,Unpaid Leaves,0,,1,0,0,-1
+3458,bhanusinghnasira@gmail.com,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3458,bhanusinghnasira@gmail.com,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3458,bhanusinghnasira@gmail.com,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3458,bhanusinghnasira@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3459,jayantverma554@gmail.com,Comp-Off,0,,0,0,0,0
+3459,jayantverma554@gmail.com,Unpaid Leaves,0,,1,0,0,-1
+3459,jayantverma554@gmail.com,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3459,jayantverma554@gmail.com,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3459,jayantverma554@gmail.com,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3459,jayantverma554@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3460,ayushmaansinght@gmail.com,Comp-Off,0,,0,0,0,0
+3460,ayushmaansinght@gmail.com,Unpaid Leaves,0,,1,0,0,-1
+3460,ayushmaansinght@gmail.com,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3460,ayushmaansinght@gmail.com,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3460,ayushmaansinght@gmail.com,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3460,ayushmaansinght@gmail.com,Half Day (Comp-Off),0,,0,0,0,0
+3466,rohitk@ces-pl.com,Comp-Off,0,,0,0,0,0
+3466,rohitk@ces-pl.com,Unpaid Leaves,0,,0.5,0,0,-0.5
+3466,rohitk@ces-pl.com,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3466,rohitk@ces-pl.com,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3466,rohitk@ces-pl.com,Rakha Bandhan (Optional),0.5,,0.5,0,0,0
+3478,ashishsharma3316@gmail.com,Comp-Off,0,,0,0,0,0

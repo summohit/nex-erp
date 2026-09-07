@@ -212,14 +212,7 @@
           <tr>
             <th class="th-job">Job Requisition</th>
             <th class="th-center">Total</th>
-            <th class="th-center col-new">New</th>
-            <th class="th-center col-reviewing">Reviewing</th>
-            <th class="th-center col-shortlisted">Shortlisted</th>
-            <th class="th-center col-interviewing">Interviewing</th>
-            <th class="th-center col-offered">Offered</th>
-            <th class="th-center col-hired">Hired</th>
-            <th class="th-center col-onboarded">Onboarded</th>
-            <th class="th-center col-rejected">Rejected</th>
+            <th class="th-center" *ngFor="let sc of stageCols" [ngClass]="'col-' + sc.cls">{{ sc.label }}</th>
             <th class="th-pipeline">Pipeline Distribution</th>
             <th class="th-actions text-right">Actions</th>
           </tr>
@@ -245,50 +238,16 @@
             </td>
 
             <!-- Pipeline Counts -->
-            <td class="cell-num">
-              <span class="stage-cell-pill pill-new" *ngIf="pipelineCount(job.pipeline, 'NEW') > 0">{{ pipelineCount(job.pipeline, 'NEW') }}</span>
-              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'NEW') === 0">0</span>
-            </td>
-            <td class="cell-num">
-              <span class="stage-cell-pill pill-reviewing" *ngIf="pipelineCount(job.pipeline, 'REVIEWING') > 0">{{ pipelineCount(job.pipeline, 'REVIEWING') }}</span>
-              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'REVIEWING') === 0">0</span>
-            </td>
-            <td class="cell-num">
-              <span class="stage-cell-pill pill-shortlisted" *ngIf="pipelineCount(job.pipeline, 'SHORTLISTED') > 0">{{ pipelineCount(job.pipeline, 'SHORTLISTED') }}</span>
-              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'SHORTLISTED') === 0">0</span>
-            </td>
-            <td class="cell-num">
-              <span class="stage-cell-pill pill-interviewing" *ngIf="pipelineCount(job.pipeline, 'INTERVIEWING') > 0">{{ pipelineCount(job.pipeline, 'INTERVIEWING') }}</span>
-              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'INTERVIEWING') === 0">0</span>
-            </td>
-            <td class="cell-num">
-              <span class="stage-cell-pill pill-offered" *ngIf="pipelineCount(job.pipeline, 'OFFERED') > 0">{{ pipelineCount(job.pipeline, 'OFFERED') }}</span>
-              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'OFFERED') === 0">0</span>
-            </td>
-            <td class="cell-num">
-              <span class="stage-cell-pill pill-hired" *ngIf="pipelineCount(job.pipeline, 'HIRED') > 0">{{ pipelineCount(job.pipeline, 'HIRED') }}</span>
-              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'HIRED') === 0">0</span>
-            </td>
-            <td class="cell-num">
-              <span class="stage-cell-pill pill-onboarded" *ngIf="pipelineCount(job.pipeline, 'ONBOARDED') > 0">{{ pipelineCount(job.pipeline, 'ONBOARDED') }}</span>
-              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'ONBOARDED') === 0">0</span>
-            </td>
-            <td class="cell-num">
-              <span class="stage-cell-pill pill-rejected" *ngIf="pipelineCount(job.pipeline, 'REJECTED') > 0">{{ pipelineCount(job.pipeline, 'REJECTED') }}</span>
-              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, 'REJECTED') === 0">0</span>
+            <td class="cell-num" *ngFor="let sc of stageCols">
+              <span class="stage-cell-pill" [ngClass]="'pill-' + sc.cls" *ngIf="pipelineCount(job.pipeline, sc.key) > 0">{{ pipelineCount(job.pipeline, sc.key) }}</span>
+              <span class="stage-zero" *ngIf="pipelineCount(job.pipeline, sc.key) === 0">0</span>
             </td>
 
             <!-- Visual Pipeline Distribution Bar -->
             <td class="cell-distribution">
               <div class="micro-funnel-bar" [title]="'Total: ' + job.total">
-                <div class="funnel-seg seg-new" [style.width.%]="getStagePercent(job.pipeline, 'NEW', job.total)"></div>
-                <div class="funnel-seg seg-reviewing" [style.width.%]="getStagePercent(job.pipeline, 'REVIEWING', job.total)"></div>
-                <div class="funnel-seg seg-shortlisted" [style.width.%]="getStagePercent(job.pipeline, 'SHORTLISTED', job.total)"></div>
-                <div class="funnel-seg seg-interviewing" [style.width.%]="getStagePercent(job.pipeline, 'INTERVIEWING', job.total)"></div>
-                <div class="funnel-seg seg-offered" [style.width.%]="getStagePercent(job.pipeline, 'OFFERED', job.total)"></div>
-                <div class="funnel-seg seg-hired" [style.width.%]="getStagePercent(job.pipeline, 'HIRED', job.total)"></div>
-                <div class="funnel-seg seg-onboarded" [style.width.%]="getStagePercent(job.pipeline, 'ONBOARDED', job.total)"></div>
-                <div class="funnel-seg seg-rejected" [style.width.%]="getStagePercent(job.pipeline, 'REJECTED', job.total)"></div>
+                <div class="funnel-seg" *ngFor="let sc of stageCols" [ngClass]="'seg-' + sc.cls"
+                     [style.width.%]="getStagePercent(job.pipeline, sc.key, job.total)"></div>
               </div>
             </td>
 

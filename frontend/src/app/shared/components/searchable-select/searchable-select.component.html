@@ -1,7 +1,20 @@
 <div class="searchable-select" [class.open]="isOpen">
   <button type="button" class="select-trigger form-control" (click)="toggle()">
-    <span [class.placeholder]="isPlaceholder">{{ selectedLabel }}</span>
-    <svg lucideChevronDown size="16"></svg>
+    <div class="select-trigger-content">
+      <ng-content select="[prefix]"></ng-content>
+      <span class="select-label" [class.placeholder]="isPlaceholder">{{ selectedLabel }}</span>
+    </div>
+    <div class="select-trigger-tail">
+      <button 
+        *ngIf="!isPlaceholder && clearable" 
+        type="button" 
+        class="btn-select-clear" 
+        (click)="clear($event)" 
+        title="Clear selection">
+        <svg lucideX size="12"></svg>
+      </button>
+      <svg lucideChevronDown size="14" class="select-chevron"></svg>
+    </div>
   </button>
 
   <div class="select-dropdown" *ngIf="isOpen">

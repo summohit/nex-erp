@@ -249,10 +249,12 @@ export class LeavesService implements OnModuleInit {
     return this.prisma.leaveRequest.findMany({
       where: { employee: { companyId } },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true } },
-        leaveType: true
+        employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
+        leaveType: true,
+        approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } }
       },
-      orderBy: { createdAt: 'desc' }
+      // Most recent leave date first, so today's leaves head the list.
+      orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }]
     });
   }
 
@@ -260,10 +262,11 @@ export class LeavesService implements OnModuleInit {
     return this.prisma.leaveRequest.findMany({
       where: { employee: { companyId }, status: 'PENDING' },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true } },
-        leaveType: true
+        employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
+        leaveType: true,
+        approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } }
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
       take
     });
   }
@@ -282,9 +285,10 @@ export class LeavesService implements OnModuleInit {
       where: { employeeId: { in: descendantIds }, status: 'PENDING' },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
-        leaveType: true
+        leaveType: true,
+        approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }]
     });
   }
 
@@ -430,8 +434,11 @@ export class LeavesService implements OnModuleInit {
 
     return this.prisma.leaveRequest.findMany({
       where: { employeeId: employee.id },
-      include: { leaveType: true },
-      orderBy: { createdAt: 'desc' }
+      include: {
+        leaveType: true,
+        approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } }
+      },
+      orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }]
     });
   }
 

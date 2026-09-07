@@ -1,0 +1,36 @@
+# Example: quotes.toscrape.com/js is a practice site whose content is rendered
+# entirely by JavaScript, so a plain HTTP fetch returns an empty page.
+#   python scraper/scrape.py --config scraper/configs/example.yaml
+name: quotes
+
+start_urls:
+  - https://quotes.toscrape.com/js/
+
+# One element per record.
+item_selector: div.quote
+
+fields:
+  quote: span.text
+  author:
+    selector: small.author
+    required: true        # drop rows where this comes out empty
+  first_tag: a.tag        # without `multiple`, the first match wins
+  tags:
+    selector: a.tag
+    multiple: true        # collect every match
+    join: ", "
+  # Attributes use the "selector@attribute" shorthand, e.g.
+  #   author_url: span a@href
+  # (this particular practice page renders no links, so there is nothing to
+  # show here — see configs/paged-with-detail.yaml for attribute extraction.)
+
+pagination:
+  mode: next_button       # none | next_button | url_template | scroll
+  selector: li.next > a
+  max_pages: 3
+
+wait_for: div.quote       # don't extract until the JS has painted results
+delay_ms: 800             # be polite between page loads
+jitter_ms: 400
+dedupe_on: [quote]
+output: out/quotes.csv    # .csv, .json or .jsonl

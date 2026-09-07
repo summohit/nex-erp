@@ -22,6 +22,9 @@ import { HotToastService } from '@ngneat/hot-toast';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
+/** Employment types offered on a job posting. */
+const EMPLOYMENT_TYPES = ['Full Time', 'Part Time', 'Contractual', 'Freelancer', 'Internship', 'Trainee'];
+
 declare var Quill: any;
 
 @Component({
@@ -143,7 +146,7 @@ export class JobPostingsComponent implements OnInit {
   // Grid State
   gridApi: any;
   searchText = '';
-  filterStatus = 'Open';
+  filterStatus = '';   // '' = All Statuses; showing only Open hid closed postings by default
   filterDepartment = '';
 
   defaultColDef: ColDef = {
@@ -156,7 +159,17 @@ export class JobPostingsComponent implements OnInit {
   gridOptions = {
     pagination: true,
     paginationPageSize: 10,
-    paginationPageSizeSelector: [10, 25, 50, 100]
+    paginationPageSizeSelector: [10, 25, 50, 100],
+    // Tint each row by posting status — kept light so the status badge and the
+    // row-hover highlight both stay readable.
+    getRowStyle: (params: any) => {
+      switch (params.data?.status) {
+        case 'Open':   return { backgroundColor: '#F0FDF4' };  // green-50
+        case 'Closed': return { backgroundColor: '#FEF2F2' };  // red-50
+        case 'Draft':  return { backgroundColor: '#FEFCE8' };  // yellow-50
+        default:       return undefined;
+      }
+    }
   };
 
   colDefs: ColDef[] = [
@@ -174,8 +187,21 @@ export class JobPostingsComponent implements OnInit {
     },
     { field: 'department', headerName: 'Department' },
     { field: 'experienceYears', headerName: 'Experience', width: 140, flex: 0 },
-    { field: 'location', headerName: 'Location' },
     { field: 'type', headerName: 'Type', width: 120, flex: 0 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 120,
+      flex: 0,
+      cellRenderer: (params: any) => {
+        const val = params.value;
+        let bg = '#F1F5F9', color = '#475569';
+        if (val === 'Open') { bg = '#DCFCE7'; color = '#166534'; }
+        if (val === 'Closed') { bg = '#FEE2E2'; color = '#991B1B'; }
+        if (val === 'Draft') { bg = '#FEF9C3'; color = '#CA8A04'; }
+        return `<span style="background: ${bg}; color: ${color}; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase;">${val}</span>`;
+      }
+    },
     {
       headerName: 'Recruiter',
       width: 200,
@@ -204,20 +230,6 @@ export class JobPostingsComponent implements OnInit {
         const total = params.data.totalOpenings || 1;
         const filled = params.data.applications?.length || 0;
         return `${filled} / ${total}`;
-      }
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      flex: 0,
-      cellRenderer: (params: any) => {
-        const val = params.value;
-        let bg = '#F1F5F9', color = '#475569';
-        if (val === 'Open') { bg = '#DCFCE7'; color = '#166534'; }
-        if (val === 'Closed') { bg = '#FEE2E2'; color = '#991B1B'; }
-        if (val === 'Draft') { bg = '#FEF9C3'; color = '#CA8A04'; }
-        return `<span style="background: ${bg}; color: ${color}; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase;">${val}</span>`;
       }
     },
     {
@@ -479,8 +491,8 @@ export class JobPostingsComponent implements OnInit {
       designationName: desig ? desig.name : (job.designation || ''),
       branchId: branch ? String(branch.id) : '',
       experienceYears: job.experienceYears || '3-5 Years',
-      type: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Temporary', 'Freelance'].includes(job.type) ? job.type : 'Other',
-      typeOther: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Temporary', 'Freelance'].includes(job.type) ? '' : job.type,
+      type: EMPLOYMENT_TYPES.includes(job.type) ? job.type : 'Other',
+      typeOther: EMPLOYMENT_TYPES.includes(job.type) ? '' : job.type,
       workLocationType: (job as any).workLocationType || 'On-site',
       recruiterId: (job as any).recruiterId ? String((job as any).recruiterId) : '',
       recruiterName: hr ? `${hr.firstName} ${hr.lastName}` : '',

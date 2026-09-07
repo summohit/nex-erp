@@ -57,15 +57,19 @@ export class JobDetailComponent implements OnInit {
 
   statusStages = [
     { key: 'ALL', label: 'All Candidates', icon: 'users', color: 'slate' },
-    { key: 'NEW', label: 'New', icon: 'inbox', color: 'blue' },
-    { key: 'REVIEWING', label: 'Reviewing', icon: 'eye', color: 'purple' },
-    { key: 'SHORTLISTED', label: 'Shortlisted', icon: 'star', color: 'orange' },
-    { key: 'INTERVIEWING', label: 'Interviewing', icon: 'users', color: 'amber' },
+    { key: 'APPLIED', label: 'Applied', icon: 'inbox', color: 'blue' },
+    { key: 'PHONE_SCREENING', label: 'Phone Screening', icon: 'phone', color: 'purple' },
+    { key: 'INTERVIEW', label: 'Interview', icon: 'users', color: 'amber' },
+    { key: 'NEGOTIATION', label: 'Negotiation', icon: 'star', color: 'orange' },
     { key: 'OFFERED', label: 'Offered', icon: 'award', color: 'teal' },
     { key: 'HIRED', label: 'Hired', icon: 'check-circle', color: 'emerald' },
     { key: 'ONBOARDED', label: 'Onboarded', icon: 'user-check', color: 'green' },
+    { key: 'ON_HOLD', label: 'On Hold', icon: 'pause-circle', color: 'slate' },
     { key: 'REJECTED', label: 'Rejected', icon: 'x-circle', color: 'rose' }
   ];
+
+  /** Stage keys in pipeline order, for status dropdowns. */
+  readonly STAGE_KEYS = ['APPLIED','PHONE_SCREENING','INTERVIEW','NEGOTIATION','OFFERED','HIRED','ONBOARDED','ON_HOLD','REJECTED'];
 
   pipelineStats = computed(() => {
     const apps = this.applications();
@@ -84,13 +88,13 @@ export class JobDetailComponent implements OnInit {
     };
 
     apps.forEach(a => {
-      const st = a.status ? a.status.toUpperCase() : 'NEW';
+      const st = a.status ? a.status.toUpperCase() : 'APPLIED';
       if (counts[st] !== undefined) {
         counts[st]++;
       }
     });
 
-    const activePipeline = (counts['REVIEWING'] || 0) + (counts['SHORTLISTED'] || 0) + (counts['INTERVIEWING'] || 0) + (counts['OFFERED'] || 0);
+    const activePipeline = (counts['PHONE_SCREENING'] || 0) + (counts['INTERVIEW'] || 0) + (counts['NEGOTIATION'] || 0) + (counts['OFFERED'] || 0);
     const hiredCount = (counts['HIRED'] || 0) + (counts['ONBOARDED'] || 0);
     const totalOpenings = j?.totalOpenings || 1;
     const progressPercent = Math.min(100, Math.round((hiredCount / totalOpenings) * 100));
@@ -163,10 +167,15 @@ export class JobDetailComponent implements OnInit {
   statusBadgeClass(status: string): string {
     const s = (status || '').toUpperCase();
     switch (s) {
-      case 'NEW': return 'badge-stage-new';
-      case 'REVIEWING': return 'badge-stage-reviewing';
-      case 'SHORTLISTED': return 'badge-stage-shortlisted';
-      case 'INTERVIEWING': return 'badge-stage-interviewing';
+      case 'NEW':
+      case 'APPLIED': return 'badge-stage-new';
+      case 'REVIEWING':
+      case 'SHORTLISTED':
+      case 'PHONE_SCREENING': return 'badge-stage-reviewing';
+      case 'INTERVIEWING':
+      case 'INTERVIEW': return 'badge-stage-interviewing';
+      case 'NEGOTIATION': return 'badge-stage-shortlisted';
+      case 'ON_HOLD': return 'badge-stage-default';
       case 'OFFERED': return 'badge-stage-offered';
       case 'HIRED': return 'badge-stage-hired';
       case 'ONBOARDED': return 'badge-stage-onboarded';
@@ -311,7 +320,7 @@ export class JobDetailComponent implements OnInit {
       `"${(app.fullName || '').replace(/"/g, '""')}"`,
       `"${(app.email || '').replace(/"/g, '""')}"`,
       `"${(app.phone || '').replace(/"/g, '""')}"`,
-      app.status || 'NEW',
+      app.status || 'APPLIED',
       `"${app.experienceYears || ''}"`,
       `"${app.noticePeriod || ''}"`,
       app.createdAt ? new Date(app.createdAt).toLocaleDateString() : ''

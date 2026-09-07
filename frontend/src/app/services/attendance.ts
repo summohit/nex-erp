@@ -20,7 +20,7 @@ export interface AttendanceRecord {
   clockInLng: number | null;
   clockOutLat: number | null;
   clockOutLng: number | null;
-  status: 'PRESENT' | 'ABSENT' | 'HALF_DAY';
+  status: 'PRESENT' | 'ABSENT' | 'HALF_DAY' | 'ON_LEAVE' | 'HOLIDAY' | 'WEEKLY_OFF';
   isLate: boolean;
   isEarlyLeave: boolean;
   totalHours?: number;

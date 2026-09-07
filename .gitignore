@@ -2,6 +2,11 @@
 .env
 *.env
 backend/.env
+# Timestamped .env backups (.env.bak.181205) end in digits, so *.env misses them.
+.env.*
+*.env.*
+!.env.example
+!*.env.example
 
 # Build outputs & node_modules
 backend/dist/
@@ -16,3 +21,10 @@ backend/uploads/
 
 # Temporary debug scripts (may contain local credentials)
 backend/_tmp_*.js
+
+# Python scraper
+scraper/.venv/
+scraper/out/
+scraper/auth/
+scraper/__pycache__/
+*.partial.jsonl

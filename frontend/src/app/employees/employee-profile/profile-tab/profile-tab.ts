@@ -329,8 +329,11 @@ export class ProfileTabComponent implements OnInit {
         designationId: this.employeeData.designationId || this.employeeData.designation?.id || null,
         managerId: this.employeeData.managerId || this.employeeData.manager?.id || null,
         branchId: this.employeeData.branchId || this.employeeData.branch?.id || null,
-        nextAppraisalDate: this.employeeData.nextAppraisalDate 
-          ? new Date(this.employeeData.nextAppraisalDate).toISOString().split('T')[0] 
+        joiningDate: this.employeeData.joiningDate
+          ? new Date(this.employeeData.joiningDate).toISOString().split('T')[0]
+          : '',
+        nextAppraisalDate: this.employeeData.nextAppraisalDate
+          ? new Date(this.employeeData.nextAppraisalDate).toISOString().split('T')[0]
           : '',
 
         // Usual work location mapping per day. Per-day shift overrides live in a

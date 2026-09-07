@@ -1,0 +1,349 @@
+﻿employee_id,leave_type,no_of_leaves,monthly_limit,total_leaves_taken,remaining_leaves,over_utilized,unused_leaves
+1252,Casual Leave,10,,0,10,0,0
+1252,Sick Leave,8,,0,8,0,0
+1252,Comp-Off,0,,0,0,0,0
+1252,Unpaid Leaves,0,,0,0,0,0
+1252,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1252,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1252,Rakha Bandhan (Optional),1,,0,1,0,0
+1252,Half Day (Comp-Off),0,,0,0,0,0
+1405,Casual Leave,10,,5,5,0,0
+1405,Sick Leave,8,,1,7,0,0
+1405,Comp-Off,0,,0,0,0,0
+1405,Unpaid Leaves,0,,1,0,0,-1
+1405,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1405,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1405,Rakha Bandhan (Optional),1,,1,0,0,0
+1405,Half Day (Comp-Off),0,,0,0,0,0
+1519,Casual Leave,10,,2,8,0,0
+1519,Sick Leave,8,,0,8,0,0
+1519,Comp-Off,0,,0,0,0,0
+1519,Unpaid Leaves,0,,0,0,0,0
+1519,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1519,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1519,Rakha Bandhan (Optional),1,,0,1,0,0
+1519,Half Day (Comp-Off),0,,0,0,0,0
+1568,Casual Leave,10,,2.5,7.5,0,0
+1568,Sick Leave,8,,0,8,0,0
+1568,Comp-Off,9,,2,7,0,0
+1568,Unpaid Leaves,0,,0,0,1,1
+1568,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1568,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1568,Rakha Bandhan (Optional),1,,0,1,0,0
+1568,Half Day (Comp-Off),0,,0,0,0,0
+1569,Casual Leave,10,,4.5,5.5,0,0
+1569,Sick Leave,8,,6,2,0,0
+1569,Comp-Off,3,,3,0,0,0
+1569,Unpaid Leaves,0,,0,0,0,0
+1569,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1569,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1569,Rakha Bandhan (Optional),1,,1,0,0,0
+1569,Half Day (Comp-Off),0,,0,0,0,0
+1573,Casual Leave,10,,10,0,0,0
+1573,Sick Leave,8,,5,3,0,0
+1573,Comp-Off,6,,3,3,0,0
+1573,Unpaid Leaves,0,,1,0,0,-1
+1573,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1573,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1573,Rakha Bandhan (Optional),1,,0,1,0,0
+1573,Half Day (Comp-Off),0,,0,0,0,0
+1575,Casual Leave,10,,3,7,0,0
+1575,Sick Leave,8,,5,3,0,0
+1575,Comp-Off,0,,0,0,0,0
+1575,Unpaid Leaves,0,,1,0,0,-1
+1575,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1575,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1575,Rakha Bandhan (Optional),1,,1,0,0,0
+1575,Half Day (Comp-Off),0,,0,0,0,0
+1602,Casual Leave,10,,0,10,0,0
+1602,Sick Leave,8,,0,8,0,0
+1602,Comp-Off,0,,0,0,0,0
+1602,Unpaid Leaves,0,,0,0,0,0
+1602,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1602,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1602,Rakha Bandhan (Optional),1,,0,1,0,0
+1602,Half Day (Comp-Off),0,,0,0,0,0
+1603,Casual Leave,10,,0,10,0,0
+1603,Sick Leave,8,,0,8,0,0
+1603,Comp-Off,0,,0,0,0,0
+1603,Unpaid Leaves,0,,0,0,0,0
+1603,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1603,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1603,Rakha Bandhan (Optional),1,,0,1,0,0
+1603,Half Day (Comp-Off),0,,0,0,0,0
+1679,Casual Leave,10,,2,8,0,0
+1679,Sick Leave,8,,4.5,3.5,0,0
+1679,Comp-Off,0,,0,0,0,0
+1679,Unpaid Leaves,0,,3,0,0,-3
+1679,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1679,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1679,Rakha Bandhan (Optional),1,,1,0,0,0
+1679,Half Day (Comp-Off),0,,0,0,0,0
+1689,Casual Leave,10,,8.5,1.5,0,0
+1689,Sick Leave,8,,1,7,0,0
+1689,Comp-Off,1,,1,0,0,0
+1689,Unpaid Leaves,0,,0,0,0,0
+1689,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1689,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1689,Rakha Bandhan (Optional),1,,1,0,0,0
+1689,Half Day (Comp-Off),0,,0,0,0,0
+1701,Casual Leave,10,,3,7,0,0
+1701,Sick Leave,8,,2,6,0,0
+1701,Comp-Off,0,,0,0,0,0
+1701,Unpaid Leaves,0,,0,0,14,14
+1701,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1701,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1701,Rakha Bandhan (Optional),1,,0,1,0,0
+1701,Half Day (Comp-Off),0,,0,0,0,0
+1718,Casual Leave,10,,2,8,0,0
+1718,Sick Leave,8,,1,7,0,0
+1718,Comp-Off,0,,0,0,0,0
+1718,Unpaid Leaves,0,,0,0,0,0
+1718,Eid-ul-Fitr (Optional),1,,1,0,0,0
+1718,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+1718,Rakha Bandhan (Optional),1,,0,1,0,0
+1718,Half Day (Comp-Off),0,,0,0,0,0
+1798,Casual Leave,7,,6,1,0,0
+1798,Sick Leave,6.5,,0,6.5,0,0
+1798,Comp-Off,0,,0,0,0,0
+1798,Unpaid Leaves,0,,5,0,1.5,-3.5
+1798,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1798,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1798,Rakha Bandhan (Optional),1,,1,0,0,0
+1798,Half Day (Comp-Off),0,,0,0,0,0
+1842,Casual Leave,8,,3,5,0,0
+1842,Sick Leave,7,,1,6,0,0
+1842,Comp-Off,3,,1,2,0,0
+1842,Unpaid Leaves,0,,2,0,0,-2
+1842,Eid-ul-Fitr (Optional),1,,0,1,0,0
+1842,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+1842,Rakha Bandhan (Optional),1,,1,0,0,0
+1842,Half Day (Comp-Off),0,,0,0,0,0
+2048,Casual Leave,10,,0,10,0,0
+2048,Sick Leave,8,,0,8,0,0
+2048,Comp-Off,0,,0,0,0,0
+2048,Unpaid Leaves,0,,0,0,0,0
+2048,Eid-ul-Fitr (Optional),1,,0,1,0,0
+2048,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+2048,Rakha Bandhan (Optional),1,,0,1,0,0
+2048,Half Day (Comp-Off),0,,0,0,0,0
+2132,Casual Leave,10,,3,7,0,0
+2132,Sick Leave,8,,6.5,1.5,0,0
+2132,Comp-Off,0,,0,0,0,0
+2132,Unpaid Leaves,0,,0,0,0,0
+2132,Eid-ul-Fitr (Optional),1,,0,1,0,0
+2132,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+2132,Rakha Bandhan (Optional),1,,0,1,0,0
+2132,Half Day (Comp-Off),0,,0,0,0,0
+2133,Casual Leave,10,,8,2,0,0
+2133,Sick Leave,8,,3,5,0,0
+2133,Comp-Off,0,,0,0,0,0
+2133,Unpaid Leaves,0,,0,0,4,4
+2133,Eid-ul-Fitr (Optional),1,,0,1,0,0
+2133,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2133,Rakha Bandhan (Optional),1,,1,0,0,0
+2133,Half Day (Comp-Off),0,,0,0,0,0
+2155,Casual Leave,10,,1,9,0,0
+2155,Sick Leave,8,,0,8,0,0
+2155,Comp-Off,0,,0,0,0,0
+2155,Unpaid Leaves,0,,0,0,0,0
+2155,Eid-ul-Fitr (Optional),1,,0,1,0,0
+2155,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+2155,Rakha Bandhan (Optional),1,,1,0,0,0
+2155,Half Day (Comp-Off),0,,0,0,0,0
+2454,Casual Leave,7,,6,1,0,0
+2454,Sick Leave,6.5,,6,0.5,0,0
+2454,Comp-Off,0,,0,0,0,0
+2454,Unpaid Leaves,0,,6.5,0,0,-6.5
+2454,Eid-ul-Fitr (Optional),1,,1,0,0,0
+2454,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2454,Rakha Bandhan (Optional),1,,0,1,0,0
+2454,Half Day (Comp-Off),0,,0,0,0,0
+2868,Casual Leave,5,,2,3,0,0
+2868,Sick Leave,4,,4,0,0,0
+2868,Comp-Off,3,,2,1,0,0
+2868,Unpaid Leaves,0,,3,0,0,-3
+2868,Eid-ul-Fitr (Optional),1,,1,0,0,0
+2868,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2868,Rakha Bandhan (Optional),1,,1,0,0,0
+2868,Half Day (Comp-Off),0,,0,0,0,0
+2950,Casual Leave,5,,0,5,0,0
+2950,Sick Leave,4,,1,3,0,0
+2950,Comp-Off,0,,0,0,0,0
+2950,Unpaid Leaves,0,,5,0,0,-5
+2950,Eid-ul-Fitr (Optional),1,,1,0,0,0
+2950,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2950,Rakha Bandhan (Optional),1,,1,0,0,0
+2950,Half Day (Comp-Off),0,,0,0,0,0
+2980,Casual Leave,5,,1,4,0,0
+2980,Sick Leave,4,,4,0,0,0
+2980,Comp-Off,10,,6,4,0,0
+2980,Unpaid Leaves,0,,1,0,0,-1
+2980,Eid-ul-Fitr (Optional),1,,1,0,0,0
+2980,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+2980,Rakha Bandhan (Optional),1,,1,0,0,0
+2980,Half Day (Comp-Off),0,,0,0,0,0
+3031,Casual Leave,5,,3,2,0,0
+3031,Sick Leave,4,,3,1,0,0
+3031,Comp-Off,0,,0,0,0,0
+3031,Unpaid Leaves,0,,8,0,0,-8
+3031,Eid-ul-Fitr (Optional),1,,0,1,0,0
+3031,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+3031,Rakha Bandhan (Optional),1,,1,0,0,0
+3031,Half Day (Comp-Off),0,,0,0,0,0
+3140,Comp-Off,0,,0,0,0,0
+3140,Unpaid Leaves,0,,18,0,0,-18
+3140,Eid-ul-Fitr (Optional),0.5,,1,0,0.5,0
+3140,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3140,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3140,Half Day (Comp-Off),0,,0,0,0,0
+3141,Casual Leave,9.5,,0,9.5,0,0
+3141,Sick Leave,7.5,,0,7.5,0,0
+3141,Comp-Off,0,,0,0,0,0
+3141,Unpaid Leaves,0,,0,0,0,0
+3141,Eid-ul-Fitr (Optional),1,,0,1,0,0
+3141,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+3141,Rakha Bandhan (Optional),1,,0,1,0,0
+3141,Half Day (Comp-Off),0,,0,0,0,0
+3155,Casual Leave,9,,2,7,0,0
+3155,Sick Leave,7,,0,7,0,0
+3155,Comp-Off,0,,0,0,0,0
+3155,Unpaid Leaves,0,,5,0,0,-5
+3155,Eid-ul-Fitr (Optional),1,,1,0,0,0
+3155,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+3155,Rakha Bandhan (Optional),1,,1,0,0,0
+3155,Half Day (Comp-Off),0,,0,0,0,0
+3188,Comp-Off,0,,0,0,0,0
+3188,Unpaid Leaves,0,,2.5,0,0,-2.5
+3188,Eid-ul-Fitr (Optional),1,,1,0,0,0
+3188,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+3188,Rakha Bandhan (Optional),1,,1,0,0,0
+3188,Half Day (Comp-Off),0,,0,0,0,0
+3189,Casual Leave,10,,0,10,0,0
+3189,Sick Leave,8,,0,8,0,0
+3189,Comp-Off,0,,0,0,0,0
+3189,Unpaid Leaves,0,,0,0,0,0
+3189,Eid-ul-Fitr (Optional),1,,0,1,0,0
+3189,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+3189,Rakha Bandhan (Optional),1,,0,1,0,0
+3189,Half Day (Comp-Off),0,,0,0,0,0
+3270,Comp-Off,0,,0,0,0,0
+3270,Unpaid Leaves,0,,14.5,0,0,-14.5
+3270,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3270,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3270,Rakha Bandhan (Optional),0,,0,0,0,0
+3270,Half Day (Comp-Off),0,,0,0,0,0
+3272,Comp-Off,0,,0,0,0,0
+3272,Unpaid Leaves,0,,7.5,0,0,-7.5
+3272,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3272,Eid-Ul-Zuha (Optional),1,,1,0,0,0
+3272,Rakha Bandhan (Optional),1,,1,0,0,0
+3272,Half Day (Comp-Off),0,,0,0,0,0
+3353,Comp-Off,0,,0,0,0,0
+3353,Unpaid Leaves,0,,6.5,0,0,-6.5
+3353,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3353,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3353,Rakha Bandhan (Optional),0,,0,0,0,0
+3353,Half Day (Comp-Off),0,,0,0,0,0
+3358,Comp-Off,2,,2,0,0,0
+3358,Unpaid Leaves,0,,0,0,0,0
+3358,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3358,Eid-Ul-Zuha (Optional),1,,0,1,0,0
+3358,Rakha Bandhan (Optional),1,,1,0,0,0
+3358,Half Day (Comp-Off),0,,0,0,0,0
+3361,Comp-Off,1,,0,1,0,0
+3361,Unpaid Leaves,0,,3,0,0,-3
+3361,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3361,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3361,Rakha Bandhan (Optional),0,,0,0,0,0
+3361,Half Day (Comp-Off),0,,0,0,0,0
+3385,Comp-Off,0,,0,0,0,0
+3385,Unpaid Leaves,0,,0,0,0,0
+3385,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3385,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3385,Rakha Bandhan (Optional),1,,0,1,0,0
+3385,Half Day (Comp-Off),0,,0,0,0,0
+3397,Comp-Off,0,,0,0,0,0
+3397,Unpaid Leaves,0,,8,0,0,-8
+3397,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3397,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3397,Rakha Bandhan (Optional),0,,0,0,0,0
+3397,Half Day (Comp-Off),0,,0,0,0,0
+3413,Comp-Off,0,,0,0,0,0
+3413,Unpaid Leaves,0,,1,0,0,-1
+3413,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3413,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3413,Rakha Bandhan (Optional),0,,0,0,0,0
+3413,Half Day (Comp-Off),0,,0,0,0,0
+3414,Comp-Off,0,,0,0,0,0
+3414,Unpaid Leaves,0,,1,0,0,-1
+3414,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3414,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3414,Rakha Bandhan (Optional),0,,0,0,0,0
+3414,Half Day (Comp-Off),0,,0,0,0,0
+3415,Casual Leave,0,,0,0,0,0
+3415,Sick Leave,0,,0,0,0,0
+3415,Comp-Off,0,,0,0,0,0
+3415,Unpaid Leaves,0,,1,0,0,-1
+3415,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3415,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3415,Rakha Bandhan (Optional),1,,1,0,0,0
+3415,Half Day (Comp-Off),0,,0,0,0,0
+3417,Comp-Off,0,,0,0,0,0
+3417,Unpaid Leaves,0,,0,0,0,0
+3417,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3417,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3417,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3417,Half Day (Comp-Off),0,,0,0,0,0
+3418,Casual Leave,5,,2,3,0,0
+3418,Sick Leave,4,,1,3,0,0
+3418,Comp-Off,0,,0,0,0,0
+3418,Unpaid Leaves,0,,0,0,0,0
+3418,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3418,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3418,Rakha Bandhan (Optional),1,,0,1,0,0
+3418,Half Day (Comp-Off),0,,0,0,0,0
+3431,Casual Leave,8.5,,0,8.5,0,0
+3431,Sick Leave,7,,0,7,0,0
+3431,Comp-Off,0,,0,0,0,0
+3431,Unpaid Leaves,0,,3,0,0,-3
+3431,Eid-ul-Fitr (Optional),0,,0,0,0,0
+3431,Eid-Ul-Zuha (Optional),0,,0,0,0,0
+3431,Rakha Bandhan (Optional),1,,1,0,0,0
+3431,Half Day (Comp-Off),0,,0,0,0,0
+3450,Comp-Off,0,,0,0,0,0
+3450,Unpaid Leaves,0,,0.5,0,0,-0.5
+3450,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3450,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3450,Rakha Bandhan (Optional),0.5,,0.5,0,0,0
+3450,Half Day (Comp-Off),0,,0,0,0,0
+3457,Comp-Off,0,,0,0,0,0
+3457,Unpaid Leaves,0,,3.5,0,0,-3.5
+3457,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3457,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3457,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3457,Half Day (Comp-Off),0,,0,0,0,0
+3458,Comp-Off,0,,0,0,0,0
+3458,Unpaid Leaves,0,,1,0,0,-1
+3458,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3458,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3458,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3458,Half Day (Comp-Off),0,,0,0,0,0
+3459,Comp-Off,0,,0,0,0,0
+3459,Unpaid Leaves,0,,1,0,0,-1
+3459,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3459,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3459,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3459,Half Day (Comp-Off),0,,0,0,0,0
+3460,Comp-Off,0,,0,0,0,0
+3460,Unpaid Leaves,0,,1,0,0,-1
+3460,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3460,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3460,Rakha Bandhan (Optional),0.5,,0,0.5,0,0
+3460,Half Day (Comp-Off),0,,0,0,0,0
+3466,Comp-Off,0,,0,0,0,0
+3466,Unpaid Leaves,0,,0.5,0,0,-0.5
+3466,Eid-ul-Fitr (Optional),0.5,,0,0.5,0,0
+3466,Eid-Ul-Zuha (Optional),0.5,,0,0.5,0,0
+3466,Rakha Bandhan (Optional),0.5,,0.5,0,0,0
+3478,Comp-Off,0,,0,0,0,0

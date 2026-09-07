@@ -386,6 +386,15 @@
   flex-shrink: 0;
 }
 
+.trigger-avatar-img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #cbd5e1;
+}
+
 .trigger-text {
   flex: 1;
   text-align: left;

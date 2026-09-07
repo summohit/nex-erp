@@ -10,39 +10,91 @@
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px 8px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   font-size: 13px;
   background: white;
   color: #374151;
-  min-width: 150px;
+  min-width: 140px;
   cursor: pointer;
   width: 100%;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
-.select-trigger span {
+.select-trigger-content {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+
+.select-trigger-content ::ng-deep svg,
+.select-trigger-content svg {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: color 0.15s ease;
+}
+
+.select-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12.5px;
+  color: #1e293b;
 }
 
-.select-trigger span.placeholder {
+.select-label.placeholder {
   color: #64748b;
+  font-weight: 400;
 }
 
-.select-trigger svg {
-  color: #6b7280;
+.select-trigger-tail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
-  transition: transform 0.15s ease;
+}
+
+.select-chevron {
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.btn-select-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: #f1f5f9;
+  border-radius: 50%;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-select-clear:hover {
+  background: #fee2e2;
+  color: #ef4444;
 }
 
 .searchable-select.open .select-trigger {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  border-color: var(--color-primary, #ea580c);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
 }
 
-.searchable-select.open .select-trigger svg {
+.searchable-select.open .select-chevron {
   transform: rotate(180deg);
+  color: var(--color-primary, #ea580c);
+}
+
+.searchable-select.open .select-trigger-content ::ng-deep svg {
+  color: var(--color-primary, #ea580c);
 }
 
 .select-dropdown {

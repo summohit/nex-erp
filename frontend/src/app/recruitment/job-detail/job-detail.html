@@ -102,7 +102,7 @@
       </div>
     </div>
 
-    <div class="kpi-card kpi-card-purple" (click)="selectStageFilter('INTERVIEWING')" [class.active-kpi]="statusFilter() === 'INTERVIEWING'">
+    <div class="kpi-card kpi-card-purple" (click)="selectStageFilter('INTERVIEW')" [class.active-kpi]="statusFilter() === 'INTERVIEW'">
       <div class="kpi-icon-wrap bg-purple-soft">
         <svg lucideSparkles size="20"></svg>
       </div>
@@ -264,7 +264,7 @@
                   (click)="toggleStatusMenu(app.id, $event)"
                   title="Click to change candidate stage">
                   <span class="badge-dot"></span>
-                  <span class="badge-text">{{ app.status || 'NEW' }}</span>
+                  <span class="badge-text">{{ app.status || 'APPLIED' }}</span>
                   <svg lucideChevronRight size="12" class="badge-chevron"></svg>
                 </button>
 
@@ -273,7 +273,7 @@
                   <div class="status-menu-header">Change Candidate Stage</div>
                   <div class="status-menu-items">
                     <button 
-                      *ngFor="let st of ['NEW', 'REVIEWING', 'SHORTLISTED', 'INTERVIEWING', 'OFFERED', 'HIRED', 'ONBOARDED', 'REJECTED']"
+                      *ngFor="let st of STAGE_KEYS"
                       class="status-menu-option"
                       [class.current]="app.status === st"
                       (click)="updateCandidateStatus(app, st, $event)">
@@ -338,7 +338,7 @@
           </div>
           <span class="stage-interactive-badge card-badge" [ngClass]="statusBadgeClass(app.status)">
             <span class="badge-dot"></span>
-            {{ app.status || 'NEW' }}
+            {{ app.status || 'APPLIED' }}
           </span>
         </div>
 
@@ -424,7 +424,7 @@
         <div class="drawer-status-pill-wrap">
           <span class="stage-interactive-badge" [ngClass]="statusBadgeClass(candidate.status)">
             <span class="badge-dot"></span>
-            {{ candidate.status || 'NEW' }}
+            {{ candidate.status || 'APPLIED' }}
           </span>
         </div>
       </div>
@@ -435,7 +435,7 @@
       <div class="section-heading">Move Candidate Stage</div>
       <div class="quick-stage-buttons-grid">
         <button 
-          *ngFor="let s of ['REVIEWING', 'SHORTLISTED', 'INTERVIEWING', 'OFFERED', 'HIRED', 'REJECTED']"
+          *ngFor="let s of STAGE_KEYS"
           class="btn-stage-quick"
           [class.active-stage]="candidate.status === s"
           [ngClass]="'btn-stage-' + s.toLowerCase()"

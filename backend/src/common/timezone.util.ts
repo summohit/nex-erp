@@ -22,13 +22,17 @@ function toISTFields(date: Date) {
 }
 
 /**
- * Midnight IST on the IST calendar day containing `date`, returned as the
- * real UTC instant that represents. Use this for "which day does this
- * attendance record belong to" bucketing instead of local Date getters.
+ * The IST calendar day containing `date`, as UTC midnight of that day.
+ *
+ * This feeds `Attendance.date`, which is a Postgres `date` column: Postgres
+ * keeps only the UTC date part, so the value must be UTC midnight of the
+ * intended day. Returning IST midnight as a UTC instant (i.e. subtracting the
+ * offset) lands on 18:30 the *previous* day and gets truncated to that day —
+ * which filed every clock-in one day early.
  */
 export function istDateKey(date: Date): Date {
   const { year, month, day } = toISTFields(date);
-  return new Date(Date.UTC(year, month, day) - IST_OFFSET_MS);
+  return new Date(Date.UTC(year, month, day));
 }
 
 /** The hour (0-23) on IST's clock for `date`, independent of the server's timezone. */

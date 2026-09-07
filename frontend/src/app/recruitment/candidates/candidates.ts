@@ -17,10 +17,13 @@ import {
   LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
   LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown,
   LucideCheck, LucideMapPin,
-  LucideEdit2
+  LucideEdit2,
+  LucideSearch,
+  LucideRotateCcw
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
-import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import { ColDef, AllCommunityModule, ModuleRegistry, RowClassRules, GridOptions, GridApi } from 'ag-grid-community';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -38,6 +41,9 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown,
     LucideCheck, LucideMapPin,
     LucideEdit2,
+    LucideSearch,
+    LucideRotateCcw,
+    SearchableSelectComponent,
   ],
   templateUrl: './candidates.html',
   styleUrls: ['./candidates.css'],
@@ -65,14 +71,52 @@ export class CandidatesComponent implements OnInit {
 
   applications = signal<JobApplication[]>([]);
   
-  // Pipeline columns
-  colNew = computed(() => this.applications().filter(a => a.status === 'NEW'));
-  colReviewing = computed(() => this.applications().filter(a => a.status === 'REVIEWING'));
-  colShortlisted = computed(() => this.applications().filter(a => a.status === 'SHORTLISTED'));
-  colInterviewing = computed(() => this.applications().filter(a => a.status === 'INTERVIEWING'));
-  colOffered = computed(() => this.applications().filter(a => a.status === 'OFFERED'));
-  colHired = computed(() => this.applications().filter(a => a.status === 'HIRED'));
-  colRejected = computed(() => this.applications().filter(a => a.status === 'REJECTED'));
+  /**
+   * The recruitment pipeline, in order. Single source of truth for the Kanban
+   * columns, the KPI tiles, the status badges and the table's status filter.
+   */
+  readonly STAGES: { key: string; label: string; tone: string }[] = [
+    { key: 'APPLIED',         label: 'Applied',         tone: 'blue'    },
+    { key: 'PHONE_SCREENING', label: 'Phone Screening', tone: 'purple'  },
+    { key: 'INTERVIEW',       label: 'Interview',       tone: 'amber'   },
+    { key: 'NEGOTIATION',     label: 'Negotiation',     tone: 'orange'  },
+    { key: 'OFFERED',         label: 'Offered',         tone: 'emerald' },
+    { key: 'HIRED',           label: 'Hired',           tone: 'green'   },
+    { key: 'ONBOARDED',       label: 'Onboarded',       tone: 'teal'    },
+    { key: 'ON_HOLD',         label: 'On Hold',         tone: 'slate'   },
+    { key: 'REJECTED',        label: 'Rejected',        tone: 'red'     },
+  ];
+
+  /** Applications grouped by stage key, so the board renders from one loop. */
+  byStage = computed<Record<string, JobApplication[]>>(() => {
+    const out: Record<string, JobApplication[]> = {};
+    for (const s of this.STAGES) out[s.key] = [];
+    for (const a of this.filteredApplications()) {
+      // Legacy rows may still carry the retired vocabulary.
+      const k = this.normaliseStage(a.status);
+      (out[k] ||= []).push(a);
+    }
+    return out;
+  });
+
+  stageApps(key: string): JobApplication[] {
+    return this.byStage()[key] || [];
+  }
+
+  /** Map any retired status onto a current stage. */
+  normaliseStage(status: string | undefined): string {
+    switch (status) {
+      case 'NEW': return 'APPLIED';
+      case 'REVIEWING':
+      case 'SHORTLISTED': return 'PHONE_SCREENING';
+      case 'INTERVIEWING': return 'INTERVIEW';
+      default: return status || 'APPLIED';
+    }
+  }
+
+  stageLabel(key: string): string {
+    return this.STAGES.find(s => s.key === this.normaliseStage(key))?.label || key;
+  }
 
   // Detail drawer
   selectedApp = signal<JobApplication | null>(null);
@@ -212,49 +256,196 @@ export class CandidatesComponent implements OnInit {
   });
 
   // Table Setup
-  defaultColDef: ColDef = { flex: 1, minWidth: 150, filter: true, sortable: true };
+  gridApi: GridApi | null = null;
+  gridOptions: GridOptions = {
+    suppressColumnVirtualisation: true,
+    rowBuffer: 15,
+    animateRows: false,
+  };
+
+  defaultColDef: ColDef = { flex: 1, minWidth: 130, filter: true, sortable: true, resizable: true };
+
+  rowClassRules: RowClassRules = {
+    'ats-row-rejected': (p: any) => this.normaliseStage(p.data?.status) === 'REJECTED',
+    'ats-row-hired': (p: any) => ['HIRED', 'ONBOARDED'].includes(this.normaliseStage(p.data?.status)),
+    'ats-row-offered': (p: any) => this.normaliseStage(p.data?.status) === 'OFFERED',
+    'ats-row-interview': (p: any) => this.normaliseStage(p.data?.status) === 'INTERVIEW',
+    'ats-row-negotiation': (p: any) => this.normaliseStage(p.data?.status) === 'NEGOTIATION',
+    'ats-row-screening': (p: any) => ['PHONE_SCREENING', 'SHORTLISTED', 'REVIEWING'].includes(this.normaliseStage(p.data?.status)),
+    'ats-row-on-hold': (p: any) => this.normaliseStage(p.data?.status) === 'ON_HOLD',
+    'ats-row-applied': (p: any) => this.normaliseStage(p.data?.status) === 'APPLIED',
+  };
+
   colDefs: ColDef[] = [
     { 
       headerName: 'Candidate', 
       field: 'fullName',
+      pinned: 'left',
+      lockPinned: true,
+      suppressMovable: true,
+      width: 280,
+      minWidth: 260,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const initials = this.getInitials(params.data.fullName);
+        const grad = this.getAvatarGradient(params.data.fullName);
+        const aiScore = params.data.aiScore;
+        const scoreBadge = (aiScore !== undefined && aiScore !== null && aiScore > 0)
+          ? `<span class="tbl-cand-ai ${this.getScoreClass(aiScore)}">★ ${aiScore}%</span>`
+          : '';
         return `
-          <div style="display: flex; align-items: center; gap: 10px; line-height: 1.2;">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #4b5563; font-size: 13px;">
+          <div class="tbl-cand-cell">
+            <div class="tbl-cand-avatar" style="background: ${grad};">
               ${initials}
             </div>
-            <div>
-              <div style="font-weight: 500; color: #111827;">${params.data.fullName}</div>
-              <div style="font-size: 12px; color: #6b7280;">${params.data.email}</div>
+            <div class="tbl-cand-meta">
+              <div class="tbl-cand-name-row">
+                <span class="tbl-cand-name" title="${params.data.fullName}">${params.data.fullName}</span>
+                ${scoreBadge}
+              </div>
+              <div class="tbl-cand-email" title="${params.data.email || ''}">${params.data.email || '—'}</div>
             </div>
           </div>
         `;
       }
     },
-    { headerName: 'Phone', field: 'phone' },
-    { headerName: 'Job Title', valueGetter: (p) => p.data?.job?.title || 'Unknown' },
-    { headerName: 'Department', valueGetter: (p) => p.data?.job?.department?.name || 'General' },
     { 
-      headerName: 'Status', 
+      headerName: 'Position', 
+      field: 'jobTitle',
+      colId: 'position',
+      minWidth: 190,
+      flex: 1.2,
+      valueGetter: (p) => p.data?.job?.title || 'Unknown',
+      cellRenderer: (p: any) => `
+        <div class="tbl-position-cell">
+          <svg class="tbl-pos-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+          <span class="tbl-position-title" title="${p.value || ''}">${p.value || '—'}</span>
+        </div>
+      `
+    },
+    { 
+      headerName: 'Department', 
+      colId: 'department',
+      minWidth: 155,
+      flex: 1.0,
+      valueGetter: (p) => p.data?.job?.department?.name || 'General',
+      cellRenderer: (p: any) => `<span class="tbl-dept-badge">${p.value || 'General'}</span>`
+    },
+    { 
+      headerName: 'Phone', 
+      field: 'phone', 
+      minWidth: 130,
+      flex: 0.85,
+      cellRenderer: (p: any) => p.value ? `<span class="tbl-phone">${p.value}</span>` : `<span class="tbl-empty">—</span>`
+    },
+    {
+      headerName: 'Current CTC',
+      field: 'currentCtc',
+      minWidth: 125,
+      flex: 0.8,
+      filter: 'agNumberColumnFilter',
+      valueFormatter: (p: any) => this.formatCtc(p.value),
+      cellRenderer: (p: any) => {
+        const ctc = this.formatCtc(p.value);
+        return ctc ? `<span class="tbl-ctc-text">${ctc}</span>` : `<span class="tbl-empty">—</span>`;
+      }
+    },
+    {
+      headerName: 'Expected CTC',
+      field: 'expectedCtc',
+      minWidth: 130,
+      flex: 0.85,
+      filter: 'agNumberColumnFilter',
+      valueFormatter: (p: any) => this.formatCtc(p.value),
+      cellRenderer: (p: any) => {
+        const ctc = this.formatCtc(p.value);
+        return ctc ? `<span class="tbl-ctc-text highlight">${ctc}</span>` : `<span class="tbl-empty">—</span>`;
+      }
+    },
+    { 
+      headerName: 'Notice Period', 
+      field: 'noticePeriod', 
+      minWidth: 130,
+      flex: 0.85,
+      cellRenderer: (p: any) => {
+        const np = String(p.value || '').trim();
+        if (!np) return '<span class="tbl-empty">—</span>';
+        let tone = 'slate';
+        const lower = np.toLowerCase();
+        if (lower.includes('immediate') || lower.includes('15')) tone = 'emerald';
+        else if (lower.includes('30') || lower.includes('1 month')) tone = 'amber';
+        return `<span class="tbl-notice-pill tone-${tone}"><span class="notice-dot"></span>${np}</span>`;
+      }
+    },
+    { 
+      headerName: 'Location', 
+      field: 'currentLocation', 
+      minWidth: 145,
+      flex: 0.9,
+      cellRenderer: (p: any) => {
+        const loc = String(p.value || '').trim();
+        if (!loc) return '<span class="tbl-empty">—</span>';
+        return `<span class="tbl-location"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> ${loc}</span>`;
+      }
+    },
+    {
+      headerName: 'Status',
       field: 'status',
-      cellRenderer: (p: any) => this.renderStatusBadge(p.value)
+      minWidth: 150,
+      flex: 0.95,
+      filter: true,
+      valueGetter: (p: any) => this.stageLabel(p.data?.status),
+      cellRenderer: (p: any) => this.renderStatusBadge(p.data?.status)
     },
     { 
       headerName: 'Applied Date', 
-      valueGetter: (p) => this.datePipe.transform(p.data?.createdAt, 'MMM d, y, h:mm a') 
+      colId: 'appliedDate',
+      minWidth: 130,
+      flex: 0.85,
+      valueGetter: (p) => this.datePipe.transform(p.data?.createdAt, 'MMM d, y'),
+      cellRenderer: (p: any) => p.value ? `<span class="tbl-date">${p.value}</span>` : '<span class="tbl-empty">—</span>'
     },
     {
-      headerName: 'Actions',
-      width: 100,
+      headerName: '',
+      width: 80,
+      minWidth: 80,
+      maxWidth: 80,
       flex: 0,
+      pinned: 'right',
+      lockPinned: true,
+      suppressMovable: true,
       sortable: false,
       filter: false,
-      cellRenderer: () => `<button class="btn-primary" style="padding: 4px 8px; font-size: 12px;">View</button>`,
+      cellRenderer: () => `<button class="btn-tbl-action" title="View Application">View</button>`,
       onCellClicked: (p: any) => this.openApplication(p.data)
     }
   ];
+
+  onGridReady(params: any) {
+    this.gridApi = params.api;
+    setTimeout(() => {
+      this.gridApi?.sizeColumnsToFit();
+      this.gridApi?.refreshCells({ force: true });
+    }, 50);
+  }
+
+  setViewMode(mode: 'KANBAN' | 'TABLE') {
+    this.viewMode.set(mode);
+    if (mode === 'TABLE') {
+      setTimeout(() => {
+        if (this.gridApi) {
+          this.gridApi.sizeColumnsToFit();
+          this.gridApi.refreshCells({ force: true });
+        }
+      }, 50);
+    }
+  }
+
+  onRowClicked(event: any) {
+    if (event && event.data) {
+      this.openApplication(event.data);
+    }
+  }
 
   ngOnInit() {
     this.loadJobs();
@@ -744,23 +935,149 @@ export class CandidatesComponent implements OnInit {
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   }
 
-  renderStatusBadge(status: string) {
-    let color = '#6b7280'; let bg = '#f3f4f6'; let label = status;
-    switch(status) {
-      case 'NEW': color = '#2563eb'; bg = '#eff6ff'; break;
-      case 'REVIEWING': color = '#8b5cf6'; bg = '#f5f3ff'; break;
-      case 'SHORTLISTED': color = '#ea580c'; bg = '#fff7ed'; break;
-      case 'INTERVIEWING': color = '#d97706'; bg = '#fef3c7'; break;
-      case 'OFFERED': color = '#059669'; bg = '#ecfdf5'; break;
-      case 'HIRED': color = '#15803d'; bg = '#dcfce7'; break;
-      case 'ONBOARDED': color = '#1e3a8a'; bg = '#dbeafe'; break;
-      case 'REJECTED': color = '#dc2626'; bg = '#fef2f2'; break;
+  getAvatarGradient(name: string): string {
+    const gradients = [
+      'linear-gradient(135deg, #4f46e5, #3730a3)', // Indigo
+      'linear-gradient(135deg, #0284c7, #0369a1)', // Sky
+      'linear-gradient(135deg, #059669, #047857)', // Emerald
+      'linear-gradient(135deg, #d97706, #b45309)', // Amber
+      'linear-gradient(135deg, #7c3aed, #5b21b6)', // Violet
+      'linear-gradient(135deg, #e11d48, #be123c)', // Rose
+      'linear-gradient(135deg, #0d9488, #0f766e)', // Teal
+    ];
+    if (!name) return gradients[0];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
-    return `<span style="background: ${bg}; color: ${color}; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">${label}</span>`;
+    const idx = Math.abs(hash) % gradients.length;
+    return gradients[idx];
   }
 
-  scrollToColumn(colName: string) {
-    const element = document.querySelector(`.kanban-col-${colName}`) as HTMLElement;
+  /**
+   * CTC display. The source data is inconsistent: recruiters entered some values
+   * in rupees (687171) and others in lakhs-per-annum (5.5, 21.5). A figure under
+   * 1000 can't be an annual salary in rupees, so it's read as LPA.
+   */
+  formatCtc(v: any): string {
+    const n = Number(v);
+    if (!v || isNaN(n) || n <= 0) return '';
+    if (n < 1000) return `₹${n.toFixed(2)} L`;              // entered as LPA
+    if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`;
+    if (n >= 100000) return `₹${(n / 100000).toFixed(2)} L`;
+    return `₹${n.toLocaleString('en-IN')}`;
+  }
+
+  // ── Toolbar filters ────────────────────────────────────────────────────
+  searchQuery = signal<string>('');
+  filterPosition = signal<string>('');
+  filterLocation = signal<string>('');
+  filterNotice = signal<string>('');
+  filterStatus = signal<string>('');
+  filterMinCtc = signal<string>('');
+  filterMaxCtc = signal<string>('');
+
+  /** Distinct, sorted values for the dropdowns, taken from the loaded rows. */
+  private distinct(pick: (a: any) => string | undefined | null): string[] {
+    const set = new Set<string>();
+    for (const a of this.applications()) {
+      const v = (pick(a) || '').toString().trim();
+      if (v) set.add(v);
+    }
+    return [...set].sort((x, y) => x.localeCompare(y));
+  }
+  positionOptions = computed(() => this.distinct(a => a.job?.title));
+  locationOptions = computed(() => this.distinct(a => a.currentLocation));
+  noticeOptions = computed(() => this.distinct(a => a.noticePeriod));
+
+  jobSelectOptions = computed<SearchableSelectOption[]>(() => {
+    return this.jobs().map(j => ({
+      id: j.id,
+      name: `${j.title}${j.department?.name ? ' (' + j.department.name + ')' : ''}`
+    }));
+  });
+
+  positionSelectOptions = computed<SearchableSelectOption[]>(() => {
+    return this.positionOptions().map(p => ({ id: p, name: p }));
+  });
+
+  stageSelectOptions = computed<SearchableSelectOption[]>(() => {
+    return this.STAGES.map(s => ({ id: s.key, name: s.label }));
+  });
+
+  locationSelectOptions = computed<SearchableSelectOption[]>(() => {
+    return this.locationOptions().map(l => ({ id: l, name: l }));
+  });
+
+  noticeSelectOptions = computed<SearchableSelectOption[]>(() => {
+    return this.noticeOptions().map(n => ({ id: n, name: n }));
+  });
+
+  activeFilterCount = computed(() => {
+    let count = 0;
+    if (this.searchQuery().trim()) count++;
+    if (this.selectedJobId()) count++;
+    if (this.filterPosition()) count++;
+    if (this.filterLocation()) count++;
+    if (this.filterNotice()) count++;
+    if (this.filterStatus()) count++;
+    if (this.filterMinCtc() || this.filterMaxCtc()) count++;
+    return count;
+  });
+
+  hasToolbarFilters = computed(() => this.activeFilterCount() > 0);
+
+  clearToolbarFilters() {
+    this.searchQuery.set('');
+    this.selectedJobId.set(null);
+    this.filterPosition.set('');
+    this.filterLocation.set('');
+    this.filterNotice.set('');
+    this.filterStatus.set('');
+    this.filterMinCtc.set('');
+    this.filterMaxCtc.set('');
+    this.onFilterChange();
+  }
+
+  /** Rows after the toolbar filters — expected CTC is compared in its own units. */
+  filteredApplications = computed(() => {
+    const q = this.searchQuery().trim().toLowerCase();
+    const pos = this.filterPosition(), loc = this.filterLocation(), nt = this.filterNotice();
+    const st = this.filterStatus();
+    const min = parseFloat(this.filterMinCtc()), max = parseFloat(this.filterMaxCtc());
+    return this.applications().filter(a => {
+      if (q) {
+        const matchName = (a.fullName || '').toLowerCase().includes(q);
+        const matchEmail = (a.email || '').toLowerCase().includes(q);
+        const matchPhone = (a.phone || '').toLowerCase().includes(q);
+        const matchJob = (a.job?.title || '').toLowerCase().includes(q);
+        if (!matchName && !matchEmail && !matchPhone && !matchJob) return false;
+      }
+      if (pos && (a.job?.title || '') !== pos) return false;
+      if (loc && (a.currentLocation || '') !== loc) return false;
+      if (nt && (a.noticePeriod || '') !== nt) return false;
+      if (st && this.normaliseStage(a.status) !== st) return false;
+
+      const ctc = Number(a.expectedCtc);
+      // Compare like with like: bring LPA-entered values onto the rupee scale.
+      const norm = !ctc || isNaN(ctc) ? NaN : (ctc < 1000 ? ctc * 100000 : ctc);
+      if (!isNaN(min) && (isNaN(norm) || norm < min * 100000)) return false;
+      if (!isNaN(max) && (isNaN(norm) || norm > max * 100000)) return false;
+      return true;
+    });
+  });
+
+  renderStatusBadge(status: string) {
+    const key = this.normaliseStage(status);
+    const label = this.stageLabel(key);
+    const stage = this.STAGES.find(s => s.key === key);
+    const tone = stage?.tone || 'slate';
+    return `<span class="tbl-status-pill status-${tone}"><span class="status-dot"></span><span class="status-text">${label}</span></span>`;
+  }
+
+  scrollToColumn(stageKey: string) {
+    // Columns are keyed by data-stage; the CSS class carries the colour tone.
+    const element = document.querySelector(`.kanban-col[data-stage="${stageKey}"]`) as HTMLElement;
     if (element) {
       const container = element.parentElement;
       if (container) {

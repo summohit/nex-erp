@@ -79,6 +79,7 @@ export class AllAttendanceComponent implements OnInit {
     status: string;
     logs: any[];
     durationStr: string;
+    isToday: boolean;
   } | null>(null);
   isDetailsModalOpen = signal(false);
 
@@ -93,6 +94,8 @@ export class AllAttendanceComponent implements OnInit {
   // Active Filter state
   filterMonth = new Date().getMonth() + 1;
   filterYear = new Date().getFullYear();
+  /** Bumped on every load() so month/year-dependent computed()s re-evaluate. */
+  periodVersion = signal(0);
   filterEmployeeId: number | null = null;
   filterDepartmentId: number | null = null;
   filterStatus = '';
@@ -147,6 +150,10 @@ export class AllAttendanceComponent implements OnInit {
   }
 
   load() {
+    // filterMonth/filterYear are plain properties, so computed() signals can't see
+    // them change. Bump this version so daysOfMonth (and the grid that derives from
+    // it) recompute for the newly selected month instead of reusing the first one.
+    this.periodVersion.update(v => v + 1);
     this.isLoading.set(true);
     this.attendanceService.getAllEmployeesAttendance({
       month: this.filterMonth,
@@ -208,6 +215,7 @@ export class AllAttendanceComponent implements OnInit {
 
   // Days in month calculation for the grid header
   daysOfMonth = computed(() => {
+    this.periodVersion();          // dependency: re-run when the month/year changes
     const year = this.filterYear;
     const month = this.filterMonth;
     const totalDays = new Date(year, month, 0).getDate();
@@ -312,10 +320,13 @@ export class AllAttendanceComponent implements OnInit {
           if (!day.isWeekend && !holiday) {
             workingDaysCount++;
           }
-        } else if (holiday) {
+        } else if (record && record.status === 'ON_LEAVE') {
+          status = 'On Leave';
+          tooltip = 'On Leave';
+        } else if (holiday || (record && record.status === 'HOLIDAY')) {
           status = 'Holiday';
-          tooltip = holiday.name || 'Company Holiday';
-        } else if (day.isWeekend) {
+          tooltip = (holiday && holiday.name) || 'Holiday';
+        } else if (day.isWeekend || (record && record.status === 'WEEKLY_OFF')) {
           status = 'Day Off';
           tooltip = 'Weekend Day Off';
         } else {
@@ -449,8 +460,21 @@ export class AllAttendanceComponent implements OnInit {
     return emps.filter(e => {
       const full = `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase();
       const dept = (e.department?.name || '').toLowerCase();
-      return full.includes(q) || dept.includes(q);
+      const desig = (e.designation?.name || '').toLowerCase();
+      return full.includes(q) || dept.includes(q) || desig.includes(q);
     });
+  }
+
+  getSelectedEmployee(): Employee | undefined {
+    if (!this.filterEmployeeId) return undefined;
+    return this.employees().find(e => e.id === this.filterEmployeeId);
+  }
+
+  onAvatarError(emp: any) {
+    if (emp) {
+      emp.avatarUrl = null;
+      if (emp.user) emp.user.avatarUrl = null;
+    }
   }
 
   getFilteredDepartments(query: string) {
@@ -715,10 +739,18 @@ export class AllAttendanceComponent implements OnInit {
         const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
         durationStr = `${hours} hrs ${mins} mins`;
       } else if (record.clockIn) {
-        const diffMs = new Date().getTime() - new Date(record.clockIn).getTime();
-        const hours = Math.floor(diffMs / (1000 * 60 * 60));
-        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        durationStr = `${hours} hrs ${mins} mins (Active)`;
+        // An open session is only "active" if it's today; a past day with no
+        // clock-out means the person never clocked out (imported/historical).
+        const dayStr = this.getLocalDateString(new Date(day.date));
+        const todayStr = this.getLocalDateString(new Date());
+        if (dayStr === todayStr) {
+          const diffMs = new Date().getTime() - new Date(record.clockIn).getTime();
+          const hours = Math.floor(diffMs / (1000 * 60 * 60));
+          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          durationStr = `${hours} hrs ${mins} mins (Active)`;
+        } else {
+          durationStr = 'Did not clock out';
+        }
       }
     }
 
@@ -731,7 +763,8 @@ export class AllAttendanceComponent implements OnInit {
       date: day.date,
       status: day.status,
       logs,
-      durationStr
+      durationStr,
+      isToday: this.getLocalDateString(new Date(day.date)) === this.getLocalDateString(new Date())
     });
 
     this.isDetailsModalOpen.set(true);

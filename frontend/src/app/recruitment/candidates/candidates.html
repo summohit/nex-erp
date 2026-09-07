@@ -36,51 +36,149 @@
 
   <!-- ENHANCED HEADER CARD -->
   <div class="page-header-card">
-    <div class="header-title-group">
-      <div class="header-title-row">
-        <h1>Candidates (ATS)</h1>
-        <span class="candidates-count-pill">{{ applications().length }} Candidate{{ applications().length === 1 ? '' : 's' }}</span>
+    <!-- Top Row: Title & Global Actions -->
+    <div class="header-top-row">
+      <div class="header-title-group">
+        <div class="header-title-row">
+          <h1>Candidates (ATS)</h1>
+          <span class="candidates-count-pill">{{ applications().length }} Candidate{{ applications().length === 1 ? '' : 's' }}</span>
+          <span class="filtered-badge" *ngIf="hasToolbarFilters() && filteredApplications().length !== applications().length">
+            {{ filteredApplications().length }} matching
+          </span>
+        </div>
+        <p>Manage, review and transition candidate applications across pipeline stages</p>
       </div>
-      <p>Manage, review and transition candidate applications across pipeline stages</p>
+
+      <div class="header-top-actions">
+        <button class="btn-secondary" (click)="exportCSV()" title="Export candidate data as CSV">
+          <svg lucideDownload size="15"></svg>
+          <span>Export CSV</span>
+        </button>
+
+        <a class="btn-secondary" routerLink="/recruitment/reports" title="View Recruitment Reports">
+          <svg lucideFileText size="15"></svg>
+          <span>Hiring Reports</span>
+        </a>
+
+        <button class="btn-primary" (click)="openAnalytics()" title="Open Recruitment Analytics">
+          <svg lucideSparkles size="15"></svg>
+          <span>Analytics</span>
+        </button>
+
+        <div class="view-toggles">
+          <button [class.active]="viewMode() === 'KANBAN'" (click)="setViewMode('KANBAN')" class="toggle-btn" title="Kanban View">
+            <svg lucideLayoutGrid size="15"></svg>
+            <span>Kanban</span>
+          </button>
+          <button [class.active]="viewMode() === 'TABLE'" (click)="setViewMode('TABLE')" class="toggle-btn" title="Table View">
+            <svg lucideTable size="15"></svg>
+            <span>Table</span>
+          </button>
+        </div>
+      </div>
     </div>
-    
-    <div class="header-actions">
-      <!-- Filter Dropdown -->
-      <div class="filter-group">
-        <svg lucideFilter size="14" class="filter-icon-prefix"></svg>
-        <label>Filter by Job:</label>
-        <select class="form-select" [ngModel]="selectedJobId()" (ngModelChange)="selectedJobId.set($event); onFilterChange()">
-          <option [ngValue]="null">All Jobs ({{ jobs().length }} Openings)</option>
-          <option *ngFor="let job of jobs()" [ngValue]="job.id">
-            {{job.title}} {{ job.department?.name ? '(' + job.department.name + ')' : '' }}
-          </option>
-        </select>
-        <button class="btn-clear-select" *ngIf="selectedJobId()" (click)="clearJobFilter()" title="Clear filter">
-          <svg lucideX size="14"></svg>
+
+    <!-- Filter Divider -->
+    <div class="filter-toolbar-divider"></div>
+
+    <!-- Second Row: Dedicated Filter Toolbar -->
+    <div class="ats-filter-toolbar">
+      <!-- Search Input -->
+      <div class="filter-item-search">
+        <svg lucideSearch size="14" class="search-icon-prefix"></svg>
+        <input 
+          type="text" 
+          class="filter-search-input" 
+          placeholder="Search by candidate, email, phone..." 
+          [ngModel]="searchQuery()" 
+          (ngModelChange)="searchQuery.set($event)"
+        />
+        <button class="btn-clear-search" *ngIf="searchQuery()" (click)="searchQuery.set('')" title="Clear search">
+          <svg lucideX size="12"></svg>
         </button>
       </div>
 
-      <button class="btn-secondary" (click)="exportCSV()" title="Export candidate data as CSV">
-        <svg lucideDownload size="15"></svg>
-        <span>Export CSV</span>
-      </button>
+      <!-- Filter Dropdowns Group with Search in Select -->
+      <div class="filter-controls-group">
+        <!-- Filter by Job -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!selectedJobId()">
+          <app-searchable-select
+            [options]="jobSelectOptions()"
+            [placeholder]="'All Jobs (' + jobs().length + ')'"
+            [value]="selectedJobId()"
+            [clearable]="true"
+            (valueChange)="selectedJobId.set($event); onFilterChange()">
+            <svg prefix lucideBriefcase size="13.5"></svg>
+          </app-searchable-select>
+        </div>
 
-      <a class="btn-secondary" routerLink="/recruitment/reports" title="View Recruitment Reports">
-        <svg lucideFileText size="15"></svg>
-        <span>Hiring Reports</span>
-      </a>
+        <!-- Position Filter -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterPosition()">
+          <app-searchable-select
+            [options]="positionSelectOptions()"
+            placeholder="All Positions"
+            [value]="filterPosition()"
+            [clearable]="true"
+            (valueChange)="filterPosition.set($event || '')">
+            <svg prefix lucideUsers size="13.5"></svg>
+          </app-searchable-select>
+        </div>
 
-      <button class="btn-primary" (click)="openAnalytics()" title="Open Recruitment Analytics">
-        <svg lucideSparkles size="15"></svg>
-        <span>Analytics</span>
-      </button>
+        <!-- Stage Filter -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterStatus()">
+          <app-searchable-select
+            [options]="stageSelectOptions()"
+            placeholder="All Stages"
+            [value]="filterStatus()"
+            [clearable]="true"
+            (valueChange)="filterStatus.set($event || '')">
+            <svg prefix lucideFilter size="13.5"></svg>
+          </app-searchable-select>
+        </div>
 
-      <div class="view-toggles">
-        <button [class.active]="viewMode() === 'KANBAN'" (click)="viewMode.set('KANBAN')" class="toggle-btn" title="Kanban View">
-          <svg lucideLayoutGrid size="16"></svg>
-        </button>
-        <button [class.active]="viewMode() === 'TABLE'" (click)="viewMode.set('TABLE')" class="toggle-btn" title="Table View">
-          <svg lucideTable size="16"></svg>
+        <!-- Location Filter -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterLocation()">
+          <app-searchable-select
+            [options]="locationSelectOptions()"
+            placeholder="All Locations"
+            [value]="filterLocation()"
+            [clearable]="true"
+            (valueChange)="filterLocation.set($event || '')">
+            <svg prefix lucideMapPin size="13.5"></svg>
+          </app-searchable-select>
+        </div>
+
+        <!-- Notice Period Filter -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterNotice()">
+          <app-searchable-select
+            [options]="noticeSelectOptions()"
+            placeholder="Any Notice"
+            [value]="filterNotice()"
+            [clearable]="true"
+            (valueChange)="filterNotice.set($event || '')">
+            <svg prefix lucideClock size="13.5"></svg>
+          </app-searchable-select>
+        </div>
+
+        <!-- Expected CTC Range -->
+        <div class="filter-ctc-pill" [class.filter-active]="!!(filterMinCtc() || filterMaxCtc())">
+          <span class="filter-pill-label">CTC:</span>
+          <input type="number" class="ctc-input" placeholder="Min" min="0" step="0.5"
+                 [ngModel]="filterMinCtc()" (ngModelChange)="filterMinCtc.set($event)" title="Min CTC in LPA" />
+          <span class="ctc-sep">-</span>
+          <input type="number" class="ctc-input" placeholder="Max" min="0" step="0.5"
+                 [ngModel]="filterMaxCtc()" (ngModelChange)="filterMaxCtc.set($event)" title="Max CTC in LPA" />
+          <span class="ctc-unit">LPA</span>
+          <button class="filter-pill-clear" *ngIf="filterMinCtc() || filterMaxCtc()" 
+                  (click)="filterMinCtc.set(''); filterMaxCtc.set(''); $event.stopPropagation()" title="Clear CTC filter">
+            <svg lucideX size="11"></svg>
+          </button>
+        </div>
+
+        <!-- Clear All Filters Button -->
+        <button class="btn-clear-all-filters" *ngIf="hasToolbarFilters()" (click)="clearToolbarFilters()" title="Reset all filters">
+          <svg lucideRotateCcw size="12"></svg>
+          <span>Reset ({{ activeFilterCount() }})</span>
         </button>
       </div>
     </div>
@@ -88,147 +186,24 @@
 
   <!-- KPI WIDGETS -->
   <div class="kpi-row" *ngIf="viewMode() === 'KANBAN'">
-    <div class="kpi-card" (click)="scrollToColumn('new')">
-      <div class="kpi-icon icon-blue"><svg lucideInbox size="20"></svg></div>
+    <div class="kpi-card" *ngFor="let s of STAGES" (click)="scrollToColumn(s.key)">
+      <div class="kpi-icon" [ngClass]="'icon-' + s.tone"><svg lucideInbox size="20"></svg></div>
       <div class="kpi-details">
-        <div class="kpi-value text-blue">{{colNew().length}}</div>
-        <div class="kpi-title">New</div>
-      </div>
-    </div>
-    <div class="kpi-card" (click)="scrollToColumn('reviewing')">
-      <div class="kpi-icon icon-purple"><svg lucideEye size="20"></svg></div>
-      <div class="kpi-details">
-        <div class="kpi-value text-purple">{{colReviewing().length}}</div>
-        <div class="kpi-title">Reviewing</div>
-      </div>
-    </div>
-    <div class="kpi-card" (click)="scrollToColumn('shortlisted')">
-      <div class="kpi-icon icon-orange"><svg lucideStar size="20"></svg></div>
-      <div class="kpi-details">
-        <div class="kpi-value text-orange">{{colShortlisted().length}}</div>
-        <div class="kpi-title">Shortlisted</div>
-      </div>
-    </div>
-    <div class="kpi-card" (click)="scrollToColumn('interviewing')">
-      <div class="kpi-icon icon-amber"><svg lucideUsers size="20"></svg></div>
-      <div class="kpi-details">
-        <div class="kpi-value text-amber">{{colInterviewing().length}}</div>
-        <div class="kpi-title">Interviewing</div>
-      </div>
-    </div>
-    <div class="kpi-card" (click)="scrollToColumn('offered')">
-      <div class="kpi-icon icon-emerald"><svg lucideAward size="20"></svg></div>
-      <div class="kpi-details">
-        <div class="kpi-value text-emerald">{{colOffered().length}}</div>
-        <div class="kpi-title">Offered</div>
-      </div>
-    </div>
-    <div class="kpi-card" (click)="scrollToColumn('hired')">
-      <div class="kpi-icon icon-green"><svg lucideCheckCircle size="20"></svg></div>
-      <div class="kpi-details">
-        <div class="kpi-value text-green">{{colHired().length}}</div>
-        <div class="kpi-title">Hired</div>
-      </div>
-    </div>
-    <div class="kpi-card" (click)="scrollToColumn('rejected')">
-      <div class="kpi-icon icon-red"><svg lucideXCircle size="20"></svg></div>
-      <div class="kpi-details">
-        <div class="kpi-value text-red">{{colRejected().length}}</div>
-        <div class="kpi-title">Rejected</div>
+        <div class="kpi-value" [ngClass]="'text-' + s.tone">{{ stageApps(s.key).length }}</div>
+        <div class="kpi-title">{{ s.label }}</div>
       </div>
     </div>
   </div>
 
   <!-- KANBAN VIEW -->
   <div class="kanban-board" *ngIf="viewMode() === 'KANBAN'" cdkDropListGroup #kanbanBoard>
-    
-    <!-- Column: NEW -->
-    <div class="kanban-col kanban-col-new" #colNewRef>
+    <div class="kanban-col" *ngFor="let s of STAGES" [ngClass]="'kanban-col-' + s.tone" [attr.data-stage]="s.key">
       <div class="col-header">
-        <h3>New <span>{{colNew().length}}</span></h3>
+        <h3>{{ s.label }} <span>{{ stageApps(s.key).length }}</span></h3>
       </div>
-      <div class="col-body" cdkDropList [cdkDropListData]="colNew()" (cdkDropListDropped)="drop($event, 'NEW')">
-        <div class="kanban-card" *ngFor="let item of colNew()" cdkDrag (click)="openApplication(item)">
-          <div class="card-title">{{item.fullName}}</div>
-          <div class="card-meta">{{item.job?.title}}</div>
-          <div class="card-footer-row">
-            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
-              <svg lucideSparkles size="12"></svg>
-              <span>{{item.aiScore}}% Match</span>
-            </div>
-            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Column: REVIEWING -->
-    <div class="kanban-col kanban-col-reviewing" #colReviewingRef>
-      <div class="col-header">
-        <h3>Reviewing <span>{{colReviewing().length}}</span></h3>
-      </div>
-      <div class="col-body" cdkDropList [cdkDropListData]="colReviewing()" (cdkDropListDropped)="drop($event, 'REVIEWING')">
-        <div class="kanban-card" *ngFor="let item of colReviewing()" cdkDrag (click)="openApplication(item)">
-          <div class="card-title">{{item.fullName}}</div>
-          <div class="card-meta">{{item.job?.title}}</div>
-          <div class="card-footer-row">
-            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
-              <svg lucideSparkles size="12"></svg>
-              <span>{{item.aiScore}}% Match</span>
-            </div>
-            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Column: SHORTLISTED -->
-    <div class="kanban-col kanban-col-shortlisted" #colShortlistedRef>
-      <div class="col-header">
-        <h3>Shortlisted <span>{{colShortlisted().length}}</span></h3>
-      </div>
-      <div class="col-body" cdkDropList [cdkDropListData]="colShortlisted()" (cdkDropListDropped)="drop($event, 'SHORTLISTED')">
-        <div class="kanban-card" *ngFor="let item of colShortlisted()" cdkDrag (click)="openApplication(item)">
-          <div class="card-title">{{item.fullName}}</div>
-          <div class="card-meta">{{item.job?.title}}</div>
-          <div class="card-footer-row">
-            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
-              <svg lucideSparkles size="12"></svg>
-              <span>{{item.aiScore}}% Match</span>
-            </div>
-            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Column: INTERVIEWING -->
-    <div class="kanban-col kanban-col-interviewing" #colInterviewingRef>
-      <div class="col-header">
-        <h3>Interviewing <span>{{colInterviewing().length}}</span></h3>
-      </div>
-      <div class="col-body" cdkDropList [cdkDropListData]="colInterviewing()" (cdkDropListDropped)="drop($event, 'INTERVIEWING')">
-        <div class="kanban-card" *ngFor="let item of colInterviewing()" cdkDrag (click)="openApplication(item)">
-          <div class="card-title">{{item.fullName}}</div>
-          <div class="card-meta">{{item.job?.title}}</div>
-          <div class="card-footer-row">
-            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
-              <svg lucideSparkles size="12"></svg>
-              <span>{{item.aiScore}}% Match</span>
-            </div>
-            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Column: OFFERED -->
-    <div class="kanban-col kanban-col-offered" #colOfferedRef>
-      <div class="col-header">
-        <h3>Offered <span>{{colOffered().length}}</span></h3>
-      </div>
-      <div class="col-body" cdkDropList [cdkDropListData]="colOffered()" (cdkDropListDropped)="drop($event, 'OFFERED')">
-        <div class="kanban-card" *ngFor="let item of colOffered()" cdkDrag (click)="openApplication(item)" [class.pending-approval]="item.approvalStatus === 'PENDING_APPROVAL'">
+      <div class="col-body" cdkDropList [cdkDropListData]="stageApps(s.key)"
+           (cdkDropListDropped)="drop($event, s.key)">
+        <div class="kanban-card" *ngFor="let item of stageApps(s.key)" cdkDrag (click)="openApplication(item)">
           <div class="card-title">{{item.fullName}}</div>
           <div class="card-meta">{{item.job?.title}}</div>
           <div class="approval-badge" *ngIf="item.approvalStatus === 'PENDING_APPROVAL'">
@@ -244,64 +219,26 @@
         </div>
       </div>
     </div>
-
-    <!-- Column: HIRED -->
-    <div class="kanban-col kanban-col-hired" #colHiredRef>
-      <div class="col-header">
-        <h3>Hired <span>{{colHired().length}}</span></h3>
-      </div>
-      <div class="col-body" cdkDropList [cdkDropListData]="colHired()" (cdkDropListDropped)="drop($event, 'HIRED')">
-        <div class="kanban-card" *ngFor="let item of colHired()" cdkDrag (click)="openApplication(item)" [class.pending-approval]="item.approvalStatus === 'PENDING_APPROVAL'">
-          <div class="card-title">{{item.fullName}}</div>
-          <div class="card-meta">{{item.job?.title}}</div>
-          <div class="approval-badge" *ngIf="item.approvalStatus === 'PENDING_APPROVAL'">
-            ⚠️ Pending Salary Approval
-          </div>
-          <div class="card-footer-row">
-            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
-              <svg lucideSparkles size="12"></svg>
-              <span>{{item.aiScore}}% Match</span>
-            </div>
-            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Column: REJECTED -->
-    <div class="kanban-col kanban-col-rejected" #colRejectedRef>
-      <div class="col-header">
-        <h3>Rejected <span>{{colRejected().length}}</span></h3>
-      </div>
-      <div class="col-body" cdkDropList [cdkDropListData]="colRejected()" (cdkDropListDropped)="drop($event, 'REJECTED')">
-        <div class="kanban-card" *ngFor="let item of colRejected()" cdkDrag (click)="openApplication(item)">
-          <div class="card-title">{{item.fullName}}</div>
-          <div class="card-meta">{{item.job?.title}}</div>
-          <div class="card-footer-row">
-            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
-              <svg lucideSparkles size="12"></svg>
-              <span>{{item.aiScore}}% Match</span>
-            </div>
-            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <!-- TABLE VIEW -->
   <div class="table-container" *ngIf="viewMode() === 'TABLE'">
     <ag-grid-angular
-      class="ag-theme-quartz"
+      class="ag-theme-quartz custom-ats-grid"
       [theme]="'legacy'"
-      [rowData]="applications()"
+      [rowData]="filteredApplications()"
       [columnDefs]="colDefs"
       [defaultColDef]="defaultColDef"
+      [rowClassRules]="rowClassRules"
+      [gridOptions]="gridOptions"
+      [suppressColumnVirtualisation]="true"
       [pagination]="true"
       [paginationPageSize]="20"
-      [domLayout]="'autoHeight'"
-      style="width: 100%;">
+      [rowHeight]="60"
+      [headerHeight]="42"
+      (gridReady)="onGridReady($event)"
+      (rowClicked)="onRowClicked($event)"
+      style="width: 100%; height: 100%;">
     </ag-grid-angular>
   </div>
 </div>

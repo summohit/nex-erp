@@ -262,6 +262,7 @@ export class AttendanceLeaveComponent implements OnInit {
       flex: 1,
       cellRenderer: LeaveActionCellRendererComponent,
       cellRendererParams: {
+        onView: (data: any) => this.openLeaveDetail(data),
         onEdit: (data: any) => this.editLeaveRequest(data),
         onCancel: (data: any) => this.cancelLeaveRequest(data.id),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
@@ -487,12 +488,13 @@ export class AttendanceLeaveComponent implements OnInit {
     },
     {
       headerName: 'Actions',
-      width: 110,
+      width: 150,
       pinned: 'right',
       sortable: false,
       filter: false,
       cellRenderer: LeaveActionCellRendererComponent,
       cellRendererParams: {
+        onView: (data: any) => this.openLeaveDetail(data),
         onApprove: (data: any) => this.approveLeaveRequest(data.id),
         onReject: (data: any) => this.openRejectModal(data.id),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
@@ -1073,6 +1075,35 @@ export class AttendanceLeaveComponent implements OnInit {
     }
   }
 
+  // ── Leave detail modal ──────────────────────────────────────────────────
+  isLeaveDetailOpen = signal(false);
+  selectedLeave = signal<any>(null);
+
+  openLeaveDetail(data: any) {
+    this.selectedLeave.set(data);
+    this.isLeaveDetailOpen.set(true);
+  }
+
+  closeLeaveDetail() {
+    this.isLeaveDetailOpen.set(false);
+    this.selectedLeave.set(null);
+  }
+
+  /** Whole days between start and end, or 0.5 when the leave is a half day. */
+  leaveDuration(leave: any): number {
+    if (!leave?.startDate || !leave?.endDate) return 0;
+    if (leave.isHalfDay) return 0.5;
+    const s = new Date(leave.startDate);
+    const e = new Date(leave.endDate);
+    return Math.ceil(Math.abs(e.getTime() - s.getTime()) / 86400000) + 1;
+  }
+
+  leaveEmployeeName(leave: any): string {
+    const emp = leave?.employee;
+    if (!emp) return 'You';
+    return emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+  }
+
   openRejectionReasonModal(reason: string) {
     this.currentRejectionReason.set(reason);
     this.isRejectionReasonModalOpen.set(true);
@@ -1183,6 +1214,9 @@ export class AttendanceLeaveComponent implements OnInit {
   gridOptions: GridOptions = {
     theme: 'legacy' as const
   };
+
+  // Leave lists run to hundreds of rows once historic leave is imported.
+  leavePageSizes = [10, 25, 50, 100];
 
   // Grid / UI State
   viewMode = signal<'grid' | 'list'>('grid');

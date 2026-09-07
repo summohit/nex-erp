@@ -153,16 +153,22 @@
 /* Header card */
 .page-header-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 14px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 18px 22px;
   margin-bottom: 20px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.header-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .header-title-group {
@@ -174,7 +180,8 @@
 .header-title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .header-title-group h1 {
@@ -188,11 +195,23 @@
 .candidates-count-pill {
   display: inline-flex;
   align-items: center;
-  padding: 2px 9px;
+  padding: 3px 10px;
   border-radius: 999px;
   background: #f1f5f9;
   color: #475569;
   font-size: 12px;
+  font-weight: 600;
+}
+
+.filtered-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #ea580c;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
@@ -202,76 +221,11 @@
   color: #64748b;
 }
 
-.header-actions {
+.header-top-actions {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 9px;
-  padding: 4px 6px 4px 10px;
-  position: relative;
-}
-
-.filter-icon-prefix {
-  color: #94a3b8;
-}
-
-.filter-group label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #64748b;
-  white-space: nowrap;
-}
-
-.btn-clear-select {
-  background: none;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  border-radius: 4px;
-}
-
-.btn-clear-select:hover {
-  color: #0f172a;
-  background: #e2e8f0;
-}
-
-.form-select {
-  padding: 6px 28px 6px 8px;
-  border-radius: 7px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
-  background-size: 14px;
-  appearance: none;
-  -webkit-appearance: none;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #0f172a;
-  min-width: 180px;
-  max-width: 280px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.form-select:hover {
-  border-color: #94a3b8;
-}
-
-.form-select:focus {
-  outline: none;
-  border-color: #ff5500;
-  box-shadow: 0 0 0 3px rgba(255, 85, 0, 0.12);
 }
 
 .btn-secondary {
@@ -329,7 +283,7 @@
 }
 
 .toggle-btn {
-  padding: 6px 10px;
+  padding: 6px 12px;
   background: transparent;
   border: none;
   border-radius: 6px;
@@ -337,7 +291,9 @@
   color: #64748b;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
   transition: all 0.15s ease;
 }
 
@@ -350,6 +306,303 @@
   background: #ffffff;
   color: #ff5500;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* Filter Toolbar Divider */
+.filter-toolbar-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 2px 0;
+}
+
+/* Dedicated ATS Filter Toolbar */
+.ats-filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-item-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 36px;
+  min-width: 250px;
+  max-width: 320px;
+  flex: 1;
+  transition: all 0.15s ease;
+}
+
+.filter-item-search:focus-within {
+  background: #ffffff;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+
+.search-icon-prefix {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.filter-search-input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-size: 12.5px;
+  color: #0f172a;
+  outline: none;
+}
+
+.filter-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.btn-clear-search {
+  background: none;
+  border: none;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.btn-clear-search:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.filter-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Filter Pills */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0 8px 0 10px;
+  height: 36px;
+  font-size: 12.5px;
+  color: #475569;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.filter-pill:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.filter-pill.filter-active {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: #c2410c;
+  font-weight: 600;
+}
+
+.filter-pill-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.filter-pill.filter-active .filter-pill-icon {
+  color: #ea580c;
+}
+
+.filter-pill-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Searchable Select Filter Pills */
+.filter-searchable-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 140px;
+  flex: 1 1 auto;
+}
+
+.filter-searchable-pill app-searchable-select {
+  display: block;
+  width: 100%;
+}
+
+.filter-searchable-pill ::ng-deep .select-trigger {
+  height: 36px;
+  padding: 0 10px 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #0f172a;
+  background: #ffffff;
+  transition: all 0.15s ease;
+}
+
+.filter-searchable-pill ::ng-deep .select-trigger:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.filter-searchable-pill.filter-active ::ng-deep .select-trigger {
+  border-color: #fdba74 !important;
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  font-weight: 600 !important;
+}
+
+.filter-searchable-pill.filter-active ::ng-deep .select-trigger-content svg {
+  color: #ea580c !important;
+}
+
+.filter-searchable-pill ::ng-deep .select-dropdown {
+  z-index: 1000;
+  box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.16), 0 4px 12px -2px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.filter-pill.filter-active .filter-pill-label {
+  color: #ea580c;
+}
+
+.filter-pill-select {
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #0f172a;
+  outline: none;
+  cursor: pointer;
+  padding: 0 4px;
+  max-width: 220px;
+  font-family: inherit;
+}
+
+.filter-pill.filter-active .filter-pill-select {
+  color: #c2410c;
+  font-weight: 600;
+}
+
+.filter-pill-clear {
+  background: rgba(15, 23, 42, 0.06);
+  border: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-left: 2px;
+  transition: all 0.15s;
+}
+
+.filter-pill.filter-active .filter-pill-clear {
+  background: rgba(234, 88, 12, 0.15);
+  color: #ea580c;
+}
+
+.filter-pill-clear:hover {
+  background: rgba(15, 23, 42, 0.15);
+  color: #0f172a;
+}
+
+/* CTC Range Pill */
+.filter-ctc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0 8px 0 10px;
+  height: 36px;
+  font-size: 12.5px;
+  transition: all 0.15s ease;
+}
+
+.filter-ctc-pill:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.filter-ctc-pill.filter-active {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.ctc-input {
+  width: 48px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: #0f172a;
+  outline: none;
+  text-align: center;
+  font-weight: 500;
+}
+
+.ctc-input:focus {
+  border-bottom: 2px solid #ea580c;
+}
+
+.ctc-sep {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.ctc-unit {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.filter-ctc-pill.filter-active .ctc-unit {
+  color: #ea580c;
+}
+
+.btn-clear-all-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-clear-all-filters:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  transform: translateY(-1px);
 }
 
 /* KPI Widgets */
@@ -958,10 +1211,603 @@
 
 .table-container {
   flex: 1;
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid var(--border-color, #e2e8f0);
+  min-height: 560px;
+  height: calc(100vh - 275px);
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   Custom AG-Grid Quartz Styling & Status Row Coloring
+   ============================================================ */
+::ng-deep .custom-ats-grid.ag-theme-quartz {
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 !important;
+  --ag-header-background-color: #f8fafc;
+  --ag-header-foreground-color: #475569;
+  --ag-header-cell-hover-background-color: #f1f5f9;
+  --ag-border-color: #e2e8f0;
+  --ag-row-border-color: #f1f5f9;
+  --ag-row-hover-color: transparent;
+  --ag-selected-row-background-color: #eff6ff;
+  --ag-font-family: inherit;
+  --ag-font-size: 13px;
+  --ag-card-radius: 12px;
+  --ag-focus-shadow: none;
+  font-family: inherit;
+  border-radius: 12px;
+  border: none;
+  box-shadow: none;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+/* Custom sleek scrollbars for AG Grid */
+::ng-deep .custom-ats-grid ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::ng-deep .custom-ats-grid ::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+::ng-deep .custom-ats-grid ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::ng-deep .custom-ats-grid ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Pinned column separators */
+::ng-deep .custom-ats-grid .ag-pinned-left-header,
+::ng-deep .custom-ats-grid .ag-pinned-left-cols-container {
+  border-right: 1.5px solid #e2e8f0 !important;
+  box-shadow: 2px 0 6px -2px rgba(15, 23, 42, 0.06);
+}
+
+::ng-deep .custom-ats-grid .ag-pinned-right-header,
+::ng-deep .custom-ats-grid .ag-pinned-right-cols-container {
+  border-left: 1.5px solid #e2e8f0 !important;
+  box-shadow: -2px 0 6px -2px rgba(15, 23, 42, 0.06);
+}
+
+/* Remove default blue focus outline on cells and header */
+::ng-deep .custom-ats-grid .ag-cell-focus,
+::ng-deep .custom-ats-grid .ag-header-cell-focus {
+  border-color: transparent !important;
+  outline: none !important;
+}
+
+::ng-deep .custom-ats-grid .ag-header-cell-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+::ng-deep .custom-ats-grid .ag-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+::ng-deep .custom-ats-grid .ag-cell {
+  display: flex !important;
+  align-items: center !important;
+  background-color: transparent !important;
+  line-height: normal !important;
+}
+
+::ng-deep .custom-ats-grid .ag-cell-wrapper,
+::ng-deep .custom-ats-grid .ag-cell-value {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  width: 100% !important;
+  line-height: normal !important;
+}
+
+/* ────────────────────────────────────────────────────────────
+   Status-Based Row Background Colors & Left Accent Indicators
+   ──────────────────────────────────────────────────────────── */
+
+/* 1. Rejected: subtle rose/red */
+::ng-deep .custom-ats-grid .ag-row.ats-row-rejected,
+::ng-deep .custom-ats-grid .ag-row.ats-row-rejected .ag-cell {
+  background-color: #fff8f8 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-rejected:hover,
+::ng-deep .custom-ats-grid .ag-row.ats-row-rejected:hover .ag-cell {
+  background-color: #fee2e2 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-rejected .ag-pinned-left-cols-container .ag-cell:first-child,
+::ng-deep .custom-ats-grid .ag-row.ats-row-rejected > .ag-cell:first-child {
+  border-left: 4px solid #ef4444 !important;
+}
+
+/* 2. Hired / Onboarded: subtle emerald/green */
+::ng-deep .custom-ats-grid .ag-row.ats-row-hired,
+::ng-deep .custom-ats-grid .ag-row.ats-row-hired .ag-cell {
+  background-color: #f0fdf4 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-hired:hover,
+::ng-deep .custom-ats-grid .ag-row.ats-row-hired:hover .ag-cell {
+  background-color: #dcfce7 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-hired .ag-pinned-left-cols-container .ag-cell:first-child,
+::ng-deep .custom-ats-grid .ag-row.ats-row-hired > .ag-cell:first-child {
+  border-left: 4px solid #10b981 !important;
+}
+
+/* 3. Offered: subtle mint/emerald-teal */
+::ng-deep .custom-ats-grid .ag-row.ats-row-offered,
+::ng-deep .custom-ats-grid .ag-row.ats-row-offered .ag-cell {
+  background-color: #ecfdf5 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-offered:hover,
+::ng-deep .custom-ats-grid .ag-row.ats-row-offered:hover .ag-cell {
+  background-color: #d1fae5 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-offered .ag-pinned-left-cols-container .ag-cell:first-child,
+::ng-deep .custom-ats-grid .ag-row.ats-row-offered > .ag-cell:first-child {
+  border-left: 4px solid #059669 !important;
+}
+
+/* 4. Interview: subtle warm amber */
+::ng-deep .custom-ats-grid .ag-row.ats-row-interview,
+::ng-deep .custom-ats-grid .ag-row.ats-row-interview .ag-cell {
+  background-color: #fffdf5 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-interview:hover,
+::ng-deep .custom-ats-grid .ag-row.ats-row-interview:hover .ag-cell {
+  background-color: #fef3c7 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-interview .ag-pinned-left-cols-container .ag-cell:first-child,
+::ng-deep .custom-ats-grid .ag-row.ats-row-interview > .ag-cell:first-child {
+  border-left: 4px solid #f59e0b !important;
+}
+
+/* 5. Negotiation: subtle warm orange */
+::ng-deep .custom-ats-grid .ag-row.ats-row-negotiation,
+::ng-deep .custom-ats-grid .ag-row.ats-row-negotiation .ag-cell {
+  background-color: #fff9f5 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-negotiation:hover,
+::ng-deep .custom-ats-grid .ag-row.ats-row-negotiation:hover .ag-cell {
+  background-color: #ffedd5 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-negotiation .ag-pinned-left-cols-container .ag-cell:first-child,
+::ng-deep .custom-ats-grid .ag-row.ats-row-negotiation > .ag-cell:first-child {
+  border-left: 4px solid #f97316 !important;
+}
+
+/* 6. Phone Screening / Shortlisted: subtle soft purple */
+::ng-deep .custom-ats-grid .ag-row.ats-row-screening,
+::ng-deep .custom-ats-grid .ag-row.ats-row-screening .ag-cell {
+  background-color: #faf5ff !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-screening:hover,
+::ng-deep .custom-ats-grid .ag-row.ats-row-screening:hover .ag-cell {
+  background-color: #f3e8ff !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-screening .ag-pinned-left-cols-container .ag-cell:first-child,
+::ng-deep .custom-ats-grid .ag-row.ats-row-screening > .ag-cell:first-child {
+  border-left: 4px solid #8b5cf6 !important;
+}
+
+/* 7. On Hold: subtle slate */
+::ng-deep .custom-ats-grid .ag-row.ats-row-on-hold,
+::ng-deep .custom-ats-grid .ag-row.ats-row-on-hold .ag-cell {
+  background-color: #f8fafc !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-on-hold:hover,
+::ng-deep .custom-ats-grid .ag-row.ats-row-on-hold:hover .ag-cell {
+  background-color: #f1f5f9 !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-on-hold .ag-pinned-left-cols-container .ag-cell:first-child,
+::ng-deep .custom-ats-grid .ag-row.ats-row-on-hold > .ag-cell:first-child {
+  border-left: 4px solid #94a3b8 !important;
+}
+
+/* 8. Applied: clean crisp white */
+::ng-deep .custom-ats-grid .ag-row.ats-row-applied,
+::ng-deep .custom-ats-grid .ag-row.ats-row-applied .ag-cell {
+  background-color: #ffffff !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-applied:hover,
+::ng-deep .custom-ats-grid .ag-row.ats-row-applied:hover .ag-cell {
+  background-color: #f8fafc !important;
+}
+::ng-deep .custom-ats-grid .ag-row.ats-row-applied .ag-pinned-left-cols-container .ag-cell:first-child,
+::ng-deep .custom-ats-grid .ag-row.ats-row-applied > .ag-cell:first-child {
+  border-left: 4px solid #3b82f6 !important;
+}
+
+/* ────────────────────────────────────────────────────────────
+   Table Cell Components
+   ──────────────────────────────────────────────────────────── */
+
+/* Candidate Cell */
+::ng-deep .tbl-cand-cell {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  line-height: 1.3 !important;
+}
+
+::ng-deep .tbl-cand-avatar {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+  letter-spacing: 0.5px !important;
+  line-height: 1 !important;
+}
+
+::ng-deep .tbl-cand-meta {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  line-height: 1.25 !important;
+}
+
+::ng-deep .tbl-cand-name-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  line-height: 1.25 !important;
+}
+
+::ng-deep .tbl-cand-name {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.25 !important;
+}
+
+::ng-deep .tbl-cand-email {
+  font-size: 11.5px !important;
+  color: #64748b !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.2 !important;
+}
+
+::ng-deep .tbl-cand-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+::ng-deep .tbl-cand-ai.score-high {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+::ng-deep .tbl-cand-ai.score-medium {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+::ng-deep .tbl-cand-ai.score-low {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* Phone */
+::ng-deep .tbl-phone {
+  font-size: 12.5px;
+  color: #334155;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+}
+
+/* Position Title */
+::ng-deep .tbl-position-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+::ng-deep .tbl-pos-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+::ng-deep .tbl-position-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Department Badge */
+::ng-deep .tbl-dept-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 22px !important;
+  max-height: 22px !important;
+  line-height: 1 !important;
+  padding: 0 8px !important;
+  border-radius: 6px !important;
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  border: 1px solid #e2e8f0 !important;
+  align-self: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* CTC Cells */
+::ng-deep .tbl-ctc-text {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  font-variant-numeric: tabular-nums !important;
+  align-self: center !important;
+}
+
+::ng-deep .tbl-ctc-text.highlight {
+  color: #ea580c !important;
+  font-weight: 700 !important;
+}
+
+/* Notice Period Pills - Sleek Compact Tag */
+::ng-deep .tbl-notice-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  height: 22px !important;
+  max-height: 22px !important;
+  line-height: 1 !important;
+  padding: 0 9px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  align-self: center !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+::ng-deep .tbl-notice-pill .notice-dot {
+  width: 5px !important;
+  height: 5px !important;
+  min-width: 5px !important;
+  min-height: 5px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  display: inline-block !important;
+}
+
+::ng-deep .tbl-notice-pill.tone-emerald {
+  background: #ecfdf5 !important;
+  color: #059669 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+::ng-deep .tbl-notice-pill.tone-emerald .notice-dot { background: #10b981 !important; }
+
+::ng-deep .tbl-notice-pill.tone-amber {
+  background: #fffbeb !important;
+  color: #d97706 !important;
+  border: 1px solid #fde68a !important;
+}
+::ng-deep .tbl-notice-pill.tone-amber .notice-dot { background: #f59e0b !important; }
+
+::ng-deep .tbl-notice-pill.tone-slate {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  border: 1px solid #e2e8f0 !important;
+}
+::ng-deep .tbl-notice-pill.tone-slate .notice-dot { background: #94a3b8 !important; }
+
+/* Location */
+::ng-deep .tbl-location {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 12px !important;
+  color: #475569 !important;
+  align-self: center !important;
+}
+
+::ng-deep .tbl-location svg {
+  color: #94a3b8 !important;
+  flex-shrink: 0 !important;
+}
+
+/* Status Badges with Status Dots - Sleek Compact Tag */
+::ng-deep .tbl-status-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  height: 22px !important;
+  max-height: 22px !important;
+  line-height: 1 !important;
+  padding: 0 9px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  align-self: center !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+::ng-deep .status-dot {
+  width: 5px !important;
+  height: 5px !important;
+  min-width: 5px !important;
+  min-height: 5px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  display: inline-block !important;
+}
+
+::ng-deep .status-text {
+  line-height: 1 !important;
+  display: inline-block !important;
+}
+
+::ng-deep .tbl-status-pill.status-blue {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+}
+::ng-deep .tbl-status-pill.status-blue .status-dot { background: #2563eb !important; }
+
+::ng-deep .tbl-status-pill.status-purple {
+  background: #f5f3ff !important;
+  color: #6d28d9 !important;
+  border: 1px solid #ddd6fe !important;
+}
+::ng-deep .tbl-status-pill.status-purple .status-dot { background: #8b5cf6 !important; }
+
+::ng-deep .tbl-status-pill.status-amber {
+  background: #fffbeb !important;
+  color: #b45309 !important;
+  border: 1px solid #fde68a !important;
+}
+::ng-deep .tbl-status-pill.status-amber .status-dot { background: #d97706 !important; }
+
+::ng-deep .tbl-status-pill.status-orange {
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid #fed7aa !important;
+}
+::ng-deep .tbl-status-pill.status-orange .status-dot { background: #ea580c !important; }
+
+::ng-deep .tbl-status-pill.status-emerald {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+::ng-deep .tbl-status-pill.status-emerald .status-dot { background: #059669 !important; }
+
+::ng-deep .tbl-status-pill.status-green {
+  background: #f0fdf4 !important;
+  color: #15803d !important;
+  border: 1px solid #bbf7d0 !important;
+}
+::ng-deep .tbl-status-pill.status-green .status-dot { background: #16a34a !important; }
+
+::ng-deep .tbl-status-pill.status-teal {
+  background: #f0fdfa !important;
+  color: #0f766e !important;
+  border: 1px solid #99f6e4 !important;
+}
+::ng-deep .tbl-status-pill.status-teal .status-dot { background: #0d9488 !important; }
+
+::ng-deep .tbl-status-pill.status-red {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+  border: 1px solid #fecaca !important;
+}
+::ng-deep .tbl-status-pill.status-red .status-dot { background: #dc2626 !important; }
+
+::ng-deep .tbl-status-pill.status-slate {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+::ng-deep .tbl-status-pill.status-slate .status-dot { background: #64748b !important; }
+
+/* Date & Empty Fallback */
+::ng-deep .tbl-date {
+  font-size: 12px !important;
+  color: #64748b !important;
+  align-self: center !important;
+}
+
+::ng-deep .tbl-empty {
+  color: #cbd5e1 !important;
+  font-weight: 500 !important;
+  align-self: center !important;
+}
+
+/* Action Button */
+::ng-deep .btn-tbl-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 26px !important;
+  padding: 0 12px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s ease !important;
+  align-self: center !important;
+}
+
+::ng-deep .btn-tbl-action:hover {
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #2563eb !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.15) !important;
+}
+
+/* Custom AG Grid Pagination */
+::ng-deep .custom-ats-grid .ag-paging-panel {
+  border-top: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+  padding: 10px 16px !important;
+  font-size: 12px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+}
+
+::ng-deep .custom-ats-grid .ag-paging-button {
+  cursor: pointer !important;
+  opacity: 0.8 !important;
+  transition: opacity 0.15s !important;
+}
+
+::ng-deep .custom-ats-grid .ag-paging-button:hover {
+  opacity: 1 !important;
 }
 
 /* AI Insights Container Design */

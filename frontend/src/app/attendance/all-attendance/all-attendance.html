@@ -155,7 +155,12 @@
         <!-- 3. Employee Dropdown (Searchable) -->
         <div class="searchable-filter-dropdown">
           <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterEmployeeId" (click)="showEmployeeDropdown = !showEmployeeDropdown; showMonthDropdown=false; showYearDropdown=false; showDeptDropdown=false; showStatusDropdown=false; showFlagDropdown=false">
-            <svg lucideUser [size]="14" class="trigger-prefix-icon"></svg>
+            <img *ngIf="getSelectedEmployee()?.avatarUrl || getSelectedEmployee()?.user?.avatarUrl" 
+                 [src]="getSelectedEmployee()?.avatarUrl || getSelectedEmployee()?.user?.avatarUrl" 
+                 class="trigger-avatar-img" 
+                 [alt]="getSelectedEmployeeLabel()" 
+                 (error)="onAvatarError(getSelectedEmployee())" />
+            <svg *ngIf="!getSelectedEmployee()?.avatarUrl && !getSelectedEmployee()?.user?.avatarUrl" lucideUser [size]="14" class="trigger-prefix-icon"></svg>
             <span class="trigger-text">{{ getSelectedEmployeeLabel() }}</span>
             <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showEmployeeDropdown"></svg>
           </button>
@@ -172,10 +177,17 @@
               </div>
               <div class="popover-option-item" *ngFor="let emp of getFilteredEmployees(employeeSearchQuery)" (click)="selectEmployee(emp.id)" [class.selected]="filterEmployeeId === emp.id">
                 <div class="popover-user-cell">
-                  <div class="avatar-circle-sm">{{ (emp.firstName || '?')[0] }}{{ (emp.lastName || '')[0] }}</div>
+                  <img *ngIf="emp.avatarUrl || emp.user?.avatarUrl" 
+                       [src]="emp.avatarUrl || emp.user?.avatarUrl" 
+                       class="avatar-img-sm" 
+                       [alt]="emp.firstName + ' ' + (emp.lastName || '')" 
+                       (error)="onAvatarError(emp)" />
+                  <div class="avatar-circle-sm" *ngIf="!emp.avatarUrl && !emp.user?.avatarUrl">
+                    {{ (emp.firstName || '?')[0] }}{{ (emp.lastName || '')[0] }}
+                  </div>
                   <div class="popover-user-info">
                     <span class="option-primary">{{ emp.firstName }} {{ emp.lastName }}</span>
-                    <span class="option-sub" *ngIf="emp.department?.name">{{ emp.department?.name }}</span>
+                    <span class="option-sub" *ngIf="emp.department?.name || emp.designation?.name">{{ emp.department?.name || emp.designation?.name }}</span>
                   </div>
                 </div>
                 <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterEmployeeId === emp.id"></svg>
@@ -563,8 +575,9 @@
         </div>
         <img *ngIf="selectedDayDetails()?.employeeAvatarUrl" [src]="selectedDayDetails()?.employeeAvatarUrl" [alt]="selectedDayDetails()?.employeeName" class="avatar-img-md" />
         <div class="session-header-text">
-          <h3 class="session-emp-name">{{ selectedDayDetails()?.employeeEmail }}</h3>
-          <span class="session-emp-role">{{ selectedDayDetails()?.employeeRole }}</span>
+          <h3 class="session-emp-name">{{ selectedDayDetails()?.employeeName }}</h3>
+          <span class="session-emp-role">{{ selectedDayDetails()?.employeeEmail }}</span>
+          <span class="session-emp-role">{{ selectedDayDetails()?.employeeDept }} · {{ selectedDayDetails()?.employeeRole }}</span>
         </div>
       </div>
       <button type="button" class="btn-modal-close" (click)="closeDayDetailsModal()" title="Close details">
@@ -626,7 +639,7 @@
                   CLOCK OUT
                 </div>
                 <div class="session-time-val">
-                  {{ punch.clockOut ? (punch.clockOut | date:'shortTime') : 'Ongoing...' }}
+                  {{ punch.clockOut ? (punch.clockOut | date:'shortTime') : (selectedDayDetails()?.isToday ? 'Ongoing...' : 'Did not clock out') }}
                 </div>
                 <div *ngIf="punch.clockOutLat" class="session-geo-meta">
                   <span class="geo-coords">Lat: {{ punch.clockOutLat | number:'1.4-4' }}<br>Lng: {{ punch.clockOutLng | number:'1.4-4' }}</span>

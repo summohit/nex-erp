@@ -73,7 +73,20 @@ export class HiringReportsComponent implements OnInit {
   selectedStageFilter = signal('ALL');
   sortBy = signal<'TOTAL_DESC' | 'TOTAL_ASC' | 'HIRED_DESC' | 'REJECTED_DESC' | 'TITLE_ASC'>('TOTAL_DESC');
 
-  statusKeys = ['NEW', 'REVIEWING', 'SHORTLISTED', 'INTERVIEWING', 'OFFERED', 'HIRED', 'ONBOARDED', 'REJECTED'];
+  statusKeys = ['APPLIED', 'PHONE_SCREENING', 'INTERVIEW', 'NEGOTIATION', 'OFFERED', 'HIRED', 'ONBOARDED', 'ON_HOLD', 'REJECTED'];
+
+  /** Stage key -> column header / pill class, in pipeline order. */
+  stageCols = [
+    { key: 'APPLIED', label: 'Applied', cls: 'new' },
+    { key: 'PHONE_SCREENING', label: 'Phone Screening', cls: 'reviewing' },
+    { key: 'INTERVIEW', label: 'Interview', cls: 'interviewing' },
+    { key: 'NEGOTIATION', label: 'Negotiation', cls: 'shortlisted' },
+    { key: 'OFFERED', label: 'Offered', cls: 'offered' },
+    { key: 'HIRED', label: 'Hired', cls: 'hired' },
+    { key: 'ONBOARDED', label: 'Onboarded', cls: 'onboarded' },
+    { key: 'ON_HOLD', label: 'On Hold', cls: 'default' },
+    { key: 'REJECTED', label: 'Rejected', cls: 'rejected' },
+  ];
 
   // Dynamic filter options extracted from real data
   departments = computed(() => {
@@ -169,7 +182,7 @@ export class HiringReportsComponent implements OnInit {
     } else if (stage === 'HAS_REJECTIONS') {
       list = list.filter(j => (j.pipeline['REJECTED'] || 0) > 0);
     } else if (stage === 'ALL_NEW') {
-      list = list.filter(j => (j.pipeline['NEW'] || 0) === j.total);
+      list = list.filter(j => (j.pipeline['APPLIED'] || 0) === j.total);
     }
 
     // 6. Sorting

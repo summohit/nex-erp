@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, HostListener, ElementRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideChevronDown, LucideSearch } from '@lucide/angular';
+import { LucideChevronDown, LucideSearch, LucideX } from '@lucide/angular';
 
 export interface SearchableSelectOption {
   id: any;
@@ -11,7 +11,7 @@ export interface SearchableSelectOption {
 @Component({
   selector: 'app-searchable-select',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideChevronDown, LucideSearch],
+  imports: [CommonModule, FormsModule, LucideChevronDown, LucideSearch, LucideX],
   templateUrl: './searchable-select.component.html',
   styleUrls: ['./searchable-select.component.css']
 })
@@ -21,6 +21,7 @@ export class SearchableSelectComponent {
   @Input() options: SearchableSelectOption[] = [];
   @Input() placeholder = 'All';
   @Input() value: any = null;
+  @Input() clearable = false;
   @Output() valueChange = new EventEmitter<any>();
 
   isOpen = false;
@@ -32,7 +33,7 @@ export class SearchableSelectComponent {
   }
 
   get isPlaceholder(): boolean {
-    return this.value === null || this.value === undefined;
+    return this.value === null || this.value === undefined || this.value === '';
   }
 
   get filteredOptions(): SearchableSelectOption[] {
@@ -50,6 +51,12 @@ export class SearchableSelectComponent {
     this.value = opt ? opt.id : null;
     this.valueChange.emit(this.value);
     this.isOpen = false;
+  }
+
+  clear(event: MouseEvent) {
+    event.stopPropagation();
+    this.value = null;
+    this.valueChange.emit(null);
   }
 
   @HostListener('document:click', ['$event'])

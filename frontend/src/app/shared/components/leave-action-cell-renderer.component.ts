@@ -1,11 +1,12 @@
 import { Component } from '@angular/core';
 import { ICellRendererAngularComp } from 'ag-grid-angular';
 import { ICellRendererParams } from 'ag-grid-community';
-import { LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo } from '@lucide/angular';
+import { LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, LucideEye } from '@lucide/angular';
 import { CommonModule } from '@angular/common';
 import { MatMenuModule } from '@angular/material/menu';
 
 export interface LeaveActionCellParams extends ICellRendererParams {
+  onView?: (data: any) => void;
   onEdit?: (data: any) => void;
   onCancel?: (data: any) => void;
   onApprove?: (data: any) => void;
@@ -17,9 +18,14 @@ export interface LeaveActionCellParams extends ICellRendererParams {
 @Component({
   selector: 'app-leave-action-cell-renderer',
   standalone: true,
-  imports: [CommonModule, LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, MatMenuModule],
+  imports: [CommonModule, LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, LucideEye, MatMenuModule],
   template: `
     <div class="action-container" (click)="$event.stopPropagation()">
+      <button class="btn-view" (click)="view()" *ngIf="params.onView" title="View full details">
+        <svg lucideEye size="14"></svg>
+        <span>View</span>
+      </button>
+
       <button class="btn-icon" [matMenuTriggerFor]="menu" *ngIf="hasMenuItems()">
         <svg lucideMoreHorizontal size="16"></svg>
       </button>
@@ -57,7 +63,27 @@ export interface LeaveActionCellParams extends ICellRendererParams {
       display: flex;
       justify-content: flex-end;
       align-items: center;
+      gap: 4px;
       height: 100%;
+    }
+    .btn-view {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #2563EB;
+      background: rgba(37, 99, 235, 0.08);
+      border: 1px solid rgba(37, 99, 235, 0.2);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-view:hover {
+      background: rgba(37, 99, 235, 0.16);
+      border-color: rgba(37, 99, 235, 0.4);
     }
     .btn-icon {
       background: none;
@@ -112,6 +138,12 @@ export class LeaveActionCellRendererComponent implements ICellRendererAngularCom
   refresh(params: LeaveActionCellParams): boolean {
     this.params = params;
     return true;
+  }
+
+  view() {
+    if (this.params.onView) {
+      this.params.onView(this.params.data);
+    }
   }
 
   edit() {
