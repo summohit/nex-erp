@@ -566,3 +566,15 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   .lf-header-actions .btn-outline-pill span,
   .lf-header-actions .btn-primary-pill span { display: none; }
 }
+.publish-share-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.publish-share-actions .btn-copy {
+  width: auto;
+  padding: 6px 9px;
+  gap: 5px;
+}

@@ -157,11 +157,29 @@ export class CrmController {
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
+    @Body('purpose') purpose?: string,
   ) {
     const uploaded = await this.processImageKitUpload(file);
     return this.crmService.addLeadFile(req.user.companyId, id, {
       ...file,
       ...uploaded,
+      purpose,
+    }, req.user.employeeId);
+  }
+
+  @Post('leads/:id/follow-ups/:followUpId/files')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DEAL_FILE_SIZE } }))
+  async uploadFollowUpFile(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('followUpId', ParseIntPipe) followUpId: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const uploaded = await this.processImageKitUpload(file);
+    return this.crmService.addLeadFile(req.user.companyId, id, {
+      ...file,
+      ...uploaded,
+      followUpId,
     }, req.user.employeeId);
   }
 

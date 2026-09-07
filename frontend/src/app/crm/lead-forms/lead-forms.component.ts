@@ -10,7 +10,7 @@ import {
   LucidePlus, LucideChevronLeft, LucideEdit2, LucideCopy, LucideCopyPlus,
   LucideLink2, LucideTrash2, LucideGripVertical, LucideSave, LucideRotateCcw,
   LucideExternalLink, LucideFileText,
-  LucideEye, LucideEyeOff, LucideSearch
+  LucideEye, LucideEyeOff, LucideSearch, LucideMail, LucideMessageCircle
 } from '@lucide/angular';
 
 interface BuilderField {
@@ -52,7 +52,7 @@ const BASE_OPTIONS: Record<string, string[]> = {
     LucidePlus, LucideChevronLeft, LucideEdit2, LucideCopy, LucideCopyPlus,
     LucideLink2, LucideTrash2, LucideGripVertical, LucideSave, LucideRotateCcw,
     LucideExternalLink, LucideFileText,
-    LucideEye, LucideEyeOff, LucideSearch
+    LucideEye, LucideEyeOff, LucideSearch, LucideMail, LucideMessageCircle
   ],
   templateUrl: './lead-forms.html',
   styleUrls: ['./lead-forms.css']
@@ -196,6 +196,16 @@ export class LeadFormsComponent implements OnInit {
       () => this.toast.success(message),
       () => this.toast.error('Failed to copy.')
     );
+  }
+
+  shareText(form: { name?: string; formKey?: string }): string {
+    const url = form.formKey ? `${this.siteUrl}/lead-form/${form.formKey}` : this.publicUrl;
+    const name = form.name || this.formName || 'our lead form';
+    return `Hello,\n\nPlease complete ${name}:\n${url}\n\nThank you.`;
+  }
+
+  copyShareText(channel: 'email' | 'whatsapp', form: { name?: string; formKey?: string }) {
+    this.copyText(this.shareText(form), `${channel === 'email' ? 'Email' : 'WhatsApp'} message copied. Paste it into ${channel === 'email' ? 'an email' : 'WhatsApp'}.`);
   }
 
   // ───────────── BUILDER ─────────────

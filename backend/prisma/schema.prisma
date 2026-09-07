@@ -2163,16 +2163,21 @@ model LeadFollowUp {
   company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  files         LeadFile[]
 }
 
 model LeadFile {
   id           Int       @id @default(autoincrement())
   leadId       Int
   lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Optional because a file can belong to the whole deal, or to one follow-up.
+  followUpId   Int?
+  followUp     LeadFollowUp? @relation(fields: [followUpId], references: [id], onDelete: Cascade)
   fileName     String
   fileUrl      String
   fileType     String?
   fileSize     Int?
+  purpose      String?   // PURCHASE_ORDER for the document required to win a deal
   uploadedById Int?
   uploadedBy   Employee? @relation("LeadFileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
   companyId    Int

@@ -38,6 +38,9 @@ export class CrmService {
 
   private sanitizeLead(data: any) {
     const out = { ...data };
+    if (typeof out.leadCode === 'string') {
+      out.leadCode = out.leadCode.trim() || undefined;
+    }
     if (out.proposalDate === '' || out.proposalDate === null) delete out.proposalDate;
     else if (out.proposalDate) out.proposalDate = new Date(out.proposalDate);
     
@@ -49,7 +52,7 @@ export class CrmService {
   }
 
   /**
-   * Builds the next human-readable reference, e.g. L0926-001 / LC0926-001:
+   * Builds the next human-readable reference, e.g. L0926-001 / LC-0926-001:
    * prefix + MMYY + a sequence that restarts each month.
    *
    * The sequence comes from the highest existing code for this month rather than
@@ -62,7 +65,7 @@ export class CrmService {
     kind: 'LEAD' | 'CONTACT',
     companyId: number,
   ): Promise<string> {
-    const prefix = kind === 'LEAD' ? 'L' : 'LC';
+    const prefix = kind === 'LEAD' ? 'L' : 'LC-';
     const now = new Date();
     const mmyy = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getFullYear()).slice(-2)}`;
     const stem = `${prefix}${mmyy}-`;
@@ -111,8 +114,8 @@ export class CrmService {
 
   async createLead(companyId: number, data: any, creatorEmployeeId?: number | null) {
     const sanitized = this.sanitizeLead(data);
-    const lead = await this.withEntityCode('LEAD', companyId, (leadCode) =>
-      this.prisma.lead.create({
+    const requestedLeadCode = sanitized.leadCode;
+    const create = (leadCode: string) => this.prisma.lead.create({
       data: {
         ...sanitized,
         leadCode,
@@ -128,8 +131,19 @@ export class CrmService {
         },
         broughtByContact: true,
       },
-      }),
-    );
+    });
+
+    let lead: any;
+    try {
+      lead = requestedLeadCode
+        ? await create(requestedLeadCode)
+        : await this.withEntityCode('LEAD', companyId, create);
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new ConflictException(`Lead ID "${requestedLeadCode}" already exists. Please enter a different unique ID.`);
+      }
+      throw error;
+    }
 
     await this.logActivity(
       companyId,
@@ -234,6 +248,17 @@ export class CrmService {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
     if (!lead) throw new NotFoundException('Lead not found');
 
+    const isWinningStage = ['WIN', 'WON'].includes(String(status || '').trim().toUpperCase());
+    if (isWinningStage) {
+      const purchaseOrder = await this.prisma.leadFile.findFirst({
+        where: { leadId, companyId, purpose: 'PURCHASE_ORDER' },
+        select: { id: true },
+      });
+      if (!purchaseOrder) {
+        throw new BadRequestException('Upload the purchase order before moving this deal to Win and sending it to Finance.');
+      }
+    }
+
     const updatedLead = await this.prisma.lead.update({
       where: { id: leadId },
       data: { status },
@@ -254,7 +279,7 @@ export class CrmService {
     );
 
     // Automatically create a client if status changed to WON
-    if (status === 'WON' && !lead.clientId && lead.companyName) {
+    if (isWinningStage && !lead.clientId && lead.companyName) {
       const newClient = await this.prisma.client.create({
         data: {
           name: lead.companyName,
@@ -284,9 +309,25 @@ export class CrmService {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
     if (!lead) throw new NotFoundException('Lead not found');
 
+    const requestedStatus = data.status;
+    if (requestedStatus !== undefined && ['WIN', 'WON'].includes(String(requestedStatus).trim().toUpperCase())) {
+      const purchaseOrder = await this.prisma.leadFile.findFirst({
+        where: { leadId, companyId, purpose: 'PURCHASE_ORDER' },
+        select: { id: true },
+      });
+      if (!purchaseOrder) {
+        throw new BadRequestException('Upload the purchase order before moving this deal to Win and sending it to Finance.');
+      }
+    }
+
+    const sanitized = this.sanitizeLead(data);
+    // Lead references are immutable after creation, so all integrations keep a
+    // stable identifier even when the opportunity details change.
+    delete sanitized.leadCode;
+
     const updatedLead = await this.prisma.lead.update({
       where: { id: leadId },
-      data: this.sanitizeLead(data),
+      data: sanitized,
       include: {
         assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } },
         addedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } },
@@ -355,6 +396,14 @@ export class CrmService {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId } });
     if (!lead) throw new NotFoundException('Lead not found');
 
+    if (file.followUpId) {
+      const followUp = await this.prisma.leadFollowUp.findFirst({
+        where: { id: Number(file.followUpId), leadId, companyId },
+        select: { id: true },
+      });
+      if (!followUp) throw new NotFoundException('Follow-up not found');
+    }
+
     const leadFile = await this.prisma.leadFile.create({
       data: {
         leadId,
@@ -363,6 +412,8 @@ export class CrmService {
         fileUrl: file.url,
         fileType: file.mimetype || null,
         fileSize: file.size || null,
+        purpose: file.purpose === 'PURCHASE_ORDER' ? 'PURCHASE_ORDER' : null,
+        followUpId: file.followUpId ? Number(file.followUpId) : null,
         uploadedById: uploaderEmployeeId || null,
       },
       include: {
@@ -378,7 +429,7 @@ export class CrmService {
       'FILE_UPLOADED',
       `File "${leadFile.fileName}" uploaded`,
       uploaderEmployeeId,
-      { fileId: leadFile.id, fileName: leadFile.fileName },
+      { fileId: leadFile.id, fileName: leadFile.fileName, purpose: leadFile.purpose, followUpId: leadFile.followUpId },
     );
 
     return leadFile;
@@ -770,6 +821,7 @@ export class CrmService {
         assignedTo: {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
         },
+        files: { orderBy: { createdAt: 'desc' } },
       },
       orderBy: { scheduledAt: 'desc' },
     });
@@ -801,6 +853,7 @@ export class CrmService {
         assignedTo: {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
         },
+        files: { orderBy: { createdAt: 'desc' } },
       },
     });
 
@@ -842,6 +895,7 @@ export class CrmService {
         assignedTo: {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
         },
+        files: { orderBy: { createdAt: 'desc' } },
       },
     });
 

@@ -31,12 +31,6 @@
         <span>Lead Insights</span>
       </button>
 
-      <!-- View Follow-Ups Button -->
-      <button class="btn-header-secondary" (click)="goToFollowUps()" title="View Scheduled Follow-ups & Reminders">
-        <svg lucideCalendarClock size="15"></svg>
-        <span>View Follow-Ups</span>
-      </button>
-
       <!-- Lead Contact Button -->
       <button class="btn-header-secondary" (click)="openLeadContactModal()" title="Add / Manage External Lead Contact">
         <svg lucideUserCheck size="15"></svg>
@@ -94,6 +88,21 @@
           </button>
         </div>
 
+        <!-- Follow-up date is a quick, board-level filter rather than a buried pipeline filter. -->
+        <div class="custom-select-wrapper sort-select-wrapper">
+          <svg lucideCalendarRange size="14" class="select-prefix-icon"></svg>
+          <select [(ngModel)]="followUpDateFilter" (change)="setFollowUpDateFilter(followUpDateFilter)" title="Filter by follow-up date">
+            <option value="all">All Follow-Ups</option>
+            <option value="today">Follow-Ups Today</option>
+            <option value="thisWeek">This Week</option>
+            <option value="lastMonth">Last Month</option>
+            <option value="lastQuarter">Last Quarter</option>
+            <option value="lastYear">Last 1 Year</option>
+            <option value="custom">Custom Dates</option>
+          </select>
+          <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+        </div>
+
         <!-- SORT -->
         <div class="custom-select-wrapper sort-select-wrapper">
           <svg lucideArrowUpDown size="14" class="select-prefix-icon"></svg>
@@ -108,7 +117,7 @@
         </div>
 
         <!-- ADVANCED FILTERS TOGGLE BUTTON -->
-        <button class="btn-advanced-filters-toggle" [class.active]="showAdvancedFilters" (click)="showAdvancedFilters = !showAdvancedFilters">
+        <button class="btn-advanced-filters-toggle" [class.active]="showAdvancedFilters" (click)="showAdvancedFilters = !showAdvancedFilters; closeFilterDropdowns()">
           <svg lucideFilter size="14"></svg>
           <span>Filters</span>
           <span class="filter-count-badge" *ngIf="hasActiveFilters()">{{ getActiveFilterChips().length }}</span>
@@ -123,29 +132,46 @@
       </div>
     </div>
 
-    <!-- Advanced Filters Panel -->
-    <div class="advanced-filters-panel" *ngIf="showAdvancedFilters">
+    <div class="followup-custom-dates" *ngIf="followUpDateFilter === 'custom'" style="padding: 0 16px 12px;">
+      <span class="followup-date-label">Follow-up range</span>
+      <input type="date" [(ngModel)]="followUpStartDate" (change)="onFilterChange()" title="Start date" />
+      <span class="followup-date-sep">&ndash;</span>
+      <input type="date" [(ngModel)]="followUpEndDate" (change)="onFilterChange()" title="End date" />
+      <button type="button" class="followup-date-clear" (click)="clearFollowUpDateFilter()" title="Clear">
+        <svg lucideX size="13"></svg>
+      </button>
+    </div>
+
+    <!-- Advanced Filters Modal (slide-in from right) -->
+    <div class="filters-modal-backdrop" *ngIf="showAdvancedFilters" (click)="showAdvancedFilters = false; closeFilterDropdowns()"></div>
+    <div class="advanced-filters-panel" [class.open]="showAdvancedFilters">
       <div class="adv-filters-header">
         <div class="adv-filters-header-left">
           <svg lucideSlidersHorizontal size="14" class="text-orange"></svg>
-          <span class="adv-title">Filter Pipeline</span>
+          <span class="adv-title">Pipeline filters</span>
           <span class="adv-subtitle" *ngIf="hasActiveFilters()">({{ getActiveFilterChips().length }} active)</span>
         </div>
-        <button type="button" class="adv-clear-all-btn" *ngIf="hasActiveFilters()" (click)="clearFilters()">
-          <svg lucideRotateCcw size="12"></svg> Clear all filters
-        </button>
+        <div class="adv-filters-header-right">
+          <button type="button" class="adv-clear-all-btn" *ngIf="hasActiveFilters()" (click)="clearFilters()">
+            <svg lucideRotateCcw size="12"></svg> Clear all
+          </button>
+          <button type="button" class="adv-filters-close-btn" (click)="showAdvancedFilters = false; closeFilterDropdowns()" title="Close filters">
+            <svg lucideX size="16"></svg>
+          </button>
+        </div>
       </div>
 
+      <div class="adv-filters-grid-scroll">
       <div class="adv-filters-grid">
         <!-- 1. Stage (multi-select with search) -->
         <div class="adv-filter-item stage">
           <label><svg lucideLayers size="13"></svg> Stage</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedStages.length > 0" (click)="showStageDropdown = !showStageDropdown; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedStages.length > 0" (click)="openFilterDropdown($event,'stage',['rep','category','source','contact','added'])">
               <span class="trigger-text">{{ selectedStages.length === 0 ? 'All Stages' : (selectedStages.length + ' selected') }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showStageDropdown"></svg>
             </button>
-            <div class="filter-dropdown-popover" *ngIf="showStageDropdown">
+            <div class="filter-dropdown-popover" *ngIf="showStageDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
               <div class="popover-search-box">
                 <svg lucideSearch size="13" class="popover-search-icon"></svg>
                 <input type="text" placeholder="Search stages..." [(ngModel)]="stageSearchQuery" (click)="$event.stopPropagation()" />
@@ -165,7 +191,7 @@
                 </div>
               </div>
             </div>
-            <div class="dropdown-backdrop-transparent" *ngIf="showStageDropdown" (click)="showStageDropdown = false"></div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showStageDropdown" (click)="closeFilterDropdowns()"></div>
           </div>
         </div>
 
@@ -173,11 +199,11 @@
         <div class="adv-filter-item rep">
           <label><svg lucideUser size="13"></svg> Sales Representative</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedRepId !== 'ALL'" (click)="showRepDropdown = !showRepDropdown; showStageDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedRepId !== 'ALL'" (click)="openFilterDropdown($event,'rep',['stage','category','source','contact','added'])">
               <span class="trigger-text">{{ getSelectedRepLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showRepDropdown"></svg>
             </button>
-            <div class="filter-dropdown-popover" *ngIf="showRepDropdown">
+            <div class="filter-dropdown-popover" *ngIf="showRepDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
               <div class="popover-search-box">
                 <svg lucideSearch size="13" class="popover-search-icon"></svg>
                 <input type="text" placeholder="Search sales reps..." [(ngModel)]="repSearchQuery" (click)="$event.stopPropagation()" />
@@ -216,7 +242,7 @@
                 </div>
               </div>
             </div>
-            <div class="dropdown-backdrop-transparent" *ngIf="showRepDropdown" (click)="showRepDropdown = false"></div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showRepDropdown" (click)="closeFilterDropdowns()"></div>
           </div>
         </div>
 
@@ -224,11 +250,11 @@
         <div class="adv-filter-item category">
           <label><svg lucideTag size="13"></svg> Deal Category</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedCategory !== 'ALL'" (click)="showCategoryDropdown = !showCategoryDropdown; showStageDropdown=false; showRepDropdown=false; showSourceDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedCategory !== 'ALL'" (click)="openFilterDropdown($event,'category',['stage','rep','source','contact','added'])">
               <span class="trigger-text">{{ getSelectedCategoryLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showCategoryDropdown"></svg>
             </button>
-            <div class="filter-dropdown-popover" *ngIf="showCategoryDropdown">
+            <div class="filter-dropdown-popover" *ngIf="showCategoryDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
               <div class="popover-search-box">
                 <svg lucideSearch size="13" class="popover-search-icon"></svg>
                 <input type="text" placeholder="Search categories..." [(ngModel)]="categorySearchQuery" (click)="$event.stopPropagation()" />
@@ -248,7 +274,7 @@
                 </div>
               </div>
             </div>
-            <div class="dropdown-backdrop-transparent" *ngIf="showCategoryDropdown" (click)="showCategoryDropdown = false"></div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showCategoryDropdown" (click)="closeFilterDropdowns()"></div>
           </div>
         </div>
 
@@ -256,11 +282,11 @@
         <div class="adv-filter-item source">
           <label><svg lucideGlobe size="13"></svg> Lead Source</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedSource !== 'ALL'" (click)="showSourceDropdown = !showSourceDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showContactDropdown=false; showAddedByDropdown=false">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedSource !== 'ALL'" (click)="openFilterDropdown($event,'source',['stage','rep','category','contact','added'])">
               <span class="trigger-text">{{ getSelectedSourceLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showSourceDropdown"></svg>
             </button>
-            <div class="filter-dropdown-popover" *ngIf="showSourceDropdown">
+            <div class="filter-dropdown-popover" *ngIf="showSourceDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
               <div class="popover-search-box">
                 <svg lucideSearch size="13" class="popover-search-icon"></svg>
                 <input type="text" placeholder="Search sources..." [(ngModel)]="sourceSearchQuery" (click)="$event.stopPropagation()" />
@@ -280,7 +306,7 @@
                 </div>
               </div>
             </div>
-            <div class="dropdown-backdrop-transparent" *ngIf="showSourceDropdown" (click)="showSourceDropdown = false"></div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showSourceDropdown" (click)="closeFilterDropdowns()"></div>
           </div>
         </div>
 
@@ -288,11 +314,11 @@
         <div class="adv-filter-item contact">
           <label><svg lucideUserCheck size="13"></svg> Lead Contact</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedContactId !== 'ALL'" (click)="showContactDropdown = !showContactDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showAddedByDropdown=false">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedContactId !== 'ALL'" (click)="openFilterDropdown($event,'contact',['stage','rep','category','source','added'])">
               <span class="trigger-text">{{ getSelectedContactLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showContactDropdown"></svg>
             </button>
-            <div class="filter-dropdown-popover" *ngIf="showContactDropdown">
+            <div class="filter-dropdown-popover" *ngIf="showContactDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
               <div class="popover-search-box">
                 <svg lucideSearch size="13" class="popover-search-icon"></svg>
                 <input type="text" placeholder="Search name, company, email..." [(ngModel)]="contactFilterSearchQuery" (click)="$event.stopPropagation()" />
@@ -322,7 +348,7 @@
                 </div>
               </div>
             </div>
-            <div class="dropdown-backdrop-transparent" *ngIf="showContactDropdown" (click)="showContactDropdown = false"></div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showContactDropdown" (click)="closeFilterDropdowns()"></div>
           </div>
         </div>
 
@@ -330,11 +356,11 @@
         <div class="adv-filter-item added">
           <label><svg lucideUserCheck size="13"></svg> Added By</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedAddedById !== 'ALL'" (click)="showAddedByDropdown = !showAddedByDropdown; showStageDropdown=false; showRepDropdown=false; showCategoryDropdown=false; showSourceDropdown=false; showContactDropdown=false">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedAddedById !== 'ALL'" (click)="openFilterDropdown($event,'added',['stage','rep','category','source','contact'])">
               <span class="trigger-text">{{ getSelectedAddedByLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showAddedByDropdown"></svg>
             </button>
-            <div class="filter-dropdown-popover" *ngIf="showAddedByDropdown">
+            <div class="filter-dropdown-popover" *ngIf="showAddedByDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
               <div class="popover-search-box">
                 <svg lucideSearch size="13" class="popover-search-icon"></svg>
                 <input type="text" placeholder="Search employees..." [(ngModel)]="addedByFilterSearchQuery" (click)="$event.stopPropagation()" />
@@ -344,7 +370,7 @@
                 <div class="popover-option-item" (click)="selectAddedByFilter('ALL')" [class.selected]="selectedAddedById === 'ALL'">
                   <div class="option-avatar-circle neutral">ALL</div>
                   <div class="option-details">
-                    <span class="option-primary">All</span>
+                    <span class="option-primary">All team members</span>
                   </div>
                   <svg lucideCheck size="14" class="check-icon" *ngIf="selectedAddedById === 'ALL'"></svg>
                 </div>
@@ -366,7 +392,7 @@
                 </div>
               </div>
             </div>
-            <div class="dropdown-backdrop-transparent" *ngIf="showAddedByDropdown" (click)="showAddedByDropdown = false"></div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showAddedByDropdown" (click)="closeFilterDropdowns()"></div>
           </div>
         </div>
 
@@ -375,7 +401,7 @@
           <label><svg lucideFileText size="13"></svg> Quotation Status</label>
           <div class="custom-select-wrapper">
             <select [(ngModel)]="selectedQuotationStatus" (change)="onFilterChange()" [class.has-selection]="selectedQuotationStatus !== 'ALL'">
-              <option value="ALL">All</option>
+              <option value="ALL">All quotation statuses</option>
               <option value="QUOTED">Quoted</option>
               <option value="NOT_QUOTED">Not Quoted</option>
             </select>
@@ -388,40 +414,12 @@
           <label><svg lucideCalendarClock size="13"></svg> Follow-Up Status</label>
           <div class="custom-select-wrapper">
             <select [(ngModel)]="selectedFollowUpStatus" (change)="onFilterChange()" [class.has-selection]="selectedFollowUpStatus !== 'ALL'">
-              <option value="ALL">All</option>
+              <option value="ALL">All follow-up statuses</option>
               <option value="OVERDUE">Overdue</option>
               <option value="SCHEDULED">Scheduled</option>
               <option value="NONE">No Follow-Up</option>
             </select>
             <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
-          </div>
-        </div>
-
-        <!-- 8b. Follow-Up Date -->
-        <!-- Same shape as every other filter: label + select. The custom range
-             is a sibling below, shown only when "Custom Dates" is picked, so
-             this item needs no bespoke flex container of its own. -->
-        <div class="adv-filter-item followup-date-filter-item fupdate">
-          <label><svg lucideCalendarRange size="13"></svg> Follow-Up Date</label>
-          <div class="custom-select-wrapper">
-            <select [(ngModel)]="followUpDateFilter" (change)="setFollowUpDateFilter(followUpDateFilter)" [class.has-selection]="followUpDateFilter !== 'all'">
-              <option value="all">All</option>
-              <option value="today">Today</option>
-              <option value="thisWeek">This Week</option>
-              <option value="lastMonth">Last Month</option>
-              <option value="lastQuarter">Last Quarter</option>
-              <option value="lastYear">Last 1 Year</option>
-              <option value="custom">Custom Dates</option>
-            </select>
-            <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
-          </div>
-          <div class="followup-custom-dates" *ngIf="followUpDateFilter === 'custom'">
-            <input type="date" [(ngModel)]="followUpStartDate" (change)="onFilterChange()" title="Start date" />
-            <span class="followup-date-sep">&ndash;</span>
-            <input type="date" [(ngModel)]="followUpEndDate" (change)="onFilterChange()" title="End date" />
-            <button type="button" class="followup-date-clear" (click)="clearFollowUpDateFilter()" title="Clear">
-              <svg lucideX size="13"></svg>
-            </button>
           </div>
         </div>
 
@@ -441,7 +439,7 @@
           </div>
         </div>
 
-        <!-- 7. Date Filter -->
+        <!-- 10. Date Filter -->
         <div class="adv-filter-item date-filter-item date-filter">
           <label><svg lucideCalendar size="13"></svg> Date Filter</label>
           <div class="date-filter-row">
@@ -473,6 +471,16 @@
             <input type="date" [(ngModel)]="dateEnd" (ngModelChange)="onFilterChange()" />
           </div>
         </div>
+      </div>
+      </div>
+
+      <div class="adv-filters-footer">
+        <button type="button" class="adv-footer-clear-btn" (click)="clearFilters()">
+          <svg lucideRotateCcw size="13"></svg> Reset all filters
+        </button>
+        <button type="button" class="adv-footer-apply-btn" (click)="showAdvancedFilters = false; closeFilterDropdowns()">
+          Done
+        </button>
       </div>
     </div>
 
@@ -625,7 +633,7 @@
           <th>Contact</th>
           <th>Phone</th>
           <th>Lead Owner</th>
-          <th>Status</th>
+          <th>Stage</th>
           <th>Value</th>
           <th>Next Follow Up</th>
           <th class="col-actions-sticky">Actions</th>
@@ -791,7 +799,8 @@
                           <th style="width: 240px;">Objective / Notes</th>
                           <th style="width: 240px;">Contact Details</th>
                           <th style="width: 250px;">Scheduled For</th>
-                          <th style="width: 160px;">Status</th>
+                          <th style="width: 180px;">Attachments</th>
+                          <th style="width: 160px;">Stage</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -844,18 +853,32 @@
                               <span class="relative-pill pill-tomorrow" *ngIf="isFollowUpTomorrow(fu.scheduledAt)">Tomorrow</span>
                             </div>
                           </td>
+                          <td>
+                            <div class="followup-file-links" *ngIf="fu.files?.length; else noFollowUpFiles">
+                              <a *ngFor="let file of fu.files" [href]="file.fileUrl" target="_blank" rel="noopener" [title]="'Open ' + file.fileName">
+                                <svg lucideFileText size="12"></svg> {{ file.fileName }}
+                              </a>
+                            </div>
+                            <ng-template #noFollowUpFiles><span class="no-data-dash">&mdash;</span></ng-template>
+                          </td>
                           <td (click)="$event.stopPropagation()">
-                            <div class="fup-status-cell">
-                              <select
-                                class="fup-status-select"
-                                [ngClass]="getFollowUpStatusClass(fu.status)"
-                                [disabled]="isFollowUpStatusSaving(fu.id)"
-                                [ngModel]="fu.status || 'PENDING'"
-                                (ngModelChange)="updateFollowUpStatus(lead, fu, $event)">
-                                <option value="PENDING">Pending</option>
-                                <option value="COMPLETED">Completed</option>
-                                <option value="CANCELLED">Cancelled</option>
-                              </select>
+                            <div class="status-dropdown" [class.open]="followUpTableStageMenu === fu.id">
+                              <button type="button" class="table-status-trigger ldm-status-badge ldm-status-{{getFollowUpStage(fu.status) | lowercase}}"
+                                      [disabled]="isFollowUpStatusSaving(fu.id)"
+                                      (click)="toggleFollowUpTableStageMenu(fu, $event)">
+                                <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(getFollowUpStage(fu.status))}"></span>
+                                <span class="table-status-text">{{ getStatusLabel(getFollowUpStage(fu.status)) }}</span>
+                                <svg lucideChevronDown size="12" class="table-status-caret"></svg>
+                              </button>
+                              <div class="status-menu" *ngIf="followUpTableStageMenu === fu.id">
+                                <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES"
+                                        [class.selected]="st === getFollowUpStage(fu.status)"
+                                        (click)="selectFollowUpTableStage(lead, fu, st, $event)">
+                                  <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
+                                  <span class="status-menu-label">{{ st }}</span>
+                                  <svg lucideCheck size="14" class="status-menu-check" *ngIf="st === getFollowUpStage(fu.status)"></svg>
+                                </button>
+                              </div>
                               <span class="fup-status-saving" *ngIf="isFollowUpStatusSaving(fu.id)">
                                 <svg lucideLoader2 size="13" class="spin-icon"></svg>
                               </span>
@@ -920,6 +943,7 @@
       <table class="contacts-table">
         <thead>
           <tr>
+            <th>LEAD CONTACT ID</th>
             <th>CONTACT PERSON</th>
             <th>COMPANY & WEBSITE</th>
             <th>CONTACT DETAILS</th>
@@ -932,6 +956,10 @@
         </thead>
         <tbody>
           <tr *ngFor="let contact of getFilteredLeadContacts()" class="contact-row">
+            <td class="lead-contact-code-cell">
+              <span class="entity-code" *ngIf="contact.contactCode">{{ contact.contactCode }}</span>
+              <span class="no-data-dash" *ngIf="!contact.contactCode">&mdash;</span>
+            </td>
             <!-- Contact Person -->
             <td>
               <div class="contact-person-cell">
@@ -1312,6 +1340,33 @@
   </div>
 </div>
 
+<!-- Win is a finance handoff: the purchase order is required before the stage changes. -->
+<div class="modal-backdrop" *ngIf="showPurchaseOrderModal" (click)="closePurchaseOrderModal()">
+  <div class="modal-card purchase-order-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2>Attach Purchase Order</h2>
+        <p class="modal-subtitle">Upload the approved PO before moving <strong>{{ pendingWinLead?.title }}</strong> to Win and sending it to Finance.</p>
+      </div>
+      <button type="button" class="btn-icon-close" (click)="closePurchaseOrderModal()" [disabled]="isUploadingPurchaseOrder"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Purchase Order <span class="required-asterisk">*</span></label>
+        <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" (change)="onPurchaseOrderSelected($event)" [disabled]="isUploadingPurchaseOrder" />
+        <span class="fum-stage-hint" *ngIf="purchaseOrderFile">Selected: {{ purchaseOrderFile.name }}</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-secondary" (click)="closePurchaseOrderModal()" [disabled]="isUploadingPurchaseOrder">Cancel</button>
+      <button type="button" class="btn-primary" (click)="submitPurchaseOrder()" [disabled]="isUploadingPurchaseOrder || !purchaseOrderFile">
+        <svg lucideLoader2 size="15" class="spin-icon" *ngIf="isUploadingPurchaseOrder"></svg>
+        {{ isUploadingPurchaseOrder ? 'Uploading…' : 'Attach PO & Send to Finance' }}
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Refined Glassmorphic Create Modal -->
 <div class="modal-backdrop" *ngIf="showCreateModal" (click)="closeModal()">
   <div class="modal-card enhanced-modal" (click)="$event.stopPropagation()">    <div class="modal-header">
@@ -1360,6 +1415,50 @@
       <!-- Step 1: Primary Contact Information -->
       <div *ngIf="activeTab === 1" class="step-content-anim">
         <div class="form-row">
+          <div class="form-group custom-select-group">
+            <label>Lead ID <span class="locked-hint" *ngIf="isEditing">unique &amp; locked</span></label>
+            <div class="owner-select-trigger" (click)="!isSaving && !isEditing && (showLeadIdDropdown = !showLeadIdDropdown)" [class.active]="showLeadIdDropdown" [class.is-locked]="isEditing">
+              <div *ngIf="newLeadData.leadCode" class="selected-owner-display">
+                <div class="owner-avatar-circle contact-avatar-badge">L</div>
+                <div class="owner-info-text">
+                  <span class="owner-name">{{ newLeadData.leadCode }}</span>
+                  <span class="owner-designation">Selected Lead ID</span>
+                </div>
+                <button *ngIf="!isEditing" type="button" class="btn-clear-owner" (click)="$event.stopPropagation(); selectLeadId(null)">
+                  <svg lucideX size="14"></svg>
+                </button>
+              </div>
+              <div *ngIf="!newLeadData.leadCode" class="unassigned-placeholder">
+                <div class="owner-avatar-circle unassigned-avatar"><svg lucideSearch size="14"></svg></div>
+                <span class="placeholder-text">Search or select a Lead ID...</span>
+                <svg lucideChevronDown size="16" class="chevron-icon"></svg>
+              </div>
+            </div>
+            <div class="owner-dropdown-menu" *ngIf="showLeadIdDropdown">
+              <div class="owner-search-box">
+                <svg lucideSearch size="14" class="owner-search-icon"></svg>
+                <input type="text" placeholder="Search by ID, lead or company..." [(ngModel)]="leadIdSearchQuery" (click)="$event.stopPropagation()" />
+              </div>
+              <div class="owner-list-scroll">
+                <div class="owner-item" (click)="selectLeadId(null)" [class.selected]="!newLeadData.leadCode">
+                  <div class="owner-avatar-circle unassigned-avatar"><svg lucidePlus size="14"></svg></div>
+                  <div class="owner-item-details"><span class="owner-item-name">Generate automatically</span><span class="owner-item-sub">Create a new Lead ID when saved</span></div>
+                </div>
+                <div class="owner-list-subheader"><svg lucideBriefcase size="13"></svg><span>Existing Leads</span></div>
+                <div class="owner-item" *ngFor="let lead of getFilteredLeadIds()" (click)="selectLeadId(lead)" [class.selected]="newLeadData.leadCode === lead.leadCode">
+                  <div class="owner-avatar-circle contact-avatar-badge">L</div>
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">{{ lead.leadCode }}</span>
+                    <span class="owner-item-sub">{{ lead.title }}<span *ngIf="lead.companyName"> &mdash; {{ lead.companyName }}</span></span>
+                  </div>
+                </div>
+                <div *ngIf="getFilteredLeadIds().length === 0" class="no-owners-found">No matching leads found</div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group"></div>
+        </div>
+        <div class="form-row">
           <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.title.trim()">
             <label>Opportunity Title <span class="required-asterisk">*</span></label>
             <input type="text" [(ngModel)]="newLeadData.title" placeholder="e.g., Enterprise Software Package" [disabled]="isSaving" />
@@ -1401,6 +1500,11 @@
           <label for="saveContactFromLead" style="font-size:13px;color:var(--text-secondary,#374151);cursor:pointer;margin:0;line-height:1.4;">
             Also save <strong style="color:var(--text-primary,#111827)">{{newLeadData.contactName}}</strong> as a Lead Contact
           </label>
+        </div>
+        <div class="form-group" *ngIf="newLeadData.broughtByContactId" style="margin-top: 12px;">
+          <label>Lead Contact ID</label>
+          <input type="text" [value]="selectedContactCode || 'ID pending'" readonly class="is-locked" />
+          <span class="builder-hint">Linked to the selected lead contact/source record.</span>
         </div>
         <div class="form-row">
           <!-- 1. Lead Brought By -->
@@ -1575,7 +1679,7 @@
       <div *ngIf="activeTab === 2" class="step-content-anim">
         <div class="form-row">
           <div class="form-group">
-            <label>Initial Pipeline Status</label>
+            <label>Initial Pipeline Stage</label>
             <select [(ngModel)]="newLeadData.status" [disabled]="isSaving" class="enhanced-select">
               <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
             </select>
@@ -2022,15 +2126,51 @@
           <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; font-style: italic;" *ngIf="!prev.notes">No notes were recorded.</p>
         </div>
 
-        <!-- Notes / Agenda -->
+        <!-- Discussion points and notes -->
         <div class="form-group" style="margin-bottom: 0;">
-          <label>Agenda / Discussion Points & Notes</label>
+          <label> Remarks</label>
           <textarea
             [(ngModel)]="newFollowUp.notes"
             placeholder="Outline key discussion points, questions to ask, or proposal items to clarify..."
             rows="3"
             [disabled]="isSavingFollowUp"
           ></textarea>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px;">
+          <label>Attachments</label>
+          <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles" />
+          <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles">
+            <svg lucideUpload size="15"></svg>
+            <span>Attach Files / Documents</span>
+          </button>
+          <span class="fum-stage-hint">Attach files now; they are uploaded after scheduling and shown in the follow-up table.</span>
+          <div *ngIf="pendingFollowUpFiles.length" class="pending-file-list">
+            <span *ngFor="let file of pendingFollowUpFiles; let i = index" class="pending-file-chip">
+              {{ file.name }}
+              <button type="button" (click)="removePendingFollowUpFile(i)" [disabled]="isSavingFollowUp">&times;</button>
+            </span>
+          </div>
+        </div>
+
+        <!-- Keep stage selection immediately below remarks so the user records context first. -->
+        <div class="form-group">
+          <label>Pipeline Stage</label>
+          <div class="status-dropdown fum-stage-dropdown" [class.open]="followUpStageMenuOpen">
+            <button type="button" class="table-status-trigger ldm-status-badge ldm-status-{{newFollowUp.stage | lowercase}}" (click)="toggleFollowUpStageMenu($event)">
+              <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(newFollowUp.stage)}"></span>
+              <span class="table-status-text">{{ getStatusLabel(newFollowUp.stage) }}</span>
+              <svg lucideChevronDown size="12" class="table-status-caret"></svg>
+            </button>
+            <div class="status-menu" *ngIf="followUpStageMenuOpen">
+              <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES" [class.selected]="st === newFollowUp.stage" (click)="selectFollowUpStage(st, $event)">
+                <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
+                <span class="status-menu-label">{{ st }}</span>
+                <svg lucideCheck size="14" class="status-menu-check" *ngIf="st === newFollowUp.stage"></svg>
+              </button>
+            </div>
+          </div>
+          <span class="fum-stage-hint">This updates the lead's Kanban stage too.</span>
         </div>
       </div>
 
@@ -2094,6 +2234,9 @@
               </div>
 
               <p class="fum-card-notes" *ngIf="f.notes">{{f.notes}}</p>
+              <div class="followup-file-links" *ngIf="f.files?.length">
+                <a *ngFor="let file of f.files" [href]="file.fileUrl" target="_blank" rel="noopener"><svg lucideFileText size="12"></svg> {{file.fileName}}</a>
+              </div>
 
               <div class="fum-card-actions">
                 <button type="button" class="btn-card-del" (click)="deleteFollowUp(f.id, $event)" title="Delete Follow-up">
@@ -2119,6 +2262,9 @@
               <h4 class="fum-card-title">{{f.title}}</h4>
 
               <p class="fum-card-notes" *ngIf="f.notes">{{f.notes}}</p>
+              <div class="followup-file-links" *ngIf="f.files?.length">
+                <a *ngFor="let file of f.files" [href]="file.fileUrl" target="_blank" rel="noopener"><svg lucideFileText size="12"></svg> {{file.fileName}}</a>
+              </div>
 
               <div class="fum-card-meta" *ngIf="f.contactPerson || f.assignedTo">
                 <div class="fum-meta-item" *ngIf="f.contactPerson">
@@ -2274,7 +2420,7 @@
             <thead>
               <tr>
                 <th style="width: 32%;">Company & Contact</th>
-                <th style="width: 17%;">Status</th>
+                <th style="width: 17%;">Stage</th>
                 <th style="width: 17%;">Expected Value</th>
                 <th style="width: 16%;">Est. Closing</th>
                 <th style="width: 18%;">Assigned Rep</th>

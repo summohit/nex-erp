@@ -52,6 +52,7 @@ export interface FollowUp {
   assignedToId?: number;
   assignedTo?: { id: number, firstName: string, lastName: string, avatarUrl?: string, designation?: { name: string } };
   createdAt: string;
+  files?: { id: number; fileName: string; fileUrl: string; fileType?: string; createdAt: string }[];
 }
 
 interface Lead {
@@ -179,6 +180,12 @@ export class LeadsComponent implements OnInit {
   showOwnerDropdown = false;
   broughtBySearchQuery = '';
   showBroughtByDropdown = false;
+  leadIdSearchQuery = '';
+  showLeadIdDropdown = false;
+
+  // Fixed-position coords for searchable filter dropdowns (so they are not
+  // clipped by the modal's scrollable grid when rendered as a right-side drawer)
+  fDropdownPos: { left: number; top: number; maxHeight: number } | null = null;
 
 
   // Pipeline order, left to right on the Kanban board. Two deliberate choices
@@ -229,6 +236,7 @@ export class LeadsComponent implements OnInit {
   employees: any[] = [];
   
   newLeadData = {
+    leadCode: '',
     title: '',
     subjectLine: '',
     dealCategory: 'Inbound',
@@ -287,12 +295,22 @@ export class LeadsComponent implements OnInit {
   isLoadingFollowUps = false;
   isSavingFollowUp = false;
   followUpTab: 'schedule' | 'history' = 'schedule';
+  followUpStageMenuOpen = false;
+  pendingFollowUpFiles: File[] = [];
+  isUploadingFollowUpFiles = false;
+
+  // A Win transition is deliberately paused until a purchase order is attached.
+  showPurchaseOrderModal = false;
+  pendingWinLead: Lead | null = null;
+  purchaseOrderFile: File | null = null;
+  isUploadingPurchaseOrder = false;
 
   // Expandable follow-ups inside the leads table
   expandedLeadId: number | null = null;
   leadFollowUpsCache: Record<number, FollowUp[]> = {};
   leadFollowUpsLoading: Record<number, boolean> = {};
   followUpStatusSaving: Record<number, boolean> = {};
+  followUpTableStageMenu: number | null = null;
   leadFollowUpsExpandedIds: number[] = [];
 
   // Follow-up date filter (filters follow-ups shown inside expanded rows)
@@ -307,7 +325,8 @@ export class LeadsComponent implements OnInit {
     contactEmail: '',
     type: 'CALL' as 'CALL' | 'MEETING' | 'DEMO' | 'EMAIL' | 'FIELD_VISIT' | 'NOTE' | 'OTHER',
     scheduledAt: '',
-    notes: ''
+    notes: '',
+    stage: ''
   };
 
   // Field Visits
@@ -319,11 +338,6 @@ export class LeadsComponent implements OnInit {
     this.loadEmployees();
     this.loadLeadContacts();
   }
-
-  goToFollowUps() {
-    this.router.navigate(['/sales/follow-ups']);
-  }
-
 
   goToLeadsDashboard() {
     this.router.navigate(['/crm/leads/dashboard']);
@@ -1056,6 +1070,48 @@ export class LeadsComponent implements OnInit {
     this.onFilterChange();
   }
 
+  // Computes a fixed position for a searchable dropdown triggered from $event,
+  // so it is never clipped by the modal's scroll container.
+  openFilterDropdown(ev: Event, activeKey: string, closeKeys: string[]) {
+    const toggles: Record<string, string> = {
+      stage: 'showStageDropdown',
+      rep: 'showRepDropdown',
+      category: 'showCategoryDropdown',
+      source: 'showSourceDropdown',
+      contact: 'showContactDropdown',
+      added: 'showAddedByDropdown'
+    };
+    for (const key of closeKeys) {
+      (this as any)[toggles[key]] = false;
+    }
+    const next = !(this as any)[toggles[activeKey]];
+    (this as any)[toggles[activeKey]] = next;
+    if (next && ev && ev.currentTarget) {
+      const el = (ev.currentTarget as HTMLElement);
+      const rect = el.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const popoverH = Math.min(320, Math.max(200, viewportH - rect.bottom - 24));
+      this.fDropdownPos = {
+        left: Math.min(rect.left, window.innerWidth - 260),
+        top: rect.bottom + 6,
+        maxHeight: popoverH
+      };
+    } else {
+      this.fDropdownPos = null;
+    }
+  }
+
+  closeFilterDropdowns() {
+    this.showStageDropdown = false;
+    this.showRepDropdown = false;
+    this.showCategoryDropdown = false;
+    this.showSourceDropdown = false;
+    this.showContactDropdown = false;
+    this.showAddedByDropdown = false;
+    this.fDropdownPos = null;
+  }
+
+
   // --- Searchable Filter Dropdowns ---
   getFilteredRepsForFilter(): any[] {
     let reps = this.employees.filter(e => {
@@ -1307,15 +1363,16 @@ export class LeadsComponent implements OnInit {
         event.currentIndex,
       );
 
-      // Status update logic based on container ID
       const newStatus = event.container.id; 
       const lead = event.container.data[event.currentIndex];
-      
-      lead.status = newStatus;
-      this.http.put(`${environment.apiUrl}/crm/leads/${lead.id}/status`, { status: newStatus }).subscribe(() => {
-        // Reload to update pipeline metrics
-        this.loadLeads();
-      });
+      if (this.isWinStage(newStatus)) {
+        // Drag-and-drop mutates the arrays before the handler runs. Put the card
+        // back while the required PO is collected.
+        transferArrayItem(event.container.data, event.previousContainer.data, event.currentIndex, event.previousIndex);
+        this.openPurchaseOrderModal(lead);
+        return;
+      }
+      this.saveLeadStage(lead, newStatus);
     }
   }
 
@@ -1328,7 +1385,7 @@ export class LeadsComponent implements OnInit {
     this.activeTab = 1;
     this.customSource = '';
     this.newLeadData = {
-      title: '', subjectLine: '', dealCategory: 'Inbound', companyName: '', contactName: '', email: '', phone: '', website: '', address: '',
+      leadCode: '', title: '', subjectLine: '', dealCategory: 'Inbound', companyName: '', contactName: '', email: '', phone: '', website: '', address: '',
       value: 0, currency: 'INR', status: 'New', source: 'Website / Inbound', assignedToId: null, addedById: null, broughtByContactId: null,
       description: '', qualificationReason: '', expectedCloseDate: ''
     };
@@ -1354,6 +1411,7 @@ export class LeadsComponent implements OnInit {
     }
 
     this.newLeadData = {
+      leadCode: lead.leadCode || '',
       title: lead.title || '',
       subjectLine: lead.subjectLine || '',
       dealCategory: lead.dealCategory || 'Inbound',
@@ -1416,6 +1474,28 @@ export class LeadsComponent implements OnInit {
     }
   }
 
+  getFilteredLeadIds(): Lead[] {
+    const query = this.leadIdSearchQuery.trim().toLowerCase();
+    const codedLeads = this.leads.filter(lead => !!lead.leadCode);
+    if (!query) return codedLeads;
+    return codedLeads.filter(lead =>
+      lead.leadCode?.toLowerCase().includes(query) ||
+      lead.title?.toLowerCase().includes(query) ||
+      lead.companyName?.toLowerCase().includes(query) ||
+      lead.contactName?.toLowerCase().includes(query),
+    );
+  }
+
+  selectLeadId(lead: Lead | null) {
+    this.showLeadIdDropdown = false;
+    this.leadIdSearchQuery = '';
+    if (!lead) {
+      this.newLeadData.leadCode = '';
+      return;
+    }
+    this.openEditModal(lead);
+  }
+
   createLead() {
     this.isSubmitted = true;
 
@@ -1429,7 +1509,13 @@ export class LeadsComponent implements OnInit {
 
     this.isSaving = true;
 
-    const payload = { ...this.newLeadData };
+    // Preserve a manually entered ID and omit a blank one so the server
+    // generates it automatically.
+    const payload: any = {
+      ...this.newLeadData,
+      leadCode: (this.newLeadData.leadCode || '').trim(),
+    };
+    if (!payload.leadCode) delete payload.leadCode;
     if (payload.value !== undefined && payload.value !== null) {
       payload.value = Math.max(0, Number(payload.value) || 0);
     }
@@ -1544,9 +1630,17 @@ export class LeadsComponent implements OnInit {
     this.actionMenuOpen = null;
   }
 
-  updateLeadStatus(lead: Lead, newStatus: string, event: Event) {
+  updateLeadStatus(lead: Lead, newStatus: string, event?: Event) {
     if (event) event.stopPropagation();
     if (!newStatus || newStatus === lead.status) return;
+    if (this.isWinStage(newStatus)) {
+      this.openPurchaseOrderModal(lead);
+      return;
+    }
+    this.saveLeadStage(lead, newStatus);
+  }
+
+  private saveLeadStage(lead: Lead, newStatus: string) {
     const previous = lead.status;
     lead.status = newStatus;
     this.http.put(`${environment.apiUrl}/crm/leads/${lead.id}/status`, { status: newStatus }).subscribe({
@@ -1555,6 +1649,59 @@ export class LeadsComponent implements OnInit {
       },
       error: () => {
         lead.status = previous;
+      }
+    });
+  }
+
+  private isWinStage(status: string): boolean {
+    return ['WIN', 'WON'].includes((status || '').trim().toUpperCase());
+  }
+
+  openPurchaseOrderModal(lead: Lead) {
+    this.pendingWinLead = lead;
+    this.purchaseOrderFile = null;
+    this.showPurchaseOrderModal = true;
+  }
+
+  closePurchaseOrderModal() {
+    if (this.isUploadingPurchaseOrder) return;
+    this.showPurchaseOrderModal = false;
+    this.pendingWinLead = null;
+    this.purchaseOrderFile = null;
+  }
+
+  onPurchaseOrderSelected(event: Event) {
+    this.purchaseOrderFile = (event.target as HTMLInputElement).files?.[0] || null;
+  }
+
+  submitPurchaseOrder() {
+    if (!this.pendingWinLead || !this.purchaseOrderFile) {
+      this.toast.error('Attach the purchase order to move this lead to Win.');
+      return;
+    }
+    this.isUploadingPurchaseOrder = true;
+    const body = new FormData();
+    body.append('file', this.purchaseOrderFile);
+    body.append('purpose', 'PURCHASE_ORDER');
+    this.http.post(`${environment.apiUrl}/crm/leads/${this.pendingWinLead.id}/files`, body).subscribe({
+      next: () => {
+        const lead = this.pendingWinLead!;
+        this.http.put(`${environment.apiUrl}/crm/leads/${lead.id}/status`, { status: 'Win' }).subscribe({
+          next: () => {
+            this.toast.success('Purchase order attached and lead sent to Finance.');
+            this.isUploadingPurchaseOrder = false;
+            this.closePurchaseOrderModal();
+            this.loadLeads();
+          },
+          error: (err) => {
+            this.isUploadingPurchaseOrder = false;
+            this.toast.error(err?.error?.message || 'Could not move the lead to Win.');
+          }
+        });
+      },
+      error: (err) => {
+        this.isUploadingPurchaseOrder = false;
+        this.toast.error(err?.error?.message || 'Failed to upload the purchase order.');
       }
     });
   }
@@ -1577,6 +1724,7 @@ export class LeadsComponent implements OnInit {
     this.selectedLead = lead;
     this.showFollowUpModal = true;
     this.followUpTab = 'schedule';
+    this.followUpStageMenuOpen = false;
 
     // Default scheduled time: Tomorrow at 10:00 AM local time
     const tomorrow = new Date();
@@ -1592,14 +1740,65 @@ export class LeadsComponent implements OnInit {
       contactEmail: lead.email || '',
       type: 'CALL',
       scheduledAt: localISOTime,
-      notes: ''
+      notes: '',
+      stage: this.normalizeStatus(lead.status)
     };
+    this.pendingFollowUpFiles = [];
 
     this.loadLeadFollowUps(lead.id);
   }
 
+  toggleFollowUpStageMenu(event: Event) {
+    if (event) event.stopPropagation();
+    this.followUpStageMenuOpen = !this.followUpStageMenuOpen;
+  }
+
+  selectFollowUpStage(stage: string, event: Event) {
+    if (event) event.stopPropagation();
+    this.newFollowUp.stage = stage;
+    this.followUpStageMenuOpen = false;
+  }
+
   closeFollowUpModal() {
     this.showFollowUpModal = false;
+    this.followUpStageMenuOpen = false;
+    this.pendingFollowUpFiles = [];
+  }
+
+  onFollowUpFilesSelected(event: Event) {
+    const files = Array.from((event.target as HTMLInputElement).files || []);
+    this.pendingFollowUpFiles = [...this.pendingFollowUpFiles, ...files];
+  }
+
+  removePendingFollowUpFile(index: number) {
+    this.pendingFollowUpFiles.splice(index, 1);
+  }
+
+  private uploadFollowUpFiles(leadId: number, followUpId: number, files: File[]) {
+    if (!files.length) return;
+    this.isUploadingFollowUpFiles = true;
+    let remaining = files.length;
+    files.forEach(file => {
+      const body = new FormData();
+      body.append('file', file);
+      this.http.post<any>(`${environment.apiUrl}/crm/leads/${leadId}/follow-ups/${followUpId}/files`, body).subscribe({
+        next: () => {
+          if (--remaining === 0) {
+            this.isUploadingFollowUpFiles = false;
+            this.loadLeadFollowUps(leadId);
+            this.loadLeadFollowUpsForTable(leadId);
+          }
+        },
+        error: () => {
+          if (--remaining === 0) {
+            this.isUploadingFollowUpFiles = false;
+            this.toast.error('One or more follow-up attachments could not be uploaded.');
+            this.loadLeadFollowUps(leadId);
+            this.loadLeadFollowUpsForTable(leadId);
+          }
+        }
+      });
+    });
   }
 
   // Most recently scheduled follow-up already on file for this lead â€” shown as
@@ -1654,7 +1853,14 @@ export class LeadsComponent implements OnInit {
       next: (created) => {
         this.isSavingFollowUp = false;
         this.leadFollowUps = [created, ...this.leadFollowUps];
+        const files = [...this.pendingFollowUpFiles];
+        this.pendingFollowUpFiles = [];
+        this.uploadFollowUpFiles(this.selectedLead!.id, created.id, files);
         this.followUpTab = 'history';
+        // Sync the deal's stage if it changed on this follow-up
+        if (this.newFollowUp.stage && this.newFollowUp.stage !== this.selectedLead!.status) {
+          this.updateLeadStatus(this.selectedLead!, this.newFollowUp.stage);
+        }
         // Reset form for next entry
         this.setQuickFollowUpTime('tomorrow_morning');
         this.newFollowUp.notes = '';
@@ -1739,10 +1945,32 @@ export class LeadsComponent implements OnInit {
     return status.charAt(0) + status.slice(1).toLowerCase();
   }
 
+  // Map legacy follow-up status values (PENDING/COMPLETED/CANCELLED) onto the
+  // current deal-stage set so the table Stage dropdown always shows a valid value.
+  getFollowUpStage(status?: string): string {
+    const s = (status || '').toUpperCase().replace(/_/g, ' ');
+    switch (s) {
+      case 'PENDING':
+      case 'COMPLETED':
+      case '':
+      case 'NEW': return 'New';
+      case 'CANCELLED':
+      case 'LOST': return 'Lost';
+      default: return this.normalizeStatus(status);
+    }
+  }
+
   getFollowUpStatusClass(status?: string): string {
-    switch ((status || 'PENDING').toUpperCase()) {
+    const s = (status || '').toUpperCase().replace(/_/g, ' ');
+    switch (s) {
+      case 'WON':
+      case 'WIN': return 'fup-status-completed';
+      case 'LOST': return 'fup-status-cancelled';
       case 'COMPLETED': return 'fup-status-completed';
       case 'CANCELLED': return 'fup-status-cancelled';
+      case 'PENDING':
+      case '':
+      case 'NEW': return 'fup-status-pending';
       default: return 'fup-status-pending';
     }
   }
@@ -1759,6 +1987,10 @@ export class LeadsComponent implements OnInit {
         const cache = this.leadFollowUpsCache[lead.id] || [];
         this.leadFollowUpsCache[lead.id] = cache.map(x => x.id === updated.id ? { ...x, status: updated.status } : x);
         this.followUpStatusSaving[fu.id] = false;
+        // Sync the deal stage whenever the follow-up stage changes in the table
+        if (status !== lead.status) {
+          this.updateLeadStatus(lead, status);
+        }
       },
       error: (err) => {
         this.followUpStatusSaving[fu.id] = false;
@@ -1767,12 +1999,24 @@ export class LeadsComponent implements OnInit {
     });
   }
 
+  toggleFollowUpTableStageMenu(fu: FollowUp, event: Event) {
+    if (event) event.stopPropagation();
+    this.followUpTableStageMenu = this.followUpTableStageMenu === fu.id ? null : fu.id;
+  }
+
+  selectFollowUpTableStage(lead: Lead, fu: FollowUp, stage: string, event: Event) {
+    if (event) event.stopPropagation();
+    this.followUpTableStageMenu = null;
+    this.updateFollowUpStatus(lead, fu, stage);
+  }
+
   isLeadExpanded(lead: Lead): boolean {
     return this.expandedLeadId === lead.id;
   }
 
   toggleLeadFollowUps(lead: Lead, event: Event) {
     if (event) event.stopPropagation();
+    this.followUpTableStageMenu = null;
     if (this.isLeadExpanded(lead)) {
       this.expandedLeadId = null;
       return;
