@@ -538,6 +538,17 @@
             </button>
           </div>
 
+          <!-- Revise CTC / joining date, then regenerate to print the new terms -->
+          <button
+            type="button"
+            class="btn-edit-terms"
+            (click)="editOfferTerms()"
+            title="Change the offered CTC, joining date or address"
+          >
+            <svg lucideEdit2 size="15"></svg>
+            <span>Edit Offer Terms (CTC, joining date)</span>
+          </button>
+
           <!-- Email the offer to the candidate, once a letter exists to send -->
           <button
             type="button"

@@ -101,9 +101,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.nexmobileapp"
+    namespace "com.cestech.nexerp"
     defaultConfig {
-        applicationId "com.nexmobileapp"
+        applicationId "com.cestech.nexerp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Keep versionName in step with backend/uploads/app/version.json, which

@@ -26,6 +26,8 @@ export interface OfferLetterConfig {
   tagline?: string;
 
   // Policy constants
+  /** Share of CTC paid as performance-linked variable pay, e.g. 20 for 80/20. */
+  variablePayPercent?: number;
   reportingTime?: string;     // e.g. "9:30 AM"
   probationMonths?: number;
   probationNoticeMonths?: number;   // notice required while still on probation
@@ -58,6 +60,7 @@ export interface OfferLetterConfig {
 
 const CONFIG_DEFAULTS: Required<Omit<OfferLetterConfig,
   'legalEntityName' | 'cin' | 'officeAddress' | 'contactPhone' | 'contactEmail' | 'website' | 'tagline'>> = {
+  variablePayPercent: 20,
   reportingTime: '9:30 AM',
   probationMonths: 6,
   probationNoticeMonths: 2,
@@ -548,7 +551,21 @@ export class OfferLettersService {
     return this.generateHtmlFromSettings(settings, sample);
   }
 
-  async generate(applicationId: number, companyId: number) {
+  /**
+   * Build (or rebuild) the offer letter from the application as it stands now —
+   * so changing the CTC or joining date and regenerating produces a corrected
+   * letter.
+   *
+   * Two rules protect the document's integrity on a rebuild:
+   *  - An already-signed offer is never overwritten. The signature belongs to
+   *    the terms the candidate actually saw; silently swapping the document
+   *    underneath it would leave a signature attached to terms they never
+   *    agreed to. Revising a signed offer means withdrawing it first.
+   *  - The access token is preserved, so a signing link already emailed to the
+   *    candidate keeps working and shows the corrected letter. Minting a fresh
+   *    token on every rebuild used to break those links silently.
+   */
+  async generate(applicationId: number, companyId: number, opts?: { allowResignature?: boolean }) {
     const application = await this.prisma.jobApplication.findFirst({
       where: { id: applicationId, companyId },
       include: { job: { include: { company: true } } },
@@ -558,13 +575,21 @@ export class OfferLettersService {
       throw new BadRequestException('An offer letter can only be generated for an OFFERED or HIRED application.');
     }
 
+    const existing = await this.prisma.offerLetter.findUnique({ where: { applicationId } });
+    if (existing?.status === 'ACCEPTED' && !opts?.allowResignature) {
+      throw new BadRequestException(
+        'This offer has already been signed by the candidate. Withdraw the signed offer before issuing revised terms.',
+      );
+    }
+
     const settings = await this.prisma.systemSetting.findUnique({ where: { companyId } });
     const { html, header, footer } = await this.generateHtmlFromSettings(settings, application);
 
     const { buffer, isPdf } = await this.htmlToPdf(html, header, footer);
     const pdfUrl = await this.uploadPdf(buffer, isPdf, applicationId);
 
-    const accessToken = crypto.randomBytes(24).toString('hex');
+    // Keep the existing envelope so links already sent still resolve.
+    const accessToken = existing?.accessToken ?? crypto.randomBytes(24).toString('hex');
 
     const letter = await this.prisma.offerLetter.upsert({
       where: { applicationId },
@@ -582,6 +607,18 @@ export class OfferLettersService {
         accessToken,
         issuedAt: new Date(),
         respondedAt: null,
+        // The document changed, so any signature or view against the previous
+        // version no longer applies to it.
+        signatureName: null,
+        signatureImage: null,
+        signatureType: null,
+        signatureIp: null,
+        signatureUserAgent: null,
+        initialsImage: null,
+        countersignedPdfUrl: null,
+        viewedAt: null,
+        unlockedAt: null,
+        unlockAttempts: 0,
       },
     });
 
@@ -1033,6 +1070,11 @@ export class OfferLettersService {
       offeredSalary: annualCtc > 0 ? `INR ${this.inr(annualCtc)}/- CTC` : 'as discussed',
       annualCtc: this.inr(annualCtc),
       monthlyCtc: this.inr(annualCtc / 12),
+      // Fixed/variable split, for templates that state one explicitly.
+      fixedCtc: this.inr(annualCtc * (100 - (cfg.variablePayPercent ?? 20)) / 100),
+      variableCtc: this.inr(annualCtc * (cfg.variablePayPercent ?? 20) / 100),
+      fixedPercent: String(100 - (cfg.variablePayPercent ?? 20)),
+      variablePercent: String(cfg.variablePayPercent ?? 20),
       issuedDate: fmtDate(issuedDate || new Date()),
       // Falls back to a readable phrase so a letter issued before the joining date
       // is agreed still reads correctly ("join on your date of joining at 9:30 AM").
@@ -1278,7 +1320,15 @@ export class OfferLettersService {
     '##OFFERED_CTC##': 'offeredSalary',
     '##ANNUAL_CTC##': 'annualCtc',
     '##MONTHLY_CTC##': 'monthlyCtc',
+    '##FIXED_CTC##': 'fixedCtc',
+    '##VARIABLE_CTC##': 'variableCtc',
+    '##FIXED_PERCENT##': 'fixedPercent',
+    '##VARIABLE_PERCENT##': 'variablePercent',
+    '##JOINING_DATE##': 'joiningDate',
     '##REPORTING_TIME##': 'reportingTime',
+    // Worksuite's own convention for "type the date in by hand". Templates
+    // imported from there carry it literally, so resolve it like a tag.
+    'XXXDATEXXX': 'joiningDate',
     // No employee record exists yet, so these have nothing to resolve to.
     '##EMPLOYEE_ID##': '',
     '##EMPLOYEE_DEPARTMENT##': '',

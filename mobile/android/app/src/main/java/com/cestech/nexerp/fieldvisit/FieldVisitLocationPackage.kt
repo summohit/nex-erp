@@ -1,4 +1,4 @@
-package com.nexmobileapp.fieldvisit
+package com.cestech.nexerp.fieldvisit
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

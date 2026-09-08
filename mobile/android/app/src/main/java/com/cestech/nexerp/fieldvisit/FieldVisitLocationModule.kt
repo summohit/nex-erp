@@ -1,4 +1,4 @@
-package com.nexmobileapp.fieldvisit
+package com.cestech.nexerp.fieldvisit
 
 import android.content.Intent
 import android.os.Build

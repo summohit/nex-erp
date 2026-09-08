@@ -26,9 +26,29 @@ export class OnboardingComponent implements OnInit {
   isLoading = signal<boolean>(true);
 
   viewMode = signal<'KANBAN' | 'TABLE'>('KANBAN');
+  searchTerm = signal('');
+
+  filteredBoardData = computed(() => {
+    const term = this.searchTerm().toLowerCase().trim();
+    const data = this.boardData();
+    if (!term) return data;
+    
+    const filterFn = (emp: any) => {
+      const name = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase();
+      const designation = (emp.designation?.name || '').toLowerCase();
+      const department = (emp.department?.name || '').toLowerCase();
+      return name.includes(term) || designation.includes(term) || department.includes(term);
+    };
+
+    return {
+      pending: data.pending.filter(filterFn),
+      inProgress: data.inProgress.filter(filterFn),
+      completed: data.completed.filter(filterFn)
+    };
+  });
 
   tableData = computed(() => {
-    const data = this.boardData();
+    const data = this.filteredBoardData();
     return [...data.pending, ...data.inProgress, ...data.completed];
   });
 

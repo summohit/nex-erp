@@ -1,4 +1,4 @@
-package com.nexmobileapp.fieldvisit
+package com.cestech.nexerp.fieldvisit
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -18,8 +18,8 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
-import com.nexmobileapp.MainActivity
-import com.nexmobileapp.R
+import com.cestech.nexerp.MainActivity
+import com.cestech.nexerp.R
 import org.json.JSONArray
 
 /**
@@ -42,7 +42,7 @@ class FieldVisitLocationService : Service() {
     private const val PREFS_NAME = "field_visit_tracking"
     private const val KEY_POINTS = "points"
     private const val KEY_VISIT_ID = "visit_id"
-    const val ACTION_STOP = "com.nexmobileapp.fieldvisit.STOP"
+    const val ACTION_STOP = "com.cestech.nexerp.fieldvisit.STOP"
     const val EXTRA_VISIT_ID = "visitId"
 
     private fun prefs(context: Context): SharedPreferences =

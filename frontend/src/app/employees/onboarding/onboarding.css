@@ -37,6 +37,14 @@
   gap: 16px;
 }
 
+.search-wrap {
+  width: 250px;
+}
+
+.search-wrap .form-control {
+  margin: 0;
+}
+
 .view-toggle {
   display: flex;
   background: #f3f4f6;

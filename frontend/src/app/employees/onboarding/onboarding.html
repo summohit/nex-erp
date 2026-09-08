@@ -5,6 +5,9 @@
       <p>Track new hire progress through their onboarding checklists.</p>
     </div>
     <div class="header-actions">
+      <div class="search-wrap">
+        <input type="text" class="form-control" placeholder="Search by name or designation..." [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)">
+      </div>
       <div class="view-toggle">
         <button [class.active]="viewMode() === 'KANBAN'" (click)="viewMode.set('KANBAN')" title="Kanban View">
           <svg lucideLayoutGrid size="16"></svg>
@@ -28,16 +31,16 @@
           <svg lucideListTodo size="16"></svg>
           <h3>Not Started</h3>
         </div>
-        <span class="count-badge">{{ boardData().pending.length }}</span>
+        <span class="count-badge">{{ filteredBoardData().pending.length }}</span>
       </div>
       
       <div class="kanban-cards"
            id="pendingList"
            cdkDropList
-           [cdkDropListData]="boardData().pending"
+           [cdkDropListData]="filteredBoardData().pending"
            (cdkDropListDropped)="drop($event)">
            
-        <div class="empty-column-state" *ngIf="!isLoading() && !boardData().pending.length">
+        <div class="empty-column-state" *ngIf="!isLoading() && !filteredBoardData().pending.length">
           Drop cards here
         </div>
 
@@ -54,7 +57,7 @@
 
         <ng-container *ngIf="!isLoading()">
 
-        <div class="kanban-card" *ngFor="let emp of boardData().pending" cdkDrag (click)="openChecklist(emp)">
+        <div class="kanban-card" *ngFor="let emp of filteredBoardData().pending" cdkDrag (click)="openChecklist(emp)">
           <div class="card-drag-handle" cdkDragHandle>
             <svg lucideGripVertical size="16"></svg>
           </div>
@@ -88,16 +91,16 @@
           <svg lucideClock size="16"></svg>
           <h3>In Progress</h3>
         </div>
-        <span class="count-badge">{{ boardData().inProgress.length }}</span>
+        <span class="count-badge">{{ filteredBoardData().inProgress.length }}</span>
       </div>
       
       <div class="kanban-cards"
            id="inProgressList"
            cdkDropList
-           [cdkDropListData]="boardData().inProgress"
+           [cdkDropListData]="filteredBoardData().inProgress"
            (cdkDropListDropped)="drop($event)">
            
-        <div class="empty-column-state" *ngIf="!isLoading() && !boardData().inProgress.length">
+        <div class="empty-column-state" *ngIf="!isLoading() && !filteredBoardData().inProgress.length">
           Drop cards here
         </div>
 
@@ -114,7 +117,7 @@
 
         <ng-container *ngIf="!isLoading()">
 
-        <div class="kanban-card" *ngFor="let emp of boardData().inProgress" cdkDrag (click)="openChecklist(emp)">
+        <div class="kanban-card" *ngFor="let emp of filteredBoardData().inProgress" cdkDrag (click)="openChecklist(emp)">
           <div class="card-drag-handle" cdkDragHandle>
             <svg lucideGripVertical size="16"></svg>
           </div>
@@ -148,16 +151,16 @@
           <svg lucideCheckCircle2 size="16"></svg>
           <h3>Completed</h3>
         </div>
-        <span class="count-badge">{{ boardData().completed.length }}</span>
+        <span class="count-badge">{{ filteredBoardData().completed.length }}</span>
       </div>
       
       <div class="kanban-cards"
            id="completedList"
            cdkDropList
-           [cdkDropListData]="boardData().completed"
+           [cdkDropListData]="filteredBoardData().completed"
            (cdkDropListDropped)="drop($event)">
            
-        <div class="empty-column-state" *ngIf="!isLoading() && !boardData().completed.length">
+        <div class="empty-column-state" *ngIf="!isLoading() && !filteredBoardData().completed.length">
           Drop cards here
         </div>
 
@@ -174,7 +177,7 @@
 
         <ng-container *ngIf="!isLoading()">
 
-        <div class="kanban-card" *ngFor="let emp of boardData().completed" cdkDrag (click)="openChecklist(emp)">
+        <div class="kanban-card" *ngFor="let emp of filteredBoardData().completed" cdkDrag (click)="openChecklist(emp)">
           <div class="card-drag-handle" cdkDragHandle>
             <svg lucideGripVertical size="16"></svg>
           </div>

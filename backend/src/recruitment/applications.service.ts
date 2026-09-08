@@ -71,6 +71,7 @@ export class ApplicationsService {
     // the generated offer letter ({{joiningDate}} / {{candidateAddress}}).
     joiningDate?: string | Date | null,
     address?: string | null,
+    actorUserId?: number,
   ) {
     const application = await this.findOne(id, companyId);
 
@@ -86,7 +87,20 @@ export class ApplicationsService {
       }
     }
 
-    return this.prisma.jobApplication.update({
+    // Moving to ONBOARDED must actually create the employee, whichever route
+    // the user took. Do it before writing the status so a failure surfaces
+    // instead of leaving the application claiming an onboarding that never ran.
+    let onboarding: { employeeId?: number; lettersIssued?: string[]; alreadyOnboarded?: boolean } | undefined;
+    if (finalStatus === 'ONBOARDED' && application.status !== 'ONBOARDED') {
+      const emp: any = await this.convertToEmployee(application, companyId, actorUserId);
+      onboarding = {
+        employeeId: emp?.id,
+        lettersIssued: emp?.lettersIssued || [],
+        alreadyOnboarded: !!emp?.alreadyOnboarded,
+      };
+    }
+
+    const updated = await this.prisma.jobApplication.update({
       where: { id: application.id },
       data: {
         status: finalStatus,
@@ -99,6 +113,8 @@ export class ApplicationsService {
         approvalStatus
       },
     });
+
+    return onboarding ? { ...updated, onboarding } : updated;
   }
 
   async approveSalary(id: number, companyId: number) {
@@ -126,7 +142,7 @@ export class ApplicationsService {
 
   async onboardCandidate(id: number, companyId: number, actorUserId?: number) {
     const application = await this.findOne(id, companyId);
-    
+
     if (application.status !== 'HIRED') {
       throw new BadRequestException('Only HIRED candidates can be onboarded');
     }
@@ -135,10 +151,31 @@ export class ApplicationsService {
       throw new BadRequestException('Cannot onboard candidate with pending salary approval');
     }
 
+    return this.convertToEmployee(application, companyId, actorUserId);
+  }
+
+  /**
+   * Turn an application into a real User + Employee.
+   *
+   * Split out from onboardCandidate so that moving a candidate to ONBOARDED by
+   * any route — the button, the status dropdown, a kanban drag — creates the
+   * employee. Previously only the button did, so the other routes left the
+   * application claiming ONBOARDED with no employee behind it.
+   */
+  private async convertToEmployee(application: any, companyId: number, actorUserId?: number) {
+    if (!application.email) {
+      throw new BadRequestException('This candidate has no email address, so no employee login can be created');
+    }
+
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: application.email }
+      where: { email: application.email },
+      include: { employee: { select: { id: true, companyId: true } } },
     });
     if (existingUser) {
+      // Already converted: report it rather than failing the caller.
+      if (existingUser.employee && existingUser.employee.companyId === companyId) {
+        return { ...existingUser.employee, alreadyOnboarded: true, lettersIssued: [] as string[] };
+      }
       throw new BadRequestException('A user with this email already exists');
     }
 

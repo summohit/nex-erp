@@ -63,6 +63,7 @@ export class ApplicationsController {
   ) {
     return this.applicationsService.updateStatus(
       id, req.user.companyId, status, offeredSalary, rejectionReason, joiningDate, address,
+      req.user.sub,
     );
   }
 

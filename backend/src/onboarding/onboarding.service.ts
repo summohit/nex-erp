@@ -14,16 +14,87 @@ export class OnboardingService {
   }
 
   async addTemplate(companyId: number, data: { title: string, description?: string }) {
-    return this.prisma.onboardingTemplate.create({
+    const template = await this.prisma.onboardingTemplate.create({
       data: {
         title: data.title,
         description: data.description,
         companyId
       }
     });
+
+    // Retroactively assign to employees currently in the onboarding pipeline
+    const onboardingEmployees = await this.prisma.employee.findMany({
+      where: {
+        companyId,
+        onboardingStatus: {
+          in: ['PENDING', 'IN_PROGRESS']
+        }
+      },
+      select: { id: true }
+    });
+
+    if (onboardingEmployees.length > 0) {
+      await this.prisma.employeeOnboardingTask.createMany({
+        data: onboardingEmployees.map(emp => ({
+          employeeId: emp.id,
+          title: template.title,
+          description: template.description
+        }))
+      });
+    }
+
+    return template;
   }
 
   async deleteTemplate(companyId: number, id: number) {
+    const template = await this.prisma.onboardingTemplate.findUnique({
+      where: { id, companyId }
+    });
+
+    if (!template) throw new NotFoundException('Template not found');
+
+    // Find affected employees before deleting
+    const affectedTasks = await this.prisma.employeeOnboardingTask.findMany({
+      where: {
+        title: template.title,
+        isCompleted: false,
+        employee: { companyId }
+      },
+      select: { employeeId: true }
+    });
+
+    const affectedEmployeeIds = [...new Set(affectedTasks.map(t => t.employeeId))];
+
+    // Retroactively remove this task from employees who haven't completed it
+    await this.prisma.employeeOnboardingTask.deleteMany({
+      where: {
+        title: template.title,
+        isCompleted: false,
+        employee: { companyId }
+      }
+    });
+
+    // Recalculate status for affected employees
+    for (const empId of affectedEmployeeIds) {
+      const allTasks = await this.prisma.employeeOnboardingTask.findMany({
+        where: { employeeId: empId }
+      });
+
+      const completedTasksCount = allTasks.filter(t => t.isCompleted).length;
+      let newStatus = 'PENDING';
+
+      if (completedTasksCount === allTasks.length && allTasks.length > 0) {
+        newStatus = 'COMPLETED';
+      } else if (completedTasksCount > 0) {
+        newStatus = 'IN_PROGRESS';
+      }
+
+      await this.prisma.employee.update({
+        where: { id: empId },
+        data: { onboardingStatus: newStatus }
+      });
+    }
+
     return this.prisma.onboardingTemplate.delete({
       where: { id, companyId }
     });

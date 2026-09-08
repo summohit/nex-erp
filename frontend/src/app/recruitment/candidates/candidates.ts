@@ -722,6 +722,20 @@ export class CandidatesComponent implements OnInit {
   generateOfferLetter() {
     const app = this.selectedApp();
     if (!app) return;
+
+    const letter = this.offerLetter();
+    if (letter && letter.status === 'ACCEPTED') {
+      this.toast.error('This offer is already signed. Withdraw it before issuing revised terms.');
+      return;
+    }
+    if (letter && (letter.status === 'SENT' || letter.viewedAt)) {
+      const ok = confirm(
+        'Rebuild this offer letter from the current CTC and joining date?\n\n' +
+        'The candidate keeps the same signing link, but any copy they have already ' +
+        'opened will be replaced by the revised terms.');
+      if (!ok) return;
+    }
+
     this.isGeneratingOfferLetter.set(true);
     this.candidatesService.generateOfferLetter(app.id).subscribe({
       next: (letter) => {
@@ -866,6 +880,18 @@ export class CandidatesComponent implements OnInit {
       },
       error: () => this.toast.error('Failed to update interview')
     });
+  }
+
+  /**
+   * Re-open the offer modal for a candidate who is already OFFERED or HIRED, so
+   * the CTC, joining date or address can be revised. The status dropdown only
+   * fires on a change, so without this there was no way back into these fields.
+   */
+  editOfferTerms() {
+    const app = this.selectedApp();
+    if (!app) return;
+    const stage = this.normaliseStage(app.status);
+    this.openSalaryPrompt(app, stage === 'HIRED' ? 'HIRED' : 'OFFERED');
   }
 
   updateDrawerStatus(newStatus: string) {
