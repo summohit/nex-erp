@@ -134,6 +134,29 @@ export class MenusService implements OnModuleInit {
             });
             await this.prisma.menu.update({ where: { id: crmParent.id }, data: { route: null } });
           }
+
+          // Ensure Lead Contacts is a CRM sub-item directly below Leads
+          const leadContactsSubMenu = await this.prisma.menu.findFirst({ where: { title: 'Lead Contacts', parentId: crmParent.id } });
+          if (!leadContactsSubMenu) {
+            await this.prisma.menu.create({
+              data: {
+                title: 'Lead Contacts',
+                icon: 'funnel',
+                route: '/crm/lead-contacts',
+                displayOrder: 2,
+                parentId: crmParent.id,
+                isActive: true,
+              },
+            });
+            this.logger.log('Lead Contacts menu auto-seeded successfully.');
+          } else {
+            // Existing installations may have an old/inactive row. Keep this
+            // quick link visible and pointing at the CRM Lead Contacts view.
+            await this.prisma.menu.update({
+              where: { id: leadContactsSubMenu.id },
+              data: { route: '/crm/lead-contacts', displayOrder: 2, isActive: true },
+            });
+          }
         }
 
         // Follow-Ups menu is now accessible via the CRM Leads Board, not the sidebar

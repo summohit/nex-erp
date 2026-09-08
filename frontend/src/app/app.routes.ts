@@ -273,6 +273,12 @@ export const routes: Routes = [
         loadComponent: () => import('./crm/lead-profile/lead-profile.component').then(m => m.LeadProfileComponent)
       },
       {
+        path: 'crm/lead-contacts',
+        canActivate: [permissionGuard],
+        data: { module: 'crm/leads' },
+        loadComponent: () => import('./crm/leads/leads').then(m => m.LeadsComponent)
+      },
+      {
         path: 'crm/lead-contacts/:id',
         canActivate: [permissionGuard],
         data: { module: 'crm/leads' },

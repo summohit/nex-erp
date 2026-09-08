@@ -334,6 +334,9 @@ export class LeadsComponent implements OnInit {
   constructor(private http: HttpClient, private router: Router, public auth: AuthService, private toast: HotToastService) {}
 
   ngOnInit() {
+    if (this.router.url.startsWith('/crm/lead-contacts')) {
+      this.activeMainTab = 'contacts';
+    }
     this.loadLeads();
     this.loadEmployees();
     this.loadLeadContacts();
