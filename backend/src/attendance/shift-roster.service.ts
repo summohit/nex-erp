@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -16,6 +17,11 @@ export interface RosterAssignment {
   shiftId?: number | null;
   isDayOff?: boolean;
   note?: string;
+  /** On-site shift details */
+  projectId?: number | null;
+  address?: string | null;
+  /** True when the requester chose "No Project" — routes the row to Admin + HR. */
+  needsApproval?: boolean;
 }
 
 /** Midnight UTC for a YYYY-MM-DD key — matches how @db.Date round-trips. */
@@ -31,7 +37,10 @@ function toKey(d: Date): string {
 
 @Injectable()
 export class ShiftRosterService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   /**
    * The roster grid: one row per employee, one cell per day in the range.
@@ -79,7 +88,7 @@ export class ShiftRosterService {
     const [entries, leaves, shifts] = await Promise.all([
       this.prisma.shiftRosterEntry.findMany({
         where: { companyId, employeeId: { in: empIds }, date: { gte: start, lte: end } },
-        include: { shift: true },
+        include: { shift: true, project: { select: { id: true, name: true, address: true } } },
       }),
       this.prisma.leaveRequest.findMany({
         where: {
@@ -128,9 +137,19 @@ export class ShiftRosterService {
         if (entry) {
           if (entry.isDayOff) return { date: day, type: 'DAY_OFF', entryId: entry.id, note: entry.note };
           if (entry.shift) {
+            const onSite =
+              entry.projectId || entry.address || entry.onsiteApprovalStatus !== 'NONE'
+                ? {
+                    projectId: entry.projectId as number | null,
+                    projectName: entry.project?.name || null,
+                    address: entry.address || null,
+                    approvalStatus: entry.onsiteApprovalStatus,
+                  }
+                : undefined;
             return {
               date: day, type: 'SHIFT', entryId: entry.id, note: entry.note,
               shift: this.shiftBrief(entry.shift),
+              onSite,
             };
           }
         }
@@ -161,7 +180,7 @@ export class ShiftRosterService {
   async assign(companyId: number, a: RosterAssignment) {
     const date = dateKey(a.date);
     await this.assertEmployee(companyId, a.employeeId);
-    if (a.shiftId) await this.assertShift(companyId, a.shiftId);
+    const shift = a.shiftId ? await this.assertShift(companyId, a.shiftId) : null;
 
     // Clearing a cell removes the override so the standing shift shows again.
     if (!a.shiftId && !a.isDayOff) {
@@ -169,12 +188,53 @@ export class ShiftRosterService {
       return { cleared: true };
     }
 
+    const onSite = await this.resolveOnSiteDetails(companyId, shift, a);
+
+    // On-site "No Project" request — the row is held for Administrator + HR.
+    if (onSite.needsApproval) {
+      const entry = await this.prisma.shiftRosterEntry.upsert({
+        where: { employeeId_date: { employeeId: a.employeeId, date } },
+        update: {
+          shiftId: a.shiftId,
+          isDayOff: !!a.isDayOff,
+          projectId: null,
+          address: onSite.address,
+          onsiteApprovalStatus: 'PENDING',
+          approvedByUserId: null,
+          note: a.note ?? 'On-site (No Project) — awaiting approval',
+        },
+        create: {
+          employeeId: a.employeeId, date, companyId,
+          shiftId: a.isDayOff ? null : a.shiftId,
+          isDayOff: !!a.isDayOff,
+          address: onSite.address,
+          onsiteApprovalStatus: 'PENDING',
+          note: 'On-site (No Project) — awaiting approval',
+        },
+      });
+      await this.notifyOnsiteApprovers(companyId, a.employeeId, date);
+      return entry;
+    }
+
     return this.prisma.shiftRosterEntry.upsert({
       where: { employeeId_date: { employeeId: a.employeeId, date } },
-      update: { shiftId: a.isDayOff ? null : a.shiftId, isDayOff: !!a.isDayOff, note: a.note ?? null },
+      update: {
+        shiftId: a.isDayOff ? null : a.shiftId,
+        isDayOff: !!a.isDayOff,
+        projectId: onSite.projectId,
+        address: onSite.address,
+        onsiteApprovalStatus: 'NONE',
+        approvedByUserId: null,
+        note: a.note ?? null,
+      },
       create: {
         employeeId: a.employeeId, date, companyId,
-        shiftId: a.isDayOff ? null : a.shiftId, isDayOff: !!a.isDayOff, note: a.note ?? null,
+        shiftId: a.isDayOff ? null : a.shiftId,
+        isDayOff: !!a.isDayOff,
+        projectId: onSite.projectId,
+        address: onSite.address,
+        onsiteApprovalStatus: 'NONE',
+        note: a.note ?? null,
       },
     });
   }
@@ -188,6 +248,10 @@ export class ShiftRosterService {
     employeeIds: number[]; start: string; end: string;
     shiftId?: number | null; isDayOff?: boolean;
     skipNonWorkingDays?: boolean; overwriteExisting?: boolean;
+    /** On-site shift details (used when the bulk shift is an on-site shift). */
+    projectId?: number | null;
+    address?: string | null;
+    needsApproval?: boolean;
   }) {
     const { employeeIds = [], start, end } = data;
     if (!employeeIds.length) throw new BadRequestException('Select at least one employee');
@@ -196,13 +260,17 @@ export class ShiftRosterService {
     if (to < from) throw new BadRequestException('end must not be before start');
 
     const shift = data.shiftId ? await this.assertShift(companyId, data.shiftId) : null;
+    const onSite = await this.resolveOnSiteDetails(companyId, shift, data);
     const valid = await this.prisma.employee.findMany({
       where: { companyId, id: { in: employeeIds } }, select: { id: true },
     });
     const validIds = new Set(valid.map(v => v.id));
 
     const working = shift?.workingDays ? shift.workingDays.split(',') : null;
-    const rows: { employeeId: number; date: Date; shiftId: number | null; isDayOff: boolean; companyId: number }[] = [];
+    const rows: {
+      employeeId: number; date: Date; shiftId: number | null; isDayOff: boolean; companyId: number;
+      projectId: number | null; address: string | null; onsiteApprovalStatus: string;
+    }[] = [];
     for (const employeeId of employeeIds) {
       if (!validIds.has(employeeId)) continue;
       for (let d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
@@ -212,6 +280,9 @@ export class ShiftRosterService {
           employeeId, date: new Date(d), companyId,
           shiftId: data.isDayOff || offDay ? null : (data.shiftId ?? null),
           isDayOff: !!data.isDayOff || offDay,
+          projectId: onSite.projectId,
+          address: onSite.address,
+          onsiteApprovalStatus: onSite.needsApproval && !data.isDayOff ? 'PENDING' : 'NONE',
         });
       }
     }
@@ -236,6 +307,14 @@ export class ShiftRosterService {
     for (let i = 0; i < rows.length; i += 1000) {
       await this.prisma.shiftRosterEntry.createMany({ data: rows.slice(i, i + 1000) });
     }
+
+    // "No Project" bulk — alert the Administrator + HR once per affected person.
+    if (onSite.needsApproval && !data.isDayOff) {
+      for (const employeeId of validIds) {
+        await this.notifyOnsiteApprovers(companyId, employeeId, from);
+      }
+    }
+
     return { written: rows.length, skipped: 0 };
   }
 
@@ -250,6 +329,98 @@ export class ShiftRosterService {
     return { cleared: res.count };
   }
 
+  /** Pending on-site ("No Project") requests awaiting Administrator/HR. */
+  async getPendingOnsiteApprovals(companyId: number) {
+    return this.prisma.shiftRosterEntry.findMany({
+      where: { companyId, onsiteApprovalStatus: 'PENDING' },
+      include: {
+        employee: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: true, department: { select: { name: true } } },
+        },
+        shift: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true } },
+      },
+      orderBy: [{ date: 'asc' }, { employee: { firstName: 'asc' } }],
+    });
+  }
+
+  /** Approve or reject an on-site "No Project" request. Only Admins and HR. */
+  async resolveOnsiteApproval(
+    companyId: number,
+    entryId: number,
+    action: 'APPROVED' | 'REJECTED',
+    actorUserId: number,
+    actorRole: string,
+  ) {
+    if (!['ADMIN', 'HR', 'SUPERADMIN'].includes(actorRole)) {
+      throw new ForbiddenException('Only Administrators and HR can approve on-site requests');
+    }
+    const entry = await this.prisma.shiftRosterEntry.findFirst({ where: { id: entryId, companyId } });
+    if (!entry) throw new NotFoundException('On-site request not found');
+    if (entry.onsiteApprovalStatus !== 'PENDING') {
+      throw new BadRequestException('Request is no longer pending');
+    }
+
+    if (action === 'REJECTED') {
+      // Falls back to the standing shift — the on-site assignment is voided.
+      await this.prisma.shiftRosterEntry.delete({ where: { id: entryId } });
+      await this.notifyRequester(entry, 'REJECTED');
+      return { id: entryId, status: 'REJECTED', entryId };
+    }
+
+    const updated = await this.prisma.shiftRosterEntry.update({
+      where: { id: entryId },
+      data: { onsiteApprovalStatus: 'APPROVED', approvedByUserId: actorUserId },
+    });
+    await this.notifyRequester(entry, 'APPROVED');
+    return updated;
+  }
+
+  /** Best-effort notification to Administrator + HR that an on-site request needs them. */
+  private async notifyOnsiteApprovers(companyId: number, employeeId: number, date: Date) {
+    try {
+      const emp = await this.prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { userId: true, firstName: true, lastName: true },
+      });
+      const name = emp ? `${emp.firstName} ${emp.lastName}`.trim() : `Employee #${employeeId}`;
+      await this.notifications.notifyApprovers({
+        companyId,
+        roles: ['ADMIN', 'HR', 'SUPERADMIN'],
+        title: 'On-site request awaiting approval',
+        message: `${name} requested On-site work (No Project) on ${toKey(date)}`,
+        type: 'ACTION_REQUIRED',
+        linkUrl: '/attendance/shift-roster',
+        excludeUserId: emp?.userId ?? undefined,
+      });
+    } catch {
+      // Notifications are best-effort — never fail an assignment because of one.
+    }
+  }
+
+  /** Tell the requester their on-site request was decided. */
+  private async notifyRequester(
+    entry: { employeeId: number; date: Date },
+    status: 'APPROVED' | 'REJECTED',
+  ) {
+    try {
+      const emp = await this.prisma.employee.findUnique({
+        where: { id: entry.employeeId },
+        select: { userId: true, firstName: true, lastName: true },
+      });
+      if (!emp?.userId) return;
+      await this.notifications.createNotification(
+        emp.userId,
+        status === 'APPROVED' ? 'On-site request approved' : 'On-site request rejected',
+        `Your on-site (No Project) request for ${toKey(entry.date)} was ${status.toLowerCase()}.`,
+        status === 'APPROVED' ? 'SUCCESS' : 'INFO',
+        '/attendance/shift-roster',
+      );
+    } catch {
+      // Best-effort.
+    }
+  }
+
   private async assertEmployee(companyId: number, employeeId: number) {
     const e = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: { id: true } });
     if (!e) throw new BadRequestException('Employee not found');
@@ -260,5 +431,47 @@ export class ShiftRosterService {
     const s = await this.prisma.shift.findFirst({ where: { id: shiftId, companyId } });
     if (!s) throw new BadRequestException('Shift not found');
     return s;
+  }
+
+  /**
+   * Enforce the on-site workflow on the server as well as in the UI. This
+   * prevents direct API calls from creating an on-site assignment without a
+   * project (or the explicit No Project approval path) and a work address.
+   */
+  private async resolveOnSiteDetails(
+    companyId: number,
+    shift: { name: string } | null,
+    data: { isDayOff?: boolean; projectId?: number | null; address?: string | null; needsApproval?: boolean },
+  ) {
+    const isOnSite = !!shift?.name && shift.name.toLowerCase().replace(/[^a-z]/g, '').includes('onsite');
+    const requestedAddress = data.address?.trim() || null;
+
+    if (!isOnSite || data.isDayOff) {
+      if (data.needsApproval || data.projectId || requestedAddress) {
+        throw new BadRequestException('Project and address details can only be used with an on-site shift');
+      }
+      return { projectId: null, address: null, needsApproval: false };
+    }
+
+    if (data.needsApproval) {
+      if (data.projectId) throw new BadRequestException('Choose either a project or No Project, not both');
+      if (!requestedAddress) throw new BadRequestException('Enter the on-site address before sending for approval');
+      return { projectId: null, address: requestedAddress, needsApproval: true };
+    }
+
+    if (!data.projectId) {
+      throw new BadRequestException('Select a project or choose No Project for an on-site shift');
+    }
+    const project = await this.prisma.project.findFirst({
+      where: { id: data.projectId, companyId },
+      select: { id: true, address: true },
+    });
+    if (!project) throw new BadRequestException('Selected project was not found');
+
+    // The configured project address is the default, while a user-entered
+    // address can be retained for a specific site visit.
+    const address = requestedAddress || project.address?.trim() || null;
+    if (!address) throw new BadRequestException('The selected project has no address; enter an on-site address');
+    return { projectId: project.id, address, needsApproval: false };
   }
 }

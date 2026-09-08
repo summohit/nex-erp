@@ -58,6 +58,7 @@ export class ProjectsService {
         description: data.description,
         color: data.color || '#2563eb',
         icon: data.icon || 'folder',
+        address: data.address ?? null,
         startDate: data.startDate ? new Date(data.startDate) : null,
         endDate: data.endDate ? new Date(data.endDate) : null,
         billingType: data.billingType || 'NON_BILLABLE',
@@ -138,6 +139,7 @@ export class ProjectsService {
           name: data.name,
           key: finalKey,
           description: data.description,
+          address: data.address ?? null,
           companyId,
           leadId,
           status: 'DRAFT',
@@ -799,6 +801,7 @@ export class ProjectsService {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
+    if (data.address !== undefined) updateData.address = data.address ?? null;
     if (data.color !== undefined) updateData.color = data.color;
     if (data.icon !== undefined) updateData.icon = data.icon;
     if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;

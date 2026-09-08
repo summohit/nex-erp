@@ -520,7 +520,8 @@ export class ProjectsComponent implements OnInit {
     budgetAmount: null as number | null,
     hourlyRate: null as number | null,
     clientId: null as number | null,
-    pmIds: [] as number[]
+    pmIds: [] as number[],
+    address: ''
   };
 
   gradients = [
@@ -693,7 +694,8 @@ export class ProjectsComponent implements OnInit {
       budgetAmount: null as number | null,
       hourlyRate: null as number | null,
       clientId: null as number | null,
-      pmIds: [] as number[]
+      pmIds: [] as number[],
+      address: ''
     };
     this.selectedBg.set(this.colorBackgrounds[1]);
     this.isSubmitted.set(false);
@@ -713,7 +715,8 @@ export class ProjectsComponent implements OnInit {
       budgetAmount: project.budgetAmount,
       hourlyRate: project.hourlyRate,
       clientId: project.clientId,
-      pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || []
+      pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || [],
+      address: project.address || ''
     };
     
     // Set the selected background (match it or use gradient as fallback)
@@ -751,7 +754,8 @@ export class ProjectsComponent implements OnInit {
       budgetAmount: this.projectForm.budgetAmount || null,
       hourlyRate: this.projectForm.hourlyRate || null,
       clientId: this.projectForm.clientId || null,
-      pmIds: this.projectForm.pmIds
+      pmIds: this.projectForm.pmIds,
+      address: this.projectForm.address || null
     };
 
     if (this.editingProjectId()) {

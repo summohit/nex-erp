@@ -563,6 +563,17 @@
       </select>
     </div>
 
+    <!-- On-site Address (used by the Shift Roster's on-site flow) -->
+    <div class="form-section">
+      <label class="section-label">On-site Address</label>
+      <textarea
+        class="trello-input" rows="2"
+        [(ngModel)]="projectForm.address"
+        placeholder="Work location for on-site shifts — auto-filled into the Shift Roster">
+      </textarea>
+      <small style="color: #6b7280; font-size: 12px; margin-top: 6px; display: block;">Staff selecting this project for an on-site shift will default to this address.</small>
+    </div>
+
     <!-- Project Managers Selection -->
     <div class="form-section">
       <label class="section-label">Project Managers</label>

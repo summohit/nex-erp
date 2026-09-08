@@ -334,6 +334,43 @@ thead .emp-col { z-index: 4; background: #F8FAFC; }
 /* A default (non-rostered) cell is dimmed so real assignments stand out. */
 .chip.is-default { opacity: 0.42; }
 
+/* On-site marker inside a shift chip. */
+.chip-onsite {
+  align-self: flex-start;
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(15, 23, 42, 0.28);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-onsite.pending {
+  background: rgba(245, 158, 11, 0.45);
+}
+
+.chip-pending-legend { background: #F59E0B; }
+
+.approval-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #DC2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .chip-off {
   background: #F1F5F9;
   color: #64748B;
@@ -514,6 +551,73 @@ thead .emp-col { z-index: 4; background: #F8FAFC; }
 
 .bulk-emp-item:hover { background: #F8FAFC; }
 .bulk-emp-item small { margin-left: auto; color: #94A3B8; font-size: 11px; }
+
+/* ── on-site details / approvals ─────────────────────────────────────── */
+.onsite-intro {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.onsite-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #64748B;
+}
+
+.onsite-hint.warn { color: #B45309; }
+
+.onsite-note {
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #92400E;
+  background: #FEF3C7;
+  border: 1px solid #FDE68A;
+  border-radius: 8px;
+}
+
+.form-group .onsite-address {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.approval-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #F1F5F9;
+  border-radius: 8px;
+}
+
+.approval-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.approval-info strong { font-size: 13px; color: #0F172A; }
+.approval-date { font-size: 12px; color: #64748B; }
+
+.approval-addr {
+  font-size: 11px;
+  color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
 
 @media (max-width: 720px) {
   .bulk-grid { grid-template-columns: 1fr; }

@@ -49,6 +49,30 @@ export class ShiftsController {
     return this.rosterService.clearRange(req.user.companyId, data);
   }
 
+  // On-site "No Project" requests — visible to anyone with roster access.
+  @Get('roster/onsite/pending')
+  @Permissions('attendance/shifts')
+  pendingOnsite(@Request() req) {
+    return this.rosterService.getPendingOnsiteApprovals(req.user.companyId);
+  }
+
+  // Approve / reject — only Administrators and HR (enforced in the service).
+  @Post('roster/onsite/:entryId/resolve')
+  @Permissions('attendance/shifts')
+  resolveOnsite(
+    @Request() req,
+    @Param('entryId', ParseIntPipe) entryId: number,
+    @Body() body: { action: 'APPROVED' | 'REJECTED' },
+  ) {
+    return this.rosterService.resolveOnsiteApproval(
+      req.user.companyId,
+      entryId,
+      body.action,
+      req.user.sub,
+      req.user.role,
+    );
+  }
+
   @Get('me')
   getMyShift(@Request() req) {
     return this.shiftsService.getMyShift(req.user.sub);

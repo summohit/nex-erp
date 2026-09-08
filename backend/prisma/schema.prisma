@@ -547,6 +547,16 @@ model ShiftRosterEntry {
   shift      Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   isDayOff   Boolean  @default(false)
   note       String?
+  // On-site work details: when the assigned shift is an on-site shift the
+  // roster needs to know WHERE the work happens. Project is optional — staff
+  // may work at a site that no project has been created for yet.
+  projectId Int?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  address   String?  @db.Text
+  // NONE = normal roster cell. PENDING = "No Project" on-site, awaiting
+  // Administrator + HR approval. APPROVED / REJECTED = resolved.
+  onsiteApprovalStatus String @default("NONE") // NONE, PENDING, APPROVED, REJECTED
+  approvedByUserId     Int?
   companyId  Int
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
@@ -554,6 +564,7 @@ model ShiftRosterEntry {
 
   @@unique([employeeId, date])
   @@index([companyId, date])
+  @@index([companyId, onsiteApprovalStatus])
 }
 
 model ShiftRotation {
@@ -1062,6 +1073,7 @@ model Project {
   status      String    @default("ACTIVE") // ACTIVE, ARCHIVED (lifecycle status — unrelated to workStatus)
   category    String? // free-text project category (e.g. "Implementation and Deployment")
   progress    Int? // 0-100 completion percentage
+  address     String?   @db.Text // On-site work location for this project, set at creation
   workStatus  String? // NOT_STARTED, IN_PROGRESS, FINISHED (work status — distinct from ACTIVE/ARCHIVED)
   leadId      Int? // Project lead (Employee)
   lead        Employee? @relation("ProjectLead", fields: [leadId], references: [id])
@@ -1092,6 +1104,7 @@ model Project {
   analysisRuns  ProjectAnalysisRun[]
   fieldVisits   FieldVisit[]         @relation("ProjectFieldVisits")
   expenseClaims ExpenseClaim[]
+  rosterEntries ShiftRosterEntry[]
 
   @@unique([key, companyId])
 }

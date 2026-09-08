@@ -5,6 +5,10 @@
       <p>Who works which shift, day by day. Click any cell to change it.</p>
     </div>
     <div class="header-actions">
+      <button class="btn-outline" *ngIf="isApprover" (click)="openApprovals()" title="On-site (No Project) requests awaiting approval">
+        <svg lucideBadgeCheck size="15"></svg> Approvals
+        <span class="approval-count" *ngIf="pendingOnsite().length">{{ pendingOnsite().length }}</span>
+      </button>
       <button class="btn-outline" (click)="load()" title="Reload">
         <svg lucideRotateCcw size="15"></svg> Refresh
       </button>
@@ -53,6 +57,7 @@
     </span>
     <span class="legend-chip chip-neutral">Day Off</span>
     <span class="legend-chip chip-leave-legend">On Leave</span>
+    <span class="legend-chip chip-pending-legend">⏳ On-site (No Project) — pending approval</span>
     <span class="legend-note">Faded cells are the employee's standing shift, not a rostered one.</span>
   </div>
 
@@ -99,6 +104,9 @@
                  [style.background]="cell.shift?.colorCode || '#2A97D8'">
               <span class="chip-name">{{ cellLabel(cell) }}</span>
               <span class="chip-time">{{ cellTime(cell) }}</span>
+              <span *ngIf="cell.onSite" class="chip-onsite" [class.pending]="cell.onSite.approvalStatus === 'PENDING'">
+                {{ cell.onSite.projectName || 'On-site' }}<span *ngIf="cell.onSite.approvalStatus === 'PENDING'"> · pending</span>
+              </span>
             </div>
 
             <div *ngIf="cell.type === 'DAY_OFF'" class="chip chip-off" [class.is-default]="cell.isDefault">
@@ -225,6 +233,113 @@
       <span class="spacer"></span>
       <button class="btn-outline" (click)="closeBulk()">Cancel</button>
       <button class="btn-primary" (click)="submitBulk()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- On-site details -->
+<div class="modal-overlay" *ngIf="onsiteOpen()" (click)="closeOnsite()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2>On-site Details</h2>
+        <p class="modal-sub">
+          <ng-container *ngIf="onsiteCtx()?.source === 'cell'">
+            {{ onsiteCtx()?.row?.employee?.name }} · {{ onsiteCtx()?.cell?.date }}
+          </ng-container>
+          <ng-container *ngIf="onsiteCtx()?.source === 'bulk'">
+            {{ onsiteCtx()?.bulk?.employeeIds?.length }} employee(s) · {{ bulkForm.start }} → {{ bulkForm.end }}
+          </ng-container>
+        </p>
+      </div>
+      <button class="icon-btn" (click)="closeOnsite()"><svg lucideX size="20"></svg></button>
+    </div>
+
+    <div class="modal-body">
+      <p class="onsite-intro">
+        <strong>{{ onsiteCtx()?.shiftName }}</strong> is an on-site shift — pick the project it belongs to (or
+        choose "No Project"), then set the address.
+      </p>
+
+      <div class="form-group">
+        <label>Project</label>
+        <select class="form-control" [ngModel]="onsiteForm.projectId"
+                (ngModelChange)="onOnsiteProjectChange($event)" [disabled]="noProject()">
+          <option [ngValue]="null">Select project…</option>
+          <option *ngFor="let p of projects()" [ngValue]="p.id">{{ p.name }}</option>
+        </select>
+      </div>
+
+      <div class="bulk-options">
+        <label>
+          <input type="checkbox" [checked]="noProject()" (change)="toggleNoProject()">
+          <span><strong>No Project</strong> — send for approval to Administrator &amp; HR</span>
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label>Address</label>
+        <textarea class="form-control onsite-address" rows="3" [(ngModel)]="onsiteForm.address"
+                  placeholder="Where does the on-site work happen?"></textarea>
+        <small *ngIf="onsiteForm.projectId && selectedProjectAddress" class="onsite-hint">
+          Auto-filled from the project — you can edit it.
+        </small>
+        <small *ngIf="onsiteForm.projectId && !selectedProjectAddress" class="onsite-hint warn">
+          This project has no address on file — enter one now, or add it under the project for next time.
+        </small>
+      </div>
+
+      <div class="onsite-note" *ngIf="noProject()">
+        This request won't apply until an Administrator or HR member approves it.
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <span class="spacer"></span>
+      <button class="btn-outline" (click)="closeOnsite()">Cancel</button>
+      <button class="btn-primary" [disabled]="!canSubmitOnsite || onsiteSubmitting()" (click)="submitOnsite()">
+        {{ noProject() ? 'Send for Approval' : 'Assign On-site' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- On-site approvals (Administrator / HR) -->
+<div class="modal-overlay" *ngIf="approvalsOpen()" (click)="closeApprovals()">
+  <div class="modal-card wide" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2>On-site approvals ({{ pendingOnsite().length }})</h2>
+        <p class="modal-sub">On-site (No Project) requests awaiting an Administrator or HR decision.</p>
+      </div>
+      <button class="icon-btn" (click)="closeApprovals()"><svg lucideX size="20"></svg></button>
+    </div>
+
+    <div class="modal-body">
+      <div class="approval-item" *ngFor="let a of pendingOnsite()">
+        <div class="approval-info">
+          <strong>{{ a.employee.firstName }} {{ a.employee.lastName }}</strong>
+          <span class="approval-date">
+            {{ a.date.split('T')[0] }} · {{ a.shift?.name }}
+            <span *ngIf="a.employee.department?.name"> · {{ a.employee.department.name }}</span>
+          </span>
+          <span class="approval-addr" *ngIf="a.address">{{ a.address }}</span>
+        </div>
+        <div class="approval-actions">
+          <button class="btn-primary" (click)="resolveOnsiteApproval(a.id, 'APPROVED')">
+            <svg lucideBadgeCheck size="14"></svg> Approve
+          </button>
+          <button class="btn-outline danger" (click)="resolveOnsiteApproval(a.id, 'REJECTED')">
+            <svg lucideXCircle size="14"></svg> Reject
+          </button>
+        </div>
+      </div>
+      <div *ngIf="pendingOnsite().length === 0" class="empty-state">No pending on-site requests.</div>
+    </div>
+
+    <div class="modal-footer">
+      <span class="spacer"></span>
+      <button class="btn-outline" (click)="closeApprovals()">Close</button>
     </div>
   </div>
 </div>

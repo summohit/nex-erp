@@ -51,21 +51,55 @@ export class ShiftsService {
     return this.http.get<RosterGrid>(`${this.apiUrl}/roster?${params.join('&')}`);
   }
 
-  assignRoster(data: { employeeId: number; date: string; shiftId?: number | null; isDayOff?: boolean }) {
+  assignRoster(data: RosterAssignmentPayload) {
     return this.http.post(`${this.apiUrl}/roster`, data);
   }
 
-  bulkAssignRoster(data: {
-    employeeIds: number[]; start: string; end: string;
-    shiftId?: number | null; isDayOff?: boolean;
-    skipNonWorkingDays?: boolean; overwriteExisting?: boolean;
-  }) {
+  bulkAssignRoster(data: RosterBulkPayload) {
     return this.http.post<{ written: number; skipped: number }>(`${this.apiUrl}/roster/bulk`, data);
   }
 
   clearRoster(data: { employeeIds: number[]; start: string; end: string }) {
     return this.http.post<{ cleared: number }>(`${this.apiUrl}/roster/clear`, data);
   }
+
+  // ── On-site ("No Project") approvals ────────────────────────────────────
+  getOnsitePending() {
+    return this.http.get<any[]>(`${this.apiUrl}/roster/onsite/pending`);
+  }
+
+  resolveOnsiteApproval(entryId: number, action: 'APPROVED' | 'REJECTED') {
+    return this.http.post(`${this.apiUrl}/roster/onsite/${entryId}/resolve`, { action });
+  }
+}
+
+export interface RosterOnSiteInfo {
+  projectId: number | null;
+  projectName?: string | null;
+  address: string | null;
+  approvalStatus: string; // NONE, PENDING, APPROVED, REJECTED
+}
+
+export interface RosterAssignmentPayload {
+  employeeId: number;
+  date: string;
+  shiftId?: number | null;
+  isDayOff?: boolean;
+  note?: string;
+  /** On-site shift details */
+  projectId?: number | null;
+  address?: string | null;
+  /** True when the requester chose "No Project" — routes the row to Admin + HR. */
+  needsApproval?: boolean;
+}
+
+export interface RosterBulkPayload {
+  employeeIds: number[]; start: string; end: string;
+  shiftId?: number | null; isDayOff?: boolean;
+  skipNonWorkingDays?: boolean; overwriteExisting?: boolean;
+  projectId?: number | null;
+  address?: string | null;
+  needsApproval?: boolean;
 }
 
 export interface RosterShift {
@@ -90,6 +124,8 @@ export interface RosterCell {
   isDefault?: boolean;
   entryId?: number;
   note?: string | null;
+  /** Present when the roster entry carries on-site location/approval info. */
+  onSite?: RosterOnSiteInfo;
 }
 
 export interface RosterRow {
