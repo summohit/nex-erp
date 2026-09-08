@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -60,7 +61,7 @@ export interface DayStatus {
   selector: 'app-attendance-leave',
   standalone: true,
   imports: [
-    CommonModule, 
+    CommonModule, RouterLink,
     FormsModule, 
     LucideCheck,
     LucideStarHalf,
@@ -120,12 +121,39 @@ export class AttendanceLeaveComponent implements OnInit {
   isCreateShiftModalOpen = signal<boolean>(false);
   shiftEditMode = signal<'create' | 'edit'>('create');
   editingShiftId = signal<number | null>(null);
-  shiftForm = {
-    name: '',
-    startTime: '09:00',
-    endTime: '18:00',
-    bufferTimeMinutes: 15
-  };
+  readonly WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  shiftForm: any = { ...this.blankShift() };
+
+  private blankShift() {
+    return {
+      name: '',
+      shortCode: '',
+      colorCode: '#2A97D8',
+      shiftType: 'STRICT',
+      startTime: '09:00',
+      endTime: '18:00',
+      halfDayTime: '09:00',
+      halfDayHours: 4,
+      totalHours: 9,
+      earlyClockInMinutes: 60,
+      autoClockOutHours: 0,
+      bufferTimeMinutes: 15,
+      maxCheckIns: 2,
+      workingDays: [...this.WEEK_DAYS],
+    };
+  }
+
+  isDayOn(day: string): boolean {
+    return (this.shiftForm.workingDays || []).includes(day);
+  }
+
+  toggleDay(day: string) {
+    const days: string[] = this.shiftForm.workingDays || [];
+    this.shiftForm.workingDays = days.includes(day)
+      ? days.filter(d => d !== day)
+      : [...days, day];
+  }
   
   showTimelineRescheduleModal = signal(false);
   selectedTimelineEmp = signal<any>(null);
@@ -742,10 +770,10 @@ export class AttendanceLeaveComponent implements OnInit {
     this.shiftEditMode.set('edit');
     this.editingShiftId.set(shift.id);
     this.shiftForm = {
-      name: shift.name,
-      startTime: shift.startTime,
-      endTime: shift.endTime,
-      bufferTimeMinutes: shift.bufferTimeMinutes
+      ...this.blankShift(),
+      ...shift,
+      // Stored as a comma-separated string; the checkboxes want an array.
+      workingDays: shift.workingDays ? String(shift.workingDays).split(',') : [...this.WEEK_DAYS],
     };
     this.isCreateShiftModalOpen.set(true);
   }
@@ -753,12 +781,7 @@ export class AttendanceLeaveComponent implements OnInit {
   openCreateShift() {
     this.shiftEditMode.set('create');
     this.editingShiftId.set(null);
-    this.shiftForm = {
-      name: '',
-      startTime: '09:00',
-      endTime: '18:00',
-      bufferTimeMinutes: 15
-    };
+    this.shiftForm = { ...this.blankShift() };
     this.isCreateShiftModalOpen.set(true);
   }
 
@@ -766,12 +789,7 @@ export class AttendanceLeaveComponent implements OnInit {
     this.isCreateShiftModalOpen.set(false);
     this.shiftEditMode.set('create');
     this.editingShiftId.set(null);
-    this.shiftForm = {
-      name: '',
-      startTime: '09:00',
-      endTime: '18:00',
-      bufferTimeMinutes: 15
-    };
+    this.shiftForm = { ...this.blankShift() };
   }
 
   // --- Grid and Calendar Logic ---

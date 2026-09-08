@@ -11,6 +11,7 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { EmployeesModule } from './employees/employees.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { LettersModule } from './letters/letters.module';
 import { LeavesModule } from './leaves/leaves.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { AppreciationModule } from './appreciation/appreciation.module';
@@ -38,7 +39,7 @@ import { AppDownloadModule } from './app-download/app-download.module';
 import { TicketsModule } from './tickets/tickets.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule],
+  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule],
   controllers: [AppController],
   providers: [AppService],
 })

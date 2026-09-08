@@ -1,0 +1,230 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Shift Roster</h1>
+      <p>Who works which shift, day by day. Click any cell to change it.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-outline" (click)="load()" title="Reload">
+        <svg lucideRotateCcw size="15"></svg> Refresh
+      </button>
+      <button class="btn-primary" (click)="openBulk()">
+        <svg lucideWandSparkles size="16"></svg> Automate Shifts
+      </button>
+    </div>
+  </div>
+
+  <!-- Toolbar: range navigation + filters -->
+  <div class="roster-toolbar">
+    <div class="range-nav">
+      <button class="icon-btn" (click)="shift(-1)" title="Previous">
+        <svg lucideChevronLeft size="18"></svg>
+      </button>
+      <span class="range-label">{{ rangeLabel() }}</span>
+      <button class="icon-btn" (click)="shift(1)" title="Next">
+        <svg lucideChevronRight size="18"></svg>
+      </button>
+      <button class="btn-today" (click)="today()">
+        <svg lucideCalendar size="14"></svg> Today
+      </button>
+    </div>
+
+    <div class="view-toggle">
+      <button class="toggle-btn" [class.active]="viewMode() === 'week'" (click)="setView('week')">Weekly</button>
+      <button class="toggle-btn" [class.active]="viewMode() === 'month'" (click)="setView('month')">Monthly</button>
+    </div>
+
+    <div class="filters">
+      <select class="form-control" [ngModel]="filterDepartmentId()"
+              (ngModelChange)="filterDepartmentId.set($event ? +$event : null); load()">
+        <option [ngValue]="null">All Departments</option>
+        <option *ngFor="let d of departments()" [ngValue]="d.id">{{ d.name }}</option>
+      </select>
+      <input type="text" class="form-control" placeholder="Search employee…"
+             [ngModel]="search()" (ngModelChange)="search.set($event)">
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <span *ngFor="let s of grid().shifts" class="legend-chip"
+          [style.background]="s.colorCode || '#94A3B8'">
+      <ng-container *ngIf="s.shortCode">{{ s.shortCode }} : </ng-container>{{ s.name }}
+    </span>
+    <span class="legend-chip chip-neutral">Day Off</span>
+    <span class="legend-chip chip-leave-legend">On Leave</span>
+    <span class="legend-note">Faded cells are the employee's standing shift, not a rostered one.</span>
+  </div>
+
+  <div class="roster-scroll" [class.is-loading]="loading()">
+    <table class="roster-table" [class.month-view]="viewMode() === 'month'">
+      <thead>
+        <tr>
+          <th class="emp-col">Employee</th>
+          <th *ngFor="let day of grid().days; trackBy: trackDay"
+              class="day-col"
+              [class.is-today]="dayLabel(day).isToday"
+              [class.is-weekend]="dayLabel(day).isWeekend">
+            <span class="day-num">{{ dayLabel(day).num }}</span>
+            <span class="day-name">{{ dayLabel(day).name }}</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of visibleRows(); trackBy: trackRow"
+            [class.row-inactive]="row.employee.isActive === false">
+          <td class="emp-col">
+            <div class="emp-cell">
+              <img *ngIf="row.employee.avatarUrl" [src]="row.employee.avatarUrl" class="emp-avatar" alt="">
+              <div *ngIf="!row.employee.avatarUrl" class="emp-avatar emp-initial">{{ row.employee.name.charAt(0) }}</div>
+              <div class="emp-text">
+                <div class="emp-name">
+                  {{ row.employee.name }}
+                  <span class="inactive-badge" *ngIf="row.employee.isActive === false">Inactive</span>
+                </div>
+                <div class="emp-sub">{{ row.employee.designation || row.employee.department || '—' }}</div>
+              </div>
+            </div>
+          </td>
+
+          <td *ngFor="let cell of row.cells; trackBy: trackCell"
+              class="day-cell"
+              [class.is-weekend]="dayLabel(cell.date).isWeekend"
+              [class.is-today]="dayLabel(cell.date).isToday"
+              [title]="cellTitle(row, cell)"
+              (click)="openCell(row, cell)">
+
+            <div *ngIf="cell.type === 'SHIFT'" class="chip chip-shift"
+                 [class.is-default]="cell.isDefault"
+                 [style.background]="cell.shift?.colorCode || '#2A97D8'">
+              <span class="chip-name">{{ cellLabel(cell) }}</span>
+              <span class="chip-time">{{ cellTime(cell) }}</span>
+            </div>
+
+            <div *ngIf="cell.type === 'DAY_OFF'" class="chip chip-off" [class.is-default]="cell.isDefault">
+              Day Off
+            </div>
+
+            <div *ngIf="cell.type === 'LEAVE'" class="chip chip-leave">
+              <span class="chip-name">{{ cell.label }}</span>
+              <span class="chip-time" *ngIf="cell.isHalfDay">Half day</span>
+            </div>
+
+            <div *ngIf="cell.type === 'UNASSIGNED'" class="chip chip-empty">+</div>
+          </td>
+        </tr>
+
+        <tr *ngIf="!visibleRows().length">
+          <td [attr.colspan]="grid().days.length + 1" class="empty-state">
+            {{ loading() ? 'Loading roster…' : 'No employees match these filters.' }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Cell editor -->
+<div class="modal-overlay" *ngIf="editorOpen()" (click)="closeEditor()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2>Assign Shift</h2>
+        <p class="modal-sub">{{ editorRow()?.employee?.name }} · {{ editorCell()?.date }}</p>
+      </div>
+      <button class="icon-btn" (click)="closeEditor()"><svg lucideX size="20"></svg></button>
+    </div>
+
+    <div class="modal-body">
+      <button *ngFor="let s of grid().shifts" class="shift-option"
+              [class.selected]="editorCell()?.shift?.id === s.id && !editorCell()?.isDefault"
+              (click)="applyCell(s.id, false)">
+        <span class="legend-dot" [style.background]="s.colorCode || '#94A3B8'"></span>
+        <span class="option-text">
+          <span class="option-name">{{ s.name }}</span>
+          <span class="option-time">
+            {{ s.shiftType === 'FLEXIBLE' ? (s.totalHours ? s.totalHours + ' hrs' : 'Flexible') : (s.startTime + ' - ' + s.endTime) }}
+          </span>
+        </span>
+      </button>
+
+      <button class="shift-option" [class.selected]="editorCell()?.type === 'DAY_OFF' && !editorCell()?.isDefault"
+              (click)="applyCell(null, true)">
+        <span class="legend-dot legend-off"></span>
+        <span class="option-text"><span class="option-name">Day Off</span></span>
+      </button>
+
+      <button class="shift-option danger" (click)="applyCell(null, false)">
+        <svg lucideTrash2 size="15"></svg>
+        <span class="option-text">
+          <span class="option-name">Clear</span>
+          <span class="option-time">Fall back to {{ editorRow()?.defaultShift?.name || 'no shift' }}</span>
+        </span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk assign -->
+<div class="modal-overlay" *ngIf="bulkOpen()" (click)="closeBulk()">
+  <div class="modal-card wide" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2>Automate Shifts</h2>
+        <p class="modal-sub">Roster one shift across a date range for many employees.</p>
+      </div>
+      <button class="icon-btn" (click)="closeBulk()"><svg lucideX size="20"></svg></button>
+    </div>
+
+    <div class="modal-body">
+      <div class="bulk-grid">
+        <div class="form-group">
+          <label>Shift</label>
+          <select class="form-control" [(ngModel)]="bulkForm.shiftId" [disabled]="bulkForm.isDayOff">
+            <option *ngFor="let s of grid().shifts" [ngValue]="s.id">{{ s.name }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>From</label>
+          <input type="date" class="form-control" [(ngModel)]="bulkForm.start">
+        </div>
+        <div class="form-group">
+          <label>To</label>
+          <input type="date" class="form-control" [(ngModel)]="bulkForm.end">
+        </div>
+      </div>
+
+      <div class="bulk-options">
+        <label><input type="checkbox" [(ngModel)]="bulkForm.isDayOff"> Mark as Day Off instead of a shift</label>
+        <label><input type="checkbox" [(ngModel)]="bulkForm.skipNonWorkingDays"> Skip days the shift doesn't run (otherwise they become days off)</label>
+        <label><input type="checkbox" [(ngModel)]="bulkForm.overwriteExisting"> Overwrite existing roster entries in this range</label>
+      </div>
+
+      <div class="bulk-employees">
+        <div class="bulk-emp-head">
+          <label>
+            <input type="checkbox" [checked]="bulkSelection().size === visibleRows().length && visibleRows().length > 0"
+                   (change)="toggleAllSelected()">
+            Employees ({{ bulkSelection().size }} selected)
+          </label>
+        </div>
+        <div class="bulk-emp-list">
+          <label *ngFor="let row of visibleRows(); trackBy: trackRow" class="bulk-emp-item">
+            <input type="checkbox" [checked]="isSelected(row.employee.id)" (change)="toggleSelected(row.employee.id)">
+            <span>{{ row.employee.name }}</span>
+            <small>{{ row.employee.designation || row.employee.department || '' }}</small>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-outline danger" (click)="clearSelectedRange()">
+        <svg lucideTrash2 size="15"></svg> Clear range
+      </button>
+      <span class="spacer"></span>
+      <button class="btn-outline" (click)="closeBulk()">Cancel</button>
+      <button class="btn-primary" (click)="submitBulk()">Apply</button>
+    </div>
+  </div>
+</div>

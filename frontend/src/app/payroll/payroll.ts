@@ -306,6 +306,12 @@ export class PayrollComponent implements OnInit {
     return this.currentStructure().filter(i => i.component?.type === 'DEDUCTION');
   });
 
+  // Deactivated staff are shown for history but visually stood down.
+  payrollRowClassRules = {
+    'payroll-row-inactive': (p: any) =>
+      !p.data?.isSummaryRow && p.data?.employee?.user?.status === 'SUSPENDED',
+  };
+
   // Computed Pinned Bottom Total Rows
   processingPinnedBottomRow = computed(() => {
     const list = this.payslips();
@@ -365,11 +371,17 @@ export class PayrollComponent implements OnInit {
         const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
         const dept = emp.department?.name || 'General';
         const initial = (emp.firstName || 'E').charAt(0);
+        // Real photo where we have one; the initial stays as the fallback.
+        const avatar = emp.avatarUrl
+          ? `<img src="${emp.avatarUrl}" class="avatar-circle-sm avatar-img" alt="" />`
+          : `<div class="avatar-circle-sm">${initial}</div>`;
+        const inactive = emp.user?.status === 'SUSPENDED';
+        const badge = inactive ? `<span class="inactive-tag">Inactive</span>` : '';
         return `
-          <div class="cell-user-avatar-row">
-            <div class="avatar-circle-sm">${initial}</div>
+          <div class="cell-user-avatar-row${inactive ? ' is-inactive' : ''}">
+            ${avatar}
             <div class="cell-stacked">
-              <div class="cell-title-bold">${name}</div>
+              <div class="cell-title-bold">${name}${badge}</div>
               <div class="user-text-stack text-secondary">${dept}</div>
             </div>
           </div>
@@ -476,11 +488,17 @@ export class PayrollComponent implements OnInit {
         const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
         const dept = emp.department?.name || 'General';
         const initial = (emp.firstName || 'E').charAt(0);
+        // Real photo where we have one; the initial stays as the fallback.
+        const avatar = emp.avatarUrl
+          ? `<img src="${emp.avatarUrl}" class="avatar-circle-sm avatar-img" alt="" />`
+          : `<div class="avatar-circle-sm">${initial}</div>`;
+        const inactive = emp.user?.status === 'SUSPENDED';
+        const badge = inactive ? `<span class="inactive-tag">Inactive</span>` : '';
         return `
-          <div class="cell-user-avatar-row">
-            <div class="avatar-circle-sm">${initial}</div>
+          <div class="cell-user-avatar-row${inactive ? ' is-inactive' : ''}">
+            ${avatar}
             <div class="cell-stacked">
-              <div class="cell-title-bold">${name}</div>
+              <div class="cell-title-bold">${name}${badge}</div>
               <div class="user-text-stack text-secondary">${dept}</div>
             </div>
           </div>
@@ -691,13 +709,26 @@ export class PayrollComponent implements OnInit {
 
   loadPayslips() {
     this.payrollService.getPayslips(this.selectedMonth(), this.selectedYear()).subscribe(res => {
-      this.payslips.set(res);
+      this.payslips.set(this.sortPayrollRows(res));
     });
   }
 
   loadMyPayslips() {
     this.payrollService.getMyPayslips().subscribe(res => {
       this.myPayslips.set(res);
+    });
+  }
+
+  /**
+   * Deactivated staff sink to the bottom of the payroll grid. They no longer
+   * receive new drafts, but historic payslips stay visible and auditable.
+   */
+  private sortPayrollRows(rows: any[]): any[] {
+    return [...(rows || [])].sort((a, b) => {
+      const ia = a.employee?.user?.status === 'SUSPENDED' ? 1 : 0;
+      const ib = b.employee?.user?.status === 'SUSPENDED' ? 1 : 0;
+      if (ia !== ib) return ia - ib;
+      return (a.employee?.firstName || '').localeCompare(b.employee?.firstName || '');
     });
   }
 
@@ -710,7 +741,7 @@ export class PayrollComponent implements OnInit {
     this.payrollService.generatePayslips(this.selectedMonth(), this.selectedYear()).subscribe({
       next: (res) => {
         toastRef.close();
-        this.payslips.set(res);
+        this.payslips.set(this.sortPayrollRows(res));
         this.toast.success(`Payslips generated for ${res.length} employees`);
       },
       error: (err) => {

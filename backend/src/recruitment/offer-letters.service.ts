@@ -638,6 +638,65 @@ export class OfferLettersService {
   }
 
   /** Metadata for the unlock screen — safe to expose without the password. */
+  /**
+   * Email the offer to the candidate with their signing link.
+   *
+   * The letter is not attached — the signing page stays the only way to read it,
+   * so the password gate and the view/unlock audit trail can't be bypassed.
+   */
+  async sendToCandidate(applicationId: number, companyId: number, actorUserId?: number) {
+    const letter = await this.prisma.offerLetter.findFirst({
+      where: { applicationId, companyId },
+      include: {
+        application: {
+          select: {
+            fullName: true, email: true, phone: true, offeredSalary: true, joiningDate: true,
+            job: { select: { title: true, company: { select: { name: true } } } },
+          },
+        },
+      },
+    });
+    if (!letter) throw new NotFoundException('Generate the offer letter before sending it');
+
+    const app = letter.application as any;
+    if (!app.email) throw new BadRequestException('This candidate has no email address on file');
+    if (letter.status === 'ACCEPTED') {
+      throw new BadRequestException('This offer has already been signed');
+    }
+
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const password = this.derivePassword(app);
+    const passwordHint = password
+      ? 'your surname in lower case, followed by the last 4 digits of your phone number'
+      : 'no password is required — the link alone opens the document';
+
+    const fmt = (n?: number | null) =>
+      n ? `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}` : undefined;
+
+    await this.mailService.sendOfferLetterEmail({
+      email: app.email,
+      candidateName: app.fullName,
+      jobTitle: app.job?.title || 'the role',
+      companyName: app.job?.company?.name || 'our company',
+      signingUrl: `${baseUrl}/offer/${letter.accessToken}`,
+      passwordHint,
+      annualCtc: fmt(app.offeredSalary),
+      joiningDate: app.joiningDate
+        ? new Date(app.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+        : undefined,
+    });
+
+    // Sending is what actually puts the offer in front of the candidate, so this
+    // is the point the letter counts as issued.
+    const updated = await this.prisma.offerLetter.update({
+      where: { id: letter.id },
+      data: { status: letter.status === 'DRAFT' ? 'SENT' : letter.status, issuedAt: letter.issuedAt ?? new Date() },
+    });
+
+    this.logger.log(`Offer letter for application ${applicationId} emailed to ${app.email}`);
+    return { sent: true, email: app.email, status: updated.status };
+  }
+
   async getAccessInfo(token: string) {
     const letter = await this.prisma.offerLetter.findUnique({
       where: { accessToken: token },
@@ -856,27 +915,10 @@ export class OfferLettersService {
         this.logger.error('Failed to generate countersigned PDF', e);
       }
 
-      // ─── NOTIFY RECRUITER ──────────────────────────────────────
-      const recruiterUser = letter.application.job.recruiter?.user;
-      if (recruiterUser) {
-        // 1. In-app notification
-        await this.notificationsService.createNotification(
-          recruiterUser.id,
-          'Offer Accepted',
-          `${letter.application.fullName} has signed and accepted the offer for ${letter.application.job.title}.`,
-          'SUCCESS',
-          `/recruitment/candidates?applicationId=${letter.applicationId}`,
-          letter.companyId
-        ).catch(e => this.logger.error('Failed to create in-app notification', e));
-
-        // 2. Email notification
-        await this.mailService.sendOfferAcceptedEmail(
-          recruiterUser.email,
-          letter.application.fullName,
-          letter.application.job.title,
-          letter.applicationId
-        ).catch(e => this.logger.error('Failed to send email notification', e));
-      }
+      // ─── NOTIFY RECRUITER, HR AND ADMINS ───────────────────────
+      // The recruiter alone is not enough: a job may have none, and HR needs to
+      // know a signature landed so onboarding can start.
+      await this.notifySigningOutcome(letter, 'ACCEPTED');
 
       return updatedLetter;
     }
@@ -887,26 +929,65 @@ export class OfferLettersService {
       data: { status: decision, respondedAt: new Date() },
     });
 
-    const recruiterUser = letter.application.job.recruiter?.user;
-    if (recruiterUser) {
-      await this.notificationsService.createNotification(
-        recruiterUser.id,
-        'Offer Declined',
-        `${letter.application.fullName} has declined the offer for ${letter.application.job.title}.`,
-        'WARNING',
-        `/recruitment/candidates?applicationId=${letter.applicationId}`,
-        letter.companyId
-      ).catch(e => this.logger.error('Failed to create in-app notification', e));
-
-      await this.mailService.sendOfferDeclinedEmail(
-        recruiterUser.email,
-        letter.application.fullName,
-        letter.application.job.title,
-        letter.applicationId
-      ).catch(e => this.logger.error('Failed to send email notification', e));
-    }
+    await this.notifySigningOutcome(letter, 'DECLINED');
 
     return updatedLetter;
+  }
+
+  /**
+   * Tell the two parties who act on a signature: the recruiter the job is
+   * assigned to, and the company's administrators. Deliberately not every HR
+   * user — an unassigned job would otherwise notify nobody, while a large HR
+   * team would be spammed on every offer.
+   *
+   * Recipients are de-duplicated, and each delivery is caught individually so a
+   * single bad address can't break the candidate's signing flow.
+   */
+  private async notifySigningOutcome(letter: any, outcome: 'ACCEPTED' | 'DECLINED') {
+    const accepted = outcome === 'ACCEPTED';
+    const name = letter.application.fullName;
+    const jobTitle = letter.application.job.title;
+
+    const admins = await this.prisma.user.findMany({
+      where: {
+        companyId: letter.companyId,
+        status: { not: 'SUSPENDED' },
+        role: { in: ['ADMIN', 'SUPERADMIN'] },
+      },
+      select: { id: true, email: true },
+    });
+
+    const recruiterUser = letter.application.job.recruiter?.user;
+    const recipients = new Map<number, string>();
+    if (recruiterUser) recipients.set(recruiterUser.id, recruiterUser.email);
+    for (const a of admins) recipients.set(a.id, a.email);
+
+    if (!recipients.size) {
+      this.logger.warn(`Offer ${outcome} for application ${letter.applicationId}, but the job has no recruiter and the company has no administrator to notify`);
+      return;
+    }
+    if (!recruiterUser) {
+      this.logger.warn(`Offer ${outcome} for application ${letter.applicationId}: job "${jobTitle}" has no assigned recruiter, so only administrators were notified`);
+    }
+
+    const title = accepted ? 'Offer Accepted' : 'Offer Declined';
+    const body = accepted
+      ? `${name} has signed and accepted the offer for ${jobTitle}.`
+      : `${name} has declined the offer for ${jobTitle}.`;
+    const link = `/recruitment/candidates?applicationId=${letter.applicationId}`;
+
+    for (const [userId, email] of recipients) {
+      await this.notificationsService.createNotification(
+        userId, title, body, accepted ? 'SUCCESS' : 'WARNING', link, letter.companyId,
+      ).catch(e => this.logger.error(`In-app notification failed for user ${userId}`, e));
+
+      const send = accepted
+        ? this.mailService.sendOfferAcceptedEmail(email, name, jobTitle, letter.applicationId)
+        : this.mailService.sendOfferDeclinedEmail(email, name, jobTitle, letter.applicationId);
+      await send.catch(e => this.logger.error(`Notification email failed for ${email}`, e));
+    }
+
+    this.logger.log(`Offer ${outcome} for application ${letter.applicationId}: notified ${recipients.size} recipient(s)`);
   }
   private async generateHtmlFromSettings(
     settings: any,
@@ -1014,14 +1095,23 @@ export class OfferLettersService {
       }
     }
 
-    const templateHtml = settings?.offerLetterTemplateHtml || DEFAULT_OFFER_LETTER_TEMPLATE;
+    // A Letter Template flagged for offer letters wins over the standalone HTML
+    // kept in settings, so both systems share one editable source.
+    const chosen = await this.prisma.letterTemplate.findFirst({
+      where: { companyId: company.id, useForOfferLetter: true, isActive: true },
+      select: { body: true },
+    });
+    const templateHtml = chosen?.body || settings?.offerLetterTemplateHtml || DEFAULT_OFFER_LETTER_TEMPLATE;
     const merged = this.mergeTemplate(templateHtml, fields);
 
-    // {{salaryTable}} is HTML, so it is substituted after the plain scalar merge.
-    const withTable = merged.replace(
-      /{{\s*salaryTable\s*}}/g,
-      breakup.length ? this.renderSalaryTable(breakup) : '<p><em>Salary details to be shared separately.</em></p>',
-    );
+    const salaryTableHtml = breakup.length
+      ? this.renderSalaryTable(breakup)
+      : '<p><em>Salary details to be shared separately.</em></p>';
+    // The table is HTML, so it is substituted after the plain scalar merge — in
+    // both syntaxes, since a Letter Template uses ##TAGS##.
+    const withTable = merged
+      .replace(/{{\s*salaryTable\s*}}/g, salaryTableHtml)
+      .split('##SALARY_TABLE##').join(salaryTableHtml);
 
     return { html: withTable, header, footer };
   }
@@ -1168,10 +1258,40 @@ export class OfferLettersService {
       </div>
     </div>`;
   }
+  /**
+   * Letter Templates address the recipient with the same ##EMPLOYEE_*## tags they
+   * use for staff — a candidate is simply the not-yet-hired employee — so those
+   * map onto the candidate fields here. This is what lets one template serve both
+   * the signed offer flow and post-hire letters.
+   */
+  private static readonly HASH_TAG_FIELDS: Record<string, string> = {
+    '##EMPLOYEE_NAME##': 'candidateName',
+    '##CANDIDATE_NAME##': 'candidateName',
+    '##EMPLOYEE_ADDRESS##': 'candidateAddress',
+    '##EMPLOYEE_EMAIL##': 'candidateEmail',
+    '##EMPLOYEE_MOBILE##': 'candidatePhone',
+    '##EMPLOYEE_DESIGNATION##': 'jobTitle',
+    '##EMPLOYEE_JOINING_DATE##': 'joiningDate',
+    '##COMPANY_NAME##': 'companyName',
+    '##CONTACT_ADDRESS##': 'officeAddress',
+    '##CURRENT_DATE##': 'issuedDate',
+    '##OFFERED_CTC##': 'offeredSalary',
+    '##ANNUAL_CTC##': 'annualCtc',
+    '##MONTHLY_CTC##': 'monthlyCtc',
+    '##REPORTING_TIME##': 'reportingTime',
+    // No employee record exists yet, so these have nothing to resolve to.
+    '##EMPLOYEE_ID##': '',
+    '##EMPLOYEE_DEPARTMENT##': '',
+  };
+
   private mergeTemplate(html: string, fields: Record<string, string>): string {
     let out = html;
     for (const [key, value] of Object.entries(fields)) {
       out = out.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value);
+    }
+    // Then the ##TAG## dialect used by Letter Templates.
+    for (const [tag, field] of Object.entries(OfferLettersService.HASH_TAG_FIELDS)) {
+      out = out.split(tag).join(field ? (fields[field] ?? '') : '');
     }
     return out;
   }

@@ -160,7 +160,8 @@ export class PayrollService {
     }
 
     const employees = await this.prisma.employee.findMany({
-      where: { companyId },
+      // Deactivated staff are off payroll — no draft is created for them.
+      where: { companyId, user: { status: { not: 'SUSPENDED' } } },
       include: {
         salaryStructures: {
           include: { component: true }
@@ -415,8 +416,10 @@ export class PayrollService {
             id: true,
             firstName: true,
             lastName: true,
+            avatarUrl: true,
             department: { select: { name: true } },
-            designation: { select: { name: true } }
+            designation: { select: { name: true } },
+            user: { select: { status: true } }
           }
         },
         items: true

@@ -1,0 +1,867 @@
+<div class="page-container" style="padding: 24px;">
+
+  <!-- TOP BREADCRUMB NAVIGATION -->
+  <div class="ats-breadcrumb-bar">
+    <div class="breadcrumb-left">
+      <a routerLink="/settings/company-profile" class="btn-back-pill">
+        <svg lucideArrowLeft size="14"></svg>
+        <span>Back to Settings</span>
+      </a>
+
+      <nav class="ats-breadcrumbs">
+        <a class="crumb-link" routerLink="/settings/company-profile">Settings</a>
+        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
+        <span class="crumb-current">Letter Templates</span>
+      </nav>
+    </div>
+  </div>
+
+  <!-- PAGE HEADER CARD -->
+  <div class="page-header">
+    <div class="header-content">
+      <div class="header-title-row">
+        <div class="header-icon-pill">
+          <svg lucideFileText size="22"></svg>
+        </div>
+        <div class="title-text-wrap">
+          <div class="title-with-pill">
+            <h1>Letter Templates</h1>
+            <span class="count-pill">{{ templates().length }} Templates</span>
+            <span class="count-pill issued">{{ letters().length }} Issued</span>
+          </div>
+          <p>Reusable HR letters — offer, relieving, increment, bond — with merge tags filled per employee.</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-action-outline" (click)="openGenerate()" [disabled]="!templates().length">
+        <svg lucideSend size="15"></svg>
+        <span>Generate Letter</span>
+      </button>
+      <button class="btn-action-primary" (click)="openCreate()">
+        <svg lucidePlus size="16"></svg>
+        <span>Add Template</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTROLS TOOLBAR: TABS & SEARCH -->
+  <div class="templates-controls-bar">
+    <div class="segmented-tabs-wrap">
+      <button 
+        type="button" 
+        class="segmented-tab" 
+        [class.active]="activeTab() === 'templates'" 
+        (click)="setTab('templates')">
+        <svg lucideFileText size="15"></svg>
+        <span>Templates</span>
+        <span class="tab-badge">{{ templates().length }}</span>
+      </button>
+      <button 
+        type="button" 
+        class="segmented-tab" 
+        [class.active]="activeTab() === 'issued'" 
+        (click)="setTab('issued')">
+        <svg lucideSend size="15"></svg>
+        <span>Issued Letters</span>
+        <span class="tab-badge" *ngIf="letters().length">{{ letters().length }}</span>
+      </button>
+    </div>
+
+    <div class="search-and-filters">
+      <div class="search-input-wrap">
+        <svg lucideSearch size="15" class="search-icon"></svg>
+        <input 
+          type="text" 
+          class="search-input"
+          [placeholder]="activeTab() === 'templates' ? 'Search templates by title or note…' : 'Search by employee or letter title…'"
+          [ngModel]="search()" 
+          (ngModelChange)="search.set($event)">
+        <button *ngIf="search()" class="btn-clear-search" (click)="clearSearch()">
+          <svg lucideX size="13"></svg>
+        </button>
+      </div>
+
+      <!-- Quick status filter for templates tab -->
+      <div class="status-filter-pills" *ngIf="activeTab() === 'templates'">
+        <button 
+          type="button" 
+          class="status-pill" 
+          [class.active]="templateStatusFilter() === 'all'" 
+          (click)="templateStatusFilter.set('all')">
+          All
+        </button>
+        <button 
+          type="button" 
+          class="status-pill" 
+          [class.active]="templateStatusFilter() === 'active'" 
+          (click)="templateStatusFilter.set('active')">
+          Active
+        </button>
+        <button 
+          type="button" 
+          class="status-pill" 
+          [class.active]="templateStatusFilter() === 'inactive'" 
+          (click)="templateStatusFilter.set('inactive')">
+          Inactive
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 1: TEMPLATES CARDS GRID -->
+  <div class="templates-section" *ngIf="activeTab() === 'templates'">
+    <div class="card-grid" *ngIf="filteredTemplates().length > 0">
+      <div class="template-card" *ngFor="let t of filteredTemplates()">
+        <!-- Card Top Bar: Icon & Status -->
+        <div class="card-header-bar">
+          <div class="template-icon-box">
+            <svg lucideFileText size="18"></svg>
+          </div>
+          <span class="status-badge" [class.active]="t.isActive" [class.inactive]="!t.isActive">
+            <span class="status-dot"></span>
+            <span>{{ t.isActive ? 'Active' : 'Inactive' }}</span>
+          </span>
+        </div>
+
+        <!-- Card Body -->
+        <div class="card-content">
+          <h3 class="card-title" [title]="t.title">{{ t.title }}</h3>
+          <p class="card-desc" *ngIf="t.description">{{ t.description }}</p>
+
+          <div class="card-meta-chips">
+            <span class="meta-chip issued-chip" *ngIf="t._count?.letters">
+              <svg lucideCheck size="12"></svg>
+              <span>{{ t._count?.letters }} issued</span>
+            </span>
+            <span class="meta-chip unused-chip" *ngIf="!t._count?.letters">
+              <span>Not used yet</span>
+            </span>
+            <span class="meta-chip candidate-chip" *ngIf="t.scope === 'CANDIDATE'">
+              <span>Candidate</span>
+            </span>
+            <span class="meta-chip offer-chip" *ngIf="t.useForOfferLetter"
+                  title="Rendered by the recruitment offer-letter flow">
+              <span>Offer letter</span>
+            </span>
+            <span class="meta-chip onboarding-chip" *ngIf="t.autoOnOnboarding"
+                  title="Issued automatically when a candidate is onboarded">
+              <span>Auto on onboarding</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Card Footer Actions -->
+        <div class="card-actions-bar">
+          <button type="button" class="btn-card-action generate" (click)="openGenerate(t)" title="Generate letter from this template">
+            <svg lucideSend size="13"></svg>
+            <span>Generate</span>
+          </button>
+          <div class="actions-right">
+            <button type="button" class="btn-card-action view" (click)="openTemplateView(t)" title="Preview template">
+              <svg lucideEye size="13"></svg>
+              <span>View</span>
+            </button>
+            <button type="button" class="btn-card-action edit" (click)="openEdit(t)" title="Edit template">
+              <svg lucideEdit3 size="13"></svg>
+              <span>Edit</span>
+            </button>
+            <button type="button" class="btn-card-action danger" (click)="deleteTemplate(t)" title="Delete template">
+              <svg lucideTrash2 size="13"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state-card" *ngIf="filteredTemplates().length === 0">
+      <div class="empty-icon-circle">
+        <svg lucideFileText size="32"></svg>
+      </div>
+      <h3>No templates found</h3>
+      <p *ngIf="search()">No templates match your search "{{ search() }}".</p>
+      <p *ngIf="!search()">{{ loading() ? 'Loading templates…' : 'No templates available. Add one to get started.' }}</p>
+      <button *ngIf="search() || templateStatusFilter() !== 'all'" class="btn-reset-filters" (click)="clearSearch(); templateStatusFilter.set('all')">
+        Clear Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB 2: ISSUED LETTERS TABLE -->
+  <div class="issued-section" *ngIf="activeTab() === 'issued'">
+    <div class="table-card-wrap" *ngIf="filteredLetters().length > 0">
+      <table class="modern-data-table">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Letter Title</th>
+            <th>Template</th>
+            <th>Date Issued</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let l of filteredLetters()">
+            <td>
+              <div class="employee-cell">
+                <img 
+                  *ngIf="l.employee?.avatarUrl" 
+                  [src]="l.employee.avatarUrl" 
+                  [alt]="l.employee.firstName" 
+                  class="employee-avatar-img"
+                  (error)="l.employee.avatarUrl = null"
+                />
+                <div 
+                  *ngIf="!l.employee?.avatarUrl"
+                  class="employee-avatar" 
+                  [style.backgroundColor]="getAvatarBg(l.employee.firstName + ' ' + l.employee.lastName)">
+                  {{ getInitials(l.employee.firstName, l.employee.lastName) }}
+                </div>
+                <div class="employee-meta">
+                  <div class="emp-name">{{ l.employee.firstName }} {{ l.employee.lastName }}</div>
+                  <div class="emp-code" *ngIf="l.employee.employeeCode">#{{ l.employee.employeeCode }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="letter-title-text">{{ l.title }}</span>
+            </td>
+            <td>
+              <span class="template-pill-badge">{{ l.template?.title || 'Custom' }}</span>
+            </td>
+            <td>
+              <div class="date-cell">
+                <svg lucideCalendar size="13"></svg>
+                <span>{{ l.createdAt | date: 'mediumDate' }}</span>
+              </div>
+            </td>
+            <td class="text-right">
+              <div class="table-actions-row">
+                <button type="button" class="btn-table-action view" (click)="openLetter(l)" title="View Letter">
+                  <svg lucideEye size="13"></svg>
+                  <span>View</span>
+                </button>
+                <button type="button" class="btn-table-action delete" (click)="deleteLetter(l)" title="Delete Letter">
+                  <svg lucideTrash2 size="13"></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State for Issued Letters -->
+    <div class="empty-state-card" *ngIf="filteredLetters().length === 0">
+      <div class="empty-icon-circle">
+        <svg lucideSend size="32"></svg>
+      </div>
+      <h3>No issued letters found</h3>
+      <p *ngIf="search()">No letters match your search "{{ search() }}".</p>
+      <p *ngIf="!search()">{{ loading() ? 'Loading issued letters…' : 'No letters have been generated yet. Click "Generate Letter" to issue one.' }}</p>
+      <button *ngIf="search()" class="btn-reset-filters" (click)="clearSearch()">
+        Clear Search
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL 1: TEMPLATE PREVIEW (READ-ONLY)
+     ========================================================================== -->
+<div class="modal-overlay" *ngIf="templateViewOpen()" (click)="closeTemplateView()">
+  <div class="modal-card wide slide-in" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-info">
+        <div class="modal-icon-badge preview">
+          <svg lucideFileText size="20"></svg>
+        </div>
+        <div>
+          <h2>{{ templateView()?.title }}</h2>
+          <div class="modal-sub-row">
+            <span class="tag-count-chip">
+              <svg lucideCode size="12"></svg>
+              <span>{{ countTags(templateView()?.body || '') }} Dynamic Merge Tags</span>
+            </span>
+            <span class="sub-hint">Highlighted below, filled automatically per employee</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn-close-modal" (click)="closeTemplateView()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="document-paper-wrapper">
+        <div class="document-paper-sheet preview-body" [innerHTML]="highlightTags(templateView()?.body)"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeTemplateView()">Close</button>
+      <button type="button" class="btn-modal-outline" (click)="generateFromView()">
+        <svg lucideSend size="14"></svg>
+        <span>Generate Letter</span>
+      </button>
+      <button type="button" class="btn-modal-primary" (click)="editFromView()">
+        <svg lucideEdit3 size="14"></svg>
+        <span>Edit Template</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL 2: GENERATE LETTER
+     ========================================================================== -->
+<div class="modal-overlay" *ngIf="generateOpen()" (click)="closeGenerate()">
+  <div class="modal-card wide slide-in" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-info">
+        <div class="modal-icon-badge generate">
+          <svg lucideSend size="20"></svg>
+        </div>
+        <div>
+          <h2>Generate Letter</h2>
+          <p class="modal-subtitle">Pick an employee and template to render and snapshot an official HR letter.</p>
+        </div>
+      </div>
+      <button class="btn-close-modal" (click)="closeGenerate()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body-content">
+      <!-- Selector Grid -->
+      <div class="gen-form-grid">
+        <div class="form-group">
+          <label class="section-label">Select Template <span class="required-star">*</span></label>
+          <select class="form-control" [(ngModel)]="genForm.templateId" (ngModelChange)="refreshPreview()">
+            <option *ngFor="let t of employeeTemplates()" [ngValue]="t.id">{{ t.title }}</option>
+          </select>
+        </div>
+
+        <!-- Searchable Target Employee -->
+        <div class="form-group emp-picker-group">
+          <label class="section-label">Target Employee <span class="required-star">*</span></label>
+          <div class="searchable-emp-container">
+            <!-- Trigger Button -->
+            <button 
+              type="button" 
+              class="emp-searchable-trigger" 
+              [class.open]="targetEmpDropdownOpen()"
+              [class.has-value]="!!getSelectedEmployee()"
+              (click)="toggleTargetEmpDropdown()">
+              
+              <div class="trigger-emp-content" *ngIf="getSelectedEmployee() as emp; else selectEmpPlaceholder">
+                <img 
+                  *ngIf="emp.avatarUrl" 
+                  [src]="emp.avatarUrl" 
+                  [alt]="emp.firstName" 
+                  class="trigger-emp-avatar" 
+                  (error)="emp.avatarUrl = null"
+                />
+                <div 
+                  *ngIf="!emp.avatarUrl" 
+                  class="trigger-emp-avatar-circle" 
+                  [style.backgroundColor]="getAvatarBg(emp.firstName + ' ' + emp.lastName)">
+                  {{ getInitials(emp.firstName, emp.lastName) }}
+                </div>
+                <div class="trigger-emp-meta">
+                  <div class="trigger-emp-name-row">
+                    <span class="trigger-emp-name">{{ employeeName(emp) }}</span>
+                    <span class="trigger-emp-code" *ngIf="emp.employeeCode">#{{ emp.employeeCode }}</span>
+                  </div>
+                  <span class="trigger-emp-sub" *ngIf="emp.department?.name || emp.designation?.name">
+                    {{ emp.department?.name }}<span *ngIf="emp.department?.name && emp.designation?.name"> • </span>{{ emp.designation?.name }}
+                  </span>
+                </div>
+              </div>
+
+              <ng-template #selectEmpPlaceholder>
+                <div class="trigger-placeholder">
+                  <svg lucideSearch size="14" class="placeholder-icon"></svg>
+                  <span>Search employee by name, code or dept...</span>
+                </div>
+              </ng-template>
+
+              <div class="trigger-actions">
+                <button 
+                  *ngIf="getSelectedEmployee()" 
+                  type="button" 
+                  class="btn-clear-selection" 
+                  (click)="clearTargetEmployee($event)" 
+                  title="Clear selection">
+                  <svg lucideX size="13"></svg>
+                </button>
+                <svg lucideChevronDown size="16" class="chevron-arrow" [class.rotated]="targetEmpDropdownOpen()"></svg>
+              </div>
+            </button>
+
+            <!-- Backdrop -->
+            <div 
+              class="dropdown-backdrop" 
+              *ngIf="targetEmpDropdownOpen()" 
+              (click)="targetEmpDropdownOpen.set(false)">
+            </div>
+
+            <!-- Dropdown Menu -->
+            <div class="searchable-emp-dropdown slide-down" *ngIf="targetEmpDropdownOpen()">
+              <div class="emp-search-header" (click)="$event.stopPropagation()">
+                <svg lucideSearch size="14" class="search-box-icon"></svg>
+                <input 
+                  type="text" 
+                  class="emp-search-input" 
+                  placeholder="Type to filter employees..." 
+                  [ngModel]="targetEmpSearch()" 
+                  (ngModelChange)="targetEmpSearch.set($event)"
+                  autofocus
+                />
+                <button 
+                  *ngIf="targetEmpSearch()" 
+                  type="button" 
+                  class="btn-clear-search" 
+                  (click)="targetEmpSearch.set('')">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </div>
+
+              <div class="emp-dropdown-list">
+                <div 
+                  class="emp-option-row" 
+                  *ngFor="let e of filteredTargetEmployees()" 
+                  [class.selected]="e.id === genForm.employeeId"
+                  (click)="selectTargetEmployee(e.id)">
+                  
+                  <img 
+                    *ngIf="e.avatarUrl" 
+                    [src]="e.avatarUrl" 
+                    [alt]="e.firstName" 
+                    class="option-avatar"
+                    (error)="e.avatarUrl = null" 
+                  />
+                  <div 
+                    *ngIf="!e.avatarUrl" 
+                    class="option-avatar-circle" 
+                    [style.backgroundColor]="getAvatarBg(e.firstName + ' ' + e.lastName)">
+                    {{ getInitials(e.firstName, e.lastName) }}
+                  </div>
+
+                  <div class="option-details">
+                    <div class="option-top-row">
+                      <span class="option-name">{{ employeeName(e) }}</span>
+                      <span class="option-code" *ngIf="e.employeeCode">#{{ e.employeeCode }}</span>
+                    </div>
+                    <div class="option-bottom-row" *ngIf="e.department?.name || e.designation?.name">
+                      <span class="option-dept">{{ e.department?.name }}</span>
+                      <span class="option-dot" *ngIf="e.department?.name && e.designation?.name">•</span>
+                      <span class="option-desig">{{ e.designation?.name }}</span>
+                    </div>
+                  </div>
+
+                  <div class="option-check" *ngIf="e.id === genForm.employeeId">
+                    <svg lucideCheck size="15"></svg>
+                  </div>
+                </div>
+
+                <div class="emp-empty-search" *ngIf="filteredTargetEmployees().length === 0">
+                  <svg lucideSearch size="18"></svg>
+                  <p>No employees matching "<strong>{{ targetEmpSearch() }}</strong>"</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Signed by (optional) -->
+        <div class="form-group emp-picker-group">
+          <label class="section-label">Signed by <span class="muted-note">(optional)</span></label>
+          <div class="searchable-emp-container">
+            <button 
+              type="button" 
+              class="emp-searchable-trigger" 
+              [class.open]="signatoryDropdownOpen()"
+              [class.has-value]="!!getSelectedSignatory()"
+              (click)="toggleSignatoryDropdown()">
+              
+              <div class="trigger-emp-content" *ngIf="getSelectedSignatory() as sig; else selectSigPlaceholder">
+                <img 
+                  *ngIf="sig.avatarUrl" 
+                  [src]="sig.avatarUrl" 
+                  [alt]="sig.firstName" 
+                  class="trigger-emp-avatar" 
+                  (error)="sig.avatarUrl = null"
+                />
+                <div 
+                  *ngIf="!sig.avatarUrl" 
+                  class="trigger-emp-avatar-circle" 
+                  [style.backgroundColor]="getAvatarBg(sig.firstName + ' ' + sig.lastName)">
+                  {{ getInitials(sig.firstName, sig.lastName) }}
+                </div>
+                <div class="trigger-emp-meta">
+                  <div class="trigger-emp-name-row">
+                    <span class="trigger-emp-name">{{ employeeName(sig) }}</span>
+                    <span class="trigger-emp-code" *ngIf="sig.employeeCode">#{{ sig.employeeCode }}</span>
+                  </div>
+                  <span class="trigger-emp-sub" *ngIf="sig.department?.name || sig.designation?.name">
+                    {{ sig.department?.name }}<span *ngIf="sig.department?.name && sig.designation?.name"> • </span>{{ sig.designation?.name }}
+                  </span>
+                </div>
+              </div>
+
+              <ng-template #selectSigPlaceholder>
+                <div class="trigger-placeholder">
+                  <span>— None (No signatory) —</span>
+                </div>
+              </ng-template>
+
+              <div class="trigger-actions">
+                <button 
+                  *ngIf="getSelectedSignatory()" 
+                  type="button" 
+                  class="btn-clear-selection" 
+                  (click)="clearSignatory($event)" 
+                  title="Remove signatory">
+                  <svg lucideX size="13"></svg>
+                </button>
+                <svg lucideChevronDown size="16" class="chevron-arrow" [class.rotated]="signatoryDropdownOpen()"></svg>
+              </div>
+            </button>
+
+            <div 
+              class="dropdown-backdrop" 
+              *ngIf="signatoryDropdownOpen()" 
+              (click)="signatoryDropdownOpen.set(false)">
+            </div>
+
+            <div class="searchable-emp-dropdown slide-down" *ngIf="signatoryDropdownOpen()">
+              <div class="emp-search-header" (click)="$event.stopPropagation()">
+                <svg lucideSearch size="14" class="search-box-icon"></svg>
+                <input 
+                  type="text" 
+                  class="emp-search-input" 
+                  placeholder="Filter signatories..." 
+                  [ngModel]="signatorySearch()" 
+                  (ngModelChange)="signatorySearch.set($event)"
+                  autofocus
+                />
+                <button 
+                  *ngIf="signatorySearch()" 
+                  type="button" 
+                  class="btn-clear-search" 
+                  (click)="signatorySearch.set('')">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </div>
+
+              <div class="emp-dropdown-list">
+                <div 
+                  class="emp-option-row none-option" 
+                  [class.selected]="!genForm.signatoryEmployeeId"
+                  (click)="selectSignatory(null)">
+                  <span class="none-label">— None —</span>
+                  <div class="option-check" *ngIf="!genForm.signatoryEmployeeId">
+                    <svg lucideCheck size="15"></svg>
+                  </div>
+                </div>
+
+                <div 
+                  class="emp-option-row" 
+                  *ngFor="let s of filteredSignatories()" 
+                  [class.selected]="s.id === genForm.signatoryEmployeeId"
+                  (click)="selectSignatory(s.id)">
+                  
+                  <img 
+                    *ngIf="s.avatarUrl" 
+                    [src]="s.avatarUrl" 
+                    [alt]="s.firstName" 
+                    class="option-avatar"
+                    (error)="s.avatarUrl = null" 
+                  />
+                  <div 
+                    *ngIf="!s.avatarUrl" 
+                    class="option-avatar-circle" 
+                    [style.backgroundColor]="getAvatarBg(s.firstName + ' ' + s.lastName)">
+                    {{ getInitials(s.firstName, s.lastName) }}
+                  </div>
+
+                  <div class="option-details">
+                    <div class="option-top-row">
+                      <span class="option-name">{{ employeeName(s) }}</span>
+                      <span class="option-code" *ngIf="s.employeeCode">#{{ s.employeeCode }}</span>
+                    </div>
+                    <div class="option-bottom-row" *ngIf="s.department?.name || s.designation?.name">
+                      <span class="option-dept">{{ s.department?.name }}</span>
+                      <span class="option-dot" *ngIf="s.department?.name && s.designation?.name">•</span>
+                      <span class="option-desig">{{ s.designation?.name }}</span>
+                    </div>
+                  </div>
+
+                  <div class="option-check" *ngIf="s.id === genForm.signatoryEmployeeId">
+                    <svg lucideCheck size="15"></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="section-label">Letter Title <span class="muted-note">(defaults to template name)</span></label>
+        <input 
+          type="text" 
+          class="form-control" 
+          placeholder="e.g. Offer Letter - John Doe"
+          [(ngModel)]="genForm.title">
+      </div>
+
+      <!-- Realistic Live Preview Pane -->
+      <div class="live-preview-section">
+        <div class="preview-header-bar">
+          <div class="preview-title-tag">
+            <svg lucideEye size="13"></svg>
+            <span>Live Document Preview</span>
+          </div>
+          <span class="preview-note" *ngIf="genPreview()">Rendered with employee merge tags</span>
+        </div>
+        <div class="document-paper-wrapper small-paper">
+          <div class="document-paper-sheet preview-body" *ngIf="genPreview()" [innerHTML]="trustHtml(genPreview())"></div>
+          <div class="preview-empty-state" *ngIf="!genPreview()">
+            <div class="empty-preview-icon">
+              <svg lucideFileText size="32"></svg>
+            </div>
+            <h4>Select an Employee and Template</h4>
+            <p>A live letterhead preview will render here with all merge tags replaced.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeGenerate()">Cancel</button>
+      <button 
+        type="button" 
+        class="btn-modal-primary" 
+        (click)="submitGenerate()"
+        [disabled]="!genForm.templateId || !genForm.employeeId">
+        <svg lucideSend size="14"></svg>
+        <span>Generate & Save Letter</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL 3: VIEW ISSUED LETTER
+     ========================================================================== -->
+<div class="modal-overlay" *ngIf="viewOpen()" (click)="closeLetter()">
+  <div class="modal-card wide slide-in" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-info">
+        <div class="modal-icon-badge issued">
+          <svg lucideFileText size="20"></svg>
+        </div>
+        <div>
+          <h2>{{ viewLetter()?.title }}</h2>
+          <div class="modal-sub-row">
+            <span class="emp-tag">
+              <img 
+                *ngIf="viewLetter()?.employee?.avatarUrl" 
+                [src]="viewLetter()?.employee?.avatarUrl" 
+                [alt]="viewLetter()?.employee?.firstName" 
+                class="tag-avatar-img"
+                (error)="viewLetter()!.employee.avatarUrl = null"
+              />
+              <svg *ngIf="!viewLetter()?.employee?.avatarUrl" lucideUser size="12"></svg>
+              <span>{{ viewLetter()?.employee?.firstName }} {{ viewLetter()?.employee?.lastName }}</span>
+            </span>
+            <span class="date-tag">
+              <svg lucideCalendar size="12"></svg>
+              <span>Issued {{ viewLetter()?.createdAt | date: 'mediumDate' }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <button class="btn-close-modal" (click)="closeLetter()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="document-paper-wrapper">
+        <div class="document-paper-sheet preview-body" [innerHTML]="trustHtml(viewLetter()?.body)"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeLetter()">Close</button>
+      <button type="button" class="btn-modal-primary" (click)="printLetter()">
+        <svg lucidePrinter size="14"></svg>
+        <span>Print / Save as PDF</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL 4: TEMPLATE EDITOR (CREATE / EDIT)
+     ========================================================================== -->
+<div class="modal-overlay" *ngIf="editorOpen()" (click)="closeEditor()">
+  <div class="modal-card wide editor-modal slide-in" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-info">
+        <div class="modal-icon-badge edit">
+          <svg lucideEdit3 size="20"></svg>
+        </div>
+        <div>
+          <h2>{{ editorMode() === 'create' ? 'New Letter Template' : 'Edit Letter Template' }}</h2>
+          <p class="modal-subtitle">Author and customize reusable templates with merge tags.</p>
+        </div>
+      </div>
+      <button class="btn-close-modal" (click)="closeEditor()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body editor-body">
+      <div class="editor-main">
+        <div class="form-group">
+          <label class="section-label">Template Title <span class="required-star">*</span></label>
+          <input 
+            type="text" 
+            class="form-control" 
+            [(ngModel)]="form.title" 
+            placeholder="e.g. Full-Time Offer Letter">
+        </div>
+
+        <div class="form-group">
+          <label class="section-label">Internal Note <span class="muted-note">(optional description)</span></label>
+          <input 
+            type="text" 
+            class="form-control" 
+            [(ngModel)]="form.description" 
+            placeholder="e.g. Standard offer letter with 3-month probation clause">
+        </div>
+
+        <div class="form-group grow">
+          <div class="body-label-row">
+            <label class="section-label">Letter Body</label>
+            <div class="view-switch">
+              <button 
+                type="button" 
+                class="switch-btn" 
+                [class.active]="editorView() === 'rich'"
+                (click)="editorView.set('rich')">
+                Visual
+              </button>
+              <button 
+                type="button" 
+                class="switch-btn" 
+                [class.active]="editorView() === 'html'"
+                (click)="editorView.set('html')">
+                <svg lucideCode size="12"></svg> HTML
+              </button>
+            </div>
+          </div>
+
+          <quill-editor 
+            *ngIf="editorView() === 'rich'"
+            class="letter-quill"
+            [(ngModel)]="form.body"
+            [modules]="quillModules"
+            [styles]="{ height: '340px' }"
+            (onEditorCreated)="onEditorCreated($event)"
+            placeholder="Dear ##EMPLOYEE_NAME##, …">
+          </quill-editor>
+
+          <textarea 
+            *ngIf="editorView() === 'html'"
+            id="letter-body" 
+            class="form-control body-editor" 
+            [(ngModel)]="form.body"
+            spellcheck="false" 
+            placeholder="<p>Dear ##EMPLOYEE_NAME##, …</p>">
+          </textarea>
+
+          <small class="hint">
+            <svg lucideCode size="11"></svg>
+            <span>{{ countTags(form.body) }} merge tag(s) included in this body.</span>
+          </small>
+        </div>
+
+        <label class="check-row">
+          <input type="checkbox" [(ngModel)]="form.isActive">
+          <span class="check-label">Active (available for letter generation)</span>
+        </label>
+
+        <div class="form-group">
+          <label>Used for</label>
+          <div class="radio-row">
+            <label>
+              <input type="radio" name="scope" value="EMPLOYEE"
+                     [ngModel]="form.scope" (ngModelChange)="onScopeChange($event)">
+              An employee
+            </label>
+            <label>
+              <input type="radio" name="scope" value="CANDIDATE"
+                     [ngModel]="form.scope" (ngModelChange)="onScopeChange($event)">
+              A job candidate
+            </label>
+          </div>
+          <small class="hint">
+            Candidate templates render against a job application, so the employee tags
+            resolve to the applicant and offer fields like CTC become available.
+          </small>
+        </div>
+
+        <label class="check-row" *ngIf="form.scope !== 'CANDIDATE'">
+          <input type="checkbox" [(ngModel)]="form.autoOnOnboarding">
+          <span class="check-label">Issue automatically when a candidate is onboarded</span>
+        </label>
+        <small class="hint" *ngIf="form.scope !== 'CANDIDATE'">
+          Fires the moment a hired candidate becomes an employee — the first point at
+          which the employee merge tags can resolve. Suits Joining and Welcome letters.
+        </small>
+
+        <label class="check-row" *ngIf="form.scope === 'CANDIDATE'">
+          <input type="checkbox" [(ngModel)]="form.useForOfferLetter">
+          <span class="check-label">Use this as the recruitment offer letter</span>
+        </label>
+        <small class="hint" *ngIf="form.scope === 'CANDIDATE'">
+          The signed offer-letter flow renders this body, keeping its e-signature,
+          accept/decline link and PDF. Only one template can hold this at a time.
+        </small>
+      </div>
+
+      <!-- Merge Tags Sidebar -->
+      <aside class="tag-panel">
+        <div class="tag-panel-head">
+          <svg lucideSparkles size="14"></svg>
+          <span>Merge Tags</span>
+        </div>
+        <p class="tag-hint">Click any tag to insert it at cursor position in the editor.</p>
+        <div class="tag-group" *ngFor="let g of tagGroups()">
+          <div class="tag-group-name">{{ g.name }}</div>
+          <button 
+            type="button"
+            class="tag-chip" 
+            *ngFor="let t of g.tags" 
+            (click)="insertTag(t.tag)" 
+            [title]="t.tag">
+            <span>+ {{ t.label }}</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeEditor()">Cancel</button>
+      <button type="button" class="btn-modal-primary" (click)="saveTemplate()">
+        {{ editorMode() === 'create' ? 'Create Template' : 'Save Changes' }}
+      </button>
+    </div>
+  </div>
+</div>

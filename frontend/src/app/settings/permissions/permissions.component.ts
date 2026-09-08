@@ -132,6 +132,7 @@ export class PermissionsComponent implements OnInit {
       subItems: [
         { id: 'settings/company', title: 'Company Profile', enabled: false },
         { id: 'settings/master-data', title: 'Master Data', enabled: false },
+        { id: 'settings/letter-templates', title: 'Letter Templates', enabled: false },
         { id: 'settings/permissions', title: 'Roles & Permissions', enabled: false },
         { id: 'settings/system', title: 'System Settings', enabled: false },
         { id: 'settings/integrations', title: 'Integrations', enabled: false }

@@ -1937,3 +1937,48 @@
   color: #0F172A;
   line-height: 1.5;
 }
+
+/* Shift create/edit form */
+.shift-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.shift-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 720px) {
+  .shift-grid-2,
+  .shift-grid-4 { grid-template-columns: 1fr 1fr; }
+}
+
+.shift-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: 8px;
+}
+
+.day-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.req { color: #EF4444; }
+
+.hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #64748B;
+}

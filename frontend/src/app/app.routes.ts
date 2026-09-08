@@ -51,7 +51,13 @@ export const routes: Routes = [
         path: 'settings/master-data', 
         canActivate: [permissionGuard],
         data: { module: 'settings/master-data' },
-        loadComponent: () => import('./settings/master-data/master-data').then(m => m.MasterDataComponent) 
+        loadComponent: () => import('./settings/master-data/master-data').then(m => m.MasterDataComponent)
+      },
+      {
+        path: 'settings/letter-templates',
+        canActivate: [permissionGuard],
+        data: { module: 'settings/letter-templates' },
+        loadComponent: () => import('./settings/letter-templates/letter-templates').then(m => m.LetterTemplatesComponent)
       },
       {
         path: 'employees/directory',
@@ -129,6 +135,12 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'attendance/all' },
         loadComponent: () => import('./attendance/all-attendance/all-attendance').then(m => m.AllAttendanceComponent)
+      },
+      {
+        path: 'attendance/shift-roster',
+        canActivate: [permissionGuard],
+        data: { module: 'attendance/shifts' },
+        loadComponent: () => import('./attendance/shift-roster/shift-roster').then(m => m.ShiftRosterComponent)
       },
       {
         path: 'attendance/:tab',

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PayrollSettingsService } from '../payroll/payroll-settings.service';
+import { LettersService } from '../letters/letters.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
 
@@ -10,6 +11,7 @@ export class ApplicationsService {
     private prisma: PrismaService,
     private payrollSettingsService: PayrollSettingsService,
     private notificationsService: NotificationsService,
+    private lettersService: LettersService,
   ) {}
 
   async findAll(companyId: number, jobId?: number) {
@@ -122,7 +124,7 @@ export class ApplicationsService {
     });
   }
 
-  async onboardCandidate(id: number, companyId: number) {
+  async onboardCandidate(id: number, companyId: number, actorUserId?: number) {
     const application = await this.findOne(id, companyId);
     
     if (application.status !== 'HIRED') {
@@ -201,7 +203,18 @@ export class ApplicationsService {
       return employee;
     });
 
-    return newEmployee;
+    // Now that the employee exists, issue whatever letters are flagged to go out
+    // at onboarding (Joining Letter, Welcome Letter, …). Kept outside the
+    // transaction: a letter that fails to render must not undo the hire.
+    let letters = { issued: 0, titles: [] as string[] };
+    try {
+      letters = await this.lettersService.generateOnboardingLetters(
+        companyId, newEmployee.id, actorUserId);
+    } catch {
+      // Onboarding succeeded; letters can be generated manually instead.
+    }
+
+    return { ...newEmployee, lettersIssued: letters.titles };
   }
 
   async generateAnnexure(id: number, companyId: number) {
@@ -271,8 +284,16 @@ export class ApplicationsService {
       where: { interviewerId: employee.id, application: { companyId } },
       include: {
         application: {
-          include: {
-            job: { select: { title: true } }
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            resumeUrl: true,
+            photoUrl: true,
+            experienceYears: true,
+            status: true,
+            job: { select: { id: true, title: true, department: true } }
           }
         }
       },

@@ -1,0 +1,7 @@
+﻿name,short_code,color,shift_type,start_time,end_time,half_day_time,total_hours,half_day_hours,auto_clock_out_hours,early_clock_in_minutes,late_mark_minutes,max_check_ins,working_days
+General Shift,GS,#2A97D8,strict,09:30,18:30,09:30,,4,0,60,1,2,"Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday"
+Comp-Off,COMP-Off,#EB8236,flexible,14:00,14:00,14:00,9,5,1,,0,1,"Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday"
+Night Shift,NS,#17191A,strict,21:30,06:30,00:30,,4,0,90,1,2,"Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday"
+Half Day,HD,#EB4C36,flexible,15:30,15:30,15:30,5,5,1,,0,1,"Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday"
+VIP Shift,VS,#16813D,strict,11:00,20:00,11:15,,3,0,120,1,2,"Monday, Tuesday, Wednesday, Thursday, Friday, Saturday"
+Onsite Project,OP,#EBB436,strict,00:15,00:00,23:30,,,1,,127,2,"Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday"

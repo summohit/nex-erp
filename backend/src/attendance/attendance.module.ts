@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { AttendanceController } from './attendance.controller';
 import { ShiftsService } from './shifts.service';
+import { ShiftRosterService } from './shift-roster.service';
 import { ShiftsController } from './shifts.controller';
 import { AutoClockoutCron } from './auto-clockout.cron';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -11,7 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [PrismaModule, PermissionsModule, NotificationsModule],
   controllers: [AttendanceController, ShiftsController],
-  providers: [AttendanceService, ShiftsService, AutoClockoutCron],
-  exports: [AttendanceService, ShiftsService]
+  providers: [AttendanceService, ShiftsService, ShiftRosterService, AutoClockoutCron],
+  exports: [AttendanceService, ShiftsService, ShiftRosterService]
 })
 export class AttendanceModule {}

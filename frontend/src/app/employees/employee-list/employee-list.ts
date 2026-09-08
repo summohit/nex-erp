@@ -379,7 +379,13 @@ export class EmployeeListComponent implements OnInit {
     this.isLoading.set(true);
     this.employeeService.getEmployees().subscribe({
       next: (data) => {
-        this.employees.set(data);
+        // Deactivated staff stay in the directory but sink below current employees.
+        const sorted = [...data].sort((a: any, b: any) => {
+          const ia = a.user?.status === 'SUSPENDED' ? 1 : 0;
+          const ib = b.user?.status === 'SUSPENDED' ? 1 : 0;
+          return ia - ib;
+        });
+        this.employees.set(sorted);
         this.isLoading.set(false);
         this.openPendingEditFromQuery();
       },

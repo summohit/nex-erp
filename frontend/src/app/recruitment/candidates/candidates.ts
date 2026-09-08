@@ -11,7 +11,7 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { 
   LucideX, LucideLayoutGrid, LucideTable, LucideFileText, 
   LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
-  LucideClock, LucideBuilding, LucideTrash2, LucideSparkles,
+  LucideClock, LucideBuilding, LucideTrash2, LucideSparkles, LucideSend,
   LucideInbox, LucideEye, LucideStar, LucideUsers, LucideAward,
   LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
   LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
@@ -34,7 +34,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     CommonModule, FormsModule, DragDropModule, AgGridAngular, DatePipe, RouterLink,
     LucideX, LucideLayoutGrid, LucideTable, LucideFileText,
     LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
-    LucideClock, LucideBuilding, LucideTrash2, LucideSparkles,
+    LucideClock, LucideBuilding, LucideTrash2, LucideSparkles, LucideSend,
     LucideInbox, LucideEye, LucideStar, LucideUsers, LucideAward,
     LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
     LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
@@ -200,6 +200,7 @@ export class CandidatesComponent implements OnInit {
 
   offerLetter = signal<any>(null);
   isGeneratingOfferLetter = signal(false);
+  isSendingOfferLetter = signal(false);
   
   newInterview = signal<any>({});
   editInterviewMode = signal<number | null>(null);
@@ -731,6 +732,35 @@ export class CandidatesComponent implements OnInit {
       error: (err) => {
         this.isGeneratingOfferLetter.set(false);
         this.toast.error(err?.error?.message || 'Failed to generate offer letter');
+      }
+    });
+  }
+
+  sendOfferLetter() {
+    const app = this.selectedApp();
+    const letter = this.offerLetter();
+    if (!app || !letter) return;
+    if (!app.email) { this.toast.error('This candidate has no email address on file'); return; }
+
+    const resend = letter.status === 'SENT' || letter.status === 'VIEWED';
+    const prompt = resend
+      ? `Re-send the offer letter to ${app.email}? They will get a fresh copy of the same signing link.`
+      : `Email the offer letter to ${app.fullName} at ${app.email}?`;
+    if (!confirm(prompt)) return;
+
+    this.isSendingOfferLetter.set(true);
+    this.candidatesService.sendOfferLetter(app.id).subscribe({
+      next: (res) => {
+        this.isSendingOfferLetter.set(false);
+        this.toast.success(`Offer letter sent to ${res.email}`);
+        // Sending moves a draft to SENT, so refresh the letter state.
+        this.candidatesService.getOfferLetter(app.id).subscribe({
+          next: (l) => this.offerLetter.set(l),
+        });
+      },
+      error: (err) => {
+        this.isSendingOfferLetter.set(false);
+        this.toast.error(err?.error?.message || 'Failed to send the offer letter');
       }
     });
   }

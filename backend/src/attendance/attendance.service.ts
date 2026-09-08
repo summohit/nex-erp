@@ -114,7 +114,8 @@ export class AttendanceService {
     const now = new Date();
     let isLate = false;
 
-    if (employee.shift) {
+    // Duration-only shifts have no startTime, so there is nothing to be late for.
+    if (employee.shift?.startTime) {
       // Shift times ("09:00") are IST wall-clock, not server-local — istTimeInstant
       // resolves them to the correct real-world instant regardless of what
       // timezone this server's OS happens to be configured with.
@@ -202,7 +203,7 @@ export class AttendanceService {
     let status = 'PRESENT';
     let overtimeHours = 0;
 
-    if (employee.shift) {
+    if (employee.shift?.endTime) {
       // Same IST-fixed resolution as clockIn — see the comment there.
       const expectedEnd = istTimeInstant(now, employee.shift.endTime);
 

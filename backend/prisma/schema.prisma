@@ -28,6 +28,9 @@ model Company {
   holidays            Holiday[]
   leaveTypes          LeaveType[]
   shifts              Shift[]
+  shiftRosterEntries  ShiftRosterEntry[]
+  letterTemplates     LetterTemplate[]
+  generatedLetters    GeneratedLetter[]
   salaryComponents    SalaryComponent[]
   expenseClaims       ExpenseClaim[]
   awardTypes          AwardType[]
@@ -290,6 +293,8 @@ model Employee {
   offboardingTasks         OffboardingTask[]
   regularizations          AttendanceRegularization[]
   shiftRotations           ShiftRotation[]
+  shiftRosterEntries       ShiftRosterEntry[]
+  generatedLetters         GeneratedLetter[]
   uploadedProjectDocuments ProjectDocument[]
   assignedLeads            Lead[]                     @relation("LeadAssignee")
   createdLeads             Lead[]                     @relation("LeadCreator")
@@ -499,16 +504,56 @@ model AttendanceRegularization {
 }
 
 model Shift {
-  id                Int        @id @default(autoincrement())
-  name              String
-  startTime         String // format "HH:mm"
-  endTime           String // format "HH:mm"
-  bufferTimeMinutes Int        @default(15)
-  companyId         Int
+  id   Int    @id @default(autoincrement())
+  name String
+  // Null on duration-only shifts (e.g. Comp-Off), which are defined by hours
+  // worked rather than a clock window — see totalHours/halfDayHours below.
+  shortCode String? // e.g. "GS" — shown on the roster grid
+  colorCode String? // hex, e.g. "#2A97D8"
+  // STRICT shifts are judged against the clock window below; FLEXIBLE ones only
+  // against totalHours worked, so lateness and early clock-in don't apply.
+  shiftType         String  @default("STRICT")
+  startTime         String? // format "HH:mm"
+  endTime           String? // format "HH:mm"
+  bufferTimeMinutes Int     @default(15) // grace period before a clock-in is late
+  // Clock time separating a full day from a half day. Not always startTime:
+  // a night shift starting 21:30 has its half-day boundary at 00:30.
+  halfDayTime         String? // format "HH:mm"
+  halfDayHours        Float? // hours that still count as a half day
+  totalHours          Float? // FLEXIBLE shifts: hours making a full day
+  earlyClockInMinutes Int     @default(0) // how early a clock-in is accepted
+  autoClockOutHours   Float   @default(0) // 0 = no auto clock-out
+  maxCheckIns         Int     @default(2) // clock-in/out pairs allowed per day
+  // Days the shift operates, e.g. "Monday,Tuesday,...". Null means all seven.
+  workingDays         String?
+  companyId           Int
   company           Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employees         Employee[]
+  rosterEntries     ShiftRosterEntry[]
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
+}
+
+// One employee's shift on one day. Employee.shiftId is the standing default;
+// this overrides it per day, which is what the roster grid edits. A row with
+// isDayOff and no shift is an explicit day off, distinct from having no row at
+// all (nothing rostered yet).
+model ShiftRosterEntry {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime @db.Date
+  shiftId    Int?
+  shift      Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  isDayOff   Boolean  @default(false)
+  note       String?
+  companyId  Int
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([companyId, date])
 }
 
 model ShiftRotation {
@@ -904,6 +949,58 @@ model JobApplication {
 // SuperAdmin-managed HTML template (System Settings) rather than a full
 // merge-field engine, matching the payslip PDF generation pattern already
 // used elsewhere in this codebase (Puppeteer + hardcoded HTML template).
+// A reusable HR letter body (offer, relieving, increment, bond, …). The body is
+// HTML containing ##MERGE_TAG## placeholders resolved per employee at generation.
+model LetterTemplate {
+  id          Int               @id @default(autoincrement())
+  companyId   Int
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title       String
+  body        String            @db.Text
+  description String? // short note for the template list
+  isActive    Boolean           @default(true)
+  // Issue this letter automatically when a candidate is onboarded — that is the
+  // first moment the employee record exists, so ##EMPLOYEE_*## tags can resolve.
+  autoOnOnboarding Boolean      @default(false)
+  // EMPLOYEE letters render against an Employee; CANDIDATE ones against a job
+  // application, where the ##EMPLOYEE_*## tags resolve to candidate details.
+  scope            String       @default("EMPLOYEE")
+  // The single CANDIDATE template the recruitment offer-letter flow renders,
+  // replacing the one-off HTML previously kept in SystemSettings.
+  useForOfferLetter Boolean     @default(false)
+  displayOrder Int              @default(0)
+  letters     GeneratedLetter[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([companyId, title])
+}
+
+// A letter actually issued to an employee. `body` is the rendered snapshot taken
+// at generation, so editing the template later never rewrites issued letters.
+model GeneratedLetter {
+  id           Int             @id @default(autoincrement())
+  companyId    Int
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeId   Int
+  employee     Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  templateId   Int?
+  template     LetterTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  title        String
+  body         String          @db.Text
+  pdfUrl       String?
+  // Page margins in millimetres, applied when rendering to PDF.
+  marginTop    Float           @default(20)
+  marginBottom Float           @default(20)
+  marginLeft   Float           @default(20)
+  marginRight  Float           @default(20)
+  issuedById   Int?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([companyId, employeeId])
+}
+
 model OfferLetter {
   id                    Int             @id @default(autoincrement())
   applicationId         Int             @unique

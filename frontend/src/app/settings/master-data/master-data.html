@@ -64,16 +64,70 @@
       [gridOptions]="gridOptions">
     </ag-grid-angular>
 
-    <ag-grid-angular
-      *ngIf="activeTab() === 'shifts'"
-      class="ag-theme-quartz"
-      [theme]="'legacy'"
-      style="width: 100%; height: 500px;"
-      [rowData]="shifts()"
-      [columnDefs]="shiftColDefs"
-      [defaultColDef]="defaultColDef"
-      [gridOptions]="gridOptions">
-    </ag-grid-angular>
+    <!-- Shifts Section with Custom Toolbar & Grid -->
+    <div *ngIf="activeTab() === 'shifts'" class="shifts-tab-wrapper">
+      <!-- Toolbar with Search, KPI stats chips, and Refresh -->
+      <div class="shifts-toolbar">
+        <div class="shifts-search-box">
+          <svg lucideSearch size="16" class="search-icon"></svg>
+          <input 
+            type="text" 
+            class="shifts-search-input" 
+            placeholder="Search shifts by name, code, timing, type..." 
+            [value]="shiftSearchText()" 
+            (input)="onShiftSearchChange($any($event.target).value)">
+          <button 
+            *ngIf="shiftSearchText()" 
+            class="clear-search-btn" 
+            (click)="clearShiftSearch()" 
+            title="Clear search">
+            <svg lucideX size="14"></svg>
+          </button>
+        </div>
+
+        <div class="shifts-stats-chips">
+          <div class="stat-chip total" title="Total Shifts">
+            <span class="chip-label">Total:</span>
+            <span class="chip-value">{{ shiftStats().total }}</span>
+          </div>
+          <div class="stat-chip strict" title="Strict Timing Shifts">
+            <span class="chip-dot strict-dot"></span>
+            <span class="chip-label">Strict:</span>
+            <span class="chip-value">{{ shiftStats().strict }}</span>
+          </div>
+          <div class="stat-chip flexible" title="Flexible Hours Shifts">
+            <span class="chip-dot flex-dot"></span>
+            <span class="chip-label">Flexible:</span>
+            <span class="chip-value">{{ shiftStats().flexible }}</span>
+          </div>
+          <div class="stat-chip employees" title="Total Employees Assigned Across All Shifts">
+            <svg lucideUsers size="13"></svg>
+            <span class="chip-label">Assigned:</span>
+            <span class="chip-value">{{ shiftStats().totalEmployees }}</span>
+          </div>
+        </div>
+
+        <div class="shifts-toolbar-actions">
+          <button class="btn-refresh" (click)="refreshShifts()" title="Refresh shift list">
+            <svg lucideRotateCcw size="15"></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid-container shifts-grid-wrapper">
+        <ag-grid-angular
+          class="ag-theme-quartz shift-grid-table"
+          [theme]="'legacy'"
+          style="width: 100%; height: 560px;"
+          [rowData]="filteredShifts()"
+          [columnDefs]="shiftColDefs"
+          [defaultColDef]="shiftDefaultColDef"
+          [gridOptions]="shiftGridOptions"
+          (gridReady)="onShiftGridReady($event)">
+        </ag-grid-angular>
+      </div>
+    </div>
 
     <ag-grid-angular
       *ngIf="activeTab() === 'leave-types'"
@@ -166,11 +220,16 @@
 
 <!-- Modal -->
 <div class="modal-overlay" *ngIf="isModalOpen()">
-  <div class="modal-content slide-in">
+  <div class="modal-content slide-in" [class.modal-wide]="activeTab() === 'shifts'">
     <div class="modal-header">
       <div class="header-titles">
-        <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
-        <p class="subtitle">Enter the details to keep your master data organized</p>
+        <div class="modal-title-row">
+          <div class="modal-header-icon-badge" *ngIf="activeTab() === 'shifts'">
+            <svg lucideClock size="20"></svg>
+          </div>
+          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
+        </div>
+        <p class="subtitle">{{ activeTab() === 'shifts' ? 'Configure shift timings, punch policies, and weekly working schedule' : 'Enter the details to keep your master data organized' }}</p>
       </div>
       <button class="btn-icon close-btn" (click)="closeModal()">
         <svg lucideX size="18"></svg>
@@ -205,24 +264,267 @@
           </label>
         </div>
 
-        <!-- Shifts -->
-        <div class="form-group full-width" *ngIf="activeTab() === 'shifts'">
-          <label>Shift Name</label>
-          <input type="text" class="form-control" [(ngModel)]="formData.name" placeholder="e.g. Morning Shift">
-        </div>
-        <div class="form-group" *ngIf="activeTab() === 'shifts'">
-          <label>Start Time</label>
-          <input type="time" class="form-control" [(ngModel)]="formData.startTime">
-        </div>
-        <div class="form-group" *ngIf="activeTab() === 'shifts'">
-          <label>End Time</label>
-          <input type="time" class="form-control" [(ngModel)]="formData.endTime">
-        </div>
-        <div class="form-group full-width" *ngIf="activeTab() === 'shifts'">
-          <label>Buffer Time (minutes)</label>
-          <input type="number" class="form-control" [(ngModel)]="formData.bufferTimeMinutes" placeholder="e.g. 15">
-          <p class="help-text">Grace period allowed before marking as late.</p>
-        </div>
+        <!-- Shifts Form Redesign -->
+        <ng-container *ngIf="activeTab() === 'shifts'">
+          <!-- Shift Type Selection Cards -->
+          <div class="shift-type-container full-width">
+            <label class="shift-field-label">Select Shift Model</label>
+            <div class="shift-type-cards">
+              <div 
+                class="shift-type-card" 
+                [class.selected]="formData.shiftType !== 'FLEXIBLE'"
+                (click)="formData.shiftType = 'STRICT'">
+                <div class="type-card-header">
+                  <div class="type-icon-circle strict">
+                    <svg lucideClock size="18"></svg>
+                  </div>
+                  <div class="type-card-text">
+                    <div class="type-title-row">
+                      <span class="type-title">Strict Timings</span>
+                      <span class="type-pill strict">Fixed Schedule</span>
+                    </div>
+                    <p class="type-desc">Fixed clock-in and clock-out window. Punches are strictly validated against scheduled times.</p>
+                  </div>
+                  <div class="type-card-radio">
+                    <svg *ngIf="formData.shiftType !== 'FLEXIBLE'" lucideCheck size="13"></svg>
+                  </div>
+                </div>
+              </div>
+
+              <div 
+                class="shift-type-card" 
+                [class.selected]="formData.shiftType === 'FLEXIBLE'"
+                (click)="formData.shiftType = 'FLEXIBLE'">
+                <div class="type-card-header">
+                  <div class="type-icon-circle flexible">
+                    <svg lucideTimer size="18"></svg>
+                  </div>
+                  <div class="type-card-text">
+                    <div class="type-title-row">
+                      <span class="type-title">Flexible Hours</span>
+                      <span class="type-pill flexible">Output Based</span>
+                    </div>
+                    <p class="type-desc">Employees can check in anytime. Evaluated purely on meeting required daily working hours.</p>
+                  </div>
+                  <div class="type-card-radio">
+                    <svg *ngIf="formData.shiftType === 'FLEXIBLE'" lucideCheck size="13"></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 1: Basic Information -->
+          <div class="shift-section-box full-width">
+            <div class="shift-section-header">
+              <svg lucideTag size="16"></svg>
+              <span>General Information</span>
+            </div>
+
+            <div class="shift-two-cols">
+              <div class="form-group">
+                <label>Shift Name <span class="required-star">*</span></label>
+                <input type="text" class="form-control" [(ngModel)]="formData.name" placeholder="e.g. Morning General Shift" required>
+              </div>
+
+              <div class="form-group">
+                <label>Shift Short Code</label>
+                <input type="text" class="form-control" [(ngModel)]="formData.shortCode" maxlength="10" placeholder="e.g. GS, MGS, NS" style="text-transform: uppercase;">
+              </div>
+            </div>
+
+            <!-- Color Palette & Live Badge Preview -->
+            <div class="form-group full-width" style="margin-top: 6px;">
+              <label>Shift Color & Badge</label>
+              <div class="color-palette-bar">
+                <div class="swatches-palette">
+                  <button 
+                    type="button" 
+                    *ngFor="let col of SHIFT_COLORS" 
+                    class="color-swatch" 
+                    [style.backgroundColor]="col"
+                    [class.active]="formData.colorCode === col"
+                    (click)="selectShiftColor(col)"
+                    [title]="col">
+                    <svg *ngIf="formData.colorCode === col" lucideCheck size="12"></svg>
+                  </button>
+                  <input type="color" [(ngModel)]="formData.colorCode" class="native-color-square" title="Pick custom color">
+                </div>
+
+                <!-- Live Shift Badge Preview inline -->
+                <div class="live-shift-tag-inline" [style.borderColor]="formData.colorCode || '#2A97D8'">
+                  <div class="live-tag-avatar" [style.backgroundColor]="formData.colorCode || '#2A97D8'">
+                    {{ formData.shortCode || (formData.name ? formData.name.substring(0, 2).toUpperCase() : 'SH') }}
+                  </div>
+                  <div class="live-tag-info">
+                    <span class="live-tag-title">{{ formData.name || 'Shift Name' }}</span>
+                    <span class="live-tag-sub">
+                      {{ formData.shiftType === 'FLEXIBLE' ? (formData.totalHours || 8) + ' hrs/day' : formatTime12h(formData.startTime || '09:00') + ' – ' + formatTime12h(formData.endTime || '18:00') }}
+                    </span>
+                  </div>
+                  <span class="live-tag-type-pill" [style.backgroundColor]="(formData.colorCode || '#2A97D8') + '20'" [style.color]="formData.colorCode || '#2A97D8'">
+                    {{ formData.shiftType === 'FLEXIBLE' ? 'Flexible' : 'Strict' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Timings & Working Duration -->
+          <div class="shift-section-box full-width">
+            <div class="shift-section-header">
+              <svg lucideClock size="16"></svg>
+              <span>Timings & Working Duration</span>
+            </div>
+
+            <!-- If Strict Shift -->
+            <div *ngIf="formData.shiftType !== 'FLEXIBLE'">
+              <div class="shift-two-cols">
+                <div class="form-group">
+                  <label>Shift Start Time <span class="required-star">*</span></label>
+                  <input type="time" class="form-control" [(ngModel)]="formData.startTime">
+                </div>
+
+                <div class="form-group">
+                  <label>Shift End Time <span class="required-star">*</span></label>
+                  <input type="time" class="form-control" [(ngModel)]="formData.endTime">
+                </div>
+              </div>
+
+              <!-- Auto-calculated Duration Pill -->
+              <div class="duration-indicator-pill">
+                <div class="duration-left">
+                  <span class="duration-label">Shift Duration:</span>
+                  <span class="duration-highlight">{{ getModalShiftDurationText() }}</span>
+                </div>
+                <div *ngIf="isModalOvernight()" class="overnight-flag">
+                  <svg lucideMoon size="14"></svg>
+                  <span>Overnight Shift (ends next day)</span>
+                </div>
+              </div>
+
+              <div class="shift-two-cols" style="margin-top: 14px;">
+                <div class="form-group">
+                  <label>Half-Day Mark Time</label>
+                  <input type="time" class="form-control" [(ngModel)]="formData.halfDayTime">
+                  <p class="help-text">Clock-out before this time counts as a half day.</p>
+                </div>
+                <div class="form-group">
+                  <label>Half-Day Minimum Hours</label>
+                  <div class="input-unit-wrapper">
+                    <input type="number" class="form-control" [(ngModel)]="formData.halfDayHours" min="0" step="0.5">
+                    <span class="input-unit">hrs</span>
+                  </div>
+                  <p class="help-text">Minimum hours required for half-day credit.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- If Flexible Shift -->
+            <div *ngIf="formData.shiftType === 'FLEXIBLE'">
+              <div class="shift-two-cols">
+                <div class="form-group">
+                  <label>Total Shift Hours Required <span class="required-star">*</span></label>
+                  <div class="input-unit-wrapper">
+                    <input type="number" class="form-control" [(ngModel)]="formData.totalHours" min="1" max="24" step="0.5">
+                    <span class="input-unit">hrs</span>
+                  </div>
+                  <p class="help-text">Total logged hours needed for Full Day status.</p>
+                </div>
+
+                <div class="form-group">
+                  <label>Half-Day Minimum Hours</label>
+                  <div class="input-unit-wrapper">
+                    <input type="number" class="form-control" [(ngModel)]="formData.halfDayHours" min="0" step="0.5">
+                    <span class="input-unit">hrs</span>
+                  </div>
+                  <p class="help-text">Hours required to qualify for Half Day.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Attendance & Punch Rules -->
+          <div class="shift-section-box full-width">
+            <div class="shift-section-header">
+              <svg lucideSliders size="16"></svg>
+              <span>Punch & Attendance Policies</span>
+            </div>
+
+            <div class="shift-two-cols">
+              <div class="form-group" *ngIf="formData.shiftType !== 'FLEXIBLE'">
+                <label>Late Mark Grace Period</label>
+                <div class="input-unit-wrapper">
+                  <input type="number" class="form-control" [(ngModel)]="formData.bufferTimeMinutes" min="0" placeholder="15">
+                  <span class="input-unit">mins</span>
+                </div>
+                <p class="help-text">Buffer allowed after start time before marked late.</p>
+              </div>
+
+              <div class="form-group" *ngIf="formData.shiftType !== 'FLEXIBLE'">
+                <label>Early Clock-in Allowance</label>
+                <div class="input-unit-wrapper">
+                  <input type="number" class="form-control" [(ngModel)]="formData.earlyClockInMinutes" min="0" placeholder="30">
+                  <span class="input-unit">mins</span>
+                </div>
+                <p class="help-text">How early employees are permitted to punch in.</p>
+              </div>
+
+              <div class="form-group">
+                <label>Maximum Daily Check-ins</label>
+                <div class="input-unit-wrapper">
+                  <input type="number" class="form-control" [(ngModel)]="formData.maxCheckIns" min="1" max="20" placeholder="2">
+                  <span class="input-unit">punches</span>
+                </div>
+                <p class="help-text">Limit on punch-ins allowed within a single day.</p>
+              </div>
+
+              <div class="form-group">
+                <label>Auto Clock-out Limit</label>
+                <div class="input-unit-wrapper">
+                  <input type="number" class="form-control" [(ngModel)]="formData.autoClockOutHours" min="0" max="24" step="0.5" placeholder="0">
+                  <span class="input-unit">hrs</span>
+                </div>
+                <p class="help-text">Set to 0 to disable automatic clock-out.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 4: Working Days Schedule -->
+          <div class="shift-section-box full-width">
+            <div class="shift-section-header">
+              <svg lucideCalendar size="16"></svg>
+              <span>Working Days Schedule</span>
+            </div>
+
+            <div class="presets-row">
+              <span class="presets-title">Quick Presets:</span>
+              <div class="presets-buttons">
+                <button type="button" class="preset-btn" (click)="setShiftDaysPreset('mon-fri')">
+                  Mon – Fri (5 Days)
+                </button>
+                <button type="button" class="preset-btn" (click)="setShiftDaysPreset('mon-sat')">
+                  Mon – Sat (6 Days)
+                </button>
+                <button type="button" class="preset-btn" (click)="setShiftDaysPreset('all')">
+                  All 7 Days
+                </button>
+              </div>
+            </div>
+
+            <div class="days-toggle-row">
+              <button 
+                type="button" 
+                *ngFor="let d of WEEK_DAYS" 
+                class="day-toggle-pill"
+                [class.selected]="isShiftDayOn(d)"
+                (click)="toggleShiftDay(d)">
+                <span>{{ d.slice(0, 3) }}</span>
+                <svg *ngIf="isShiftDayOn(d)" lucideCheck size="12"></svg>
+              </button>
+            </div>
+          </div>
+        </ng-container>
 
         <!-- Branches -->
         <div class="form-group full-width" *ngIf="activeTab() === 'branches'">
@@ -358,6 +660,114 @@
         <span *ngIf="!isSaving()">{{ modalMode() === 'create' ? 'Create' : 'Save Changes' }}</span>
         <span *ngIf="isSaving()" class="loader-text">Saving...</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Assigned Employees Modal -->
+<div class="modal-overlay" *ngIf="isShiftEmployeesModalOpen()" (click)="closeShiftEmployeesModal()">
+  <div class="modal-content shift-employees-modal slide-in" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <div class="header-titles">
+        <div class="modal-title-row">
+          <div class="modal-header-icon-badge" [style.backgroundColor]="(selectedShiftForEmployees()?.colorCode || '#2A97D8') + '20'" [style.color]="selectedShiftForEmployees()?.colorCode || '#2A97D8'">
+            <svg lucideUsers size="20"></svg>
+          </div>
+          <div>
+            <div class="title-with-badge">
+              <h2>Assigned Employees</h2>
+              <span class="shift-name-tag" [style.borderColor]="selectedShiftForEmployees()?.colorCode || '#2A97D8'" [style.color]="selectedShiftForEmployees()?.colorCode || '#2A97D8'">
+                {{ selectedShiftForEmployees()?.name }}
+              </span>
+            </div>
+            <p class="subtitle">
+              {{ selectedShiftForEmployees()?.shiftType === 'FLEXIBLE' ? 'Flexible Hours (' + (selectedShiftForEmployees()?.totalHours || 8) + ' hrs/day)' : formatTime12h(selectedShiftForEmployees()?.startTime) + ' – ' + formatTime12h(selectedShiftForEmployees()?.endTime) }}
+              • {{ shiftEmployeesList().length }} total assigned
+            </p>
+          </div>
+        </div>
+      </div>
+      <button class="btn-icon close-btn" (click)="closeShiftEmployeesModal()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <!-- Search / Filter Bar -->
+    <div class="shift-employees-toolbar">
+      <div class="emp-search-input-wrapper">
+        <svg lucideSearch size="14" class="search-icon"></svg>
+        <input 
+          type="text" 
+          class="emp-search-input" 
+          placeholder="Search by name, ID, department, designation..." 
+          [ngModel]="shiftEmployeesSearchText()" 
+          (ngModelChange)="shiftEmployeesSearchText.set($event)">
+        <button 
+          *ngIf="shiftEmployeesSearchText()" 
+          class="clear-emp-search" 
+          (click)="shiftEmployeesSearchText.set('')"
+          title="Clear search">
+          <svg lucideX size="13"></svg>
+        </button>
+      </div>
+      <span class="emp-count-badge">
+        {{ filteredShiftEmployees().length }} of {{ shiftEmployeesList().length }}
+      </span>
+    </div>
+
+    <!-- Modal Body: Employee List -->
+    <div class="modal-body shift-employees-body">
+      <!-- Loading State -->
+      <div class="shift-employees-loading" *ngIf="shiftEmployeesLoading()">
+        <div class="loading-spinner"></div>
+        <span>Loading assigned employees...</span>
+      </div>
+
+      <!-- Empty State -->
+      <div class="shift-employees-empty" *ngIf="!shiftEmployeesLoading() && filteredShiftEmployees().length === 0">
+        <div class="empty-icon-circle">
+          <svg lucideUsers size="28"></svg>
+        </div>
+        <h4>No employees found</h4>
+        <p *ngIf="shiftEmployeesSearchText()">No employees match "{{ shiftEmployeesSearchText() }}".</p>
+        <p *ngIf="!shiftEmployeesSearchText()">There are currently no employees assigned to this shift.</p>
+      </div>
+
+      <!-- Employee List -->
+      <div class="shift-employees-list" *ngIf="!shiftEmployeesLoading() && filteredShiftEmployees().length > 0">
+        <div class="emp-item-row" *ngFor="let emp of filteredShiftEmployees()">
+          <div class="emp-avatar-container">
+            <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName" class="avatar-photo" (error)="emp.avatarUrl = null">
+            <div *ngIf="!emp.avatarUrl" class="avatar-initials" [style.backgroundColor]="getAvatarBg(emp.firstName)">
+              {{ (emp.firstName?.[0] || '') + (emp.lastName?.[0] || '') | uppercase }}
+            </div>
+          </div>
+          <div class="emp-main-info">
+            <div class="emp-name-line">
+              <span class="emp-full-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+              <span class="emp-code-badge" *ngIf="emp.employeeCode">#{{ emp.employeeCode }}</span>
+            </div>
+            <div class="emp-sub-line">
+              <span class="emp-designation">{{ emp.designation?.name || 'Staff' }}</span>
+              <span class="emp-sep" *ngIf="emp.department?.name">•</span>
+              <span class="emp-dept" *ngIf="emp.department?.name">{{ emp.department?.name }}</span>
+            </div>
+            <span class="emp-email-text" *ngIf="emp.user?.email">{{ emp.user?.email }}</span>
+          </div>
+          <div class="emp-status-badge">
+            <span class="status-indicator-pill" [class.active]="emp.user?.status === 'ACTIVE'" [class.pending]="emp.user?.status !== 'ACTIVE'">
+              <span class="status-dot"></span>
+              {{ emp.user?.status === 'ACTIVE' ? 'Active' : (emp.user?.status === 'PENDING_VERIFICATION' ? 'Pending' : (emp.user?.status || 'Active')) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closeShiftEmployeesModal()">Close</button>
     </div>
   </div>
 </div>

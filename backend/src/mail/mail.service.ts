@@ -328,6 +328,87 @@ export class MailService {
     }
   }
 
+  /**
+   * The offer itself, sent to the candidate. The letter is never attached — the
+   * signing page is the only place it can be read, so the document stays behind
+   * the password and every view is recorded against the envelope.
+   */
+  async sendOfferLetterEmail(params: {
+    email: string;
+    candidateName: string;
+    jobTitle: string;
+    companyName: string;
+    signingUrl: string;
+    passwordHint: string;
+    annualCtc?: string;
+    joiningDate?: string;
+  }) {
+    const { email, candidateName, jobTitle, companyName, signingUrl, passwordHint } = params;
+
+    const detailRow = (label: string, value?: string) => value
+      ? `<tr>
+           <td style="padding:6px 0;color:#64748b;font-size:14px;">${label}</td>
+           <td style="padding:6px 0;color:#0f172a;font-size:14px;font-weight:600;text-align:right;">${value}</td>
+         </tr>`
+      : '';
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color:#0f172a; margin:0 0 6px;">Your offer from ${companyName}</h2>
+        <p style="color:#64748b; font-size:14px; margin:0 0 22px;">Position: <strong style="color:#0f172a;">${jobTitle}</strong></p>
+
+        <p style="color:#475569; font-size:15px; line-height:1.6;">Dear ${candidateName},</p>
+        <p style="color:#475569; font-size:15px; line-height:1.6;">
+          We are delighted to offer you the role of <strong>${jobTitle}</strong> at <strong>${companyName}</strong>.
+          Your offer letter is ready for you to review and sign electronically.
+        </p>
+
+        <table style="width:100%; border-collapse:collapse; margin:18px 0; padding:12px; background:#f8fafc; border-radius:8px;">
+          ${detailRow('Annual CTC', params.annualCtc)}
+          ${detailRow('Expected joining date', params.joiningDate)}
+        </table>
+
+        <div style="text-align:center; margin:28px 0;">
+          <a href="${signingUrl}" style="background-color:#ff5a1f; color:#ffffff; padding:13px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:16px; display:inline-block;">Review &amp; Sign Your Offer</a>
+        </div>
+
+        <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:14px; margin:20px 0;">
+          <p style="margin:0 0 6px; color:#92400e; font-size:13px; font-weight:700;">To open the document</p>
+          <p style="margin:0; color:#92400e; font-size:13px; line-height:1.6;">
+            You will be asked for a password: ${passwordHint}
+          </p>
+        </div>
+
+        <p style="color:#64748b; font-size:13px; line-height:1.6;">
+          If the button does not work, paste this link into your browser:<br>
+          <span style="color:#2563eb; word-break:break-all;">${signingUrl}</span>
+        </p>
+        <p style="color:#94a3b8; font-size:12px; line-height:1.6; margin-top:22px;">
+          This link is personal to you. Please do not forward it — anyone with the link and password could sign on your behalf.
+        </p>
+      </div>
+    `;
+
+    const subject = `Your offer from ${companyName} — ${jobTitle}`;
+    try {
+      if (this.brevoApiKey) {
+        await this.sendBrevoEmail({ to: email, subject, html: htmlContent });
+        return { sent: true };
+      }
+      await this.sendWithRetry({
+        from: `"${companyName}" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        subject,
+        html: htmlContent,
+      });
+      return { sent: true };
+    } catch (error) {
+      this.logger.error(`Failed to send offer letter email to ${email}`, error);
+      throw error;
+    }
+  }
+
   async sendOfferAcceptedEmail(email: string, candidateName: string, jobTitle: string, applicationId: number) {
     const baseUrl = process.env.APP_URL || 'http://localhost:4200';
     const link = `${baseUrl}/recruitment/candidates?applicationId=${applicationId}`;

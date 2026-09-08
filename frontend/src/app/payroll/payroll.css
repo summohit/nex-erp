@@ -1750,3 +1750,32 @@
 .nested-claims-table tr:last-child td {
   border-bottom: none;
 }
+
+/* Deactivated staff: kept for history, but clearly off payroll. */
+.payroll-row-inactive {
+  background: #FAFAFA;
+  opacity: 0.62;
+}
+
+.payroll-row-inactive .cell-title-bold { color: #64748B; }
+
+.cell-user-avatar-row.is-inactive .avatar-circle-sm { filter: grayscale(1); }
+
+.avatar-circle-sm.avatar-img {
+  object-fit: cover;
+  padding: 0;
+}
+
+.inactive-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #F1F5F9;
+  color: #64748B;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}

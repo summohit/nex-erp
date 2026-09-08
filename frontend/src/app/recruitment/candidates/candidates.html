@@ -238,7 +238,7 @@
       [headerHeight]="42"
       (gridReady)="onGridReady($event)"
       (rowClicked)="onRowClicked($event)"
-      style="width: 100%; height: 100%;">
+      style="width: 100%; height: calc(100vh - 300px); min-height: 520px;">
     </ag-grid-angular>
   </div>
 </div>
@@ -538,6 +538,27 @@
             </button>
           </div>
 
+          <!-- Email the offer to the candidate, once a letter exists to send -->
+          <button
+            type="button"
+            *ngIf="offerLetter() as ol"
+            class="btn-send-offer"
+            (click)="sendOfferLetter()"
+            [disabled]="isSendingOfferLetter() || ol.status === 'ACCEPTED'"
+            [title]="ol.status === 'ACCEPTED' ? 'Already signed by the candidate' : 'Email the signing link to the candidate'"
+          >
+            <svg lucideSend size="15"></svg>
+            <span>
+              {{ isSendingOfferLetter()
+                  ? 'Sending…'
+                  : ol.status === 'ACCEPTED'
+                    ? 'Signed — nothing to send'
+                    : (ol.status === 'SENT' || ol.status === 'VIEWED')
+                      ? 'Re-send Offer Email'
+                      : 'Email Offer to Candidate' }}
+            </span>
+          </button>
+
           <!-- E-signature: link the candidate uses to review and sign -->
           <div class="esign-panel" *ngIf="offerLetter() as ol">
             <div class="esign-head">
@@ -550,8 +571,30 @@
               </span>
             </div>
 
-            <p class="esign-hint">
-              Send this link to the candidate. They confirm their identity, review the letter and sign it electronically.
+            <!-- Signature audit trail: who signed, when, and from where -->
+            <div class="esign-signed-box" *ngIf="ol.status === 'ACCEPTED'">
+              <div class="signed-line">
+                <strong>{{ ol.signatureName || selectedApp()?.fullName }}</strong> signed this offer
+                <span *ngIf="ol.respondedAt"> on {{ ol.respondedAt | date: 'medium' }}</span>
+              </div>
+              <div class="signed-meta">
+                <span *ngIf="ol.signatureType">Signature: {{ ol.signatureType | lowercase }}</span>
+                <span *ngIf="ol.signatureIp">· IP {{ ol.signatureIp }}</span>
+                <span *ngIf="ol.viewedAt">· First opened {{ ol.viewedAt | date: 'short' }}</span>
+              </div>
+              <div class="signed-meta">
+                The assigned recruiter and administrators were notified by email and in-app.
+              </div>
+            </div>
+
+            <div class="esign-declined-box" *ngIf="ol.status === 'DECLINED'">
+              <strong>{{ selectedApp()?.fullName }} declined this offer</strong>
+              <span *ngIf="ol.respondedAt"> on {{ ol.respondedAt | date: 'medium' }}</span>
+            </div>
+
+            <p class="esign-hint" *ngIf="ol.status !== 'ACCEPTED' && ol.status !== 'DECLINED'">
+              Email the link to the candidate, or copy it below. They confirm their identity,
+              review the letter and sign it electronically. The assigned recruiter and administrators are notified the moment they do.
             </p>
 
             <div class="esign-row">
@@ -778,15 +821,11 @@
     <div class="footer-stage-selector">
       <span class="stage-prefix">Status</span>
       <div class="stage-select-wrapper">
-        <select class="form-select status-dropdown" [ngModel]="app.status" (ngModelChange)="updateDrawerStatus($event)">
-          <option value="NEW">New</option>
-          <option value="REVIEWING">Reviewing</option>
-          <option value="SHORTLISTED">Shortlisted</option>
-          <option value="INTERVIEWING">Interviewing</option>
-          <option value="OFFERED">Offered</option>
-          <option value="HIRED">Hired</option>
-          <option value="ONBOARDED">Onboarded</option>
-          <option value="REJECTED">Rejected</option>
+        <!-- Bound to the same STAGES the board renders, so the two never drift. -->
+        <select class="form-select status-dropdown"
+                [ngModel]="normaliseStage(app.status)"
+                (ngModelChange)="updateDrawerStatus($event)">
+          <option *ngFor="let s of STAGES" [value]="s.key">{{ s.label }}</option>
         </select>
         <svg lucideChevronDown size="14" class="stage-chevron"></svg>
       </div>

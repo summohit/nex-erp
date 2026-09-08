@@ -78,7 +78,7 @@ export class ApplicationsController {
 
   @Post(':id/onboard')
   onboardCandidate(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.applicationsService.onboardCandidate(id, req.user.companyId);
+    return this.applicationsService.onboardCandidate(id, req.user.companyId, req.user.sub);
   }
 
   @Get(':id/annexure')
@@ -94,6 +94,11 @@ export class ApplicationsController {
   @Post(':id/offer-letter')
   generateOfferLetter(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.offerLettersService.generate(id, req.user.companyId);
+  }
+
+  @Post(':id/offer-letter/send')
+  sendOfferLetter(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.offerLettersService.sendToCandidate(id, req.user.companyId, req.user.sub);
   }
 
   @Get(':id/interviews')

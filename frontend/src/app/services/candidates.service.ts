@@ -110,6 +110,12 @@ export class CandidatesService {
     return this.http.post<any>(`${this.apiUrl}/${applicationId}/offer-letter`, {});
   }
 
+  /** Emails the offer to the candidate with their personal signing link. */
+  sendOfferLetter(applicationId: number): Observable<{ sent: boolean; email: string; status: string }> {
+    return this.http.post<{ sent: boolean; email: string; status: string }>(
+      `${this.apiUrl}/${applicationId}/offer-letter/send`, {});
+  }
+
   scheduleInterview(applicationId: number, data: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/${applicationId}/interviews`, data);
   }

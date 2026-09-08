@@ -1227,8 +1227,9 @@
    ============================================================ */
 ::ng-deep .custom-ats-grid.ag-theme-quartz {
   width: 100% !important;
-  height: 100% !important;
-  flex: 1 !important;
+  /* Height comes from the inline style on the element. Forcing flex:1 here as
+     well collapsed ag-grid's own column layout, leaving only the paging panel. */
+  display: block;
   --ag-header-background-color: #f8fafc;
   --ag-header-foreground-color: #475569;
   --ag-header-cell-hover-background-color: #f1f5f9;
@@ -1268,6 +1269,10 @@
 }
 
 /* Pinned column separators */
+::ng-deep .custom-ats-grid .ag-root-wrapper {
+  height: 100%;
+}
+
 ::ng-deep .custom-ats-grid .ag-pinned-left-header,
 ::ng-deep .custom-ats-grid .ag-pinned-left-cols-container {
   border-right: 1.5px solid #e2e8f0 !important;
@@ -4133,3 +4138,65 @@
   font-size: 11.5px; color: #64748b;
 }
 .esign-timeline strong { color: #334155; font-weight: 700; }
+
+/* Email the offer to the candidate */
+.btn-send-offer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 16px;
+  border: 1px solid #ff5a1f;
+  border-radius: 8px;
+  background: #ff5a1f;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-send-offer:hover:not(:disabled) { background: #e94e15; }
+
+.btn-send-offer:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Signature audit trail */
+.esign-signed-box {
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+}
+
+.esign-signed-box .signed-line {
+  font-size: 13.5px;
+  color: #065f46;
+  line-height: 1.5;
+}
+
+.esign-signed-box .signed-meta {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: #047857;
+  line-height: 1.5;
+}
+
+.esign-declined-box {
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #991b1b;
+  line-height: 1.5;
+}

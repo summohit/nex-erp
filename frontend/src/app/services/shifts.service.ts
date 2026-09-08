@@ -30,4 +30,80 @@ export class ShiftsService {
   deleteShift(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
+
+  getShiftEmployees(shiftId: number): Observable<{
+    shift: Shift;
+    employees: any[];
+    totalCount: number;
+  }> {
+    return this.http.get<{
+      shift: Shift;
+      employees: any[];
+      totalCount: number;
+    }>(`${this.apiUrl}/${shiftId}/employees`);
+  }
+
+  // ── Shift roster ────────────────────────────────────────────────────────
+  getRoster(q: { start: string; end: string; departmentId?: number; employeeId?: number }): Observable<RosterGrid> {
+    const params: string[] = [`start=${q.start}`, `end=${q.end}`];
+    if (q.departmentId) params.push(`departmentId=${q.departmentId}`);
+    if (q.employeeId) params.push(`employeeId=${q.employeeId}`);
+    return this.http.get<RosterGrid>(`${this.apiUrl}/roster?${params.join('&')}`);
+  }
+
+  assignRoster(data: { employeeId: number; date: string; shiftId?: number | null; isDayOff?: boolean }) {
+    return this.http.post(`${this.apiUrl}/roster`, data);
+  }
+
+  bulkAssignRoster(data: {
+    employeeIds: number[]; start: string; end: string;
+    shiftId?: number | null; isDayOff?: boolean;
+    skipNonWorkingDays?: boolean; overwriteExisting?: boolean;
+  }) {
+    return this.http.post<{ written: number; skipped: number }>(`${this.apiUrl}/roster/bulk`, data);
+  }
+
+  clearRoster(data: { employeeIds: number[]; start: string; end: string }) {
+    return this.http.post<{ cleared: number }>(`${this.apiUrl}/roster/clear`, data);
+  }
+}
+
+export interface RosterShift {
+  id: number;
+  name: string;
+  shortCode?: string | null;
+  colorCode?: string | null;
+  shiftType?: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  totalHours?: number | null;
+  workingDays?: string | null;
+}
+
+export interface RosterCell {
+  date: string;
+  type: 'SHIFT' | 'DAY_OFF' | 'LEAVE' | 'UNASSIGNED';
+  shift?: RosterShift;
+  label?: string;
+  isHalfDay?: boolean;
+  /** True when the cell reflects the employee's standing shift, not an explicit entry. */
+  isDefault?: boolean;
+  entryId?: number;
+  note?: string | null;
+}
+
+export interface RosterRow {
+  employee: {
+    id: number; name: string; employeeCode?: string | null;
+    avatarUrl?: string | null; department?: string | null; designation?: string | null;
+    isActive?: boolean;
+  };
+  defaultShift: { id: number; name: string } | null;
+  cells: RosterCell[];
+}
+
+export interface RosterGrid {
+  days: string[];
+  shifts: RosterShift[];
+  rows: RosterRow[];
 }
