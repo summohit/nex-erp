@@ -20,15 +20,14 @@ import { CandidatesService, JobApplication } from '../../services/candidates.ser
   selector: 'app-job-detail',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink, DatePipe,
+    CommonModule, FormsModule, DatePipe,
     LucideArrowLeft, LucideSearch, LucideUsers, LucideCalendarClock,
     LucideBriefcase, LucideMapPin, LucideBuilding, LucideEye,
-    LucidePlus, LucideX, LucideSparkles, LucideCheckCircle, LucideXCircle,
+    LucideX, LucideSparkles, LucideXCircle,
     LucideFileText, LucideMail, LucidePhone, LucideLink, LucideGlobe,
-    LucideClock, LucideTrash2, LucideInbox, LucideStar, LucideAward,
+    LucideClock, LucideAward,
     LucideLayoutGrid, LucideTable, LucideExternalLink, LucideDownload,
-    LucideCopy, LucideCheck, LucideShare2, LucideChevronRight, LucideInfo,
-    LucideMoreVertical, LucideCalendar, LucideDollarSign, LucideUserCheck, LucideUserX
+    LucideCopy, LucideCheck, LucideShare2, LucideChevronRight, LucideInfo
   ],
   templateUrl: './job-detail.html',
   styleUrls: ['./job-detail.css']
@@ -200,7 +199,9 @@ export class JobDetailComponent implements OnInit {
           this.selectedApp.update(current => current ? { ...current, status: newStatus } : null);
         }
       },
-      error: () => this.toast.error('Failed to update candidate status')
+      // The pipeline's mandatory-stage gate rejects here too, and its message
+      // names the stages still owed — far more useful than a generic failure.
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to update candidate status')
     });
   }
 
@@ -267,11 +268,24 @@ export class JobDetailComponent implements OnInit {
     }
   }
 
+  /**
+   * The public careers route is `/careers/:companyId`, where the segment is the
+   * base64 company id the sidebar's "Public Careers Page" link also builds —
+   * not the job id. Putting the job id there asked for a company that does not
+   * exist, which is why the page loaded with zero open positions. The job id
+   * rides along as `?job=` so the visitor lands on this posting.
+   */
   copyJobLink() {
-    const url = `${window.location.origin}/careers/${this.jobId}`;
+    const companyId = this.job()?.companyId;
+    if (!companyId) {
+      this.toast.error('Could not build the careers link — this job has no company on it');
+      return;
+    }
+
+    const url = `${window.location.origin}/careers/${btoa(String(companyId))}?job=${this.jobId}`;
     navigator.clipboard.writeText(url).then(() => {
       this.isCopiedJobLink.set(true);
-      this.toast.success('Careers page link copied to clipboard!');
+      this.toast.success('Public link to this posting copied to clipboard!');
       setTimeout(() => this.isCopiedJobLink.set(false), 2500);
     });
   }

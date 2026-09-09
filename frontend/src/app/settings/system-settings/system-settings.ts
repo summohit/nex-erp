@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
 import { 
   LucideShieldAlert, 
+  LucideShieldCheck,
   LucideSave, 
   LucideLoader2, 
   LucideCheck, 
@@ -40,6 +41,7 @@ import { environment } from '../../../environments/environment';
     CommonModule, 
     FormsModule, 
     LucideShieldAlert, 
+  LucideShieldCheck,
     LucideSave, 
     LucideLoader2, 
     LucideCheck, 
@@ -233,12 +235,19 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  toggleTwoFactorRequired() {
+    const current = this.settings();
+    if (!current) return;
+    this.settings.set({ ...current, twoFactorRequired: !current.twoFactorRequired });
+  }
+
   save() {
     const current = this.settings();
     if (!current) return;
     this.isSaving.set(true);
     this.systemSettingsService.updateSettings({
       shiftRosterVisibleToEmployees: current.shiftRosterVisibleToEmployees,
+      twoFactorRequired: current.twoFactorRequired,
       offerLetterTemplateHtml: current.offerLetterTemplateHtml,
       offerLetterTemplateDocxUrl: current.offerLetterTemplateDocxUrl,
       offerLetterConfig: current.offerLetterConfig,

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, RefreshControl, TouchableOpacity, Text, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
 import { employeeService } from '../../api/employeeService';
 import { PulseSkeleton } from '../../components/SharedUI';
-import { Check, Briefcase, GraduationCap, User, PhoneCall, Files, Sparkles } from 'lucide-react-native';
+import { Check, Briefcase, GraduationCap, User, PhoneCall, Files } from 'lucide-react-native';
 
 import ProfileHeader from './components/ProfileHeader';
 import MediaPickerModal from './components/MediaPickerModal';
@@ -66,14 +67,14 @@ export default function ProfileScreen() {
   // Fetch on mount (master data) and on every tab focus (profile stays fresh with CRM edits)
   useEffect(() => {
     fetchMasterData();
-  }, []);
+  }, [fetchMasterData]);
 
   useFocusEffect(
     useCallback(() => {
       if (empId) {
         fetchProfile(empId);
       }
-    }, [empId])
+    }, [empId, fetchProfile])
   );
 
   useEffect(() => {
@@ -85,7 +86,7 @@ export default function ProfileScreen() {
         setActiveTab('Work');
       }
     }
-  }, [profileData]);
+  }, [profileData, activeTab, setActiveTab]);
 
   const onRefresh = () => {
     if (empId) {
@@ -117,7 +118,7 @@ export default function ProfileScreen() {
         handleFormChange({ avatarUrl: url });
         await fetchProfile(empId);
       }
-    } catch (err) {
+    } catch {
       setFeedback({
         visible: true,
         type: 'error',
@@ -175,18 +176,16 @@ export default function ProfileScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Sleek Top Navigation Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <Text style={styles.topBarTitle}>My Profile</Text>
-          <Text style={styles.topBarSubtitle}>View and manage employee details</Text>
-        </View>
-
-        <TouchableOpacity 
+    <AppScreen
+      showBottomNav={false}
+      hideTitle
+      title="Profile"
+      subtitle="Employee details"
+      right={
+        <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.saveBtn, isSaving && styles.saveBtnLoading]} 
-          onPress={handleSave} 
+          style={[styles.saveBtn, isSaving && styles.saveBtnLoading]}
+          onPress={handleSave}
           disabled={isSaving}
         >
           <Check color="#FFFFFF" size={16} strokeWidth={3} />
@@ -194,7 +193,8 @@ export default function ProfileScreen() {
             {isSaving ? 'Saving...' : 'Save'}
           </Text>
         </TouchableOpacity>
-      </View>
+      }
+    >
 
       <ScrollView
         style={styles.scrollView}
@@ -315,7 +315,7 @@ export default function ProfileScreen() {
         message={feedback.message}
         onClose={() => setFeedback((prev) => ({ ...prev, visible: false }))}
       />
-    </View>
+    </AppScreen>
     </KeyboardAvoidingView>
   );
 }

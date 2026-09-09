@@ -17,12 +17,18 @@ export const routes: Routes = [
   { path: 'auth/check-email', loadComponent: () => import('./auth/check-email/check-email').then(m => m.CheckEmailComponent) },
   { path: 'auth/verify-email', loadComponent: () => import('./auth/verify-email/verify-email').then(m => m.VerifyEmailComponent) },
   { path: 'auth/forgot-password', loadComponent: () => import('./auth/forgot-password/forgot-password').then(m => m.ForgotPasswordComponent) },
+  // Unguarded like the other auth routes: the user is only half-authenticated
+  // here and holds no access_token, so authGuard would bounce them.
+  { path: 'auth/two-factor', loadComponent: () => import('./auth/two-factor/two-factor').then(m => m.TwoFactorComponent) },
   { path: 'kiosk/:companyId', loadComponent: () => import('./kiosk/kiosk').then(m => m.Kiosk) },
   { path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.OnboardingComponent) },
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { path: 'lead-form/:formId', loadComponent: () => import('./public/lead-form/lead-form.component').then(m => m.PublicLeadFormComponent) },
   { path: 'careers', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
   { path: 'offer/:token', loadComponent: () => import('./public/offer-letter/offer-letter').then(m => m.OfferLetterComponent) },
+  { path: 'privacy-policy', loadComponent: () => import('./public/privacy-policy/privacy-policy').then(m => m.PrivacyPolicyComponent) },
+  { path: 'terms-of-service', loadComponent: () => import('./public/terms-of-service/terms-of-service').then(m => m.TermsOfServiceComponent) },
+  { path: 'security-overview', loadComponent: () => import('./public/security-overview/security-overview').then(m => m.SecurityOverviewComponent) },
   { 
     path: 'projects/onboarding/:id', 
     canActivate: [authGuard, permissionGuard],
@@ -118,6 +124,15 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'settings/system' },
         loadComponent: () => import('./settings/system-settings/system-settings').then(m => m.SystemSettingsComponent)
+      },
+      {
+        // Self-service: every role manages their own second factor, so
+        // 'settings/security' is in permissionGuard's universalModules list
+        // rather than gated on a settings permission.
+        path: 'settings/security',
+        canActivate: [permissionGuard],
+        data: { module: 'settings/security' },
+        loadComponent: () => import('./settings/security/security').then(m => m.SecurityComponent)
       },
       {
         path: 'settings/payroll',

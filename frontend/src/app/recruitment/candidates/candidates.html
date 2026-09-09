@@ -184,6 +184,70 @@
     </div>
   </div>
 
+  <!-- PENDING OFFER APPROVALS -->
+  <!-- Company-wide queue: an approver lands on the candidates page and sees
+       every above-budget offer waiting on them, without opening any drawer. -->
+  <div class="approvals-queue" *ngIf="pendingApprovals().length > 0">
+    <button type="button" class="approvals-queue-header" (click)="showApprovalsPanel.set(!showApprovalsPanel())">
+      <span class="approvals-queue-icon"><svg lucideAlertCircle size="17"></svg></span>
+      <span class="approvals-queue-title">
+        {{ pendingApprovals().length }} offer{{ pendingApprovals().length === 1 ? '' : 's' }} above budget awaiting your approval
+      </span>
+      <span class="approvals-queue-toggle">
+        {{ showApprovalsPanel() ? 'Hide' : 'Show' }}
+        <svg lucideChevronDown size="14" [class.is-collapsed]="!showApprovalsPanel()"></svg>
+      </span>
+    </button>
+
+    <div class="approvals-queue-list" *ngIf="showApprovalsPanel()">
+      <div class="approval-request-card" *ngFor="let req of pendingApprovals()">
+        <div class="approval-request-who">
+          <button type="button" class="approval-request-name" (click)="openApplication(req)">{{ req.fullName }}</button>
+          <span class="approval-request-role">{{ req.job?.title || 'Open position' }}</span>
+          <span class="approval-request-target">
+            Requested move to <strong>{{ stageLabel(req.approvalRequestedStage || 'OFFERED') }}</strong>
+            <em>· held in {{ stageLabel(req.status) }} until approved</em>
+          </span>
+        </div>
+
+        <div class="approval-request-figures">
+          <div>
+            <span class="comp-stat-label">Proposed</span>
+            <strong class="comp-stat-value text-orange">₹{{ req.offeredSalary | number }}</strong>
+          </div>
+          <div>
+            <span class="comp-stat-label">Budget</span>
+            <strong class="comp-stat-value">₹{{ (req.approvalBudget ?? profileBudgetOf(req)) | number }}</strong>
+          </div>
+          <div>
+            <span class="comp-stat-label">Extra</span>
+            <strong class="comp-stat-value text-orange">₹{{ approvalOverageOf(req) | number }}</strong>
+          </div>
+        </div>
+
+        <div class="approval-request-reason">
+          <span class="comp-stat-label">Reason for the extra payment</span>
+          <p>{{ req.approvalReason }}</p>
+        </div>
+
+        <div class="approval-request-actions">
+          <button type="button" class="btn-approve-request"
+                  [disabled]="decidingApprovalId() === req.id"
+                  (click)="decideApproval(req, true)">
+            <svg lucideCheckCircle size="15"></svg>
+            <span>Approve</span>
+          </button>
+          <button type="button" class="btn-reject-request"
+                  [disabled]="decidingApprovalId() === req.id"
+                  (click)="decideApproval(req, false)">
+            <svg lucideXCircle size="15"></svg>
+            <span>Reject</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- KPI WIDGETS -->
   <div class="kpi-row" *ngIf="viewMode() === 'KANBAN'">
     <div class="kpi-card" *ngFor="let s of STAGES" (click)="scrollToColumn(s.key)">
@@ -201,13 +265,22 @@
       <div class="col-header">
         <h3>{{ s.label }} <span>{{ stageApps(s.key).length }}</span></h3>
       </div>
+      <!-- enterPredicate refuses the drop outright when the candidate has not
+           been through every mandatory stage, so the card never visually lands
+           in a column the server would bounce it out of. -->
       <div class="col-body" cdkDropList [cdkDropListData]="stageApps(s.key)"
+           [cdkDropListEnterPredicate]="stageDropPredicate(s.key)"
            (cdkDropListDropped)="drop($event, s.key)">
-        <div class="kanban-card" *ngFor="let item of stageApps(s.key)" cdkDrag (click)="openApplication(item)">
+        <div class="kanban-card" *ngFor="let item of stageApps(s.key)" cdkDrag [cdkDragData]="item" (click)="openApplication(item)">
           <div class="card-title">{{item.fullName}}</div>
           <div class="card-meta">{{item.job?.title}}</div>
+          <!-- The candidate is held here, not moved, until the extra payment
+               is signed off — so the card says which move is waiting. -->
           <div class="approval-badge" *ngIf="item.approvalStatus === 'PENDING_APPROVAL'">
-            ⚠️ Pending Salary Approval
+            ⚠️ Awaiting approval to move to {{ stageLabel(item.approvalRequestedStage || 'OFFERED') }}
+          </div>
+          <div class="approval-badge is-rejected" *ngIf="item.approvalStatus === 'REJECTED'">
+            ⛔ Extra payment rejected
           </div>
           <div class="card-footer-row">
             <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
@@ -466,7 +539,7 @@
       </div>
 
       <!-- Offer Package & Compensation Card -->
-      <div class="section-block compensation-package-card" *ngIf="app.offeredSalary || app.status === 'OFFERED' || app.status === 'HIRED' || app.status === 'ONBOARDED'">
+      <div class="section-block compensation-package-card">
         <div class="compensation-card-header">
           <div class="compensation-header-title">
             <div class="compensation-icon">
@@ -477,7 +550,7 @@
               <p>Salary breakdown and compensation structure</p>
             </div>
           </div>
-          <span class="approval-badge" [ngClass]="{
+          <span class="approval-badge" *ngIf="app.offeredSalary" [ngClass]="{
             'approved': app.approvalStatus === 'APPROVED' || (!app.approvalStatus && app.offeredSalary),
             'pending': app.approvalStatus === 'PENDING_APPROVAL',
             'rejected': app.approvalStatus === 'REJECTED'
@@ -485,6 +558,85 @@
             <span class="badge-dot"></span>
             {{ app.approvalStatus === 'PENDING_APPROVAL' ? 'Pending Approval' : (app.approvalStatus === 'REJECTED' ? 'Salary Rejected' : 'Approved Offer') }}
           </span>
+        </div>
+
+        <!-- Profile budget: the ceiling every offer for this candidate is
+             measured against. Edited here rather than in the offer modal, so
+             raising it is a deliberate, separate act. -->
+        <div class="profile-budget-row">
+          <div class="profile-budget-info">
+            <span class="comp-stat-label">Profile Budget</span>
+            <ng-container *ngIf="!editingProfileBudget()">
+              <strong class="comp-stat-value text-emerald" *ngIf="profileBudgetOf(app) !== null">
+                ₹{{ profileBudgetOf(app) | number }}
+                <span class="budget-inherited-tag" *ngIf="isInheritedBudget(app)">inherited from job maximum</span>
+              </strong>
+              <strong class="comp-stat-value text-slate" *ngIf="profileBudgetOf(app) === null">Not set</strong>
+            </ng-container>
+          </div>
+
+          <button
+            type="button"
+            class="btn-budget-edit"
+            *ngIf="!editingProfileBudget()"
+            (click)="startEditProfileBudget()"
+          >
+            <svg lucideEdit2 size="14"></svg>
+            <span>{{ isInheritedBudget(app) ? 'Set' : 'Edit' }}</span>
+          </button>
+
+          <div class="profile-budget-edit" *ngIf="editingProfileBudget()">
+            <input
+              type="number"
+              class="offer-field-input budget-input"
+              placeholder="Leave blank to use the job maximum"
+              [ngModel]="profileBudgetInput()"
+              (ngModelChange)="profileBudgetInput.set($event === '' || $event === null ? null : +$event)"
+            />
+            <button type="button" class="btn-budget-save" (click)="saveProfileBudget()" [disabled]="isSavingProfileBudget()">
+              {{ isSavingProfileBudget() ? 'Saving…' : 'Save' }}
+            </button>
+            <button type="button" class="btn-budget-cancel" (click)="cancelEditProfileBudget()">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Above-budget approval request: the amount and the reason together,
+             which is what the approver decides on. -->
+        <div class="approval-review-panel" *ngIf="app.approvalStatus === 'PENDING_APPROVAL' && app.approvalReason">
+          <div class="approval-review-header">
+            <svg lucideAlertCircle size="16"></svg>
+            <strong>Extra payment awaiting approval</strong>
+          </div>
+          <div class="approval-review-figures">
+            <div>
+              <span class="comp-stat-label">Proposed offer</span>
+              <strong class="comp-stat-value text-orange">₹{{ app.offeredSalary | number }}</strong>
+            </div>
+            <div>
+              <span class="comp-stat-label">Profile budget</span>
+              <strong class="comp-stat-value">₹{{ (app.approvalBudget ?? profileBudgetOf(app)) | number }}</strong>
+            </div>
+            <div>
+              <span class="comp-stat-label">Above budget by</span>
+              <strong class="comp-stat-value text-orange">₹{{ approvalOverageOf(app) | number }}</strong>
+            </div>
+          </div>
+          <div class="approval-review-reason">
+            <span class="comp-stat-label">Reason given</span>
+            <p>{{ app.approvalReason }}</p>
+          </div>
+          <p class="approval-review-hint">Approve or reject this request from the actions below.</p>
+        </div>
+
+        <div class="approval-review-panel rejected" *ngIf="app.approvalStatus === 'REJECTED' && app.approvalReason">
+          <div class="approval-review-header">
+            <svg lucideXCircle size="16"></svg>
+            <strong>Extra payment was rejected</strong>
+          </div>
+          <div class="approval-review-reason">
+            <span class="comp-stat-label">Reason that was submitted</span>
+            <p>{{ app.approvalReason }}</p>
+          </div>
         </div>
 
         <div class="compensation-details-grid" *ngIf="app.offeredSalary">
@@ -542,6 +694,7 @@
           <button
             type="button"
             class="btn-edit-terms"
+            *ngIf="app.offeredSalary"
             (click)="editOfferTerms()"
             title="Change the offered CTC, joining date or address"
           >
@@ -836,7 +989,14 @@
         <select class="form-select status-dropdown"
                 [ngModel]="normaliseStage(app.status)"
                 (ngModelChange)="updateDrawerStatus($event)">
-          <option *ngFor="let s of STAGES" [value]="s.key">{{ s.label }}</option>
+          <!-- A stage the candidate has not earned yet is offered but disabled,
+               so the pipeline stays visible without being selectable. -->
+          <option *ngFor="let s of STAGES"
+                  [value]="s.key"
+                  [disabled]="!canMoveTo(app, s.key)"
+                  [title]="blockedStageTooltip(app, s.key)">
+            {{ s.label }}{{ canMoveTo(app, s.key) ? '' : ' (locked)' }}
+          </option>
         </select>
         <svg lucideChevronDown size="14" class="stage-chevron"></svg>
       </div>
@@ -845,7 +1005,7 @@
     <div class="footer-actions-group">
       <!-- Onboard button -->
       <button 
-        *ngIf="app.status === 'HIRED' && app.approvalStatus !== 'PENDING_APPROVAL'" 
+        *ngIf="app.status === 'HIRED' && canMoveTo(app, 'ONBOARDED')" 
         class="btn-drawer-primary" 
         (click)="onboardCandidate()"
       >
@@ -917,9 +1077,26 @@
     <div class="salary-modal-body" *ngIf="pendingCandidate() as cand">
       <!-- Intelligence Strip -->
       <div class="salary-intel-grid">
+        <!-- The figure the offer is actually measured against, so the proposed
+             amount can be compared against it without leaving the modal. -->
+        <div class="salary-intel-chip budget-chip" *ngIf="pendingProfileBudget() !== null">
+          <span class="chip-label">
+            Profile Budget
+            <span class="chip-inherited" *ngIf="isInheritedBudget(cand)" title="No candidate-specific budget is set, so the job's maximum applies">from job</span>
+          </span>
+          <strong class="chip-val text-emerald">₹{{ pendingProfileBudget() | number }}</strong>
+        </div>
         <div class="salary-intel-chip" *ngIf="cand.job?.minSalary || cand.job?.maxSalary">
           <span class="chip-label">Approved Job Budget</span>
-          <strong class="chip-val">₹{{ (cand.job?.minSalary || 0) | number }} - ₹{{ (cand.job?.maxSalary || 0) | number }}</strong>
+          <strong class="chip-val" *ngIf="cand.job?.minSalary && cand.job?.maxSalary">
+            ₹{{ cand.job?.minSalary | number }} - ₹{{ cand.job?.maxSalary | number }}
+          </strong>
+          <strong class="chip-val" *ngIf="cand.job?.minSalary && !cand.job?.maxSalary">
+            ₹{{ cand.job?.minSalary | number }}+
+          </strong>
+          <strong class="chip-val" *ngIf="!cand.job?.minSalary && cand.job?.maxSalary">
+            up to ₹{{ cand.job?.maxSalary | number }}
+          </strong>
         </div>
         <div class="salary-intel-chip" *ngIf="cand.expectedCtc">
           <span class="chip-label">Candidate Expected CTC</span>
@@ -956,7 +1133,7 @@
       </div>
 
       <!-- Quick Preset Suggestions -->
-      <div class="salary-presets-row" *ngIf="cand.job?.maxSalary || cand.expectedCtc">
+      <div class="salary-presets-row" *ngIf="pendingProfileBudget() !== null || cand.expectedCtc">
         <span class="preset-label">Quick fill:</span>
         <button 
           type="button" 
@@ -969,10 +1146,10 @@
         <button 
           type="button" 
           class="salary-preset-pill" 
-          *ngIf="cand.job?.maxSalary"
-          (click)="setQuickOfferedSalary(cand.job?.maxSalary!)"
+          *ngIf="pendingProfileBudget() !== null"
+          (click)="setQuickOfferedSalary(pendingProfileBudget()!)"
         >
-          Max Budget (₹{{ cand.job?.maxSalary | number }})
+          Profile Budget (₹{{ pendingProfileBudget() | number }})
         </button>
       </div>
 
@@ -1012,16 +1189,53 @@
       <div class="salary-status-banner warning" *ngIf="salaryExceedsBudget()">
         <div class="banner-icon"><svg lucideAlertCircle size="18"></svg></div>
         <div class="banner-content">
-          <strong>Exceeds Approved Job Budget (Max: ₹{{ cand.job?.maxSalary | number }})</strong>
-          <p>Submitting this offer will automatically keep it in <em>OFFERED</em> status and route it for managerial budget approval.</p>
+          <strong>₹{{ budgetOverage() | number }} above the profile budget of ₹{{ pendingProfileBudget() | number }}</strong>
+          <p>
+            {{ pendingCandidate()?.fullName }} stays in
+            <em>{{ stageLabel(pendingCandidate()?.status || '') }}</em> and is marked
+            <em>awaiting approval</em> — the move to
+            <em>{{ stageLabel(pendingStatusChange()?.status || '') }}</em> happens once an approver signs off.
+            Explain the extra payment below.
+          </p>
         </div>
       </div>
 
-      <div class="salary-status-banner success" *ngIf="offeredSalaryInput() && !salaryExceedsBudget()">
+      <!-- Reason for the extra payment. Mandatory: the approver decides on the
+           amount and this reason together. -->
+      <div class="approval-reason-group" *ngIf="salaryExceedsBudget()">
+        <label class="offer-field-label" for="approvalReasonInput">
+          Reason for the extra payment <span class="required-star">*</span>
+        </label>
+        <textarea
+          id="approvalReasonInput"
+          class="offer-field-input offer-field-textarea"
+          rows="3"
+          placeholder="e.g. Candidate holds a competing offer at ₹12L and is the only shortlist with production Kubernetes experience."
+          [ngModel]="approvalReasonInput()"
+          (ngModelChange)="approvalReasonInput.set($event)"
+        ></textarea>
+        <small class="approval-reason-hint" [class.is-error]="!approvalReasonInput().trim()">
+          {{ approvalReasonInput().trim()
+             ? 'The approver sees this alongside the proposed amount.'
+             : 'Required before this offer can be sent for approval.' }}
+        </small>
+      </div>
+
+      <div class="salary-status-banner success" *ngIf="offeredSalaryInput() && pendingProfileBudget() !== null && !salaryExceedsBudget()">
         <div class="banner-icon"><svg lucideCheckCircle2 size="18"></svg></div>
         <div class="banner-content">
-          <strong>Within Approved Budget</strong>
+          <strong>Within Profile Budget</strong>
           <p>Candidate status will immediately be updated to <em>{{ pendingStatusChange()?.status }}</em>.</p>
+        </div>
+      </div>
+
+      <!-- No budget anywhere means nothing to measure the offer against, so
+           say that plainly rather than implying the offer passed a check. -->
+      <div class="salary-status-banner info" *ngIf="offeredSalaryInput() && pendingProfileBudget() === null">
+        <div class="banner-icon"><svg lucideAlertCircle size="18"></svg></div>
+        <div class="banner-content">
+          <strong>No profile budget set</strong>
+          <p>This offer will not be checked against a budget, and no approval will be required. Set a profile budget on the candidate, or a maximum salary on the job, to enforce approval for extra payment.</p>
         </div>
       </div>
     </div>
@@ -1035,10 +1249,11 @@
         type="button" 
         class="btn-modal-submit" 
         (click)="submitSalaryPrompt()" 
-        [disabled]="!offeredSalaryInput() || offeredSalaryInput()! <= 0"
+        [disabled]="offerSubmitBlocked()"
+        [title]="offerSubmitBlocked() && salaryExceedsBudget() ? 'Give a reason for the extra payment first' : ''"
       >
         <svg lucideCheckCircle size="16"></svg>
-        <span>Confirm & Submit Offer</span>
+        <span>{{ salaryExceedsBudget() ? 'Submit for Approval' : 'Confirm & Submit Offer' }}</span>
       </button>
     </div>
   </div>

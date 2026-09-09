@@ -135,6 +135,7 @@ export class AttendanceService {
           clockIn: now,
           clockInLat: data.lat,
           clockInLng: data.lng,
+          status: 'PRESENT',
           isLate
         },
         include: { logs: true }
@@ -153,8 +154,12 @@ export class AttendanceService {
     return this.prisma.attendance.update({
       where: { id: existing.id },
       data: {
+        status: existing.status === 'HALF_DAY' ? 'HALF_DAY' : 'PRESENT',
+        isLate: existing.isLate || isLate,
         clockOut: null, // Reset clockOut on parent since they are active
-        clockIn: existing.clockIn || now
+        clockIn: existing.clockIn || now,
+        clockInLat: existing.clockInLat || data.lat,
+        clockInLng: existing.clockInLng || data.lng,
       },
       include: { logs: true }
     }).then(r => this.withTotalHours(r));

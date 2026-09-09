@@ -56,7 +56,6 @@ type Status = 'loading' | 'ready' | 'success' | 'notfound' | 'error';
     LucideShieldCheck,
     LucideSparkles,
     LucideChevronDown,
-    LucideArrowRight,
     LucideRotateCcw
   ],
   templateUrl: './lead-form.html',

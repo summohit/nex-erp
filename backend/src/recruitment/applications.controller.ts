@@ -24,6 +24,11 @@ export class ApplicationsController {
     return this.applicationsService.getMyInterviews(req.user.companyId, req.user.sub);
   }
 
+  @Get('pending-approvals')
+  getPendingApprovals(@Request() req) {
+    return this.applicationsService.findPendingApprovals(req.user.companyId);
+  }
+
   @Get('analytics/dashboard')
   getAnalytics(@Request() req) {
     return this.applicationsService.getAnalytics(req.user.companyId);
@@ -59,22 +64,36 @@ export class ApplicationsController {
     @Body('offeredSalary') offeredSalary?: number,
     @Body('rejectionReason') rejectionReason?: string,
     @Body('joiningDate') joiningDate?: string,
-    @Body('address') address?: string
+    @Body('address') address?: string,
+    @Body('approvalReason') approvalReason?: string
   ) {
     return this.applicationsService.updateStatus(
       id, req.user.companyId, status, offeredSalary, rejectionReason, joiningDate, address,
-      req.user.sub,
+      req.user.sub, approvalReason,
     );
+  }
+
+  @Put(':id/profile-budget')
+  setProfileBudget(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body('profileBudget') profileBudget?: number | null,
+  ) {
+    const parsed =
+      profileBudget === null || profileBudget === undefined || (profileBudget as any) === ''
+        ? null
+        : Number(profileBudget);
+    return this.applicationsService.setProfileBudget(id, req.user.companyId, parsed);
   }
 
   @Post(':id/approve-salary')
   approveSalary(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.applicationsService.approveSalary(id, req.user.companyId);
+    return this.applicationsService.approveSalary(id, req.user.companyId, req.user.sub);
   }
 
   @Post(':id/reject-salary')
   rejectSalary(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.applicationsService.rejectSalary(id, req.user.companyId);
+    return this.applicationsService.rejectSalary(id, req.user.companyId, req.user.sub);
   }
 
   @Post(':id/onboard')

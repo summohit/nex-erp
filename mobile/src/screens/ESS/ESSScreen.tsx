@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  TextInput, ActivityIndicator, RefreshControl, Alert, StatusBar, Platform, Animated, Modal
+  TextInput, ActivityIndicator, RefreshControl, Alert, Animated, Modal
 } from 'react-native';
 
 const PulseSkeleton = ({ style }: { style: any }) => {
@@ -17,15 +17,14 @@ const PulseSkeleton = ({ style }: { style: any }) => {
   return <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: '#E2E8F0' }]} />;
 };
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import { 
-  Home, ChevronRight, Calendar, Clock, CheckCircle, XCircle, 
+  Calendar, Clock, CheckCircle, XCircle, 
   FileText, Send, HeartPulse, Briefcase, Umbrella, Sparkles, Info, Trash2, AlertCircle,
   UploadCloud, Paperclip, X
 } from 'lucide-react-native';
 import { useLeaveStore } from '../../store/leaveStore';
 import { leaveService } from '../../api/leaveService';
-import { useNavigation } from '@react-navigation/native';
 import { Calendar as RNCalendar } from 'react-native-calendars';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
@@ -34,7 +33,6 @@ import HolidaysTab from './tabs/HolidaysTab';
 import ExpensesTab from './tabs/ExpensesTab';
 
 export default function ESSScreen({ route }: any) {
-  const navigation = useNavigation<any>();
   const { balances, requests, isLoading, isSubmitting, fetchLeaveData, submitLeaveRequest, cancelLeaveRequest } = useLeaveStore();
   const [mainTab, setMainTab] = useState<'timesheets' | 'leaves' | 'holidays' | 'expenses'>((route?.params?.initialTab as any) || 'timesheets');
   const [activeTab, setActiveTab] = useState<'requests' | 'apply'>('requests');
@@ -79,7 +77,7 @@ export default function ESSScreen({ route }: any) {
 
   useEffect(() => {
     fetchLeaveData();
-  }, []);
+  }, [fetchLeaveData]);
 
   const validateAndCalculateDays = (startStr: string, endStr: string) => {
     if (!startStr.trim() || !endStr.trim()) return null;
@@ -267,53 +265,13 @@ export default function ESSScreen({ route }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {/* @ts-ignore */}<StatusBar barStyle="dark-content" />
-      {/* --- Premium Header & Breadcrumb Bar --- */}
-      <View style={styles.headerContainer}>
-        {/* Mobile Breadcrumb */}
-        <View style={styles.breadcrumbBar}>
-          <TouchableOpacity 
-            style={styles.breadcrumbItem} 
-            onPress={() => navigation.navigate('Home')}
-            activeOpacity={0.7}
-          >
-            <Home size={13} color="#94A3B8" />
-            <Text style={styles.breadcrumbText}>Home</Text>
-          </TouchableOpacity>
-          
-          <ChevronRight size={12} color="#CBD5E1" style={styles.breadcrumbSeparator} />
-          
-          <View style={styles.breadcrumbItem}>
-            <Text style={styles.breadcrumbText}>ESS</Text>
-          </View>
-          
-          <ChevronRight size={12} color="#CBD5E1" style={styles.breadcrumbSeparator} />
-          
-          <View style={[styles.breadcrumbItem, styles.breadcrumbActiveChip]}>
-            <Sparkles size={11} color="#E25E3E" />
-            <Text style={styles.breadcrumbActiveText}>
-              {mainTab === 'timesheets' ? 'Timesheets' : mainTab === 'holidays' ? 'Holidays' : 'Leave Portal'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Title Area */}
-        <View style={styles.headerTitleRow}>
-          <View>
-            <Text style={styles.headerTitle}>Attendance & Leave</Text>
-            <Text style={styles.headerSubtitle}>Manage your time, view logs, and request leaves</Text>
-          </View>
-        </View>
-      </View>
-
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={styles.scrollContentContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchLeaveData} colors={['#E25E3E']} />}
-      >
-        {/* --- Main Navigation Tabs --- */}
+    <AppScreen
+      showBottomNav={false}
+      title="Attendance"
+      subtitle="Timesheets, leaves & holidays"
+    >
+      {/* --- Main Navigation Tabs --- */}
+      <View style={styles.mainTabsHeader}>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false} 
@@ -345,13 +303,21 @@ export default function ESSScreen({ route }: any) {
             <Text style={[styles.mainTabText, mainTab === 'expenses' && styles.mainTabTextActive]}>Expenses</Text>
           </TouchableOpacity>
         </ScrollView>
+      </View>
 
+      <View style={styles.content}>
         {mainTab === 'timesheets' && (
           <TimesheetTab />
         )}
 
         {mainTab === 'holidays' && (
-          <HolidaysTab />
+          <ScrollView
+            style={styles.tabScrollView}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <HolidaysTab />
+          </ScrollView>
         )}
 
         {mainTab === 'expenses' && (
@@ -359,8 +325,14 @@ export default function ESSScreen({ route }: any) {
         )}
 
         {mainTab === 'leaves' && (
-          <View>
-        {/* --- Leave Balances Section --- */}
+          <ScrollView
+            style={styles.tabScrollView}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchLeaveData} colors={['#E25E3E']} />}
+          >
+            <View>
+              {/* --- Leave Balances Section --- */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Leave Balances</Text>
           <Text style={styles.sectionBadge}>{balances.length} Available</Text>
@@ -762,9 +734,10 @@ export default function ESSScreen({ route }: any) {
             </TouchableOpacity>
           </View>
         )}
-        </View>
+            </View>
+          </ScrollView>
         )}
-      </ScrollView>
+      </View>
       {/* Custom Error/Success Modal */}
       <FeedbackModal
         visible={modalVisible}
@@ -776,7 +749,7 @@ export default function ESSScreen({ route }: any) {
         confirmText={modalConfig.confirmText}
         showCancel={modalConfig.showCancel}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -785,64 +758,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  /* --- Header & Breadcrumbs --- */
-  headerContainer: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 4 : 12,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  breadcrumbBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  breadcrumbItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  breadcrumbText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  breadcrumbSeparator: {
-    marginHorizontal: 6,
-  },
-  breadcrumbActiveChip: {
-    backgroundColor: '#FFF1EC',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  breadcrumbActiveText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#E25E3E',
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#64748B',
-    marginTop: 2,
-  },
 
   /* --- Content & Scroll Container --- */
   content: {
+    flex: 1,
+  },
+  tabScrollView: {
     flex: 1,
   },
   scrollContentContainer: {
@@ -850,11 +771,14 @@ const styles = StyleSheet.create({
   },
 
   /* --- Main Tabs --- */
+  mainTabsHeader: {
+    backgroundColor: '#FFFFFF',
+  },
   mainTabsScroll: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    marginBottom: 16,
+    marginBottom: 0,
   },
   mainTabsContainer: {
     flexDirection: 'row',

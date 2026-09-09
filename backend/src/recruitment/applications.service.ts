@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PayrollSettingsService } from '../payroll/payroll-settings.service';
 import { LettersService } from '../letters/letters.service';
@@ -7,12 +7,133 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class ApplicationsService {
+  private readonly logger = new Logger(ApplicationsService.name);
+
   constructor(
     private prisma: PrismaService,
     private payrollSettingsService: PayrollSettingsService,
     private notificationsService: NotificationsService,
     private lettersService: LettersService,
   ) {}
+
+  /**
+   * The stages that gate progression. NEGOTIATION, ON_HOLD and REJECTED are
+   * deliberately absent: they are skippable, so nothing is ever withheld for
+   * want of them, and reaching them is never itself blocked.
+   */
+  private static readonly GATED_STAGES = ['OFFERED', 'HIRED', 'ONBOARDED'];
+
+  /** Every stage a candidate must have passed through before being OFFERED. */
+  private static readonly MANDATORY_BEFORE_OFFER = ['APPLIED', 'PHONE_SCREENING', 'INTERVIEW'];
+
+  private static readonly STAGE_LABELS: Record<string, string> = {
+    APPLIED: 'Applied',
+    PHONE_SCREENING: 'Phone Screening',
+    INTERVIEW: 'Interview',
+    NEGOTIATION: 'Negotiation',
+    OFFERED: 'Offered',
+    HIRED: 'Hired',
+    ONBOARDED: 'Onboarded',
+    ON_HOLD: 'On Hold',
+    REJECTED: 'Rejected',
+  };
+
+  /** Map any retired status onto a current stage. Mirrors the frontend. */
+  private normaliseStage(status?: string | null): string {
+    switch (status) {
+      case 'NEW': return 'APPLIED';
+      case 'REVIEWING':
+      case 'SHORTLISTED': return 'PHONE_SCREENING';
+      case 'INTERVIEWING': return 'INTERVIEW';
+      default: return status || 'APPLIED';
+    }
+  }
+
+  private stageLabel(key: string): string {
+    return ApplicationsService.STAGE_LABELS[key] || key;
+  }
+
+  /**
+   * Stages this candidate has been through: whatever was recorded, plus the
+   * stage they are sitting in right now. Every application starts at APPLIED,
+   * so that one is always credited.
+   */
+  private visitedStages(application: { status: string; completedStages?: string[] }): Set<string> {
+    const visited = new Set<string>(['APPLIED']);
+    for (const stage of application.completedStages || []) visited.add(this.normaliseStage(stage));
+    visited.add(this.normaliseStage(application.status));
+    return visited;
+  }
+
+  /**
+   * The budget the offer is measured against: the candidate's own approved
+   * budget, falling back to the job's ceiling.
+   *
+   * Plenty of jobs carry only one bound — a posted `minSalary` with no
+   * `maxSalary` is common — and treating those as "no budget at all" silently
+   * disabled the approval rule for them. Whichever bound exists is the ceiling.
+   */
+  private effectiveProfileBudget(application: any): number | null {
+    const candidates = [
+      application.profileBudget,
+      application.job?.maxSalary,
+      application.job?.minSalary,
+    ];
+    for (const value of candidates) {
+      if (value !== null && value !== undefined) return Number(value);
+    }
+    return null;
+  }
+
+  /**
+   * Refuse a move that skips a mandatory stage. NEGOTIATION, ON_HOLD and
+   * REJECTED are never required, so they are absent from every check below.
+   */
+  private assertStageAllowed(application: any, target: string) {
+    if (!ApplicationsService.GATED_STAGES.includes(target)) return;
+
+    const visited = this.visitedStages(application);
+
+    const missing = ApplicationsService.MANDATORY_BEFORE_OFFER.filter((s) => !visited.has(s));
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Cannot move to ${this.stageLabel(target)} — this candidate has not been through ` +
+        `${missing.map((s) => this.stageLabel(s)).join(', ')}. Every stage except ` +
+        `Negotiation, On Hold and Rejected is mandatory.`,
+      );
+    }
+
+    if ((target === 'HIRED' || target === 'ONBOARDED') && !visited.has('OFFERED')) {
+      throw new BadRequestException(
+        `Cannot move to ${this.stageLabel(target)} — the candidate must be Offered first.`,
+      );
+    }
+
+    if (target === 'ONBOARDED' && !visited.has('HIRED')) {
+      throw new BadRequestException('Cannot onboard — the candidate must be Hired first.');
+    }
+  }
+
+  /**
+   * An above-budget offer only really gates the hire if the unapproved state
+   * blocks HIRED. Checked against the approval status the write is about to
+   * leave behind, not the one it started with, so revising the salary down to
+   * within budget clears a previous rejection in the same call.
+   */
+  private assertApprovalClear(stage: string, approvalStatus?: string | null) {
+    if (stage !== 'HIRED' && stage !== 'ONBOARDED') return;
+
+    if (approvalStatus === 'PENDING_APPROVAL') {
+      throw new BadRequestException(
+        'This offer is above the profile budget and is still waiting for approval.',
+      );
+    }
+    if (approvalStatus === 'REJECTED') {
+      throw new BadRequestException(
+        'The extra payment on this offer was rejected. Revise the offered salary before hiring.',
+      );
+    }
+  }
 
   async findAll(companyId: number, jobId?: number) {
     const whereClause: any = { companyId };
@@ -26,6 +147,10 @@ export class ApplicationsService {
         job: {
           select: {
             title: true,
+            // The board's offer modal compares against these, so the list
+            // payload has to carry them too — not just findOne's.
+            minSalary: true,
+            maxSalary: true,
             department: { select: { name: true } },
             designation: { select: { name: true } }
           }
@@ -72,20 +197,57 @@ export class ApplicationsService {
     joiningDate?: string | Date | null,
     address?: string | null,
     actorUserId?: number,
+    // Why the company is paying above the candidate's profile budget. Required
+    // whenever the offer exceeds it; ignored otherwise.
+    approvalReason?: string | null,
   ) {
     const application = await this.findOne(id, companyId);
+
+    const target = this.normaliseStage(status);
+    this.assertStageAllowed(application, target);
 
     let approvalStatus = application.approvalStatus;
     let finalStatus = status;
 
-    if (offeredSalary !== undefined && (status === 'HIRED' || status === 'OFFERED')) {
-      if (application.job?.maxSalary && offeredSalary > application.job.maxSalary) {
+    const budget = this.effectiveProfileBudget(application);
+    const approvalFields: Record<string, any> = {};
+
+    if (offeredSalary !== undefined && (target === 'HIRED' || target === 'OFFERED')) {
+      if (budget !== null && offeredSalary > budget) {
+        const reason = (approvalReason || '').trim();
+        if (!reason) {
+          throw new BadRequestException(
+            `This offer is above the candidate's profile budget of ${budget}. ` +
+            `Give a reason for the extra payment so it can be sent for approval.`,
+          );
+        }
         approvalStatus = 'PENDING_APPROVAL';
-        finalStatus = 'OFFERED'; // Enforce OFFERED if pending approval
+        // Hold the candidate where they are. Moving them to OFFERED here would
+        // tell the board an offer had been made when the money behind it has
+        // not been approved yet; approveSalary completes the move instead.
+        finalStatus = application.status;
+        approvalFields.approvalRequestedStage = target;
+        approvalFields.approvalReason = reason;
+        // Snapshot the budget in force now, so a later edit to profileBudget
+        // never rewrites what the approver is being asked to sign off on.
+        approvalFields.approvalBudget = budget;
+        approvalFields.approvalRequestedAt = new Date();
+        approvalFields.approvalDecidedAt = null;
+        approvalFields.approvalDecidedById = null;
       } else {
+        // A within-budget revision clears any earlier request outright, so a
+        // previous rejection cannot keep blocking the hire.
         approvalStatus = 'APPROVED';
+        approvalFields.approvalReason = null;
+        approvalFields.approvalBudget = null;
+        approvalFields.approvalRequestedStage = null;
+        approvalFields.approvalRequestedAt = null;
+        approvalFields.approvalDecidedAt = null;
+        approvalFields.approvalDecidedById = null;
       }
     }
+
+    this.assertApprovalClear(this.normaliseStage(finalStatus), approvalStatus);
 
     // Moving to ONBOARDED must actually create the employee, whichever route
     // the user took. Do it before writing the status so a failure surfaces
@@ -104,32 +266,138 @@ export class ApplicationsService {
       where: { id: application.id },
       data: {
         status: finalStatus,
+        // Record the stage actually landed on, so a later move can tell what
+        // this candidate has genuinely been through.
+        completedStages: this.recordStage(application, finalStatus),
         ...(offeredSalary !== undefined && { offeredSalary }),
         ...(status === 'REJECTED' && { rejectionReason: rejectionReason || null }),
         ...(joiningDate !== undefined && {
           joiningDate: joiningDate ? new Date(joiningDate) : null,
         }),
         ...(address !== undefined && { address: address || null }),
+        ...approvalFields,
         approvalStatus
       },
     });
 
+    if (approvalStatus === 'PENDING_APPROVAL' && application.approvalStatus !== 'PENDING_APPROVAL') {
+      await this.notifyBudgetApprovers(updated, companyId, budget, actorUserId);
+    }
+
     return onboarding ? { ...updated, onboarding } : updated;
   }
 
-  async approveSalary(id: number, companyId: number) {
+  /**
+   * The candidate's stage history with `stage` appended. Order is preserved and
+   * duplicates dropped, so re-entering a stage does not bloat the column.
+   */
+  private recordStage(application: { status: string; completedStages?: string[] }, stage: string): string[] {
+    const history = (application.completedStages || []).map((s) => this.normaliseStage(s));
+    const current = this.normaliseStage(application.status);
+    const next = this.normaliseStage(stage);
+    return [...new Set(['APPLIED', ...history, current, next])];
+  }
+
+  /** Tell whoever can approve that an above-budget offer is waiting on them. */
+  private async notifyBudgetApprovers(
+    application: any,
+    companyId: number,
+    budget: number | null,
+    actorUserId?: number,
+  ) {
+    try {
+      await this.notificationsService.notifyApprovers({
+        companyId,
+        roles: ['SUPERADMIN', 'ADMIN', 'HR'],
+        title: 'Offer above budget needs approval',
+        message:
+          `${application.fullName} has been offered ${application.offeredSalary}` +
+          (budget !== null ? ` against a profile budget of ${budget}` : '') +
+          `. Reason: ${application.approvalReason}`,
+        type: 'ACTION_REQUIRED',
+        linkUrl: '/recruitment/candidates',
+        excludeUserId: actorUserId ?? null,
+      });
+    } catch (error) {
+      // A failed notification must not roll back an offer that was saved.
+      this.logger.error('Failed to notify budget approvers', error as any);
+    }
+  }
+
+  /**
+   * The candidate's own approved budget. Set on the profile rather than in the
+   * offer modal on purpose — a recruiter raising the budget in the same breath
+   * as the offer would make the approval gate meaningless.
+   */
+  async setProfileBudget(id: number, companyId: number, profileBudget: number | null) {
     const application = await this.findOne(id, companyId);
+    if (profileBudget !== null && (!Number.isFinite(profileBudget) || profileBudget < 0)) {
+      throw new BadRequestException('Profile budget must be a positive amount');
+    }
     return this.prisma.jobApplication.update({
       where: { id: application.id },
-      data: { approvalStatus: 'APPROVED' },
+      data: { profileBudget },
     });
   }
 
-  async rejectSalary(id: number, companyId: number) {
+  /**
+   * Approve the extra payment and finish the move the recruiter asked for. The
+   * candidate has been sitting in their original stage all along, so approving
+   * is what actually advances them.
+   */
+  async approveSalary(id: number, companyId: number, actorUserId?: number) {
     const application = await this.findOne(id, companyId);
+    if (application.approvalStatus !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('There is no pending approval request on this offer');
+    }
+
+    const requested = application.approvalRequestedStage || 'OFFERED';
+    // The pipeline rules still apply — approving the money never buys a way
+    // past a stage the candidate has not been through.
+    this.assertStageAllowed(application, this.normaliseStage(requested));
+
     return this.prisma.jobApplication.update({
       where: { id: application.id },
-      data: { approvalStatus: 'REJECTED' },
+      data: {
+        approvalStatus: 'APPROVED',
+        status: requested,
+        completedStages: this.recordStage(application, requested),
+        approvalDecidedAt: new Date(),
+        approvalDecidedById: actorUserId ?? null,
+      },
+    });
+  }
+
+  /** Every offer whose extra payment is still waiting on an approver. */
+  async findPendingApprovals(companyId: number) {
+    return this.prisma.jobApplication.findMany({
+      where: { companyId, approvalStatus: 'PENDING_APPROVAL' },
+      include: {
+        job: {
+          select: {
+            title: true,
+            minSalary: true,
+            maxSalary: true,
+            department: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { approvalRequestedAt: 'asc' },
+    });
+  }
+
+  async rejectSalary(id: number, companyId: number, actorUserId?: number) {
+    const application = await this.findOne(id, companyId);
+    if (application.approvalStatus !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('There is no pending approval request on this offer');
+    }
+    return this.prisma.jobApplication.update({
+      where: { id: application.id },
+      data: {
+        approvalStatus: 'REJECTED',
+        approvalDecidedAt: new Date(),
+        approvalDecidedById: actorUserId ?? null,
+      },
     });
   }
 
@@ -147,9 +415,9 @@ export class ApplicationsService {
       throw new BadRequestException('Only HIRED candidates can be onboarded');
     }
 
-    if (application.approvalStatus === 'PENDING_APPROVAL') {
-      throw new BadRequestException('Cannot onboard candidate with pending salary approval');
-    }
+    this.assertStageAllowed(application, 'ONBOARDED');
+
+    this.assertApprovalClear('ONBOARDED', application.approvalStatus);
 
     return this.convertToEmployee(application, companyId, actorUserId);
   }
@@ -234,7 +502,10 @@ export class ApplicationsService {
 
       await tx.jobApplication.update({
         where: { id: application.id },
-        data: { status: 'ONBOARDED' }
+        data: {
+          status: 'ONBOARDED',
+          completedStages: this.recordStage(application, 'ONBOARDED'),
+        }
       });
 
       return employee;

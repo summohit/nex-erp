@@ -27,6 +27,7 @@ export class SystemSettingsService {
       offerLetterTemplateDocxUrl?: string;
       offerLetterConfig?: any;
       defaultTicketAssigneeId?: number | null;
+      twoFactorRequired?: boolean;
     },
   ) {
     return this.prisma.systemSetting.upsert({
@@ -38,6 +39,7 @@ export class SystemSettingsService {
         offerLetterTemplateDocxUrl: data.offerLetterTemplateDocxUrl,
         offerLetterConfig: data.offerLetterConfig ?? undefined,
         defaultTicketAssigneeId: data.defaultTicketAssigneeId ?? null,
+        twoFactorRequired: data.twoFactorRequired ?? false,
       },
       update: {
         shiftRosterVisibleToEmployees: data.shiftRosterVisibleToEmployees,
@@ -46,6 +48,7 @@ export class SystemSettingsService {
         // undefined leaves the stored JSON untouched; only overwrite when sent.
         offerLetterConfig: data.offerLetterConfig ?? undefined,
         ...(data.defaultTicketAssigneeId !== undefined && { defaultTicketAssigneeId: data.defaultTicketAssigneeId }),
+        ...(data.twoFactorRequired !== undefined && { twoFactorRequired: data.twoFactorRequired }),
       },
     });
   }

@@ -25,6 +25,12 @@ try {
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // A reverse proxy fronts this app in production, so without this every
+  // request reports the proxy's IP and per-IP rate limiting would throttle the
+  // whole company as if it were one client.
+  app.set('trust proxy', 1);
+
   app.enableCors({ origin: 'http://localhost:4200' });
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));

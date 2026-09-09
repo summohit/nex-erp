@@ -81,8 +81,12 @@ export class AutoClockoutCron implements OnModuleInit, OnModuleDestroy {
         if (attendance.clockIn && cutoff < attendance.clockIn) {
           cutoff = attendance.clockIn;
         }
-        // Today's sweep should never stamp a time in the future.
-        if (cutoff > now) cutoff = now;
+        // The cutoff still being in the future means this session belongs to
+        // today and has not reached 23:00 yet — it is someone's live workday.
+        // Leave it alone. Clamping to `now` here is what let a mid-afternoon
+        // process restart clock the whole company out, since onModuleInit runs
+        // this sweep unconditionally.
+        if (cutoff > now) continue;
 
         // Mirror the manual clock-out so an auto-closed day is scored the same
         // way — otherwise anyone who forgets silently loses their overtime.

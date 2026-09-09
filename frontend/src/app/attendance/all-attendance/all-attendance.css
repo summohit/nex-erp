@@ -1733,6 +1733,16 @@
   font-weight: 500;
 }
 
+.session-emp-email {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.session-emp-desig {
+  font-weight: 600;
+  color: #334155;
+}
+
 .btn-modal-close {
   border: none;
   background: #f1f5f9;

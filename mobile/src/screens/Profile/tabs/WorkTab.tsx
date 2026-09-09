@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, FlatList, Platform } from 'react-native';
-import { ChevronDown, MapPin, Briefcase, Calendar, FileText, X, Lock, CheckCircle2, Building, Users } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal } from 'react-native';
+import { ChevronDown, Briefcase, Calendar, FileText, X, Lock, CheckCircle2, Building, Users } from 'lucide-react-native';
 import OrgChartMini from '../components/OrgChartMini';
 import { useAuthStore } from '../../../store/authStore';
 
@@ -63,49 +63,53 @@ const DropdownPicker = ({
         <ChevronDown size={18} color={selectedOption && selectedOption.label !== 'Unspecified' ? "#E25E3E" : "#94A3B8"} />
       </TouchableOpacity>
       
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalDismissArea} 
-            activeOpacity={1} 
-            onPress={() => setModalVisible(false)} 
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalDragHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select {label}</Text>
-              <TouchableOpacity style={styles.closeBtn} onPress={() => setModalVisible(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={options}
-              keyExtractor={(item, index) => `${item.value}-${index}`}
-              contentContainerStyle={styles.optionsList}
-              renderItem={({ item }) => {
-                const isSelected = String(value) === String(item.value);
-                return (
-                  <TouchableOpacity 
-                    activeOpacity={0.7}
-                    style={[styles.optionItem, isSelected && styles.optionItemSelected]}
-                    onPress={() => {
-                      onSelect(item.value);
-                      setModalVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
-                      {item.label}
-                    </Text>
-                    {isSelected && (
-                      <CheckCircle2 size={18} color="#E25E3E" strokeWidth={2.5} />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
+      {modalVisible && (
+        <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity 
+              style={styles.modalDismissArea} 
+              activeOpacity={1} 
+              onPress={() => setModalVisible(false)} 
             />
+            <View style={styles.modalContent}>
+              <View style={styles.modalDragHandle} />
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select {label}</Text>
+                <TouchableOpacity style={styles.closeBtn} onPress={() => setModalVisible(false)}>
+                  <X size={20} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView 
+                contentContainerStyle={styles.optionsList}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {options.map((item, index) => {
+                  const isSelected = String(value) === String(item.value);
+                  return (
+                    <TouchableOpacity 
+                      key={`${item.value}-${index}`}
+                      activeOpacity={0.7}
+                      style={[styles.optionItem, isSelected && styles.optionItemSelected]}
+                      onPress={() => {
+                        onSelect(item.value);
+                        setModalVisible(false);
+                      }}
+                    >
+                      <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
+                        {item.label}
+                      </Text>
+                      {isSelected && (
+                        <CheckCircle2 size={18} color="#E25E3E" strokeWidth={2.5} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 };

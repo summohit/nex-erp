@@ -540,6 +540,14 @@ export class AttendanceLeaveComponent implements OnInit {
   // Manage Balances (HR/Admin)
   allBalances = signal<LeaveBalance[]>([]);
   allRequests = signal<LeaveRequest[]>([]);
+  approvalStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('PENDING');
+  filteredRequests = computed(() => {
+    const filter = this.approvalStatusFilter();
+    const requests = this.allRequests();
+    if (filter === 'ALL') return requests;
+    return requests.filter(r => r.status === filter);
+  });
+  pendingCount = computed(() => this.allRequests().filter(r => r.status === 'PENDING').length);
   managerRequests = signal<LeaveRequest[]>([]);
   employees = signal<Employee[]>([]);
   isLoadingEmployees = signal<boolean>(false);

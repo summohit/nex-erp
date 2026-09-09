@@ -1,0 +1,179 @@
+<div class="privacy-page">
+  
+  <!-- Modern Public Navigation Bar -->
+  <header class="public-nav">
+    <div class="nav-container">
+      <a routerLink="/" class="nav-brand" title="NEX ERP">
+        <img src="/logo.png" alt="NEX ERP Logo" class="brand-logo-img">
+      </a>
+      
+      <a routerLink="/" class="btn-back-home">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        <span>Back to Home</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Hero & Breadcrumbs Section -->
+  <div class="hero-section">
+    <div class="hero-container">
+      <nav class="breadcrumb-bar" aria-label="Breadcrumb">
+        <a routerLink="/" class="bc-link">Home</a>
+        <span class="bc-sep">/</span>
+        <span class="bc-link">Legal</span>
+        <span class="bc-sep">/</span>
+        <span class="bc-current">Security Overview</span>
+      </nav>
+
+      <div class="badge-pill">Enterprise Trust &amp; Security</div>
+      <h1 class="page-title">Security Overview</h1>
+      <p class="meta-date">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        Effective Date: September 8, 2026
+      </p>
+    </div>
+  </div>
+
+  <!-- Main Content Document Card -->
+  <main class="content-container">
+    <article class="document-card">
+
+      <div class="callout-box">
+        <div class="callout-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF5200" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+        </div>
+        <div class="callout-content">
+          <strong>Built for Enterprise Reliability &amp; Compliance</strong>
+          <p>Security is embedded into every architectural layer of NEX ERP. From end-to-end data encryption and strict role isolation to automated audit trails, we ensure your organization's sensitive operational data remains fortified.</p>
+        </div>
+      </div>
+
+      <section class="doc-section">
+        <div class="section-badge">01</div>
+        <div class="section-body">
+          <h2>Data Encryption Architecture</h2>
+          <p>
+            We enforce multi-tiered cryptographic controls across data lifecycle transitions:
+          </p>
+          <ul class="styled-list">
+            <li><strong>Encryption in Transit:</strong> All communication between client applications (web, iOS, Android) and our cloud services is enforced through modern TLS 1.3 encryption (HTTPS/WSS) with strict cipher suite configurations.</li>
+            <li><strong>Encryption at Rest:</strong> All core databases, transactional logs, and object attachments are encrypted using industry-standard AES-256 bit encryption algorithms.</li>
+            <li><strong>Cryptographic Password Hashing:</strong> User credentials are protected using salted, computationally intensive hashing algorithms (Bcrypt/Argon2). We never store or transmit plaintext passwords.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <div class="section-badge">02</div>
+        <div class="section-body">
+          <h2>Role-Based Access Control (RBAC) &amp; Multi-Tenancy</h2>
+          <p>
+            NEX ERP utilizes strict multi-tenant logical partitioning to guarantee that company records are completely isolated and impenetrable by unauthorized users:
+          </p>
+          <ul class="styled-list">
+            <li><strong>Organizational Sandboxing:</strong> Every database query is scoped strictly to your unique company identifier, preventing cross-tenant data leakage.</li>
+            <li><strong>Granular Permissions:</strong> Access rights are governed by fine-grained permissions. Standard employees cannot access confidential salary structures, peer appraisals, or administrative configurations without explicit privilege delegation.</li>
+            <li><strong>Session Authentication:</strong> Stateful verification with JSON Web Tokens (JWT), automatic token invalidation upon password reset, and configurable inactivity timeouts.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <div class="section-badge">03</div>
+        <div class="section-body">
+          <h2>Cloud Infrastructure &amp; Network Defense</h2>
+          <p>
+            Our microservices and application gateways operate on top of hardened tier-1 cloud facilities:
+          </p>
+          <ul class="styled-list">
+            <li><strong>Distributed Denial of Service (DDoS) Mitigation:</strong> Automated edge traffic analysis and scrubbing networks absorb and neutralize high-volume attacks.</li>
+            <li><strong>Virtual Private Clouds (VPC):</strong> Databases and internal message brokers reside inside isolated private subnets inaccessible from the public internet.</li>
+            <li><strong>Continuous Patching:</strong> Operating system kernels, Docker containers, and framework dependencies undergo regular patch cycles to address upstream zero-day CVEs.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <div class="section-badge">04</div>
+        <div class="section-body">
+          <h2>Mobile App Security &amp; Geolocation Integrity</h2>
+          <p>
+            The NEX ERP mobile application incorporates specialized device safeguards:
+          </p>
+          <ul class="styled-list">
+            <li><strong>Anti-Tampering &amp; Mock Detection:</strong> Geolocation verification checks defend against mock locations and GPS spoofing during punch-in/attendance submissions.</li>
+            <li><strong>Minimal Permission Footprint:</strong> We request only runtime permissions necessary for functionality (such as camera for document uploads or receipt capture). We do not perform silent background tracking.</li>
+            <li><strong>Secure Local Storage:</strong> Sensitive device tokens are safeguarded in encrypted hardware-backed keystores (Android KeyStore and iOS Keychain).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <div class="section-badge">05</div>
+        <div class="section-body">
+          <h2>Comprehensive Audit Logging &amp; Forensics</h2>
+          <p>
+            To assist your internal compliance and forensic investigations, NEX ERP captures tamper-resistant audit logs:
+          </p>
+          <ul class="styled-list">
+            <li>All administrative modifications (salary overrides, employee terminations, role promotions, and record deletions) record user timestamps and originating IP addresses.</li>
+            <li>Access logs are preserved in append-only storage systems, preventing deletion even by standard administrators.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <div class="section-badge">06</div>
+        <div class="section-body">
+          <h2>Backup, Disaster Recovery &amp; Resilience</h2>
+          <p>
+            Business continuity is built into our operational roadmap:
+          </p>
+          <ul class="styled-list">
+            <li><strong>Automated Daily Snapshots:</strong> Encrypted backups of all production relational databases occur on an automated daily schedule with point-in-time recovery capabilities.</li>
+            <li><strong>Geographic Redundancy:</strong> Backups are replicated across independent availability zones to safeguard against localized datacenter failures.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <div class="section-badge">07</div>
+        <div class="section-body">
+          <h2>Vulnerability Reporting &amp; Security Team</h2>
+          <p>
+            We welcome responsible disclosure from security researchers and corporate auditors. If you identify an issue or require our security team's assistance, please reach out directly:
+          </p>
+          
+          <div class="contact-card">
+            <div class="contact-avatar">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+            </div>
+            <div class="contact-details">
+              <span class="contact-role">Security Operations &amp; Incident Response</span>
+              <a href="mailto:ces.techteam@gmail.com" class="contact-email">ces.techteam@gmail.com</a>
+              <span class="contact-company">NEX ERP &bull; CES Technologies</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </article>
+  </main>
+
+  <!-- Legal Footer -->
+  <footer class="public-footer">
+    <p>&copy; 2026 NEX ERP &amp; CES Technologies. All rights reserved.</p>
+  </footer>
+
+</div>

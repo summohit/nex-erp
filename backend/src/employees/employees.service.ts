@@ -50,8 +50,10 @@ export class EmployeesService {
         lastName: true,
         avatarUrl: true,
         managerId: true,
-        department: { select: { name: true } },
-        designation: { select: { name: true } }
+        employeeCode: true,
+        department: { select: { id: true, name: true } },
+        designation: { select: { id: true, name: true } },
+        user: { select: { email: true, role: true } }
       },
       orderBy: { firstName: 'asc' }
     });

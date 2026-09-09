@@ -72,6 +72,7 @@ export class AllAttendanceComponent implements OnInit {
   selectedDayDetails = signal<{
     employeeName: string;
     employeeEmail: string;
+    employeeDesignation: string;
     employeeDept: string;
     employeeRole: string;
     employeeAvatarUrl: string | null;
@@ -258,10 +259,21 @@ export class AllAttendanceComponent implements OnInit {
     });
 
     const empMap = new Map<number, any>();
-    allEmps.forEach(e => empMap.set(e.id, e));
+    allEmps.forEach(e => empMap.set(e.id, { ...e }));
     records.forEach(r => {
-      if (r.employee && !empMap.has(r.employeeId)) {
-        empMap.set(r.employeeId, r.employee);
+      if (r.employee) {
+        const existing = empMap.get(r.employeeId);
+        if (existing) {
+          empMap.set(r.employeeId, {
+            ...existing,
+            ...r.employee,
+            department: r.employee.department || existing.department,
+            designation: r.employee.designation || existing.designation,
+            user: r.employee.user || existing.user,
+          });
+        } else {
+          empMap.set(r.employeeId, r.employee);
+        }
       }
     });
 
@@ -303,10 +315,6 @@ export class AllAttendanceComponent implements OnInit {
             status = 'Half Day';
           } else if (record.isLate) {
             status = 'Late';
-          } else if (record.status === 'PRESENT') {
-            status = 'Present';
-          } else if (record.status === 'ABSENT') {
-            status = 'Absent';
           } else {
             status = 'Present';
           }
@@ -710,11 +718,21 @@ export class AllAttendanceComponent implements OnInit {
   openDayDetails(emp: any, day: any, record?: AttendanceRecord) {
     if (day.isFuture) return;
 
-    const empName = `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.name || 'Employee';
-    const empEmail = emp.user?.email || emp.email || 'employee@company.com';
-    const empDept = emp.department?.name || emp.designation?.name || 'Staff';
-    const empRole = emp.user?.role || 'EMPLOYEE';
-    const empAvatar = emp.avatarUrl || null;
+    // Merge emp and record.employee so we have all fields available
+    const mergedEmp = {
+      ...(emp || {}),
+      ...(record?.employee || {}),
+      user: record?.employee?.user || emp?.user,
+      department: record?.employee?.department || emp?.department,
+      designation: record?.employee?.designation || emp?.designation,
+    };
+
+    const empName = `${mergedEmp.firstName || ''} ${mergedEmp.lastName || ''}`.trim() || mergedEmp.name || 'Employee';
+    const empEmail = mergedEmp.user?.email || mergedEmp.email || '';
+    const empDesignation = mergedEmp.designation?.name || (typeof mergedEmp.designation === 'string' ? mergedEmp.designation : '');
+    const empDept = mergedEmp.department?.name || (typeof mergedEmp.department === 'string' ? mergedEmp.department : '');
+    const empRole = mergedEmp.user?.role || mergedEmp.role || 'EMPLOYEE';
+    const empAvatar = mergedEmp.avatarUrl || null;
 
     let logs: any[] = [];
     let durationStr = '—';
@@ -757,6 +775,7 @@ export class AllAttendanceComponent implements OnInit {
     this.selectedDayDetails.set({
       employeeName: empName,
       employeeEmail: empEmail,
+      employeeDesignation: empDesignation,
       employeeDept: empDept,
       employeeRole: empRole,
       employeeAvatarUrl: empAvatar,
@@ -778,7 +797,7 @@ export class AllAttendanceComponent implements OnInit {
   openDetail(record: AttendanceRecord) {
     const day = {
       date: new Date(record.date),
-      status: record.status === 'HALF_DAY' ? 'Half Day' : record.isLate ? 'Late' : record.status === 'PRESENT' ? 'Present' : 'Absent',
+      status: record.status === 'HALF_DAY' ? 'Half Day' : record.isLate ? 'Late' : (record.clockIn || record.status === 'PRESENT') ? 'Present' : 'Absent',
       isFuture: false
     };
     this.openDayDetails(record.employee, day, record);

@@ -65,8 +65,8 @@ export class LettersController {
 
   @Get(':id')
   @Permissions('settings/letter-templates')
-  findLetter(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.lettersService.findLetter(req.user.companyId, id);
+  findLetter(@Request() req, @Param('id', ParseIntPipe) id: number, @Query('source') source?: string) {
+    return this.lettersService.findLetter(req.user.companyId, id, source);
   }
 
   @Post()
@@ -77,7 +77,7 @@ export class LettersController {
 
   @Delete(':id')
   @Permissions('settings/letter-templates')
-  deleteLetter(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.lettersService.deleteLetter(req.user.companyId, id);
+  deleteLetter(@Request() req, @Param('id', ParseIntPipe) id: number, @Query('source') source?: string) {
+    return this.lettersService.deleteLetter(req.user.companyId, id, source);
   }
 }

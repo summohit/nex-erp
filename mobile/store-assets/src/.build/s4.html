@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:'SF Pro Display','SF Pro Text',-apple-system,'Helvetica Neue',Arial,sans-serif;}
+svg{display:block}
+
+html,body{width:360px;height:640px;overflow:hidden;background:#F5F7FA}
+.screen{width:360px;height:640px;position:relative;background:#F5F7FA;overflow:hidden}
+/* status bar */
+.sb{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:12px;font-weight:700;color:#0F172A;letter-spacing:.2px}
+.sb .r{display:flex;align-items:center;gap:5px}
+.bars{display:flex;align-items:flex-end;gap:1.5px;height:9px}
+.bars i{width:2.5px;background:#0F172A;border-radius:1px;display:block}
+.batt{width:17px;height:9px;border:1.4px solid #0F172A;border-radius:2.5px;position:relative;display:block}
+.batt:after{content:'';position:absolute;right:-3px;top:2.2px;width:1.6px;height:3px;background:#0F172A;border-radius:0 1px 1px 0}
+.batt i{position:absolute;left:1.3px;top:1.3px;bottom:1.3px;width:9px;background:#0F172A;border-radius:1px;display:block}
+/* header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 16px 12px}
+.ibtn{width:40px;height:40px;border-radius:13px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(15,23,42,.05);position:relative}
+.dot{position:absolute;top:9px;right:10px;width:7px;height:7px;border-radius:4px;background:#EF4444;border:1.5px solid #fff}
+.hc{flex:1;text-align:center}
+.greet{font-size:11px;font-weight:600;color:#94A3B8;letter-spacing:.2px}
+.nm{font-size:16px;font-weight:800;color:#0F172A;letter-spacing:-.3px;margin-top:1px}
+.hr{display:flex;align-items:center;gap:8px}
+.av{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#F97316,#E25E3E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:800}
+.body{padding:0 16px}
+.card{background:#fff;border-radius:24px;box-shadow:0 4px 14px rgba(15,23,42,.045)}
+.sec{font-size:17px;font-weight:800;color:#0F172A;margin-bottom:12px}
+.secrow{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.viewall{font-size:13px;font-weight:700;color:#E25E3E}
+
+.pbar{display:flex;align-items:center;gap:10px;padding:6px 16px 14px}
+.psub{font-size:11.5px;color:#94A3B8;font-weight:500;margin-top:1px}
+.dlbtn{width:34px;height:34px;border-radius:11px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(15,23,42,.05)}
+.back{width:34px;height:34px;border-radius:11px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(15,23,42,.05);transform:rotate(180deg)}
+.ptitle{font-size:17px;font-weight:800;color:#0F172A}
+.ybar{display:flex;gap:8px;background:#fff;border-radius:14px;padding:4px;margin-bottom:12px;box-shadow:0 2px 6px rgba(15,23,42,.04)}
+.yt{flex:1;text-align:center;font-size:12.5px;font-weight:700;color:#64748B;padding:6px 0;border-radius:10px}
+.yt.on{background:#FFF1EC;color:#E25E3E}
+.pcard{background:#fff;border-radius:18px;padding:13px 14px;box-shadow:0 2px 8px rgba(15,23,42,.04);margin-bottom:10px}
+.crow{display:flex;align-items:center;gap:12px}
+.cico{width:44px;height:44px;border-radius:12px;background:#FFF1EC;display:flex;align-items:center;justify-content:center}
+.cm{font-size:13.5px;font-weight:600;color:#64748B}
+.cn{font-size:17px;font-weight:800;color:#0F172A;letter-spacing:-.3px;margin-top:1px}
+.sb2{font-size:10px;font-weight:800;padding:4px 9px;border-radius:8px;letter-spacing:.3px}
+.dtitle{display:flex;align-items:center;gap:7px;margin-bottom:10px}
+.dt2{font-size:13.5px;font-weight:800;color:#0F172A}
+.drow2{display:flex;justify-content:space-between;align-items:center;padding:4.5px 0}
+.dl{font-size:12.5px;color:#64748B;font-weight:500}
+.dv{font-size:12.5px;color:#0F172A;font-weight:700;font-variant-numeric:tabular-nums}
+.dvd{height:1px;background:#F1F5F9;margin:8px 0}
+.tot .dl,.tot .dv{font-weight:800;color:#0F172A;font-size:13px}
+.net{background:#E25E3E;border-radius:18px;padding:17px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 8px 18px rgba(226,94,62,.28)}
+.netl{font-size:15px;font-weight:700;color:#fff}
+.netv{font-size:21px;font-weight:800;color:#fff;letter-spacing:-.4px}
+</style></head><body><div class="screen"><div class="sb"><span>9:41</span><div class="r">
+<div class="bars"><i style="height:3px"></i><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i></div>
+<svg width="14" height="11" viewBox="0 0 16 12"><path d="M8 10.2 1 4.4a10.6 10.6 0 0 1 14 0Z" fill="#0F172A"/></svg>
+<span class="batt"><i></i></span></div></div>
+<div class="pbar"><div class="back"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+ <div style="flex:1"><div class="ptitle">August 2026</div><div class="psub">Payslip &middot; Arjun Mehta</div></div>
+ <span class="sb2" style="background:#F0FDF4;color:#16A34A">PAID</span>
+ <div class="dlbtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#E25E3E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></div></div>
+<div class="body">
+ <div class="pcard"><div class="crow"><div class="cico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E25E3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></div>
+  <div style="flex:1"><div class="cm">Net pay credited</div><div class="cn">₹ 86,420.00</div></div>
+  <div style="text-align:right"><div class="cm" style="font-size:11px">Pay date</div><div style="font-size:12.5px;font-weight:700;color:#0F172A">31 Aug 2026</div></div></div></div>
+ <div class="pcard">
+  <div class="dtitle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg><span class="dt2">Earnings</span></div>
+  <div class="drow2"><span class="dl">Basic Salary</span><span class="dv" style="">₹ 52,000.00</span></div>
+  <div class="drow2"><span class="dl">House Rent Allowance</span><span class="dv" style="">₹ 20,800.00</span></div>
+  <div class="drow2"><span class="dl">Conveyance</span><span class="dv" style="">₹ 4,800.00</span></div>
+  <div class="drow2"><span class="dl">Special Allowance</span><span class="dv" style="">₹ 12,400.00</span></div>
+  <div class="drow2"><span class="dl">Field Travel Reimbursement</span><span class="dv" style="">₹ 4,200.00</span></div>
+  <div class="dvd"></div>
+  <div class="drow2 tot"><span class="dl">Total Earnings</span><span class="dv">₹ 94,200.00</span></div>
+ </div>
+ <div class="pcard">
+  <div class="dtitle"><span style="transform:rotate(180deg);display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span><span class="dt2">Deductions</span></div>
+  <div class="drow2"><span class="dl">Provident Fund</span><span class="dv" style="">₹ 6,240.00</span></div>
+  <div class="drow2"><span class="dl">Professional Tax</span><span class="dv" style="">₹ 200.00</span></div>
+  <div class="drow2"><span class="dl">Loss of Pay</span><span class="dv" style="color:#EF4444">₹ 1,340.00</span></div>
+  <div class="dvd"></div>
+  <div class="drow2 tot"><span class="dl">Total Deductions</span><span class="dv">₹ 7,780.00</span></div>
+ </div>
+ <div class="net"><span class="netl">Net Pay</span><span class="netv">₹ 86,420.00</span></div>
+</div></div></body></html>

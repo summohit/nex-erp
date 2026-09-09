@@ -74,7 +74,7 @@
         <input 
           type="text" 
           class="search-input"
-          [placeholder]="activeTab() === 'templates' ? 'Search templates by title or note…' : 'Search by employee or letter title…'"
+          [placeholder]="activeTab() === 'templates' ? 'Search templates by title or note…' : 'Search by employee, email, phone, or title…'"
           [ngModel]="search()" 
           (ngModelChange)="search.set($event)">
         <button *ngIf="search()" class="btn-clear-search" (click)="clearSearch()">
@@ -104,6 +104,38 @@
           [class.active]="templateStatusFilter() === 'inactive'" 
           (click)="templateStatusFilter.set('inactive')">
           Inactive
+        </button>
+      </div>
+
+      <!-- Quick status filter for issued letters tab -->
+      <div class="status-filter-pills" *ngIf="activeTab() === 'issued'">
+        <button 
+          type="button" 
+          class="status-pill" 
+          [class.active]="issuedStatusFilter() === 'all'" 
+          (click)="issuedStatusFilter.set('all')">
+          All ({{ issuedStats().total }})
+        </button>
+        <button 
+          type="button" 
+          class="status-pill" 
+          [class.active]="issuedStatusFilter() === 'signed'" 
+          (click)="issuedStatusFilter.set('signed')">
+          Signed ({{ issuedStats().signed }})
+        </button>
+        <button 
+          type="button" 
+          class="status-pill" 
+          [class.active]="issuedStatusFilter() === 'awaiting'" 
+          (click)="issuedStatusFilter.set('awaiting')">
+          Awaiting ({{ issuedStats().awaiting }})
+        </button>
+        <button 
+          type="button" 
+          class="status-pill" 
+          [class.active]="issuedStatusFilter() === 'regular'" 
+          (click)="issuedStatusFilter.set('regular')">
+          Standard ({{ issuedStats().regular }})
         </button>
       </div>
     </div>
@@ -195,14 +227,16 @@
         <thead>
           <tr>
             <th>Employee</th>
+            <th>Contact Details</th>
             <th>Letter Title</th>
             <th>Template</th>
-            <th>Date Issued</th>
-            <th class="text-right">Actions</th>
+            <th class="date-th">Date Issued</th>
+            <th class="text-center actions-th" style="width: 70px;">Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let l of filteredLetters()">
+          <tr *ngFor="let l of filteredLetters()" (click)="openLetter(l)" class="clickable-row" title="Click to view letter">
+            <!-- EMPLOYEE / CANDIDATE -->
             <td>
               <div class="employee-cell">
                 <img 
@@ -219,32 +253,154 @@
                   {{ getInitials(l.employee.firstName, l.employee.lastName) }}
                 </div>
                 <div class="employee-meta">
-                  <div class="emp-name">{{ l.employee.firstName }} {{ l.employee.lastName }}</div>
-                  <div class="emp-code" *ngIf="l.employee.employeeCode">#{{ l.employee.employeeCode }}</div>
+                  <div class="emp-name-row">
+                    <span class="emp-name">{{ l.employee.firstName }} {{ l.employee.lastName }}</span>
+                    <span class="emp-code" *ngIf="l.employee.employeeCode">#{{ l.employee.employeeCode }}</span>
+                    <span class="candidate-tag" *ngIf="l.source === 'OFFER'">Candidate</span>
+                  </div>
+                  <div class="emp-role" *ngIf="getRoleOrDesignation(l)">
+                    {{ getRoleOrDesignation(l) }}
+                  </div>
                 </div>
               </div>
             </td>
-            <td>
-              <span class="letter-title-text">{{ l.title }}</span>
-            </td>
-            <td>
-              <span class="template-pill-badge">{{ l.template?.title || 'Custom' }}</span>
-            </td>
-            <td>
-              <div class="date-cell">
-                <svg lucideCalendar size="13"></svg>
-                <span>{{ l.createdAt | date: 'mediumDate' }}</span>
+
+            <!-- CONTACT DETAILS (EMAIL & PHONE) -->
+            <td class="contact-col">
+              <div class="contact-info-block">
+                <!-- Email -->
+                <div class="contact-item" *ngIf="getEmail(l) as email; else noEmailTpl">
+                  <div class="contact-icon-box email">
+                    <svg lucideMail size="12"></svg>
+                  </div>
+                  <a [href]="'mailto:' + email" class="contact-link email-link" [title]="'Send email to ' + email" (click)="$event.stopPropagation()">
+                    {{ email }}
+                  </a>
+                  <button 
+                    type="button" 
+                    class="btn-copy-chip" 
+                    [class.copied]="copiedText() === email"
+                    (click)="copyText(email, 'Email', $event)" 
+                    [title]="copiedText() === email ? 'Copied!' : 'Copy email'">
+                    <svg *ngIf="copiedText() !== email" lucideCopy size="11"></svg>
+                    <svg *ngIf="copiedText() === email" lucideCheck size="11"></svg>
+                  </button>
+                </div>
+                <ng-template #noEmailTpl>
+                  <div class="contact-item muted">
+                    <div class="contact-icon-box empty">
+                      <svg lucideMail size="12"></svg>
+                    </div>
+                    <span class="contact-empty">No email registered</span>
+                  </div>
+                </ng-template>
+
+                <!-- Phone / Contact Number -->
+                <div class="contact-item" *ngIf="getPhone(l) as phone; else noPhoneTpl">
+                  <div class="contact-icon-box phone">
+                    <svg lucidePhone size="12"></svg>
+                  </div>
+                  <a [href]="'tel:' + phone" class="contact-link phone-link" [title]="'Call ' + phone" (click)="$event.stopPropagation()">
+                    {{ phone }}
+                  </a>
+                  <button 
+                    type="button" 
+                    class="btn-copy-chip" 
+                    [class.copied]="copiedText() === phone"
+                    (click)="copyText(phone, 'Phone number', $event)" 
+                    [title]="copiedText() === phone ? 'Copied!' : 'Copy phone'">
+                    <svg *ngIf="copiedText() !== phone" lucideCopy size="11"></svg>
+                    <svg *ngIf="copiedText() === phone" lucideCheck size="11"></svg>
+                  </button>
+                </div>
+                <ng-template #noPhoneTpl>
+                  <div class="contact-item muted">
+                    <div class="contact-icon-box empty">
+                      <svg lucidePhone size="12"></svg>
+                    </div>
+                    <span class="contact-empty">No contact number</span>
+                  </div>
+                </ng-template>
               </div>
             </td>
-            <td class="text-right">
-              <div class="table-actions-row">
-                <button type="button" class="btn-table-action view" (click)="openLetter(l)" title="View Letter">
-                  <svg lucideEye size="13"></svg>
-                  <span>View</span>
+
+            <!-- LETTER TITLE & STATUS -->
+            <td>
+              <div class="letter-title-wrapper">
+                <span class="letter-title-text">{{ l.title }}</span>
+                <div class="badges-row">
+                  <span class="sig-badge signed" *ngIf="l.isSigned" [title]="'Signed by ' + l.signatureName">
+                    <svg lucideCheck size="11"></svg>
+                    <span>Signed</span>
+                    <span class="sig-by-name" *ngIf="l.signatureName">· {{ l.signatureName }}</span>
+                  </span>
+                  <span class="sig-badge awaiting" *ngIf="l.source === 'OFFER' && !l.isSigned">
+                    <svg lucideClock size="11"></svg>
+                    <span>{{ l.offerStatus === 'DECLINED' ? 'Declined' : 'Awaiting signature' }}</span>
+                  </span>
+                  <span class="sig-badge standard" *ngIf="l.source !== 'OFFER'">
+                    <svg lucideFileText size="11"></svg>
+                    <span>Official</span>
+                  </span>
+                </div>
+              </div>
+            </td>
+
+            <!-- TEMPLATE -->
+            <td>
+              <span class="template-pill-badge" [class.recruitment]="l.source === 'OFFER'">
+                <svg lucideFileText size="12" class="tmpl-icon"></svg>
+                <span>{{ l.template?.title || 'Custom Letter' }}</span>
+              </span>
+            </td>
+
+            <!-- DATE ISSUED -->
+            <td>
+              <div class="date-cell">
+                <div class="date-icon-box">
+                  <svg lucideCalendar size="13"></svg>
+                </div>
+                <div class="date-text-stack">
+                  <span class="date-primary">{{ l.createdAt | date: 'mediumDate' }}</span>
+                  <span class="date-secondary">{{ l.createdAt | date: 'shortTime' }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- ACTIONS (DROPDOWN MENU) -->
+            <td class="text-center cell-actions" (click)="$event.stopPropagation()">
+              <div class="action-menu-wrap">
+                <button 
+                  type="button" 
+                  class="btn-row-menu-trigger" 
+                  [matMenuTriggerFor]="rowMenu"
+                  (click)="$event.stopPropagation()"
+                  title="More actions">
+                  <svg lucideMoreHorizontal size="18"></svg>
                 </button>
-                <button type="button" class="btn-table-action delete" (click)="deleteLetter(l)" title="Delete Letter">
-                  <svg lucideTrash2 size="13"></svg>
-                </button>
+
+                <mat-menu #rowMenu="matMenu" class="letter-action-menu" xPosition="before">
+                  <button mat-menu-item class="menu-action-item" (click)="openLetter(l)">
+                    <svg lucideEye size="15" class="menu-item-icon"></svg>
+                    <span class="menu-item-text">View Letter</span>
+                  </button>
+
+                  <button mat-menu-item class="menu-action-item" (click)="printDirectLetter(l, $event)">
+                    <svg lucidePrinter size="15" class="menu-item-icon"></svg>
+                    <span class="menu-item-text">{{ l.source === 'OFFER' ? 'Open PDF' : 'Print / Download' }}</span>
+                  </button>
+
+                  <div class="menu-item-divider" *ngIf="l.source !== 'OFFER'"></div>
+
+                  <button 
+                    mat-menu-item 
+                    class="menu-action-item danger" 
+                    *ngIf="l.source !== 'OFFER'"
+                    (click)="deleteLetter(l)">
+                    <svg lucideTrash2 size="15" class="menu-item-icon text-danger"></svg>
+                    <span class="menu-item-text text-danger">Delete</span>
+                  </button>
+                </mat-menu>
               </div>
             </td>
           </tr>
@@ -258,10 +414,10 @@
         <svg lucideSend size="32"></svg>
       </div>
       <h3>No issued letters found</h3>
-      <p *ngIf="search()">No letters match your search "{{ search() }}".</p>
-      <p *ngIf="!search()">{{ loading() ? 'Loading issued letters…' : 'No letters have been generated yet. Click "Generate Letter" to issue one.' }}</p>
-      <button *ngIf="search()" class="btn-reset-filters" (click)="clearSearch()">
-        Clear Search
+      <p *ngIf="search() || issuedStatusFilter() !== 'all'">No letters match your search and filter criteria.</p>
+      <p *ngIf="!search() && issuedStatusFilter() === 'all'">{{ loading() ? 'Loading issued letters…' : 'No letters have been generated yet. Click "Generate Letter" to issue one.' }}</p>
+      <button *ngIf="search() || issuedStatusFilter() !== 'all'" class="btn-reset-filters" (click)="clearSearch(); issuedStatusFilter.set('all')">
+        Clear Filters
       </button>
     </div>
   </div>
@@ -678,6 +834,14 @@
               <svg *ngIf="!viewLetter()?.employee?.avatarUrl" lucideUser size="12"></svg>
               <span>{{ viewLetter()?.employee?.firstName }} {{ viewLetter()?.employee?.lastName }}</span>
             </span>
+            <span class="contact-tag email" *ngIf="getEmail(viewLetter()) as email">
+              <svg lucideMail size="12"></svg>
+              <a [href]="'mailto:' + email" target="_blank">{{ email }}</a>
+            </span>
+            <span class="contact-tag phone" *ngIf="getPhone(viewLetter()) as phone">
+              <svg lucidePhone size="12"></svg>
+              <a [href]="'tel:' + phone">{{ phone }}</a>
+            </span>
             <span class="date-tag">
               <svg lucideCalendar size="12"></svg>
               <span>Issued {{ viewLetter()?.createdAt | date: 'mediumDate' }}</span>
@@ -691,16 +855,72 @@
     </div>
 
     <div class="modal-body">
-      <div class="document-paper-wrapper">
-        <div class="document-paper-sheet preview-body" [innerHTML]="trustHtml(viewLetter()?.body)"></div>
-      </div>
+      <!-- Offer letters: signature trail, then the PDF, since they have no HTML body -->
+      <ng-container *ngIf="viewLetter() as vl">
+        <div class="offer-detail-panel" *ngIf="vl.source === 'OFFER'">
+          <div class="offer-facts">
+            <div class="fact">
+              <span class="fact-label">Position</span>
+              <span class="fact-value">{{ vl.jobTitle || '—' }}</span>
+            </div>
+            <div class="fact">
+              <span class="fact-label">Candidate email</span>
+              <span class="fact-value">{{ vl.candidateEmail || getEmail(vl) || '—' }}</span>
+            </div>
+            <div class="fact">
+              <span class="fact-label">Candidate phone</span>
+              <span class="fact-value">{{ vl.candidatePhone || getPhone(vl) || '—' }}</span>
+            </div>
+            <div class="fact">
+              <span class="fact-label">Offered CTC</span>
+              <span class="fact-value">{{ vl.offeredSalary ? ('₹' + (vl.offeredSalary | number)) : '—' }}</span>
+            </div>
+            <div class="fact">
+              <span class="fact-label">Joining date</span>
+              <span class="fact-value">{{ vl.joiningDate ? (vl.joiningDate | date: 'mediumDate') : '—' }}</span>
+            </div>
+          </div>
+
+          <div class="signature-box signed" *ngIf="vl.isSigned">
+            <div class="sig-head">
+              <svg lucideCheck size="14"></svg>
+              <strong>Signed by {{ vl.signatureName }}</strong>
+              <span *ngIf="vl.signedAt"> on {{ vl.signedAt | date: 'medium' }}</span>
+            </div>
+            <img *ngIf="vl.signatureImage" [src]="vl.signatureImage" alt="Signature" class="sig-image" />
+            <div class="sig-meta">
+              <span *ngIf="vl.signatureType">Method: {{ vl.signatureType | lowercase }}</span>
+              <span *ngIf="vl.signatureIp"> · IP {{ vl.signatureIp }}</span>
+              <span *ngIf="vl.viewedAt"> · First opened {{ vl.viewedAt | date: 'short' }}</span>
+            </div>
+          </div>
+
+          <div class="signature-box awaiting" *ngIf="!vl.isSigned">
+            <strong>{{ vl.offerStatus === 'DECLINED' ? 'Declined by the candidate' : 'Not yet signed' }}</strong>
+            <div class="sig-meta">
+              Status {{ vl.offerStatus }}<span *ngIf="vl.viewedAt"> · opened {{ vl.viewedAt | date: 'short' }}</span>.
+              Manage this offer from the candidate record in Recruitment.
+            </div>
+          </div>
+
+          <a *ngIf="vl.pdfUrl" [href]="vl.pdfUrl" target="_blank" class="btn-open-pdf">
+            <svg lucideFileText size="14"></svg>
+            <span>{{ vl.signedPdfUrl ? 'Open Signed PDF' : 'Open Offer Letter PDF' }}</span>
+          </a>
+          <p class="no-pdf" *ngIf="!vl.pdfUrl">No PDF is attached to this offer letter.</p>
+        </div>
+
+        <div class="document-paper-wrapper" *ngIf="vl.source !== 'OFFER'">
+          <div class="document-paper-sheet preview-body" [innerHTML]="trustHtml(vl.body)"></div>
+        </div>
+      </ng-container>
     </div>
 
     <div class="modal-footer">
       <button type="button" class="btn-modal-cancel" (click)="closeLetter()">Close</button>
       <button type="button" class="btn-modal-primary" (click)="printLetter()">
         <svg lucidePrinter size="14"></svg>
-        <span>Print / Save as PDF</span>
+        <span>{{ viewLetter()?.source === 'OFFER' ? 'Open PDF' : 'Print / Save as PDF' }}</span>
       </button>
     </div>
   </div>

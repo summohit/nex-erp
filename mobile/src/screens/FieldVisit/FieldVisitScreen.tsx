@@ -2,14 +2,14 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Modal, ActivityIndicator, Alert, Image,
-  Platform, StatusBar, RefreshControl, Dimensions,
+  Platform, RefreshControl, Dimensions, PermissionsAndroid,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import {
   MapPin, Navigation, Clock, Ruler, Play, Square, X, Plus,
-  Camera, ChevronDown, ChevronLeft, CheckCircle2, XCircle, FileText,
-  AlertTriangle, ArrowRight, Search, Image as ImageIcon, Briefcase,
+  Camera, ChevronDown, CheckCircle2, FileText,
+  ArrowRight, Search, Image as ImageIcon, Briefcase,
   Calendar, Activity, Check,
 } from 'lucide-react-native';
 import Geolocation from 'react-native-geolocation-service';
@@ -54,7 +54,6 @@ const statusColor = (status: string) => {
 /* ────────────────────────────────────────────────────────── */
 export default function FieldVisitScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
   const {
     activeVisit, myVisits, isStarting, isEnding,
     routePoints, liveDistanceKm, elapsedSeconds,
@@ -106,29 +105,6 @@ export default function FieldVisitScreen() {
   const trackingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Boot: load active visit + history + projects ───────────
-  useEffect(() => {
-    const load = async () => {
-      const calls: Promise<any>[] = [fetchActiveVisit(), fetchMyVisits()];
-      if (projects.length === 0) calls.push(fetchDashboardData());
-      await Promise.all(calls);
-    };
-    load().catch(() => {});
-  }, []);
-
-  // ── Restore timer if we already have an active visit ────────
-  useEffect(() => {
-    if (activeVisit) {
-      const startMs = new Date(activeVisit.startTime).getTime();
-      const alreadyElapsed = Math.floor((Date.now() - startMs) / 1000);
-      useFieldVisitStore.setState({ elapsedSeconds: alreadyElapsed });
-      startIntervals();
-    } else {
-      stopIntervals();
-    }
-    return () => stopIntervals();
-  }, [activeVisit?.id]);
-
   // ── Live UI refresh while a visit is active ─────────────────
   // Actual GPS recording is owned by the native tracker (Android foreground
   // service / iOS background CLLocationManager) so it keeps working while
@@ -136,6 +112,14 @@ export default function FieldVisitScreen() {
   // cannot do that, the OS suspends it the moment the app leaves the
   // foreground. This just keeps the on-screen clock and route stats fresh
   // by periodically draining what the native side has captured.
+  //
+  // Declared above the effects that use them: a dependency array is evaluated
+  // during render, so a `const` named there has to already be initialised.
+  const stopIntervals = useCallback(() => {
+    if (timerInterval.current) { clearInterval(timerInterval.current); timerInterval.current = null; }
+    if (trackingInterval.current) { clearInterval(trackingInterval.current); trackingInterval.current = null; }
+  }, []);
+
   const startIntervals = useCallback(() => {
     stopIntervals();
     // Drain immediately — covers resuming a visit that collected points
@@ -147,16 +131,77 @@ export default function FieldVisitScreen() {
     trackingInterval.current = setInterval(() => {
       syncFromNative().catch(() => {});
     }, 15000);
-  }, []);
+  }, [stopIntervals, syncFromNative]);
 
-  const stopIntervals = useCallback(() => {
-    if (timerInterval.current) { clearInterval(timerInterval.current); timerInterval.current = null; }
-    if (trackingInterval.current) { clearInterval(trackingInterval.current); trackingInterval.current = null; }
-  }, []);
+  // ── Boot: load active visit + history + projects ───────────
+  useEffect(() => {
+    const load = async () => {
+      const calls: Promise<any>[] = [fetchActiveVisit(), fetchMyVisits()];
+      // Read the count imperatively. This is a boot-time question — "is the
+      // project list already warm?" — and depending on `projects` would re-run
+      // the whole load every time that list changes.
+      if (useDashboardStore.getState().projects.length === 0) calls.push(fetchDashboardData());
+      await Promise.all(calls);
+    };
+    load().catch(() => {});
+  }, [fetchActiveVisit, fetchMyVisits, fetchDashboardData]);
+
+  // ── Restore timer if we already have an active visit ────────
+  // Keyed on the id and start time rather than the whole visit object, so the
+  // timer is not torn down and rebuilt every time an unrelated field changes.
+  const activeVisitId = activeVisit?.id;
+  const activeVisitStartTime = activeVisit?.startTime;
+  useEffect(() => {
+    // Both are required: without a start time the elapsed count would be NaN,
+    // so fall through to stopIntervals rather than run a broken clock.
+    if (activeVisitId && activeVisitStartTime) {
+      const startMs = new Date(activeVisitStartTime).getTime();
+      const alreadyElapsed = Math.floor((Date.now() - startMs) / 1000);
+      useFieldVisitStore.setState({ elapsedSeconds: alreadyElapsed });
+      startIntervals();
+    } else {
+      stopIntervals();
+    }
+    return () => stopIntervals();
+  }, [activeVisitId, activeVisitStartTime, startIntervals, stopIntervals]);
 
   // ── Start Visit ─────────────────────────────────────────────
   const handleStart = async () => {
     if (!selectedProject || isGettingLocation || isStarting) return;
+
+    if (Platform.OS === 'android') {
+      const fineGranted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+      let bgGranted = true;
+      if (Number(Platform.Version) >= 29) {
+        bgGranted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION);
+      }
+
+      if (!fineGranted || !bgGranted) {
+        const userAgreed = await new Promise((resolve) => {
+          Alert.alert(
+            "Background Location Required",
+            "NEX ERP collects location data to enable route tracking for your field visits and to calculate travel distance for allowances, even when the app is closed or not in use.",
+            [
+              { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+              { text: "Accept", onPress: () => resolve(true) }
+            ],
+            { cancelable: false }
+          );
+        });
+
+        if (!userAgreed) return;
+
+        if (!fineGranted) {
+          const fineRes = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+          if (fineRes !== PermissionsAndroid.RESULTS.GRANTED) return;
+        }
+        
+        if (Number(Platform.Version) >= 29 && !bgGranted) {
+          await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION);
+        }
+      }
+    }
+
     try {
       setIsGettingLocation(true);
       const loc = await getCurrentLocation();
@@ -203,7 +248,7 @@ export default function FieldVisitScreen() {
           const uploaded = await fieldVisitService.uploadVisitPhoto(fd);
           const url = uploaded?.url || uploaded?.fileUrl;
           if (url) await fieldVisitService.addPhoto(completed.id, { url, takenAt: p.takenAt });
-        } catch (_) {}
+        } catch {}
       }
       setShowEndModal(false);
       setPendingPhotos([]);
@@ -232,7 +277,7 @@ export default function FieldVisitScreen() {
     setRefreshing(true);
     try {
       await Promise.all([fetchActiveVisit(), fetchMyVisits()]);
-    } catch (_) {
+    } catch {
     } finally {
       setRefreshing(false);
     }
@@ -249,30 +294,18 @@ export default function FieldVisitScreen() {
 
   /* ── RENDER ── */
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* ── Top Header bar (outside scroll) ── */}
-      <View style={styles.topBar}>
-        <View style={styles.headerLeftRow}>
-          {navigation.canGoBack() && (
-            <TouchableOpacity style={styles.backBtn} activeOpacity={0.7} onPress={() => navigation.goBack()}>
-              <ChevronLeft size={20} color="#0F172A" />
-            </TouchableOpacity>
-          )}
-          <View>
-            <Text style={styles.headerTitle}>Field Visits</Text>
-            <Text style={styles.headerSub}>Track your site visits & route</Text>
-          </View>
-        </View>
-
-        {!activeVisit && (
+    <AppScreen
+      title="Visits"
+      subtitle="Site visits & tracking"
+      right={
+        !activeVisit ? (
           <TouchableOpacity style={styles.startBtn} activeOpacity={0.8} onPress={() => setShowStartModal(true)}>
             <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
             <Text style={styles.startBtnText}>New Visit</Text>
           </TouchableOpacity>
-        )}
-      </View>
+        ) : null
+      }
+    >
 
       <ScrollView
         style={styles.container}
@@ -959,7 +992,7 @@ export default function FieldVisitScreen() {
         message={feedback.message}
         onClose={() => setFeedback(p => ({ ...p, visible: false }))}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

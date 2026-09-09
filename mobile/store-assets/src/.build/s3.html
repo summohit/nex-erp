@@ -1,0 +1,113 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:'SF Pro Display','SF Pro Text',-apple-system,'Helvetica Neue',Arial,sans-serif;}
+svg{display:block}
+
+html,body{width:360px;height:640px;overflow:hidden;background:#F5F7FA}
+.screen{width:360px;height:640px;position:relative;background:#F5F7FA;overflow:hidden}
+/* status bar */
+.sb{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:12px;font-weight:700;color:#0F172A;letter-spacing:.2px}
+.sb .r{display:flex;align-items:center;gap:5px}
+.bars{display:flex;align-items:flex-end;gap:1.5px;height:9px}
+.bars i{width:2.5px;background:#0F172A;border-radius:1px;display:block}
+.batt{width:17px;height:9px;border:1.4px solid #0F172A;border-radius:2.5px;position:relative;display:block}
+.batt:after{content:'';position:absolute;right:-3px;top:2.2px;width:1.6px;height:3px;background:#0F172A;border-radius:0 1px 1px 0}
+.batt i{position:absolute;left:1.3px;top:1.3px;bottom:1.3px;width:9px;background:#0F172A;border-radius:1px;display:block}
+/* header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 16px 12px}
+.ibtn{width:40px;height:40px;border-radius:13px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(15,23,42,.05);position:relative}
+.dot{position:absolute;top:9px;right:10px;width:7px;height:7px;border-radius:4px;background:#EF4444;border:1.5px solid #fff}
+.hc{flex:1;text-align:center}
+.greet{font-size:11px;font-weight:600;color:#94A3B8;letter-spacing:.2px}
+.nm{font-size:16px;font-weight:800;color:#0F172A;letter-spacing:-.3px;margin-top:1px}
+.hr{display:flex;align-items:center;gap:8px}
+.av{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#F97316,#E25E3E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:800}
+.body{padding:0 16px}
+.card{background:#fff;border-radius:24px;box-shadow:0 4px 14px rgba(15,23,42,.045)}
+.sec{font-size:17px;font-weight:800;color:#0F172A;margin-bottom:12px}
+.secrow{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.viewall{font-size:13px;font-weight:700;color:#E25E3E}
+
+.tbar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 12px}
+.tl{display:flex;align-items:center;gap:10px}
+.back{width:34px;height:34px;border-radius:11px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(15,23,42,.05);transform:rotate(180deg)}
+.ttl{font-size:17px;font-weight:800;color:#0F172A;letter-spacing:-.2px}
+.tsub{font-size:11.5px;color:#94A3B8;font-weight:500;margin-top:1px}
+.newbtn{display:flex;align-items:center;gap:5px;background:#E25E3E;color:#fff;font-size:12.5px;font-weight:700;padding:8px 13px;border-radius:20px;box-shadow:0 4px 10px rgba(226,94,62,.28)}
+.live{background:#0F172A;border-radius:22px;padding:16px;border:1.5px solid rgba(226,94,62,.4);box-shadow:0 6px 18px rgba(226,94,62,.18);margin-bottom:14px;position:relative;overflow:hidden}
+.lglow{position:absolute;top:-60px;right:-50px;width:170px;height:170px;border-radius:99px;background:radial-gradient(circle,rgba(226,94,62,.35),transparent 70%)}
+.ltop{position:relative;display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
+.ltag{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:#FDBA74;letter-spacing:1px}
+.pulse{width:8px;height:8px;border-radius:5px;background:#E25E3E;box-shadow:0 0 0 4px rgba(226,94,62,.25)}
+.gps{display:flex;align-items:center;gap:4px;background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.3);padding:4px 9px;border-radius:20px;font-size:10.5px;font-weight:700;color:#38BDF8}
+.lproj{position:relative;font-size:19px;font-weight:800;color:#fff;letter-spacing:-.4px}
+.lpurp{position:relative;background:rgba(255,255,255,.07);border-radius:11px;padding:9px 11px;margin-top:10px;font-size:12px;color:#CBD5E1;line-height:1.45}
+.mrow{position:relative;display:flex;align-items:center;margin-top:14px}
+.mbox{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
+.mi{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.mv{font-size:14px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+.ml{font-size:10px;color:#94A3B8;font-weight:600}
+.mdiv{width:1px;height:38px;background:rgba(255,255,255,.1)}
+.lact{position:relative;display:flex;gap:10px;margin-top:14px}
+.endbtn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:#E25E3E;color:#fff;font-size:14px;font-weight:700;padding:11px;border-radius:14px}
+.cxbtn{width:46px;border-radius:14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);display:flex;align-items:center;justify-content:center}
+.kpi{display:flex;align-items:center;background:#fff;border-radius:20px;padding:12px 6px;box-shadow:0 2px 8px rgba(15,23,42,.04);margin-bottom:14px}
+.ki{flex:1;text-align:center}
+.kv{font-size:18px;font-weight:800;color:#0F172A;letter-spacing:-.3px}
+.ku{font-size:11px;font-weight:700}
+.kl{font-size:10.5px;color:#94A3B8;font-weight:600;margin-top:3px}
+.kd{width:1px;height:30px;background:#F1F5F9}
+.hcard{background:#fff;border-radius:18px;padding:14px;box-shadow:0 2px 8px rgba(15,23,42,.04);margin-bottom:10px}
+.hh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.hpt{display:flex;align-items:center;gap:8px}
+.hdot{width:8px;height:8px;border-radius:4px}
+.hp{font-size:14px;font-weight:700;color:#0F172A}
+.spill{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700;border:1px solid}
+.drow{display:flex;align-items:center;gap:5px;margin-bottom:9px}
+.dtxt{font-size:11px;color:#94A3B8;font-weight:600}
+.chips{display:flex;gap:7px}
+.chip{display:flex;align-items:center;gap:4px;background:#EFF6FF;padding:5px 9px;border-radius:9px;font-size:11px;font-weight:700;color:#2563EB}
+.cbadge2{background:#FFF1EC;color:#E25E3E;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:9px}
+</style></head><body><div class="screen"><div class="sb"><span>9:41</span><div class="r">
+<div class="bars"><i style="height:3px"></i><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i></div>
+<svg width="14" height="11" viewBox="0 0 16 12"><path d="M8 10.2 1 4.4a10.6 10.6 0 0 1 14 0Z" fill="#0F172A"/></svg>
+<span class="batt"><i></i></span></div></div>
+<div class="tbar"><div class="tl"><div class="back"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div><div><div class="ttl">Field Visits</div><div class="tsub">Track your site visits & route</div></div></div></div>
+<div class="body">
+ <div class="live"><div class="lglow"></div>
+  <div class="ltop"><div class="ltag"><span class="pulse"></span>LIVE TRACKING</div>
+   <div class="gps"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg> GPS Active</div></div>
+  <div class="lproj">Metro Depot Expansion</div>
+  <div class="lpurp">Site inspection &amp; contractor handover — Phase 2</div>
+  <div class="mrow">
+   <div class="mbox"><div class="mi" style="background:rgba(226,94,62,.18)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E25E3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><div class="mv">01:24:07</div><div class="ml">Elapsed</div></div>
+   <div class="mdiv"></div>
+   <div class="mbox"><div class="mi" style="background:rgba(56,189,248,.18)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></div><div class="mv">18.42 km</div><div class="ml">Distance</div></div>
+   <div class="mdiv"></div>
+   <div class="mbox"><div class="mi" style="background:rgba(168,85,247,.18)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C084FC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></div><div class="mv">146</div><div class="ml">Points</div></div>
+  </div>
+  <div class="lact"><div class="endbtn"><svg width="13" height="13" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="#fff"/></svg>End Visit</div>
+   <div class="cxbtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div></div>
+ </div>
+ <div class="kpi">
+  <div class="ki"><div class="kv">28</div><div class="kl">Total Visits</div></div><div class="kd"></div>
+  <div class="ki"><div class="kv" style="color:#E25E3E">312.6 <span class="ku">km</span></div><div class="kl">Distance</div></div><div class="kd"></div>
+  <div class="ki"><div class="kv">46h 20m</div><div class="kl">Time Logged</div></div>
+ </div>
+ <div class="secrow"><div class="sec" style="margin:0">Visit History</div><span class="cbadge2">28</span></div>
+ <div class="hcard">
+  <div class="hh"><div class="hpt"><span class="hdot" style="background:#2563EB"></span><span class="hp">Riverside Retail Fit-out</span></div>
+   <span class="spill" style="background:#F0FDF4;border-color:#BBF7D0;color:#16A34A"><span class="hdot" style="background:#16A34A"></span>Completed</span></div>
+  <div class="drow"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg><span class="dtxt">8 Sep 2026  •  10:15 AM</span></div>
+  <div class="chips"><span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg> 12.80 km</span>
+   <span class="chip" style="background:#FFF1EC;color:#E25E3E"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E25E3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> 2h 05m</span>
+   <span class="chip" style="background:#FAF5FF;color:#9333EA"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9333EA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg> 4 photos</span></div>
+ </div>
+ <div class="hcard">
+  <div class="hh"><div class="hpt"><span class="hdot" style="background:#16A34A"></span><span class="hp">Northgate Solar Audit</span></div>
+   <span class="spill" style="background:#F0FDF4;border-color:#BBF7D0;color:#16A34A"><span class="hdot" style="background:#16A34A"></span>Completed</span></div>
+  <div class="drow"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg><span class="dtxt">5 Sep 2026  •  09:02 AM</span></div>
+  <div class="chips"><span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg> 31.05 km</span>
+   <span class="chip" style="background:#FFF1EC;color:#E25E3E"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E25E3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> 3h 40m</span></div>
+ </div>
+</div></div></body></html>

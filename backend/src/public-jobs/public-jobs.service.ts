@@ -165,6 +165,9 @@ export class PublicJobsService {
       data: {
         jobId: job.id,
         companyId: job.companyId,
+        // Every application starts at APPLIED; the recruitment pipeline's
+        // mandatory-stage gate reads this history.
+        completedStages: ['APPLIED'],
         fullName: dto.fullName,
         email: email,
         phone: dto.phone,

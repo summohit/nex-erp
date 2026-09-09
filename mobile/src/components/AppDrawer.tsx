@@ -11,40 +11,9 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
-import { API_URL } from '../api/apiClient';
-
-// The Angular web app is served from the same host as the API, one path
-// segment up (https://host/api -> https://host). The public careers page is
-// a real page in that app, so "opening it in Chrome" from the drawer means
-// building this absolute URL, not an in-app route.
-const WEB_URL = API_URL.replace(/\/api\/?$/, '');
-
-const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-// React Native's Hermes engine doesn't polyfill window.btoa, and the web
-// side's companyId encoding (`btoa(currentUser.companyId)`) is plain ASCII
-// base64 with no unicode edge cases to worry about, so this minimal
-// standalone encoder is enough — no need to pull in a whole base64 package.
-function base64Encode(input: string): string {
-  let output = '';
-  let i = 0;
-  while (i < input.length) {
-    const c1 = input.charCodeAt(i++);
-    const c2 = i < input.length ? input.charCodeAt(i++) : NaN;
-    const c3 = i < input.length ? input.charCodeAt(i++) : NaN;
-    const e1 = c1 >> 2;
-    const e2 = ((c1 & 3) << 4) | (isNaN(c2) ? 0 : c2 >> 4);
-    const e3 = isNaN(c2) ? 64 : (((c2 & 15) << 2) | (isNaN(c3) ? 0 : c3 >> 6));
-    const e4 = isNaN(c3) ? 64 : (c3 & 63);
-    output += B64_CHARS[e1] + B64_CHARS[e2] + (e3 === 64 ? '=' : B64_CHARS[e3]) + (e4 === 64 ? '=' : B64_CHARS[e4]);
-  }
-  return output;
-}
-
-const PANEL_WIDTH = Math.min(300, Dimensions.get('window').width - 56);
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
-  Home,
   Users,
   Briefcase,
   Clock,
@@ -67,28 +36,70 @@ import {
   Monitor,
   Package,
   Ticket,
+  Bug,
   Rocket,
   LayoutDashboard,
+  Award,
+  Sparkles,
+  CalendarClock,
+  CalendarDays,
+  ExternalLink,
+  FolderKanban,
+  UserCheck,
+  UserPlus,
+  LifeBuoy,
 } from 'lucide-react-native';
+import { API_URL } from '../api/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { useMenuStore, MenuItem } from '../store/menuStore';
 import { useDashboardStore } from '../store/dashboardStore';
-import { useProjectStore } from '../store/projectStore';
+import { navigateTo } from '../navigation/navigationUtils';
 import FeedbackModal from './FeedbackModal';
 
-// Map icon name strings (from DB/API) to lucide components
+const PANEL_WIDTH = Math.min(320, Dimensions.get('window').width * 0.82);
+
+// The Angular web app is served from the same host as the API, one path
+// segment up (https://host/api -> https://host).
+const WEB_URL = API_URL.replace(/\/api\/?$/, '');
+
+const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function base64Encode(input: string): string {
+  let output = '';
+  let i = 0;
+  while (i < input.length) {
+    const c1 = input.charCodeAt(i++);
+    const c2 = i < input.length ? input.charCodeAt(i++) : NaN;
+    const c3 = i < input.length ? input.charCodeAt(i++) : NaN;
+    const e1 = c1 >> 2;
+    const e2 = ((c1 & 3) << 4) | (isNaN(c2) ? 0 : c2 >> 4);
+    const e3 = isNaN(c2) ? 64 : (((c2 & 15) << 2) | (isNaN(c3) ? 0 : c3 >> 6));
+    const e4 = isNaN(c3) ? 64 : (c3 & 63);
+    output += B64_CHARS[e1] + B64_CHARS[e2] + (e3 === 64 ? '=' : B64_CHARS[e3]) + (e4 === 64 ? '=' : B64_CHARS[e4]);
+  }
+  return output;
+}
+
+// Map normalized icon strings to Lucide components
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'layout-dashboard': LayoutDashboard,
   'users': Users,
+  'user-check': UserCheck,
+  'user-plus': UserPlus,
   'briefcase': Briefcase,
-  'kanban': Briefcase,
-  'calendar-clock': Clock,
+  'kanban': FolderKanban,
+  'folder-kanban': FolderKanban,
+  'calendar-clock': CalendarClock,
+  'calendar-days': CalendarDays,
+  'clock': Clock,
+  'calendar': Calendar,
   'banknote': DollarSign,
   'dollar-sign': DollarSign,
   'laptop': Monitor,
   'monitor': Monitor,
   'settings': Settings,
   'trophy': Trophy,
+  'award': Award,
+  'sparkles': Sparkles,
   'building': Building,
   'target': Target,
   'door-open': LogOut,
@@ -101,8 +112,113 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'file-text': FileText,
   'package': Package,
   'ticket': Ticket,
+  'bug': Bug,
   'rocket': Rocket,
+  'life-buoy': LifeBuoy,
 };
+
+function normalizeIconKey(rawName?: string): string {
+  if (!rawName) return '';
+  return rawName
+    .replace(/^lucide[-_]?/i, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase();
+}
+
+function getIcon(iconName?: string, itemId?: string, route?: string): React.ComponentType<any> {
+  const norm = normalizeIconKey(iconName);
+  if (norm && ICON_MAP[norm]) return ICON_MAP[norm];
+
+  // Contextual fallback based on item ID and route
+  const key = (itemId || route?.replace(/^\//, '') || '').toLowerCase();
+  if (key === 'overview' || key === 'dashboard' || key === 'home') return LayoutDashboard;
+  if (key === 'employees') return Users;
+  if (key === 'recruitment') return UserCheck;
+  if (key === 'projects') return FolderKanban;
+  if (key === 'attendance' || key.startsWith('attendance')) return CalendarClock;
+  if (key === 'leaves') return CalendarDays;
+  if (key === 'appreciation') return Award;
+  if (key === 'field-visits') return MapPin;
+  if (key === 'tickets' || key === 'crm/tickets') return Ticket;
+  if (key === 'notifications') return Bell;
+  if (key === 'performance') return Target;
+  if (key === 'payslips' || key.includes('payroll')) return FileText;
+  if (key.includes('asset') || key.includes('hardware')) return Package;
+
+  return Briefcase;
+}
+
+function getSubItemIcon(sub: MenuItem): React.ComponentType<any> | null {
+  const titleLower = sub.title?.toLowerCase() || '';
+  const idLower = sub.id?.toLowerCase() || '';
+  if (sub.external || titleLower.includes('public') || titleLower.includes('career')) return ExternalLink;
+  if (titleLower.includes('interview') || idLower.includes('interview')) return Calendar;
+  if (titleLower.includes('candidate') || titleLower.includes('job')) return Users;
+  if (titleLower.includes('profile') || idLower.includes('profile')) return UserCircle;
+  if (titleLower.includes('timesheet') || titleLower.includes('time')) return Clock;
+  if (titleLower.includes('leave') || titleLower.includes('holiday')) return CalendarDays;
+  if (titleLower.includes('document')) return FileText;
+  if (sub.icon) {
+    const icon = getIcon(sub.icon, sub.id, sub.route);
+    if (icon !== Briefcase) return icon;
+  }
+  return null;
+}
+
+// Executive Soft-Card category tints (Slack / Notion inspired)
+interface ItemTheme {
+  iconBg: string;
+  iconColor: string;
+}
+
+const CATEGORY_THEMES: Record<string, ItemTheme> = {
+  // Dashboard / Overview
+  overview: { iconBg: '#FFF1EC', iconColor: '#E25E3E' },
+  dashboard: { iconBg: '#FFF1EC', iconColor: '#E25E3E' },
+  home: { iconBg: '#FFF1EC', iconColor: '#E25E3E' },
+  // People & Talent
+  employees: { iconBg: '#EEF2FF', iconColor: '#4F46E5' },
+  recruitment: { iconBg: '#F5F3FF', iconColor: '#7C3AED' },
+  // Projects & Tasks
+  projects: { iconBg: '#FEF3C7', iconColor: '#D97706' },
+  // Attendance & Time
+  attendance: { iconBg: '#ECFDF5', iconColor: '#059669' },
+  'attendance/timesheets': { iconBg: '#ECFDF5', iconColor: '#059669' },
+  'attendance/leaves': { iconBg: '#ECFDF5', iconColor: '#059669' },
+  leaves: { iconBg: '#ECFDF5', iconColor: '#059669' },
+  // Appreciation & Culture
+  appreciation: { iconBg: '#FFF1F2', iconColor: '#E11D48' },
+  // Field Operations
+  'field-visits': { iconBg: '#F0F9FF', iconColor: '#0284C7' },
+  // Support & Issues
+  tickets: { iconBg: '#FAF5FF', iconColor: '#9333EA' },
+  // Notifications
+  notifications: { iconBg: '#EFF6FF', iconColor: '#2563EB' },
+  // Finance & HR
+  payslips: { iconBg: '#F0FDF4', iconColor: '#16A34A' },
+  payroll: { iconBg: '#F0FDF4', iconColor: '#16A34A' },
+  'payroll/payslips': { iconBg: '#F0FDF4', iconColor: '#16A34A' },
+  'payroll/expenses': { iconBg: '#F0FDF4', iconColor: '#16A34A' },
+  expenses: { iconBg: '#F0FDF4', iconColor: '#16A34A' },
+  'assets/requests': { iconBg: '#FEF2F2', iconColor: '#DC2626' },
+  'hardware-requests': { iconBg: '#FEF2F2', iconColor: '#DC2626' },
+  assets: { iconBg: '#FEF2F2', iconColor: '#DC2626' },
+  // Muted & Default
+  performance: { iconBg: '#F1F5F9', iconColor: '#64748B' },
+  offboarding: { iconBg: '#F1F5F9', iconColor: '#64748B' },
+  settings: { iconBg: '#F8FAFC', iconColor: '#475569' },
+  default: { iconBg: '#F8FAFC', iconColor: '#64748B' },
+};
+
+function getItemTheme(item: { id?: string; route?: string }): ItemTheme {
+  const key = (item.id || item.route?.replace(/^\//, '') || '').toLowerCase();
+  if (CATEGORY_THEMES[key]) return CATEGORY_THEMES[key];
+  if (item.route) {
+    const rKey = item.route.replace(/^\//, '').toLowerCase();
+    if (CATEGORY_THEMES[rKey]) return CATEGORY_THEMES[rKey];
+  }
+  return CATEGORY_THEMES.default;
+}
 
 // Map API route → { screen, params? } for screens that exist in mobile
 const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
@@ -119,11 +235,16 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/crm/tickets': { screen: 'Tickets' },
   '/assets/requests': { screen: 'HardwareRequests' },
   '/assets/hardware-requests': { screen: 'HardwareRequests' },
+  '/field-visits': { screen: 'FieldVisit' },
+  '/employees/me/profile': { screen: 'Profile' },
+  '/attendance/holidays': { screen: 'Attendance', params: { initialTab: 'holidays' } },
+  '/payroll/expenses': { screen: 'Attendance', params: { initialTab: 'expenses' } },
 };
 
-// Client-side group bucketing so the flat MAIN section gets visual grouping
+// Client-side group bucketing for visual grouping
 const ITEM_TO_GROUP: Record<string, string> = {
   dashboard: 'WORKSPACE',
+  overview: 'WORKSPACE',
   employees: 'WORKSPACE',
   projects: 'WORKSPACE',
   'attendance': 'WORKSPACE',
@@ -148,37 +269,17 @@ const ITEM_TO_GROUP: Record<string, string> = {
 
 const GROUP_ORDER = ['WORKSPACE', 'FINANCE', 'OPERATIONS', 'SYSTEM'];
 
-// Items that are fully implemented and always shown (no WIP badge)
+// Items that are fully implemented and always shown
 const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string; route: string }[] = [
-  { group: 'WORKSPACE', id: 'notifications',      title: 'Notifications',    icon: 'bell',      route: '/notifications' },
-  { group: 'FINANCE',   id: 'payslips',            title: 'Payslips',         icon: 'file-text', route: '/payroll/payslips' },
-  { group: 'FINANCE',   id: 'hardware-requests',   title: 'Hardware Requests', icon: 'package',  route: '/assets/requests' },
+  { group: 'WORKSPACE', id: 'notifications', title: 'Notifications', icon: 'bell', route: '/notifications' },
+  { group: 'FINANCE', id: 'payslips', title: 'Payslips', icon: 'file-text', route: '/payroll/payslips' },
+  { group: 'FINANCE', id: 'hardware-requests', title: 'Hardware Requests', icon: 'package', route: '/assets/requests' },
 ];
-
-// Items that are always shown as WIP regardless of what the API returns.
-// Recruitment is NOT here — the API already returns it with real sub-items
-// (Job Postings, Candidates, Interviews, Public Careers Page), so it goes
-// through the normal expandable-item path below instead of being force-stubbed.
-// Individual sub-items that aren't wired to a screen yet (Job Postings,
-// Candidates, Interviews) still fall through to "Coming Soon" on tap via
-// handleSubItemPress — only the Public Careers Page link is actually live.
-const WIP_ITEMS: { group: string; id: string; title: string; icon: string }[] = [
-  { group: 'WORKSPACE', id: 'performance', title: 'Performance', icon: 'target' },
-  { group: 'OPERATIONS', id: 'offboarding', title: 'Offboarding', icon: 'door-open' },
-  { group: 'OPERATIONS', id: 'appreciation', title: 'Appreciation', icon: 'trophy' },
-];
-
-function getIcon(iconName?: string): React.ComponentType<any> {
-  if (iconName && ICON_MAP[iconName]) return ICON_MAP[iconName];
-  return Briefcase;
-}
 
 function resolveNav(item: MenuItem): { screen: string; params?: any } | null {
-  // Check top-level route first
   if (item.route && ROUTE_TO_NAV[item.route]) {
     return ROUTE_TO_NAV[item.route];
   }
-  // For items with subitems, find first navigable subitem
   if (item.subItems?.length) {
     for (const sub of item.subItems) {
       if (sub.route && ROUTE_TO_NAV[sub.route]) {
@@ -189,30 +290,43 @@ function resolveNav(item: MenuItem): { screen: string; params?: any } | null {
   return null;
 }
 
-// Group items from a flat section into visual sections, merging WIP supplements
-function groupItems(items: MenuItem[]): { group: string; items: (MenuItem & { wip?: boolean })[] }[] {
-  const groups: Record<string, (MenuItem & { wip?: boolean })[]> = {};
-  const existingIds = new Set(items.map(i => i.id));
-
+function filterFunctionalItems(items: MenuItem[]): MenuItem[] {
+  const result: MenuItem[] = [];
   for (const item of items) {
+    if (item.subItems && item.subItems.length > 0) {
+      const validSubItems = item.subItems.filter(
+        sub => sub.external || sub.route === '/careers' || (sub.route && ROUTE_TO_NAV[sub.route])
+      );
+      if (validSubItems.length > 0) {
+        result.push({
+          ...item,
+          subItems: validSubItems,
+        });
+        continue;
+      }
+    }
+    if (item.external || item.route === '/careers' || (item.route && ROUTE_TO_NAV[item.route])) {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+function groupItems(items: MenuItem[]): { group: string; items: MenuItem[] }[] {
+  const functionalItems = filterFunctionalItems(items);
+  const groups: Record<string, MenuItem[]> = {};
+  const existingIds = new Set(functionalItems.map(i => i.id));
+
+  for (const item of functionalItems) {
     const group = ITEM_TO_GROUP[item.id] || ITEM_TO_GROUP[item.route?.replace('/', '') || ''] || 'WORKSPACE';
     if (!groups[group]) groups[group] = [];
     groups[group].push(item);
   }
 
-  // Merge always-on items (fully implemented, no WIP badge)
   for (const item of ALWAYS_ON_ITEMS) {
     if (!existingIds.has(item.id)) {
       if (!groups[item.group]) groups[item.group] = [];
       groups[item.group].push({ id: item.id, title: item.title, icon: item.icon, route: item.route });
-    }
-  }
-
-  // Merge WIP items that weren't returned by the API
-  for (const wip of WIP_ITEMS) {
-    if (!existingIds.has(wip.id)) {
-      if (!groups[wip.group]) groups[wip.group] = [];
-      groups[wip.group].push({ id: wip.id, title: wip.title, icon: wip.icon, wip: true });
     }
   }
 
@@ -229,6 +343,7 @@ interface AppDrawerProps {
 
 export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: AppDrawerProps) {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { user, company, logout } = useAuthStore();
   const { sections, isLoading, fetchMenus } = useMenuStore();
   const { profile, projects, leaveBalances, unreadCount } = useDashboardStore();
@@ -241,7 +356,7 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
     if (visible && sections.length === 0) {
       fetchMenus();
     }
-  }, [visible]);
+  }, [visible, sections.length, fetchMenus]);
 
   const activeProjectsCount = projects.filter((p: any) => p.status !== 'ARCHIVED').length;
   const totalLeaveRemaining = leaveBalances.reduce((s: number, lb: any) => s + lb.allocated - lb.used, 0);
@@ -267,18 +382,13 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
     const nav = resolveNav(item);
     if (nav) {
       onClose();
-      navigation.navigate(nav.screen, nav.params);
+      navigateTo(navigation, nav.screen, nav.params);
     } else {
       setComingSoon(true);
     }
   }
 
   function handleSubItemPress(sub: MenuItem) {
-    // Mirrors the web sidebar's handling of external sub-items: the public
-    // careers page is a real page in the web app, opened in the system
-    // browser rather than as an in-app screen. '/careers' is encrypted with
-    // the same scheme web uses (base64 of the company id) so both surfaces
-    // land on the same URL shape.
     if (sub.external || sub.route === '/careers') {
       let path = sub.route || '/careers';
       if (path === '/careers' && user?.companyId != null) {
@@ -292,7 +402,7 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
     const nav = resolveNav(sub);
     if (nav) {
       onClose();
-      navigation.navigate(nav.screen, nav.params);
+      navigateTo(navigation, nav.screen, nav.params);
     } else {
       setComingSoon(true);
     }
@@ -313,8 +423,6 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
     return email ? email.substring(0, 2).toUpperCase() : 'MS';
   };
 
-  // Flatten the API sections: the API returns [{title:'MAIN', items:[...]}]
-  // We take all items from all sections and group them ourselves for visual clarity
   const allItems: MenuItem[] = sections.flatMap(s => s.items);
   const grouped = groupItems(allItems);
 
@@ -322,165 +430,221 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
     <>
       <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
         <View style={styles.overlay}>
-          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-
+          {/* Panel anchored on the left */}
           <View style={styles.panel}>
-            <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
+            <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+              {/* Header with workspace brand and close button */}
+              <View style={styles.header}>
+                <View style={styles.brandGroup}>
+                  {company?.logoUrl ? (
+                    <View style={styles.logoWrapper}>
+                      <Image source={{ uri: company.logoUrl }} style={styles.companyLogo} />
+                    </View>
+                  ) : (
+                    <View style={styles.logoBox}>
+                      <Text style={styles.logoText}>
+                        {company?.name ? company.name.charAt(0).toUpperCase() : 'N'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.brandTitle} numberOfLines={1}>
+                      {company?.name || 'NEX'}
+                    </Text>
+                    <View style={styles.brandSubtitleRow}>
+                      <View style={styles.workspaceDot} />
+                      <Text style={styles.brandSubtitle}>Employee Workspace</Text>
+                    </View>
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+                  <X size={16} color="#475569" strokeWidth={2.5} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Menu items scroll list */}
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
               >
-                {/* Header — company name + logo from API */}
-                <View style={styles.header}>
-                  <View style={styles.brandGroup}>
-                    {company?.logoUrl ? (
-                      <Image source={{ uri: company.logoUrl }} style={styles.companyLogo} />
-                    ) : (
-                      <View style={styles.logoBox}>
-                        <Text style={styles.logoText}>
-                          {company?.name ? company.name.charAt(0).toUpperCase() : 'N'}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.brandTitle} numberOfLines={1}>
-                        {company?.name || 'NEX'}
-                      </Text>
-                      <Text style={styles.brandSubtitle}>Employee Workspace</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-                    <X size={18} color="#0F172A" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Menu items */}
                 {isLoading ? (
                   <View style={styles.loadingBox}>
                     <ActivityIndicator size="small" color="#E25E3E" />
                     <Text style={styles.loadingText}>Loading menu…</Text>
                   </View>
                 ) : allItems.length === 0 ? (
-                  // API returned nothing — show static fallback with working items + WIP section
                   <StaticMenuFallback
                     activeScreen={activeScreen}
                     activeProjectsCount={activeProjectsCount}
                     totalLeaveRemaining={totalLeaveRemaining}
                     unreadCount={unreadCount}
-                    onNavigate={(screen, params) => { onClose(); navigation.navigate(screen, params); }}
-                    onComingSoon={() => setComingSoon(true)}
+                    onNavigate={(screen, params) => { onClose(); navigateTo(navigation, screen, params); }}
                   />
                 ) : (
-                  grouped.map(({ group, items: groupItems }) => (
-                    <View key={group}>
+                  grouped.map(({ group, items: groupItemsList }) => (
+                    <View key={group} style={styles.groupContainer}>
                       <Text style={styles.groupLabel}>{group}</Text>
-                      {groupItems.map(item => {
-                        const isWip = !!(item as any).wip;
-                        const isActive = !isWip && activeScreen === resolveNav(item)?.screen;
-                        const badge = isWip ? 0 : getBadge(item);
-                        const Icon = getIcon(item.icon);
+                      {groupItemsList.map(item => {
+                        const isActive = activeScreen === resolveNav(item)?.screen;
+                        const badge = getBadge(item);
+                        const Icon = getIcon(item.icon, item.id, item.route);
+                        const theme = getItemTheme(item);
                         const isExpanded = expandedIds.has(item.id);
-                        const hasSubItems = !isWip && !!item.subItems?.length;
+                        const hasSubItems = !!item.subItems?.length;
 
                         return (
                           <View key={item.id}>
                             <TouchableOpacity
-                              style={[styles.item, isActive && styles.itemActive]}
+                              style={[
+                                styles.item,
+                                isActive && styles.itemActive,
+                              ]}
                               activeOpacity={0.75}
-                              onPress={() => isWip ? setComingSoon(true) : handleItemPress(item)}
+                              onPress={() => handleItemPress(item)}
                             >
+                              {isActive && <View style={styles.activeBar} />}
+
                               <View style={styles.itemLeft}>
-                                <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
-                                  <Icon size={18} color={isActive ? '#E25E3E' : isWip ? '#CBD5E1' : '#64748B'} />
+                                <View
+                                  style={[
+                                    styles.iconBox,
+                                    { backgroundColor: theme.iconBg },
+                                    isActive && styles.iconBoxActive,
+                                  ]}
+                                >
+                                  <Icon
+                                    size={18}
+                                    color={isActive ? '#E25E3E' : theme.iconColor}
+                                    strokeWidth={isActive ? 2.2 : 2}
+                                  />
                                 </View>
-                                <Text style={[styles.itemText, isActive && styles.itemTextActive, isWip && styles.itemTextWip]}>
+                                <Text
+                                  style={[
+                                    styles.itemText,
+                                    isActive && styles.itemTextActive,
+                                  ]}
+                                >
                                   {item.title}
                                 </Text>
                               </View>
+
                               <View style={styles.itemRight}>
                                 {badge > 0 && (
                                   <View style={styles.badge}>
                                     <Text style={styles.badgeText}>{badge}</Text>
                                   </View>
                                 )}
-                                {isWip ? (
-                                  <View style={styles.wipBadge}>
-                                    <Text style={styles.wipBadgeText}>WIP</Text>
-                                  </View>
-                                ) : hasSubItems ? (
+                                {hasSubItems ? (
                                   <ChevronDown
                                     size={16}
-                                    color="#CBD5E1"
+                                    color={isActive ? '#E25E3E' : '#94A3B8'}
+                                    strokeWidth={2}
                                     style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }}
                                   />
                                 ) : (
-                                  <ChevronRight size={16} color={isActive ? '#FFFFFF' : '#CBD5E1'} />
+                                  <ChevronRight
+                                    size={16}
+                                    color={isActive ? '#E25E3E' : '#CBD5E1'}
+                                    strokeWidth={2}
+                                  />
                                 )}
                               </View>
                             </TouchableOpacity>
 
-                            {/* Sub-items */}
-                            {hasSubItems && isExpanded && item.subItems!.map(sub => {
-                              const subActive = activeScreen === resolveNav(sub)?.screen;
-                              const SubIcon = getIcon(sub.icon || item.icon);
-                              return (
-                                <TouchableOpacity
-                                  key={sub.id}
-                                  style={[styles.subItem, subActive && styles.subItemActive]}
-                                  activeOpacity={0.75}
-                                  onPress={() => handleSubItemPress(sub)}
-                                >
-                                  <View style={styles.subItemDot} />
-                                  <Text style={[styles.subItemText, subActive && styles.subItemTextActive]}>
-                                    {sub.title}
-                                  </Text>
-                                </TouchableOpacity>
-                              );
-                            })}
+                            {/* Sub-items tree view */}
+                            {hasSubItems && isExpanded && (
+                              <View style={styles.subItemsTree}>
+                                {item.subItems!.map(sub => {
+                                  const subActive = activeScreen === resolveNav(sub)?.screen;
+                                  const SubIconComponent = getSubItemIcon(sub);
+                                  const isExternal = !!sub.external || sub.route === '/careers';
+
+                                  return (
+                                    <TouchableOpacity
+                                      key={sub.id}
+                                      style={[styles.subItem, subActive && styles.subItemActive]}
+                                      activeOpacity={0.7}
+                                      onPress={() => handleSubItemPress(sub)}
+                                    >
+                                      <View style={styles.subItemLeft}>
+                                        {SubIconComponent ? (
+                                          <SubIconComponent
+                                            size={14}
+                                            color={subActive ? '#E25E3E' : '#64748B'}
+                                            strokeWidth={subActive ? 2.2 : 1.8}
+                                          />
+                                        ) : (
+                                          <View style={[styles.subItemDot, subActive && styles.subItemDotActive]} />
+                                        )}
+                                        <Text
+                                          style={[styles.subItemText, subActive && styles.subItemTextActive]}
+                                          numberOfLines={1}
+                                        >
+                                          {sub.title.replace(' ↗', '')}
+                                        </Text>
+                                      </View>
+                                      {isExternal && (
+                                        <ExternalLink size={12} color="#94A3B8" strokeWidth={2} />
+                                      )}
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            )}
                           </View>
                         );
                       })}
                     </View>
                   ))
                 )}
-
-                <View style={styles.divider} />
-
-                <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={handleLogout}>
-                  <View style={styles.itemLeft}>
-                    <View style={styles.iconBox}><LogOut size={18} color="#EF4444" /></View>
-                    <Text style={[styles.itemText, { color: '#EF4444' }]}>Logout</Text>
-                  </View>
-                </TouchableOpacity>
               </ScrollView>
 
-              {/* Footer user card */}
-              <TouchableOpacity
-                style={styles.footerCard}
-                activeOpacity={0.7}
-                onPress={() => { onClose(); navigation.navigate('Profile'); }}
-              >
-                {profile?.avatarUrl ? (
-                  <Image source={{ uri: profile.avatarUrl }} style={styles.footerAvatar} />
-                ) : (
-                  <View style={styles.footerAvatarPlaceholder}>
-                    <Text style={styles.footerAvatarText}>
-                      {getInitials(profile?.firstName, profile?.lastName, user?.email)}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.footerInfo}>
-                  <Text style={styles.footerName} numberOfLines={1}>
-                    {profile ? `${profile.firstName} ${profile.lastName}` : (user?.email?.split('@')[0] || 'Employee')}
-                  </Text>
-                  <Text style={styles.footerRole} numberOfLines={1}>
-                    {(profile as any)?.designation?.name || (profile as any)?.jobTitle || user?.role || 'Employee'}
-                  </Text>
-                </View>
-                <ChevronRight size={16} color="#CBD5E1" />
-              </TouchableOpacity>
+              {/* Elevated Footer User Profile Dock */}
+              <View style={[styles.footerWrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+                <View style={styles.footerCard}>
+                  <TouchableOpacity
+                    style={styles.profileClickArea}
+                    activeOpacity={0.7}
+                    onPress={() => { onClose(); navigateTo(navigation, 'Profile'); }}
+                  >
+                    <View style={styles.avatarContainer}>
+                      {profile?.avatarUrl ? (
+                        <Image source={{ uri: profile.avatarUrl }} style={styles.footerAvatar} />
+                      ) : (
+                        <View style={styles.footerAvatarPlaceholder}>
+                          <Text style={styles.footerAvatarText}>
+                            {getInitials(profile?.firstName, profile?.lastName, user?.email)}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.onlineDot} />
+                    </View>
 
-              {/* Modals rendered inside panel SafeAreaView so they appear on top of the drawer */}
+                    <View style={styles.footerInfo}>
+                      <Text style={styles.footerName} numberOfLines={1}>
+                        {profile ? `${profile.firstName} ${profile.lastName}` : (user?.email?.split('@')[0] || 'Employee')}
+                      </Text>
+                      <View style={styles.roleBadge}>
+                        <Text style={styles.roleBadgeText} numberOfLines={1}>
+                          {(profile as any)?.designation?.name || (profile as any)?.jobTitle || user?.role || 'Employee'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Quick Logout Button */}
+                  <TouchableOpacity
+                    style={styles.logoutBtn}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={handleLogout}
+                  >
+                    <LogOut size={16} color="#EF4444" strokeWidth={2.2} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Modals rendered inside panel */}
               <FeedbackModal
                 visible={comingSoon}
                 type="warning"
@@ -500,58 +664,47 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
               />
             </SafeAreaView>
           </View>
+
+          {/* Backdrop on the right side */}
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
         </View>
       </Modal>
     </>
   );
 }
 
-type StaticItem = { id: string; title: string; icon: string; screen: string | null; badge?: number; params?: any };
+type StaticItem = { id: string; title: string; icon: string; screen: string; badge?: number; params?: any };
 
-// Static fallback shown when API returns no menus (offline / error)
 function StaticMenuFallback({
   activeScreen,
   activeProjectsCount,
   totalLeaveRemaining,
   unreadCount,
   onNavigate,
-  onComingSoon,
 }: {
   activeScreen: string;
   activeProjectsCount: number;
   totalLeaveRemaining: number;
   unreadCount: number;
   onNavigate: (screen: string, params?: any) => void;
-  onComingSoon: () => void;
 }) {
   const staticGroups: { group: string; items: StaticItem[] }[] = [
     {
       group: 'WORKSPACE',
       items: [
         { id: 'home', title: 'Home', icon: 'layout-dashboard', screen: 'Home' },
-        { id: 'projects', title: 'Projects', icon: 'briefcase', screen: 'Projects', badge: activeProjectsCount },
+        { id: 'projects', title: 'Projects', icon: 'folder-kanban', screen: 'Projects', badge: activeProjectsCount },
         { id: 'attendance', title: 'Attendance', icon: 'calendar-clock', screen: 'Attendance', params: { initialTab: 'timesheets' } },
-        { id: 'leaves', title: 'Leave', icon: 'calendar-clock', screen: 'Leaves', params: { initialTab: 'leaves' }, badge: totalLeaveRemaining },
+        { id: 'leaves', title: 'Leave', icon: 'calendar-days', screen: 'Leaves', params: { initialTab: 'leaves' }, badge: totalLeaveRemaining },
         { id: 'notifications', title: 'Notifications', icon: 'bell', screen: 'Notifications', badge: unreadCount },
-        { id: 'recruitment', title: 'Recruitment', icon: 'users', screen: null },
-        { id: 'performance', title: 'Performance', icon: 'target', screen: null },
       ],
     },
     {
       group: 'FINANCE',
       items: [
         { id: 'payslips', title: 'Payslips', icon: 'file-text', screen: 'Payslips' },
-        { id: 'payroll', title: 'Payroll', icon: 'banknote', screen: null },
-        { id: 'expenses', title: 'Expenses', icon: 'file-text', screen: null },
         { id: 'assets', title: 'Hardware Requests', icon: 'package', screen: 'HardwareRequests' },
         { id: 'tickets', title: 'Helpdesk & Tickets', icon: 'ticket', screen: 'Tickets' },
-      ],
-    },
-    {
-      group: 'OPERATIONS',
-      items: [
-        { id: 'offboarding', title: 'Offboarding', icon: 'door-open', screen: null },
-        { id: 'appreciation', title: 'Appreciation', icon: 'trophy', screen: null },
       ],
     },
   ];
@@ -559,42 +712,60 @@ function StaticMenuFallback({
   return (
     <>
       {staticGroups.map(({ group, items }) => (
-        <View key={group}>
+        <View key={group} style={styles.groupContainer}>
           <Text style={styles.groupLabel}>{group}</Text>
           {items.map(item => {
             const isActive = activeScreen === item.screen;
-            const Icon = getIcon(item.icon);
+            const Icon = getIcon(item.icon, item.id);
+            const theme = getItemTheme({ id: item.id });
+
             return (
               <TouchableOpacity
                 key={item.id}
-                style={[styles.item, isActive && styles.itemActive]}
+                style={[
+                  styles.item,
+                  isActive && styles.itemActive,
+                ]}
                 activeOpacity={0.75}
-                onPress={() => {
-                  if (item.screen) onNavigate(item.screen, item.params);
-                  else onComingSoon();
-                }}
+                onPress={() => onNavigate(item.screen, item.params)}
               >
+                {isActive && <View style={styles.activeBar} />}
+
                 <View style={styles.itemLeft}>
-                  <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
-                    <Icon size={18} color={isActive ? '#E25E3E' : item.screen ? '#64748B' : '#CBD5E1'} />
+                  <View
+                    style={[
+                      styles.iconBox,
+                      { backgroundColor: theme.iconBg },
+                      isActive && styles.iconBoxActive,
+                    ]}
+                  >
+                    <Icon
+                      size={18}
+                      color={isActive ? '#E25E3E' : theme.iconColor}
+                      strokeWidth={isActive ? 2.2 : 2}
+                    />
                   </View>
-                  <Text style={[styles.itemText, isActive && styles.itemTextActive, !item.screen && styles.itemTextWip]}>
+                  <Text
+                    style={[
+                      styles.itemText,
+                      isActive && styles.itemTextActive,
+                    ]}
+                  >
                     {item.title}
                   </Text>
                 </View>
+
                 <View style={styles.itemRight}>
                   {(item.badge ?? 0) > 0 && (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{item.badge}</Text>
                     </View>
                   )}
-                  {!item.screen ? (
-                    <View style={styles.wipBadge}>
-                      <Text style={styles.wipBadgeText}>WIP</Text>
-                    </View>
-                  ) : (
-                    <ChevronRight size={16} color={isActive ? '#FFFFFF' : '#CBD5E1'} />
-                  )}
+                  <ChevronRight
+                    size={16}
+                    color={isActive ? '#E25E3E' : '#CBD5E1'}
+                    strokeWidth={2}
+                  />
                 </View>
               </TouchableOpacity>
             );
@@ -609,72 +780,104 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: 'rgba(15,23,42,0.45)',
-  },
-  backdrop: {
-    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
   },
   panel: {
     width: PANEL_WIDTH,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: -2, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 12,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 6, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 16,
+    overflow: 'hidden',
+  },
+  backdrop: {
+    flex: 1,
   },
   scrollContent: {
-    paddingBottom: 8,
+    paddingTop: 4,
+    paddingBottom: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   brandGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     flex: 1,
     marginRight: 8,
   },
+  logoWrapper: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  companyLogo: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
   logoBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     backgroundColor: '#E25E3E',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#E25E3E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   logoText: {
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 18,
   },
-  companyLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    resizeMode: 'contain',
-  },
   brandTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  brandSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  workspaceDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
   },
   brandSubtitle: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: '#64748B',
     fontWeight: '500',
   },
   closeBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: 10,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
@@ -692,27 +895,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#94A3B8',
   },
+  groupContainer: {
+    marginTop: 14,
+  },
   groupLabel: {
     fontSize: 10,
     fontWeight: '700',
     color: '#94A3B8',
-    letterSpacing: 1,
-    marginTop: 20,
-    marginBottom: 4,
-    paddingHorizontal: 20,
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    paddingHorizontal: 18,
+    textTransform: 'uppercase',
   },
   item: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginHorizontal: 8,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginHorizontal: 10,
+    borderRadius: 14,
     marginBottom: 2,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   itemActive: {
+    backgroundColor: '#FFF7F5',
+    borderColor: '#FED7AA',
+  },
+  activeBar: {
+    position: 'absolute',
+    left: 0,
+    top: 8,
+    bottom: 8,
+    width: 3.5,
     backgroundColor: '#E25E3E',
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
   },
   itemLeft: {
     flexDirection: 'row',
@@ -721,18 +941,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   iconBoxActive: {
-    backgroundColor: '#FFF1EC',
-    borderColor: '#FFDDD5',
+    backgroundColor: '#FFE8DF',
   },
   itemText: {
     fontSize: 14,
@@ -740,8 +956,11 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   itemTextActive: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontWeight: '700',
+  },
+  itemTextWip: {
+    color: '#94A3B8',
   },
   itemRight: {
     flexDirection: 'row',
@@ -749,54 +968,66 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   badge: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#FEE2E2',
     borderRadius: 10,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    minWidth: 22,
+    minWidth: 20,
     alignItems: 'center',
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: '#DC2626',
     fontSize: 11,
     fontWeight: '700',
   },
   wipBadge: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#F1F5F9',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: '#E2E8F0',
   },
   wipBadgeText: {
-    color: '#92400E',
+    color: '#64748B',
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  itemTextWip: {
-    color: '#94A3B8',
+  subItemsTree: {
+    marginLeft: 32,
+    paddingLeft: 12,
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#E2E8F0',
+    marginVertical: 4,
+    gap: 2,
   },
   subItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 9,
-    marginHorizontal: 8,
-    marginLeft: 24,
-    borderRadius: 10,
-    marginBottom: 1,
-    gap: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 9,
+    backgroundColor: 'transparent',
   },
   subItemActive: {
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#FFF7F5',
+  },
+  subItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
   },
   subItemDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#CBD5E1',
+  },
+  subItemDotActive: {
+    backgroundColor: '#E25E3E',
   },
   subItemText: {
     fontSize: 13,
@@ -807,33 +1038,41 @@ const styles = StyleSheet.create({
     color: '#E25E3E',
     fontWeight: '600',
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-    marginHorizontal: 20,
-    marginVertical: 12,
+  footerWrapper: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
   },
   footerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    marginHorizontal: 8,
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    padding: 10,
     borderRadius: 14,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    gap: 12,
+    borderColor: '#E2E8F0',
+  },
+  profileClickArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    flex: 1,
+  },
+  avatarContainer: {
+    position: 'relative',
   },
   footerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
   },
   footerAvatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     backgroundColor: '#E25E3E',
     justifyContent: 'center',
     alignItems: 'center',
@@ -843,17 +1082,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+  onlineDot: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
   footerInfo: {
     flex: 1,
   },
   footerName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#0F172A',
   },
-  footerRole: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
+  roleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    marginTop: 3,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  logoutBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6,
   },
 });

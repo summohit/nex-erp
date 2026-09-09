@@ -16,10 +16,20 @@ export interface JobApplication {
   experienceYears?: string;
   noticePeriod?: string;
   status: string; // NEW, REVIEWING, SHORTLISTED, INTERVIEWING, OFFERED, HIRED, REJECTED
+  /** Every pipeline stage this candidate has been moved through, in visit order. */
+  completedStages?: string[];
   rejectionReason?: string;
   answers?: string;
   offeredSalary?: number;
   approvalStatus?: string;
+  /** Why the company is paying above the profile budget. */
+  approvalReason?: string;
+  /** The profile budget in force when approval was requested. */
+  approvalBudget?: number;
+  /** Stage the recruiter was trying to reach; approving completes that move. */
+  approvalRequestedStage?: string;
+  approvalRequestedAt?: string;
+  approvalDecidedAt?: string;
   aiScore?: number;
   aiSummary?: string;
   isAiScored?: boolean;
@@ -28,6 +38,8 @@ export interface JobApplication {
   currentLocation?: string;
   currentCtc?: number;
   expectedCtc?: number;
+  /** Budget approved for this candidate; falls back to the job's max salary. */
+  profileBudget?: number | null;
   source?: string;
   coverLetter?: string;
   photoUrl?: string;
@@ -70,10 +82,19 @@ export class CandidatesService {
     rejectionReason?: string,
     joiningDate?: string,
     address?: string,
+    approvalReason?: string,
   ): Observable<JobApplication> {
     return this.http.put<JobApplication>(`${this.apiUrl}/${id}/status`, {
-      status, offeredSalary, rejectionReason, joiningDate, address,
+      status, offeredSalary, rejectionReason, joiningDate, address, approvalReason,
     });
+  }
+
+  getPendingApprovals(): Observable<JobApplication[]> {
+    return this.http.get<JobApplication[]>(`${this.apiUrl}/pending-approvals`);
+  }
+
+  setProfileBudget(id: number, profileBudget: number | null): Observable<JobApplication> {
+    return this.http.put<JobApplication>(`${this.apiUrl}/${id}/profile-budget`, { profileBudget });
   }
 
   approveSalary(id: number): Observable<any> {

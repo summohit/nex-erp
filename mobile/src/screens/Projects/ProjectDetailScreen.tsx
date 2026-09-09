@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { ChevronLeft, Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock } from 'lucide-react-native';
+import { Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock } from 'lucide-react-native';
 import { useProjectStore } from '../../store/projectStore';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { projectService } from '../../api/projectService';
@@ -115,22 +116,19 @@ export default function ProjectDetailScreen() {
 
   return (
     <GradientBanner colorStr={currentProject?.color} index={currentProject?.id || 1} style={styles.container}>
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.headerContent}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <ChevronLeft size={24} color="#0F172A" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {projectName || currentProject?.name || 'Project'}
-          </Text>
+      <AppScreen
+        transparent
+        showBottomNav={false}
+        title={projectName || currentProject?.name || 'Project'}
+        right={
           <TouchableOpacity
             style={styles.teamBtn}
             onPress={() => navigation.navigate('TeamMembers', { projectId, projectName })}
           >
             <Users size={18} color="#0F172A" />
           </TouchableOpacity>
-        </View>
+        }
+      >
 
         {/* Scrollable Tabs */}
         <View style={styles.tabsContainer}>
@@ -178,7 +176,7 @@ export default function ProjectDetailScreen() {
             <TabContent activeTab={activeTab} projectId={currentProject?.id ?? 0} />
           )}
         </View>
-      </SafeAreaView>
+      </AppScreen>
     </GradientBanner>
   );
 }

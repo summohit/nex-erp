@@ -9,9 +9,9 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { ChevronLeft, Search, UserPlus, UserMinus, Crown, ShieldCheck, X } from 'lucide-react-native';
+import { Search, UserPlus, UserMinus, Crown, ShieldCheck, X } from 'lucide-react-native';
 import { useProjectStore } from '../../store/projectStore';
 import { projectService } from '../../api/projectService';
 import { useProjectPermissions } from '../../hooks/useProjectPermissions';
@@ -182,16 +182,11 @@ export default function TeamMembersScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ChevronLeft size={22} color="#0F172A" />
-        </TouchableOpacity>
-        <View>
-          <Text style={styles.headerTitle}>Team</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>{projectName || currentProject?.name || ''}</Text>
-        </View>
-      </View>
+    <AppScreen
+      title="Team"
+      subtitle={projectName || currentProject?.name || ''}
+      showBottomNav={false}
+    >
 
       <FlatList
         data={members}
@@ -242,7 +237,7 @@ export default function TeamMembersScreen() {
         confirmText={modalConfig.confirmText}
         showCancel={modalConfig.showCancel}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

@@ -1,0 +1,560 @@
+<div class="security-page">
+
+  <!-- ── Top Header Bar ──────────────────────────────────────────────── -->
+  <div class="settings-header-bar">
+    <div class="header-left">
+      <div class="header-badge">
+        <svg lucideShieldCheck size="15"></svg>
+        <span>Account Security</span>
+      </div>
+      <h2>Two-Factor Authentication (2FA)</h2>
+      <p>Protect your account with an extra layer of defense using Time-based One-Time Passwords (TOTP).</p>
+    </div>
+
+    <div class="header-right" *ngIf="status() as s">
+      <div class="security-posture-badge" [class.secure]="s.enabled" [class.unsecure]="!s.enabled">
+        <span class="pulse-dot"></span>
+        <span class="posture-text">{{ s.enabled ? 'High Security · 2FA Active' : 'Basic Security · Password Only' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="security-layout-grid" *ngIf="!isLoading(); else loadingTpl">
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- LEFT / MAIN INTERACTION COLUMN                                    -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <div class="security-main-column">
+
+      <!-- ── CARD 1: Status Overview ──────────────────────────────────── -->
+      <div class="setting-card status-hero-card" *ngIf="status() as s" [class.is-enabled]="s.enabled" [class.is-disabled]="!s.enabled">
+        <div class="card-top">
+          <div class="card-icon-wrap" [class.on]="s.enabled">
+            <svg *ngIf="s.enabled" lucideShieldCheck size="24"></svg>
+            <svg *ngIf="!s.enabled" lucideShieldAlert size="24"></svg>
+          </div>
+          
+          <div class="card-title-group">
+            <div class="status-heading-row">
+              <h3>{{ s.enabled ? 'Two-Factor Authentication is Active' : 'Two-Factor Authentication is Disabled' }}</h3>
+              <span class="state-pill" [class.on]="s.enabled">
+                <span class="live-pulse-dot" *ngIf="s.enabled"></span>
+                <span>{{ s.enabled ? 'Protected' : 'Not Configured' }}</span>
+              </span>
+            </div>
+
+            <p *ngIf="s.enabled" class="status-desc">
+              Your account is guarded by multi-factor security. Every sign-in requires both your password and an ephemeral 6-digit verification code from your authenticator app.
+            </p>
+            <p *ngIf="!s.enabled" class="status-desc">
+              Your account is currently guarded by your password alone. Enabling two-factor authentication blocks unauthorized access even if your password is leaked or compromised.
+            </p>
+
+            <!-- Stat Chips for active state -->
+            <div class="security-stat-chips" *ngIf="s.enabled">
+              <div class="stat-chip">
+                <div class="chip-icon-box chip-success">
+                  <svg lucideCheckCircle2 size="13"></svg>
+                </div>
+                <div class="chip-content">
+                  <span class="chip-label">Active Since</span>
+                  <span class="chip-val">{{ s.confirmedAt | date:'d MMMM y' }}</span>
+                </div>
+              </div>
+
+              <div class="stat-chip" [class.chip-alert]="lowOnCodes()">
+                <div class="chip-icon-box" [class.chip-amber]="lowOnCodes()" [class.chip-slate]="!lowOnCodes()">
+                  <svg lucideKeyRound size="13"></svg>
+                </div>
+                <div class="chip-content">
+                  <span class="chip-label">Recovery Vault</span>
+                  <span class="chip-val">
+                    <strong>{{ s.backupCodesRemaining }}</strong> of 10 codes left
+                  </span>
+                </div>
+                <span class="chip-badge" [class.badge-healthy]="!lowOnCodes()" [class.badge-warn]="lowOnCodes()">
+                  {{ lowOnCodes() ? 'Low' : 'Healthy' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Policy requirement banner -->
+        <div class="card-footer-note mandate" *ngIf="s.companyRequires">
+          <svg lucideInfo size="16"></svg>
+          <div>
+            <strong>Company Policy Enforcement:</strong>
+            <span> Your organization requires two-factor authentication for all user accounts to safeguard company resources.</span>
+          </div>
+        </div>
+
+        <!-- Low codes warning banner -->
+        <div class="card-footer-note warn" *ngIf="lowOnCodes()">
+          <svg lucideAlertTriangle size="16"></svg>
+          <div>
+            <strong>Low Recovery Codes Warning:</strong>
+            <span> You only have {{ s.backupCodesRemaining }} backup code{{ s.backupCodesRemaining === 1 ? '' : 's' }} left. Generate a new batch to avoid being locked out.</span>
+          </div>
+        </div>
+
+        <!-- Actions when idle -->
+        <div class="card-actions" *ngIf="step() === 'idle'">
+          <button *ngIf="!s.enabled" class="btn-action-primary" (click)="askPassword('enable')">
+            <svg lucideSmartphone size="16"></svg>
+            <span>Set Up Authenticator App</span>
+            <svg lucideArrowRight size="15"></svg>
+          </button>
+
+          <div class="card-actions-row" *ngIf="s.enabled">
+            <button class="btn-action-secondary btn-action-with-icon" (click)="askPassword('regenerate')">
+              <svg lucideRefreshCw size="15"></svg>
+              <span>Generate New Backup Codes</span>
+            </button>
+
+            <button *ngIf="s.canDisable" class="btn-action-danger-soft" (click)="askPassword('disable')">
+              <svg lucideShieldAlert size="15"></svg>
+              <span>Turn Off 2FA</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CARD 2: Interactive Wizard (Step !== idle) ────────────────── -->
+      <div class="setting-card wizard-card" *ngIf="step() !== 'idle'">
+
+        <!-- Elevated Stepper Track -->
+        <div class="stepper-nav-bar">
+          <!-- Step 1 -->
+          <div class="stepper-tab" [class.active]="step() === 'password'" [class.completed]="step() === 'enrol' || step() === 'codes'">
+            <div class="stepper-tab-icon">
+              <svg lucideCheck size="14" *ngIf="step() === 'enrol' || step() === 'codes'"></svg>
+              <svg lucideLock size="14" *ngIf="step() === 'password'"></svg>
+            </div>
+            <div class="stepper-tab-info">
+              <span class="stepper-step-num">Step 1</span>
+              <span class="stepper-step-title">Verify Password</span>
+            </div>
+          </div>
+
+          <div class="stepper-divider" [class.active]="step() === 'enrol' || step() === 'codes'"></div>
+
+          <!-- Step 2 -->
+          <div class="stepper-tab" [class.active]="step() === 'enrol'" [class.completed]="step() === 'codes'">
+            <div class="stepper-tab-icon">
+              <svg lucideCheck size="14" *ngIf="step() === 'codes'"></svg>
+              <svg lucideQrCode size="14" *ngIf="step() !== 'codes'"></svg>
+            </div>
+            <div class="stepper-tab-info">
+              <span class="stepper-step-num">Step 2</span>
+              <span class="stepper-step-title">Scan QR Code</span>
+            </div>
+          </div>
+
+          <div class="stepper-divider" [class.active]="step() === 'codes'"></div>
+
+          <!-- Step 3 -->
+          <div class="stepper-tab" [class.active]="step() === 'codes'">
+            <div class="stepper-tab-icon">
+              <svg lucideKeyRound size="14"></svg>
+            </div>
+            <div class="stepper-tab-info">
+              <span class="stepper-step-num">Step 3</span>
+              <span class="stepper-step-title">Backup Codes</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SUB-STEP: Password Verification ────────────────────────── -->
+        <div class="wizard-step-content" *ngIf="step() === 'password'">
+          <div class="wizard-form-body">
+            <div class="form-group-elevated">
+              <div class="label-row">
+                <label for="pwdInput">Current Account Password</label>
+                <span class="label-required-badge">Required</span>
+              </div>
+              
+              <div class="input-container-modern">
+                <div class="input-icon-left">
+                  <svg lucideLock size="17"></svg>
+                </div>
+                <input
+                  id="pwdInput"
+                  [type]="passwordVisible() ? 'text' : 'password'"
+                  class="modern-input"
+                  [(ngModel)]="password"
+                  placeholder="Enter your current password"
+                  autocomplete="current-password"
+                  (keyup.enter)="submitPassword()">
+                <button
+                  type="button"
+                  class="modern-eye-btn"
+                  (click)="togglePasswordVisibility()"
+                  [title]="passwordVisible() ? 'Hide password' : 'Show password'">
+                  <svg *ngIf="!passwordVisible()" lucideEye size="17"></svg>
+                  <svg *ngIf="passwordVisible()" lucideEyeOff size="17"></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Current authenticator code if intent is disable/regenerate -->
+            <div class="form-group-elevated" *ngIf="intent() !== 'enable'">
+              <div class="label-row">
+                <label for="totpInput">Current Authenticator Passcode</label>
+                <span class="label-required-badge">Required</span>
+              </div>
+              
+              <div class="input-container-modern">
+                <div class="input-icon-left">
+                  <svg lucideSmartphone size="17"></svg>
+                </div>
+                <input
+                  id="totpInput"
+                  type="text"
+                  class="modern-input code-digits"
+                  [(ngModel)]="code"
+                  maxlength="14"
+                  inputmode="numeric"
+                  placeholder="000000"
+                  (keyup.enter)="submitPassword()">
+              </div>
+              <div class="input-footer-hint">
+                <span>Enter the 6-digit code currently shown on your authenticator device</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons Row -->
+            <div class="wizard-action-toolbar">
+              <button class="btn-action-primary" (click)="submitPassword()" [disabled]="isSubmitting() || !password">
+                <span *ngIf="!isSubmitting()">Continue to Setup</span>
+                <span *ngIf="isSubmitting()">Verifying Password…</span>
+                <svg lucideArrowRight size="16" *ngIf="!isSubmitting()"></svg>
+              </button>
+
+              <button class="btn-action-secondary" (click)="cancel()">
+                <span>Cancel</span>
+              </button>
+
+              <span class="enter-shortcut-hint" *ngIf="password">
+                Press <strong>↵ Enter</strong> to continue
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SUB-STEP: Scan QR Code & Enter 6-digit Code ────────────── -->
+        <div class="wizard-step-content" *ngIf="step() === 'enrol'">
+          <div class="enrol-clean-layout">
+            <!-- Left: QR Code frame & setup key -->
+            <div class="qr-showcase-panel">
+              <div class="qr-frame-box">
+                <img [src]="qrDataUri()" alt="Two-factor setup QR code" class="qr-code-img">
+              </div>
+
+              <!-- Compact copyable secret key -->
+              <div class="secret-key-pill">
+                <div class="secret-key-header">
+                  <span class="secret-key-label">SETUP KEY</span>
+                  <button type="button" class="btn-copy-key" (click)="copySecret()" [title]="'Copy setup key'">
+                    <svg *ngIf="!secretCopied()" lucideCopy size="12"></svg>
+                    <svg *ngIf="secretCopied()" lucideCheck size="12" class="text-emerald"></svg>
+                    <span>{{ secretCopied() ? 'Copied' : 'Copy' }}</span>
+                  </button>
+                </div>
+                <code class="secret-key-text">{{ formattedSecret() }}</code>
+              </div>
+            </div>
+
+            <!-- Right: Instructions, 6-digit input & action buttons -->
+            <div class="verify-showcase-panel">
+              <div class="verify-instructions">
+                <h4>Scan to Connect</h4>
+                <p>Open your authenticator app (Google Authenticator, Microsoft Authenticator, or Apple Passwords) and scan this QR code.</p>
+              </div>
+
+              <div class="verify-input-group">
+                <label for="otpCodeInput">Enter 6-Digit Code from App</label>
+                <div class="otp-input-wrapper">
+                  <input
+                    id="otpCodeInput"
+                    type="text"
+                    class="otp-digit-input"
+                    [(ngModel)]="code"
+                    maxlength="6"
+                    inputmode="numeric"
+                    placeholder="000000"
+                    autocomplete="one-time-code"
+                    (keyup.enter)="confirmEnrolment()">
+                </div>
+                <span class="otp-hint-text">Codes refresh every 30 seconds</span>
+              </div>
+
+              <div class="enrol-action-buttons">
+                <button class="btn-action-primary" (click)="confirmEnrolment()" [disabled]="isSubmitting() || !code || code.length < 6">
+                  <svg lucideShieldCheck size="16"></svg>
+                  <span>{{ isSubmitting() ? 'Verifying…' : 'Activate 2FA' }}</span>
+                </button>
+                <button class="btn-action-secondary" (click)="cancel()">
+                  <span>Cancel</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SUB-STEP: Save Backup Codes ────────────────────────────── -->
+        <div class="wizard-step-content" *ngIf="step() === 'codes'">
+          <div class="step-header-clean">
+            <h3>Save Your Emergency Recovery Codes</h3>
+            <p>If you lose access to your authenticator app, these 10 single-use codes are the only way to sign in to your account.</p>
+          </div>
+
+          <!-- Alert box -->
+          <div class="backup-alert-box">
+            <div class="alert-icon-wrap">
+              <svg lucideAlertTriangle size="18"></svg>
+            </div>
+            <div class="alert-content">
+              <span class="alert-title">Store these codes in a safe, private location</span>
+              <p class="alert-desc">Each code works <strong>once</strong>. For security reasons, they will <strong>never be shown again</strong> after you leave this page.</p>
+            </div>
+          </div>
+
+          <!-- Codes grid & vault container -->
+          <div class="codes-vault-container">
+            <div class="codes-vault-header">
+              <div class="vault-header-title">
+                <svg lucideKeyRound size="14"></svg>
+                <span>10 Single-Use Recovery Codes</span>
+              </div>
+              <div class="vault-header-actions">
+                <button type="button" class="vault-action-btn" (click)="copyCodes()" [title]="'Copy all codes'">
+                  <svg *ngIf="!codesCopied()" lucideCopy size="12"></svg>
+                  <svg *ngIf="codesCopied()" lucideCheck size="12" class="text-emerald"></svg>
+                  <span>{{ codesCopied() ? 'Copied' : 'Copy all' }}</span>
+                </button>
+                <button type="button" class="vault-action-btn" (click)="downloadCodes()" [title]="'Download as .txt'">
+                  <svg lucideDownload size="12"></svg>
+                  <span>Download .txt</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="codes-vault-grid">
+              <div
+                class="vault-code-item"
+                *ngFor="let c of backupCodes(); let i = index"
+                (click)="copySingleCode(c, i)"
+                [title]="'Click to copy code'">
+                <span class="code-index">{{ (i + 1) < 10 ? '0' + (i + 1) : (i + 1) }}</span>
+                <code class="code-string">{{ c }}</code>
+                <div class="code-copy-indicator">
+                  <svg *ngIf="copiedSingleIndex() !== i" lucideCopy size="13"></svg>
+                  <svg *ngIf="copiedSingleIndex() === i" lucideCheck size="13" class="text-emerald"></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions footer bar -->
+          <div class="backup-actions-bar">
+            <div class="backup-secondary-buttons">
+              <button type="button" class="btn-action-secondary" (click)="copyCodes()">
+                <svg *ngIf="!codesCopied()" lucideCopy size="15"></svg>
+                <svg *ngIf="codesCopied()" lucideCheck size="15" class="text-emerald"></svg>
+                <span>{{ codesCopied() ? 'All Codes Copied' : 'Copy All Codes' }}</span>
+              </button>
+              <button type="button" class="btn-action-secondary" (click)="downloadCodes()">
+                <svg lucideDownload size="15"></svg>
+                <span>Download .TXT</span>
+              </button>
+            </div>
+
+            <button type="button" class="btn-action-primary finish-step-btn" (click)="done()">
+              <svg lucideCheckCircle2 size="16"></svg>
+              <span>I've Safely Saved My Codes</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- RIGHT / COMPANION GUIDE COLUMN                                    -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <div class="security-guide-column">
+
+      <!-- ── CARD: Supported Apps ────────────────────────────────────── -->
+      <div class="guide-card">
+        <div class="guide-card-header">
+          <div class="guide-icon-badge app-badge">
+            <svg lucideSmartphone size="16"></svg>
+          </div>
+          <div>
+            <h4>Supported Authenticator Apps</h4>
+            <p>Free, trusted TOTP apps you can use on iOS & Android</p>
+          </div>
+        </div>
+
+        <div class="app-picker-list">
+          <!-- Google Authenticator -->
+          <div class="app-item">
+            <div class="app-logo-box google">
+              <span>G</span>
+            </div>
+            <div class="app-info">
+              <div class="app-name">Google Authenticator</div>
+              <div class="app-meta">iOS · Android · WearOS</div>
+            </div>
+            <span class="app-tag">Popular</span>
+          </div>
+
+          <!-- Microsoft Authenticator -->
+          <div class="app-item">
+            <div class="app-logo-box microsoft">
+              <span>M</span>
+            </div>
+            <div class="app-info">
+              <div class="app-name">Microsoft Authenticator</div>
+              <div class="app-meta">iOS · Android · Cloud Backup</div>
+            </div>
+            <span class="app-tag">Cloud Sync</span>
+          </div>
+
+          <!-- Apple Passwords / Keychain -->
+          <div class="app-item">
+            <div class="app-logo-box apple">
+              <span></span>
+            </div>
+            <div class="app-info">
+              <div class="app-name">Apple Passwords (Keychain)</div>
+              <div class="app-meta">Built into iOS 15+ & macOS</div>
+            </div>
+            <span class="app-tag">Built-in</span>
+          </div>
+
+          <!-- 1Password / Bitwarden -->
+          <div class="app-item">
+            <div class="app-logo-box vault">
+              <svg lucideKeyRound size="14"></svg>
+            </div>
+            <div class="app-info">
+              <div class="app-name">1Password or Bitwarden</div>
+              <div class="app-meta">Cross-platform password managers</div>
+            </div>
+            <span class="app-tag">Password Mgr</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CARD: How it Works Walkthrough ──────────────────────────── -->
+      <div class="guide-card">
+        <div class="guide-card-header">
+          <div class="guide-icon-badge lock-badge">
+            <svg lucideLock size="16"></svg>
+          </div>
+          <div>
+            <h4>How Sign-in Works with 2FA</h4>
+            <p>A quick overview of the two-step login experience</p>
+          </div>
+        </div>
+
+        <div class="flow-steps-list">
+          <div class="flow-step-item">
+            <div class="flow-step-marker">1</div>
+            <div class="flow-step-content">
+              <strong>Enter your normal credentials</strong>
+              <span>Sign in with your email and password as usual on NEX ERP.</span>
+            </div>
+          </div>
+
+          <div class="flow-step-item">
+            <div class="flow-step-marker">2</div>
+            <div class="flow-step-content">
+              <strong>Check your phone's app</strong>
+              <span>Open your authenticator app to get the current 6-digit passcode.</span>
+            </div>
+          </div>
+
+          <div class="flow-step-item">
+            <div class="flow-step-marker">3</div>
+            <div class="flow-step-content">
+              <strong>Instant verified access</strong>
+              <span>Enter the code to unlock your dashboard and private records.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CARD: Frequently Asked Questions ────────────────────────── -->
+      <div class="guide-card">
+        <div class="guide-card-header">
+          <div class="guide-icon-badge faq-badge">
+            <svg lucideHelpCircle size="16"></svg>
+          </div>
+          <div>
+            <h4>Frequently Asked Questions</h4>
+            <p>Essential guidance on device recovery & usage</p>
+          </div>
+        </div>
+
+        <div class="faq-accordion">
+          <!-- FAQ 1 -->
+          <div class="faq-item" [class.open]="activeFaq() === 0">
+            <button type="button" class="faq-trigger" (click)="toggleFaq(0)">
+              <span>What if I lose or misplace my phone?</span>
+              <svg *ngIf="activeFaq() !== 0" lucideChevronDown size="16"></svg>
+              <svg *ngIf="activeFaq() === 0" lucideChevronUp size="16"></svg>
+            </button>
+            <div class="faq-body" *ngIf="activeFaq() === 0">
+              <p>
+                Use one of your 10 emergency backup codes to sign in. Once signed in, you can generate a new QR code to link your replacement device, or request an administrator reset.
+              </p>
+            </div>
+          </div>
+
+          <!-- FAQ 2 -->
+          <div class="faq-item" [class.open]="activeFaq() === 1">
+            <button type="button" class="faq-trigger" (click)="toggleFaq(1)">
+              <span>Does my phone need internet access?</span>
+              <svg *ngIf="activeFaq() !== 1" lucideChevronDown size="16"></svg>
+              <svg *ngIf="activeFaq() === 1" lucideChevronUp size="16"></svg>
+            </button>
+            <div class="faq-body" *ngIf="activeFaq() === 1">
+              <p>
+                No. TOTP authenticators calculate codes locally using standardized cryptographic mathematics and clock synchronization. They work 100% offline, even in Airplane Mode.
+              </p>
+            </div>
+          </div>
+
+          <!-- FAQ 3 -->
+          <div class="faq-item" [class.open]="activeFaq() === 2">
+            <button type="button" class="faq-trigger" (click)="toggleFaq(2)">
+              <span>Can I scan this on multiple devices?</span>
+              <svg *ngIf="activeFaq() !== 2" lucideChevronDown size="16"></svg>
+              <svg *ngIf="activeFaq() === 2" lucideChevronUp size="16"></svg>
+            </button>
+            <div class="faq-body" *ngIf="activeFaq() === 2">
+              <p>
+                Yes! During the QR code step, you can scan the same QR code with multiple phones, tablets, or your desktop password manager before submitting the verification code.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <ng-template #loadingTpl>
+    <div class="loading-state">
+      <span class="spinner"></span>
+      <p class="loading-text">Loading security profile…</p>
+    </div>
+  </ng-template>
+
+</div>
+

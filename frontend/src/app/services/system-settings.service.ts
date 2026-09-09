@@ -12,6 +12,8 @@ export interface SystemSetting {
   offerLetterConfig?: Record<string, any> | null;
   /** Employee every new ticket is auto-assigned to (the software dev PM). */
   defaultTicketAssigneeId?: number | null;
+  /** SuperAdmin switch: every user must enrol in two-factor auth to sign in. */
+  twoFactorRequired?: boolean;
 }
 
 export interface PlaceholderTag {

@@ -27,7 +27,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status === 401 && !req.url.includes('/auth/login') && !req.url.includes('/auth/signup') && !req.url.includes('/auth/forgot-password') && !req.url.includes('/auth/reset-password') && !req.url.includes('/auth/reset-password-email')) {
+      // The 2fa/challenge routes are excluded because a wrong code legitimately
+      // answers 401 there, and popping the session-expired modal mid sign-in
+      // would strand the user. The AUTHENTICATED /auth/2fa routes are NOT
+      // excluded: they answer 403 for a wrong code, so a 401 from them really
+      // does mean an expired token worth refreshing.
+      if (error.status === 401 && !req.url.includes('/auth/login') && !req.url.includes('/auth/signup') && !req.url.includes('/auth/forgot-password') && !req.url.includes('/auth/reset-password') && !req.url.includes('/auth/reset-password-email') && !req.url.includes('/auth/2fa/challenge')) {
         return from(sessionModal.prompt()).pipe(
           switchMap((shouldContinue) => {
             if (shouldContinue) {

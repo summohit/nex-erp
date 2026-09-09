@@ -45,6 +45,33 @@
       </div>
     </div>
 
+    <!-- Card: Company-wide two-factor authentication -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap shift-icon">
+          <svg lucideShieldCheck size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <h3>Require Two-Factor Authentication</h3>
+          <p>Every user must set up an authenticator app before they can sign in. Anyone without one is walked through setup at their next login.</p>
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle-switch">
+            <input type="checkbox" [checked]="!!s.twoFactorRequired" (change)="toggleTwoFactorRequired()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="card-footer-note">
+        <svg lucideInfo size="14"></svg>
+        <span>
+          Set up two-factor on your own account first — the server refuses to turn this on otherwise,
+          because a SuperAdmin without an authenticator would lock the whole company out.
+          Nobody can disable their own second factor while this is on.
+        </span>
+      </div>
+    </div>
+
     <!-- Card: Default Ticket Assignee -->
     <div class="setting-card">
       <div class="card-top">

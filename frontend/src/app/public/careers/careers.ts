@@ -122,6 +122,8 @@ export class CareersComponent implements OnInit {
       
       const depts = Array.from(new Set((res || []).map((j: any) => j.department)));
       this.departments.set(depts as string[]);
+
+      this.openJobFromQueryParam();
     } catch (err) {
       console.error('Error fetching public jobs:', err);
     }
@@ -197,6 +199,19 @@ export class CareersComponent implements OnInit {
     }
 
     this.filteredJobs.set(result);
+  }
+
+  /**
+   * A shared posting link carries `?job=<id>`, so the visitor lands on that
+   * posting instead of having to find it in the list. Silently ignored when the
+   * job is closed or belongs to another company — the list still renders.
+   */
+  private openJobFromQueryParam() {
+    const requested = this.route.snapshot.queryParamMap.get('job');
+    if (!requested) return;
+
+    const job = this.jobs().find((j: any) => String(j.id) === requested);
+    if (job) this.openJobApplication(job);
   }
 
   openJobApplication(job: PublicJob) {

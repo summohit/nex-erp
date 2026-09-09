@@ -11,9 +11,8 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import AppScreen from '../../components/AppScreen';
 import {
-  ArrowLeft,
   FileText,
   ChevronRight,
   X,
@@ -212,7 +211,6 @@ function PayslipCard({ payslip, onPress }: { payslip: Payslip; onPress: () => vo
 }
 
 export default function PayslipsScreen() {
-  const navigation = useNavigation();
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -249,16 +247,10 @@ export default function PayslipsScreen() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
-
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <ArrowLeft size={20} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payslips</Text>
-        <View style={{ width: 36 }} />
-      </View>
+    <AppScreen
+      title="Payslips"
+      subtitle="Salary & payroll slips"
+    >
 
       {loading ? (
         <View style={styles.center}>
@@ -322,7 +314,7 @@ export default function PayslipsScreen() {
       {selected && (
         <PayslipDetail payslip={selected} onClose={() => setSelected(null)} />
       )}
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

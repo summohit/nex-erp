@@ -1,0 +1,87 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:'SF Pro Display','SF Pro Text',-apple-system,'Helvetica Neue',Arial,sans-serif;}
+svg{display:block}
+
+html,body{width:360px;height:640px;overflow:hidden;background:#F5F7FA}
+.screen{width:360px;height:640px;position:relative;background:#F5F7FA;overflow:hidden}
+/* status bar */
+.sb{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:12px;font-weight:700;color:#0F172A;letter-spacing:.2px}
+.sb .r{display:flex;align-items:center;gap:5px}
+.bars{display:flex;align-items:flex-end;gap:1.5px;height:9px}
+.bars i{width:2.5px;background:#0F172A;border-radius:1px;display:block}
+.batt{width:17px;height:9px;border:1.4px solid #0F172A;border-radius:2.5px;position:relative;display:block}
+.batt:after{content:'';position:absolute;right:-3px;top:2.2px;width:1.6px;height:3px;background:#0F172A;border-radius:0 1px 1px 0}
+.batt i{position:absolute;left:1.3px;top:1.3px;bottom:1.3px;width:9px;background:#0F172A;border-radius:1px;display:block}
+/* header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 16px 12px}
+.ibtn{width:40px;height:40px;border-radius:13px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(15,23,42,.05);position:relative}
+.dot{position:absolute;top:9px;right:10px;width:7px;height:7px;border-radius:4px;background:#EF4444;border:1.5px solid #fff}
+.hc{flex:1;text-align:center}
+.greet{font-size:11px;font-weight:600;color:#94A3B8;letter-spacing:.2px}
+.nm{font-size:16px;font-weight:800;color:#0F172A;letter-spacing:-.3px;margin-top:1px}
+.hr{display:flex;align-items:center;gap:8px}
+.av{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#F97316,#E25E3E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:800}
+.body{padding:0 16px}
+.card{background:#fff;border-radius:24px;box-shadow:0 4px 14px rgba(15,23,42,.045)}
+.sec{font-size:17px;font-weight:800;color:#0F172A;margin-bottom:12px}
+.secrow{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.viewall{font-size:13px;font-weight:700;color:#E25E3E}
+
+.acard{background:#fff;border-radius:24px;padding:16px;margin-bottom:16px;position:relative;overflow:hidden;border:1px solid #FFF5F2;box-shadow:0 8px 16px rgba(226,94,62,.06)}
+.glow{position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:80px;background:#FFF1EC;opacity:.7}
+.act{position:relative;font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:.8px;margin-bottom:6px}
+.adate{position:relative;font-size:14px;font-weight:600;color:#64748B}
+.atrow{position:relative;display:flex;align-items:center;justify-content:space-between;margin:2px 0 14px}
+.clock{font-size:26px;font-weight:900;color:#0F172A;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.ringwrap{position:relative;width:60px;height:60px;display:flex;align-items:center;justify-content:center}
+.ringtxt{position:absolute;font-size:10px;font-weight:700;color:#0F172A}
+.afoot{position:relative;display:flex;align-items:center;justify-content:space-between}
+.pill{display:flex;align-items:center;background:#fff;border:1px solid #E2E8F0;padding:7px 12px;border-radius:20px}
+.pd{width:8px;height:8px;border-radius:4px;background:#10B981;margin-right:8px}
+.pt{font-size:13px;font-weight:600;color:#475569}
+.punch{display:flex;align-items:center;gap:6px;background:#EF4444;padding:10px 18px;border-radius:22px;color:#fff;font-weight:700;font-size:14px;box-shadow:0 4px 8px rgba(239,68,68,.25)}
+.qgrid{display:flex;gap:10px;margin-bottom:22px}
+.qcard{flex:1;height:94px;background:#fff;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;box-shadow:0 2px 6px rgba(15,23,42,.04)}
+.qi{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center}
+.qt{font-size:11.5px;font-weight:600;color:#334155}
+.ogrid{display:flex;gap:12px}
+.ocard{flex:1;background:#fff;border-radius:22px;padding:16px;box-shadow:0 2px 6px rgba(15,23,42,.04)}
+.oi{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.ov{font-size:22px;font-weight:800;color:#0F172A;letter-spacing:-.6px}
+.ol{font-size:12.5px;color:#64748B;margin-top:2px;font-weight:500}
+.obadge{display:inline-flex;align-items:center;gap:2px;margin-top:10px;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700}
+</style></head><body><div class="screen"><div class="sb"><span>9:41</span><div class="r">
+<div class="bars"><i style="height:3px"></i><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i></div>
+<svg width="14" height="11" viewBox="0 0 16 12"><path d="M8 10.2 1 4.4a10.6 10.6 0 0 1 14 0Z" fill="#0F172A"/></svg>
+<span class="batt"><i></i></span></div></div><div class="hdr">
+<div class="ibtn"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></div>
+<div class="hc"><div class="greet">Good morning</div><div class="nm">Arjun Mehta</div></div>
+<div class="hr"><div class="ibtn"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg><span class="dot"></span></div><div class="av">AM</div></div></div>
+<div class="body">
+ <div class="acard"><div class="glow"></div>
+  <div class="act">TODAY'S ATTENDANCE</div>
+  <div class="adate">Tue, Sep 9</div>
+  <div class="atrow"><div class="clock">10: 42: 18</div>
+   <div class="ringwrap"><svg width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" stroke="#F3E8E5" stroke-width="5" fill="none"/>
+  <circle cx="30" cy="30" r="26" stroke="#EA580C" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="163.36281798666926" stroke-dashoffset="22.8707945181337" transform="rotate(-90 30 30)"/></svg><div class="ringtxt">7h 44m</div></div></div>
+  <div class="afoot"><div class="pill"><span class="pd"></span><span class="pt">Clocked in</span></div>
+   <div class="punch"><span style="transform:rotate(90deg);display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg></span>Clock Out</div></div>
+ </div>
+ <div class="sec">Quick Actions</div>
+ <div class="qgrid">
+  <div class="qcard"><div class="qi" style="background:#FFF7ED"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></div><div class="qt">Leave</div></div>
+  <div class="qcard"><div class="qi" style="background:#F0FDF4"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><div class="qt">Attendance</div></div>
+  <div class="qcard"><div class="qi" style="background:#EFF6FF"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></div><div class="qt">Expense</div></div>
+  <div class="qcard"><div class="qi" style="background:#FAF5FF"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#9333EA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></div><div class="qt">Field Visit</div></div>
+ </div>
+ <div class="secrow"><div class="sec" style="margin:0">Overview</div><div class="viewall">View all</div></div>
+ <div class="ogrid">
+  <div class="ocard"><div class="oi" style="background:#FFF7ED"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+   <div class="ov">7h 44m</div><div class="ol">Worked today</div>
+   <div class="obadge" style="background:#ECFDF5;color:#16A34A"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg> 8.4% vs avg</div></div>
+  <div class="ocard"><div class="oi" style="background:#F0FDF4"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg></div>
+   <div class="ov">6</div><div class="ol">Active projects</div>
+   <div class="obadge" style="background:#F1F5F9;color:#64748B">14 completed</div></div>
+ </div>
+</div></div></body></html>

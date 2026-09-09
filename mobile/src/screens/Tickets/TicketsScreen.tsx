@@ -18,10 +18,10 @@ import {
 } from 'react-native';
 // Must come from safe-area-context, not react-native: RN's own SafeAreaView is
 // a no-op on Android, which lets the header slide under the status bar.
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import AppScreen from '../../components/AppScreen';
+import { useFocusEffect } from '@react-navigation/native';
 import {
-  ArrowLeft, Plus, X, Search, Ticket as TicketIcon, Send,
+  Plus, X, Search, Ticket as TicketIcon, Send,
   Paperclip, Building2, User as UserIcon,
   Clock, CheckCircle2, AlertCircle, Timer,
 } from 'lucide-react-native';
@@ -120,8 +120,6 @@ const emptyForm = (deptId: number | null): FormState => ({
 });
 
 export default function TicketsScreen() {
-  const navigation = useNavigation<any>();
-
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [stats, setStats] = useState<TicketStats | null>(null);
   const [permissions, setPermissions] = useState<TicketPermissions | null>(null);
@@ -481,16 +479,15 @@ export default function TicketsScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={22} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Helpdesk & Tickets</Text>
+    <AppScreen
+      title="Tickets"
+      subtitle="Support & requests"
+      right={
         <TouchableOpacity style={styles.headerAction} onPress={openCreate}>
           <Plus size={20} color="#E25E3E" />
         </TouchableOpacity>
-      </View>
+      }
+    >
 
       {loading ? (
         <View style={styles.center}>
@@ -873,7 +870,7 @@ export default function TicketsScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

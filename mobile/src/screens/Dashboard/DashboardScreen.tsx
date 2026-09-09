@@ -6,36 +6,34 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  StatusBar,
   RefreshControl,
-  Image,
   ActivityIndicator,
-  Alert,
   Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuthStore } from '../../store/authStore';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { notificationService, AppNotification } from '../../api/notificationService';
-import { useProjectStore } from '../../store/projectStore';
 import { useFieldVisitStore } from '../../store/fieldVisitStore';
 import { formatElapsed } from '../../utils/haversine';
+import { navigateTo } from '../../navigation/navigationUtils';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
-import AppDrawer from '../../components/AppDrawer';
 import {
-  Briefcase,
-  Calendar,
   Clock,
-  Menu,
-  Bell,
   Play,
+  Square,
+  CalendarDays,
+  CalendarClock,
   Receipt,
   MapPin,
+  Navigation,
+  FolderKanban,
   ArrowUp,
-  ChevronDown,
   ChevronRight,
+  Bell,
   X,
+  CheckCircle2,
 } from 'lucide-react-native';
 
 const PulseSkeleton = ({ style }: { style: any }) => {
@@ -44,45 +42,91 @@ const PulseSkeleton = ({ style }: { style: any }) => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 0.5, duration: 800, useNativeDriver: true })
+        Animated.timing(pulseAnim, { toValue: 0.5, duration: 800, useNativeDriver: true }),
       ])
     ).start();
   }, [pulseAnim]);
   return <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: '#E2E8F0' }]} />;
 };
 
+function formatRelativeTime(dateStr?: string | Date): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getNotificationIcon(title?: string, message?: string) {
+  const text = `${title || ''} ${message || ''}`.toLowerCase();
+  if (text.includes('leave') || text.includes('holiday')) {
+    return { Icon: CalendarDays, bg: '#ECFDF5', color: '#059669' };
+  }
+  if (text.includes('project') || text.includes('task') || text.includes('board')) {
+    return { Icon: FolderKanban, bg: '#FEF3C7', color: '#D97706' };
+  }
+  if (text.includes('payroll') || text.includes('payslip') || text.includes('expense')) {
+    return { Icon: Receipt, bg: '#F0FDF4', color: '#16A34A' };
+  }
+  if (text.includes('visit') || text.includes('travel') || text.includes('client')) {
+    return { Icon: MapPin, bg: '#FAF5FF', color: '#9333EA' };
+  }
+  if (text.includes('attendance') || text.includes('timesheet') || text.includes('clock')) {
+    return { Icon: CalendarClock, bg: '#EFF6FF', color: '#2563EB' };
+  }
+  return { Icon: Bell, bg: '#F8FAFC', color: '#64748B' };
+}
+
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
-  const { logout, user } = useAuthStore();
-  const { 
-    profile, 
-    todayAttendance, 
-    attendanceHistory, 
-    leaveBalances, 
-    projects, 
-    notifications, 
-    unreadCount, 
-    fetchDashboardData, 
-    clockIn, 
-    clockOut, 
+  const { user } = useAuthStore();
+  const {
+    profile,
+    todayAttendance,
+    attendanceHistory,
+    leaveBalances,
+    projects,
+    notifications,
+    fetchDashboardData,
+    clockIn,
+    clockOut,
     isClockingIn,
     isLoading,
     error,
   } = useDashboardStore();
-  
+  const { activeVisit, fetchActiveVisit } = useFieldVisitStore();
+
   const [currentTime, setCurrentTime] = useState('');
   const [liveWorkedTime, setLiveWorkedTime] = useState({ hours: 0, minutes: 0 });
-  const [timeFilter, setTimeFilter] = useState<'7D' | '30D' | '3M'>('3M');
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [timeFilter, setTimeFilter] = useState<'7D' | '30D' | '3M'>('7D');
   const [refreshing, setRefreshing] = useState(false);
-
-  // Field visit — live data from the store
-  const { activeVisit, fetchActiveVisit } = useFieldVisitStore();
-  const isTraveling = !!activeVisit;
   const [visitElapsed, setVisitElapsed] = useState('00:00:00');
+  const [feedback, setFeedback] = useState<{
+    visible: boolean;
+    type: ModalType;
+    title: string;
+    message: string;
+  }>({ visible: false, type: 'success', title: '', message: '' });
 
-  // Tick the elapsed timer off the visit's own start time, so it stays correct
-  // even though the GPS tracking intervals only run on the Field Visit screen.
+  const isTraveling = !!activeVisit;
+
+  // Initial load
+  useEffect(() => {
+    fetchDashboardData();
+    fetchActiveVisit().catch(() => {});
+  }, [fetchDashboardData, fetchActiveVisit]);
+
+  // Field visit elapsed timer
   useEffect(() => {
     if (!activeVisit?.startTime) return;
     const tick = () => {
@@ -94,34 +138,14 @@ export default function DashboardScreen() {
     return () => clearInterval(t);
   }, [activeVisit?.startTime]);
 
-  const safeNavigate = (screenName: string, params?: any) => {
-    const comingSoon: string[] = []; // removed Expenses
-    if (comingSoon.includes(screenName)) {
-      Alert.alert('Coming Soon', `The ${screenName} screen is currently under development.`);
-    } else if (screenName === 'Expenses') {
-      navigation.navigate('Attendance' as any, { initialTab: 'expenses' });
-    } else {
-      navigation.navigate(screenName as any, params);
-    }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
-    fetchActiveVisit().catch(() => {});
-  }, []);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchDashboardData();
-    setRefreshing(false);
-  };
-
   // Live Clock
   useEffect(() => {
-    const timer = setInterval(() => {
+    const updateClock = () => {
       const now = new Date();
       setCurrentTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
-    }, 1000);
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -130,41 +154,50 @@ export default function DashboardScreen() {
     const updateTimer = () => {
       if (todayAttendance?.clockIn && !todayAttendance?.clockOut) {
         const clockInTime = new Date(todayAttendance.clockIn).getTime();
-        const diffMs = Math.max(0, new Date().getTime() - clockInTime);
+        const diffMs = Math.max(0, Date.now() - clockInTime);
         const totalMinutes = Math.floor(diffMs / 60000);
         setLiveWorkedTime({ hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 });
       } else if (todayAttendance?.totalHours) {
         setLiveWorkedTime({
           hours: Math.floor(todayAttendance.totalHours),
-          minutes: Math.round((todayAttendance.totalHours % 1) * 60)
+          minutes: Math.round((todayAttendance.totalHours % 1) * 60),
         });
       } else {
         setLiveWorkedTime({ hours: 0, minutes: 0 });
       }
     };
-    
+
     updateTimer();
     const interval = setInterval(updateTimer, 60000);
     return () => clearInterval(interval);
   }, [todayAttendance]);
 
+  const safeNavigate = (screenName: string, params?: any) => {
+    if (screenName === 'Expenses') {
+      navigateTo(navigation, 'Attendance', { initialTab: 'expenses' });
+    } else {
+      navigateTo(navigation, screenName, params);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
+  };
+
   const handleAttendanceToggle = async () => {
     try {
       if (todayAttendance?.clockIn && !todayAttendance?.clockOut) {
         await clockOut();
-        setFeedback({ visible: true, type: 'success', title: 'Clocked Out', message: 'You have clocked out successfully.' });
+        setFeedback({ visible: true, type: 'success', title: 'Shift Ended', message: 'You have clocked out successfully.' });
       } else {
         await clockIn();
-        setFeedback({ visible: true, type: 'success', title: 'Clocked In', message: 'You have clocked in successfully.' });
+        setFeedback({ visible: true, type: 'success', title: 'Shift Started', message: 'You have clocked in successfully.' });
       }
-    } catch (error: any) {
-      setFeedback({ visible: true, type: 'error', title: 'Error', message: error?.message || 'Failed to update attendance' });
+    } catch (err: any) {
+      setFeedback({ visible: true, type: 'error', title: 'Action Failed', message: err?.message || 'Failed to update attendance' });
     }
-  };
-
-  const getInitials = (firstName?: string, lastName?: string, email?: string) => {
-    if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    return email ? email.substring(0, 2).toUpperCase() : 'MS';
   };
 
   const isCheckedIn = !!(todayAttendance?.clockIn && !todayAttendance?.clockOut);
@@ -174,7 +207,7 @@ export default function DashboardScreen() {
       notificationService.markAsRead(notification.id).catch(() => {});
       useDashboardStore.setState(state => ({
         notifications: state.notifications.map(n => n.id === notification.id ? { ...n, isRead: true } : n),
-        unreadCount: Math.max(0, state.unreadCount - 1)
+        unreadCount: Math.max(0, state.unreadCount - 1),
       }));
     }
 
@@ -187,7 +220,7 @@ export default function DashboardScreen() {
       if (!isNaN(projectId)) {
         const project = projects.find((p: any) => p.id === projectId);
         if (project) {
-          (navigation as any).navigate('ProjectDetail', { projectId: project.id, projectName: project.name });
+          navigation.navigate('ProjectDetail', { projectId: project.id, projectName: project.name });
           return;
         }
       }
@@ -199,939 +232,890 @@ export default function DashboardScreen() {
     } else if (path.startsWith('/attendance')) {
       safeNavigate('Attendance', { initialTab: 'timesheets' });
     } else if (path.startsWith('/payroll')) {
-      (navigation as any).navigate('Payslips');
+      safeNavigate('Payslips');
     }
   };
-  
-  const [feedback, setFeedback] = useState<{ 
-    visible: boolean; 
-    type: ModalType; 
-    title: string; 
-    message: string; 
-  }>({ visible: false, type: 'success', title: '', message: '' });
-  
+
   // Computed values
   const totalLeaveAllocated = leaveBalances.reduce((sum, lb) => sum + lb.allocated, 0);
   const totalLeaveUsed = leaveBalances.reduce((sum, lb) => sum + lb.used, 0);
-  const totalLeaveRemaining = totalLeaveAllocated - totalLeaveUsed;
+  const totalLeaveRemaining = Math.max(0, totalLeaveAllocated - totalLeaveUsed);
   const leaveProgress = totalLeaveAllocated > 0 ? (totalLeaveUsed / totalLeaveAllocated) * 100 : 0;
-  
+
   const activeProjectsCount = projects.filter(p => p.status !== 'ARCHIVED').length;
   const completedProjectsCount = projects.filter(p => p.status === 'COMPLETED').length;
-  
+
   const currentHour = new Date().getHours();
-  const greeting = currentHour < 12 ? 'GOOD MORNING' : currentHour < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
-  const displayName = profile ? `${profile.firstName} ${profile.lastName}` : (user?.email?.split('@')[0] || 'Employee');
+  const greeting = currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening';
+  const cleanLastName = (profile?.lastName || '').trim() === '.' ? '' : (profile?.lastName || '').trim();
+  const displayName = profile
+    ? [profile.firstName?.trim(), cleanLastName].filter(Boolean).join(' ')
+    : (user?.email?.split('@')[0] || 'Employee');
 
   // Weekly attendance chart data (computed)
   const getChartData = () => {
-    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const data = [
-      { day: 'M', height: '0%' },
-      { day: 'T', height: '0%' },
-      { day: 'W', height: '0%' },
-      { day: 'T', height: '0%' },
-      { day: 'F', height: '0%' },
-      { day: 'S', height: '0%' },
-      { day: 'S', height: '0%' },
+      { day: 'M', label: 'Mon', pct: 0, hours: 0 },
+      { day: 'T', label: 'Tue', pct: 0, hours: 0 },
+      { day: 'W', label: 'Wed', pct: 0, hours: 0 },
+      { day: 'T', label: 'Thu', pct: 0, hours: 0 },
+      { day: 'F', label: 'Fri', pct: 0, hours: 0 },
+      { day: 'S', label: 'Sat', pct: 0, hours: 0 },
+      { day: 'S', label: 'Sun', pct: 0, hours: 0 },
     ];
-    
+
     if (!attendanceHistory || attendanceHistory.length === 0) return { data, avgHours: 0 };
-    
-    // Group history by day of week
+
     const now = new Date();
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
+    startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // Monday
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     let totalHoursWeek = 0;
-    
+    let workDaysCount = 0;
+
     attendanceHistory.forEach(record => {
       const recordDate = new Date(record.date);
       if (recordDate >= startOfWeek) {
         const dayIndex = recordDate.getDay(); // 0 (Sun) to 6 (Sat)
-        const mappedIndex = dayIndex === 0 ? 6 : dayIndex - 1; // Map to M-S
+        const mappedIndex = dayIndex === 0 ? 6 : dayIndex - 1; // Map to Mon-Sun
         if (mappedIndex >= 0 && mappedIndex < 7) {
           totalHoursWeek += record.totalHours;
-          // Normalize to a max of 12 hours for 100% height
-          const pct = Math.min(100, Math.round((record.totalHours / 12) * 100));
-          data[mappedIndex].height = `${pct}%`;
+          if (record.totalHours > 0) workDaysCount++;
+          const pct = Math.min(100, Math.round((record.totalHours / 10) * 100));
+          data[mappedIndex].pct = pct;
+          data[mappedIndex].hours = record.totalHours;
         }
       }
     });
-    
-    return { data, avgHours: totalHoursWeek / 5 }; // Assuming 5 work days for avg
+
+    const avg = workDaysCount > 0 ? totalHoursWeek / workDaysCount : (totalHoursWeek / 5);
+    return { data, avgHours: avg };
   };
 
   const { data: chartData, avgHours } = getChartData();
-
-  const workedTodayHours = todayAttendance?.totalHours || 0;
+  const todayDayIndex = (new Date().getDay() + 6) % 7; // Monday = 0
+  const workedTodayHours = todayAttendance?.totalHours || (liveWorkedTime.hours + liveWorkedTime.minutes / 60);
+  const targetHours = 8.5;
+  const progressRatio = Math.min(workedTodayHours / targetHours, 1);
   const trendVsAvg = avgHours > 0 ? ((workedTodayHours - avgHours) / avgHours) * 100 : 0;
-  const trendColor = trendVsAvg >= 0 ? '#16A34A' : '#EF4444';
-  const trendBg = trendVsAvg >= 0 ? '#DCFCE7' : '#FEE2E2';
+  const trendColor = trendVsAvg >= 0 ? '#10B981' : '#EF4444';
+  const trendBg = trendVsAvg >= 0 ? '#ECFDF5' : '#FEF2F2';
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      
-      {/* Top Header Bar */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          activeOpacity={0.7}
-          onPress={() => setIsDrawerOpen(true)}
-        >
-          <Menu size={22} color="#0F172A" />
-        </TouchableOpacity>
-
-        {isLoading && !refreshing ? (
-          <View style={styles.headerCenter}>
-            <PulseSkeleton style={{ width: 80, height: 10, borderRadius: 4, marginBottom: 6 }} />
-            <PulseSkeleton style={{ width: 140, height: 18, borderRadius: 6 }} />
-          </View>
-        ) : (
-          <View style={styles.headerCenter}>
-            <Text style={styles.greetingText}>{greeting}</Text>
-            <Text style={styles.nameText}>{displayName}</Text>
-          </View>
-        )}
-        
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={() => safeNavigate('Notifications')}>
-            <Bell size={20} color="#0F172A" />
-            {unreadCount > 0 && <View style={styles.notificationDot} />}
-          </TouchableOpacity>
-          {isLoading && !refreshing ? (
-            <PulseSkeleton style={{ width: 44, height: 44, borderRadius: 14 }} />
-          ) : (
-            <TouchableOpacity style={styles.avatarButton} onPress={() => safeNavigate('Profile')} activeOpacity={0.8}>
-              {profile?.avatarUrl ? (
-                <Image source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
-              ) : (
-                <Text style={styles.avatarText}>{getInitials(profile?.firstName, profile?.lastName, user?.email)}</Text>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
+    <AppScreen
+      showBottomNav={false}
+      title={displayName}
+      subtitle={greeting}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E25E3E']} />
         }
       >
         {error ? (
-          <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center', marginTop: 40 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <X color="#DC2626" size={32} />
+          <View style={styles.errorContainer}>
+            <View style={styles.errorIconBox}>
+              <X color="#DC2626" size={32} strokeWidth={2.5} />
             </View>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8, textAlign: 'center' }}>
-              Oops, something went wrong
+            <Text style={styles.errorTitle}>Connection Issue</Text>
+            <Text style={styles.errorMessage}>
+              We could not sync your dashboard. Please verify your network connection.
             </Text>
-            <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 24, lineHeight: 20 }}>
-              We couldn't load your dashboard data. Please check your connection and try again.
-            </Text>
-            <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', marginBottom: 24, paddingHorizontal: 20 }}>
-              Error: {error}
-            </Text>
-            <TouchableOpacity 
-              style={{ backgroundColor: '#E25E3E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 100 }}
-              onPress={onRefresh}
-            >
-              <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 14 }}>Try Again</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={onRefresh} activeOpacity={0.8}>
+              <Text style={styles.retryBtnText}>Retry Sync</Text>
             </TouchableOpacity>
           </View>
         ) : isLoading && !refreshing ? (
-          <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 20 }}>
-            <PulseSkeleton style={{ height: 220, borderRadius: 24, width: '100%' }} />
-            <PulseSkeleton style={{ height: 100, borderRadius: 16, width: '100%' }} />
-            <View style={{ flexDirection: 'row', gap: 15 }}>
-              <PulseSkeleton style={{ height: 140, borderRadius: 20, flex: 1 }} />
-              <PulseSkeleton style={{ height: 140, borderRadius: 20, flex: 1 }} />
+          <View style={styles.skeletonContainer}>
+            <PulseSkeleton style={{ height: 210, borderRadius: 24, width: '100%' }} />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <PulseSkeleton style={{ height: 88, borderRadius: 18, flex: 1 }} />
+              <PulseSkeleton style={{ height: 88, borderRadius: 18, flex: 1 }} />
+              <PulseSkeleton style={{ height: 88, borderRadius: 18, flex: 1 }} />
+              <PulseSkeleton style={{ height: 88, borderRadius: 18, flex: 1 }} />
             </View>
-            <PulseSkeleton style={{ height: 280, borderRadius: 24, width: '100%' }} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <PulseSkeleton style={{ height: 135, borderRadius: 22, flex: 1 }} />
+              <PulseSkeleton style={{ height: 135, borderRadius: 22, flex: 1 }} />
+            </View>
+            <PulseSkeleton style={{ height: 240, borderRadius: 24, width: '100%' }} />
           </View>
         ) : (
           <>
-        {/* --- Today's Attendance Card --- */}
-        <View style={styles.attendanceCard}>
-          {/* Subtle decorative background circle top-right */}
-          <View style={styles.cardGlowBg} />
+            {/* 1. HERO ATTENDANCE & SHIFT HUB */}
+            <View style={styles.heroAttendanceCard}>
+              <View style={styles.heroGlowAccent} />
 
-          <Text style={styles.attendanceCardTitle}>TODAY'S ATTENDANCE</Text>
-          <Text style={styles.attendanceDate}>
-            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-          </Text>
-
-          <View style={styles.attendanceTimeRow}>
-            <Text style={styles.timeClock}>{currentTime || '00: 00: 00'}</Text>
-            
-            <View style={{ position: 'relative', width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
-              <Svg width="60" height="60" viewBox="0 0 60 60">
-                <Circle
-                  cx="30" cy="30" r="26"
-                  stroke="#F3E8E5" strokeWidth="5" fill="none"
-                />
-                <Circle
-                  cx="30" cy="30" r="26"
-                  stroke="#EA580C" strokeWidth="5" fill="none"
-                  strokeDasharray={`${2 * Math.PI * 26}`}
-                  strokeDashoffset={`${2 * Math.PI * 26 * (1 - Math.min((liveWorkedTime.hours * 60 + liveWorkedTime.minutes) / (9 * 60), 1))}`}
-                  strokeLinecap="round"
-                  rotation="-90"
-                  origin="30, 30"
-                />
-              </Svg>
-              <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={styles.progressRingText}>
-                  {liveWorkedTime.hours}h {liveWorkedTime.minutes.toString().padStart(2, '0')}m
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.attendanceFooter}>
-            <View style={styles.statusPill}>
-              <View style={[styles.statusDot, { backgroundColor: isCheckedIn ? '#10B981' : '#94A3B8' }]} />
-              <Text style={styles.statusText}>{isCheckedIn ? 'Clocked in' : 'Not clocked in'}</Text>
-            </View>
-
-            <TouchableOpacity 
-              style={[
-                styles.punchButton, 
-                isCheckedIn ? styles.punchButtonOut : styles.punchButtonIn, 
-                isClockingIn && { opacity: 0.7 }
-              ]}
-              activeOpacity={0.8}
-              onPress={handleAttendanceToggle}
-              disabled={isClockingIn}
-            >
-              {isClockingIn ? (
-                <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />
-              ) : (
-                <Play size={15} color="#FFFFFF" style={{ marginRight: 6, transform: [{ rotate: isCheckedIn ? '90deg' : '0deg' }] }} />
-              )}
-              <Text style={styles.punchButtonText}>
-                {isClockingIn ? 'Processing...' : (isCheckedIn ? 'Clock Out' : 'Clock In')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-
-        {/* --- Quick Actions (Equal 4-Column Grid) --- */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.quickActionsGrid}>
-          <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.7} onPress={() => safeNavigate('Leaves')}>
-            <View style={[styles.qaIconWrapper, { backgroundColor: '#FFF7ED' }]}>
-              <Calendar size={22} color="#EA580C" />
-            </View>
-            <Text style={styles.qaText}>Leave</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.7} onPress={() => safeNavigate('Attendance')}>
-            <View style={[styles.qaIconWrapper, { backgroundColor: '#F0FDF4' }]}>
-              <Clock size={22} color="#16A34A" />
-            </View>
-            <Text style={styles.qaText}>Attendance</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.7} onPress={() => safeNavigate('Expenses')}>
-            <View style={[styles.qaIconWrapper, { backgroundColor: '#EFF6FF' }]}>
-              <Receipt size={22} color="#2563EB" />
-            </View>
-            <Text style={styles.qaText}>Expense</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} activeOpacity={0.7} onPress={() => safeNavigate('FieldVisit')}>
-            <View style={[styles.qaIconWrapper, { backgroundColor: '#FAF5FF' }]}>
-              <MapPin size={22} color="#9333EA" />
-            </View>
-            <Text style={styles.qaText}>Field Visit</Text>
-          </TouchableOpacity>
-        </View>
-
-
-        {/* --- Overview (2-Column Equal Grid) --- */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Overview</Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('Projects')}>
-            <Text style={styles.viewAllText}>View all</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.overviewGrid}>
-          {/* Card 1: Worked Today */}
-          <View style={styles.overviewCard}>
-            <View style={[styles.overviewIconWrapper, { backgroundColor: '#FFF7ED' }]}>
-              <Clock size={20} color="#EA580C" />
-            </View>
-            <Text style={styles.overviewValue}>
-              {todayAttendance?.totalHours ? `${Math.floor(todayAttendance.totalHours)}h ${Math.round((todayAttendance.totalHours % 1) * 60)}m` : '0h 0m'}
-            </Text>
-            <Text style={styles.overviewLabel}>Worked today</Text>
-            <View style={[styles.overviewBadge, { backgroundColor: trendBg }]}>
-              <ArrowUp size={12} color={trendColor} style={{ transform: [{ rotate: trendVsAvg >= 0 ? '0deg' : '180deg' }] }} />
-              <Text style={[styles.overviewBadgeText, { color: trendColor }]}> {Math.abs(trendVsAvg).toFixed(1)}% vs avg</Text>
-            </View>
-          </View>
-
-          {/* Card 2: Active Projects */}
-          <View style={styles.overviewCard}>
-            <View style={[styles.overviewIconWrapper, { backgroundColor: '#F0FDF4' }]}>
-              <Briefcase size={20} color="#16A34A" />
-            </View>
-            <Text style={styles.overviewValue}>{activeProjectsCount}</Text>
-            <Text style={styles.overviewLabel}>Active projects</Text>
-            <View style={[styles.overviewBadge, { backgroundColor: '#F1F5F9' }]}>
-              <Text style={[styles.overviewBadgeText, { color: '#64748B' }]}>{completedProjectsCount} completed</Text>
-            </View>
-          </View>
-        </View>
-
-
-        {/* --- Working Hours / Attendance Chart Section --- */}
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Attendance</Text>
-
-        <View style={styles.chartCard}>
-          {/* Header Row inside Chart Card */}
-          <View style={styles.chartHeader}>
-            <View>
-              <Text style={styles.chartTitle}>Working hours</Text>
-              <Text style={styles.chartSubtitle}>Your attendance this week</Text>
-            </View>
-
-            {/* Time Filter Pill Selector */}
-            <View style={styles.filterPillContainer}>
-              {(['7D', '30D', '3M'] as const).map((filter) => (
-                <TouchableOpacity
-                  key={filter}
-                  style={[
-                    styles.filterTab,
-                    timeFilter === filter && styles.filterTabActive,
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => setTimeFilter(filter)}
-                >
-                  <Text
-                    style={[
-                      styles.filterTabText,
-                      timeFilter === filter && styles.filterTabTextActive,
-                    ]}
-                  >
-                    {filter}
+              {/* Status Pill & Date Header */}
+              <View style={styles.heroHeaderRow}>
+                <View style={[styles.heroShiftBadge, isCheckedIn ? styles.heroShiftBadgeActive : styles.heroShiftBadgeIdle]}>
+                  <View style={[styles.heroStatusDot, isCheckedIn ? styles.heroStatusDotActive : styles.heroStatusDotIdle]} />
+                  <Text style={[styles.heroShiftBadgeText, isCheckedIn ? styles.heroShiftTextActive : styles.heroShiftTextIdle]}>
+                    {isCheckedIn ? 'ACTIVE SHIFT' : 'OFF SHIFT'}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+                </View>
 
-          {/* Bar Chart View */}
-          <View style={styles.chartContainer}>
-            {/* Background Grid Lines */}
-            <View style={styles.gridLinesContainer}>
-              <View style={styles.gridLine} />
-              <View style={styles.gridLine} />
-              <View style={styles.gridLine} />
-              <View style={styles.gridLine} />
-            </View>
+                <View style={styles.heroDateRow}>
+                  <CalendarDays size={14} color="#64748B" strokeWidth={2} />
+                  <Text style={styles.heroDateText}>
+                    {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </Text>
+                </View>
+              </View>
 
-            {/* Bars */}
-            <View style={styles.barsRow}>
-              {/* Dynamic Chart Data based on history will go here */}
-              {chartData.map((item: { day: string; height: string }, index: number) => (
-                <View key={index} style={styles.barColumn}>
-                  <View style={styles.barTrack}>
-                    <View
-                      style={[
-                        styles.barFill,
-                        { height: item.height },
-                      ]}
+              {/* Clock & SVG Gauge Center */}
+              <View style={styles.heroCenterRow}>
+                <View style={styles.heroTimeCol}>
+                  <Text style={styles.heroTimeClock}>{currentTime || '00:00:00'}</Text>
+                  <Text style={styles.heroTargetSubtitle}>
+                    {todayAttendance?.clockIn
+                      ? `Clocked in at ${new Date(todayAttendance.clockIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                      : 'Regular shift target: 8h 30m'}
+                  </Text>
+                </View>
+
+                {/* Circular Progress Gauge */}
+                <View style={styles.heroRingWrapper}>
+                  <Svg width="68" height="68" viewBox="0 0 68 68">
+                    <Circle
+                      cx="34" cy="34" r="28"
+                      stroke="#F1F5F9" strokeWidth="6" fill="none"
                     />
-                  </View>
-                  <Text style={styles.barLabel}>{item.day}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Chart Footer */}
-          <View style={styles.chartFooter}>
-            <View style={styles.avgContainer}>
-              <Text style={styles.avgValue}>
-                {avgHours > 0 ? `${Math.floor(avgHours)}h ${Math.round((avgHours % 1) * 60)}m` : '0h 0m'}
-              </Text>
-              <Text style={styles.avgLabel}>Weekly average</Text>
-            </View>
-
-            <View style={[styles.chartBadge, { backgroundColor: trendBg }]}>
-              <ArrowUp size={12} color={trendColor} style={{ transform: [{ rotate: trendVsAvg >= 0 ? '0deg' : '180deg' }] }} />
-              <Text style={[styles.chartBadgeText, { color: trendColor }]}> {Math.abs(trendVsAvg).toFixed(1)}%</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* --- Leave Balance --- */}
-        <TouchableOpacity
-          style={styles.statPanel}
-          activeOpacity={0.85}
-          onPress={() => safeNavigate('Leaves')}
-        >
-          <View style={styles.statPanelHeader}>
-            <View style={styles.statPanelHeaderLeft}>
-              <View style={[styles.statPanelIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                <Calendar size={18} color="#16A34A" />
-              </View>
-              <Text style={styles.statPanelTitle}>Leave Balance</Text>
-            </View>
-            <ChevronRight size={18} color="#CBD5E1" />
-          </View>
-
-          <View style={styles.statPanelValueRow}>
-            <Text style={styles.statPanelBigValue}>{totalLeaveRemaining}</Text>
-            <Text style={styles.statPanelValueUnit}>days remaining</Text>
-          </View>
-
-          <View style={styles.leaveProgressBarTrack}>
-            <View
-              style={[
-                styles.leaveProgressBarFill,
-                { width: `${Math.min(leaveProgress, 100)}%` },
-                leaveProgress >= 90 && { backgroundColor: '#F87171' },
-              ]}
-            />
-          </View>
-          <View style={styles.leaveProgressLabels}>
-            <Text style={styles.leaveProgressText}>{totalLeaveUsed} used</Text>
-            <Text style={styles.leaveProgressText}>{totalLeaveAllocated} total</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* --- Active Projects --- */}
-        <TouchableOpacity
-          style={[styles.statPanel, { marginBottom: 24 }]}
-          activeOpacity={0.85}
-          onPress={() => safeNavigate('Projects')}
-        >
-          <View style={styles.statPanelHeader}>
-            <View style={styles.statPanelHeaderLeft}>
-              <View style={[styles.statPanelIconWrap, { backgroundColor: '#FFF7ED' }]}>
-                <Briefcase size={18} color="#EA580C" />
-              </View>
-              <Text style={styles.statPanelTitle}>Active Projects</Text>
-            </View>
-            <View style={styles.statPanelCountPill}>
-              <Text style={styles.statPanelCountPillText}>{activeProjectsCount}</Text>
-            </View>
-          </View>
-
-          <View style={styles.projectsList}>
-            {projects.slice(0, 3).map((project, index) => (
-              <View key={project.id || index} style={styles.projectItemRow}>
-                <View
-                  style={[
-                    styles.projectStatusDot,
-                    { backgroundColor: project.status === 'COMPLETED' ? '#16A34A' : '#EA580C' },
-                  ]}
-                />
-                <Text style={styles.projectNameText} numberOfLines={1}>{project.name}</Text>
-                <View style={[styles.statusBadge, project.status === 'COMPLETED' ? styles.doneBadge : styles.wipBadge]}>
-                  <Text style={project.status === 'COMPLETED' ? styles.doneBadgeText : styles.wipBadgeText}>
-                    {project.status === 'COMPLETED' ? 'DONE' : 'WIP'}
-                  </Text>
-                </View>
-              </View>
-            ))}
-            {projects.length === 0 && (
-              <Text style={styles.emptyProjectsText}>No active projects</Text>
-            )}
-            {projects.length > 3 && (
-              <Text style={styles.moreProjectsText}>+{projects.length - 3} more</Text>
-            )}
-          </View>
-        </TouchableOpacity>
-
-        {/* --- Field Visit Section --- */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Field Visit</Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('FieldVisit')}>
-            <Text style={styles.historyText}>History</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity activeOpacity={0.97} onPress={() => safeNavigate('FieldVisit')}>
-          <View style={styles.fieldVisitCard}>
-            <View style={styles.fieldVisitHeaderRow}>
-              <View>
-                <Text style={styles.fieldVisitTag}>FIELD VISIT</Text>
-                <Text style={styles.fieldVisitStatusText}>{isTraveling ? 'Traveling' : 'Not traveling'}</Text>
-              </View>
-              <View style={[styles.idlePill, isTraveling && { backgroundColor: '#DCFCE7' }]}>
-                <View style={[styles.idleDot, isTraveling && { backgroundColor: '#16A34A' }]} />
-                <Text style={[styles.idlePillText, isTraveling && { color: '#16A34A' }]}>{isTraveling ? 'Active' : 'Idle'}</Text>
-              </View>
-            </View>
-
-            {isTraveling && activeVisit ? (
-              <>
-                <Text style={styles.travelingForLabel}>Traveling for</Text>
-                <View style={styles.dropdownInput}>
-                  <View style={[styles.projectDot, { backgroundColor: activeVisit.project?.color || '#2563EB', marginRight: 8 }]} />
-                  <Text style={styles.dropdownSelectedText} numberOfLines={1}>
-                    {activeVisit.project?.name || 'Active visit'}
-                  </Text>
-                </View>
-
-                {activeVisit.purpose ? (
-                  <Text style={styles.visitPurposeText} numberOfLines={2}>{activeVisit.purpose}</Text>
-                ) : null}
-
-                <View style={styles.visitLiveRow}>
-                  <View style={styles.visitLiveBox}>
-                    <Clock size={15} color="#E25E3E" />
-                    <Text style={styles.visitLiveValue}>{visitElapsed}</Text>
-                    <Text style={styles.visitLiveLabel}>Elapsed</Text>
-                  </View>
-                  <View style={styles.visitLiveDivider} />
-                  <View style={styles.visitLiveBox}>
-                    <MapPin size={15} color="#2563EB" />
-                    <Text style={styles.visitLiveValue}>
-                      {new Date(activeVisit.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    <Circle
+                      cx="34" cy="34" r="28"
+                      stroke={isCheckedIn ? '#10B981' : '#E25E3E'} strokeWidth="6" fill="none"
+                      strokeDasharray={`${2 * Math.PI * 28}`}
+                      strokeDashoffset={`${2 * Math.PI * 28 * (1 - progressRatio)}`}
+                      strokeLinecap="round"
+                      rotation="-90"
+                      origin="34, 34"
+                    />
+                  </Svg>
+                  <View style={styles.heroRingCenterContent}>
+                    <Text style={styles.heroRingMainText}>
+                      {liveWorkedTime.hours}h {liveWorkedTime.minutes}m
                     </Text>
-                    <Text style={styles.visitLiveLabel}>Started</Text>
+                    <Text style={styles.heroRingSubText}>Worked</Text>
                   </View>
                 </View>
+              </View>
 
+              {/* Action Button Bar */}
+              <View style={styles.heroFooter}>
                 <TouchableOpacity
-                  style={[styles.startTripButton, { backgroundColor: '#EF4444', shadowColor: '#EF4444' }]}
-                  activeOpacity={0.8}
-                  onPress={() => safeNavigate('FieldVisit')}
+                  style={[
+                    styles.heroPunchBtn,
+                    isCheckedIn ? styles.heroPunchBtnOut : styles.heroPunchBtnIn,
+                    isClockingIn && { opacity: 0.75 },
+                  ]}
+                  activeOpacity={0.82}
+                  onPress={handleAttendanceToggle}
+                  disabled={isClockingIn}
                 >
-                  <MapPin size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.startTripButtonText}>View Active Visit</Text>
+                  {isClockingIn ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                  ) : isCheckedIn ? (
+                    <Square size={16} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 8 }} />
+                  ) : (
+                    <Play size={16} color="#FFFFFF" fill="#FFFFFF" style={{ marginRight: 8 }} />
+                  )}
+                  <Text style={styles.heroPunchBtnText}>
+                    {isClockingIn ? 'Updating Status…' : isCheckedIn ? 'Clock Out' : 'Clock In for Today'}
+                  </Text>
                 </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.travelingForLabel}>Ready to start a field visit?</Text>
-                <TouchableOpacity
-                  style={styles.startTripButton}
-                  activeOpacity={0.8}
-                  onPress={() => safeNavigate('FieldVisit')}
-                >
-                  <MapPin size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.startTripButtonText}>Start Trip</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </TouchableOpacity>
+              </View>
+            </View>
 
-        {/* --- Recent Activity Section --- */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('Notifications')}>
-            <Text style={styles.viewAllText}>View all</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.activityCard}>
-          {notifications.length > 0 ? notifications.slice(0, 5).map((notification, index) => (
-            <React.Fragment key={notification.id}>
-              <TouchableOpacity style={[styles.activityItemRow, !notification.isRead && { backgroundColor: '#F1F5F9', borderRadius: 12, paddingHorizontal: 12, marginHorizontal: -12 }]} activeOpacity={0.7} onPress={() => handleNotificationPress(notification)}>
-
-                <View style={styles.activityIconBox}>
-                  <Bell size={20} color={notification.isRead ? "#64748B" : "#2563EB"} />
-                  {!notification.isRead && <View style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />}
+            {/* 2. REFINED QUICK ACTIONS GRID */}
+            <View style={styles.sectionHeadingRow}>
+              <Text style={styles.sectionHeading}>Quick Actions</Text>
+            </View>
+            <View style={styles.quickGrid}>
+              <TouchableOpacity
+                style={styles.quickTile}
+                activeOpacity={0.75}
+                onPress={() => safeNavigate('Leaves')}
+              >
+                <View style={[styles.quickTileIcon, { backgroundColor: '#FFF7ED' }]}>
+                  <CalendarDays size={22} color="#EA580C" strokeWidth={2.2} />
                 </View>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityTitle}>{notification.title}</Text>
-                  <Text style={styles.activitySubtitle} numberOfLines={1}>{notification.message}</Text>
+                <Text style={styles.quickTileLabel}>Leaves</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickTile}
+                activeOpacity={0.75}
+                onPress={() => safeNavigate('Attendance')}
+              >
+                <View style={[styles.quickTileIcon, { backgroundColor: '#ECFDF5' }]}>
+                  <CalendarClock size={22} color="#059669" strokeWidth={2.2} />
                 </View>
-                <View style={styles.activityStatusGroup}>
-                  <Text style={styles.activityDate}>
-                    {new Date(notification.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                <Text style={styles.quickTileLabel}>Timesheet</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickTile}
+                activeOpacity={0.75}
+                onPress={() => safeNavigate('Expenses')}
+              >
+                <View style={[styles.quickTileIcon, { backgroundColor: '#EFF6FF' }]}>
+                  <Receipt size={22} color="#2563EB" strokeWidth={2.2} />
+                </View>
+                <Text style={styles.quickTileLabel}>Expense</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickTile}
+                activeOpacity={0.75}
+                onPress={() => safeNavigate('FieldVisit')}
+              >
+                <View style={[styles.quickTileIcon, { backgroundColor: '#FAF5FF' }]}>
+                  <MapPin size={22} color="#9333EA" strokeWidth={2.2} />
+                </View>
+                <Text style={styles.quickTileLabel}>Field Visit</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 3. EXECUTIVE BENTO CARDS (LEAVE & PROJECTS) */}
+            <View style={styles.sectionHeadingRow}>
+              <Text style={styles.sectionHeading}>Overview</Text>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('Projects')}>
+                <Text style={styles.viewAllBtnText}>View all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.bentoGrid}>
+              {/* Card A: Leave Balance */}
+              <TouchableOpacity
+                style={styles.bentoCard}
+                activeOpacity={0.8}
+                onPress={() => safeNavigate('Leaves')}
+              >
+                <View style={styles.bentoHeader}>
+                  <View style={[styles.bentoIconBadge, { backgroundColor: '#ECFDF5' }]}>
+                    <CalendarDays size={18} color="#059669" strokeWidth={2.2} />
+                  </View>
+                  <ChevronRight size={16} color="#CBD5E1" strokeWidth={2.2} />
+                </View>
+                <View style={styles.bentoValueRow}>
+                  <Text style={styles.bentoValue}>{totalLeaveRemaining}</Text>
+                  <Text style={styles.bentoUnit}>days left</Text>
+                </View>
+                <Text style={styles.bentoTitle}>Leave Balance</Text>
+                <View style={styles.bentoProgressTrack}>
+                  <View
+                    style={[
+                      styles.bentoProgressFill,
+                      { width: `${Math.min(leaveProgress, 100)}%` },
+                      leaveProgress >= 90 && { backgroundColor: '#EF4444' },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.bentoFooterNote}>{totalLeaveUsed} of {totalLeaveAllocated} used</Text>
+              </TouchableOpacity>
+
+              {/* Card B: Active Projects */}
+              <TouchableOpacity
+                style={styles.bentoCard}
+                activeOpacity={0.8}
+                onPress={() => safeNavigate('Projects')}
+              >
+                <View style={styles.bentoHeader}>
+                  <View style={[styles.bentoIconBadge, { backgroundColor: '#FEF3C7' }]}>
+                    <FolderKanban size={18} color="#D97706" strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.bentoPill}>
+                    <Text style={styles.bentoPillText}>{activeProjectsCount} Active</Text>
+                  </View>
+                </View>
+                <View style={styles.bentoValueRow}>
+                  <Text style={styles.bentoValue}>{activeProjectsCount}</Text>
+                  <Text style={styles.bentoUnit}>projects</Text>
+                </View>
+                <Text style={styles.bentoTitle}>Current Pipeline</Text>
+                <View style={styles.bentoProgressTrack}>
+                  <View
+                    style={[
+                      styles.bentoProgressFill,
+                      {
+                        backgroundColor: '#3B82F6',
+                        width: projects.length > 0 ? `${Math.min((completedProjectsCount / projects.length) * 100, 100)}%` : '0%',
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.bentoFooterNote}>{completedProjectsCount} completed</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 4. WORKING HOURS / ATTENDANCE RHYTHM CHART */}
+            <View style={styles.chartCard}>
+              <View style={styles.chartCardHeader}>
+                <View>
+                  <Text style={styles.chartCardTitle}>Working Hours</Text>
+                  <Text style={styles.chartCardSubtitle}>Weekly attendance rhythm</Text>
+                </View>
+                <View style={styles.periodPills}>
+                  {(['7D', '30D', '3M'] as const).map((filter) => (
+                    <TouchableOpacity
+                      key={filter}
+                      style={[styles.periodTab, timeFilter === filter && styles.periodTabActive]}
+                      activeOpacity={0.7}
+                      onPress={() => setTimeFilter(filter)}
+                    >
+                      <Text style={[styles.periodTabText, timeFilter === filter && styles.periodTabTextActive]}>
+                        {filter}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Bar Chart */}
+              <View style={styles.chartBody}>
+                <View style={styles.chartGridLines}>
+                  <View style={styles.chartGridLine} />
+                  <View style={styles.chartGridLine} />
+                  <View style={styles.chartGridLine} />
+                </View>
+                <View style={styles.barsRow}>
+                  {chartData.map((item, index) => {
+                    const isToday = index === todayDayIndex;
+                    return (
+                      <View key={index} style={styles.barColumn}>
+                        <View style={styles.barTrack}>
+                          <View
+                            style={[
+                              styles.barFill,
+                              { height: `${Math.max(item.pct, 4)}%` },
+                              isToday ? styles.barFillToday : styles.barFillOther,
+                            ]}
+                          />
+                        </View>
+                        <Text style={[styles.barLabel, isToday && styles.barLabelToday]}>
+                          {item.day}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Chart Stats Footer */}
+              <View style={styles.chartFooterRow}>
+                <View style={styles.chartAvgGroup}>
+                  <Text style={styles.chartAvgValue}>
+                    {avgHours > 0 ? `${Math.floor(avgHours)}h ${Math.round((avgHours % 1) * 60)}m` : '0h 0m'}
+                  </Text>
+                  <Text style={styles.chartAvgLabel}>Weekly average</Text>
+                </View>
+                <View style={[styles.chartTrendBadge, { backgroundColor: trendBg }]}>
+                  <ArrowUp
+                    size={13}
+                    color={trendColor}
+                    strokeWidth={2.5}
+                    style={{ transform: [{ rotate: trendVsAvg >= 0 ? '0deg' : '180deg' }] }}
+                  />
+                  <Text style={[styles.chartTrendText, { color: trendColor }]}>
+                    {' '}{Math.abs(trendVsAvg).toFixed(1)}% vs avg
                   </Text>
                 </View>
-              </TouchableOpacity>
-              {index < Math.min(notifications.length, 5) - 1 && <View style={styles.activityDivider} />}
-            </React.Fragment>
-          )) : (
-            <View style={{ padding: 16, alignItems: 'center' }}>
-              <Text style={{ color: '#94A3B8' }}>No recent activity</Text>
+              </View>
             </View>
-          )}
-        </View>
+
+            {/* 5. SMART FIELD VISIT ISLAND */}
+            <View style={styles.sectionHeadingRow}>
+              <Text style={styles.sectionHeading}>Field Operations</Text>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('FieldVisit')}>
+                <Text style={styles.viewAllBtnText}>History</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={styles.fieldCard}
+              onPress={() => safeNavigate('FieldVisit')}
+            >
+              <View style={styles.fieldCardHeader}>
+                <View style={styles.fieldTitleGroup}>
+                  <View style={[styles.fieldBadge, isTraveling && styles.fieldBadgeActive]}>
+                    <Navigation size={15} color={isTraveling ? '#16A34A' : '#64748B'} strokeWidth={2.2} />
+                    <Text style={[styles.fieldBadgeText, isTraveling && styles.fieldBadgeTextActive]}>
+                      {isTraveling ? 'TRAVELING' : 'IDLE'}
+                    </Text>
+                  </View>
+                  <Text style={styles.fieldMainTitle}>
+                    {isTraveling ? 'Field Visit in Progress' : 'Field Visit'}
+                  </Text>
+                </View>
+                <View style={[styles.fieldStatusDotWrap, isTraveling ? styles.fieldDotActive : styles.fieldDotIdle]} />
+              </View>
+
+              {isTraveling && activeVisit ? (
+                <>
+                  <View style={styles.fieldVisitProjectRow}>
+                    <View style={[styles.fieldProjectDot, { backgroundColor: activeVisit.project?.color || '#2563EB' }]} />
+                    <Text style={styles.fieldProjectName} numberOfLines={1}>
+                      {activeVisit.project?.name || 'Active Visit Project'}
+                    </Text>
+                  </View>
+                  {!!activeVisit.purpose && (
+                    <Text style={styles.fieldPurposeText} numberOfLines={2}>
+                      {activeVisit.purpose}
+                    </Text>
+                  )}
+                  <View style={styles.fieldLiveMetricsRow}>
+                    <View style={styles.fieldLiveMetricItem}>
+                      <Clock size={15} color="#E25E3E" strokeWidth={2.2} />
+                      <Text style={styles.fieldLiveValue}>{visitElapsed}</Text>
+                      <Text style={styles.fieldLiveLabel}>Duration</Text>
+                    </View>
+                    <View style={styles.fieldLiveDivider} />
+                    <View style={styles.fieldLiveMetricItem}>
+                      <MapPin size={15} color="#2563EB" strokeWidth={2.2} />
+                      <Text style={styles.fieldLiveValue}>
+                        {new Date(activeVisit.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      <Text style={styles.fieldLiveLabel}>Started</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.fieldActiveActionBtn}
+                    activeOpacity={0.8}
+                    onPress={() => safeNavigate('FieldVisit')}
+                  >
+                    <MapPin size={16} color="#FFFFFF" strokeWidth={2.2} style={{ marginRight: 6 }} />
+                    <Text style={styles.fieldActiveActionText}>View Live Route</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.fieldIdleContent}>
+                  <Text style={styles.fieldIdleDescription}>
+                    Track your business travel, client meetings, and route logs effortlessly.
+                  </Text>
+                  <View style={styles.fieldIdleActionRow}>
+                    <TouchableOpacity
+                      style={styles.fieldStartBtn}
+                      activeOpacity={0.8}
+                      onPress={() => safeNavigate('FieldVisit')}
+                    >
+                      <Navigation size={15} color="#FFFFFF" strokeWidth={2.4} style={{ marginRight: 6 }} />
+                      <Text style={styles.fieldStartBtnText}>Start Trip</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* 6. RECENT ACTIVITY TIMELINE FEED */}
+            <View style={styles.sectionHeadingRow}>
+              <Text style={styles.sectionHeading}>Recent Activity</Text>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('Notifications')}>
+                <Text style={styles.viewAllBtnText}>View all</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.activityCard}>
+              {notifications.length > 0 ? (
+                notifications.slice(0, 4).map((notification, index) => {
+                  const { Icon: ActionIcon, bg: iconBg, color: iconColor } = getNotificationIcon(notification.title, notification.message);
+                  return (
+                    <React.Fragment key={notification.id}>
+                      <TouchableOpacity
+                        style={[
+                          styles.activityItem,
+                          !notification.isRead && styles.activityItemUnread,
+                        ]}
+                        activeOpacity={0.7}
+                        onPress={() => handleNotificationPress(notification)}
+                      >
+                        <View style={[styles.activityIconBox, { backgroundColor: iconBg }]}>
+                          <ActionIcon size={18} color={iconColor} strokeWidth={2.2} />
+                          {!notification.isRead && <View style={styles.activityUnreadDot} />}
+                        </View>
+                        <View style={styles.activityContentCol}>
+                          <Text style={[styles.activityTitle, !notification.isRead && styles.activityTitleBold]} numberOfLines={1}>
+                            {notification.title}
+                          </Text>
+                          <Text style={styles.activityMessage} numberOfLines={2}>
+                            {notification.message}
+                          </Text>
+                          <Text style={styles.activityTime}>{formatRelativeTime(notification.createdAt)}</Text>
+                        </View>
+                        <ChevronRight size={15} color="#CBD5E1" strokeWidth={2} />
+                      </TouchableOpacity>
+                      {index < Math.min(notifications.length, 4) - 1 && <View style={styles.activityDivider} />}
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <View style={styles.activityEmptyState}>
+                  <CheckCircle2 size={32} color="#10B981" strokeWidth={2} style={{ marginBottom: 8 }} />
+                  <Text style={styles.activityEmptyTitle}>All Caught Up</Text>
+                  <Text style={styles.activityEmptySubtitle}>You have no pending notifications or updates.</Text>
+                </View>
+              )}
+            </View>
           </>
         )}
-
       </ScrollView>
 
-      {/* Dynamic side drawer — menus fetched from /menus/sidebar API */}
-      <AppDrawer
-        visible={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        activeScreen="Home"
+      <FeedbackModal
+        visible={feedback.visible}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        onClose={() => setFeedback(prev => ({ ...prev, visible: false }))}
       />
-
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 90,
   },
-  header: {
+
+  // --- 1. HERO ATTENDANCE & SHIFT HUB ---
+  heroAttendanceCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 20,
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#FFF1EC',
+    shadowColor: '#E25E3E',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  heroGlowAccent: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: '#FFF7F5',
+  },
+  heroHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-    backgroundColor: '#F5F7FA',
+    marginBottom: 16,
   },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  headerCenter: {
-    flex: 1,
-    paddingHorizontal: 12,
-  },
-  greetingText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  nameText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    textTransform: 'capitalize',
-  },
-  headerRight: {
+  heroShiftBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 20,
+    gap: 6,
   },
-  notificationDot: {
-    position: 'absolute',
-    top: 11,
-    right: 13,
+  heroShiftBadgeActive: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  heroShiftBadgeIdle: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  heroStatusDot: {
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: '#EA580C',
   },
-  avatarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#E25E3E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#E25E3E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+  heroStatusDotActive: {
+    backgroundColor: '#10B981',
   },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
+  heroStatusDotIdle: {
+    backgroundColor: '#94A3B8',
   },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 84,
-  },
-
-  // --- Today's Attendance Card Styles ---
-  attendanceCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 16,
-    position: 'relative',
-    overflow: 'hidden',
-    shadowColor: '#E25E3E',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#FFF5F2',
-  },
-  cardGlowBg: {
-    position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: '#FFF1EC',
-    opacity: 0.7,
-  },
-  attendanceCardTitle: {
+  heroShiftBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 6,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
-  attendanceDate: {
-    fontSize: 14,
+  heroShiftTextActive: {
+    color: '#059669',
+  },
+  heroShiftTextIdle: {
+    color: '#64748B',
+  },
+  heroDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  heroDateText: {
+    fontSize: 12.5,
     fontWeight: '600',
     color: '#64748B',
-    marginBottom: 2,
   },
-  attendanceTimeRow: {
+  heroCenterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  heroTimeCol: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  heroTimeClock: {
+    fontSize: 27,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.8,
+    fontVariant: ['tabular-nums'],
+    marginBottom: 4,
+  },
+  heroTargetSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  heroRingWrapper: {
+    width: 68,
+    height: 68,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroRingCenterContent: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroRingMainText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  heroRingSubText: {
+    fontSize: 8.5,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+  },
+  heroFooter: {
+    marginTop: 2,
+  },
+  heroPunchBtn: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  heroPunchBtnIn: {
+    backgroundColor: '#E25E3E',
+    shadowColor: '#E25E3E',
+  },
+  heroPunchBtnOut: {
+    backgroundColor: '#EF4444',
+    shadowColor: '#EF4444',
+  },
+  heroPunchBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14.5,
+    letterSpacing: 0.2,
+  },
+
+  // --- 2. QUICK ACTIONS GRID ---
+  sectionHeadingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
+    paddingHorizontal: 2,
   },
-  timeClock: {
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  viewAllBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E25E3E',
+  },
+  quickGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 22,
+  },
+  quickTile: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  quickTileIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  quickTileLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+
+  // --- 3. BENTO CARDS ---
+  bentoGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 22,
+  },
+  bentoCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  bentoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  bentoIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bentoPill: {
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  bentoPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EA580C',
+  },
+  bentoValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 5,
+    marginBottom: 2,
+  },
+  bentoValue: {
     fontSize: 26,
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.5,
-    flex: 1,
-    fontVariant: ['tabular-nums'],
   },
-  progressRing: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    borderWidth: 5,
-    borderColor: '#F5E6E3',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressRingInner: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressRingText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  attendanceFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  punchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 22,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  punchButtonIn: {
-    backgroundColor: '#E25E3E',
-    shadowColor: '#E25E3E',
-  },
-  punchButtonOut: {
-    backgroundColor: '#EF4444',
-    shadowColor: '#EF4444',
-  },
-  punchButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-
-  // --- Quick Actions Grid (4 Columns side-by-side) ---
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 14,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 24,
-  },
-  quickActionCard: {
-    flex: 1,
-    height: 94,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  qaIconWrapper: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  qaText: {
+  bentoUnit: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#475569',
+    color: '#64748B',
   },
-
-  // --- Overview Grid (2 Columns side-by-side) ---
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  viewAllText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#E25E3E',
-  },
-  overviewGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  overviewCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  overviewIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  overviewValue: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#0F172A',
-    marginBottom: 2,
-  },
-  overviewLabel: {
+  bentoTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
-    marginBottom: 12,
+    color: '#334155',
+    marginBottom: 10,
   },
-  overviewBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  bentoProgressTrack: {
+    height: 6,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 6,
   },
-  overviewBadgeText: {
+  bentoProgressFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 3,
+  },
+  bentoFooterNote: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '500',
+    color: '#94A3B8',
   },
 
-  // --- Working Hours / Attendance Chart Styles ---
+  // --- 4. WORKING HOURS CHART ---
   chartCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#000',
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
     elevation: 2,
-    marginBottom: 24,
   },
-  chartHeader: {
+  chartCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  chartTitle: {
-    fontSize: 18,
+  chartCardTitle: {
+    fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
   },
-  chartSubtitle: {
-    fontSize: 13,
+  chartCardSubtitle: {
+    fontSize: 12,
     fontWeight: '500',
     color: '#64748B',
     marginTop: 2,
   },
-  filterPillContainer: {
+  periodPills: {
     flexDirection: 'row',
     backgroundColor: '#F1F5F9',
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 3,
   },
-  filterTab: {
-    paddingHorizontal: 10,
+  periodTab: {
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 9,
   },
-  filterTabActive: {
+  periodTabActive: {
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -1139,38 +1123,38 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  filterTabText: {
-    fontSize: 12,
+  periodTabText: {
+    fontSize: 11,
     fontWeight: '700',
     color: '#94A3B8',
   },
-  filterTabTextActive: {
+  periodTabTextActive: {
     color: '#0F172A',
   },
-  chartContainer: {
-    height: 170,
+  chartBody: {
+    height: 140,
     justifyContent: 'flex-end',
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  gridLinesContainer: {
+  chartGridLines: {
     position: 'absolute',
     top: 0,
-    bottom: 30,
+    bottom: 24,
     left: 0,
     right: 0,
     justifyContent: 'space-between',
   },
-  gridLine: {
+  chartGridLine: {
     height: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
   },
   barsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     height: '100%',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
   barColumn: {
     alignItems: 'center',
@@ -1179,395 +1163,368 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   barTrack: {
-    height: 130,
-    width: 24,
+    height: 104,
+    width: 20,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
     justifyContent: 'flex-end',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   barFill: {
-    width: 24,
+    width: 20,
+    borderRadius: 10,
+  },
+  barFillToday: {
     backgroundColor: '#E25E3E',
-    borderRadius: 12,
+  },
+  barFillOther: {
+    backgroundColor: '#CBD5E1',
   },
   barLabel: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
     color: '#94A3B8',
-    marginTop: 8,
+    marginTop: 6,
   },
-  chartFooter: {
+  barLabelToday: {
+    color: '#E25E3E',
+    fontWeight: '800',
+  },
+  chartFooterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderColor: '#F1F5F9',
-    paddingTop: 16,
-    marginTop: 8,
+    borderColor: '#F8FAFC',
+    paddingTop: 12,
   },
-  avgContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-  },
-  avgValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  avgLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#64748B',
-  },
-  chartBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  chartBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#16A34A',
-  },
-
-  // --- Leave Balance & Projects Styles ---
-  statPanel: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 12,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  statPanelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  statPanelHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  statPanelIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statPanelTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  statPanelCountPill: {
-    backgroundColor: '#FFF7ED',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  statPanelCountPillText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#EA580C',
-  },
-  statPanelValueRow: {
+  chartAvgGroup: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 6,
-    marginBottom: 14,
   },
-  statPanelBigValue: {
-    fontSize: 30,
-    fontWeight: '900',
+  chartAvgValue: {
+    fontSize: 18,
+    fontWeight: '800',
     color: '#0F172A',
-    lineHeight: 34,
   },
-  statPanelValueUnit: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  leaveProgressBarTrack: {
-    height: 8,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  leaveProgressBarFill: {
-    height: '100%',
-    backgroundColor: '#34D399',
-    borderRadius: 4,
-  },
-  leaveProgressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  leaveProgressText: {
+  chartAvgLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontWeight: '500',
+    color: '#64748B',
   },
-  projectsList: {
-    gap: 12,
-  },
-  projectItemRow: {
+  chartTrendBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  projectStatusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  projectNameText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
-  wipBadge: {
-    backgroundColor: '#FEF3C7',
-  },
-  wipBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#D97706',
-  },
-  doneBadge: {
-    backgroundColor: '#DCFCE7',
-  },
-  doneBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#16A34A',
-  },
-  emptyProjectsText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 4,
-  },
-  moreProjectsText: {
-    fontSize: 12,
+  chartTrendText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#E25E3E',
-    marginTop: 2,
   },
 
-  // --- Field Visit & Recent Activity Styles ---
-  historyText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#E25E3E',
-  },
-  fieldVisitCard: {
+  // --- 5. FIELD VISIT ISLAND ---
+  fieldCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 8,
     elevation: 2,
   },
-  fieldVisitHeaderRow: {
+  fieldCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  fieldVisitTag: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 4,
+  fieldTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  fieldVisitStatusText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  idlePill: {
+  fieldBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+    gap: 4,
   },
-  idleDot: {
+  fieldBadgeActive: {
+    backgroundColor: '#DCFCE7',
+  },
+  fieldBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.4,
+  },
+  fieldBadgeTextActive: {
+    color: '#16A34A',
+  },
+  fieldMainTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  fieldStatusDotWrap: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#94A3B8',
-    marginRight: 6,
   },
-  idlePillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
+  fieldDotActive: {
+    backgroundColor: '#16A34A',
   },
-  travelingForLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-    marginTop: 16,
+  fieldDotIdle: {
+    backgroundColor: '#CBD5E1',
+  },
+  fieldVisitProjectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    marginTop: 4,
     marginBottom: 8,
   },
-  projectDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  fieldProjectDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  visitPurposeText: {
+  fieldProjectName: {
     fontSize: 13,
-    color: '#64748B',
-    fontWeight: '500',
-    marginTop: -8,
-    marginBottom: 14,
-    lineHeight: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
   },
-  visitLiveRow: {
+  fieldPurposeText: {
+    fontSize: 12.5,
+    color: '#64748B',
+    marginBottom: 10,
+    lineHeight: 17,
+  },
+  fieldLiveMetricsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderRadius: 14,
-    paddingVertical: 12,
-    marginBottom: 16,
+    paddingVertical: 10,
+    marginBottom: 12,
   },
-  visitLiveBox: { flex: 1, alignItems: 'center', gap: 3 },
-  visitLiveDivider: { width: 1, height: 34, backgroundColor: '#E2E8F0' },
-  visitLiveValue: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
-  visitLiveLabel: { fontSize: 10.5, fontWeight: '600', color: '#94A3B8' },
-  dropdownInput: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
+  fieldLiveMetricItem: {
+    flex: 1,
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 18,
+    gap: 2,
   },
-  dropdownSelectedText: {
-    fontSize: 15,
-    fontWeight: '700',
+  fieldLiveDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E2E8F0',
+  },
+  fieldLiveValue: {
+    fontSize: 14,
+    fontWeight: '800',
     color: '#0F172A',
   },
-  startTripButton: {
+  fieldLiveLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  fieldActiveActionBtn: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#E25E3E',
-    borderRadius: 24,
-    paddingVertical: 14,
-    shadowColor: '#E25E3E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#EF4444',
+    paddingVertical: 11,
+    borderRadius: 14,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  startTripButtonText: {
+  fieldActiveActionText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
+    fontSize: 13.5,
+  },
+  fieldIdleContent: {
+    marginTop: 4,
+  },
+  fieldIdleDescription: {
+    fontSize: 12.5,
+    color: '#64748B',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  fieldIdleActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  fieldStartBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E25E3E',
+    paddingHorizontal: 16,
+    paddingVertical: 8.5,
+    borderRadius: 12,
+    shadowColor: '#E25E3E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  fieldStartBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
   },
 
-  // Recent Activity Styles
+  // --- 6. RECENT ACTIVITY FEED ---
   activityCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 4,
-    shadowColor: '#000',
+    paddingVertical: 6,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 8,
     elevation: 2,
-    marginBottom: 24,
   },
-  activityItemRow: {
+  activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
+  },
+  activityItemUnread: {
+    backgroundColor: '#FFFBF9',
+    marginHorizontal: -8,
+    paddingHorizontal: 8,
+    borderRadius: 12,
   },
   activityIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#F8FAFC',
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: 12,
+    position: 'relative',
   },
-  activityContent: {
+  activityUnreadDot: {
+    position: 'absolute',
+    top: -1,
+    right: -1,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E25E3E',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  activityContentCol: {
     flex: 1,
+    marginRight: 8,
   },
   activityTitle: {
-    fontSize: 15,
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  activityTitleBold: {
+    fontWeight: '800',
+  },
+  activityMessage: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+    marginBottom: 2,
+  },
+  activityTime: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  activityDivider: {
+    height: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  activityEmptyState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  activityEmptyTitle: {
+    fontSize: 14,
     fontWeight: '700',
     color: '#0F172A',
     marginBottom: 2,
   },
-  activitySubtitle: {
+  activityEmptySubtitle: {
     fontSize: 12,
-    fontWeight: '500',
-    color: '#64748B',
-  },
-  activityStatusGroup: {
-    alignItems: 'flex-end',
-  },
-  approvedBadge: {
-    backgroundColor: '#DCFCE7',
-  },
-  approvedBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#16A34A',
-  },
-  pendingBadge: {
-    backgroundColor: '#FEF3C7',
-  },
-  pendingBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#D97706',
-  },
-  reviewBadge: {
-    backgroundColor: '#FEF3C7',
-  },
-  reviewBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#D97706',
-  },
-  activityDate: {
-    fontSize: 11,
-    fontWeight: '600',
     color: '#94A3B8',
-    marginTop: 4,
   },
-  activityDivider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
+
+  // --- STATE CONTAINERS ---
+  errorContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 40,
+  },
+  errorIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  errorMessage: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  retryBtn: {
+    backgroundColor: '#E25E3E',
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  skeletonContainer: {
+    gap: 16,
+    paddingTop: 8,
   },
 });

@@ -376,8 +376,8 @@
                   <span class="emp-name" [title]="(row.employee?.firstName || '') + ' ' + (row.employee?.lastName || '')">
                     {{ row.employee?.firstName }} {{ row.employee?.lastName || '' }}
                   </span>
-                  <span class="emp-dept" [title]="row.employee?.department?.name || 'Staff'">
-                    {{ row.employee?.department?.name || row.employee?.designation?.name || 'Staff' }}
+                  <span class="emp-dept" [title]="(row.employee?.designation?.name ? (row.employee?.designation?.name + ' · ') : '') + (row.employee?.department?.name || 'Staff')">
+                    {{ row.employee?.designation?.name || row.employee?.department?.name || 'Staff' }}
                   </span>
                 </div>
               </div>
@@ -576,8 +576,16 @@
         <img *ngIf="selectedDayDetails()?.employeeAvatarUrl" [src]="selectedDayDetails()?.employeeAvatarUrl" [alt]="selectedDayDetails()?.employeeName" class="avatar-img-md" />
         <div class="session-header-text">
           <h3 class="session-emp-name">{{ selectedDayDetails()?.employeeName }}</h3>
-          <span class="session-emp-role">{{ selectedDayDetails()?.employeeEmail }}</span>
-          <span class="session-emp-role">{{ selectedDayDetails()?.employeeDept }} · {{ selectedDayDetails()?.employeeRole }}</span>
+          <span class="session-emp-role session-emp-email" *ngIf="selectedDayDetails()?.employeeEmail">
+            {{ selectedDayDetails()?.employeeEmail }}
+          </span>
+          <span class="session-emp-role">
+            <span *ngIf="selectedDayDetails()?.employeeDesignation" class="session-emp-desig">{{ selectedDayDetails()?.employeeDesignation }}</span>
+            <span *ngIf="selectedDayDetails()?.employeeDesignation && (selectedDayDetails()?.employeeDept || selectedDayDetails()?.employeeRole)"> · </span>
+            <span *ngIf="selectedDayDetails()?.employeeDept">{{ selectedDayDetails()?.employeeDept }}</span>
+            <span *ngIf="selectedDayDetails()?.employeeDept && selectedDayDetails()?.employeeRole"> · </span>
+            <span *ngIf="selectedDayDetails()?.employeeRole">{{ selectedDayDetails()?.employeeRole }}</span>
+          </span>
         </div>
       </div>
       <button type="button" class="btn-modal-close" (click)="closeDayDetailsModal()" title="Close details">

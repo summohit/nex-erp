@@ -1,0 +1,358 @@
+.privacy-page {
+  min-height: 100vh;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ================= Top Navigation Bar ================= */
+.public-nav {
+  background-color: #0f172a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
+.nav-container {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.brand-logo-img {
+  height: 34px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.btn-back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.2s ease;
+}
+
+.btn-back-home:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateX(-2px);
+}
+
+/* ================= Hero & Breadcrumbs ================= */
+.hero-section {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  padding: 50px 24px 80px 24px;
+  color: #ffffff;
+}
+
+.hero-container {
+  max-width: 860px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 24px;
+}
+
+.bc-link {
+  color: #94a3b8;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.bc-link:hover {
+  color: #f1f5f9;
+}
+
+.bc-sep {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.bc-current {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.badge-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(255, 82, 0, 0.15);
+  color: #ff8a4c;
+  border: 1px solid rgba(255, 82, 0, 0.3);
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.page-title {
+  font-size: 2.75rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 12px 0;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.meta-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* ================= Main Document Card ================= */
+.content-container {
+  max-width: 860px;
+  width: 100%;
+  margin: -45px auto 60px auto;
+  padding: 0 24px;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+.document-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.06), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
+  padding: 48px;
+}
+
+/* Highlight / Callout */
+.callout-box {
+  display: flex;
+  gap: 16px;
+  background-color: #fff7ed;
+  border: 1px solid #ffedd5;
+  border-left: 4px solid #FF5200;
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-bottom: 40px;
+}
+
+.callout-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.callout-content strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #9a3412;
+  margin-bottom: 4px;
+}
+
+.callout-content p {
+  margin: 0;
+  color: #7c2d12;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Document Sections */
+.doc-section {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 42px;
+  padding-bottom: 36px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.doc-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.section-badge {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  background-color: #f1f5f9;
+  color: #475569;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: -0.02em;
+}
+
+.section-body {
+  flex: 1;
+}
+
+.section-body h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 4px 0 14px 0;
+  letter-spacing: -0.01em;
+}
+
+.section-body p {
+  color: #475569;
+  font-size: 1rem;
+  line-height: 1.7;
+  margin: 0 0 14px 0;
+}
+
+.styled-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #475569;
+}
+
+.styled-list li {
+  line-height: 1.7;
+  margin-bottom: 10px;
+  font-size: 0.975rem;
+}
+
+.styled-list li strong {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* Contact Card */
+.contact-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-top: 18px;
+}
+
+.contact-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #FF5200, #ff7a38);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.contact-role {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.contact-email {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #FF5200;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.contact-email:hover {
+  color: #d94300;
+  text-decoration: underline;
+}
+
+.contact-company {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+/* ================= Footer ================= */
+.public-footer {
+  text-align: center;
+  padding: 30px 20px;
+  background-color: #0f172a;
+  color: #64748b;
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.public-footer p {
+  margin: 0;
+}
+
+/* ================= Responsive ================= */
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 35px 20px 65px 20px;
+  }
+
+  .page-title {
+    font-size: 2rem;
+  }
+
+  .content-container {
+    margin-top: -35px;
+    padding: 0 16px;
+  }
+
+  .document-card {
+    padding: 24px 20px;
+  }
+
+  .doc-section {
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 30px;
+    padding-bottom: 24px;
+  }
+
+  .section-badge {
+    width: 30px;
+    height: 30px;
+    font-size: 0.75rem;
+  }
+
+  .contact-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px;
+  }
+}

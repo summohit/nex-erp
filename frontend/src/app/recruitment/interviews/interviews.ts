@@ -23,8 +23,8 @@ export type InterviewTab = 'all' | 'upcoming' | 'needs-review' | 'completed';
     LucideCalendar, LucideClock, LucideVideo, 
     LucideFileText, LucideStar, LucideMessageSquare,
     LucideSearch, LucideBriefcase, LucideCheckCircle2,
-    LucideAlertCircle, LucideExternalLink, LucideRotateCcw,
-    LucideX, LucideUsers, LucideCheck, LucideMail, LucidePhone,
+    LucideAlertCircle, LucideExternalLink,
+    LucideX,
     LucideArrowLeft, LucideChevronRight
   ],
   templateUrl: './interviews.html',

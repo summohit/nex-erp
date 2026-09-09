@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ThrottlerModule, seconds } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -37,9 +38,18 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { LeadFormsModule } from './lead-forms/lead-forms.module';
 import { AppDownloadModule } from './app-download/app-download.module';
 import { TicketsModule } from './tickets/tickets.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule],
+  imports: [
+    // Registered but deliberately NOT installed as an APP_GUARD: this app has
+    // no global guards, and a blanket limit would break the dashboard, which
+    // fires many requests in parallel on load. Individual sensitive routes opt
+    // in with @UseGuards(ThrottlerGuard) + @Throttle.
+    ThrottlerModule.forRoot({
+      throttlers: [{ name: 'default', ttl: seconds(60), limit: 60 }],
+    }),
+    CommonModule, AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule],
   controllers: [AppController],
   providers: [AppService],
 })

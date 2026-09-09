@@ -1,10 +1,14 @@
 import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { TwoFactorService } from '../auth/two-factor.service';
 
 @Controller('users')
 export class UsersController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private twoFactorService: TwoFactorService,
+  ) {}
 
   @UseGuards(AuthGuard)
   @Get('me')
@@ -37,6 +41,10 @@ export class UsersController {
       delete (user as any).password;
       (user as any).employeeId = (user as any).employee?.id ?? null;
       (user as any).isManager = ((user as any).employee?._count?.subordinates ?? 0) > 0;
+
+      // A boolean only. The UserTwoFactor relation is deliberately never
+      // included on a user payload — it carries the encrypted TOTP secret.
+      (user as any).twoFactorEnabled = await this.twoFactorService.isEnabled((user as any).id);
     }
     return user;
   }

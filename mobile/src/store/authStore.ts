@@ -21,32 +21,63 @@ interface AuthState {
   user: User | null;
   company: CompanyInfo | null;
   token: string | null;
+  /**
+   * Long-lived token used to mint a new access token when the current one
+   * expires. Access tokens last an hour; without this the session died on the
+   * hour and the user had to retype their password.
+   */
+  refreshToken: string | null;
   isLoading: boolean;
-  login: (user: User, token: string) => Promise<void>;
+  login: (user: User, token: string, refreshToken?: string | null) => Promise<void>;
+  /** Swap in a freshly minted token pair. Called by the API client's 401 retry. */
+  setTokens: (token: string, refreshToken?: string | null) => Promise<void>;
   logout: () => Promise<void>;
   restoreToken: () => Promise<void>;
   refreshUserProfile: () => Promise<void>;
 }
 
+const TOKEN_KEY = 'userToken';
+const REFRESH_TOKEN_KEY = 'userRefreshToken';
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   company: null,
   token: null,
+  refreshToken: null,
   isLoading: true,
-  login: async (user, token) => {
+  login: async (user, token, refreshToken) => {
     // Drop anything the previous session left in memory before the new user's
     // screens mount, so they never render stale data belonging to someone else.
     const { resetUserScopedStores } = await import('./resetStores');
     resetUserScopedStores();
-    await AsyncStorage.setItem('userToken', token);
+    await AsyncStorage.setItem(TOKEN_KEY, token);
     await AsyncStorage.setItem('userData', JSON.stringify(user));
-    set({ user, token, isLoading: false });
+    if (refreshToken) {
+      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    } else {
+      // Signing in without one must not leave the previous session's refresh
+      // token behind for the interceptor to find.
+      await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+    set({ user, token, refreshToken: refreshToken ?? null, isLoading: false });
+  },
+  setTokens: async (token, refreshToken) => {
+    await AsyncStorage.setItem(TOKEN_KEY, token);
+    // The server rotates the refresh token on every refresh, so the new one has
+    // to replace the old — reusing a spent token would fail the next refresh.
+    if (refreshToken) {
+      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      set({ token, refreshToken });
+    } else {
+      set({ token });
+    }
   },
   logout: async () => {
-    await AsyncStorage.removeItem('userToken');
+    await AsyncStorage.removeItem(TOKEN_KEY);
+    await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
     await AsyncStorage.removeItem('userData');
     await AsyncStorage.removeItem('companyData');
-    set({ user: null, company: null, token: null, isLoading: false });
+    set({ user: null, company: null, token: null, refreshToken: null, isLoading: false });
     // Clear the other stores too — they are in-memory singletons that would
     // otherwise hand the next user to sign in the previous user's data.
     // Imported lazily so this module stays free of store import cycles.
@@ -55,12 +86,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   restoreToken: async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
+      const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
       const userData = await AsyncStorage.getItem('userData');
       const companyData = await AsyncStorage.getItem('companyData');
       if (token && userData) {
+        // An access token that expired while the app was closed is fine — the
+        // first request 401s and the interceptor refreshes it in place.
         set({
           token,
+          refreshToken,
           user: JSON.parse(userData),
           company: companyData ? JSON.parse(companyData) : null,
           isLoading: false,
@@ -68,7 +103,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else {
         set({ isLoading: false });
       }
-    } catch (e) {
+    } catch {
       set({ isLoading: false });
     }
   },
@@ -91,7 +126,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ company });
         await AsyncStorage.setItem('companyData', JSON.stringify(company));
       }
-    } catch (e) {
+    } catch {
       // Non-fatal
     }
   },

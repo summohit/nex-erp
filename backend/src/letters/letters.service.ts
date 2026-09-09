@@ -229,28 +229,211 @@ export class LettersService {
   }
 
   // ── issued letters ─────────────────────────────────────────────────────
-  findLetters(companyId: number, employeeId?: number) {
-    return this.prisma.generatedLetter.findMany({
+  /**
+   * Every letter this company has issued, from both sources:
+   *
+   *  - GeneratedLetter — letters rendered from a template for an employee.
+   *  - OfferLetter     — the recruitment e-signature flow, which is keyed to a
+   *                      job application rather than an employee, so it lives in
+   *                      its own table. Those never appeared here before, which
+   *                      made a signed offer look missing.
+   *
+   * Rows are normalised into one shape and merged newest-first. Offer rows carry
+   * `source: 'OFFER'` plus their signature state so the UI can badge them and
+   * link to the countersigned PDF.
+   */
+  async findLetters(companyId: number, employeeId?: number) {
+    const generated = await this.prisma.generatedLetter.findMany({
       where: { companyId, ...(employeeId ? { employeeId } : {}) },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, title: true, pdfUrl: true, createdAt: true,
-        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true } },
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true, phone: true,
+            user: { select: { email: true } },
+            department: { select: { name: true } },
+            designation: { select: { name: true } },
+          },
+        },
         template: { select: { id: true, title: true } },
       },
     });
+
+    const rows: any[] = generated.map(g => ({
+      ...g,
+      source: 'TEMPLATE',
+      employee: {
+        id: g.employee?.id ?? null,
+        firstName: g.employee?.firstName,
+        lastName: g.employee?.lastName,
+        employeeCode: g.employee?.employeeCode,
+        avatarUrl: g.employee?.avatarUrl,
+        email: g.employee?.user?.email ?? null,
+        phone: g.employee?.phone ?? null,
+        designation: g.employee?.designation?.name ?? null,
+        department: g.employee?.department?.name ?? null,
+      },
+      candidateEmail: g.employee?.user?.email ?? null,
+      candidatePhone: g.employee?.phone ?? null,
+    }));
+
+    // An offer belongs to a candidate, so it can't be filtered by employee id.
+    if (!employeeId) {
+      const offers = await this.prisma.offerLetter.findMany({
+        where: { companyId },
+        orderBy: { issuedAt: 'desc' },
+        select: {
+          id: true, status: true, pdfUrl: true, countersignedPdfUrl: true,
+          issuedAt: true, createdAt: true, respondedAt: true,
+          signatureName: true, signatureType: true, signatureIp: true, viewedAt: true,
+          application: {
+            select: {
+              id: true, fullName: true, email: true, phone: true,
+              job: { select: { title: true } },
+            },
+          },
+        },
+      });
+
+      for (const o of offers) {
+        // Skip historical records imported from Worksuite. This system only ever
+        // sets ACCEPTED through the signing flow, which always writes signature
+        // data — so ACCEPTED with no signature and no response can only have come
+        // from an import. Listing those as "Awaiting signature" is wrong twice
+        // over: nobody is waiting, and nobody ever signed here.
+        const neverSignedHere = !o.signatureName && !o.respondedAt;
+        if (o.status === 'ACCEPTED' && neverSignedHere) continue;
+
+        const [firstName, ...rest] = (o.application?.fullName || 'Candidate').split(' ');
+        rows.push({
+          id: o.id,
+          source: 'OFFER',
+          title: 'Offer Letter',
+          // Candidates have no employee record until they are hired.
+          employee: {
+            id: null,
+            firstName,
+            lastName: rest.join(' '),
+            employeeCode: null,
+            avatarUrl: null,
+            email: o.application?.email ?? null,
+            phone: o.application?.phone ?? null,
+            designation: o.application?.job?.title ?? null,
+            department: null,
+          },
+          applicationId: o.application?.id ?? null,
+          candidateEmail: o.application?.email ?? null,
+          candidatePhone: o.application?.phone ?? null,
+          jobTitle: o.application?.job?.title ?? null,
+          template: { id: null, title: 'Offer Letter (Recruitment)' },
+          pdfUrl: o.countersignedPdfUrl || o.pdfUrl,
+          createdAt: o.issuedAt ?? o.createdAt,
+          offerStatus: o.status,
+          // Only a real e-signature counts as signed here. Rows imported from
+          // Worksuite carry status ACCEPTED without one, and must not be
+          // presented as though someone signed in this system.
+          isSigned: !!o.signatureName,
+          signatureName: o.signatureName,
+          signatureType: o.signatureType,
+          signatureIp: o.signatureIp,
+          signedAt: o.respondedAt,
+          viewedAt: o.viewedAt,
+        });
+      }
+    }
+
+    rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return rows;
   }
 
-  async findLetter(companyId: number, id: number) {
+  /**
+   * One issued letter. `source` says which table the id belongs to, since the
+   * two share an id space. An offer letter has no stored HTML body — it exists
+   * only as a PDF — so the caller gets the PDF url and signature detail instead.
+   */
+  async findLetter(companyId: number, id: number, source?: string) {
+    if ((source || '').toUpperCase() === 'OFFER') {
+      const o = await this.prisma.offerLetter.findFirst({
+        where: { id, companyId },
+        include: {
+          application: {
+            select: { id: true, fullName: true, email: true, phone: true, offeredSalary: true,
+                      joiningDate: true, job: { select: { title: true } } },
+          },
+        },
+      });
+      if (!o) throw new NotFoundException('Offer letter not found');
+      const [firstName, ...rest] = (o.application?.fullName || 'Candidate').split(' ');
+      return {
+        id: o.id,
+        source: 'OFFER',
+        title: 'Offer Letter',
+        body: null,
+        pdfUrl: o.countersignedPdfUrl || o.pdfUrl,
+        signedPdfUrl: o.countersignedPdfUrl,
+        createdAt: o.issuedAt ?? o.createdAt,
+        employee: {
+          id: null,
+          firstName,
+          lastName: rest.join(' '),
+          employeeCode: null,
+          avatarUrl: null,
+          email: o.application?.email ?? null,
+          phone: o.application?.phone ?? null,
+          designation: o.application?.job?.title ?? null,
+          department: null,
+        },
+        template: { id: null, title: 'Offer Letter (Recruitment)' },
+        applicationId: o.application?.id ?? null,
+        candidateEmail: o.application?.email ?? null,
+        candidatePhone: o.application?.phone ?? null,
+        jobTitle: o.application?.job?.title ?? null,
+        offeredSalary: o.application?.offeredSalary ?? null,
+        joiningDate: o.application?.joiningDate ?? null,
+        offerStatus: o.status,
+        isSigned: !!o.signatureName,
+        signatureName: o.signatureName,
+        signatureType: o.signatureType,
+        signatureIp: o.signatureIp,
+        signatureImage: o.signatureImage,
+        signedAt: o.respondedAt,
+        viewedAt: o.viewedAt,
+      };
+    }
+
     const l = await this.prisma.generatedLetter.findFirst({
       where: { id, companyId },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true } },
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true, phone: true,
+            user: { select: { email: true } },
+            department: { select: { name: true } },
+            designation: { select: { name: true } },
+          },
+        },
         template: { select: { id: true, title: true } },
       },
     });
     if (!l) throw new NotFoundException('Letter not found');
-    return l;
+    return {
+      ...l,
+      source: 'TEMPLATE',
+      employee: {
+        id: l.employee?.id ?? null,
+        firstName: l.employee?.firstName,
+        lastName: l.employee?.lastName,
+        employeeCode: l.employee?.employeeCode,
+        avatarUrl: l.employee?.avatarUrl,
+        email: l.employee?.user?.email ?? null,
+        phone: l.employee?.phone ?? null,
+        designation: l.employee?.designation?.name ?? null,
+        department: l.employee?.department?.name ?? null,
+      },
+      candidateEmail: l.employee?.user?.email ?? null,
+      candidatePhone: l.employee?.phone ?? null,
+    };
   }
 
   /** Render and store a letter. The stored body is a snapshot, not a live view. */
@@ -322,7 +505,12 @@ export class LettersService {
     return { issued: titles.length, titles };
   }
 
-  async deleteLetter(companyId: number, id: number) {
+  async deleteLetter(companyId: number, id: number, source?: string) {
+    // Offer letters are recruitment records with a signature trail; they are
+    // managed from the candidate, not deleted from the letters list.
+    if ((source || '').toUpperCase() === 'OFFER') {
+      throw new BadRequestException('Offer letters are managed from the candidate record and cannot be deleted here');
+    }
     await this.findLetter(companyId, id);
     await this.prisma.generatedLetter.delete({ where: { id } });
     return { success: true };

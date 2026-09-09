@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, RefreshControl, Dimensions, Animated, Image
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import { useNavigation } from '@react-navigation/native';
 import {
   Search, Star, Clock, Archive, User, Plus, Sparkles,
@@ -239,7 +239,11 @@ export default function ProjectsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <AppScreen
+      showBottomNav={false}
+      title="Projects"
+      subtitle="Boards & tasks"
+    >
       {/* Control Bar */}
       <View style={styles.controlBar}>
         {/* Search Bar */}
@@ -383,7 +387,7 @@ export default function ProjectsScreen() {
         confirmText={modalConfig.confirmText}
         showCancel={modalConfig.showCancel}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

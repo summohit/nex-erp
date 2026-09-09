@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { MailService } from '../mail/mail.service';
 import { CompanySeederService } from '../company-seeder/company-seeder.service';
+import { TwoFactorService } from './two-factor.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -13,7 +14,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private mailService: MailService,
-    private companySeederService: CompanySeederService
+    private companySeederService: CompanySeederService,
+    private twoFactorService: TwoFactorService
   ) {}
 
   async signupCompany(
@@ -171,7 +173,9 @@ export class AuthService {
       where: {
         email: { equals: email, mode: 'insensitive' }
       },
-      include: { employee: true }
+      // Only `confirmedAt` — never the whole relation, which would pull the
+      // encrypted TOTP secret into a value that gets returned to callers.
+      include: { employee: true, twoFactor: { select: { confirmedAt: true } } }
     });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
@@ -186,41 +190,83 @@ export class AuthService {
       throw new UnauthorizedException('Your account has been deactivated. Please contact your administrator.');
     }
 
-    const payload = { 
-      sub: user.id, 
-      email: user.email, 
-      role: user.role, 
+    // Two-factor gate. Note this tests `confirmedAt`, not the existence of a
+    // UserTwoFactor row — a row is created the moment enrolment starts, and a
+    // half-finished enrolment must not count as protection.
+    const twoFactorActive = !!user.twoFactor?.confirmedAt;
+    const companyRequires = await this.twoFactorService.companyRequires(user.companyId);
+
+    if (twoFactorActive || companyRequires) {
+      const mode = twoFactorActive ? 'VERIFY' : 'ENROL';
+      // A 200 carrying no tokens, deliberately, rather than an exception: both
+      // clients already guard their token storage on `access_token` being
+      // present, so nothing is persisted and neither treats the user as signed
+      // in until they finish the challenge.
+      return {
+        twoFactorRequired: true as const,
+        mode,
+        challengeToken: await this.twoFactorService.issueChallenge(user, mode),
+      };
+    }
+
+    return this.issueTokens(user);
+  }
+
+  /**
+   * The one place a real session is minted. Extracted so the plain login path
+   * and the post-two-factor path cannot drift apart.
+   */
+  async issueTokens(user: { id: number; email: string; role: string; companyId: number; employee?: { id: number } | null }) {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
       companyId: user.companyId,
       employeeId: user.employee?.id ?? null
     };
-    
+
     const access_token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
-    const refresh_token = await this.jwtService.signAsync(payload, { 
-      expiresIn: '7d', 
-      secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh' 
+    const refresh_token = await this.jwtService.signAsync(payload, {
+      expiresIn: '7d',
+      secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh'
     });
 
     return { access_token, refresh_token };
   }
 
   async refreshToken(refreshToken: string) {
+    let payload: any;
+
+    // Only the signature check belongs in the try. Wrapping the compliance
+    // checks below in it too would swallow their specific messages and report
+    // every one of them as an expired token, which is both misleading and
+    // indistinguishable to the clients.
     try {
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
+      payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh'
       });
-
-      const newPayload = { sub: payload.sub, email: payload.email, role: payload.role, companyId: payload.companyId, employeeId: payload.employeeId ?? null };
-      
-      const new_access_token = await this.jwtService.signAsync(newPayload, { expiresIn: '1h' });
-      const new_refresh_token = await this.jwtService.signAsync(newPayload, { 
-        expiresIn: '7d', 
-        secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh' 
-      });
-
-      return { access_token: new_access_token, refresh_token: new_refresh_token };
-    } catch (err) {
+    } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+
+    // Re-read the user rather than trusting a payload that may be a week old.
+    // Without this, a suspended account keeps a live session until its refresh
+    // token expires, and neither company-wide 2FA enforcement nor an admin
+    // reset reaches anyone already signed in.
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { employee: true, twoFactor: { select: { confirmedAt: true } } },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Session is no longer valid. Please sign in again.');
+    }
+
+    if (!user.twoFactor?.confirmedAt && await this.twoFactorService.companyRequires(user.companyId)) {
+      throw new UnauthorizedException('Two-factor authentication setup is required. Please sign in again.');
+    }
+
+    return this.issueTokens(user);
   }
 
   async verifyEmail(token: string) {

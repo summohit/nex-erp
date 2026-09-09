@@ -27,7 +27,10 @@ export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot) =>
     const userRole = user?.role || 'EMPLOYEE';
 
     // Universal access: every logged-in user can view their own profile and basic self-service routes
-    const universalModules = ['employees/me/profile', 'attendance', 'attendance/my-attendance'];
+    // Self-service routes every role reaches regardless of RolePermission rows.
+    // 'settings/security' is each user's own two-factor setup — gating it on a
+    // settings permission would lock most roles out of protecting their account.
+    const universalModules = ['employees/me/profile', 'attendance', 'attendance/my-attendance', 'settings/security'];
     if (universalModules.includes(targetModule)) {
       return of(true);
     }

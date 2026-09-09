@@ -12,7 +12,6 @@ import {
   ScrollView,
   StatusBar,
   Modal,
-  Animated,
 } from 'react-native';
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../api/apiClient';
@@ -85,6 +84,22 @@ export default function LoginScreen() {
         password: password.trim(),
       });
 
+      // Two-factor challenge. This MUST come before the decode below: a
+      // challenge response carries no access_token, and `access_token.split`
+      // would throw into the generic catch, leaving the user at a dead end with
+      // a "server error" and no way in.
+      //
+      // Interim behaviour — the in-app challenge screen lands in a later
+      // release, and an already-installed build has to cope until then.
+      if (response.data?.twoFactorRequired) {
+        setLoading(false);
+        showError(
+          'Two-Factor Authentication Required',
+          'Your account is protected with an authenticator app. Please sign in on the web app to continue — support in this app is coming in the next update.',
+        );
+        return;
+      }
+
       const { access_token, refresh_token } = response.data;
       
       // Simple base64 decode for JWT
@@ -113,7 +128,9 @@ export default function LoginScreen() {
         employeeId: payload.employeeId,
       };
       
-      await login(user, access_token);
+      // The refresh token is what keeps the session alive past the access
+      // token's one-hour life; it was previously read and thrown away.
+      await login(user, access_token, refresh_token);
       refreshUserProfile().catch(() => {});
     } catch (error: any) {
       console.error('Login RAW error:', error?.message, 'Code:', error?.code, 'BaseURL:', error?.config?.baseURL);

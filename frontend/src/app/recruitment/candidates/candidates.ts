@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+import { DragDropModule, CdkDrag, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -35,7 +35,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideX, LucideLayoutGrid, LucideTable, LucideFileText,
     LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
     LucideClock, LucideBuilding, LucideTrash2, LucideSparkles, LucideSend,
-    LucideInbox, LucideEye, LucideStar, LucideUsers, LucideAward,
+    LucideEye, LucideUsers, LucideAward,
     LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
     LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
     LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown,
@@ -118,6 +118,90 @@ export class CandidatesComponent implements OnInit {
     return this.STAGES.find(s => s.key === this.normaliseStage(key))?.label || key;
   }
 
+  /**
+   * Stages a candidate may skip: Negotiation is optional, and On Hold /
+   * Rejected are detours that must never block the path to onboarding.
+   */
+  readonly SKIPPABLE_STAGES = ['NEGOTIATION', 'ON_HOLD', 'REJECTED'];
+
+  /** Every stage a candidate must have passed through before being Offered. */
+  readonly MANDATORY_BEFORE_OFFER = ['APPLIED', 'PHONE_SCREENING', 'INTERVIEW'];
+
+  /** Stages the candidate has been through, including the one they sit in now. */
+  private visitedStages(app: JobApplication): Set<string> {
+    const visited = new Set<string>(['APPLIED']);
+    for (const stage of app.completedStages || []) visited.add(this.normaliseStage(stage));
+    visited.add(this.normaliseStage(app.status));
+    return visited;
+  }
+
+  /**
+   * Mandatory stages this candidate still owes before `target` is reachable.
+   * Empty means the move is allowed. Mirrors the backend gate, so the UI can
+   * grey out a move the server would reject anyway.
+   */
+  blockedStagesFor(app: JobApplication, target: string): string[] {
+    if (this.SKIPPABLE_STAGES.includes(target)) return [];
+    if (!['OFFERED', 'HIRED', 'ONBOARDED'].includes(target)) return [];
+
+    const visited = this.visitedStages(app);
+    const missing = this.MANDATORY_BEFORE_OFFER.filter(k => !visited.has(k));
+
+    if ((target === 'HIRED' || target === 'ONBOARDED') && !visited.has('OFFERED')) missing.push('OFFERED');
+    if (target === 'ONBOARDED' && !visited.has('HIRED')) missing.push('HIRED');
+
+    return missing;
+  }
+
+  /**
+   * Why `target` is closed to this candidate, or null when the move is legal.
+   * Covers both gates the server applies: mandatory stages, and an above-budget
+   * offer that has not been signed off.
+   */
+  stageBlockReason(app: JobApplication, target: string): string | null {
+    const missing = this.blockedStagesFor(app, target);
+    if (missing.length > 0) {
+      return `Requires ${missing.map(k => this.stageLabel(k)).join(', ')} first`;
+    }
+
+    if (target === 'HIRED' || target === 'ONBOARDED') {
+      if (app.approvalStatus === 'PENDING_APPROVAL') {
+        return 'The above-budget offer is still waiting for approval';
+      }
+      if (app.approvalStatus === 'REJECTED') {
+        return 'The extra payment was rejected — revise the offered salary first';
+      }
+    }
+
+    return null;
+  }
+
+  canMoveTo(app: JobApplication | null, target: string): boolean {
+    if (!app) return true;
+    return this.stageBlockReason(app, target) === null;
+  }
+
+  /**
+   * cdkDropList predicates are re-read on every drag, so the factory is memoised
+   * per stage — a fresh arrow function each change-detection pass would make the
+   * CDK tear the drop list down mid-drag.
+   */
+  private dropPredicates = new Map<string, (drag: CdkDrag) => boolean>();
+
+  stageDropPredicate(stageKey: string): (drag: CdkDrag) => boolean {
+    let predicate = this.dropPredicates.get(stageKey);
+    if (!predicate) {
+      predicate = (drag: CdkDrag) => this.canMoveTo(drag.data as JobApplication, stageKey);
+      this.dropPredicates.set(stageKey, predicate);
+    }
+    return predicate;
+  }
+
+  /** Tooltip for a stage the candidate cannot legally be moved to yet. */
+  blockedStageTooltip(app: JobApplication | null, target: string): string {
+    return app ? (this.stageBlockReason(app, target) || '') : '';
+  }
+
   // Detail drawer
   selectedApp = signal<JobApplication | null>(null);
   activeTab = signal<'details' | 'interviews'>('details');
@@ -141,15 +225,149 @@ export class CandidatesComponent implements OnInit {
     return this.applications().find(a => a.id === id) || this.selectedApp() || null;
   });
 
+  /**
+   * The budget the offer is measured against: the candidate's own approved
+   * budget, falling back to the job's ceiling when nobody has set one. Mirrors
+   * ApplicationsService.effectiveProfileBudget on the server.
+   */
+  profileBudgetOf(app: JobApplication | null | undefined): number | null {
+    if (!app) return null;
+    // A job posted with only a floor and no ceiling is common; whichever bound
+    // exists is the budget, otherwise the rule silently switches itself off.
+    for (const value of [app.profileBudget, app.job?.maxSalary, app.job?.minSalary]) {
+      if (value !== null && value !== undefined) return Number(value);
+    }
+    return null;
+  }
+
+  /** True when the budget shown is the job's ceiling rather than a candidate-specific figure. */
+  isInheritedBudget(app: JobApplication | null | undefined): boolean {
+    return !!app && (app.profileBudget === null || app.profileBudget === undefined);
+  }
+
+  pendingProfileBudget = computed(() => this.profileBudgetOf(this.pendingCandidate()));
+
+  /**
+   * How far the pending request sits above budget, measured against the budget
+   * snapshotted at request time so a later edit cannot move the goalposts.
+   */
+  approvalOverageOf(app: JobApplication): number {
+    const budget = app.approvalBudget ?? this.profileBudgetOf(app);
+    if (budget === null || budget === undefined || !app.offeredSalary) return 0;
+    return Math.max(0, Number(app.offeredSalary) - Number(budget));
+  }
+
   salaryExceedsBudget = computed(() => {
-    const cand = this.pendingCandidate();
+    const budget = this.pendingProfileBudget();
     const offered = this.offeredSalaryInput();
-    if (!cand?.job?.maxSalary || !offered) return false;
-    return Number(offered) > Number(cand.job.maxSalary);
+    if (budget === null || !offered) return false;
+    return Number(offered) > budget;
+  });
+
+  /** How far above the profile budget the proposed offer sits. */
+  budgetOverage = computed(() => {
+    const budget = this.pendingProfileBudget();
+    const offered = this.offeredSalaryInput();
+    if (budget === null || !offered) return 0;
+    return Math.max(0, Number(offered) - budget);
+  });
+
+  /** Reason for the extra payment — mandatory once the offer is above budget. */
+  approvalReasonInput = signal<string>('');
+
+  // ── Pending offer approvals ───────────────────────────────
+  // Surfaced at the top of the board so an approver does not have to open each
+  // candidate's drawer to find out that money is waiting on them.
+  pendingApprovals = signal<JobApplication[]>([]);
+  showApprovalsPanel = signal(true);
+  decidingApprovalId = signal<number | null>(null);
+
+  loadPendingApprovals() {
+    this.candidatesService.getPendingApprovals().subscribe({
+      next: (list) => this.pendingApprovals.set(list || []),
+      error: () => this.pendingApprovals.set([]),
+    });
+  }
+
+  /** Approve or reject straight from the queue, without opening the drawer. */
+  decideApproval(app: JobApplication, approve: boolean) {
+    this.decidingApprovalId.set(app.id);
+    const request = approve
+      ? this.candidatesService.approveSalary(app.id)
+      : this.candidatesService.rejectSalary(app.id);
+
+    request.subscribe({
+      next: () => {
+        this.decidingApprovalId.set(null);
+        this.toast.success(
+          approve
+            ? `Approved — ${app.fullName} moved to ${this.stageLabel(app.approvalRequestedStage || 'OFFERED')}`
+            : `Rejected the extra payment for ${app.fullName}`
+        );
+        this.loadPendingApprovals();
+        this.loadApplications();
+        if (this.selectedApp()?.id === app.id) {
+          this.candidatesService.getApplication(app.id).subscribe({
+            next: (fresh) => this.selectedApp.set(fresh),
+            error: () => {},
+          });
+        }
+      },
+      error: (err) => {
+        this.decidingApprovalId.set(null);
+        this.toast.error(err?.error?.message || 'Failed to record the decision');
+      },
+    });
+  }
+
+  /** The modal cannot be submitted without a reason for an above-budget offer. */
+  offerSubmitBlocked = computed(() => {
+    const amt = this.offeredSalaryInput();
+    if (!amt || amt <= 0) return true;
+    return this.salaryExceedsBudget() && !this.approvalReasonInput().trim();
   });
 
   setQuickOfferedSalary(amount: number) {
     this.offeredSalaryInput.set(amount);
+  }
+
+  // ── Candidate profile budget ──────────────────────────────
+  // Edited on the profile rather than inside the offer modal on purpose: a
+  // recruiter who could raise the budget in the same breath as the offer would
+  // make the approval gate meaningless.
+  editingProfileBudget = signal(false);
+  profileBudgetInput = signal<number | null>(null);
+  isSavingProfileBudget = signal(false);
+
+  startEditProfileBudget() {
+    const app = this.selectedApp();
+    this.profileBudgetInput.set(app?.profileBudget ?? null);
+    this.editingProfileBudget.set(true);
+  }
+
+  cancelEditProfileBudget() {
+    this.editingProfileBudget.set(false);
+    this.profileBudgetInput.set(null);
+  }
+
+  saveProfileBudget() {
+    const app = this.selectedApp();
+    if (!app) return;
+    const value = this.profileBudgetInput();
+    this.isSavingProfileBudget.set(true);
+    this.candidatesService.setProfileBudget(app.id, value === null || value === undefined ? null : Number(value)).subscribe({
+      next: (updated) => {
+        this.isSavingProfileBudget.set(false);
+        this.editingProfileBudget.set(false);
+        this.toast.success('Profile budget updated');
+        this.selectedApp.update(a => a ? { ...a, profileBudget: updated.profileBudget } : a);
+        this.loadApplications();
+      },
+      error: (err) => {
+        this.isSavingProfileBudget.set(false);
+        this.toast.error(err?.error?.message || 'Failed to update profile budget');
+      }
+    });
   }
 
   // ── E-signature link sharing ──────────────────────────────
@@ -177,6 +395,7 @@ export class CandidatesComponent implements OnInit {
   private openSalaryPrompt(app: JobApplication, status: string) {
     this.pendingStatusChange.set({ id: app.id, status });
     this.offeredSalaryInput.set(app.offeredSalary ?? null);
+    this.approvalReasonInput.set(app.approvalReason || '');
     this.addressInput.set(app.address || app.currentLocation || '');
 
     if (app.joiningDate) {
@@ -450,6 +669,9 @@ export class CandidatesComponent implements OnInit {
 
   ngOnInit() {
     this.loadJobs();
+    // Company-wide, not per-job: an approver should see everything waiting on
+    // them regardless of which job the board is filtered to.
+    this.loadPendingApprovals();
 
     this.route.queryParams.subscribe(params => {
       const qJobId = params['jobId'];
@@ -593,7 +815,16 @@ export class CandidatesComponent implements OnInit {
       );
       
       const movedItem = event.container.data[event.currentIndex];
-      
+
+      // Refuse the move and snap the board back rather than letting the server
+      // reject it after the card has already jumped.
+      const blocked = this.stageBlockReason(movedItem, newStatus);
+      if (blocked) {
+        this.toast.error(`${movedItem.fullName} cannot move to ${this.stageLabel(newStatus)} — ${blocked.toLowerCase()}.`);
+        this.loadApplications();
+        return;
+      }
+
       if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
         this.openSalaryPrompt(movedItem, newStatus);
       } else if (newStatus === 'REJECTED') {
@@ -627,21 +858,25 @@ export class CandidatesComponent implements OnInit {
       undefined,
       this.joiningDateInput() || undefined,
       this.addressInput() || undefined,
+      this.salaryExceedsBudget() ? this.approvalReasonInput().trim() : undefined,
     ).subscribe({
       next: (updatedApp) => {
         if (updatedApp.approvalStatus === 'PENDING_APPROVAL') {
-          this.toast.success('Salary exceeds maximum. Sent for approval.');
+          this.toast.success(
+            `Sent for approval — ${updatedApp.fullName} stays in ${this.stageLabel(updatedApp.status)} until it is approved.`
+          );
         } else {
-          this.toast.success(`Moved to ${updatedApp.status}`);
+          this.toast.success(`Moved to ${this.stageLabel(updatedApp.status)}`);
         }
         this.closeSalaryPrompt();
+        this.loadPendingApprovals();
         this.loadApplications();
         if (this.selectedApp()?.id === updatedApp.id) {
            this.selectedApp.set(updatedApp);
         }
       },
-      error: () => {
-        this.toast.error('Failed to update status');
+      error: (err) => {
+        this.toast.error(err?.error?.message || 'Failed to update status');
         this.closeSalaryPrompt();
         this.loadApplications();
       }
@@ -652,6 +887,7 @@ export class CandidatesComponent implements OnInit {
     this.showSalaryPrompt.set(false);
     this.pendingStatusChange.set(null);
     this.offeredSalaryInput.set(null);
+    this.approvalReasonInput.set('');
     this.joiningDateInput.set('');
     this.addressInput.set('');
     this.loadApplications(); // Revert kanban UI if canceled
@@ -897,7 +1133,15 @@ export class CandidatesComponent implements OnInit {
   updateDrawerStatus(newStatus: string) {
     const app = this.selectedApp();
     if (!app) return;
-    
+
+    const blocked = this.stageBlockReason(app, newStatus);
+    if (blocked) {
+      this.toast.error(`Cannot move to ${this.stageLabel(newStatus)} — ${blocked.toLowerCase()}.`);
+      // Bounce the <select> back to the stage the candidate is actually in.
+      this.selectedApp.update(a => a ? { ...a } : a);
+      return;
+    }
+
     if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
       this.openSalaryPrompt(app, newStatus);
       return;
@@ -916,7 +1160,7 @@ export class CandidatesComponent implements OnInit {
         this.selectedApp.set(updatedApp);
         this.loadApplications(); // Sync main board
       },
-      error: () => this.toast.error('Failed to update status')
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to update status')
     });
   }
 
@@ -925,13 +1169,14 @@ export class CandidatesComponent implements OnInit {
     if (!app) return;
     this.candidatesService.approveSalary(app.id).subscribe({
       next: () => {
-        this.toast.success('Salary approved');
+        this.toast.success('Offer approved');
+        this.loadPendingApprovals();
         this.loadApplications();
         if (this.selectedApp()?.id === app.id) {
           this.selectedApp.update(a => ({ ...a!, approvalStatus: 'APPROVED' }));
         }
       },
-      error: () => this.toast.error('Failed to approve salary')
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to approve salary')
     });
   }
 
@@ -940,13 +1185,14 @@ export class CandidatesComponent implements OnInit {
     if (!app) return;
     this.candidatesService.rejectSalary(app.id).subscribe({
       next: () => {
-        this.toast.success('Salary rejected');
+        this.toast.success('Offer rejected');
+        this.loadPendingApprovals();
         this.loadApplications();
         if (this.selectedApp()?.id === app.id) {
           this.selectedApp.update(a => ({ ...a!, approvalStatus: 'REJECTED' }));
         }
       },
-      error: () => this.toast.error('Failed to reject salary')
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to reject salary')
     });
   }
 

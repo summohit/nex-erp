@@ -3174,12 +3174,16 @@ section[id] {
   gap: 20px;
 }
 
-.legal-links span {
+.legal-links span,
+.legal-links a {
   cursor: pointer;
   transition: color 0.15s ease;
+  color: inherit;
+  text-decoration: none;
 }
 
-.legal-links span:hover {
+.legal-links span:hover,
+.legal-links a:hover {
   color: #cbd5e1;
 }
 

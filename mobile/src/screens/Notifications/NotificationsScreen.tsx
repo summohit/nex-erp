@@ -6,12 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import { useNavigation } from '@react-navigation/native';
 import {
-  ArrowLeft,
   Bell,
   CheckCheck,
   Calendar,
@@ -24,6 +22,7 @@ import {
 } from 'lucide-react-native';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { AppNotification } from '../../api/notificationService';
+import { navigateTo } from '../../navigation/navigationUtils';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -170,7 +169,7 @@ export default function NotificationsScreen() {
     }
     const dest = resolveLink(item.linkUrl, projects);
     if (dest) {
-      navigation.navigate(dest.screen, dest.params);
+      navigateTo(navigation, dest.screen, dest.params);
     }
   }, [markNotificationRead, projects, navigation]);
 
@@ -199,31 +198,18 @@ export default function NotificationsScreen() {
   }, [sections]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <ArrowLeft size={20} color="#0F172A" />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          {unreadCount > 0 && (
-            <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </View>
-        {unreadCount > 0 ? (
+    <AppScreen
+      title="Notifications"
+      subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+      right={
+        unreadCount > 0 ? (
           <TouchableOpacity style={styles.markAllBtn} onPress={handleMarkAllRead} activeOpacity={0.7}>
             <CheckCheck size={16} color="#E25E3E" />
             <Text style={styles.markAllText}>All read</Text>
           </TouchableOpacity>
-        ) : (
-          <View style={{ width: 80 }} />
-        )}
-      </View>
+        ) : null
+      }
+    >
 
       {/* List */}
       {flatData.length === 0 && !isLoading ? (
@@ -256,7 +242,7 @@ export default function NotificationsScreen() {
           }
         />
       )}
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

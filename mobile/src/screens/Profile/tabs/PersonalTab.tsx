@@ -10,7 +10,6 @@ import {
   Platform,
   UIManager,
   Modal,
-  FlatList,
 } from 'react-native';
 import {
   User,
@@ -159,67 +158,71 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
         <ChevronDown size={17} color={selectedOption ? '#E25E3E' : '#94A3B8'} />
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={styles.modalDismissArea} activeOpacity={1} onPress={() => setModalVisible(false)} />
-          <View style={styles.modalContent}>
-            <View style={styles.modalDragHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select {label}</Text>
-              <TouchableOpacity style={styles.closeBtn} onPress={() => setModalVisible(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            {searchable && (
-              <View style={styles.searchRow}>
-                <Search size={16} color="#94A3B8" />
-                <TextInput
-                  style={styles.searchInput}
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder={`Search ${label.toLowerCase()}...`}
-                  placeholderTextColor="#94A3B8"
-                  autoFocus
-                />
-                {query.length > 0 && (
-                  <TouchableOpacity onPress={() => setQuery('')}>
-                    <X size={15} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
+      {modalVisible && (
+        <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity style={styles.modalDismissArea} activeOpacity={1} onPress={() => setModalVisible(false)} />
+            <View style={styles.modalContent}>
+              <View style={styles.modalDragHandle} />
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select {label}</Text>
+                <TouchableOpacity style={styles.closeBtn} onPress={() => setModalVisible(false)}>
+                  <X size={20} color="#64748B" />
+                </TouchableOpacity>
               </View>
-            )}
 
-            <FlatList
-              data={filtered}
-              keyExtractor={(item, i) => `${item.value}-${i}`}
-              contentContainerStyle={styles.optionsList}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => {
-                const isSelected = item.value === value;
-                return (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    style={[styles.optionItem, isSelected && styles.optionItemSelected]}
-                    onPress={() => {
-                      onSelect(item.value);
-                      setModalVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
-                      {item.label}
-                    </Text>
-                    {isSelected && <CheckCircle2 size={18} color="#E25E3E" strokeWidth={2.5} />}
-                  </TouchableOpacity>
-                );
-              }}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>No results for "{query}"</Text>
-              }
-            />
+              {searchable && (
+                <View style={styles.searchRow}>
+                  <Search size={16} color="#94A3B8" />
+                  <TextInput
+                    style={styles.searchInput}
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder={`Search ${label.toLowerCase()}...`}
+                    placeholderTextColor="#94A3B8"
+                    autoFocus
+                  />
+                  {query.length > 0 && (
+                    <TouchableOpacity onPress={() => setQuery('')}>
+                      <X size={15} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              <ScrollView
+                contentContainerStyle={styles.optionsList}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {filtered.length === 0 ? (
+                  <Text style={styles.emptyText}>No results for "{query}"</Text>
+                ) : (
+                  filtered.map((item, i) => {
+                    const isSelected = item.value === value;
+                    return (
+                      <TouchableOpacity
+                        key={`${item.value}-${i}`}
+                        activeOpacity={0.7}
+                        style={[styles.optionItem, isSelected && styles.optionItemSelected]}
+                        onPress={() => {
+                          onSelect(item.value);
+                          setModalVisible(false);
+                        }}
+                      >
+                        <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
+                          {item.label}
+                        </Text>
+                        {isSelected && <CheckCircle2 size={18} color="#E25E3E" strokeWidth={2.5} />}
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 };

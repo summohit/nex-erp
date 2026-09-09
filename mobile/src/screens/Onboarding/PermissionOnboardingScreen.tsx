@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MapPin, Camera, Image as ImageIcon, Bell, Check, ChevronRight } from 'lucide-react-native';
+import { MapPin, Camera, Bell, Check, ChevronRight } from 'lucide-react-native';
 
 export const PERMISSIONS_ONBOARDED_KEY = '@ceswork/permissions_onboarded';
 
@@ -58,31 +58,7 @@ const PERMS = [
       buttonPositive: 'Allow',
     },
   },
-  {
-    id: 'photos',
-    color: '#7C3AED',
-    lightColor: '#EDE9FE',
-    ringColor: 'rgba(124,58,237,0.10)',
-    Icon: ImageIcon,
-    title: 'Photos & Files',
-    subtitle: 'Attach evidence, not just descriptions',
-    description:
-      'Pick images and files from your gallery to attach to project issues, field visit reports, and work orders — so every record is complete.',
-    bullets: [
-      'Attach files to project issues',
-      'Upload visit photos from gallery',
-      'Share documents with your team',
-    ],
-    androidPermission:
-      Number(Platform.Version) >= 33
-        ? (PermissionsAndroid.PERMISSIONS as any).READ_MEDIA_IMAGES
-        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-    androidRationale: {
-      title: 'Photos Permission',
-      message: 'CES Work needs gallery access to attach photos to your work records.',
-      buttonPositive: 'Allow',
-    },
-  },
+
   {
     id: 'notifications',
     color: '#D97706',
@@ -117,7 +93,7 @@ async function requestPermission(perm: Perm): Promise<void> {
   if (Platform.OS !== 'android' || !perm.androidPermission) return;
   try {
     await PermissionsAndroid.request(perm.androidPermission, perm.androidRationale);
-  } catch (_) {}
+  } catch {}
 }
 
 /* ─── Single slide ───────────────────────────────────────── */
@@ -185,18 +161,18 @@ export default function PermissionOnboardingScreen({ onDone }: { onDone: () => v
     });
   }, [cardAnim]);
 
+  const finish = useCallback(async () => {
+    await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, '1');
+    onDone();
+  }, [onDone]);
+
   const advance = useCallback(() => {
     if (isLast) {
       finish();
     } else {
       animateCardChange(step + 1);
     }
-  }, [isLast, step]);
-
-  const finish = async () => {
-    await AsyncStorage.setItem(PERMISSIONS_ONBOARDED_KEY, '1');
-    onDone();
-  };
+  }, [isLast, step, finish, animateCardChange]);
 
   const handleAllow = async () => {
     await requestPermission(perm);

@@ -8,8 +8,10 @@ import { QuillModule } from 'ngx-quill';
 import {
   LucidePlus, LucideX, LucideSearch, LucideTrash2, LucideEye, LucideFileText,
   LucideSend, LucideCode, LucideArrowLeft, LucideChevronRight, LucideChevronDown, LucideEdit3,
-  LucidePrinter, LucideCheck, LucideCalendar, LucideUser, LucideSparkles
+  LucidePrinter, LucideCheck, LucideCalendar, LucideUser, LucideSparkles,
+  LucideMail, LucidePhone, LucideCopy, LucideCheckCircle2, LucideClock, LucideMoreHorizontal
 } from '@lucide/angular';
+import { MatMenuModule } from '@angular/material/menu';
 import { LettersService, LetterTemplate, MergeTag, GeneratedLetter } from '../../services/letters.service';
 import { EmployeeService } from '../../services/employee.service';
 
@@ -19,10 +21,11 @@ type Tab = 'templates' | 'issued';
   selector: 'app-letter-templates',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink, QuillModule, LucidePlus, LucideX, LucideSearch,
+    CommonModule, FormsModule, RouterLink, QuillModule, MatMenuModule, LucidePlus, LucideX, LucideSearch,
     LucideTrash2, LucideEye, LucideFileText, LucideSend, LucideCode,
     LucideArrowLeft, LucideChevronRight, LucideChevronDown, LucideEdit3, LucidePrinter,
-    LucideCheck, LucideCalendar, LucideUser, LucideSparkles
+    LucideCheck, LucideCalendar, LucideUser, LucideSparkles,
+    LucideMail, LucidePhone, LucideCopy, LucideCheckCircle2, LucideClock, LucideMoreHorizontal
   ],
   templateUrl: './letter-templates.html',
   styleUrls: ['./letter-templates.css'],
@@ -143,15 +146,41 @@ export class LetterTemplatesComponent implements OnInit {
     );
   });
 
+  issuedStatusFilter = signal<'all' | 'signed' | 'awaiting' | 'regular'>('all');
+
+  issuedStats = computed(() => {
+    const list = this.letters();
+    const signed = list.filter(l => l.isSigned).length;
+    const awaiting = list.filter(l => l.source === 'OFFER' && !l.isSigned).length;
+    const regular = list.filter(l => l.source !== 'OFFER').length;
+    return { total: list.length, signed, awaiting, regular };
+  });
+
   filteredLetters = computed(() => {
     const q = this.search().toLowerCase().trim();
-    const list = this.letters();
+    const status = this.issuedStatusFilter();
+    let list = this.letters();
+
+    if (status === 'signed') {
+      list = list.filter(l => l.isSigned);
+    } else if (status === 'awaiting') {
+      list = list.filter(l => l.source === 'OFFER' && !l.isSigned);
+    } else if (status === 'regular') {
+      list = list.filter(l => l.source !== 'OFFER');
+    }
+
     if (!q) return list;
-    return list.filter(l =>
-      l.title.toLowerCase().includes(q) ||
-      (l.template?.title || '').toLowerCase().includes(q) ||
-      `${l.employee.firstName} ${l.employee.lastName}`.toLowerCase().includes(q) ||
-      (l.employee.employeeCode || '').toLowerCase().includes(q));
+    return list.filter(l => {
+      const titleMatch = l.title.toLowerCase().includes(q);
+      const tmplMatch = (l.template?.title || '').toLowerCase().includes(q);
+      const nameMatch = `${l.employee.firstName || ''} ${l.employee.lastName || ''}`.toLowerCase().includes(q);
+      const codeMatch = (l.employee.employeeCode || '').toLowerCase().includes(q);
+      const emailMatch = (this.getEmail(l) || '').toLowerCase().includes(q);
+      const phoneMatch = (this.getPhone(l) || '').toLowerCase().includes(q);
+      const roleMatch = (this.getRoleOrDesignation(l) || '').toLowerCase().includes(q);
+      const deptMatch = (l.employee.department || '').toLowerCase().includes(q);
+      return titleMatch || tmplMatch || nameMatch || codeMatch || emailMatch || phoneMatch || roleMatch || deptMatch;
+    });
   });
 
   clearSearch() {
@@ -462,7 +491,7 @@ export class LetterTemplatesComponent implements OnInit {
 
   // ── issued letters ──────────────────────────────────────────────────────
   openLetter(l: GeneratedLetter) {
-    this.lettersService.getLetter(l.id).subscribe({
+    this.lettersService.getLetter(l.id, l.source).subscribe({
       next: full => { this.viewLetter.set(full); this.viewOpen.set(true); },
       error: () => this.toast.error('Failed to load letter'),
     });
@@ -473,6 +502,12 @@ export class LetterTemplatesComponent implements OnInit {
   printLetter() {
     const l = this.viewLetter();
     if (!l) return;
+    // An offer letter exists only as a PDF, so open that rather than an empty page.
+    if (l.source === 'OFFER') {
+      if (l.pdfUrl) window.open(l.pdfUrl, '_blank');
+      else this.toast.error('No PDF is attached to this offer letter');
+      return;
+    }
     const w = window.open('', '_blank');
     if (!w) { this.toast.error('Allow pop-ups to print'); return; }
     w.document.write(`<!doctype html><title>${l.title}</title>` +
@@ -484,10 +519,76 @@ export class LetterTemplatesComponent implements OnInit {
   }
 
   deleteLetter(l: GeneratedLetter) {
+    if (l.source === 'OFFER') {
+      this.toast.error('Offer letters are managed from the candidate record.');
+      return;
+    }
     if (!confirm(`Delete the "${l.title}" issued to ${l.employee.firstName} ${l.employee.lastName}?`)) return;
-    this.lettersService.deleteLetter(l.id).subscribe({
+    this.lettersService.deleteLetter(l.id, l.source).subscribe({
       next: () => { this.toast.success('Letter deleted'); this.loadLetters(); },
       error: () => this.toast.error('Failed to delete letter'),
+    });
+  }
+
+  getEmail(letter: GeneratedLetter | null | undefined): string | null {
+    if (!letter) return null;
+    return letter.employee?.email || letter.candidateEmail || null;
+  }
+
+  getPhone(letter: GeneratedLetter | null | undefined): string | null {
+    if (!letter) return null;
+    return letter.employee?.phone || letter.candidatePhone || null;
+  }
+
+  getRoleOrDesignation(letter: GeneratedLetter | null | undefined): string | null {
+    if (!letter) return null;
+    return letter.employee?.designation || letter.jobTitle || letter.employee?.department || null;
+  }
+
+  copiedText = signal<string | null>(null);
+
+  copyText(text: string | null | undefined, label: string, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      this.toast.success(`${label} copied to clipboard`);
+      this.copiedText.set(text);
+      setTimeout(() => {
+        if (this.copiedText() === text) this.copiedText.set(null);
+      }, 2000);
+    }).catch(() => {
+      this.toast.error(`Failed to copy ${label.toLowerCase()}`);
+    });
+  }
+
+  printDirectLetter(l: GeneratedLetter, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    if (l.source === 'OFFER') {
+      if (l.pdfUrl) {
+        window.open(l.pdfUrl, '_blank');
+      } else {
+        this.lettersService.getLetter(l.id, l.source).subscribe({
+          next: full => {
+            if (full.pdfUrl) window.open(full.pdfUrl, '_blank');
+            else this.toast.error('No PDF attached to this offer letter');
+          },
+          error: () => this.toast.error('Failed to load letter PDF')
+        });
+      }
+      return;
+    }
+    this.lettersService.getLetter(l.id, l.source).subscribe({
+      next: full => {
+        const w = window.open('', '_blank');
+        if (!w) { this.toast.error('Allow pop-ups to print'); return; }
+        w.document.write(`<!doctype html><title>${full.title}</title>` +
+          `<style>body{font-family:Georgia,serif;line-height:1.6;padding:20mm;max-width:210mm;margin:auto}</style>` +
+          (full.body || ''));
+        w.document.close();
+        w.focus();
+        w.print();
+      },
+      error: () => this.toast.error('Failed to print letter')
     });
   }
 

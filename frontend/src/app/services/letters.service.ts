@@ -27,11 +27,41 @@ export interface MergeTag {
 export interface GeneratedLetter {
   id: number;
   title: string;
-  body?: string;
+  body?: string | null;
   pdfUrl?: string | null;
   createdAt: string;
-  employee: { id: number; firstName: string; lastName: string; employeeCode?: string | null; avatarUrl?: string | null };
-  template?: { id: number; title: string } | null;
+  employee: {
+    id: number | null;
+    firstName: string;
+    lastName: string;
+    employeeCode?: string | null;
+    avatarUrl?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    designation?: string | null;
+    department?: string | null;
+  };
+  template?: { id: number | null; title: string } | null;
+
+  /** TEMPLATE = rendered from a letter template; OFFER = recruitment offer letter. */
+  source?: 'TEMPLATE' | 'OFFER';
+
+  // Offer-letter rows only
+  applicationId?: number | null;
+  candidateEmail?: string | null;
+  candidatePhone?: string | null;
+  jobTitle?: string | null;
+  offerStatus?: string;
+  isSigned?: boolean;
+  signatureName?: string | null;
+  signatureType?: string | null;
+  signatureIp?: string | null;
+  signatureImage?: string | null;
+  signedAt?: string | null;
+  viewedAt?: string | null;
+  signedPdfUrl?: string | null;
+  offeredSalary?: number | null;
+  joiningDate?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -73,8 +103,9 @@ export class LettersService {
     return this.http.get<GeneratedLetter[]>(`${this.apiUrl}${qs}`);
   }
 
-  getLetter(id: number): Observable<GeneratedLetter> {
-    return this.http.get<GeneratedLetter>(`${this.apiUrl}/${id}`);
+  getLetter(id: number, source?: string): Observable<GeneratedLetter> {
+    const qs = source ? `?source=${source}` : '';
+    return this.http.get<GeneratedLetter>(`${this.apiUrl}/${id}${qs}`);
   }
 
   generate(data: {
@@ -84,7 +115,8 @@ export class LettersService {
     return this.http.post<GeneratedLetter>(this.apiUrl, data);
   }
 
-  deleteLetter(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  deleteLetter(id: number, source?: string): Observable<void> {
+    const qs = source ? `?source=${source}` : '';
+    return this.http.delete<void>(`${this.apiUrl}/${id}${qs}`);
   }
 }

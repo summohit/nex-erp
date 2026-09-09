@@ -265,6 +265,9 @@ export class MenusService implements OnModuleInit {
     allowedModules.add('employees/me/profile');
     allowedModules.add('dashboard');
     allowedModules.add('crm/tickets');
+    // Self-service account security (two-factor setup). Every role manages their
+    // own, so it is granted alongside the profile rather than via RolePermission.
+    allowedModules.add('settings/security');
 
     // Field Visits rides on the projects permission — a visit is always logged
     // against a project, so there is no separate module for an admin to grant.

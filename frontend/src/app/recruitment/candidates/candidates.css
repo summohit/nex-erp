@@ -2309,6 +2309,26 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* Never taller than the viewport: the body scrolls instead, so the header
+     stays readable and the submit button stays reachable on short screens. */
+  max-height: 90vh;
+}
+
+/* Header and footer hold their size; only the body gives. */
+.salary-modal-header,
+.reject-modal-header,
+.salary-modal-footer,
+.reject-modal-footer {
+  flex-shrink: 0;
+}
+
+.salary-modal-body,
+.reject-modal-body {
+  overflow-y: auto;
+  /* A flex child will not shrink below its content height without this, and
+     the card would grow past 90vh instead of scrolling. */
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .salary-modal-header,
@@ -2597,6 +2617,18 @@
 
 .salary-status-banner.success .banner-icon {
   color: #16a34a;
+}
+
+/* Neither pass nor fail: there is simply no budget to measure the offer
+   against, so it reads as information rather than approval. */
+.salary-status-banner.info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.salary-status-banner.info .banner-icon {
+  color: #64748b;
 }
 
 .banner-icon {
@@ -4225,4 +4257,370 @@
   border-color: #ff5a1f;
   color: #ff5a1f;
   background: #fff7ed;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Profile budget & above-budget approval
+   ═══════════════════════════════════════════════════════════ */
+
+/* The budget chip in the offer modal is the figure the offer is judged on, so
+   it reads ahead of the surrounding intelligence chips. */
+.salary-intel-chip.budget-chip {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.chip-val.text-emerald { color: #059669; }
+
+.chip-inherited {
+  margin-left: 5px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Reason for the extra payment — sits between the warning banner and the
+   footer, where the eye lands after reading why approval is needed. */
+.approval-reason-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  background: #fffbf5;
+}
+
+.approval-reason-group .offer-field-label { color: #9a3412; }
+
+.required-star { color: #dc2626; }
+
+.approval-reason-hint {
+  font-size: 11px;
+  color: #78716c;
+}
+
+.approval-reason-hint.is-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* Profile budget row in the drawer's compensation card. */
+.profile-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 1px solid #d1fae5;
+  border-radius: 10px;
+  background: #f0fdf4;
+}
+
+.profile-budget-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.comp-stat-value.text-emerald { color: #059669; }
+
+.budget-inherited-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.profile-budget-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 260px;
+}
+
+.profile-budget-edit .budget-input { flex: 1; min-width: 140px; }
+
+.btn-budget-edit,
+.btn-budget-save,
+.btn-budget-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-budget-edit {
+  background: #ffffff;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.btn-budget-edit:hover { background: #ecfdf5; }
+
+.btn-budget-save {
+  background: #059669;
+  color: #ffffff;
+}
+
+.btn-budget-save:hover:not(:disabled) { background: #047857; }
+.btn-budget-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-budget-cancel {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.btn-budget-cancel:hover { background: #f8fafc; }
+
+/* What the approver decides on: the proposed amount and the reason together. */
+.approval-review-panel {
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  background: #fffbf5;
+}
+
+.approval-review-panel.rejected {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.approval-review-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #9a3412;
+}
+
+.approval-review-panel.rejected .approval-review-header { color: #991b1b; }
+
+.approval-review-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.approval-review-figures .comp-stat-value { font-size: 16px; }
+
+.approval-review-reason p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1f2937;
+  white-space: pre-wrap;
+}
+
+.approval-review-hint {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: #a16207;
+}
+
+/* A stage the candidate has not earned yet, in the drawer's status dropdown. */
+.status-dropdown option:disabled { color: #cbd5e1; }
+
+/* ═══════════════════════════════════════════════════════════
+   Pending offer approvals queue
+   ═══════════════════════════════════════════════════════════ */
+
+.approvals-queue {
+  margin: 0 0 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: #fffbf5;
+  overflow: hidden;
+}
+
+.approvals-queue-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.approvals-queue-icon {
+  display: flex;
+  color: #ea580c;
+  flex-shrink: 0;
+}
+
+.approvals-queue-title {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.approvals-queue-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #c2410c;
+}
+
+.approvals-queue-toggle svg {
+  transition: transform 0.15s ease;
+}
+
+.approvals-queue-toggle svg.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+.approvals-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.approval-request-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) auto minmax(200px, 2fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 14px;
+  border: 1px solid #fde3c7;
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.approval-request-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.approval-request-name {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.approval-request-name:hover { text-decoration: underline; }
+
+.approval-request-role {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.approval-request-target {
+  font-size: 11.5px;
+  color: #9a3412;
+}
+
+.approval-request-target em {
+  color: #a16207;
+  font-style: normal;
+}
+
+.approval-request-figures {
+  display: flex;
+  gap: 18px;
+}
+
+.approval-request-figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.approval-request-figures .comp-stat-value { font-size: 15px; }
+
+.approval-request-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.approval-request-reason p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #1f2937;
+  white-space: pre-wrap;
+}
+
+.approval-request-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-approve-request,
+.btn-reject-request {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.btn-approve-request {
+  background: #059669;
+  color: #ffffff;
+}
+
+.btn-approve-request:hover:not(:disabled) { background: #047857; }
+
+.btn-reject-request {
+  background: #ffffff;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.btn-reject-request:hover:not(:disabled) { background: #fef2f2; }
+
+.btn-approve-request:disabled,
+.btn-reject-request:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* The board card's own rejected state, distinct from the pending warning. */
+.kanban-card .approval-badge.is-rejected {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+@media (max-width: 1100px) {
+  .approval-request-card {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
 }

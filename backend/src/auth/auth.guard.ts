@@ -16,7 +16,17 @@ export class AuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_SECRET || 'super-secret'
       });
-      
+
+      // Defence in depth for the half-authenticated two-factor challenge token.
+      // That token is signed with a different secret, so it should never verify
+      // here at all — but this guard's only other check is the signature, so a
+      // misconfiguration that made the secrets match would silently turn every
+      // challenge into a full session. Every real access token carries `sub`
+      // and no `typ`, so this rejects nothing that used to work.
+      if (!payload?.sub || payload.typ === '2fa') {
+        throw new UnauthorizedException();
+      }
+
       // Fallback for older tokens without employeeId
       if (!payload.employeeId && payload.sub) {
         const employee = await this.prisma.employee.findFirst({ where: { userId: payload.sub } });

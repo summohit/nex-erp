@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Alert, RefreshControl } from 'react-native';
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, XCircle, AlertCircle, Calendar, Plane, Star } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTimesheetStore } from '../../../store/timesheetStore';
@@ -16,6 +16,21 @@ const LEGEND = [
   { label: 'Holiday', color: '#F59E0B', bg: '#FEF3C7', border: '#FDE68A', icon: Star },
   { label: 'Day Off', color: '#94A3B8', bg: '#F1F5F9', border: '#E2E8F0', icon: Calendar },
 ];
+
+/**
+ * Convert a backend date string to a local IST date string (YYYY-MM-DD).
+ * Backend stores dates as IST-midnight in UTC (e.g. Sep 9 IST → "2026-09-08T18:30:00.000Z").
+ * We add IST offset (+5:30) to recover the intended calendar date.
+ */
+const IST_OFFSET_MS = 330 * 60_000; // UTC+5:30
+function toISTDateString(dateStr: string): string {
+  const d = new Date(dateStr);
+  const shifted = new Date(d.getTime() + IST_OFFSET_MS);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export default function TimesheetTab() {
   const { attendanceHistory, regularizations, holidays, leaveRequests, currentMonth, isLoading, fetchData, changeMonth } = useTimesheetStore();
@@ -57,8 +72,8 @@ export default function TimesheetTab() {
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-      // Check Attendance record
-      const log = attendanceHistory.find(r => r.date.startsWith(dateStr));
+      // Check Attendance record — use IST date conversion to handle UTC-shifted dates
+      const log = attendanceHistory.find(r => toISTDateString(r.date) === dateStr);
 
       // Check Holiday
       const holiday = holidays.find(h => {
@@ -87,6 +102,7 @@ export default function TimesheetTab() {
         if (log && (log.clockIn || log.status)) {
           if (log.status === 'HALF_DAY') status = 'Half Day';
           else if (log.status === 'LATE' || (log as any).isLate) status = 'Late';
+          else if (log.clockIn) status = (log as any).isLate ? 'Late' : 'Present';
           else if (log.status === 'ABSENT') status = 'Absent';
           else status = 'Present';
         } else if (holiday) {
@@ -130,18 +146,23 @@ export default function TimesheetTab() {
         listRef.current?.scrollToIndex({ index: todayIndex, animated: true, viewPosition: 0.5 });
       }, 100);
     }
-  }, [isLoading, currentMonth]);
+  }, [isLoading, currentMonth, days]);
 
   // Accurate working days calculation matching CRM logic
+  // Working days = non-future weekdays that are not holidays and not on-leave
   let totalWorkingDays = 0;
   let totalPresent = 0;
 
   for (const d of days) {
     if (!d.isFuture) {
       const worked = d.status === 'Present' || d.status === 'Late' || d.status === 'Half Day';
-      if (!d.isWeekend && !d.isHoliday) {
+      const isLeave = d.status === 'On Leave';
+
+      if (!d.isWeekend && !d.isHoliday && !isLeave) {
+        // Regular weekday (not holiday, not on leave) → counts as working day
         totalWorkingDays++;
       } else if (worked) {
+        // Worked on a weekend/holiday → also counts
         totalWorkingDays++;
       }
 

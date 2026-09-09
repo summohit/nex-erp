@@ -104,6 +104,8 @@ model User {
   clearedOffboardingTasks  OffboardingTask[]          @relation("TaskClearer")
   approvedRegularizations  AttendanceRegularization[]
   approvedQuotations       Quotation[]                @relation("QuotationApprover")
+  twoFactor                UserTwoFactor?
+  twoFactorBackupCodes     TwoFactorBackupCode[]
 }
 
 model VerificationToken {
@@ -114,6 +116,58 @@ model VerificationToken {
   createdAt  DateTime @default(now())
 
   @@unique([identifier, token])
+}
+
+/// TOTP (RFC 6238) enrolment for one user — the "Google Authenticator" second
+/// factor.
+///
+/// Deliberately a side table rather than columns on User: several services do
+/// `include: { user: true }` and serialize the whole row to the client
+/// (leaves.service.ts, payroll.service.ts), so any scalar added to User leaks
+/// by default. A relation is only serialized when explicitly included.
+model UserTwoFactor {
+  id     Int  @id @default(autoincrement())
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// AES-256-GCM ciphertext from CryptoService, "v1:"-prefixed so the key can
+  /// be rotated later. Never returned to a client after enrolment.
+  secretCiphertext String
+
+  /// Set once the user proves possession with a valid code. A row exists from
+  /// the moment enrolment STARTS, so every "does this user have 2FA?" check
+  /// must test this field — never row existence.
+  confirmedAt DateTime?
+
+  /// Highest TOTP time step already accepted, fed back to otplib as
+  /// `afterTimeStep`. Stops a code observed over the shoulder being replayed
+  /// while it is still inside the acceptance window.
+  lastUsedStep Int?
+
+  /// Consecutive failures; reset to 0 on any success. Backs the per-user
+  /// lockout, which is the real brute-force control — per-IP throttling is
+  /// useless when a whole office shares one address.
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  lastUsedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// One-time recovery codes, bcrypt-hashed and shown to the user exactly once at
+/// enrolment. Rows are kept after use (usedAt set) so "already used" stays
+/// distinguishable from "never existed".
+model TwoFactorBackupCode {
+  id       Int       @id @default(autoincrement())
+  userId   Int
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash String
+  usedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, usedAt])
 }
 
 // Roles & Permissions
@@ -937,15 +991,38 @@ model JobApplication {
   currentLocation String?
   currentCtc      Float?
   expectedCtc     Float?
+  // The salary budget approved for this specific candidate. When unset the
+  // job's maxSalary stands in as the effective budget — see
+  // ApplicationsService.effectiveProfileBudget.
+  profileBudget   Float?
   source          String?
   coverLetter     String?       @db.Text
   photoUrl        String?
   address         String?       @db.Text // Full postal address, printed on the offer letter
   joiningDate     DateTime? // Agreed date of joining, printed on the offer letter
   status          String        @default("NEW") // NEW, REVIEWING, SHORTLISTED, INTERVIEWING, OFFERED, REJECTED, HIRED, ONBOARDED
+  // Every pipeline stage this candidate has actually been moved through, in
+  // visit order. A single `status` column cannot answer "did they pass phone
+  // screening?" once the candidate has moved on, and that is exactly what the
+  // mandatory-stage gate on OFFERED / HIRED needs to know.
+  completedStages String[]      @default([])
   rejectionReason String?       @db.Text
   offeredSalary   Float?
   approvalStatus  String?       @default("APPROVED") // PENDING_APPROVAL, APPROVED, REJECTED
+  // Why the company is paying above the profile budget. Mandatory to raise the
+  // request, and shown to the approver next to the proposed amount.
+  approvalReason  String?       @db.Text
+  // The budget the offer was measured against when approval was requested, kept
+  // so the approver sees the figure that applied at request time even if the
+  // candidate's profile budget is edited afterwards.
+  approvalBudget      Float?
+  // The stage the recruiter was trying to reach when approval was demanded.
+  // The candidate holds their current stage while the request is open, and this
+  // is where approving it finally moves them.
+  approvalRequestedStage String?
+  approvalRequestedAt DateTime?
+  approvalDecidedAt   DateTime?
+  approvalDecidedById Int?
   answers         String?       @db.Text // Store JSON string of answers
   aiScore         Int?
   aiSummary       String?       @db.Text
@@ -2171,6 +2248,9 @@ model SystemSetting {
   // migration — see OfferLetterConfig in offer-letters.service.ts for the shape.
   offerLetterConfig              Json?
   defaultTicketAssigneeId        Int?     // Employee auto-assigned as default ticket assignee
+  // SUPERADMIN switch: when true, every user in the company must complete TOTP
+  // enrolment at next sign-in, and nobody may turn their own 2FA off.
+  twoFactorRequired              Boolean  @default(false)
   createdAt                      DateTime @default(now())
   updatedAt                      DateTime @updatedAt
 }

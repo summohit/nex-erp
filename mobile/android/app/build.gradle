@@ -90,10 +90,10 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
 
-def releaseStoreFile = keystoreProperties['storeFile'] ?: System.getenv('NEX_KEYSTORE_FILE')
-def releaseStorePassword = keystoreProperties['storePassword'] ?: System.getenv('NEX_KEYSTORE_PASSWORD')
-def releaseKeyAlias = keystoreProperties['keyAlias'] ?: System.getenv('NEX_KEY_ALIAS')
-def releaseKeyPassword = keystoreProperties['keyPassword'] ?: System.getenv('NEX_KEY_PASSWORD')
+def releaseStoreFile = project.hasProperty('NEX_UPLOAD_STORE_FILE') ? NEX_UPLOAD_STORE_FILE : (keystoreProperties['storeFile'] ?: System.getenv('NEX_KEYSTORE_FILE'))
+def releaseStorePassword = project.hasProperty('NEX_UPLOAD_STORE_PASSWORD') ? NEX_UPLOAD_STORE_PASSWORD : (keystoreProperties['storePassword'] ?: System.getenv('NEX_KEYSTORE_PASSWORD'))
+def releaseKeyAlias = project.hasProperty('NEX_UPLOAD_KEY_ALIAS') ? NEX_UPLOAD_KEY_ALIAS : (keystoreProperties['keyAlias'] ?: System.getenv('NEX_KEY_ALIAS'))
+def releaseKeyPassword = project.hasProperty('NEX_UPLOAD_KEY_PASSWORD') ? NEX_UPLOAD_KEY_PASSWORD : (keystoreProperties['keyPassword'] ?: System.getenv('NEX_KEY_PASSWORD'))
 def hasReleaseKeystore = releaseStoreFile != null && !releaseStoreFile.trim().isEmpty()
 
 android {
@@ -108,7 +108,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Keep versionName in step with backend/uploads/app/version.json, which
         // drives the version label on the landing page's download button.
-        versionCode 241
+        versionCode 242
         versionName "2.4.1"
     }
     signingConfigs {
@@ -122,7 +122,7 @@ android {
             if (hasReleaseKeystore) {
                 // Resolved against the android/ directory (where keystore.properties
                 // lives), not app/ — so the property can name the file plainly.
-                storeFile rootProject.file(releaseStoreFile)
+                storeFile file(releaseStoreFile)
                 storePassword releaseStorePassword
                 keyAlias releaseKeyAlias
                 keyPassword releaseKeyPassword

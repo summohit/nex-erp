@@ -1,0 +1,321 @@
+/* Mirrors auth/forgot-password so the whole sign-in journey looks like one flow. */
+
+.tf-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fafc;
+  position: relative;
+  overflow: hidden;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+.glow-bg {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.glow-bg-1 {
+  top: -10%;
+  left: -10%;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(255, 82, 0, 0.15) 0%, rgba(255, 45, 85, 0.05) 100%);
+}
+
+.glow-bg-2 {
+  bottom: -10%;
+  right: -10%;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(112, 0, 255, 0.15) 0%, rgba(255, 82, 0, 0.05) 100%);
+}
+
+.tf-card {
+  max-width: 460px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 3rem 2.5rem;
+  text-align: center;
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(15, 23, 42, 0.05);
+  position: relative;
+  z-index: 10;
+  border: 1px solid #f1f5f9;
+}
+
+.icon-badge {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 1.75rem auto;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 82, 0, 0.1) 0%, rgba(255, 45, 85, 0.1) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.icon-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255, 82, 0, 0.12);
+  animation: tf-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes tf-ping {
+  75%, 100% { transform: scale(1.5); opacity: 0; }
+}
+
+.badge-icon {
+  color: var(--color-primary, #ff5200);
+  position: relative;
+  z-index: 1;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.6rem 0;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0 0 1.75rem 0;
+}
+
+.highlight { color: #0f172a; font-weight: 600; }
+.warning-text { color: #b45309; font-weight: 600; }
+
+.form-group { text-align: left; margin-bottom: 1.25rem; }
+
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.5rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  font-size: 0.95rem;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  background: #ffffff;
+  border-color: var(--color-primary, #ff5200);
+  box-shadow: 0 0 0 3px rgba(255, 82, 0, 0.12);
+}
+
+/* Wide tracking makes a 6-digit code readable at a glance, and is the same
+   treatment the password-reset OTP field already uses. */
+.code-input {
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: none;
+  border-radius: 12px;
+  background: var(--color-primary, #ff5200);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.primary-btn:hover:not(:disabled) { filter: brightness(0.94); }
+.primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.secondary-btn {
+  flex: 1;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.secondary-btn:hover { background: #f8fafc; }
+
+.ghost-btn {
+  width: 100%;
+  margin-top: 0.85rem;
+  padding: 0.7rem;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.ghost-btn:hover { color: #0f172a; }
+.arrow-back { transform: rotate(180deg); }
+
+.hint {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin: 0.9rem 0 0 0;
+  line-height: 1.5;
+}
+
+.loader {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: tf-spin 0.7s linear infinite;
+}
+
+.loader.dark {
+  border-color: rgba(15, 23, 42, 0.15);
+  border-top-color: var(--color-primary, #ff5200);
+}
+
+@keyframes tf-spin { to { transform: rotate(360deg); } }
+
+/* ── Enrolment ────────────────────────────────────────────────────────────── */
+
+.qr-block { margin-bottom: 1.5rem; }
+
+.qr-image {
+  width: 200px;
+  height: 200px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 8px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.qr-placeholder {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.secret-block { margin-top: 1rem; }
+
+.secret-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.secret-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.secret-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f172a;
+  background: #f1f5f9;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+}
+
+.icon-btn {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: #64748b;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover { background: #f8fafc; color: #0f172a; }
+
+/* ── Backup codes ─────────────────────────────────────────────────────────── */
+
+.codes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+}
+
+.backup-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.05em;
+  padding: 0.35rem 0;
+}
+
+.codes-actions { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+
+.ack-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+  color: #334155;
+  text-align: left;
+  margin-bottom: 1.25rem;
+  cursor: pointer;
+}
+
+.ack-row input { width: 16px; height: 16px; accent-color: var(--color-primary, #ff5200); cursor: pointer; }

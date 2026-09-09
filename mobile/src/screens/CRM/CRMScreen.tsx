@@ -1,12 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import AppScreen from '../../components/AppScreen';
 
 export default function CRMScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>CRM Leads</Text>
-      <Text style={styles.subtitle}>Lead management coming soon...</Text>
-    </View>
+    <AppScreen
+      title="Leads"
+      subtitle="Pipeline management"
+    >
+      <View style={styles.container}>
+        <Text style={styles.title}>CRM Leads</Text>
+        <Text style={styles.subtitle}>Lead management coming soon...</Text>
+      </View>
+    </AppScreen>
   );
 }
 

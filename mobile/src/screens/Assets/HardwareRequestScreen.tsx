@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,9 @@ import {
 } from 'react-native';
 // Must come from safe-area-context, not react-native: RN's own SafeAreaView is
 // a no-op on Android, which lets the header slide under the status bar.
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AppScreen from '../../components/AppScreen';
 import { useFocusEffect } from '@react-navigation/native';
-import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, Plus, Package, Calendar, ZoomIn, X, Camera, Image as ImageIcon } from 'lucide-react-native';
+import { Plus, Package, Calendar, ZoomIn, X, Image as ImageIcon } from 'lucide-react-native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { hardwareRequestService, HardwareRequest } from '../../api/hardwareRequestService';
 import { employeeService } from '../../api/employeeService';
@@ -52,7 +51,6 @@ const emptyForm = (): FormState => ({
 });
 
 export default function HardwareRequestScreen() {
-  const navigation = useNavigation();
   const [requests, setRequests] = useState<HardwareRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -236,14 +234,10 @@ export default function HardwareRequestScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={22} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Hardware Requests</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <AppScreen
+      title="Hardware"
+      subtitle="IT requests & assets"
+    >
 
       {loading ? (
         <View style={styles.center}>
@@ -401,7 +395,7 @@ export default function HardwareRequestScreen() {
           )}
         </View>
       </Modal>
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

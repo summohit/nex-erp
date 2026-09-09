@@ -1,0 +1,96 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:'SF Pro Display','SF Pro Text',-apple-system,'Helvetica Neue',Arial,sans-serif;}
+svg{display:block}
+
+html,body{width:360px;height:640px;overflow:hidden;background:#F5F7FA}
+.screen{width:360px;height:640px;position:relative;background:#F5F7FA;overflow:hidden}
+/* status bar */
+.sb{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:12px;font-weight:700;color:#0F172A;letter-spacing:.2px}
+.sb .r{display:flex;align-items:center;gap:5px}
+.bars{display:flex;align-items:flex-end;gap:1.5px;height:9px}
+.bars i{width:2.5px;background:#0F172A;border-radius:1px;display:block}
+.batt{width:17px;height:9px;border:1.4px solid #0F172A;border-radius:2.5px;position:relative;display:block}
+.batt:after{content:'';position:absolute;right:-3px;top:2.2px;width:1.6px;height:3px;background:#0F172A;border-radius:0 1px 1px 0}
+.batt i{position:absolute;left:1.3px;top:1.3px;bottom:1.3px;width:9px;background:#0F172A;border-radius:1px;display:block}
+/* header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 16px 12px}
+.ibtn{width:40px;height:40px;border-radius:13px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(15,23,42,.05);position:relative}
+.dot{position:absolute;top:9px;right:10px;width:7px;height:7px;border-radius:4px;background:#EF4444;border:1.5px solid #fff}
+.hc{flex:1;text-align:center}
+.greet{font-size:11px;font-weight:600;color:#94A3B8;letter-spacing:.2px}
+.nm{font-size:16px;font-weight:800;color:#0F172A;letter-spacing:-.3px;margin-top:1px}
+.hr{display:flex;align-items:center;gap:8px}
+.av{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#F97316,#E25E3E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:800}
+.body{padding:0 16px}
+.card{background:#fff;border-radius:24px;box-shadow:0 4px 14px rgba(15,23,42,.045)}
+.sec{font-size:17px;font-weight:800;color:#0F172A;margin-bottom:12px}
+.secrow{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.viewall{font-size:13px;font-weight:700;color:#E25E3E}
+
+.chart{background:#fff;border-radius:24px;padding:16px;box-shadow:0 2px 8px rgba(15,23,42,.04);margin-bottom:14px}
+.chdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.ct{font-size:15.5px;font-weight:800;color:#0F172A}
+.cs{font-size:12px;color:#94A3B8;margin-top:2px;font-weight:500}
+.filt{display:flex;background:#F1F5F9;border-radius:10px;padding:3px}
+.ft{font-size:11px;font-weight:700;color:#64748B;padding:5px 9px;border-radius:8px}
+.ft.on{background:#fff;color:#0F172A;box-shadow:0 1px 3px rgba(15,23,42,.09)}
+.plot{position:relative;height:132px;margin-bottom:4px}
+.grid{position:absolute;inset:0 0 22px 0;display:flex;flex-direction:column;justify-content:space-between}
+.grid span{height:1px;background:#F1F5F9;display:block}
+.brow{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:space-between}
+.bcol{flex:1;display:flex;flex-direction:column;align-items:center}
+.btrack{height:110px;display:flex;align-items:flex-end}
+.bfill{width:22px;background:#E25E3E;border-radius:11px}
+.blab{font-size:11px;font-weight:700;color:#94A3B8;margin-top:7px}
+.cfoot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #F1F5F9;padding-top:12px}
+.avgv{font-size:19px;font-weight:800;color:#0F172A;letter-spacing:-.4px}
+.avgl{font-size:11.5px;color:#94A3B8;font-weight:500;margin-top:1px}
+.cbadge{display:flex;align-items:center;gap:2px;background:#ECFDF5;color:#16A34A;font-size:12px;font-weight:700;padding:6px 10px;border-radius:10px}
+.panel{background:#fff;border-radius:22px;padding:14px 16px;box-shadow:0 2px 8px rgba(15,23,42,.04);margin-bottom:12px}
+.phdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.phl{display:flex;align-items:center;gap:10px}
+.pi{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center}
+.ptl{font-size:14.5px;font-weight:700;color:#0F172A}
+.pvrow{display:flex;align-items:baseline;gap:6px;margin-bottom:10px}
+.pbig{font-size:26px;font-weight:800;color:#0F172A;letter-spacing:-.8px}
+.punit{font-size:12.5px;color:#64748B;font-weight:500}
+.track{height:8px;background:#F1F5F9;border-radius:4px;overflow:hidden}
+.fill{height:8px;background:#16A34A;border-radius:4px}
+.plabs{display:flex;justify-content:space-between;margin-top:7px}
+.plab{font-size:11px;color:#94A3B8;font-weight:600}
+.cpill{background:#FFF7ED;color:#EA580C;font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:9px}
+.prow{display:flex;align-items:center;gap:9px;padding:6px 0}
+.pdot{width:7px;height:7px;border-radius:4px}
+.pnm{flex:1;font-size:13px;font-weight:600;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:9.5px;font-weight:800;padding:3px 7px;border-radius:6px;letter-spacing:.3px}
+</style></head><body><div class="screen"><div class="sb"><span>9:41</span><div class="r">
+<div class="bars"><i style="height:3px"></i><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i></div>
+<svg width="14" height="11" viewBox="0 0 16 12"><path d="M8 10.2 1 4.4a10.6 10.6 0 0 1 14 0Z" fill="#0F172A"/></svg>
+<span class="batt"><i></i></span></div></div><div class="hdr">
+<div class="ibtn"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></div>
+<div class="hc"><div class="greet">Good morning</div><div class="nm">Arjun Mehta</div></div>
+<div class="hr"><div class="ibtn"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg><span class="dot"></span></div><div class="av">AM</div></div></div>
+<div class="body">
+ <div class="sec">Attendance</div>
+ <div class="chart">
+  <div class="chdr"><div><div class="ct">Working hours</div><div class="cs">Your attendance this week</div></div>
+   <div class="filt"><span class="ft">7D</span><span class="ft">30D</span><span class="ft on">3M</span></div></div>
+  <div class="plot"><div class="grid"><span></span><span></span><span></span><span></span></div>
+   <div class="brow"><div class="bcol"><div class="btrack"><div class="bfill" style="height:58%"></div></div><div class="blab">Mon</div></div><div class="bcol"><div class="btrack"><div class="bfill" style="height:82%"></div></div><div class="blab">Tue</div></div><div class="bcol"><div class="btrack"><div class="bfill" style="height:70%"></div></div><div class="blab">Wed</div></div><div class="bcol"><div class="btrack"><div class="bfill" style="height:96%"></div></div><div class="blab">Thu</div></div><div class="bcol"><div class="btrack"><div class="bfill" style="height:88%"></div></div><div class="blab">Fri</div></div><div class="bcol"><div class="btrack"><div class="bfill" style="height:34%"></div></div><div class="blab">Sat</div></div><div class="bcol"><div class="btrack"><div class="bfill" style="height:12%"></div></div><div class="blab">Sun</div></div></div></div>
+  <div class="cfoot"><div><div class="avgv">8h 12m</div><div class="avgl">Weekly average</div></div>
+   <div class="cbadge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg> 8.4%</div></div>
+ </div>
+ <div class="panel">
+  <div class="phdr"><div class="phl"><div class="pi" style="background:#ECFDF5"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></div><div class="ptl">Leave Balance</div></div><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+  <div class="pvrow"><div class="pbig">14</div><div class="punit">days remaining</div></div>
+  <div class="track"><div class="fill" style="width:42%"></div></div>
+  <div class="plabs"><span class="plab">10 used</span><span class="plab">24 total</span></div>
+ </div>
+ <div class="panel">
+  <div class="phdr"><div class="phl"><div class="pi" style="background:#FFF7ED"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg></div><div class="ptl">Active Projects</div></div><span class="cpill">6</span></div>
+  <div class="prow"><span class="pdot" style="background:#EA580C"></span><span class="pnm">Metro Depot Expansion</span><span class="tag" style="background:#FFF7ED;color:#EA580C">WIP</span></div>
+  <div class="prow"><span class="pdot" style="background:#EA580C"></span><span class="pnm">Riverside Retail Fit-out</span><span class="tag" style="background:#FFF7ED;color:#EA580C">WIP</span></div>
+  <div class="prow"><span class="pdot" style="background:#16A34A"></span><span class="pnm">Northgate Solar Audit</span><span class="tag" style="background:#F0FDF4;color:#16A34A">DONE</span></div>
+ </div>
+</div></div></body></html>

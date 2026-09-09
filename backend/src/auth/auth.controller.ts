@@ -1,4 +1,5 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import { Throttle, ThrottlerGuard, seconds } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 
@@ -27,6 +28,12 @@ export class AuthController {
   }
 
   @HttpCode(HttpStatus.OK)
+  // Credential stuffing runs at whatever rate the endpoint allows, and until now
+  // that was unlimited. Applied per-route rather than globally because the app
+  // has no global guards and a blanket limit would break the dashboard's
+  // parallel loads.
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(60), limit: 10 } })
   @Post('login')
   signIn(@Body() signInDto: Record<string, any>) {
     return this.authService.login(signInDto.email, signInDto.password);
@@ -58,6 +65,10 @@ export class AuthController {
     return this.authService.resendVerificationEmail(body.email);
   }
 
+  // The reset OTP is six digits and `resetPassword` imposes no attempt limit of
+  // its own, so without this the code is guessable by brute force.
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(900), limit: 5 } })
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
   forgotPassword(@Body() body: { email: string }) {
@@ -67,6 +78,8 @@ export class AuthController {
     return this.authService.forgotPassword(body.email);
   }
 
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(900), limit: 10 } })
   @HttpCode(HttpStatus.OK)
   @Post('reset-password')
   resetPassword(@Body() body: { email: string; otp: string; newPassword: string }) {

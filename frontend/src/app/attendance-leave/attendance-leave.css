@@ -1982,3 +1982,89 @@
   font-size: 11px;
   color: #64748B;
 }
+
+/* ── Tab Badge (pending count) ── */
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #EF4444;
+  border-radius: 10px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* ── Approval Status Filter Pills ── */
+.approval-status-filters {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.status-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
+  color: #64748B;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-filter-pill:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+  color: #334155;
+}
+
+.status-filter-pill.active {
+  background: #EFF6FF;
+  border-color: #3B82F6;
+  color: #1D4ED8;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15);
+}
+
+.filter-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.filter-dot.pending { background: #F59E0B; }
+.filter-dot.approved { background: #10B981; }
+.filter-dot.rejected { background: #EF4444; }
+.filter-dot.cancelled { background: #94A3B8; }
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #F59E0B;
+  border-radius: 9px;
+  line-height: 1;
+}
+
+.status-filter-pill.active .filter-count {
+  background: #1D4ED8;
+}

@@ -137,7 +137,19 @@ export class AuthComponent implements OnInit {
 
     const { email, password } = this.loginForm.value;
     this.authService.login({ email, password }).subscribe({
-      next: (res) => {
+      next: (res: any) => {
+        // A two-factor challenge comes back as a 200 carrying no tokens, so
+        // AuthService stored nothing and the user is not signed in yet. This has
+        // to be checked BEFORE getMe(), which would otherwise fire without a
+        // token, 401, and strand them on the session-expired modal.
+        if (res?.twoFactorRequired && res?.challengeToken) {
+          sessionStorage.setItem('twoFactorChallenge', res.challengeToken);
+          sessionStorage.setItem('twoFactorMode', res.mode || 'VERIFY');
+          this.isSubmitting.set(false);
+          this.router.navigate(['/auth/two-factor']);
+          return;
+        }
+
         this.toast.success('Login successful! Loading workspace...');
         
         // Fetch user to check onboarding status
