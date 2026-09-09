@@ -54,6 +54,10 @@ export class LeadContactProfileComponent implements OnInit {
 
   sourceOptions = LEAD_SOURCES;
 
+  // Same pipeline stages as the main Kanban board, so the profile's stage
+  // dropdown matches exactly what the board uses.
+  readonly leadStages = ['New', 'Interested', 'Proposal Sent', 'Schedule Meeting', 'Negotiation', 'Win', 'On Hold', 'Lost'];
+
   employees: any[] = [];
   dealModalOpen = false;
   isSavingDeal = false;
@@ -234,31 +238,65 @@ export class LeadContactProfileComponent implements OnInit {
     return (status || '—').toUpperCase();
   }
 
+  // Kanban-board equivalence: legacy statuses (NEW/PROPOSAL/WON/...) collapse
+  // onto the same 8 stages the board displays.
+  normalizeStatus(status: string | null | undefined): string {
+    if (!status) return 'New';
+    const s = status.trim().toUpperCase();
+    if (s === 'NEW') return 'New';
+    if (s === 'INTERESTED' || s === 'QUALIFIED' || s === 'ASSIGNED' || s === 'CONTACTED' || s === 'ATTEMPTED TO CONTACT' || s === 'CONNECTED' || s === 'FOLLOW-UP REQUIRED' || s === 'FOLLOW_UP_REQUIRED') return 'Interested';
+    if (s === 'PROPOSAL' || s === 'PROPOSAL SENT' || s === 'PROPOSAL_SENT' || s === 'DEMO SCHEDULED' || s === 'DEMO COMPLETED') return 'Proposal Sent';
+    if (s === 'NEGOTIATION') return 'Negotiation';
+    if (s === 'ON HOLD' || s === 'ON_HOLD') return 'On Hold';
+    if (s === 'CONVERTED' || s === 'WON' || s === 'WIN') return 'Win';
+    if (s === 'LOST') return 'Lost';
+    if (s === 'SCHEDULE MEETING' || s === 'SCHEDULE_MEETING') return 'Schedule Meeting';
+    const directMatch = this.leadStages.find(st => st.toLowerCase() === status.toLowerCase());
+    return directMatch || 'New';
+  }
+
+  // Kanban stages first, plus any legacy raw status still present on a lead so
+  // existing rows render instead of showing a blank dropdown.
+  get stageOptions(): string[] {
+    const opts = [...this.leadStages];
+    const seen = new Set(opts.map(s => s.toLowerCase()));
+    for (const lead of this.leadsBrought) {
+      const status = (lead.status || '').toString().trim();
+      if (status && !seen.has(status.toLowerCase())) {
+        opts.push(status);
+        seen.add(status.toLowerCase());
+      }
+    }
+    return opts;
+  }
+
   dealStatusClass(status: string): string {
-    const s = (status || '').toUpperCase();
-    if (s === 'WON') return 'deal-won';
-    if (s === 'LOST') return 'deal-rejected';
-    if (s === 'PROPOSAL') return 'deal-open';
-    return 'deal-draft';
+    const s = this.normalizeStatus(status);
+    if (s === 'Win') return 'deal-won';
+    if (s === 'Lost') return 'deal-rejected';
+    return 'deal-open';
   }
 
   dealStatusLabel(status: string): string {
-    const s = (status || '').toUpperCase();
-    if (s === 'WON') return 'Won';
-    if (s === 'LOST') return 'Lost';
-    if (s === 'PROPOSAL') return 'Open';
-    if (s === 'QUALIFIED') return 'Open';
+    const s = this.normalizeStatus(status);
+    if (s === 'Win') return 'Won';
+    if (s === 'Lost') return 'Lost';
     return 'Open';
   }
 
   stageClass(status: string): string {
-    const s = (status || '').toUpperCase();
-    if (s === 'NEW') return 'stg-new';
-    if (s === 'QUALIFIED') return 'stg-qualified';
-    if (s === 'PROPOSAL') return 'stg-proposal';
-    if (s === 'WON') return 'stg-won';
-    if (s === 'LOST') return 'stg-lost';
-    return 'stg-default';
+    const s = this.normalizeStatus(status);
+    const map: Record<string, string> = {
+      'New': 'stg-new',
+      'Interested': 'stg-interested',
+      'Proposal Sent': 'stg-proposal',
+      'Schedule Meeting': 'stg-meeting',
+      'Negotiation': 'stg-negotiation',
+      'Win': 'stg-win',
+      'On Hold': 'stg-onhold',
+      'Lost': 'stg-lost',
+    };
+    return map[s] || 'stg-default';
   }
 
   changeLeadStage(lead: any, event: Event): void {
@@ -268,12 +306,12 @@ export class LeadContactProfileComponent implements OnInit {
     this.http.put(`${environment.apiUrl}/crm/leads/${lead.id}/status`, { status: newStatus }).subscribe({
       next: () => {
         lead.status = newStatus;
-        this.dialog.success(`Deal moved to ${newStatus}.`);
+        this.dialog.success(`Lead moved to ${newStatus}.`);
       },
       error: (err) => {
         console.error(err);
         lead.status = prevStatus;
-        this.dialog.error('Failed to update deal stage.');
+        this.dialog.error('Failed to update lead stage.');
       }
     });
   }
@@ -494,7 +532,7 @@ export class LeadContactProfileComponent implements OnInit {
       value: null,
       currency: 'INR',
       expectedCloseDate: '',
-      status: 'NEW',
+      status: 'New',
       source: c?.leadSource || '',
       assignedToId: null,
       broughtByContactId: c?.id ?? null,
@@ -532,7 +570,7 @@ export class LeadContactProfileComponent implements OnInit {
     const leads = this.leadsBrought;
     const currency = leads[0]?.currency || 'INR';
     const csvRows = [
-      ['Deal Name', 'Lead Name', 'Contact Details', 'Value', 'Close Date', 'Next Follow Up', 'Deal Agent', 'Deal Watcher', 'Stage', 'Deal Status'].join(','),
+      ['Lead Name', 'Contact', 'Contact Details', 'Value', 'Close Date', 'Next Follow Up', 'Lead Agent', 'Lead Watcher', 'Stage', 'Lead Status'].join(','),
       ...leads.map((l: any) => [
         this.escapeCsv(l.title || ''),
         this.escapeCsv(l.contactName || ''),

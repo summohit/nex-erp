@@ -379,9 +379,12 @@
 
 /* Stage color variants */
 .stage-select.stg-new { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
-.stage-select.stg-qualified { background: #e0e7ff; color: #4338ca; border-color: #c7d2fe; }
+.stage-select.stg-interested { background: #e0e7ff; color: #4338ca; border-color: #c7d2fe; }
 .stage-select.stg-proposal { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
-.stage-select.stg-won { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+.stage-select.stg-meeting { background: #fef9c3; color: #854d0e; border-color: #fde68a; }
+.stage-select.stg-negotiation { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+.stage-select.stg-win { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+.stage-select.stg-onhold { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
 .stage-select.stg-lost { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
 .stage-select.stg-default { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
 

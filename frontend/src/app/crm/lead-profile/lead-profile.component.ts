@@ -11,7 +11,8 @@ import {
   LucideMessageSquare, LucideFileText, LucideTarget, LucideChevronRight,
   LucideUpload, LucideDownload, LucideTrash2, LucideEdit, LucideCheckCircle,
   LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
-  LucideFile, LucideMoreVertical, LucideRefreshCw
+  LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
+  LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock
 } from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
 
@@ -31,7 +32,8 @@ interface PipelineStage {
     LucideMessageSquare, LucideFileText, LucideTarget, LucideChevronRight,
     LucideUpload, LucideDownload, LucideTrash2, LucideEdit, LucideCheckCircle,
     LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
-    LucideFile, LucideMoreVertical, LucideRefreshCw
+    LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
+    LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock
   ],
   templateUrl: './lead-profile.html',
   styleUrls: ['./lead-profile.css']
@@ -90,9 +92,23 @@ export class LeadProfileComponent implements OnInit {
     stage: '',
     type: 'CALL',
     scheduledAt: '',
-    notes: ''
+    notes: '',
+    contactPerson: '',
+    contactPhone: '',
+    contactEmail: '',
+    title: ''
   };
   isEditingFollowUp = false;
+  followUpTab: 'schedule' | 'history' = 'schedule';
+  followUpStageMenuOpen = false;
+  followUpTableStageMenu: number | null = null;
+  isSavingFollowUp = false;
+  isUploadingFollowUpFiles = false;
+  pendingFollowUpFiles: File[] = [];
+  followUpStatusSaving: Record<number, boolean> = {};
+
+  // Must stay in step with LEAD_STATUSES on the leads board.
+  readonly LEAD_STATUSES = ['New', 'Interested', 'Proposal Sent', 'Schedule Meeting', 'Negotiation', 'Win', 'On Hold', 'Lost'];
 
   // Note form
   noteForm: any = { id: null, content: '' };
@@ -243,45 +259,69 @@ export class LeadProfileComponent implements OnInit {
     if (this.leadId == null) return;
     this.loadingFollowUps = true;
     this.http.get<any[]>(`${environment.apiUrl}/crm/leads/${this.leadId}/follow-ups`).subscribe({
-      next: (data) => { this.followUps = data || []; this.loadingFollowUps = false; },
+      next: (data) => {
+        this.followUps = (data || []).slice().sort((a, b) => this.sortFollowUpsDesc(a, b));
+        this.loadingFollowUps = false;
+      },
       error: (err) => { console.error(err); this.loadingFollowUps = false; }
     });
   }
 
+  // Newest follow-up first, oldest last.
+  private sortFollowUpsDesc(a: any, b: any): number {
+    return new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime();
+  }
+
   openNewFollowUp() {
     this.isEditingFollowUp = false;
+    this.followUpTab = 'schedule';
+    this.followUpStageMenuOpen = false;
     this.followUpForm = {
       id: null,
-      title: '',
+      title: this.lead ? `Follow-up with ${this.lead.contactName || this.lead.companyName || 'Client'}` : '',
       type: 'CALL',
-      scheduledAt: this.toLocalDateTime(new Date()),
+      scheduledAt: '',
       notes: '',
-      status: 'PENDING'
+      contactPerson: this.lead?.contactName || '',
+      contactPhone: this.lead?.phone || '',
+      contactEmail: this.lead?.email || '',
+      stage: this.normalizeStatus(this.lead?.status)
     };
+    this.setQuickFollowUpTime('tomorrow_morning');
+    this.pendingFollowUpFiles = [];
     this.showFollowUpModal = true;
   }
 
   openEditFollowUp(fu: any) {
     this.isEditingFollowUp = true;
+    this.followUpTab = 'schedule';
+    this.followUpStageMenuOpen = false;
     this.followUpForm = {
       id: fu.id,
-      title: fu.title,
+      title: fu.title || 'Follow-up',
       type: fu.type,
       scheduledAt: this.toLocalDateTime(new Date(fu.scheduledAt)),
       notes: fu.notes || '',
-      status: fu.status || 'PENDING'
+      contactPerson: fu.contactPerson || '',
+      contactPhone: fu.contactPhone || '',
+      contactEmail: fu.contactEmail || '',
+      stage: this.normalizeStatus(this.lead?.status)
     };
+    this.pendingFollowUpFiles = [];
     this.showFollowUpModal = true;
   }
 
   closeFollowUpModal() {
     this.showFollowUpModal = false;
+    this.followUpStageMenuOpen = false;
+    this.followUpTableStageMenu = null;
+    this.pendingFollowUpFiles = [];
   }
 
   saveFollowUp() {
     if (this.leadId == null) return;
-    if (!this.followUpForm.scheduledAt) {
-      this.dialog.error('Please fill in the scheduled date and time.');
+    if (!this.followUpForm.scheduledAt || !(this.followUpForm.title || '').trim()) {
+      this.dialog.error('Please fill in the follow-up title and scheduled date & time.');
       return;
     }
 
@@ -290,26 +330,23 @@ export class LeadProfileComponent implements OnInit {
     // part of it — a stage that fails to stick must not lose the follow-up.
     const newStage = this.followUpForm.stage;
     if (newStage && newStage !== this.lead?.status) {
-      this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}`, { status: newStage }).subscribe({
-        next: (updated) => {
-          if (this.lead) this.lead.status = updated?.status ?? newStage;
-          this.loadHistory();
-        },
-        error: () => this.dialog.error('Follow-up saved, but the stage could not be updated.'),
-      });
+      this.saveLeadStage(newStage);
     }
+
     const payload = {
-      title: this.followUpForm.type,
+      title: this.followUpForm.title.trim(),
       type: this.followUpForm.type,
+      contactPerson: this.followUpForm.contactPerson,
+      contactPhone: this.followUpForm.contactPhone,
+      contactEmail: this.followUpForm.contactEmail,
       scheduledAt: new Date(this.followUpForm.scheduledAt).toISOString(),
-      notes: this.followUpForm.notes,
-      status: this.followUpForm.status
+      notes: this.followUpForm.notes
     };
 
     if (this.isEditingFollowUp) {
       this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/follow-ups/${this.followUpForm.id}`, payload).subscribe({
         next: (data) => {
-          this.followUps = this.followUps.map(f => f.id === data.id ? data : f);
+          this.followUps = this.followUps.map(f => f.id === data.id ? data : f).sort((a, b) => this.sortFollowUpsDesc(a, b));
           this.showFollowUpModal = false;
           this.dialog.success('Follow-up updated.');
           this.loadHistory();
@@ -320,19 +357,149 @@ export class LeadProfileComponent implements OnInit {
         }
       });
     } else {
+      this.isSavingFollowUp = true;
       this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/follow-ups`, payload).subscribe({
         next: (data) => {
-          this.followUps.push(data);
-          this.showFollowUpModal = false;
+          this.isSavingFollowUp = false;
+          this.followUps = [data, ...this.followUps].sort((a, b) => this.sortFollowUpsDesc(a, b));
+          const files = [...this.pendingFollowUpFiles];
+          this.pendingFollowUpFiles = [];
+          this.uploadFollowUpFiles(data.id, files);
+          this.followUpTab = 'history';
+          this.followUpForm.notes = '';
+          this.setQuickFollowUpTime('tomorrow_morning');
           this.dialog.success('Follow-up created.');
           this.loadHistory();
         },
         error: (err) => {
+          this.isSavingFollowUp = false;
           console.error(err);
-          this.dialog.error('Failed to create follow-up.');
+          this.dialog.error(err?.error?.message || 'Failed to create follow-up.');
         }
       });
     }
+  }
+
+  saveLeadStage(newStatus: string) {
+    if (this.leadId == null || !newStatus || newStatus === this.lead?.status) return;
+    if (['WIN', 'WON'].includes(newStatus.toUpperCase())) {
+      this.dialog.error('Upload the purchase order before moving this deal to Win and sending it to Finance.');
+      return;
+    }
+    this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/status`, { status: newStatus }).subscribe({
+      next: (updated) => {
+        if (this.lead) this.lead.status = updated?.status ?? newStatus;
+        this.loadHistory();
+      },
+      error: () => this.dialog.error('Follow-up saved, but the stage could not be updated.'),
+    });
+  }
+
+  // Stage column in the follow-up table — keeps the follow-up and the lead in sync.
+  toggleFollowUpTableStageMenu(fu: any, event: Event) {
+    if (event) event.stopPropagation();
+    this.followUpTableStageMenu = this.followUpTableStageMenu === fu.id ? null : fu.id;
+  }
+
+  selectFollowUpTableStage(fu: any, stage: string, event: Event) {
+    if (event) event.stopPropagation();
+    this.followUpTableStageMenu = null;
+    if (stage === this.getFollowUpStage(fu.status)) return;
+    this.followUpStatusSaving[fu.id] = true;
+    this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/follow-ups/${fu.id}`, { status: stage }).subscribe({
+      next: (updated) => {
+        this.followUpStatusSaving[fu.id] = false;
+        this.followUps = this.followUps.map(x => x.id === updated.id ? updated : x);
+        this.saveLeadStage(stage);
+      },
+      error: (err) => {
+        this.followUpStatusSaving[fu.id] = false;
+        console.error('Failed to update follow-up stage', err);
+        this.dialog.error('Failed to update the stage.');
+      }
+    });
+  }
+
+  toggleFollowUpStageMenu(event: Event) {
+    if (event) event.stopPropagation();
+    this.followUpStageMenuOpen = !this.followUpStageMenuOpen;
+  }
+
+  selectFollowUpStage(stage: string, event: Event) {
+    if (event) event.stopPropagation();
+    this.followUpForm.stage = stage;
+    this.followUpStageMenuOpen = false;
+  }
+
+  setQuickFollowUpTime(option: 'today_afternoon' | 'tomorrow_morning' | 'in_2_days' | 'next_week') {
+    const d = new Date();
+    if (option === 'today_afternoon') {
+      d.setHours(15, 0, 0, 0);
+    } else if (option === 'tomorrow_morning') {
+      d.setDate(d.getDate() + 1);
+      d.setHours(10, 0, 0, 0);
+    } else if (option === 'in_2_days') {
+      d.setDate(d.getDate() + 2);
+      d.setHours(11, 0, 0, 0);
+    } else if (option === 'next_week') {
+      d.setDate(d.getDate() + 7);
+      d.setHours(10, 0, 0, 0);
+    }
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    this.followUpForm.scheduledAt = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
+  }
+
+  onFollowUpFilesSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    this.pendingFollowUpFiles = [...this.pendingFollowUpFiles, ...files];
+  }
+
+  removePendingFollowUpFile(index: number) {
+    this.pendingFollowUpFiles.splice(index, 1);
+  }
+
+  uploadFollowUpFiles(followUpId: number, files: File[]) {
+    if (this.leadId == null || !files.length) return;
+    this.isUploadingFollowUpFiles = true;
+    let remaining = files.length;
+    files.forEach(file => {
+      const body = new FormData();
+      body.append('file', file);
+      this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/follow-ups/${followUpId}/files`, body).subscribe({
+        next: () => {
+          if (--remaining === 0) {
+            this.isUploadingFollowUpFiles = false;
+            this.loadFollowUps();
+          }
+        },
+        error: () => {
+          if (--remaining === 0) {
+            this.isUploadingFollowUpFiles = false;
+            this.dialog.error('One or more follow-up attachments could not be uploaded.');
+            this.loadFollowUps();
+          }
+        }
+      });
+    });
+  }
+
+  // Most recently scheduled follow-up still on file — shown as read-only context
+  // when scheduling the next one.
+  getPreviousFollowUpNote(): any | null {
+    if (!this.followUps.length) return null;
+    return [...this.followUps].sort((a, b) => this.sortFollowUpsDesc(a, b))[0];
+  }
+
+  getUpcomingFollowUps(): any[] {
+    const now = new Date().getTime();
+    return this.followUps.filter(f => new Date(f.scheduledAt).getTime() >= now);
+  }
+
+  getPastFollowUps(): any[] {
+    const now = new Date().getTime();
+    return this.followUps.filter(f => new Date(f.scheduledAt).getTime() < now)
+      .sort((a, b) => this.sortFollowUpsDesc(a, b));
   }
 
   async markFollowUpComplete(fu: any) {
@@ -341,7 +508,7 @@ export class LeadProfileComponent implements OnInit {
     if (!confirmed) return;
     this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/follow-ups/${fu.id}`, { status: 'COMPLETED' }).subscribe({
       next: (data) => {
-        this.followUps = this.followUps.map(f => f.id === data.id ? data : f);
+        this.followUps = this.followUps.map(f => f.id === data.id ? data : f).sort((a, b) => this.sortFollowUpsDesc(a, b));
         this.dialog.success('Follow-up marked as completed.');
         this.loadHistory();
       },
@@ -374,6 +541,97 @@ export class LeadProfileComponent implements OnInit {
     if (s === 'COMPLETED') return 'fu-status-completed';
     if (s === 'CANCELLED') return 'fu-status-cancelled';
     return 'fu-status-pending';
+  }
+
+  getFollowUpTypeBadge(type: string): { label: string, color: string, bg: string } {
+    switch (type) {
+      case 'CALL': return { label: 'Phone Call', color: '#0284c7', bg: '#e0f2fe' };
+      case 'MEETING': return { label: 'Meeting', color: '#7c3aed', bg: '#f5f3ff' };
+      case 'DEMO': return { label: 'Product Demo', color: '#ea580c', bg: '#fff7ed' };
+      case 'EMAIL': return { label: 'Email', color: '#059669', bg: '#ecfdf5' };
+      case 'FIELD_VISIT': return { label: 'Field Visit', color: '#d97706', bg: '#fffbeb' };
+      case 'NOTE': return { label: 'Note / Task', color: '#475569', bg: '#f1f5f9' };
+      default: return { label: type, color: '#64748b', bg: '#f8fafc' };
+    }
+  }
+
+  getFollowUpTypeClass(type: string): string {
+    switch (type) {
+      case 'CALL': return 'type-badge-call';
+      case 'EMAIL': return 'type-badge-email';
+      case 'MEETING': return 'type-badge-meeting';
+      case 'DEMO': return 'type-badge-demo';
+      case 'FIELD_VISIT': return 'type-badge-visit';
+      default: return 'type-badge-default';
+    }
+  }
+
+  normalizeStatus(status: string | undefined | null): string {
+    if (!status) return 'New';
+    const s = status.trim().toUpperCase();
+    if (s === 'NEW') return 'New';
+    if (s === 'INTERESTED' || s === 'QUALIFIED' || s === 'ASSIGNED' || s === 'CONTACTED' || s === 'ATTEMPTED TO CONTACT' || s === 'CONNECTED' || s === 'FOLLOW-UP REQUIRED' || s === 'FOLLOW_UP_REQUIRED') return 'Interested';
+    if (s === 'PROPOSAL' || s === 'PROPOSAL SENT' || s === 'PROPOSAL_SENT' || s === 'DEMO SCHEDULED' || s === 'DEMO COMPLETED') return 'Proposal Sent';
+    if (s === 'NEGOTIATION') return 'Negotiation';
+    if (s === 'ON HOLD' || s === 'ON_HOLD') return 'On Hold';
+    if (s === 'CONVERTED' || s === 'WON' || s === 'WIN') return 'Win';
+    if (s === 'LOST') return 'Lost';
+    if (s === 'SCHEDULE MEETING' || s === 'SCHEDULE_MEETING') return 'Schedule Meeting';
+    const directMatch = this.LEAD_STATUSES.find(st => st.toLowerCase() === status.toLowerCase());
+    if (directMatch) return directMatch;
+    return 'New';
+  }
+
+  getStatusLabel(status: string): string {
+    return this.normalizeStatus(status);
+  }
+
+  // Map follow-up status values (PENDING/COMPLETED/CANCELLED) onto the current
+  // deal-stage set so the Stage dropdown always shows a valid progression.
+  getFollowUpStage(status?: string): string {
+    const s = (status || '').toUpperCase().replace(/_/g, ' ');
+    switch (s) {
+      case 'PENDING':
+      case 'COMPLETED':
+      case '':
+      case 'NEW': return 'New';
+      case 'CANCELLED':
+      case 'LOST': return 'Lost';
+      default: return this.normalizeStatus(status);
+    }
+  }
+
+  private readonly statusColorMap: Record<string, string> = {
+    'new': '#2563eb',
+    'interested': '#7c3aed',
+    'schedule-meeting': '#0891b2',
+    'proposal-sent': '#6d28d9',
+    'negotiation': '#b45309',
+    'on-hold': '#64748b',
+    'win': '#059669',
+    'lost': '#dc2626',
+  };
+
+  statusDotColor(status: string): string {
+    const key = (status || '').toLowerCase().replace(/\s+/g, '-');
+    return this.statusColorMap[key] || '#64748b';
+  }
+
+  isFollowUpOverdue(scheduledAt: string | Date): boolean {
+    return new Date(scheduledAt).getTime() < Date.now();
+  }
+
+  isFollowUpToday(dateStr: string): boolean {
+    if (!dateStr) return false;
+    return new Date(dateStr).toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+  }
+
+  isFollowUpTomorrow(dateStr: string): boolean {
+    if (!dateStr) return false;
+    const d = new Date(dateStr).toISOString().slice(0, 10);
+    const t = new Date();
+    t.setDate(t.getDate() + 1);
+    return d === t.toISOString().slice(0, 10);
   }
 
   // ═══════════════════════════════════════════
@@ -579,6 +837,20 @@ export class LeadProfileComponent implements OnInit {
 
   get followUpItems(): any[] {
     return this.lead?.followUps || [];
+  }
+
+  // Earliest still-pending scheduled follow-up, falling back to the most recent
+  // overdue one so the header box always has something meaningful to show.
+  get nextFollowUpInfo(): { date: string; isOverdue: boolean } | null {
+    const sorted = (this.followUps || [])
+      .filter((f: any) => (f.status || 'PENDING').toUpperCase() !== 'COMPLETED')
+      .map((f: any) => ({ t: new Date(f.scheduledAt).getTime(), f }))
+      .filter(x => !isNaN(x.t))
+      .sort((a, b) => a.t - b.t);
+    if (!sorted.length) return null;
+    const upcoming = sorted.find(x => x.t >= Date.now());
+    const chosen = upcoming || sorted[sorted.length - 1];
+    return { date: chosen.f.scheduledAt, isOverdue: !upcoming };
   }
 
   get fullAddress(): string {

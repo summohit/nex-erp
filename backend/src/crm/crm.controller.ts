@@ -64,6 +64,14 @@ export class CrmController {
     return this.crmService.createLead(req.user.companyId, data, req.user.employeeId);
   }
 
+  @Post('leads/sync-contacts')
+  syncLeadContactLinks(@Request() req) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
+      throw new ForbiddenException('Only admins can sync lead contacts.');
+    }
+    return this.crmService.syncLeadContactLinks(req.user.companyId);
+  }
+
   @Get('leads')
   getLeads(@Request() req) {
     return this.crmService.getLeads(req.user.companyId, req.user);

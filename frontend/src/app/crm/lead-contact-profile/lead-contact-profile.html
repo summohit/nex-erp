@@ -82,7 +82,7 @@
 
     <div class="segmented-nav">
       <button class="nav-pill-btn" [class.active]="activeTab === 'overview'" (click)="setTab('overview')"><svg lucideLayoutList size="16"></svg> Overview</button>
-      <button class="nav-pill-btn" [class.active]="activeTab === 'deals'" (click)="setTab('deals')"><svg lucideBriefcase size="16"></svg> Deals <span class="count-badge">{{ leadsBrought.length }}</span></button>
+      <button class="nav-pill-btn" [class.active]="activeTab === 'deals'" (click)="setTab('deals')"><svg lucideBriefcase size="16"></svg> Leads <span class="count-badge">{{ leadsBrought.length }}</span></button>
       <button class="nav-pill-btn" [class.active]="activeTab === 'notes'" (click)="setTab('notes')"><svg lucideMessageSquare size="16"></svg> Notes <span class="count-badge">{{ notes.length }}</span></button>
     </div>
 
@@ -121,7 +121,7 @@
             <div class="card-header-styled">
               <div class="header-title-box">
                 <span class="header-icon bg-indigo-light text-indigo"><svg lucideBriefcase size="16"></svg></span>
-                <h3>Deals Summary</h3>
+                <h3>Leads Summary</h3>
               </div>
             </div>
             <p class="summary-prose">
@@ -168,22 +168,22 @@
             </div>
             <div class="deals-toolbar">
               <button type="button" class="btn btn-outline-pill" (click)="exportLeadsCsv()"><svg lucideDownload size="15"></svg> Export CSV</button>
-              <button type="button" class="btn btn-primary-pill" (click)="openAddDeal()"><svg lucidePlus size="15"></svg> Add Deal</button>
+              <button type="button" class="btn btn-primary-pill" (click)="openAddDeal()"><svg lucidePlus size="15"></svg> Add Lead</button>
             </div>
           </div>
           <div class="table-scroll" *ngIf="leadsBrought.length">
             <table class="leads-table deals-pipeline-table">
               <thead><tr>
-                <th>Deal Name</th>
                 <th>Lead Name</th>
+                <th>Contact Person</th>
                 <th>Contact Details</th>
                 <th>Value</th>
                 <th>Close Date</th>
                 <th>Next Follow Up</th>
-                <th>Deal Agent</th>
-                <th>Deal Watcher</th>
+                <th>Lead Agent</th>
+                <th>Lead Watcher</th>
                 <th>Stage</th>
-                <th>Deal Status</th>
+                <th>Lead Status</th>
                 <th>Action</th>
               </tr></thead>
               <tbody>
@@ -196,7 +196,7 @@
                   <td><div class="table-user-sub">{{ nextFollowUp(lead) }}</div></td>
                   <td><span class="table-user-name">{{ employeeName(lead.assignedTo) }}</span></td>
                   <td><span class="table-user-name">{{ employeeName(lead.addedBy) }}</span></td>
-                  <td><span class="stage-select-wrap"><select class="stage-select {{ stageClass(lead.status) }}" [value]="lead.status" (change)="changeLeadStage(lead, $event)"><option value="NEW">NEW</option><option value="QUALIFIED">QUALIFIED</option><option value="PROPOSAL">PROPOSAL</option><option value="WON">WON</option><option value="LOST">LOST</option></select></span></td>
+                  <td><span class="stage-select-wrap"><select class="stage-select {{ stageClass(lead.status) }}" [value]="lead.status" (change)="changeLeadStage(lead, $event)"><option *ngFor="let option of stageOptions" [value]="option">{{ option }}</option></select></span></td>
                   <td><span class="deal-status-badge {{ dealStatusClass(lead.status) }}">{{ dealStatusLabel(lead.status) }}</span></td>
                   <td><div class="table-actions-group">
                     <button type="button" class="btn-action-icon" (click)="openLead(lead.id)" title="View deal">View</button>
@@ -371,13 +371,13 @@
   <div class="modal-overlay" *ngIf="dealModalOpen" (click)="closeAddDeal()">
     <div class="edit-modal" (click)="$event.stopPropagation()">
       <div class="edit-modal-header">
-        <h3>Add Deal</h3>
+        <h3>Add Lead</h3>
         <button type="button" class="edit-close-btn" (click)="closeAddDeal()"><svg lucideX size="18"></svg></button>
       </div>
       <form #dealFormNg="ngForm" (ngSubmit)="saveDeal(dealFormNg)">
         <div class="form-row form-row-3">
           <div class="form-group">
-            <label>Deal Name <span class="required-asterisk">*</span></label>
+            <label>Lead Name <span class="required-asterisk">*</span></label>
             <input type="text" [(ngModel)]="dealForm.title" name="title" required placeholder="e.g. New Contract" />
           </div>
           <!-- Carried from this lead contact and locked: the deal belongs to
@@ -420,11 +420,7 @@
           <div class="form-group">
             <label>Stage</label>
             <select [(ngModel)]="dealForm.status" name="status" class="enhanced-select">
-              <option value="NEW">NEW</option>
-              <option value="QUALIFIED">QUALIFIED</option>
-              <option value="PROPOSAL">PROPOSAL</option>
-              <option value="WON">WON</option>
-              <option value="LOST">LOST</option>
+              <option *ngFor="let st of leadStages" [value]="st">{{ st }}</option>
             </select>
           </div>
           <div class="form-group">
@@ -451,7 +447,7 @@
         </div>
         <div class="form-row form-row-2">
           <div class="form-group">
-            <label>Assigned To (Deal Agent)</label>
+            <label>Assigned To (Lead Agent)</label>
             <select [(ngModel)]="dealForm.assignedToId" name="assignedToId" class="enhanced-select">
               <option [ngValue]="null">-- Select Agent --</option>
               <option *ngFor="let emp of employees" [ngValue]="emp.id">{{ employeeName(emp) }}</option>
@@ -470,7 +466,7 @@
         </div>
         <div class="edit-modal-footer">
           <button type="button" class="btn btn-outline-pill" (click)="closeAddDeal()">Cancel</button>
-          <button type="submit" class="btn btn-primary-pill" [disabled]="isSavingDeal || !dealForm.title">{{ isSavingDeal ? 'Saving...' : 'Add Deal' }}</button>
+          <button type="submit" class="btn btn-primary-pill" [disabled]="isSavingDeal || !dealForm.title">{{ isSavingDeal ? 'Saving...' : 'Add Lead' }}</button>
         </div>
       </form>
     </div>

@@ -51,6 +51,112 @@ export class CrmService {
     return out;
   }
 
+  private normalizeIdentity(value: any): string {
+    return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  // CSV exports often leave stray commas on email addresses; strip them so
+  // "a@b.com," and "a@b.com" compare as equal.
+  private normalizeEmail(value: any): string {
+    return this.normalizeIdentity(value).replace(/[,;]+$/, '');
+  }
+
+  // Compare phone numbers by digits only (+91 / spaces / dashes all collapse).
+  private normalizePhone(value: any): string {
+    return this.normalizeIdentity(value).replace(/[^0-9]/g, '');
+  }
+
+  /**
+   * Backfills the contact linkage for deals that were created without pointing
+   * at a Lead Contact (older/imported rows). Matching is deliberately
+   * conservative so unrelated deals are never attached. A deal matches when:
+   *   - email or phone is identical, OR
+   *   - name AND company agree, OR
+   *   - a multi-word name agrees exactly.
+   * Imports sometimes put the phone into the name field, so a match is decided
+   * by any signal, not by requiring the name to agree too. It only ever writes
+   * the link (plus the contact's canonical name/company onto unlabeled deals);
+   * no deal data is deleted.
+   */
+  private async linkLeadsToContact(companyId: number, contact: any): Promise<number> {
+    const name = this.normalizeIdentity(contact?.name);
+    if (!name) return 0;
+
+    const email = this.normalizeEmail(contact?.email);
+    const phone = this.normalizePhone(contact?.phone || contact?.mobile);
+    const company = this.normalizeIdentity(contact?.companyName);
+    const multiWord = name.includes(' ');
+
+    const unlinked = await this.prisma.lead.findMany({
+      where: { companyId, broughtByContactId: null, contactName: { not: null } },
+      select: { id: true, contactName: true, email: true, phone: true, companyName: true },
+    });
+
+    const toLink: number[] = [];
+    for (const lead of unlinked) {
+      const lName = this.normalizeIdentity(lead.contactName);
+      const lEmail = this.normalizeEmail(lead.email);
+      const lPhone = this.normalizePhone(lead.phone);
+      const lCompany = this.normalizeIdentity(lead.companyName);
+
+      const sameName = !!lName && lName === name;
+      const sameEmail = !!email && !!lEmail && lEmail === email;
+      const samePhone = !!phone && !!lPhone && lPhone === phone;
+      const sameCompany = !!company && !!lCompany && lCompany === company;
+
+      const confident =
+        sameEmail ||
+        samePhone ||
+        (sameName && sameCompany) ||
+        (sameName && multiWord && lName.includes(' '));
+      if (confident) toLink.push(lead.id);
+    }
+
+    if (!toLink.length) return 0;
+
+    // The contact profile is the source of truth for the person, so deals that
+    // were only identifiable by phone/email also get the real name/company.
+    const syncData: any = { broughtByContactId: contact.id };
+    if (contact.name) syncData.contactName = contact.name;
+    if (contact.companyName) syncData.companyName = contact.companyName;
+
+    const result = await this.prisma.lead.updateMany({
+      where: { id: { in: toLink } },
+      data: syncData,
+    });
+    return result.count;
+  }
+
+  /**
+   * When a deal is saved without an explicit Lead Contact, tries to link it to
+   * an existing contact by identity (email/phone, name + company, or a
+   * multi-word name). Only ever writes `broughtByContactId` and returns null
+   * when no confident match exists.
+   */
+  private async findContactForLead(companyId: number, leadData: any): Promise<{ id: number } | null> {
+    const name = this.normalizeIdentity(leadData?.contactName);
+    const email = this.normalizeEmail(leadData?.email);
+    const phone = this.normalizePhone(leadData?.phone);
+    const company = this.normalizeIdentity(leadData?.companyName);
+    const multiWord = name.includes(' ');
+
+    const or: any[] = [];
+    if (email) or.push({ email: { equals: email } });
+    if (phone) or.push({ phone: { equals: phone } });
+    if (name) {
+      if (multiWord) or.push({ name: { equals: name } });
+      if (company) or.push({ name: { equals: name }, companyName: { equals: company } });
+    }
+    if (!or.length) return null;
+
+    const contact = await this.prisma.leadContact.findFirst({
+      where: { companyId, OR: or },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return contact ?? null;
+  }
+
   /**
    * Builds the next human-readable reference, e.g. L0926-001 / LC-0926-001:
    * prefix + MMYY + a sequence that restarts each month.
@@ -115,6 +221,14 @@ export class CrmService {
   async createLead(companyId: number, data: any, creatorEmployeeId?: number | null) {
     const sanitized = this.sanitizeLead(data);
     const requestedLeadCode = sanitized.leadCode;
+
+    // No explicit contact chosen — link by identity so the new deal shows up
+    // under its Lead Contact profile immediately.
+    if (!sanitized.broughtByContactId) {
+      const contact = await this.findContactForLead(companyId, sanitized);
+      if (contact) sanitized.broughtByContactId = contact.id;
+    }
+
     const create = (leadCode: string) => this.prisma.lead.create({
       data: {
         ...sanitized,
@@ -343,6 +457,24 @@ export class CrmService {
       updatedLead.addedById,
       { title: lead.title },
     );
+
+    // Deals saved without a contact get linked by identity (email/phone/name)
+    // so the contact profile and the table/Kanban always show the same deals.
+    if (!updatedLead.broughtByContactId) {
+      const contact = await this.findContactForLead(companyId, {
+        contactName: updatedLead.contactName,
+        email: updatedLead.email,
+        phone: updatedLead.phone,
+        companyName: updatedLead.companyName,
+      });
+      if (contact) {
+        await this.prisma.lead.update({
+          where: { id: leadId },
+          data: { broughtByContactId: contact.id },
+        });
+        updatedLead.broughtByContactId = contact.id;
+      }
+    }
 
     // Only on a genuine handover — an edit that leaves the owner alone should
     // not re-notify them, or every field change becomes a ping.
@@ -1160,7 +1292,7 @@ export class CrmService {
       addedById = employee?.id || null;
     }
 
-    return this.withEntityCode('CONTACT', companyId, (contactCode) =>
+    const created = await this.withEntityCode('CONTACT', companyId, (contactCode) =>
       this.prisma.leadContact.create({
       data: {
         companyId,
@@ -1191,6 +1323,11 @@ export class CrmService {
       },
       }),
     );
+
+    // Attach any existing deals already carrying this contact's identity so
+    // the table/Kanban and the contact profile stay in sync (covers CSV import).
+    await this.linkLeadsToContact(companyId, created);
+    return created;
   }
 
   async importLeadContacts(companyId: number, userId: number, contacts: any[], addedById: number | null) {
@@ -1230,7 +1367,7 @@ export class CrmService {
       updateData.addedById = data.addedById ? parseInt(data.addedById, 10) : null;
     }
 
-    return this.prisma.leadContact.update({
+    const updated = await this.prisma.leadContact.update({
       where: { id },
       data: updateData,
       include: {
@@ -1242,6 +1379,26 @@ export class CrmService {
         }
       },
     });
+
+    // A linked LeadContact is the source of truth for the contact fields on
+    // every deal it brought in. Keep Kanban, table and contact-profile views
+    // consistent when its profile is edited.
+    await this.prisma.lead.updateMany({
+      where: { companyId, broughtByContactId: id },
+      data: {
+        contactName: updated.name,
+        companyName: updated.companyName,
+        email: updated.email,
+        phone: updated.phone || updated.mobile,
+        website: updated.website,
+        address: updated.address,
+      },
+    });
+
+    // Also pick up deals that match under the contact's (possibly new)
+    // identity but were never linked, so both views stay in sync.
+    await this.linkLeadsToContact(companyId, updated);
+    return updated;
   }
 
   async deleteLeadContact(companyId: number, id: number) {
@@ -1251,6 +1408,31 @@ export class CrmService {
     return this.prisma.leadContact.delete({
       where: { id },
     });
+  }
+
+  /**
+   * One-time admin backfill: links every deal that matches an existing
+   * Lead Contact by identity but has not been attached yet. Non-destructive —
+   * only writes `broughtByContactId`, never removes or edits deal data.
+   */
+  async syncLeadContactLinks(companyId: number) {
+    const contacts = await this.prisma.leadContact.findMany({
+      where: { companyId },
+      select: { id: true, name: true, email: true, phone: true, mobile: true, companyName: true },
+    });
+
+    let matched = 0;
+    for (const contact of contacts) {
+      matched += await this.linkLeadsToContact(companyId, contact);
+    }
+
+    return {
+      contacts: contacts.length,
+      dealsLinked: matched,
+      message: matched
+        ? `${matched} deal${matched === 1 ? '' : 's'} linked to their lead contact${matched === 1 ? '' : 's'}.`
+        : 'All deals are already linked to their lead contacts.',
+    };
   }
 
   async convertLeadContactToClient(companyId: number, id: number) {

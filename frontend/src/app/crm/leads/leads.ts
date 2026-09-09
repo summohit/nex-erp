@@ -180,8 +180,8 @@ export class LeadsComponent implements OnInit {
   showOwnerDropdown = false;
   broughtBySearchQuery = '';
   showBroughtByDropdown = false;
-  leadIdSearchQuery = '';
-  showLeadIdDropdown = false;
+  leadContactSearchQuery = '';
+  showLeadContactDropdown = false;
 
   // Fixed-position coords for searchable filter dropdowns (so they are not
   // clipped by the modal's scrollable grid when rendered as a right-side drawer)
@@ -453,6 +453,8 @@ export class LeadsComponent implements OnInit {
   selectBroughtBy(emp: any) {
     this.newLeadData.addedById = emp ? emp.id : null;
     this.newLeadData.broughtByContactId = null;
+    this.lockedFromContact = false;
+    this.selectedContactCode = null;
     this.showBroughtByDropdown = false;
     this.broughtBySearchQuery = '';
   }
@@ -508,7 +510,9 @@ export class LeadsComponent implements OnInit {
     this.router.navigate(['/crm/lead-forms']);
   }
 
-  csvImporting = false;
+csvImporting = false;
+
+  syncingContacts = false;
 
   onCsvImportSelected(event: any) {
     const file: File | undefined = event?.target?.files?.[0];
@@ -631,6 +635,24 @@ export class LeadsComponent implements OnInit {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  syncLeadContacts() {
+    if (this.syncingContacts) return;
+    if (!window.confirm('Link existing deals to their matching lead contacts? This is safe and only adds missing links.')) return;
+    this.syncingContacts = true;
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/sync-contacts`, {}).subscribe({
+      next: (res) => {
+        this.syncingContacts = false;
+        this.loadLeadContacts();
+        this.loadLeads();
+        this.toast.success(res?.message || 'Lead contacts synced.');
+      },
+      error: (err) => {
+        this.syncingContacts = false;
+        this.toast.error(err?.error?.message || 'Failed to sync lead contacts.');
+      }
+    });
   }
 
   private escapeCsv(value: string): string {
@@ -1435,6 +1457,11 @@ export class LeadsComponent implements OnInit {
       qualificationReason: lead.qualificationReason || '',
       expectedCloseDate: lead.expectedCloseDate ? lead.expectedCloseDate.split('T')[0] : ''
     };
+    const linkedContact = this.newLeadData.broughtByContactId
+      ? this.leadContacts.find(contact => contact.id === this.newLeadData.broughtByContactId)
+      : null;
+    this.lockedFromContact = !!this.newLeadData.broughtByContactId;
+    this.selectedContactCode = linkedContact?.contactCode || null;
   }
 
   get isContactEmailNew(): boolean {
@@ -1477,26 +1504,27 @@ export class LeadsComponent implements OnInit {
     }
   }
 
-  getFilteredLeadIds(): Lead[] {
-    const query = this.leadIdSearchQuery.trim().toLowerCase();
-    const codedLeads = this.leads.filter(lead => !!lead.leadCode);
-    if (!query) return codedLeads;
-    return codedLeads.filter(lead =>
-      lead.leadCode?.toLowerCase().includes(query) ||
-      lead.title?.toLowerCase().includes(query) ||
-      lead.companyName?.toLowerCase().includes(query) ||
-      lead.contactName?.toLowerCase().includes(query),
+  getFilteredLeadContactsForNewLead(): any[] {
+    const query = this.leadContactSearchQuery.trim().toLowerCase();
+    if (!query) return this.leadContacts;
+    return this.leadContacts.filter(contact =>
+      contact.name?.toLowerCase().includes(query) ||
+      contact.contactCode?.toLowerCase().includes(query) ||
+      contact.companyName?.toLowerCase().includes(query) ||
+      contact.email?.toLowerCase().includes(query),
     );
   }
 
-  selectLeadId(lead: Lead | null) {
-    this.showLeadIdDropdown = false;
-    this.leadIdSearchQuery = '';
-    if (!lead) {
-      this.newLeadData.leadCode = '';
-      return;
-    }
-    this.openEditModal(lead);
+  getSelectedLeadContact(): any | null {
+    return this.newLeadData.broughtByContactId
+      ? this.leadContacts.find(contact => contact.id === this.newLeadData.broughtByContactId) || null
+      : null;
+  }
+
+  selectLeadContactForNewLead(contact: any | null) {
+    this.showLeadContactDropdown = false;
+    this.leadContactSearchQuery = '';
+    this.selectBroughtByContact(contact);
   }
 
   createLead() {
@@ -1543,21 +1571,9 @@ export class LeadsComponent implements OnInit {
         }
       });
     } else {
-      this.http.post<Lead>(`${environment.apiUrl}/crm/leads`, payload).subscribe({
+      const saveLead = (data: any) => this.http.post<Lead>(`${environment.apiUrl}/crm/leads`, data).subscribe({
         next: (created) => {
           this.isSaving = false;
-          if (this.contactCheckboxChecked && this.newLeadData.contactName?.trim()) {
-            const contactPayload = {
-              name: this.newLeadData.contactName.trim(),
-              email: this.newLeadData.email?.trim() || undefined,
-              phone: this.newLeadData.phone?.trim() || undefined,
-              companyName: this.newLeadData.companyName?.trim() || undefined,
-            };
-            this.http.post(`${environment.apiUrl}/crm/lead-contacts`, contactPayload).subscribe({
-              next: () => this.loadLeadContacts(),
-              error: () => {},
-            });
-          }
           this.closeModal();
           this.toast.success('Lead created successfully');
           this.loadLeads(() => this.highlightNewLead(created.id));
@@ -1567,6 +1583,34 @@ export class LeadsComponent implements OnInit {
           this.toast.error(err?.error?.message || 'Failed to save lead.');
         }
       });
+
+      // A new contact must exist before the lead is saved so the lead's
+      // broughtByContactId is persisted. This makes the Kanban/table record and
+      // the contact profile refer to the same source record immediately.
+      if (this.contactCheckboxChecked && !payload.broughtByContactId && this.newLeadData.contactName?.trim()) {
+        const contactPayload = {
+          name: this.newLeadData.contactName.trim(),
+          email: this.newLeadData.email?.trim() || undefined,
+          phone: this.newLeadData.phone?.trim() || undefined,
+          companyName: this.newLeadData.companyName?.trim() || undefined,
+          website: this.newLeadData.website?.trim() || undefined,
+          address: this.newLeadData.address?.trim() || undefined,
+          leadSource: payload.source || undefined,
+        };
+        this.http.post<any>(`${environment.apiUrl}/crm/lead-contacts`, contactPayload).subscribe({
+          next: (contact) => {
+            payload.broughtByContactId = contact.id;
+            this.leadContacts = [contact, ...this.leadContacts];
+            saveLead(payload);
+          },
+          error: (err) => {
+            this.isSaving = false;
+            this.toast.error(err?.error?.message || 'Failed to save the lead contact.');
+          },
+        });
+      } else {
+        saveLead(payload);
+      }
     }
   }
 

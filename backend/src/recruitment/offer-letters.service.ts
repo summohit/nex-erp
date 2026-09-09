@@ -1,7 +1,7 @@
 import { NotificationsService } from "../notifications/notifications.service";
 import { MailService } from "../mail/mail.service";
 
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 import axios from 'axios';
@@ -710,18 +710,33 @@ export class OfferLettersService {
     const fmt = (n?: number | null) =>
       n ? `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}` : undefined;
 
-    await this.mailService.sendOfferLetterEmail({
-      email: app.email,
-      candidateName: app.fullName,
-      jobTitle: app.job?.title || 'the role',
-      companyName: app.job?.company?.name || 'our company',
-      signingUrl: `${baseUrl}/offer/${letter.accessToken}`,
-      passwordHint,
-      annualCtc: fmt(app.offeredSalary),
-      joiningDate: app.joiningDate
-        ? new Date(app.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-        : undefined,
-    });
+    try {
+      await this.mailService.sendOfferLetterEmail({
+        email: app.email,
+        candidateName: app.fullName,
+        jobTitle: app.job?.title || 'the role',
+        companyName: app.job?.company?.name || 'our company',
+        signingUrl: `${baseUrl}/offer/${letter.accessToken}`,
+        passwordHint,
+        annualCtc: fmt(app.offeredSalary),
+        joiningDate: app.joiningDate
+          ? new Date(app.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          : undefined,
+      });
+    } catch (error: any) {
+      // Never turn a provider-side mail rejection into an opaque 500. The offer
+      // remains intact and its signing link can still be copied from the drawer.
+      const detail = `${error?.code || ''} ${error?.message || ''}`;
+      this.logger.error(`Could not email offer letter for application ${applicationId}: ${detail}`);
+      if (/unauthorized ip|525\s+5\.7\.1/i.test(detail)) {
+        throw new ServiceUnavailableException(
+          'Offer email could not be sent because the mail provider has not authorised this server IP. Add this server IP to Brevo’s authorised IP list, then resend the existing offer.',
+        );
+      }
+      throw new ServiceUnavailableException(
+        'Offer email could not be sent. The offer and signing link are still available; please check the mail provider configuration and try again.',
+      );
+    }
 
     // Sending is what actually puts the offer in front of the candidate, so this
     // is the point the letter counts as issued.

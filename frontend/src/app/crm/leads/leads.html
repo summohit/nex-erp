@@ -935,6 +935,15 @@
         <button type="button" class="btn btn-outline-pill" (click)="exportLeadContactsCsv()">
           <svg lucideDownload size="15"></svg> Export
         </button>
+        <button
+          type="button"
+          class="btn btn-outline-pill"
+          (click)="syncLeadContacts()"
+          [disabled]="syncingContacts"
+          *ngIf="auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'SUPERADMIN'"
+        >
+          <svg lucideRotateCcw size="15" [class.spin-icon]="syncingContacts"></svg> {{ syncingContacts ? 'Syncing...' : 'Sync Contacts' }}
+        </button>
       </div>
     </div>
 
@@ -1416,43 +1425,43 @@
       <div *ngIf="activeTab === 1" class="step-content-anim">
         <div class="form-row">
           <div class="form-group custom-select-group">
-            <label>Lead ID <span class="locked-hint" *ngIf="isEditing">unique &amp; locked</span></label>
-            <div class="owner-select-trigger" (click)="!isSaving && !isEditing && (showLeadIdDropdown = !showLeadIdDropdown)" [class.active]="showLeadIdDropdown" [class.is-locked]="isEditing">
-              <div *ngIf="newLeadData.leadCode" class="selected-owner-display">
-                <div class="owner-avatar-circle contact-avatar-badge">L</div>
+            <label>Lead Contact</label>
+            <div class="owner-select-trigger" (click)="!isSaving && (showLeadContactDropdown = !showLeadContactDropdown)" [class.active]="showLeadContactDropdown">
+              <div *ngIf="getSelectedLeadContact() as contact" class="selected-owner-display">
+                <div class="owner-avatar-circle contact-avatar-badge">{{ contact.name ? contact.name[0].toUpperCase() : 'C' }}</div>
                 <div class="owner-info-text">
-                  <span class="owner-name">{{ newLeadData.leadCode }}</span>
-                  <span class="owner-designation">Selected Lead ID</span>
+                  <span class="owner-name">{{ contact.name }}</span>
+                  <span class="owner-designation">{{ contact.contactCode || contact.companyName || 'Lead Contact' }}</span>
                 </div>
-                <button *ngIf="!isEditing" type="button" class="btn-clear-owner" (click)="$event.stopPropagation(); selectLeadId(null)">
+                <button type="button" class="btn-clear-owner" (click)="$event.stopPropagation(); selectLeadContactForNewLead(null)">
                   <svg lucideX size="14"></svg>
                 </button>
               </div>
-              <div *ngIf="!newLeadData.leadCode" class="unassigned-placeholder">
+              <div *ngIf="!getSelectedLeadContact()" class="unassigned-placeholder">
                 <div class="owner-avatar-circle unassigned-avatar"><svg lucideSearch size="14"></svg></div>
-                <span class="placeholder-text">Search or select a Lead ID...</span>
+                <span class="placeholder-text">Search or select a Lead Contact...</span>
                 <svg lucideChevronDown size="16" class="chevron-icon"></svg>
               </div>
             </div>
-            <div class="owner-dropdown-menu" *ngIf="showLeadIdDropdown">
+            <div class="owner-dropdown-menu" *ngIf="showLeadContactDropdown">
               <div class="owner-search-box">
                 <svg lucideSearch size="14" class="owner-search-icon"></svg>
-                <input type="text" placeholder="Search by ID, lead or company..." [(ngModel)]="leadIdSearchQuery" (click)="$event.stopPropagation()" />
+                <input type="text" placeholder="Search by name, contact ID or company..." [(ngModel)]="leadContactSearchQuery" (click)="$event.stopPropagation()" />
               </div>
               <div class="owner-list-scroll">
-                <div class="owner-item" (click)="selectLeadId(null)" [class.selected]="!newLeadData.leadCode">
+                <div class="owner-item" (click)="selectLeadContactForNewLead(null)" [class.selected]="!newLeadData.broughtByContactId">
                   <div class="owner-avatar-circle unassigned-avatar"><svg lucidePlus size="14"></svg></div>
-                  <div class="owner-item-details"><span class="owner-item-name">Generate automatically</span><span class="owner-item-sub">Create a new Lead ID when saved</span></div>
+                  <div class="owner-item-details"><span class="owner-item-name">New / no contact selected</span><span class="owner-item-sub">Enter a new contact below</span></div>
                 </div>
-                <div class="owner-list-subheader"><svg lucideBriefcase size="13"></svg><span>Existing Leads</span></div>
-                <div class="owner-item" *ngFor="let lead of getFilteredLeadIds()" (click)="selectLeadId(lead)" [class.selected]="newLeadData.leadCode === lead.leadCode">
-                  <div class="owner-avatar-circle contact-avatar-badge">L</div>
+                <div class="owner-list-subheader"><svg lucideUserCheck size="13"></svg><span>Lead Contacts</span></div>
+                <div class="owner-item" *ngFor="let contact of getFilteredLeadContactsForNewLead()" (click)="selectLeadContactForNewLead(contact)" [class.selected]="newLeadData.broughtByContactId === contact.id">
+                  <div class="owner-avatar-circle contact-avatar-badge">{{ contact.name ? contact.name[0].toUpperCase() : 'C' }}</div>
                   <div class="owner-item-details">
-                    <span class="owner-item-name">{{ lead.leadCode }}</span>
-                    <span class="owner-item-sub">{{ lead.title }}<span *ngIf="lead.companyName"> &mdash; {{ lead.companyName }}</span></span>
+                    <span class="owner-item-name">{{ contact.name }}</span>
+                    <span class="owner-item-sub">{{ contact.contactCode || 'Contact' }}<span *ngIf="contact.companyName"> &mdash; {{ contact.companyName }}</span></span>
                   </div>
                 </div>
-                <div *ngIf="getFilteredLeadIds().length === 0" class="no-owners-found">No matching leads found</div>
+                <div *ngIf="getFilteredLeadContactsForNewLead().length === 0" class="no-owners-found">No matching lead contacts found</div>
               </div>
             </div>
           </div>

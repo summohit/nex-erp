@@ -80,6 +80,10 @@
             <span class="header-icon bg-orange-light text-orange"><svg lucideBriefcase size="16"></svg></span>
             <h3>Deal Info</h3>
           </div>
+          <div class="next-followup-box" *ngIf="nextFollowUpInfo" [class.is-overdue]="nextFollowUpInfo.isOverdue">
+            <span class="nf-label"><svg lucideClock size="13"></svg> Next Follow Up</span>
+            <span class="nf-date">{{ nextFollowUpInfo.date | date:'medium' }}</span>
+          </div>
         </div>
         <div class="info-tiles-grid">
           <div class="info-tile"><div class="tile-icon"><svg lucideBriefcase size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Name</span><span class="tile-value">{{ lead.title || '—' }}</span></div></div>
@@ -175,33 +179,114 @@
               <span class="header-icon bg-purple-light text-purple"><svg lucideClock size="16"></svg></span>
               <h3>Follow Ups</h3>
             </div>
-            <button class="btn-primary-pill" (click)="openNewFollowUp()"><svg lucidePlus size="16"></svg> New Follow Up</button>
+            <button class="btn-primary-pill" (click)="openNewFollowUp()"><svg lucidePlus size="16"></svg> Add Follow-Up</button>
           </div>
 
           <div class="loading-box" *ngIf="loadingFollowUps"><div class="spinner small"></div><span>Loading follow-ups...</span></div>
 
-          <div class="table-scroll" *ngIf="!loadingFollowUps && followUps.length">
-            <table class="leads-table">
-              <thead><tr><th>Created</th><th>Next Follow Up</th><th>Remark</th><th>Status</th><th>Action</th></tr></thead>
-              <tbody>
-                <tr *ngFor="let fu of followUps">
-                  <td>{{ fu.createdAt | date:'medium' }}</td>
-                  <td>{{ fu.scheduledAt | date:'medium' }}</td>
-                  <td><div class="table-user-name">{{ fu.title }}</div><div class="table-user-sub" *ngIf="fu.notes">{{ fu.notes }}</div></td>
-                  <td><span class="followup-type-pill {{ followUpStatusClass(fu.status) }}">{{ fu.status || 'PENDING' }}</span></td>
-                  <td><div class="table-actions-group">
-                    <button class="btn-action-icon" title="Edit" (click)="openEditFollowUp(fu)"><svg lucideEdit size="15"></svg></button>
-                    <button class="btn-action-icon" title="Mark as Completed" *ngIf="fu.status !== 'COMPLETED'" (click)="markFollowUpComplete(fu)"><svg lucideCheckCircle size="15"></svg></button>
-                    <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFollowUp(fu)"><svg lucideTrash2 size="15"></svg></button>
-                  </div></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="empty-state-box" *ngIf="!loadingFollowUps && !followUps.length">
-            <svg lucideClock size="24" style="margin-bottom:6px;opacity:.5"></svg>
-            <div>No follow-ups found.</div>
-          </div>
+          <ng-container *ngIf="!loadingFollowUps">
+            <div class="table-scroll lead-followups-table-wrap" *ngIf="followUps.length">
+              <table class="fu-table">
+                <thead>
+                  <tr>
+                    <th style="width: 150px;">Type</th>
+                    <th style="width: 240px;">Objective / Notes</th>
+                    <th style="width: 240px;">Contact Details</th>
+                    <th style="width: 250px;">Scheduled For</th>
+                    <th style="width: 180px;">Attachments</th>
+                    <th style="width: 160px;">Stage</th>
+                    <th style="width: 130px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let fu of followUps"
+                      [class.row-overdue]="isFollowUpOverdue(fu.scheduledAt)"
+                      [class.row-today]="isFollowUpToday(fu.scheduledAt)">
+                    <td>
+                      <span class="fu-type-badge" [ngClass]="getFollowUpTypeClass(fu.type)">
+                        <span [ngSwitch]="fu.type">
+                          <svg *ngSwitchCase="'CALL'" lucidePhone size="13"></svg>
+                          <svg *ngSwitchCase="'EMAIL'" lucideMail size="13"></svg>
+                          <svg *ngSwitchCase="'MEETING'" lucideVideo size="13"></svg>
+                          <svg *ngSwitchCase="'DEMO'" lucideVideo size="13"></svg>
+                          <svg *ngSwitchCase="'FIELD_VISIT'" lucideMapPin size="13"></svg>
+                          <svg *ngSwitchDefault lucideCalendarClock size="13"></svg>
+                        </span>
+                        <span>{{ getFollowUpTypeBadge(fu.type).label }}</span>
+                      </span>
+                    </td>
+                    <td>
+                      <div class="objective-cell">
+                        <span class="fu-title-text" [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)">{{ fu.title || 'Follow-up' }}</span>
+                        <span class="fu-notes-snippet" *ngIf="fu.notes" [title]="fu.notes">"{{ fu.notes }}"</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="contact-details-cell">
+                        <span class="contact-name" *ngIf="fu.contactPerson"><svg lucideUser size="12"></svg> {{ fu.contactPerson }}</span>
+                        <a class="contact-link" *ngIf="fu.contactPhone" [href]="'tel:' + fu.contactPhone"><svg lucidePhone size="12"></svg> {{ fu.contactPhone }}</a>
+                        <a class="contact-link" *ngIf="fu.contactEmail" [href]="'mailto:' + fu.contactEmail"><svg lucideMail size="12"></svg> {{ fu.contactEmail }}</a>
+                        <span class="unassigned-text" *ngIf="!fu.contactPerson && !fu.contactPhone && !fu.contactEmail">No Contact Info</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="time-cell">
+                        <div class="schedule-time-row"
+                             [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)"
+                             [class.text-today]="isFollowUpToday(fu.scheduledAt)">
+                          <svg lucideClock size="14"></svg>
+                          <span class="time-text">{{ fu.scheduledAt | date:'mediumDate' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
+                        </div>
+                        <span class="relative-pill pill-overdue" *ngIf="isFollowUpOverdue(fu.scheduledAt)">Overdue</span>
+                        <span class="relative-pill pill-today" *ngIf="isFollowUpToday(fu.scheduledAt)">Today</span>
+                        <span class="relative-pill pill-tomorrow" *ngIf="isFollowUpTomorrow(fu.scheduledAt)">Tomorrow</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="followup-file-links" *ngIf="fu.files?.length; else noFollowUpFiles">
+                        <a *ngFor="let file of fu.files" [href]="file.fileUrl" target="_blank" rel="noopener" [title]="'Open ' + file.fileName"><svg lucideFileText size="12"></svg> {{ file.fileName }}</a>
+                      </div>
+                      <ng-template #noFollowUpFiles><span class="no-data-dash">&mdash;</span></ng-template>
+                    </td>
+                    <td (click)="$event.stopPropagation()">
+                      <div class="status-dropdown" [class.open]="followUpTableStageMenu === fu.id">
+                        <button type="button"
+                                class="table-status-trigger ldm-status-badge ldm-status-{{ getFollowUpStage(fu.status) | lowercase }}"
+                                [disabled]="followUpStatusSaving[fu.id]"
+                                (click)="toggleFollowUpTableStageMenu(fu, $event)">
+                          <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(getFollowUpStage(fu.status))}"></span>
+                          <span class="table-status-text">{{ getStatusLabel(getFollowUpStage(fu.status)) }}</span>
+                          <svg lucideChevronDown size="12" class="table-status-caret"></svg>
+                        </button>
+                        <div class="status-menu" *ngIf="followUpTableStageMenu === fu.id">
+                          <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES"
+                                  [class.selected]="st === getFollowUpStage(fu.status)"
+                                  (click)="selectFollowUpTableStage(fu, st, $event)">
+                            <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
+                            <span class="status-menu-label">{{ st }}</span>
+                            <svg lucideCheck size="14" class="status-menu-check" *ngIf="st === getFollowUpStage(fu.status)"></svg>
+                          </button>
+                        </div>
+                        <span class="fup-status-saving" *ngIf="followUpStatusSaving[fu.id]"><svg lucideLoader2 size="13" class="spin-icon"></svg></span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="table-actions-group">
+                        <button class="btn-action-icon" title="Edit" (click)="openEditFollowUp(fu)"><svg lucideEdit size="15"></svg></button>
+                        <button class="btn-action-icon" title="Mark as Completed" *ngIf="fu.status !== 'COMPLETED'" (click)="markFollowUpComplete(fu)"><svg lucideCheckCircle size="15"></svg></button>
+                        <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFollowUp(fu)"><svg lucideTrash2 size="15"></svg></button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="empty-state-box" *ngIf="!followUps.length">
+              <svg lucideClock size="24" style="margin-bottom:6px;opacity:.5"></svg>
+              <div>No follow-ups found.</div>
+            </div>
+          </ng-container>
         </div>
       </div>
 
@@ -318,41 +403,219 @@
     </div>
 
     <!-- ══════════════════════════ FOLLOW-UP MODAL ══════════════════════════ -->
-    <div class="modal-overlay" *ngIf="showFollowUpModal">
-      <div class="modal-card modal-card-md">
-        <div class="modal-header-styled">
-          <div class="modal-header-text"><h3>{{ isEditingFollowUp ? 'Edit Follow Up' : 'New Follow Up' }}</h3><p>Schedule or log an interaction on this deal.</p></div>
-          <button class="close-btn" (click)="closeFollowUpModal()"><svg lucideX size="18"></svg></button>
+    <div class="modal-overlay" *ngIf="showFollowUpModal" (click)="closeFollowUpModal()">
+      <div class="modal-card fum-modal-card" (click)="$event.stopPropagation()">
+        <!-- Header -->
+        <div class="fum-header">
+          <div class="fum-header-left">
+            <div class="fum-icon-badge">
+              <svg lucideCalendar size="20" style="color:#ffffff"></svg>
+            </div>
+            <div class="fum-header-text">
+              <div class="fum-lead-tag">
+                <span class="ldm-status-badge ldm-status-{{ (lead?.status | lowercase) || 'new' }}">{{ getStatusLabel(lead?.status) }}</span>
+                <span class="fum-lead-company" *ngIf="lead?.companyName"><svg lucideBuilding size="12"></svg> {{ lead.companyName }}</span>
+              </div>
+              <h3 class="fum-title">Follow-Up: {{ lead?.title }}</h3>
+            </div>
+          </div>
+          <button class="btn-icon-close" (click)="closeFollowUpModal()" title="Close"><svg lucideX size="18"></svg></button>
         </div>
-        <div class="modal-body-styled modal-body-scroll">
-          <label class="form-label">Type</label>
-          <select class="modern-form-control" [(ngModel)]="followUpForm.type">
-            <option value="CALL">Call</option>
-            <option value="MEETING">Meeting</option>
-            <option value="DEMO">Demo</option>
-            <option value="EMAIL">Email</option>
-            <option value="FIELD_VISIT">Field Visit</option>
-            <option value="NOTE">Note</option>
-            <option value="OTHER">Other</option>
-          </select>
 
-          <label class="form-label" style="margin-top:16px">Scheduled Date/Time *</label>
-          <input type="datetime-local" class="modern-form-control" [(ngModel)]="followUpForm.scheduledAt">
-
-          <label class="form-label" style="margin-top:16px">Remark</label>
-          <textarea class="modern-form-control" rows="3" [(ngModel)]="followUpForm.notes" placeholder="Agenda or remarks"></textarea>
-
-          <!-- Logging the interaction is usually when the deal actually moves,
-               so the stage can be changed from here instead of a second trip. -->
-          <label class="form-label" style="margin-top:16px">Move stage to</label>
-          <select class="modern-form-control" [(ngModel)]="followUpForm.stage">
-            <option value="">Leave unchanged ({{ lead?.status || 'New' }})</option>
-            <option *ngFor="let s of pipelineStages" [value]="s.key">{{ s.label }}</option>
-          </select>
+        <!-- Navigation Tabs -->
+        <div class="fum-nav-container">
+          <div class="fum-tabs-segmented">
+            <button type="button" class="fum-tab-btn" [class.active]="followUpTab === 'schedule'" (click)="followUpTab = 'schedule'">
+              <svg lucideCalendar size="14"></svg> Schedule Next Follow-Up
+            </button>
+            <button type="button" class="fum-tab-btn" [class.active]="followUpTab === 'history'" (click)="followUpTab = 'history'">
+              <svg lucideClock size="14"></svg> Follow-Up Timeline &amp; History
+              <span class="fum-count-pill" *ngIf="followUps.length">{{ followUps.length }}</span>
+            </button>
+          </div>
         </div>
-        <div class="modal-footer-styled">
-          <button class="btn-outline-pill" (click)="closeFollowUpModal()">Cancel</button>
-          <button class="btn-primary-pill" (click)="saveFollowUp()">{{ isEditingFollowUp ? 'Update' : 'Save' }}</button>
+
+        <!-- Body -->
+        <div class="fum-body">
+          <!-- TAB 1: SCHEDULE -->
+          <div *ngIf="followUpTab === 'schedule'" class="fum-schedule-form">
+            <div class="form-group">
+              <label>Follow-Up Title / Purpose <span class="required-asterisk">*</span></label>
+              <input type="text" [(ngModel)]="followUpForm.title" placeholder="e.g. Discuss revised pricing quote & implementation timeline" [disabled]="isSavingFollowUp" />
+            </div>
+
+            <div class="form-group">
+              <label>Follow-Up Medium / Type</label>
+              <div class="fum-type-grid">
+                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'CALL'" (click)="followUpForm.type = 'CALL'">
+                  <div class="type-icon-box"><svg lucidePhone size="14"></svg></div><span>Phone Call</span>
+                </button>
+                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'MEETING'" (click)="followUpForm.type = 'MEETING'">
+                  <div class="type-icon-box"><svg lucideVideo size="14"></svg></div><span>Meeting / VC</span>
+                </button>
+                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'DEMO'" (click)="followUpForm.type = 'DEMO'">
+                  <div class="type-icon-box"><svg lucideEye size="14"></svg></div><span>Product Demo</span>
+                </button>
+                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'EMAIL'" (click)="followUpForm.type = 'EMAIL'">
+                  <div class="type-icon-box"><svg lucideMail size="14"></svg></div><span>Email</span>
+                </button>
+                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'FIELD_VISIT'" (click)="followUpForm.type = 'FIELD_VISIT'">
+                  <div class="type-icon-box"><svg lucideMapPin size="14"></svg></div><span>Field Visit</span>
+                </button>
+                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'NOTE'" (click)="followUpForm.type = 'NOTE'">
+                  <div class="type-icon-box"><svg lucideFileText size="14"></svg></div><span>Note / Task</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="fum-section-box">
+              <div class="fum-section-header">
+                <svg lucideUser size="14"></svg>
+                <span>Whom to Follow Up With (Client Contact)</span>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Contact Person</label>
+                  <input type="text" [(ngModel)]="followUpForm.contactPerson" placeholder="e.g. John Doe - Decision Maker" />
+                </div>
+                <div class="form-group">
+                  <label>Direct Phone Number</label>
+                  <input type="text" [(ngModel)]="followUpForm.contactPhone" placeholder="Phone Number" />
+                </div>
+                <div class="form-group">
+                  <label>Direct Email Address</label>
+                  <input type="email" [(ngModel)]="followUpForm.contactEmail" placeholder="contact@company.com" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Scheduled Date &amp; Time (Future) <span class="required-asterisk">*</span></label>
+              <input type="datetime-local" [(ngModel)]="followUpForm.scheduledAt" [disabled]="isSavingFollowUp" class="fum-datetime-input" />
+              <div class="fum-presets">
+                <span class="preset-label">Quick Set:</span>
+                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('today_afternoon')">Today 3 PM</button>
+                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('tomorrow_morning')">Tomorrow 10 AM</button>
+                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('in_2_days')">In 2 Days</button>
+                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('next_week')">Next Week</button>
+              </div>
+            </div>
+
+            <div class="fum-section-box" *ngIf="getPreviousFollowUpNote() as prev">
+              <div class="fum-section-header">
+                <svg lucideHistory size="14"></svg>
+                <span>Last Follow-Up ({{ prev.scheduledAt | date:'d MMM, h:mm a' }})</span>
+              </div>
+              <p *ngIf="prev.notes">{{ prev.notes }}</p>
+              <p *ngIf="!prev.notes">No notes were recorded.</p>
+            </div>
+
+            <div class="form-group">
+              <label>Remarks</label>
+              <textarea [(ngModel)]="followUpForm.notes" placeholder="Outline key discussion points, questions to ask, or proposal items to clarify..." rows="3" [disabled]="isSavingFollowUp"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Attachments</label>
+              <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles" />
+              <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles">
+                <svg lucideUpload size="15"></svg>
+                <span>Attach Files / Documents</span>
+              </button>
+              <span class="fum-stage-hint">Attach files now; they are uploaded after scheduling and shown in the follow-up table.</span>
+              <div *ngIf="pendingFollowUpFiles.length" class="pending-file-list">
+                <span *ngFor="let file of pendingFollowUpFiles; let i = index" class="pending-file-chip">
+                  {{ file.name }}
+                  <button type="button" (click)="removePendingFollowUpFile(i)" [disabled]="isSavingFollowUp">&times;</button>
+                </span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Pipeline Stage</label>
+              <div class="status-dropdown fum-stage-dropdown" [class.open]="followUpStageMenuOpen">
+                <button type="button" class="table-status-trigger ldm-status-badge ldm-status-{{ (followUpForm.stage | lowercase) || 'new' }}" (click)="toggleFollowUpStageMenu($event)">
+                  <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(followUpForm.stage)}"></span>
+                  <span class="table-status-text">{{ getStatusLabel(followUpForm.stage) }}</span>
+                  <svg lucideChevronDown size="12" class="table-status-caret"></svg>
+                </button>
+                <div class="status-menu" *ngIf="followUpStageMenuOpen">
+                  <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES" [class.selected]="st === followUpForm.stage" (click)="selectFollowUpStage(st, $event)">
+                    <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
+                    <span class="status-menu-label">{{ st }}</span>
+                    <svg lucideCheck size="14" class="status-menu-check" *ngIf="st === followUpForm.stage"></svg>
+                  </button>
+                </div>
+              </div>
+              <span class="fum-stage-hint">This updates the lead's Kanban stage too.</span>
+            </div>
+          </div>
+
+          <!-- TAB 2: TIMELINE & HISTORY -->
+          <div *ngIf="followUpTab === 'history'" class="fum-history-view">
+            <div class="fum-empty-state" *ngIf="!loadingFollowUps && followUps.length === 0">
+              <div class="empty-icon-circle"><svg lucideCalendar size="32"></svg></div>
+              <h4>No Follow-Ups Scheduled Yet</h4>
+              <p>Schedule your first follow-up to track client communications, calls, and product demos.</p>
+              <button type="button" class="btn-primary-pill" (click)="followUpTab = 'schedule'"><svg lucidePlus size="14"></svg> Schedule First Follow-Up</button>
+            </div>
+
+            <div class="fum-timeline" *ngIf="followUps.length > 0">
+              <div class="fum-timeline-group" *ngIf="getUpcomingFollowUps().length > 0">
+                <div class="fum-group-title"><span class="group-dot dot-orange"></span> Upcoming Follow-Ups ({{getUpcomingFollowUps().length}})</div>
+                <div class="fum-card pending-card" *ngFor="let f of getUpcomingFollowUps()">
+                  <div class="fum-card-top">
+                    <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">{{ getFollowUpTypeBadge(f.type).label }}</div>
+                    <div class="fum-time-pill"><svg lucideClock size="12"></svg><span>{{ f.scheduledAt | date:'dd MMM yyyy, h:mm a' }}</span></div>
+                  </div>
+                  <h4 class="fum-card-title">{{ f.title }}</h4>
+                  <div class="fum-card-meta">
+                    <div class="fum-meta-item" *ngIf="f.contactPerson"><svg lucideUser size="13"></svg><span><strong>Contact:</strong> {{ f.contactPerson }}</span></div>
+                    <div class="fum-meta-item" *ngIf="f.contactPhone"><svg lucidePhone size="13"></svg><a [href]="'tel:' + f.contactPhone">{{ f.contactPhone }}</a></div>
+                    <div class="fum-meta-item" *ngIf="f.contactEmail"><svg lucideMail size="13"></svg><a [href]="'mailto:' + f.contactEmail">{{ f.contactEmail }}</a></div>
+                  </div>
+                  <p class="fum-card-notes" *ngIf="f.notes">{{ f.notes }}</p>
+                  <div class="followup-file-links" *ngIf="f.files?.length">
+                    <a *ngFor="let file of f.files" [href]="file.fileUrl" target="_blank" rel="noopener"><svg lucideFileText size="12"></svg> {{ file.fileName }}</a>
+                  </div>
+                  <div class="fum-card-actions">
+                    <button type="button" class="btn-card-del" (click)="deleteFollowUp(f)" title="Delete Follow-up"><svg lucideTrash2 size="13"></svg></button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fum-timeline-group" *ngIf="getPastFollowUps().length > 0">
+                <div class="fum-group-title"><span class="group-dot dot-green"></span> Past Follow-Ups ({{getPastFollowUps().length}})</div>
+                <div class="fum-card completed-card" *ngFor="let f of getPastFollowUps()">
+                  <div class="fum-card-top">
+                    <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">{{ getFollowUpTypeBadge(f.type).label }}</div>
+                    <span class="fum-date-sub">{{ f.scheduledAt | date:'dd MMM yyyy, h:mm a' }}</span>
+                  </div>
+                  <h4 class="fum-card-title">{{ f.title }}</h4>
+                  <p class="fum-card-notes" *ngIf="f.notes">{{ f.notes }}</p>
+                  <div class="followup-file-links" *ngIf="f.files?.length">
+                    <a *ngFor="let file of f.files" [href]="file.fileUrl" target="_blank" rel="noopener"><svg lucideFileText size="12"></svg> {{ file.fileName }}</a>
+                  </div>
+                  <div class="fum-card-meta" *ngIf="f.contactPerson">
+                    <div class="fum-meta-item"><svg lucideUser size="13"></svg><span>{{ f.contactPerson }}</span></div>
+                  </div>
+                  <div class="fum-card-actions">
+                    <button type="button" class="btn-card-del" (click)="deleteFollowUp(f)" title="Delete Follow-up"><svg lucideTrash2 size="13"></svg></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="fum-footer">
+          <button type="button" class="btn-fum-cancel" (click)="closeFollowUpModal()">Cancel</button>
+          <button *ngIf="followUpTab === 'schedule'" type="button" class="btn-fum-submit" (click)="saveFollowUp()" [disabled]="isSavingFollowUp">
+            <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingFollowUp"></svg>
+            <svg lucideCalendar size="15" *ngIf="!isSavingFollowUp"></svg>
+            <span>{{ isSavingFollowUp ? 'Scheduling...' : (isEditingFollowUp ? 'Update Follow-Up' : 'Schedule Follow-Up') }}</span>
+          </button>
         </div>
       </div>
     </div>
