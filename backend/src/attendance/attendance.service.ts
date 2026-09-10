@@ -201,6 +201,7 @@ export class AttendanceService {
 
     const now = new Date();
     let isLate = false;
+    let isHalfDay = false;
 
     // Duration-only shifts have no startTime, so there is nothing to be late for.
     // The window comes from the roster when one is set for today, which is how
@@ -216,6 +217,12 @@ export class AttendanceService {
       if (now > maxStartTime) {
         isLate = true;
       }
+
+      // Clocking in past the shift's half-day boundary is more than late — the
+      // day reads as a half day from the start.
+      if (effective.shift?.halfDayTime && now > istTimeInstant(now, effective.shift.halfDayTime)) {
+        isHalfDay = true;
+      }
     }
 
     if (!existing) {
@@ -226,7 +233,7 @@ export class AttendanceService {
           clockIn: now,
           clockInLat: data.lat,
           clockInLng: data.lng,
-          status: 'PRESENT',
+          status: isHalfDay ? 'HALF_DAY' : 'PRESENT',
           isLate,
           shiftId: effective.shift?.id ?? null,
           projectId: effective.onsite?.projectId ?? null,
@@ -248,7 +255,7 @@ export class AttendanceService {
     return this.prisma.attendance.update({
       where: { id: existing.id },
       data: {
-        status: existing.status === 'HALF_DAY' ? 'HALF_DAY' : 'PRESENT',
+        status: existing.status === 'HALF_DAY' || isHalfDay ? 'HALF_DAY' : 'PRESENT',
         isLate: existing.isLate || isLate,
         clockOut: null, // Reset clockOut on parent since they are active
         clockIn: existing.clockIn || now,

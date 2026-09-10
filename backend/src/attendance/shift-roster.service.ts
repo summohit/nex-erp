@@ -34,7 +34,12 @@ export interface RosterAssignment {
  */
 export interface EffectiveShift {
   source: 'ROSTER' | 'STANDING' | 'NONE';
-  shift: { id: number; name: string; bufferTimeMinutes: number } | null;
+  shift: {
+    id: number;
+    name: string;
+    bufferTimeMinutes: number;
+    halfDayTime?: string | null;
+  } | null;
   startTime: string | null;
   endTime: string | null;
   isDayOff: boolean;
@@ -214,7 +219,7 @@ export class ShiftRosterService {
   async getEffectiveShift(
     employeeId: number,
     date: Date,
-    standingShift?: { id: number; name: string; startTime: string | null; endTime: string | null; bufferTimeMinutes: number; workingDays: string | null } | null,
+    standingShift?: { id: number; name: string; startTime: string | null; endTime: string | null; bufferTimeMinutes: number; workingDays: string | null; halfDayTime?: string | null } | null,
   ): Promise<EffectiveShift> {
     const standing =
       standingShift !== undefined
@@ -234,7 +239,12 @@ export class ShiftRosterService {
       const works = !standing.workingDays || standing.workingDays.split(',').includes(dayName);
       return {
         source: 'STANDING',
-        shift: { id: standing.id, name: standing.name, bufferTimeMinutes: standing.bufferTimeMinutes },
+        shift: {
+          id: standing.id,
+          name: standing.name,
+          bufferTimeMinutes: standing.bufferTimeMinutes,
+          halfDayTime: standing.halfDayTime ?? null,
+        },
         startTime: standing.startTime,
         endTime: standing.endTime,
         isDayOff: !works,
@@ -261,7 +271,12 @@ export class ShiftRosterService {
 
     return {
       source: 'ROSTER',
-      shift: { id: shift.id, name: shift.name, bufferTimeMinutes: shift.bufferTimeMinutes },
+      shift: {
+          id: shift.id,
+          name: shift.name,
+          bufferTimeMinutes: shift.bufferTimeMinutes,
+          halfDayTime: shift.halfDayTime ?? null,
+        },
       // The entry's own window wins; the shift's is the fallback.
       startTime: entry.startTime ?? shift.startTime,
       endTime: entry.endTime ?? shift.endTime,
