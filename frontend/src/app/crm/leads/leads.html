@@ -1419,14 +1419,6 @@
         </div>
         <span class="step-label">Deal Tracking</span>
       </div>
-      <div class="step-connector" [class.active]="activeTab > 2"></div>
-      <div class="wizard-step" [class.active]="activeTab === 3" [class.completed]="activeTab > 3" (click)="activeTab = 3">
-        <div class="step-badge">
-          <span *ngIf="activeTab <= 3">3</span>
-          <svg lucideCheckCircle size="14" *ngIf="activeTab > 3"></svg>
-        </div>
-        <span class="step-label">Additional</span>
-      </div>
     </div>
 
     <div class="modal-body enhanced-body">
@@ -1485,31 +1477,6 @@
           <div class="form-group">
             <label>Subject Line / Deal Summary</label>
             <input type="text" [(ngModel)]="newLeadData.subjectLine" placeholder="e.g., SD-WAN Multi-Branch Setup" [disabled]="isSaving" />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.companyName.trim()">
-            <label>Company Name <span class="required-asterisk">*</span> <span class="locked-hint" *ngIf="lockedFromContact">from contact</span></label>
-            <input type="text" [(ngModel)]="newLeadData.companyName" placeholder="e.g., Acme Technologies Inc." [disabled]="isSaving" [readonly]="lockedFromContact" [class.is-locked]="lockedFromContact" />
-            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.companyName.trim()">Company Name is required.</span>
-          </div>
-          <div class="form-group">
-            <label>Primary Contact Name <span class="locked-hint" *ngIf="lockedFromContact">from contact</span></label>
-            <input type="text" [(ngModel)]="newLeadData.contactName" placeholder="e.g., John Doe" [disabled]="isSaving" [readonly]="lockedFromContact" [class.is-locked]="lockedFromContact" />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.email.trim()">
-            <label>Email Address <span class="required-asterisk">*</span> <span class="locked-hint" *ngIf="lockedFromContact">from contact</span></label>
-            <input type="email" [(ngModel)]="newLeadData.email" placeholder="john@acme.com" [disabled]="isSaving" [readonly]="lockedFromContact" [class.is-locked]="lockedFromContact" />
-            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.email.trim()">Email is required.</span>
-          </div>
-          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.phone.trim()">
-            <label>WhatsApp / Phone Number <span class="required-asterisk">*</span> <span class="locked-hint" *ngIf="lockedFromContact">from contact</span></label>
-            <input type="text" [(ngModel)]="newLeadData.phone" placeholder="+1 (555) 000-0000" [disabled]="isSaving" [readonly]="lockedFromContact" [class.is-locked]="lockedFromContact" />
-            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.phone.trim()">WhatsApp/Phone is required.</span>
           </div>
         </div>
 
@@ -1696,17 +1663,19 @@
       <!-- Step 2: Deal & Pipeline Tracking -->
       <div *ngIf="activeTab === 2" class="step-content-anim">
         <div class="form-row">
-          <div class="form-group">
-            <label>Initial Pipeline Stage</label>
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.status?.trim()">
+            <label>Initial Pipeline Stage <span class="required-asterisk">*</span></label>
             <select [(ngModel)]="newLeadData.status" [disabled]="isSaving" class="enhanced-select">
               <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
             </select>
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.status?.trim()">Pipeline Stage is required.</span>
           </div>
-          <div class="form-group">
-            <label>Lead Source</label>
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.source?.trim()">
+            <label>Lead Source <span class="required-asterisk">*</span></label>
             <select [(ngModel)]="newLeadData.source" [disabled]="isSaving" class="enhanced-select">
               <option *ngFor="let src of LEAD_SOURCES" [value]="src">{{src}}</option>
             </select>
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.source?.trim()">Lead Source is required.</span>
             <input 
               *ngIf="newLeadData.source === 'Other'" 
               type="text" 
@@ -1719,8 +1688,8 @@
         </div>
 
         <div class="form-row">
-          <div class="form-group">
-            <label>Expected Deal Value</label>
+          <div class="form-group" [class.has-error]="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined)">
+            <label>Expected Deal Value <span class="required-asterisk">*</span></label>
             <div class="input-with-prefix">
               <span class="currency-symbol-addon">$</span>
               <input 
@@ -1735,34 +1704,18 @@
                 class="currency-input" 
               />
             </div>
+            <span class="error-msg" *ngIf="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined)">Deal Value is required.</span>
           </div>
-          <div class="form-group">
-            <label>Expected Close Date</label>
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.expectedCloseDate">
+            <label>Expected Close Date <span class="required-asterisk">*</span></label>
             <input type="date" [(ngModel)]="newLeadData.expectedCloseDate" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.expectedCloseDate">Close Date is required.</span>
           </div>
         </div>
 
-      </div>
-
-      <!-- Step 3: Additional Details -->
-      <div *ngIf="activeTab === 3" class="step-content-anim">
-        <div class="form-group">
-          <label>Lead Description / Notes</label>
-          <textarea [(ngModel)]="newLeadData.description" placeholder="Enter background information, pain points, or notes..." rows="3" [disabled]="isSaving"></textarea>
-        </div>
-        
-        <div class="form-group">
-          <label>Company Website</label>
-          <input type="url" [(ngModel)]="newLeadData.website" placeholder="https://acme.com" [disabled]="isSaving" />
-        </div>
-        
-        <div class="form-group">
-          <label>Office Address</label>
-          <textarea [(ngModel)]="newLeadData.address" placeholder="Enter physical office address or city/state..." rows="3" [disabled]="isSaving"></textarea>
-        </div>
       </div>
     </div>
-    
+
     <div class="modal-footer enhanced-footer">
       <button class="btn-secondary" (click)="activeTab = activeTab - 1" *ngIf="activeTab > 1" [disabled]="isSaving">
         Previous
@@ -1771,10 +1724,10 @@
       
       <div class="footer-right-actions">
         <button class="btn-secondary" (click)="closeModal()" [disabled]="isSaving">Cancel</button>
-        <button class="btn-primary" (click)="activeTab = activeTab + 1" *ngIf="activeTab < 3" [disabled]="isSaving">
+        <button class="btn-primary" (click)="activeTab = activeTab + 1" *ngIf="activeTab === 1" [disabled]="isSaving">
           Next Step
         </button>
-        <button class="btn-primary btn-save" (click)="createLead()" *ngIf="activeTab === 3" [disabled]="isSaving">
+        <button class="btn-primary btn-save" (click)="createLead()" *ngIf="activeTab === 2" [disabled]="isSaving">
           <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving"></svg>
           <span>{{ isSaving ? (isEditing ? 'Updating Deal...' : 'Creating Deal...') : (isEditing ? 'Save Changes' : 'Submit & Save Deal') }}</span>
         </button>

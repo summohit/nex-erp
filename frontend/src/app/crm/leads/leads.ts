@@ -1569,11 +1569,22 @@ csvImporting = false;
   createLead() {
     this.isSubmitted = true;
 
-    // Validation: Title, Company Name, Email, and Phone are required
-    const isTab1Valid = this.newLeadData.title.trim() && this.newLeadData.companyName.trim() && this.newLeadData.email.trim() && this.newLeadData.phone.trim();
+    // Validation: Title is required on tab 1
+    const isTab1Valid = this.newLeadData.title.trim();
     
     if (!isTab1Valid) {
       this.activeTab = 1;
+      return;
+    }
+
+    // Validation: Stage, Source, Deal Value, and Close Date are required on tab 2
+    const isTab2Valid = this.newLeadData.status?.trim()
+      && this.newLeadData.source?.trim()
+      && this.newLeadData.value !== null && this.newLeadData.value !== undefined
+      && this.newLeadData.expectedCloseDate;
+
+    if (!isTab2Valid) {
+      this.activeTab = 2;
       return;
     }
 
