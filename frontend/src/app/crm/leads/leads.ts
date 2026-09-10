@@ -319,7 +319,7 @@ export class LeadsComponent implements OnInit {
   leadFollowUpsExpandedIds: number[] = [];
 
   // Follow-up date filter (filters follow-ups shown inside expanded rows)
-  followUpDateFilter = 'all'; // all | today | thisWeek | lastMonth | lastQuarter | lastYear | custom
+  followUpDateFilter = 'all'; // all | today | thisWeek | thisMonth | lastMonth | last30 | last90 | thisYear | lastYear | custom
   followUpStartDate = '';
   followUpEndDate = '';
 
@@ -1348,8 +1348,9 @@ csvImporting = false;
     }
     if (this.followUpDateFilter !== 'all') {
       const labels: Record<string, string> = {
-        today: 'Today', thisWeek: 'This Week', lastMonth: 'Last Month',
-        lastQuarter: 'Last Quarter', lastYear: 'Last 1 Year',
+        today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month',
+        lastMonth: 'Last Month', last30: 'Last 30 Days', last90: 'Last 90 Days',
+        thisYear: 'This Year', lastYear: 'Last Year',
       };
       const label = this.followUpDateFilter === 'custom'
         ? `${this.followUpStartDate || '…'} to ${this.followUpEndDate || '…'}`
@@ -2159,10 +2160,24 @@ csvImporting = false;
         const e = new Date(now.getFullYear(), now.getMonth(), 1);
         return d >= +s && d < +e;
       }
-      case 'lastQuarter': {
-        const qi = Math.floor(now.getMonth() / 3);
-        const s = new Date(now.getFullYear(), (qi - 1) * 3, 1);
-        const e = new Date(now.getFullYear(), qi * 3, 1);
+      case 'thisMonth': {
+        const s = new Date(now.getFullYear(), now.getMonth(), 1);
+        const e = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        return d >= +s && d < +e;
+      }
+      case 'last30': {
+        const s = new Date(startOfToday);
+        s.setDate(s.getDate() - 30);
+        return d >= +s && d < +startOfToday;
+      }
+      case 'last90': {
+        const s = new Date(startOfToday);
+        s.setDate(s.getDate() - 90);
+        return d >= +s && d < +startOfToday;
+      }
+      case 'thisYear': {
+        const s = new Date(now.getFullYear(), 0, 1);
+        const e = new Date(now.getFullYear() + 1, 0, 1);
         return d >= +s && d < +e;
       }
       case 'lastYear': {
