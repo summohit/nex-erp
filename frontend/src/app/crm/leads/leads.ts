@@ -162,6 +162,11 @@ export class LeadsComponent implements OnInit {
   selectedQuotationStatus: 'ALL' | 'QUOTED' | 'NOT_QUOTED' = 'ALL';
   selectedFollowUpStatus: 'ALL' | 'OVERDUE' | 'SCHEDULED' | 'NONE' = 'ALL';
 
+  // Quick "My Leads" toggle in the filter bar (admin/superadmin only).
+  // Admins normally see every lead; turning this on narrows the board to
+  // leads the current user owns or created.
+  myLeadsOnly = false;
+
   // NOTE: the "Category" filter that used these was removed. It compared service
   // names against Lead.dealCategory, which only ever holds a DEAL_CATEGORIES
   // value (Inbound/Outbound/...), so it could never match a row. Restoring it
@@ -956,6 +961,8 @@ csvImporting = false;
     const q = this.searchQuery.trim().toLowerCase();
     const { start, end } = this.getDateRangeForPreset();
 
+    const myEmpId = this.currentEmployeeId();
+
     const filtered = this.leads.filter(lead => {
       const matchesSearch =
         !q ||
@@ -985,6 +992,10 @@ csvImporting = false;
 
       const matchesAddedBy =
         this.selectedAddedById === 'ALL' || lead.addedBy?.id === this.selectedAddedById;
+
+      const matchesMyLeads =
+        !this.myLeadsOnly || !myEmpId ||
+        lead.assignedTo?.id === myEmpId || lead.addedBy?.id === myEmpId;
 
       const hasQuotation = (lead.quotations?.length || 0) > 0;
       const matchesQuotation =
@@ -1020,7 +1031,7 @@ csvImporting = false;
       }
 
       return matchesSearch && matchesStage && matchesRep && matchesCategory &&
-        matchesSource && matchesContact && matchesAddedBy && matchesQuotation &&
+        matchesSource && matchesContact && matchesAddedBy && matchesMyLeads && matchesQuotation &&
         matchesFollowUpStatus && matchesFollowUpDate && matchesMin && matchesMax && matchesDate;
     });
 
@@ -1065,6 +1076,23 @@ csvImporting = false;
 
   onFilterChange() {
     this.distributeLeads();
+  }
+
+  // "My Leads" quick filter — shown only to admin/superadmin, who otherwise
+  // see every lead on the board. Toggling narrows to leads owned or created
+  // by the current user (mirrors the backend's non-admin reach rules).
+  get isAdminOrSuperAdmin(): boolean {
+    const role = this.auth.currentUser()?.role;
+    return role === 'ADMIN' || role === 'SUPERADMIN';
+  }
+
+  private currentEmployeeId(): number | null {
+    return this.auth.currentUser()?.employee?.id ?? this.auth.currentUser()?.employeeId ?? null;
+  }
+
+  toggleMyLeads() {
+    this.myLeadsOnly = !this.myLeadsOnly;
+    this.onFilterChange();
   }
 
   getConnectedLists(): string[] {
@@ -1114,11 +1142,17 @@ csvImporting = false;
     if (next && ev && ev.currentTarget) {
       const el = (ev.currentTarget as HTMLElement);
       const rect = el.getBoundingClientRect();
+      const panelEl = document.querySelector('.advanced-filters-panel') as HTMLElement | null;
+      const panelRect = panelEl ? panelEl.getBoundingClientRect() : null;
+      const originX = panelRect ? panelRect.left : 0;
+      const originY = panelRect ? panelRect.top : 0;
+      const panelW = panelEl ? panelEl.offsetWidth : window.innerWidth;
       const viewportH = window.innerHeight;
       const popoverH = Math.min(320, Math.max(200, viewportH - rect.bottom - 24));
+      const relLeft = rect.left - originX;
       this.fDropdownPos = {
-        left: Math.min(rect.left, window.innerWidth - 260),
-        top: rect.bottom + 6,
+        left: Math.max(0, Math.min(relLeft, Math.max(0, panelW - 308))),
+        top: rect.bottom + 6 - originY,
         maxHeight: popoverH
       };
     } else {
@@ -1277,6 +1311,9 @@ csvImporting = false;
     if (this.searchQuery.trim()) {
       chips.push({ key: 'search', label: `Search: "${this.searchQuery.trim()}"`, clear: () => { this.searchQuery = ''; this.onFilterChange(); } });
     }
+    if (this.myLeadsOnly) {
+      chips.push({ key: 'myLeads', label: 'My Leads', clear: () => { this.myLeadsOnly = false; this.onFilterChange(); } });
+    }
     if (this.selectedStages.length > 0) {
       chips.push({ key: 'stage', label: `Stage: ${this.selectedStages.join(', ')}`, clear: () => this.clearStages() });
     }
@@ -1344,6 +1381,7 @@ csvImporting = false;
 
   clearFilters() {
     this.searchQuery = '';
+    this.myLeadsOnly = false;
     this.selectedStages = [];
     this.selectedRepId = 'ALL';
     this.selectedCategory = 'ALL';

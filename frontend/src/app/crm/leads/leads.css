@@ -234,7 +234,7 @@
   position: relative;
   flex: 1;
   min-width: 260px;
-  max-width: 440px;
+  max-width: 370px;
   display: flex;
   align-items: center;
 }
@@ -459,6 +459,14 @@
   align-items: center;
   justify-content: center;
   padding: 0 5px;
+}
+
+/* My Leads quick filter — solid accent when active, distinct from Filters */
+.btn-my-leads.active {
+  background: #ff5500;
+  color: #ffffff;
+  border-color: #ff5500;
+  box-shadow: 0 2px 8px rgba(255, 85, 0, 0.35);
 }
 
 /* Reset Filters Button */
@@ -711,6 +719,10 @@
 .advanced-filters-panel .filter-dropdown-trigger {
   height: 36px;
   border-radius: 8px;
+}
+.advanced-filters-panel .filter-dropdown-trigger {
+  position: relative;
+  z-index: 60;
 }
 .advanced-filters-panel .value-range-inputs > span.range-sep {
   font-size: 0.75rem;

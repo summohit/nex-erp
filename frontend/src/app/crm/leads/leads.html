@@ -116,6 +116,12 @@
           <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
         </div>
 
+        <!-- MY LEADS QUICK FILTER (admin/superadmin only) -->
+        <button *ngIf="isAdminOrSuperAdmin" class="btn-advanced-filters-toggle btn-my-leads" [class.active]="myLeadsOnly" (click)="toggleMyLeads()" title="Show only leads owned by me">
+          <svg lucideUserCheck size="14"></svg>
+          <span>My Leads</span>
+        </button>
+
         <!-- ADVANCED FILTERS TOGGLE BUTTON -->
         <button class="btn-advanced-filters-toggle" [class.active]="showAdvancedFilters" (click)="showAdvancedFilters = !showAdvancedFilters; closeFilterDropdowns()">
           <svg lucideFilter size="14"></svg>
