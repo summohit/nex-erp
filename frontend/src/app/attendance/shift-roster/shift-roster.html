@@ -5,9 +5,9 @@
       <p>Who works which shift, day by day. Click any cell to change it.</p>
     </div>
     <div class="header-actions">
-      <button class="btn-outline" *ngIf="isApprover" (click)="openApprovals()" title="On-site (No Project) requests awaiting approval">
+      <button class="btn-outline" *ngIf="isApprover && pendingOnsite().length > 0" (click)="openApprovals()" title="On-site (No Project) requests awaiting approval">
         <svg lucideBadgeCheck size="15"></svg> Approvals
-        <span class="approval-count" *ngIf="pendingOnsite().length">{{ pendingOnsite().length }}</span>
+        <span class="approval-count">{{ pendingOnsite().length }}</span>
       </button>
       <button class="btn-outline" (click)="load()" title="Reload">
         <svg lucideRotateCcw size="15"></svg> Refresh
@@ -57,7 +57,7 @@
     </span>
     <span class="legend-chip chip-neutral">Day Off</span>
     <span class="legend-chip chip-leave-legend">On Leave</span>
-    <span class="legend-chip chip-pending-legend">⏳ On-site (No Project) — pending approval</span>
+    <span class="legend-chip chip-pending-legend" *ngIf="pendingOnsite().length > 0">⏳ On-site — pending approval</span>
     <span class="legend-note">Faded cells are the employee's standing shift, not a rostered one.</span>
   </div>
 
@@ -237,138 +237,249 @@
   </div>
 </div>
 
-<!-- On-site details -->
+<!-- On-site details Modal -->
 <div class="modal-overlay" *ngIf="onsiteOpen()" (click)="closeOnsite()">
-  <div class="modal-card" (click)="$event.stopPropagation()">
+  <div class="modal-card onsite-modal-card" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <div>
-        <h2>On-site Details</h2>
-        <p class="modal-sub">
-          <ng-container *ngIf="onsiteCtx()?.source === 'cell'">
-            {{ onsiteCtx()?.row?.employee?.name }} ·
-            <ng-container *ngIf="onsiteForm.span === 'day'">{{ onsiteForm.start }}</ng-container>
-            <ng-container *ngIf="onsiteForm.span === 'range'">
-              {{ onsiteForm.start }} → {{ onsiteForm.end }}
-            </ng-container>
-          </ng-container>
-          <ng-container *ngIf="onsiteCtx()?.source === 'bulk'">
-            {{ onsiteCtx()?.bulk?.employeeIds?.length }} employee(s) · {{ bulkForm.start }} → {{ bulkForm.end }}
-          </ng-container>
-        </p>
+      <div class="modal-title-group">
+        <div class="modal-icon-badge">
+          <svg lucideBuilding2 size="20"></svg>
+        </div>
+        <div>
+          <h2>On-site Shift Details</h2>
+          <div class="modal-meta-chips">
+            <span class="meta-chip emp-chip">
+              <svg lucideUserCheck size="13"></svg>
+              <span>
+                <ng-container *ngIf="onsiteCtx()?.source === 'cell'">
+                  {{ onsiteCtx()?.row?.employee?.name }}
+                </ng-container>
+                <ng-container *ngIf="onsiteCtx()?.source === 'bulk'">
+                  {{ onsiteCtx()?.bulk?.employeeIds?.length }} Employees Selected
+                </ng-container>
+              </span>
+            </span>
+            <span class="meta-chip date-chip">
+              <svg lucideCalendar size="13"></svg>
+              <span>
+                <ng-container *ngIf="onsiteCtx()?.source === 'cell'">
+                  <ng-container *ngIf="onsiteForm.span === 'day'">{{ onsiteForm.start | date:'mediumDate' }}</ng-container>
+                  <ng-container *ngIf="onsiteForm.span === 'range'">
+                    {{ onsiteForm.start | date:'mediumDate' }} → {{ onsiteForm.end | date:'mediumDate' }}
+                  </ng-container>
+                </ng-container>
+                <ng-container *ngIf="onsiteCtx()?.source === 'bulk'">
+                  {{ bulkForm.start | date:'mediumDate' }} → {{ bulkForm.end | date:'mediumDate' }}
+                </ng-container>
+              </span>
+            </span>
+          </div>
+        </div>
       </div>
-      <button class="icon-btn" (click)="closeOnsite()"><svg lucideX size="20"></svg></button>
+      <button class="icon-btn-close" (click)="closeOnsite()" title="Close dialog">
+        <svg lucideX size="18"></svg>
+      </button>
     </div>
 
     <div class="modal-body">
-      <p class="onsite-intro">
-        <strong>{{ onsiteCtx()?.shiftName }}</strong> is an on-site shift — pick the project it belongs to (or
-        choose "No Project"), then set the address.
-      </p>
+      <!-- Contextual Shift Guidance Banner -->
+      <div class="onsite-info-banner">
+        <div class="info-banner-icon">
+          <svg lucideInfo size="16"></svg>
+        </div>
+        <div class="info-banner-text">
+          <p>
+            <strong>{{ onsiteCtx()?.shiftName }}</strong> is an on-site assignment. Optionally select a project to link client &amp; address records, then enter or verify the work location.
+          </p>
+        </div>
+      </div>
 
+      <!-- Project Searchable Select -->
       <div class="form-group">
-        <label>Project</label>
-        <select class="form-control" [ngModel]="onsiteForm.projectId"
-                (ngModelChange)="onOnsiteProjectChange($event)" [disabled]="noProject()">
-          <option [ngValue]="null">Select project…</option>
-          <option *ngFor="let p of projects()" [ngValue]="p.id">{{ p.name }}</option>
-        </select>
+        <div class="form-label-row">
+          <label class="form-label">
+            <span>Assigned Project</span>
+            <span class="optional-tag">(Optional)</span>
+          </label>
+          <span class="label-badge">{{ projects().length }} available</span>
+        </div>
+        
+        <app-searchable-select
+          [options]="projectOptions()"
+          [value]="onsiteForm.projectId"
+          [fullWidth]="true"
+          placeholder="Search projects or leave unassigned…"
+          [clearable]="true"
+          (valueChange)="onOnsiteProjectChange($event)"
+        >
+          <svg prefix lucideBriefcase size="15"></svg>
+        </app-searchable-select>
       </div>
 
-      <div class="bulk-options">
-        <label>
-          <input type="checkbox" [checked]="noProject()" (change)="toggleNoProject()">
-          <span><strong>No Project</strong> — send for approval to Administrator &amp; HR</span>
-        </label>
-      </div>
-
+      <!-- On-site Address -->
       <div class="form-group">
-        <label>Address</label>
-        <textarea class="form-control onsite-address" rows="3" [(ngModel)]="onsiteForm.address"
-                  placeholder="Where does the on-site work happen?"></textarea>
-        <small *ngIf="onsiteForm.projectId && selectedProjectAddress" class="onsite-hint">
-          Auto-filled from the project — you can edit it.
-        </small>
-        <small *ngIf="onsiteForm.projectId && !selectedProjectAddress" class="onsite-hint warn">
-          This project has no address on file — enter one now, or add it under the project for next time.
-        </small>
+        <div class="form-label-row">
+          <label class="form-label" for="onsite-addr">
+            <span>On-site Work Location / Address</span>
+            <span class="req-star">*</span>
+          </label>
+          <span class="auto-fill-pill" *ngIf="onsiteForm.projectId && selectedProjectAddress">
+            <svg lucideCheckCircle2 size="12"></svg>
+            <span>Auto-filled from project</span>
+          </span>
+        </div>
+
+        <div class="textarea-wrapper">
+          <div class="textarea-icon">
+            <svg lucideMapPin size="16"></svg>
+          </div>
+          <textarea 
+            id="onsite-addr"
+            class="form-control-enhanced onsite-address" 
+            rows="3" 
+            [(ngModel)]="onsiteForm.address"
+            placeholder="Enter physical address, facility or coordinates where work happens…"
+          ></textarea>
+        </div>
+
+        <div class="onsite-hint-box warn" *ngIf="onsiteForm.projectId && !selectedProjectAddress">
+          <svg lucideAlertCircle size="14"></svg>
+          <span>This project has no address on file — please enter the address manually.</span>
+        </div>
       </div>
 
-      <!-- How long the stint runs. Bulk assign already carries its own range,
-           so this only appears when a single roster cell was clicked. -->
+      <!-- Duration (Cell click only) -->
       <div class="form-group" *ngIf="onsiteCtx()?.source === 'cell'">
-        <label>How long?</label>
-        <div class="span-toggle">
-          <button type="button" class="span-btn" [class.active]="onsiteForm.span === 'day'"
-                  (click)="onsiteForm.span = 'day'">Just this day</button>
-          <button type="button" class="span-btn" [class.active]="onsiteForm.span === 'range'"
-                  (click)="onsiteForm.span = 'range'">Date range</button>
+        <label class="form-label">Assignment Duration</label>
+        
+        <div class="segmented-control">
+          <button 
+            type="button" 
+            class="seg-btn" 
+            [class.active]="onsiteForm.span === 'day'"
+            (click)="onsiteForm.span = 'day'"
+          >
+            <span>Single Day Only</span>
+          </button>
+          <button 
+            type="button" 
+            class="seg-btn" 
+            [class.active]="onsiteForm.span === 'range'"
+            (click)="onsiteForm.span = 'range'"
+          >
+            <span>Multi-Day Date Range</span>
+          </button>
         </div>
 
-        <div class="onsite-range" *ngIf="onsiteForm.span === 'range'">
-          <div class="range-fields">
-            <label class="range-field">
-              <span>From</span>
-              <input type="date" class="form-control" [(ngModel)]="onsiteForm.start">
-            </label>
-            <label class="range-field">
-              <span>To</span>
-              <input type="date" class="form-control" [(ngModel)]="onsiteForm.end">
-            </label>
+        <div class="onsite-range-box" *ngIf="onsiteForm.span === 'range'">
+          <div class="range-inputs-grid">
+            <div class="range-input-col">
+              <span class="range-col-label">From Date</span>
+              <div class="input-with-icon">
+                <svg lucideCalendar size="15"></svg>
+                <input type="date" class="form-control-enhanced" [(ngModel)]="onsiteForm.start">
+              </div>
+            </div>
+            <div class="range-input-col">
+              <span class="range-col-label">To Date</span>
+              <div class="input-with-icon">
+                <svg lucideCalendar size="15"></svg>
+                <input type="date" class="form-control-enhanced" [(ngModel)]="onsiteForm.end">
+              </div>
+            </div>
           </div>
-          <div class="range-quick">
-            <button type="button" class="chip-btn" (click)="quickRange('week')">Rest of the week</button>
-            <button type="button" class="chip-btn" (click)="quickRange('month')">Rest of the month</button>
+
+          <div class="quick-range-bar">
+            <span class="quick-lbl">Presets:</span>
+            <button type="button" class="preset-chip" (click)="quickRange('week')">
+              <span>Rest of week</span>
+            </button>
+            <button type="button" class="preset-chip" (click)="quickRange('month')">
+              <span>Rest of month</span>
+            </button>
+            <span class="days-selected-pill" *ngIf="!onsiteRangeError && onsiteDayCount > 0">
+              {{ onsiteDayCount }} day(s) selected
+            </span>
           </div>
-          <small class="onsite-hint" *ngIf="!onsiteRangeError">
-            {{ onsiteDayCount }} day(s). Existing roster entries in this range are replaced;
-            days the shift doesn't operate are marked off rather than on-site.
-          </small>
-          <small class="onsite-hint warn" *ngIf="onsiteRangeError">{{ onsiteRangeError }}</small>
+
+          <div class="onsite-hint-box warn" *ngIf="onsiteRangeError">
+            <svg lucideAlertCircle size="14"></svg>
+            <span>{{ onsiteRangeError }}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Site hours. Blank on both = the shift's own timing applies. -->
+      <!-- On-site Hours -->
       <div class="form-group">
-        <label>On-site hours</label>
-        <div class="range-fields">
-          <label class="range-field">
-            <span>Start</span>
-            <input type="time" class="form-control" [(ngModel)]="onsiteForm.startTime">
-          </label>
-          <label class="range-field">
-            <span>End</span>
-            <input type="time" class="form-control" [(ngModel)]="onsiteForm.endTime">
-          </label>
-          <button type="button" class="chip-btn"
-                  (click)="onsiteForm.startTime = ''; onsiteForm.endTime = ''">Use shift timing</button>
+        <div class="form-label-row">
+          <label class="form-label">On-site Working Hours</label>
+          <button 
+            type="button" 
+            class="btn-reset-timing"
+            (click)="resetToShiftTiming()"
+            title="Reset to default hours configured for this shift"
+          >
+            <svg lucideRotateCcw size="12"></svg>
+            <span>Reset to shift default</span>
+          </button>
         </div>
-        <small class="onsite-hint" *ngIf="!onsiteTimeError && onsiteWindowChanged">
-          Clock-in and clock-out on these days are judged against this window, not
-          <strong>{{ onsiteCtx()?.shiftName }}</strong>'s usual hours.
-        </small>
-        <small class="onsite-hint" *ngIf="!onsiteTimeError && !onsiteWindowChanged">
-          Using <strong>{{ onsiteCtx()?.shiftName }}</strong>'s own hours. Change them if the site runs different times.
-        </small>
-        <small class="onsite-hint warn" *ngIf="onsiteTimeError">{{ onsiteTimeError }}</small>
-      </div>
 
-      <div class="onsite-note" *ngIf="noProject()">
-        This request won't apply until an Administrator or HR member approves it.
+        <div class="time-inputs-grid">
+          <div class="time-input-col">
+            <span class="time-col-label">Shift Start</span>
+            <div class="input-with-icon">
+              <svg lucideClock size="15"></svg>
+              <input type="time" class="form-control-enhanced" [(ngModel)]="onsiteForm.startTime">
+            </div>
+          </div>
+          <div class="time-input-col">
+            <span class="time-col-label">Shift End</span>
+            <div class="input-with-icon">
+              <svg lucideClock size="15"></svg>
+              <input type="time" class="form-control-enhanced" [(ngModel)]="onsiteForm.endTime">
+            </div>
+          </div>
+        </div>
+
+        <div class="timing-status-container">
+          <div class="timing-hint-line" *ngIf="!onsiteTimeError && onsiteWindowChanged">
+            <span class="hint-pulse-dot amber"></span>
+            <span>Custom site window: Clock-ins will be validated against these hours.</span>
+          </div>
+          <div class="timing-hint-line" *ngIf="!onsiteTimeError && !onsiteWindowChanged">
+            <span class="hint-pulse-dot green"></span>
+            <span>Standard shift timing for <strong>{{ onsiteCtx()?.shiftName }}</strong> will apply.</span>
+          </div>
+          <div class="onsite-hint-box warn" *ngIf="onsiteTimeError">
+            <svg lucideAlertCircle size="14"></svg>
+            <span>{{ onsiteTimeError }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="modal-footer">
-      <span class="spacer"></span>
-      <button class="btn-outline" (click)="closeOnsite()">Cancel</button>
-      <button class="btn-primary" [disabled]="!canSubmitOnsite || onsiteSubmitting()" (click)="submitOnsite()">
-        <ng-container *ngIf="noProject()">Send for Approval</ng-container>
-        <ng-container *ngIf="!noProject()">
-          Assign On-site<ng-container *ngIf="onsiteDayCount > 1"> · {{ onsiteDayCount }} days</ng-container>
-        </ng-container>
+      <button class="btn-modal-cancel" (click)="closeOnsite()">Cancel</button>
+      <button 
+        class="btn-modal-submit" 
+        [disabled]="!canSubmitOnsite || onsiteSubmitting()" 
+        (click)="submitOnsite()"
+      >
+        <span *ngIf="!onsiteSubmitting()" class="btn-inner-content">
+          <span>
+            Assign On-site<ng-container *ngIf="onsiteDayCount > 1"> · {{ onsiteDayCount }} days</ng-container>
+          </span>
+          <svg lucideArrowRight size="16"></svg>
+        </span>
+        <span *ngIf="onsiteSubmitting()" class="btn-loader-content">
+          <span class="spinner-ring"></span>
+          <span>Saving assignment…</span>
+        </span>
       </button>
     </div>
   </div>
 </div>
+
 
 <!-- On-site approvals (Administrator / HR) -->
 <div class="modal-overlay" *ngIf="approvalsOpen()" (click)="closeApprovals()">

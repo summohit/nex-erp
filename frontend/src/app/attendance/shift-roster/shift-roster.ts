@@ -5,11 +5,14 @@ import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideChevronLeft, LucideChevronRight, LucideX, LucideCalendar,
   LucideRotateCcw, LucideWandSparkles, LucideTrash2, LucideBadgeCheck, LucideXCircle,
+  LucideBuilding2, LucideMapPin, LucideClock, LucideAlertCircle, LucideCheckCircle2,
+  LucideArrowRight, LucideBriefcase, LucideInfo, LucideUserCheck
 } from '@lucide/angular';
 import { ShiftsService, RosterAssignmentPayload, RosterCell, RosterGrid, RosterRow, RosterShift } from '../../services/shifts.service';
 import { MasterDataService } from '../../services/master-data.service';
 import { ProjectsService } from '../../services/projects';
 import { AuthService } from '../../services/auth.service';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 type ViewMode = 'week' | 'month';
 
@@ -31,7 +34,9 @@ interface OnSiteCtx {
   imports: [
     CommonModule, FormsModule, LucideChevronLeft, LucideChevronRight, LucideX,
     LucideCalendar, LucideRotateCcw, LucideWandSparkles, LucideTrash2,
-    LucideBadgeCheck, LucideXCircle,
+    LucideBadgeCheck, LucideXCircle, LucideBuilding2, LucideMapPin,
+    LucideClock, LucideAlertCircle, LucideCheckCircle2, LucideArrowRight,
+    LucideBriefcase, LucideInfo, LucideUserCheck, SearchableSelectComponent
   ],
   templateUrl: './shift-roster.html',
   styleUrls: ['./shift-roster.css'],
@@ -48,6 +53,15 @@ export class ShiftRosterComponent implements OnInit {
   departments = signal<any[]>([]);
   projects = signal<any[]>([]);
   currentUser = this.authService.currentUser;
+
+  projectOptions = computed<SearchableSelectOption[]>(() => {
+    return this.projects().map(p => ({
+      id: p.id,
+      name: p.name,
+      subtitle: p.address || p.client?.name || undefined
+    }));
+  });
+
 
   viewMode = signal<ViewMode>('week');
   /** Monday of the displayed week, or the 1st for month view. */
@@ -80,7 +94,6 @@ export class ShiftRosterComponent implements OnInit {
     startTime: '',
     endTime: '',
   };
-  noProject = signal(false);
   onsiteSubmitting = signal(false);
 
   // On-site "No Project" approval queue (Administrator / HR only).
@@ -107,7 +120,6 @@ export class ShiftRosterComponent implements OnInit {
       startTime: shift?.startTime || '',
       endTime: shift?.endTime || '',
     };
-    this.noProject.set(false);
   }
 
   /** Extend the on-site range to the rest of the week / month from its start. */
@@ -330,9 +342,10 @@ export class ShiftRosterComponent implements OnInit {
     if (p?.address) this.onsiteForm.address = p.address;
   }
 
-  toggleNoProject() {
-    this.noProject.update(v => !v);
-    if (this.noProject()) this.onsiteForm.projectId = null;
+  resetToShiftTiming() {
+    const shift = this.grid().shifts.find(s => s.id === this.onsiteCtx()?.shiftId);
+    this.onsiteForm.startTime = shift?.startTime || '';
+    this.onsiteForm.endTime = shift?.endTime || '';
   }
 
   get onsiteTimeError(): string {
@@ -362,7 +375,6 @@ export class ShiftRosterComponent implements OnInit {
   get canSubmitOnsite(): boolean {
     const addr = (this.onsiteForm.address || '').trim();
     if (!addr) return false;
-    if (!this.noProject() && !this.onsiteForm.projectId) return false;
     return !this.onsiteTimeError && !this.onsiteRangeError;
   }
 
@@ -382,6 +394,7 @@ export class ShiftRosterComponent implements OnInit {
     // getEffectiveShift falls back to the shift.
     const startTime = this.onsiteForm.startTime || null;
     const endTime = this.onsiteForm.endTime || null;
+    const projectId = this.onsiteForm.projectId || null;
 
     if (ctx.source === 'cell' && ctx.row && ctx.cell) {
       const employeeId = ctx.row.employee.id;
@@ -396,19 +409,15 @@ export class ShiftRosterComponent implements OnInit {
           shiftId: ctx.shiftId,
           skipNonWorkingDays: false,
           overwriteExisting: true,
+          projectId,
           address, startTime, endTime,
         };
-        if (this.noProject()) payload.needsApproval = true;
-        else payload.projectId = this.onsiteForm.projectId;
         this.shiftsService.bulkAssignRoster(payload).subscribe({
           next: (r) => {
-            this.toast.success(this.noProject()
-              ? `${r.written} day(s) sent for Administrator & HR approval`
-              : `Rostered on-site for ${r.written} day(s)`);
+            this.toast.success(`Rostered on-site for ${r.written} day(s)`);
             this.closeOnsite();
             this.closeEditor();
             this.load();
-            this.refreshApprovals();
           },
           error: (e) => { this.toast.error(e.error?.message || 'Failed to update roster'); this.onsiteSubmitting.set(false); },
         });
@@ -419,19 +428,15 @@ export class ShiftRosterComponent implements OnInit {
         employeeId,
         date: ctx.cell.date,
         shiftId: ctx.shiftId,
+        projectId,
         address, startTime, endTime,
       };
-      if (this.noProject()) payload.needsApproval = true;
-      else payload.projectId = this.onsiteForm.projectId;
       this.shiftsService.assignRoster(payload).subscribe({
         next: () => {
-          this.toast.success(this.noProject()
-            ? 'Request sent — pending Administrator & HR approval'
-            : 'Roster updated');
+          this.toast.success('Roster updated');
           this.closeOnsite();
           this.closeEditor();
           this.load();
-          this.refreshApprovals();
         },
         error: (e) => { this.toast.error(e.error?.message || 'Failed to update roster'); this.onsiteSubmitting.set(false); },
       });
@@ -446,19 +451,15 @@ export class ShiftRosterComponent implements OnInit {
         shiftId: ctx.shiftId,
         skipNonWorkingDays: b.skipNonWorkingDays,
         overwriteExisting: b.overwriteExisting,
+        projectId,
         address, startTime, endTime,
       };
-      if (this.noProject()) payload.needsApproval = true;
-      else payload.projectId = this.onsiteForm.projectId;
       this.shiftsService.bulkAssignRoster(payload).subscribe({
         next: (r) => {
-          this.toast.success(this.noProject()
-            ? `Rostered ${r.written} day(s) — on-site (No Project) sent for Administrator & HR approval`
-            : `Rostered ${r.written} day(s)`);
+          this.toast.success(`Rostered ${r.written} day(s)`);
           this.closeOnsite();
           this.closeBulk();
           this.load();
-          this.refreshApprovals();
         },
         error: (e) => { this.toast.error(e.error?.message || 'Bulk assign failed'); this.onsiteSubmitting.set(false); },
       });

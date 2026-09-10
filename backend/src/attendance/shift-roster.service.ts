@@ -595,12 +595,13 @@ export class ShiftRosterService {
 
     if (data.needsApproval) {
       if (data.projectId) throw new BadRequestException('Choose either a project or No Project, not both');
-      if (!requestedAddress) throw new BadRequestException('Enter the on-site address before sending for approval');
-      return { projectId: null, address: requestedAddress, needsApproval: true, isOnSite: true };
+      if (!requestedAddress) throw new BadRequestException('Enter the on-site address');
+      return { projectId: null, address: requestedAddress, needsApproval: false, isOnSite: true };
     }
 
     if (!data.projectId) {
-      throw new BadRequestException('Select a project or choose No Project for an on-site shift');
+      if (!requestedAddress) throw new BadRequestException('Enter an on-site address');
+      return { projectId: null, address: requestedAddress, needsApproval: false, isOnSite: true };
     }
     const project = await this.prisma.project.findFirst({
       where: { id: data.projectId, companyId },
