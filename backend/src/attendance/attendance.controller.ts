@@ -14,14 +14,21 @@ export class AttendanceController {
     return this.attendanceService.getTodayAttendance(req.user.sub);
   }
 
+  // `from`/`to` are ISO dates. Callers that render one month should pass that
+  // month; omitting them falls back to a bounded recent window rather than the
+  // employee's entire history.
   @Get('history/me')
-  getMyHistory(@Request() req) {
-    return this.attendanceService.getMyHistory(req.user.sub);
+  getMyHistory(@Request() req, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.attendanceService.getMyHistory(req.user.sub, from, to);
   }
 
   @Get('employee/:employeeId')
-  getEmployeeHistory(@Param('employeeId') employeeId: string) {
-    return this.attendanceService.getEmployeeHistory(+employeeId);
+  getEmployeeHistory(
+    @Param('employeeId') employeeId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.attendanceService.getEmployeeHistory(+employeeId, from, to);
   }
 
   @Post('clock-in')

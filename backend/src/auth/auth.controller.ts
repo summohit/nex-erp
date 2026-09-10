@@ -2,6 +2,7 @@ import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@n
 import { Throttle, ThrottlerGuard, seconds } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
+import { CLIENT_PLATFORM_HEADER } from './two-factor.constants';
 
 @Controller('auth')
 export class AuthController {
@@ -35,8 +36,11 @@ export class AuthController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: seconds(60), limit: 10 } })
   @Post('login')
-  signIn(@Body() signInDto: Record<string, any>) {
-    return this.authService.login(signInDto.email, signInDto.password);
+  signIn(@Body() signInDto: Record<string, any>, @Req() req: any) {
+    // Forwarded only so the temporary mobile bypass can read it. It is a
+    // client-supplied string and proves nothing — see CLIENT_PLATFORM_HEADER.
+    const clientPlatform = req?.headers?.[CLIENT_PLATFORM_HEADER];
+    return this.authService.login(signInDto.email, signInDto.password, clientPlatform);
   }
   @HttpCode(HttpStatus.OK)
   @Post('refresh')

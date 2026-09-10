@@ -55,8 +55,8 @@ describe('AuthController', () => {
   });
 
   it('passes credentials straight through to the service', async () => {
-    await controller.signIn({ email: 'a@b.com', password: 'pw' });
-    expect(authService.login).toHaveBeenCalledWith('a@b.com', 'pw');
+    await controller.signIn({ email: 'a@b.com', password: 'pw' }, { headers: {} });
+    expect(authService.login).toHaveBeenCalledWith('a@b.com', 'pw', undefined);
   });
 
   it('returns whatever login produces, including a 2FA challenge', async () => {
@@ -68,10 +68,10 @@ describe('AuthController', () => {
       challengeToken: 'tok',
     });
 
-    const result: any = await controller.signIn({
-      email: 'a@b.com',
-      password: 'pw',
-    });
+    const result: any = await controller.signIn(
+      { email: 'a@b.com', password: 'pw' },
+      { headers: {} },
+    );
 
     expect(result).toEqual({
       twoFactorRequired: true,

@@ -75,3 +75,31 @@ export interface ChallengePayload {
   pw: string;
   nonce: string;
 }
+
+/**
+ * Header the mobile app sets to identify itself.
+ *
+ * SECURITY: this is a CLIENT-SUPPLIED value and therefore forgeable by anyone —
+ * `curl -H "X-Client-Platform: mobile"` is enough. It must never be used for an
+ * authorisation decision that matters. It exists only to drive the temporary
+ * bypass below, and is not evidence of anything.
+ */
+export const CLIENT_PLATFORM_HEADER = 'x-client-platform';
+export const MOBILE_PLATFORM = 'mobile';
+
+/**
+ * TEMPORARY: lets the mobile app sign in with a password alone, skipping the
+ * second factor, while older builds without the challenge screen are still in
+ * users' hands.
+ *
+ * This deliberately makes two-factor authentication ADVISORY rather than
+ * enforced: an attacker holding a stolen password only has to add the header
+ * above to bypass it entirely. It is off unless explicitly switched on, so it
+ * cannot leak into an environment by accident, and it can be closed instantly
+ * by unsetting the variable and restarting — no deploy required.
+ *
+ * Remove this, and the header handling around it, once the 2FA-capable app
+ * build has replaced the old one.
+ */
+export const mobileTwoFactorBypassEnabled = () =>
+  process.env.ALLOW_MOBILE_2FA_BYPASS === 'true';

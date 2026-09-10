@@ -3,12 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
 import { haversineKm } from '../common/geo.util';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ShiftRosterService, EffectiveShift } from './shift-roster.service';
 
 @Injectable()
 export class AttendanceService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private roster: ShiftRosterService,
   ) {}
 
   async getTodayAttendance(userId: number) {
@@ -44,23 +46,98 @@ export class AttendanceService {
     return { ...record, totalHours: parseFloat(totalHours.toFixed(2)) };
   }
 
-  async getMyHistory(userId: number) {
-    const employee = await this.prisma.employee.findUnique({ where: { userId } });
-    if (!employee) throw new BadRequestException('Employee profile not found');
+  /**
+   * How far back a history request reaches when the caller does not say.
+   *
+   * Both the web grid and the mobile timesheet render one month at a time and
+   * should pass an explicit `from`/`to`. This default only covers older clients
+   * that ask for everything; it is generous enough that month navigation keeps
+   * working, while stopping a single request from shipping years of records.
+   */
+  private static readonly DEFAULT_HISTORY_MONTHS = 12;
 
-    return this.prisma.attendance.findMany({
-      where: { employeeId: employee.id },
-      include: { employee: { include: { department: true } }, logs: true },
-      orderBy: { date: 'desc' }
-    }).then(rows => rows.map(r => this.withTotalHours(r)));
+  /**
+   * The fields the attendance grids actually render. Selecting explicitly keeps
+   * new columns from silently joining every response, and — with the employee
+   * relation gone — is what keeps this endpoint small.
+   */
+  private static readonly HISTORY_SELECT = {
+    id: true,
+    date: true,
+    clockIn: true,
+    clockOut: true,
+    clockInLat: true,
+    clockInLng: true,
+    clockOutLat: true,
+    clockOutLng: true,
+    status: true,
+    isLate: true,
+    isEarlyLeave: true,
+    overtimeHours: true,
+    logs: {
+      select: {
+        id: true,
+        clockIn: true,
+        clockOut: true,
+        clockInLat: true,
+        clockInLng: true,
+        clockOutLat: true,
+        clockOutLng: true,
+      },
+    },
+  } as const;
+
+  /** Clamp a history request to a sane window. */
+  private historyDateFilter(from?: string, to?: string) {
+    const filter: { gte?: Date; lte?: Date } = {};
+
+    const parsedFrom = from ? new Date(from) : null;
+    const parsedTo = to ? new Date(to) : null;
+
+    if (parsedFrom && !isNaN(parsedFrom.getTime())) {
+      filter.gte = parsedFrom;
+    } else {
+      const fallback = new Date();
+      fallback.setMonth(fallback.getMonth() - AttendanceService.DEFAULT_HISTORY_MONTHS);
+      filter.gte = fallback;
+    }
+
+    if (parsedTo && !isNaN(parsedTo.getTime())) filter.lte = parsedTo;
+
+    return filter;
   }
 
-  async getEmployeeHistory(employeeId: number) {
-    return this.prisma.attendance.findMany({
-      where: { employeeId },
-      include: { employee: { include: { department: true } }, logs: true },
-      orderBy: { date: 'desc' }
-    }).then(rows => rows.map(r => this.withTotalHours(r)));
+  async getMyHistory(userId: number, from?: string, to?: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!employee) throw new BadRequestException('Employee profile not found');
+
+    return this.getHistoryFor(employee.id, from, to);
+  }
+
+  async getEmployeeHistory(employeeId: number, from?: string, to?: string) {
+    return this.getHistoryFor(employeeId, from, to);
+  }
+
+  /**
+   * Deliberately does NOT include the employee or their department.
+   *
+   * It used to, which attached a full copy of the same employee record to every
+   * row — around 300 KB of pure duplication on a 600-row history, repeated on
+   * every page load from both clients. Neither the web grid nor the mobile
+   * timesheet ever read those fields; the caller already knows whose history it
+   * asked for.
+   */
+  private getHistoryFor(employeeId: number, from?: string, to?: string) {
+    return this.prisma.attendance
+      .findMany({
+        where: { employeeId, date: this.historyDateFilter(from, to) },
+        select: AttendanceService.HISTORY_SELECT,
+        orderBy: { date: 'desc' },
+      })
+      .then((rows) => rows.map((r) => this.withTotalHours(r)));
   }
 
   async clockIn(userId: number, data: { lat?: number, lng?: number, ipAddress?: string }) {
@@ -70,10 +147,21 @@ export class AttendanceService {
     });
     if (!employee) throw new BadRequestException('Employee profile not found');
 
+    const nowForDay = new Date();
+    const todayKey = istDateKey(nowForDay);
+
+    // What the roster says about today — an on-site assignment, a rostered
+    // shift, or (the usual case) nothing, in which case the standing shift
+    // still applies exactly as before.
+    const effective = await this.roster.getEffectiveShift(employee.id, todayKey, employee.shift);
+    const onsite = !!effective.onsite;
+
     const branch = employee.branch;
     if (branch) {
       // 1. IP Restriction Check
-      if (branch.allowedIps) {
+      // Skipped on-site: the whole point of an on-site day is that the person
+      // is not on the office network.
+      if (branch.allowedIps && !onsite) {
         const allowed = branch.allowedIps.split(',').map(ip => ip.trim());
         if (data.ipAddress && !allowed.includes(data.ipAddress)) {
           throw new BadRequestException(`Clock-in denied. IP Address ${data.ipAddress} is not in the allowed list.`);
@@ -82,7 +170,10 @@ export class AttendanceService {
 
       // 2. Geofencing Check — only enforced once an admin has actually set the
       // branch's coordinates; branches without them behave as before (no check).
-      if (branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
+      // Also skipped on-site, for the same reason: someone rostered to a client
+      // site is by definition outside the branch radius, and enforcing it would
+      // make an on-site day impossible to clock at all.
+      if (!onsite && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
         if (data.lat == null || data.lng == null) {
           throw new BadRequestException('Location is required to clock in at this branch.');
         }
@@ -96,11 +187,8 @@ export class AttendanceService {
       }
     }
 
-    const nowLocal = new Date();
-    const today = istDateKey(nowLocal);
-
     let existing = await this.prisma.attendance.findUnique({
-      where: { employeeId_date: { employeeId: employee.id, date: today } },
+      where: { employeeId_date: { employeeId: employee.id, date: todayKey } },
       include: { logs: true }
     });
 
@@ -115,12 +203,15 @@ export class AttendanceService {
     let isLate = false;
 
     // Duration-only shifts have no startTime, so there is nothing to be late for.
-    if (employee.shift?.startTime) {
+    // The window comes from the roster when one is set for today, which is how
+    // an on-site stint with its own hours stops reading as three hours late.
+    const buffer = effective.shift?.bufferTimeMinutes ?? 0;
+    if (effective.startTime) {
       // Shift times ("09:00") are IST wall-clock, not server-local — istTimeInstant
       // resolves them to the correct real-world instant regardless of what
       // timezone this server's OS happens to be configured with.
-      const expectedStart = istTimeInstant(now, employee.shift.startTime);
-      const maxStartTime = new Date(expectedStart.getTime() + (employee.shift.bufferTimeMinutes * 60000));
+      const expectedStart = istTimeInstant(now, effective.startTime);
+      const maxStartTime = new Date(expectedStart.getTime() + buffer * 60000);
 
       if (now > maxStartTime) {
         isLate = true;
@@ -131,12 +222,15 @@ export class AttendanceService {
       existing = await this.prisma.attendance.create({
         data: {
           employeeId: employee.id,
-          date: today,
+          date: todayKey,
           clockIn: now,
           clockInLat: data.lat,
           clockInLng: data.lng,
           status: 'PRESENT',
-          isLate
+          isLate,
+          shiftId: effective.shift?.id ?? null,
+          projectId: effective.onsite?.projectId ?? null,
+          isOnsite: onsite,
         },
         include: { logs: true }
       });
@@ -160,6 +254,11 @@ export class AttendanceService {
         clockIn: existing.clockIn || now,
         clockInLat: existing.clockInLat || data.lat,
         clockInLng: existing.clockInLng || data.lng,
+        // Don't overwrite what the first clock-in of the day captured; only
+        // fill in a row that some other path created without this context.
+        shiftId: existing.shiftId ?? effective.shift?.id ?? null,
+        projectId: existing.projectId ?? effective.onsite?.projectId ?? null,
+        isOnsite: existing.isOnsite || onsite,
       },
       include: { logs: true }
     }).then(r => this.withTotalHours(r));
@@ -172,8 +271,14 @@ export class AttendanceService {
     });
     if (!employee) throw new BadRequestException('Employee profile not found');
 
+    const nowForDay = new Date();
+    const todayKey = istDateKey(nowForDay);
+    const effective = await this.roster.getEffectiveShift(employee.id, todayKey, employee.shift);
+
     const branch = employee.branch;
-    if (branch && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
+    // Same on-site exemption as clock-in — otherwise someone could clock in at
+    // a client site and then be unable to clock out.
+    if (!effective.onsite && branch && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
       if (data.lat == null || data.lng == null) {
         throw new BadRequestException('Location is required to clock out at this branch.');
       }
@@ -186,11 +291,8 @@ export class AttendanceService {
       }
     }
 
-    const nowLocal = new Date();
-    const today = istDateKey(nowLocal);
-
     const existing = await this.prisma.attendance.findUnique({
-      where: { employeeId_date: { employeeId: employee.id, date: today } },
+      where: { employeeId_date: { employeeId: employee.id, date: todayKey } },
       include: { logs: true }
     });
 
@@ -208,9 +310,11 @@ export class AttendanceService {
     let status = 'PRESENT';
     let overtimeHours = 0;
 
-    if (employee.shift?.endTime) {
+    // The roster's window again, so leaving a 14:00-finish on-site day at 14:05
+    // is not recorded as a half day against the 18:00 office shift.
+    if (effective.endTime) {
       // Same IST-fixed resolution as clockIn — see the comment there.
-      const expectedEnd = istTimeInstant(now, employee.shift.endTime);
+      const expectedEnd = istTimeInstant(now, effective.endTime);
 
       if (now < expectedEnd) {
         isEarlyLeave = true;

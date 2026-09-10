@@ -22,7 +22,27 @@ export interface RosterAssignment {
   address?: string | null;
   /** True when the requester chose "No Project" — routes the row to Admin + HR. */
   needsApproval?: boolean;
+  /** Clock window for this assignment, "HH:mm" IST. Null/absent = use the shift's. */
+  startTime?: string | null;
+  endTime?: string | null;
 }
+
+/**
+ * Which shift actually governs one person on one day, once the roster has had
+ * its say. `startTime`/`endTime` are already merged: a roster entry's own
+ * window wins over the shift's, and the shift's is the fallback.
+ */
+export interface EffectiveShift {
+  source: 'ROSTER' | 'STANDING' | 'NONE';
+  shift: { id: number; name: string; bufferTimeMinutes: number } | null;
+  startTime: string | null;
+  endTime: string | null;
+  isDayOff: boolean;
+  /** Non-null only for an on-site day that is actually in force. */
+  onsite: { projectId: number | null; address: string | null } | null;
+}
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Midnight UTC for a YYYY-MM-DD key — matches how @db.Date round-trips. */
 function dateKey(s: string): Date {
@@ -144,6 +164,8 @@ export class ShiftRosterService {
                     projectName: entry.project?.name || null,
                     address: entry.address || null,
                     approvalStatus: entry.onsiteApprovalStatus,
+                    startTime: entry.startTime,
+                    endTime: entry.endTime,
                   }
                 : undefined;
             return {
@@ -176,6 +198,106 @@ export class ShiftRosterService {
     };
   }
 
+  /**
+   * The single source of truth for "what shift is this person on, this day?".
+   *
+   * Attendance used to read Employee.shift directly, which meant the roster —
+   * including every on-site assignment — had no effect on clocking at all.
+   * clockIn, clockOut and the auto-clock-out cron all resolve through here now.
+   *
+   * Order: an explicit roster entry wins, the standing shift is the fallback.
+   *
+   * A PENDING on-site row deliberately does NOT take effect. It is a *request*,
+   * and letting it govern would let anyone move their own clock window — and
+   * skip the branch geofence — just by filing one and never being approved.
+   */
+  async getEffectiveShift(
+    employeeId: number,
+    date: Date,
+    standingShift?: { id: number; name: string; startTime: string | null; endTime: string | null; bufferTimeMinutes: number; workingDays: string | null } | null,
+  ): Promise<EffectiveShift> {
+    const standing =
+      standingShift !== undefined
+        ? standingShift
+        : await this.prisma.employee
+            .findUnique({ where: { id: employeeId }, select: { shift: true } })
+            .then(e => e?.shift ?? null);
+
+    const entry = await this.prisma.shiftRosterEntry.findUnique({
+      where: { employeeId_date: { employeeId, date } },
+      include: { shift: true },
+    });
+
+    const fromStanding = (): EffectiveShift => {
+      if (!standing) return { source: 'NONE', shift: null, startTime: null, endTime: null, isDayOff: false, onsite: null };
+      const dayName = DAY_NAMES[date.getUTCDay()];
+      const works = !standing.workingDays || standing.workingDays.split(',').includes(dayName);
+      return {
+        source: 'STANDING',
+        shift: { id: standing.id, name: standing.name, bufferTimeMinutes: standing.bufferTimeMinutes },
+        startTime: standing.startTime,
+        endTime: standing.endTime,
+        isDayOff: !works,
+        onsite: null,
+      };
+    };
+
+    if (!entry) return fromStanding();
+
+    if (entry.isDayOff) {
+      return { source: 'ROSTER', shift: null, startTime: null, endTime: null, isDayOff: true, onsite: null };
+    }
+
+    // Unapproved on-site request — the row exists but must not govern.
+    if (entry.onsiteApprovalStatus === 'PENDING') return fromStanding();
+
+    const shift = entry.shift ?? standing;
+    if (!shift) return { source: 'ROSTER', shift: null, startTime: null, endTime: null, isDayOff: false, onsite: null };
+
+    const onsite =
+      entry.projectId || entry.address
+        ? { projectId: entry.projectId, address: entry.address }
+        : null;
+
+    return {
+      source: 'ROSTER',
+      shift: { id: shift.id, name: shift.name, bufferTimeMinutes: shift.bufferTimeMinutes },
+      // The entry's own window wins; the shift's is the fallback.
+      startTime: entry.startTime ?? shift.startTime,
+      endTime: entry.endTime ?? shift.endTime,
+      isDayOff: false,
+      onsite,
+    };
+  }
+
+  /**
+   * A per-assignment clock window is only meaningful on an on-site shift, and
+   * only as a pair — half a window would silently inherit the other half from
+   * the shift and read as a bug. Crossing midnight is legitimate (night work),
+   * so end-before-start is not an error.
+   */
+  private resolveWindow(
+    isOnSite: boolean,
+    data: { startTime?: string | null; endTime?: string | null },
+  ): { startTime: string | null; endTime: string | null } {
+    const start = data.startTime?.trim() || null;
+    const end = data.endTime?.trim() || null;
+    if (!start && !end) return { startTime: null, endTime: null };
+    if (!isOnSite) {
+      throw new BadRequestException('A custom clock window can only be set on an on-site shift');
+    }
+    if (!start || !end) {
+      throw new BadRequestException('Enter both a start time and an end time, or leave both blank to use the shift timing');
+    }
+    if (!HHMM.test(start) || !HHMM.test(end)) {
+      throw new BadRequestException('Times must be in 24-hour HH:mm format');
+    }
+    if (start === end) {
+      throw new BadRequestException('Start and end time cannot be the same');
+    }
+    return { startTime: start, endTime: end };
+  }
+
   /** Set (or clear) one employee's shift on one day. */
   async assign(companyId: number, a: RosterAssignment) {
     const date = dateKey(a.date);
@@ -189,6 +311,7 @@ export class ShiftRosterService {
     }
 
     const onSite = await this.resolveOnSiteDetails(companyId, shift, a);
+    const window = this.resolveWindow(onSite.isOnSite, a);
 
     // On-site "No Project" request — the row is held for Administrator + HR.
     if (onSite.needsApproval) {
@@ -199,6 +322,8 @@ export class ShiftRosterService {
           isDayOff: !!a.isDayOff,
           projectId: null,
           address: onSite.address,
+          startTime: window.startTime,
+          endTime: window.endTime,
           onsiteApprovalStatus: 'PENDING',
           approvedByUserId: null,
           note: a.note ?? 'On-site (No Project) — awaiting approval',
@@ -208,6 +333,8 @@ export class ShiftRosterService {
           shiftId: a.isDayOff ? null : a.shiftId,
           isDayOff: !!a.isDayOff,
           address: onSite.address,
+          startTime: window.startTime,
+          endTime: window.endTime,
           onsiteApprovalStatus: 'PENDING',
           note: 'On-site (No Project) — awaiting approval',
         },
@@ -223,6 +350,8 @@ export class ShiftRosterService {
         isDayOff: !!a.isDayOff,
         projectId: onSite.projectId,
         address: onSite.address,
+        startTime: window.startTime,
+        endTime: window.endTime,
         onsiteApprovalStatus: 'NONE',
         approvedByUserId: null,
         note: a.note ?? null,
@@ -233,6 +362,8 @@ export class ShiftRosterService {
         isDayOff: !!a.isDayOff,
         projectId: onSite.projectId,
         address: onSite.address,
+        startTime: window.startTime,
+        endTime: window.endTime,
         onsiteApprovalStatus: 'NONE',
         note: a.note ?? null,
       },
@@ -252,6 +383,9 @@ export class ShiftRosterService {
     projectId?: number | null;
     address?: string | null;
     needsApproval?: boolean;
+    /** Clock window applied to every day in the range, "HH:mm" IST. */
+    startTime?: string | null;
+    endTime?: string | null;
   }) {
     const { employeeIds = [], start, end } = data;
     if (!employeeIds.length) throw new BadRequestException('Select at least one employee');
@@ -261,6 +395,7 @@ export class ShiftRosterService {
 
     const shift = data.shiftId ? await this.assertShift(companyId, data.shiftId) : null;
     const onSite = await this.resolveOnSiteDetails(companyId, shift, data);
+    const window = this.resolveWindow(onSite.isOnSite, data);
     const valid = await this.prisma.employee.findMany({
       where: { companyId, id: { in: employeeIds } }, select: { id: true },
     });
@@ -270,6 +405,7 @@ export class ShiftRosterService {
     const rows: {
       employeeId: number; date: Date; shiftId: number | null; isDayOff: boolean; companyId: number;
       projectId: number | null; address: string | null; onsiteApprovalStatus: string;
+      startTime: string | null; endTime: string | null;
     }[] = [];
     for (const employeeId of employeeIds) {
       if (!validIds.has(employeeId)) continue;
@@ -283,6 +419,10 @@ export class ShiftRosterService {
           projectId: onSite.projectId,
           address: onSite.address,
           onsiteApprovalStatus: onSite.needsApproval && !data.isDayOff ? 'PENDING' : 'NONE',
+          // A day the shift doesn't operate is an off day; a window on it would
+          // be meaningless and would show up as a phantom time on the grid.
+          startTime: data.isDayOff || offDay ? null : window.startTime,
+          endTime: data.isDayOff || offDay ? null : window.endTime,
         });
       }
     }
@@ -450,13 +590,13 @@ export class ShiftRosterService {
       if (data.needsApproval || data.projectId || requestedAddress) {
         throw new BadRequestException('Project and address details can only be used with an on-site shift');
       }
-      return { projectId: null, address: null, needsApproval: false };
+      return { projectId: null, address: null, needsApproval: false, isOnSite: false };
     }
 
     if (data.needsApproval) {
       if (data.projectId) throw new BadRequestException('Choose either a project or No Project, not both');
       if (!requestedAddress) throw new BadRequestException('Enter the on-site address before sending for approval');
-      return { projectId: null, address: requestedAddress, needsApproval: true };
+      return { projectId: null, address: requestedAddress, needsApproval: true, isOnSite: true };
     }
 
     if (!data.projectId) {
@@ -472,6 +612,6 @@ export class ShiftRosterService {
     // address can be retained for a specific site visit.
     const address = requestedAddress || project.address?.trim() || null;
     if (!address) throw new BadRequestException('The selected project has no address; enter an on-site address');
-    return { projectId: project.id, address, needsApproval: false };
+    return { projectId: project.id, address, needsApproval: false, isOnSite: true };
   }
 }

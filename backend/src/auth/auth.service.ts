@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { MailService } from '../mail/mail.service';
 import { CompanySeederService } from '../company-seeder/company-seeder.service';
 import { TwoFactorService } from './two-factor.service';
+import { MOBILE_PLATFORM, mobileTwoFactorBypassEnabled } from './two-factor.constants';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -168,7 +169,12 @@ export class AuthService {
     });
   }
 
-  async login(email: string, pass: string) {
+  /**
+   * `clientPlatform` comes from a request header the mobile app sets. It is
+   * client-supplied and therefore forgeable — see CLIENT_PLATFORM_HEADER. It is
+   * used for nothing except the temporary bypass below.
+   */
+  async login(email: string, pass: string, clientPlatform?: string) {
     const user = await this.prisma.user.findFirst({
       where: {
         email: { equals: email, mode: 'insensitive' }
@@ -195,6 +201,27 @@ export class AuthService {
     // half-finished enrolment must not count as protection.
     const twoFactorActive = !!user.twoFactor?.confirmedAt;
     const companyRequires = await this.twoFactorService.companyRequires(user.companyId);
+
+    // TEMPORARY mobile bypass. Off unless ALLOW_MOBILE_2FA_BYPASS=true, so it
+    // cannot leak into an environment by accident and can be closed instantly
+    // by unsetting the variable and restarting.
+    //
+    // SECURITY: the header this trusts is client-supplied. Anyone can send it,
+    // so while this is enabled two-factor authentication is ADVISORY, not
+    // enforced — a stolen password plus one header is a full session. It exists
+    // only while app builds without the challenge screen are still in use.
+    // Remove it, and the header plumbing, once those builds are gone.
+    if (
+      (twoFactorActive || companyRequires) &&
+      mobileTwoFactorBypassEnabled() &&
+      String(clientPlatform || '').toLowerCase() === MOBILE_PLATFORM
+    ) {
+      this.logger.warn(
+        `Two-factor bypassed for ${user.email}: the request claimed to be the mobile app. ` +
+        'This is unverifiable. Unset ALLOW_MOBILE_2FA_BYPASS to enforce 2FA again.',
+      );
+      return this.issueTokens(user);
+    }
 
     if (twoFactorActive || companyRequires) {
       const mode = twoFactorActive ? 'VERIFY' : 'ENROL';

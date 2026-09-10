@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -40,6 +41,8 @@ const INVALID_CODE = 'Invalid or expired verification code.';
 
 @Injectable()
 export class TwoFactorService {
+  private readonly logger = new Logger(TwoFactorService.name);
+
   /**
    * An instance rather than a shared singleton, so per-request state can never
    * race with another request's.
@@ -202,6 +205,27 @@ export class TwoFactorService {
    *
    * Throws on failure; returns how the user got in on success.
    */
+  /**
+   * Decrypt a stored TOTP secret, turning an unreadable one into a clear
+   * instruction rather than a 500.
+   *
+   * This fires when the secret was written under a different ENCRYPTION_KEY —
+   * which happens when two environments share a database but not the key. The
+   * user cannot fix that by retrying, so say what actually has to happen.
+   */
+  private decryptSecret(record: { secretCiphertext: string }): string {
+    try {
+      return this.cryptoService.decrypt(record.secretCiphertext);
+    } catch {
+      this.logger.error(
+        'Stored two-factor secret could not be decrypted. ENCRYPTION_KEY does not match the key it was encrypted with — every environment sharing this database must use the same key.',
+      );
+      throw new ForbiddenException(
+        'Your two-factor setup could not be read on this server and needs to be set up again. Ask an administrator to reset two-factor authentication on your account.',
+      );
+    }
+  }
+
   async verifyCodeForUser(userId: number, rawCode: unknown) {
     const record = await this.prisma.userTwoFactor.findUnique({
       where: { userId },
@@ -216,7 +240,7 @@ export class TwoFactorService {
     // A 6-digit numeric string is a TOTP attempt; anything else is treated as a
     // backup code. Both failure paths return the same message.
     if (/^\d{6}$/.test(code)) {
-      const secret = this.cryptoService.decrypt(record.secretCiphertext);
+      const secret = this.decryptSecret(record);
       const result = await this.totp.verify(code, {
         secret,
         epochTolerance: EPOCH_TOLERANCE_SECONDS,
@@ -380,7 +404,7 @@ export class TwoFactorService {
       throw new UnauthorizedException(INVALID_CODE);
     }
 
-    const secret = this.cryptoService.decrypt(record.secretCiphertext);
+    const secret = this.decryptSecret(record);
     const result = await this.totp.verify(code, {
       secret,
       epochTolerance: EPOCH_TOLERANCE_SECONDS,

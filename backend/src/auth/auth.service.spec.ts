@@ -148,6 +148,69 @@ describe('AuthService — login and refresh', () => {
     });
   });
 
+  describe('the temporary mobile bypass', () => {
+    const originalFlag = process.env.ALLOW_MOBILE_2FA_BYPASS;
+
+    beforeEach(() => {
+      prisma.user.findFirst.mockResolvedValue(user({ twoFactor: { confirmedAt: new Date() } }));
+    });
+
+    afterEach(() => {
+      if (originalFlag === undefined) delete process.env.ALLOW_MOBILE_2FA_BYPASS;
+      else process.env.ALLOW_MOBILE_2FA_BYPASS = originalFlag;
+    });
+
+    it('is INERT unless the environment switch is on', async () => {
+      delete process.env.ALLOW_MOBILE_2FA_BYPASS;
+
+      // The default must be "2FA enforced", so the hole cannot appear in an
+      // environment simply because the code shipped there.
+      const result: any = await service.login('a@b.com', PASSWORD, 'mobile');
+      expect(result.twoFactorRequired).toBe(true);
+      expect(result.access_token).toBeUndefined();
+    });
+
+    it('is inert for any value other than the literal string "true"', async () => {
+      process.env.ALLOW_MOBILE_2FA_BYPASS = '1';
+
+      const result: any = await service.login('a@b.com', PASSWORD, 'mobile');
+      expect(result.twoFactorRequired).toBe(true);
+    });
+
+    it('skips the second factor when switched on and the header claims mobile', async () => {
+      process.env.ALLOW_MOBILE_2FA_BYPASS = 'true';
+
+      const result: any = await service.login('a@b.com', PASSWORD, 'mobile');
+      expect(result.access_token).toEqual(expect.any(String));
+      expect(result.twoFactorRequired).toBeUndefined();
+    });
+
+    it('is case-insensitive about the header value', async () => {
+      process.env.ALLOW_MOBILE_2FA_BYPASS = 'true';
+
+      const result: any = await service.login('a@b.com', PASSWORD, 'Mobile');
+      expect(result.access_token).toEqual(expect.any(String));
+    });
+
+    it('still challenges the web, which sends no such header', async () => {
+      process.env.ALLOW_MOBILE_2FA_BYPASS = 'true';
+
+      const result: any = await service.login('a@b.com', PASSWORD, undefined);
+      expect(result.twoFactorRequired).toBe(true);
+    });
+
+    it('does not let the bypass skip the account-status checks', async () => {
+      process.env.ALLOW_MOBILE_2FA_BYPASS = 'true';
+      prisma.user.findFirst.mockResolvedValue(
+        user({ status: 'SUSPENDED', twoFactor: { confirmedAt: new Date() } }),
+      );
+
+      // The bypass sits after the status gate, so a deactivated account is
+      // still refused regardless of what the client claims to be.
+      await expect(service.login('a@b.com', PASSWORD, 'mobile')).rejects.toThrow(/deactivated/i);
+    });
+  });
+
   describe('refreshToken', () => {
     const refreshFor = (payload: any) =>
       new JwtService({ secret: `${JWT_SECRET}_refresh` }).sign(payload);

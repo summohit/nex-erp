@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istHour, istTimeInstant } from '../common/timezone.util';
+import { ShiftRosterService } from './shift-roster.service';
 
 /** Sessions still open at this IST hour are closed out automatically. */
 const AUTO_CLOCKOUT_HOUR = 23;
@@ -12,7 +13,10 @@ export class AutoClockoutCron implements OnModuleInit, OnModuleDestroy {
   private isProcessing = false;
   private lastRunDateKey: string | null = null;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private roster: ShiftRosterService,
+  ) {}
 
   onModuleInit() {
     // setInterval rather than @nestjs/schedule, which is not installed.
@@ -94,9 +98,17 @@ export class AutoClockoutCron implements OnModuleInit, OnModuleDestroy {
         let status = attendance.status ?? 'PRESENT';
         let overtimeHours = 0;
 
-        const shift = attendance.employee?.shift;
-        if (shift?.endTime) {
-          const expectedEnd = istTimeInstant(cutoff, shift.endTime);
+        // Resolve through the roster, exactly as manual clock-out does, so an
+        // on-site day with its own window is scored against that window rather
+        // than the office hours. One query per open session — at 23:00 there
+        // are only ever a handful, and agreeing with clockOut matters more.
+        const effective = await this.roster.getEffectiveShift(
+          attendance.employeeId,
+          attendance.date,
+          attendance.employee?.shift ?? null,
+        );
+        if (effective.endTime) {
+          const expectedEnd = istTimeInstant(cutoff, effective.endTime);
           if (cutoff < expectedEnd) {
             isEarlyLeave = true;
             status = 'HALF_DAY';

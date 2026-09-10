@@ -428,6 +428,36 @@ describe('TwoFactorService', () => {
     });
   });
 
+  describe('a secret encrypted under a different key', () => {
+    /**
+     * Two environments sharing one database but not the ENCRYPTION_KEY makes
+     * every stored secret unreadable in the other. That surfaced as a bare
+     * "Internal server error" with nothing telling the user what to do.
+     */
+    it('reports what has to happen instead of throwing a 500', async () => {
+      const boom = jest.spyOn(cryptoService, 'decrypt').mockImplementation(() => {
+        throw new Error('Unsupported state or unable to authenticate data');
+      });
+
+      await expect(service.verifyCodeForUser(USER_ID, await currentCode()))
+        .rejects.toThrow(/needs to be set up again/i);
+
+      boom.mockRestore();
+    });
+
+    it('surfaces the same guidance during enrolment confirmation', async () => {
+      build({ confirmedAt: null });
+      const boom = jest.spyOn(cryptoService, 'decrypt').mockImplementation(() => {
+        throw new Error('Unsupported state or unable to authenticate data');
+      });
+
+      await expect(service.confirmEnrolment(USER_ID, '123456'))
+        .rejects.toThrow(/needs to be set up again/i);
+
+      boom.mockRestore();
+    });
+  });
+
   describe('challenge tokens', () => {
     it('round-trips a challenge and binds it to the password', async () => {
       const user = { id: USER_ID, password: '$2b$10$abcdefghijklmnopqrstuv' };

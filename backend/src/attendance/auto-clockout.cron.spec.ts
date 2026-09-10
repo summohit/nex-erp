@@ -13,6 +13,7 @@ describe('AutoClockoutCron', () => {
     new Date(Date.UTC(2026, 8, day, hh, mm) - IST_OFFSET_MS);
 
   let prisma: any;
+  let roster: any;
   let cron: AutoClockoutCron;
 
   const openSessionAt = (clockInIstHour: number, day = 9) => {
@@ -38,7 +39,19 @@ describe('AutoClockoutCron', () => {
       attendance: { findMany: jest.fn(), update: jest.fn(async () => ({})) },
       attendanceLog: { update: jest.fn(async () => ({})) },
     };
-    cron = new AutoClockoutCron(prisma);
+    // Stands in for the real resolver: with no roster entry it hands back the
+    // standing shift's window, which is what every fixture here expects.
+    roster = {
+      getEffectiveShift: jest.fn(async (_empId: number, _date: Date, standing: any) => ({
+        source: standing ? 'STANDING' : 'NONE',
+        shift: standing ? { id: 1, name: 'General', bufferTimeMinutes: 15 } : null,
+        startTime: standing?.startTime ?? null,
+        endTime: standing?.endTime ?? null,
+        isDayOff: false,
+        onsite: null,
+      })),
+    };
+    cron = new AutoClockoutCron(prisma, roster as any);
   });
 
   afterEach(() => jest.useRealTimers());

@@ -520,6 +520,16 @@ model Attendance {
   status        String          @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
   isLate        Boolean         @default(false)
   isEarlyLeave  Boolean         @default(false)
+  // What the day was judged against, captured at clock-in. Stored rather than
+  // re-derived because the roster can be edited afterwards and history must
+  // not silently change: a day marked late has to stay explicable.
+  shiftId       Int?
+  shift         Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  // On-site work: which project the day belonged to, and whether the branch
+  // geofence was bypassed because the person was rostered away from the office.
+  projectId     Int?
+  project       Project?        @relation("ProjectAttendance", fields: [projectId], references: [id], onDelete: SetNull)
+  isOnsite      Boolean         @default(false)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   logs          AttendanceLog[]
@@ -584,6 +594,7 @@ model Shift {
   company           Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employees         Employee[]
   rosterEntries     ShiftRosterEntry[]
+  attendances       Attendance[]
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 }
@@ -607,6 +618,12 @@ model ShiftRosterEntry {
   projectId Int?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   address   String?  @db.Text
+  // Clock window for THIS day only, "HH:mm" IST — an on-site stint at a client
+  // site rarely runs the office hours. Null means "use the shift's own window",
+  // which is what every pre-existing row has, so behaviour is unchanged unless
+  // someone deliberately sets a time.
+  startTime String?
+  endTime   String?
   // NONE = normal roster cell. PENDING = "No Project" on-site, awaiting
   // Administrator + HR approval. APPROVED / REJECTED = resolved.
   onsiteApprovalStatus String @default("NONE") // NONE, PENDING, APPROVED, REJECTED
@@ -1182,6 +1199,7 @@ model Project {
   fieldVisits   FieldVisit[]         @relation("ProjectFieldVisits")
   expenseClaims ExpenseClaim[]
   rosterEntries ShiftRosterEntry[]
+  attendances   Attendance[]         @relation("ProjectAttendance")
 
   @@unique([key, companyId])
 }
