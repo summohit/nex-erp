@@ -107,7 +107,7 @@
 }
 
 .btn-search {
-  background: #ff5a1f;
+  background: var(--color-primary);
   color: white;
   border: none;
   padding: 10px 24px;
@@ -190,9 +190,9 @@
 }
 
 .dept-pill.active {
-  background: #ff5a1f;
+  background: var(--color-primary);
   color: #ffffff;
-  border-color: #ff5a1f;
+  border-color: var(--color-primary);
 }
 
 /* Jobs Grid */
@@ -290,8 +290,8 @@
 .btn-apply-now {
   width: 100%;
   background: #ffffff;
-  color: #ff5a1f;
-  border: 1px solid #ff5a1f;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
   padding: 10px 16px;
   border-radius: 8px;
   font-size: 13px;
@@ -305,7 +305,7 @@
 }
 
 .btn-apply-now:hover {
-  background: #ff5a1f;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -564,7 +564,7 @@
 .form-group select:focus,
 .form-group textarea:focus,
 .sq-textarea:focus {
-  border-color: #ff5a1f;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
 }
 
@@ -601,12 +601,12 @@
 }
 
 .file-dropzone:hover {
-  border-color: #ff5a1f;
+  border-color: var(--color-primary);
   background: #fff7ed;
 }
 
 .upload-icon {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .upload-text .main-text {

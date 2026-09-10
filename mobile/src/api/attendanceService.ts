@@ -25,8 +25,15 @@ export const attendanceService = {
     return response.data;
   },
   
-  getMyHistory: async (): Promise<AttendanceRecord[]> => {
-    const response = await apiClient.get('/attendance/history/me');
+  /**
+   * `from`/`to` are ISO dates. Passing the month actually on screen keeps the
+   * response to ~30 rows; omitting them makes the server fall back to a year of
+   * history, which is far more than the grid ever renders.
+   */
+  getMyHistory: async (from?: string, to?: string): Promise<AttendanceRecord[]> => {
+    const response = await apiClient.get('/attendance/history/me', {
+      params: from && to ? { from, to } : undefined,
+    });
     return response.data;
   },
 

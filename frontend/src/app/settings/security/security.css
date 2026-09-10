@@ -535,7 +535,7 @@
 }
 
 .stepper-tab.active .stepper-tab-icon {
-  background: linear-gradient(135deg, #ff5200 0%, #ea580c 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #ea580c 100%);
   color: #ffffff;
   border-color: #ea580c;
   box-shadow: 0 3px 8px rgba(234, 88, 12, 0.3);
@@ -740,7 +740,7 @@
 
 .modern-input:focus {
   outline: none;
-  border-color: #ff5200;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 4px rgba(255, 82, 0, 0.14), 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
@@ -802,7 +802,7 @@
   height: 46px;
   padding: 0 24px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #ff5200 0%, #ea4800 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #ea4800 100%);
   color: #ffffff;
   font-size: 0.9rem;
   font-weight: 750;
@@ -920,7 +920,7 @@
 
 .form-control:focus {
   outline: none;
-  border-color: var(--color-primary, #ff5200);
+  border-color: var(--color-primary, var(--color-primary));
   box-shadow: 0 0 0 3px rgba(255, 82, 0, 0.12);
 }
 
@@ -1108,7 +1108,7 @@
 
 .otp-digit-input:focus {
   outline: none;
-  border-color: #ff5200;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 4px rgba(255, 82, 0, 0.14), 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
@@ -1283,7 +1283,7 @@
 }
 
 .vault-code-item:hover {
-  border-color: #ff5200;
+  border-color: var(--color-primary);
   background: #fffaf7;
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(255, 82, 0, 0.08);
@@ -1319,7 +1319,7 @@
 }
 
 .vault-code-item:hover .code-copy-indicator {
-  color: #ff5200;
+  color: var(--color-primary);
 }
 
 .text-emerald {
@@ -1628,7 +1628,7 @@
 }
 
 .btn-primary {
-  background: var(--color-primary, #ff5200);
+  background: var(--color-primary, var(--color-primary));
   color: #ffffff;
   box-shadow: 0 2px 6px rgba(255, 82, 0, 0.2);
 }
@@ -1700,7 +1700,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid #e2e8f0;
-  border-top-color: var(--color-primary, #ff5200);
+  border-top-color: var(--color-primary, var(--color-primary));
   border-radius: 50%;
   animation: sec-spin 0.7s linear infinite;
 }

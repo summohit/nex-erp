@@ -123,8 +123,8 @@
 }
 
 .nav-tab.active {
-  color: #FF5A1F;
-  border-bottom-color: #FF5A1F;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 .tab-badge {
@@ -175,7 +175,7 @@
 }
 
 .search-box input:focus {
-  border-color: #FF5A1F;
+  border-color: var(--color-primary);
 }
 
 /* Table Styles */
@@ -301,7 +301,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #FF5A1F;
+  background: var(--color-primary);
   color: #FFFFFF;
   font-weight: 700;
   font-size: 13px;
@@ -335,7 +335,7 @@
 }
 
 .btn-primary {
-  background: #FF5A1F;
+  background: var(--color-primary);
   color: #FFFFFF;
   border: none;
 }
@@ -489,7 +489,7 @@
 }
 
 .upload-dropzone:hover {
-  border-color: #FF5A1F !important;
+  border-color: var(--color-primary) !important;
   background: #FFF5F2 !important;
   transform: translateY(-1px) !important;
 }
@@ -500,7 +500,7 @@
   border-radius: 50%;
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
-  color: #FF5A1F;
+  color: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -509,9 +509,9 @@
 }
 
 .upload-dropzone:hover .upload-icon-circle {
-  background: #FF5A1F;
+  background: var(--color-primary);
   color: #FFFFFF;
-  border-color: #FF5A1F;
+  border-color: var(--color-primary);
 }
 
 .upload-text-content {
@@ -608,7 +608,7 @@
 }
 
 .form-control:focus {
-  border-color: #FF5A1F;
+  border-color: var(--color-primary);
 }
 
 .text-danger { color: #DC2626; }
@@ -758,7 +758,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #FF5A1F;
+  background: var(--color-primary);
   color: #FFFFFF;
   font-weight: 700;
   font-size: 12px;
@@ -1295,8 +1295,8 @@
 }
 .txn-tab:hover { color: #0F172A; }
 .txn-tab.active {
-  color: #FF5A1F;
-  border-bottom-color: #FF5A1F;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 .txn-table-wrap {

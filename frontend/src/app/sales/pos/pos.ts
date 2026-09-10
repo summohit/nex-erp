@@ -28,8 +28,8 @@ interface CartItem {
     CommonModule, FormsModule,
     LucideShoppingCart, LucidePlus, LucideTrash2, LucideCreditCard,
     LucidePackage, LucideUser, LucidePercent, LucideFileText,
-    LucideIndianRupee, LucideX, LucideCheck, LucideChevronDown,
-    LucideCircleMinus, LucideCirclePlus, LucideTag, DialogHostComponent
+    LucideX, LucideCheck,
+    LucideCircleMinus, LucideCirclePlus, DialogHostComponent
   ],
   templateUrl: './pos.html',
   styleUrls: ['./pos.css']

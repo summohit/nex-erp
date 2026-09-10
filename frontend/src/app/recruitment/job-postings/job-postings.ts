@@ -31,7 +31,7 @@ declare var Quill: any;
   selector: 'app-job-postings',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, LucidePlus, LucideBriefcase, LucideMapPin, LucideClock,
+    CommonModule, FormsModule, LucidePlus, LucideBriefcase,
     LucideSparkles, LucideX, LucideSearch,
     LucideHelpCircle, LucideTrash2, LucideBuilding,
     LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff,

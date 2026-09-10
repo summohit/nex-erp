@@ -11,5 +11,7 @@ import { CommonModule } from '@angular/common';
 export class StatCardComponent {
   @Input() label = '';
   @Input() value: string | number | null = '';
-  @Input() colorClass: 'bg-blue' | 'bg-indigo' | 'bg-amber' | 'bg-emerald' | 'bg-purple' = 'bg-blue';
+  @Input() subtitle?: string;
+  @Input() badge?: string;
+  @Input() colorClass: 'bg-blue' | 'bg-indigo' | 'bg-amber' | 'bg-emerald' | 'bg-purple' | 'bg-orange' = 'bg-blue';
 }

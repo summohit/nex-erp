@@ -567,7 +567,86 @@ thead .emp-col { z-index: 4; background: #F8FAFC; }
   color: #64748B;
 }
 
-.onsite-hint.warn { color: #B45309; }
+.onsite-hint.warn { color: var(--color-warning-text, #B45309); }
+
+/* ── on-site span + hours ────────────────────────────────────────────── */
+.span-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.span-btn {
+  flex: 1;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.span-btn:hover { background: #F1F5F9; }
+
+.span-btn.active {
+  color: #fff;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.onsite-range { margin-top: 4px; }
+
+/* Dates and times sit on one row until the modal gets narrow, at which point
+   wrapping beats squeezing a date input below its usable width. */
+.range-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.range-field {
+  display: flex;
+  flex: 1 1 130px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+
+.range-field > span {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748B;
+}
+
+.range-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chip-btn {
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 11px;
+  color: #475569;
+  white-space: nowrap;
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
 
 .onsite-note {
   margin: 2px 0 0;

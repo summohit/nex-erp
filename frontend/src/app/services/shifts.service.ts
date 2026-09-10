@@ -78,6 +78,9 @@ export interface RosterOnSiteInfo {
   projectName?: string | null;
   address: string | null;
   approvalStatus: string; // NONE, PENDING, APPROVED, REJECTED
+  /** Clock window for this day only, "HH:mm". Null = the shift's own timing. */
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 export interface RosterAssignmentPayload {
@@ -91,6 +94,9 @@ export interface RosterAssignmentPayload {
   address?: string | null;
   /** True when the requester chose "No Project" — routes the row to Admin + HR. */
   needsApproval?: boolean;
+  /** Clock window for this assignment, "HH:mm". Null = use the shift's timing. */
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 export interface RosterBulkPayload {
@@ -100,6 +106,8 @@ export interface RosterBulkPayload {
   projectId?: number | null;
   address?: string | null;
   needsApproval?: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 export interface RosterShift {

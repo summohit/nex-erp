@@ -281,7 +281,7 @@
 
 .kpi-gross .kpi-icon-wrapper {
   background: #FFF7ED;
-  color: #FF5200;
+  color: var(--color-primary);
 }
 
 .kpi-net .kpi-icon-wrapper {
@@ -358,15 +358,15 @@
 }
 
 .tab-btn:hover {
-  color: #FF5200;
+  color: var(--color-primary);
   background: transparent;
 }
 
 .tab-btn.active {
   background: transparent;
-  color: #FF5200;
+  color: var(--color-primary);
   font-weight: 800;
-  border-bottom: 3px solid #FF5200;
+  border-bottom: 3px solid var(--color-primary);
   box-shadow: none;
 }
 
@@ -417,7 +417,7 @@
 .selector-icon {
   display: flex;
   align-items: center;
-  color: #FF5200;
+  color: var(--color-primary);
 }
 
 .inline-select {
@@ -479,7 +479,7 @@
 }
 
 .btn-primary {
-  background: #FF5200;
+  background: var(--color-primary);
   color: #FFFFFF;
   box-shadow: 0 2px 6px rgba(255, 82, 0, 0.2);
   width: auto;
@@ -492,8 +492,8 @@
 
 .btn-outline-primary {
   background: #FFFFFF;
-  border: 1.5px solid #FF5200;
-  color: #FF5200;
+  border: 1.5px solid var(--color-primary);
+  color: var(--color-primary);
   box-shadow: 0 2px 4px rgba(255, 82, 0, 0.08);
 }
 
@@ -538,7 +538,7 @@
 .btn-text {
   background: none;
   border: none;
-  color: #FF5200;
+  color: var(--color-primary);
   font-weight: 700;
   cursor: pointer;
   padding: 0;
@@ -652,7 +652,7 @@
 }
 
 .emp-dropdown-trigger:hover {
-  border-color: #FF5200;
+  border-color: var(--color-primary);
   box-shadow: 0 4px 10px rgba(255, 82, 0, 0.1);
 }
 
@@ -676,7 +676,7 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: #FF5200;
+  background: var(--color-primary);
   color: #FFFFFF;
   font-weight: 800;
   font-size: 13px;
@@ -718,7 +718,7 @@
 
 .chevron-icon.open {
   transform: rotate(180deg);
-  color: #FF5200;
+  color: var(--color-primary);
 }
 
 .placeholder-text {
@@ -956,7 +956,7 @@
 
 .badge-custom {
   background: #FFF7ED;
-  color: #FF5200;
+  color: var(--color-primary);
 }
 
 .comp-desc {
@@ -1005,7 +1005,7 @@
 }
 
 .comp-amount-input:focus {
-  border-color: #FF5200 !important;
+  border-color: var(--color-primary) !important;
   box-shadow: 0 0 0 3px rgba(255, 82, 0, 0.15) !important;
 }
 
@@ -1089,7 +1089,7 @@
 }
 
 .btn-save-structure {
-  background: #FF5200;
+  background: var(--color-primary);
   color: #FFFFFF;
   border: none;
   padding: 12px 24px;
@@ -1129,7 +1129,7 @@
 
 .payslip-card:hover {
   transform: translateY(-3px);
-  border-color: #FF5200;
+  border-color: var(--color-primary);
   box-shadow: 0 8px 20px rgba(255, 82, 0, 0.12);
 }
 
@@ -1341,7 +1341,7 @@
 }
 
 .form-control:focus {
-  border-color: #FF5200;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(255, 82, 0, 0.15);
 }
 
@@ -1404,7 +1404,7 @@
 .company-brand h3 {
     font-size: 20px;
     font-weight: 700;
-    color: #FF5200;
+    color: var(--color-primary);
     margin-bottom: 5px;
 }
 
@@ -1594,7 +1594,7 @@
 }
 
 .file-upload-zone:hover {
-  border-color: #FF5200;
+  border-color: var(--color-primary);
   background: #FFF7F5;
 }
 

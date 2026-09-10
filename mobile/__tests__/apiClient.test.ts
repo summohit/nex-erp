@@ -117,6 +117,27 @@ describe('401 handling', () => {
     expect(mockState.logout).toHaveBeenCalledTimes(1);
   });
 
+  it('does not refresh on a rejected two-factor code', async () => {
+    // A wrong code answers 401 by design. Refreshing and retrying would be
+    // meaningless, and logging the user out mid sign-in would strand them.
+    await expect(onError(unauthorized('/auth/2fa/challenge/verify'))).rejects.toBeDefined();
+
+    expect(refreshClient.post).not.toHaveBeenCalled();
+    expect(mockState.logout).not.toHaveBeenCalled();
+  });
+
+  it('still refreshes for the AUTHENTICATED 2fa routes', async () => {
+    refreshClient.post.mockResolvedValue({
+      data: { access_token: 'new-access', refresh_token: 'refresh-2' },
+    });
+
+    // Only /auth/2fa/challenge is excluded. The Security screen's calls answer
+    // 403 for a wrong code, so a 401 there really is an expired session.
+    await onError(unauthorized('/auth/2fa/status'));
+
+    expect(refreshClient.post).toHaveBeenCalledTimes(1);
+  });
+
   it('does not refresh on a failed login — those credentials were simply wrong', async () => {
     await expect(onError(unauthorized('/auth/login'))).rejects.toBeDefined();
 

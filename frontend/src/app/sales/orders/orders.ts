@@ -31,7 +31,7 @@ interface SalesOrder {
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideShoppingCart, LucideCalendar, LucidePackage, LucideIndianRupee],
+  imports: [CommonModule, FormsModule, LucidePackage],
   templateUrl: './orders.html',
   styleUrls: ['./orders.css']
 })

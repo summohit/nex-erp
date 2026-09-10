@@ -65,7 +65,7 @@
 
 .client-tab.active {
   background: #FFFFFF;
-  color: #FF5A1F;
+  color: var(--color-primary);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
@@ -113,7 +113,7 @@
 }
 
 .btn-primary {
-  background: #FF5A1F;
+  background: var(--color-primary);
   color: white;
 }
 
@@ -320,7 +320,7 @@ select.form-control {
 
 .form-control:focus {
   outline: none;
-  border-color: #FF5A1F;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
 }
 
@@ -349,7 +349,7 @@ select.form-control {
 }
 
 .logo-dropzone:hover, .logo-dropzone.dragging {
-  border-color: #FF5A1F;
+  border-color: var(--color-primary);
   background: #FFF5F2;
 }
 
@@ -373,7 +373,7 @@ select.form-control {
 
 .logo-dropzone:hover .upload-icon-circle {
   background: #FFEBE5;
-  color: #FF5A1F;
+  color: var(--color-primary);
 }
 
 .upload-text {
@@ -515,7 +515,7 @@ select.form-control {
 }
 
 input:checked + .toggle-slider {
-  background-color: var(--color-primary, #FF5A1F);
+  background-color: var(--color-primary);
 }
 
 input:checked + .toggle-slider:before {

@@ -25,7 +25,7 @@ type Tab = 'templates' | 'issued';
     LucideTrash2, LucideEye, LucideFileText, LucideSend, LucideCode,
     LucideArrowLeft, LucideChevronRight, LucideChevronDown, LucideEdit3, LucidePrinter,
     LucideCheck, LucideCalendar, LucideUser, LucideSparkles,
-    LucideMail, LucidePhone, LucideCopy, LucideCheckCircle2, LucideClock, LucideMoreHorizontal
+    LucideMail, LucidePhone, LucideCopy, LucideClock, LucideMoreHorizontal
   ],
   templateUrl: './letter-templates.html',
   styleUrls: ['./letter-templates.css'],

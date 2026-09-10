@@ -68,7 +68,18 @@ export class ShiftRosterComponent implements OnInit {
   // On-site ("where does the field work happen?")
   onsiteOpen = signal(false);
   onsiteCtx = signal<OnSiteCtx | null>(null);
-  onsiteForm = { projectId: null as number | null, address: '' };
+  onsiteForm = {
+    projectId: null as number | null,
+    address: '',
+    // A stint at a client site normally runs for a stretch, not a single day,
+    // so the modal can span a range. 'day' keeps the old single-cell behaviour.
+    span: 'day' as 'day' | 'range',
+    start: '',
+    end: '',
+    // Blank means "use the shift's own timing" — the server reads it that way.
+    startTime: '',
+    endTime: '',
+  };
   noProject = signal(false);
   onsiteSubmitting = signal(false);
 
@@ -84,6 +95,45 @@ export class ShiftRosterComponent implements OnInit {
     });
     this.load();
     if (this.isApprover) this.loadPendingOnsite();
+  }
+
+  /** Reset the on-site form, seeding the range from the day being edited. */
+  private resetOnsiteForm(anchorDate: string, shift?: RosterShift | null) {
+    this.onsiteForm = {
+      projectId: null, address: '',
+      span: 'day', start: anchorDate, end: anchorDate,
+      // Pre-fill with the shift's own hours so the fields show what will apply
+      // if they are left alone, rather than looking empty and undecided.
+      startTime: shift?.startTime || '',
+      endTime: shift?.endTime || '',
+    };
+    this.noProject.set(false);
+  }
+
+  /** Extend the on-site range to the rest of the week / month from its start. */
+  quickRange(unit: 'week' | 'month') {
+    const from = new Date(`${this.onsiteForm.start || this.todayKey()}T00:00:00Z`);
+    if (isNaN(from.getTime())) return;
+    const to = new Date(from);
+    if (unit === 'week') {
+      // Through Sunday of the week the start falls in.
+      to.setUTCDate(to.getUTCDate() + ((7 - to.getUTCDay()) % 7));
+    } else {
+      to.setUTCMonth(to.getUTCMonth() + 1, 0); // last day of that month
+    }
+    this.onsiteForm.span = 'range';
+    this.onsiteForm.end = to.toISOString().slice(0, 10);
+  }
+
+  private todayKey(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  /** True when the window differs from the shift's own hours. */
+  get onsiteWindowChanged(): boolean {
+    const shift = this.grid().shifts.find(s => s.id === this.onsiteCtx()?.shiftId);
+    return (this.onsiteForm.startTime || '') !== (shift?.startTime || '')
+        || (this.onsiteForm.endTime || '') !== (shift?.endTime || '');
   }
 
   /** The "Onsite Project" shift (and siblings) trigger the project/address flow. */
@@ -204,6 +254,10 @@ export class ShiftRosterComponent implements OnInit {
   }
 
   cellTime(cell: RosterCell): string {
+    // An on-site day can carry its own window; show what will actually be
+    // enforced rather than the shift's nominal hours.
+    const on = cell.onSite;
+    if (on?.startTime && on?.endTime) return `${on.startTime} - ${on.endTime}`;
     const s = cell.shift;
     if (!s) return '';
     if (s.shiftType === 'FLEXIBLE') return s.totalHours ? `${s.totalHours} hrs` : '';
@@ -217,6 +271,9 @@ export class ShiftRosterComponent implements OnInit {
     if (cell.type === 'SHIFT') {
       let t = `${who}: ${cell.shift?.name} ${this.cellTime(cell)}${cell.isDefault ? ' (default shift)' : ''}`;
       if (cell.onSite) {
+        if (cell.onSite.startTime && cell.onSite.endTime) {
+          t += ` (on-site hours, not the shift's)`;
+        }
         if (cell.onSite.projectName) t += ` · ${cell.onSite.projectName}`;
         if (cell.onSite.address) t += ` @ ${cell.onSite.address}`;
         if (cell.onSite.approvalStatus === 'PENDING') t += ' · awaiting Administrator/HR approval';
@@ -252,8 +309,7 @@ export class ShiftRosterComponent implements OnInit {
     // On-site shifts need a location before the roster can be saved.
     const shift = this.grid().shifts.find(s => s.id === shiftId);
     if (!isDayOff && shift && this.isOnSiteShift(shift)) {
-      this.onsiteForm = { projectId: null, address: '' };
-      this.noProject.set(false);
+      this.resetOnsiteForm(cell.date, shift);
       this.onsiteCtx.set({ source: 'cell', shiftId: shift.id, shiftName: shift.name, row, cell });
       this.onsiteOpen.set(true);
       return;
@@ -279,9 +335,35 @@ export class ShiftRosterComponent implements OnInit {
     if (this.noProject()) this.onsiteForm.projectId = null;
   }
 
+  get onsiteTimeError(): string {
+    const { startTime: a, endTime: b } = this.onsiteForm;
+    if (!a && !b) return '';
+    if (!a || !b) return 'Enter both times, or clear both to use the shift timing.';
+    if (a === b) return 'Start and end time cannot be the same.';
+    return '';
+  }
+
+  get onsiteRangeError(): string {
+    if (this.onsiteForm.span !== 'range') return '';
+    const { start, end } = this.onsiteForm;
+    if (!start || !end) return 'Pick both a start and an end date.';
+    if (end < start) return 'The end date is before the start date.';
+    return '';
+  }
+
+  get onsiteDayCount(): number {
+    if (this.onsiteForm.span !== 'range') return 1;
+    if (this.onsiteRangeError) return 0;
+    const a = Date.parse(`${this.onsiteForm.start}T00:00:00Z`);
+    const b = Date.parse(`${this.onsiteForm.end}T00:00:00Z`);
+    return Math.round((b - a) / 86400000) + 1;
+  }
+
   get canSubmitOnsite(): boolean {
     const addr = (this.onsiteForm.address || '').trim();
-    return !!addr && (this.noProject() || !!this.onsiteForm.projectId);
+    if (!addr) return false;
+    if (!this.noProject() && !this.onsiteForm.projectId) return false;
+    return !this.onsiteTimeError && !this.onsiteRangeError;
   }
 
   closeOnsite() {
@@ -296,12 +378,48 @@ export class ShiftRosterComponent implements OnInit {
     this.onsiteSubmitting.set(true);
     const address = this.onsiteForm.address.trim();
 
+    // Blank means "use the shift's own timing"; the server stores null and
+    // getEffectiveShift falls back to the shift.
+    const startTime = this.onsiteForm.startTime || null;
+    const endTime = this.onsiteForm.endTime || null;
+
     if (ctx.source === 'cell' && ctx.row && ctx.cell) {
+      const employeeId = ctx.row.employee.id;
+
+      // A multi-day stint is the same bulk write, just for one person — no
+      // second backend path, and the range semantics stay identical.
+      if (this.onsiteForm.span === 'range') {
+        const payload: any = {
+          employeeIds: [employeeId],
+          start: this.onsiteForm.start,
+          end: this.onsiteForm.end,
+          shiftId: ctx.shiftId,
+          skipNonWorkingDays: false,
+          overwriteExisting: true,
+          address, startTime, endTime,
+        };
+        if (this.noProject()) payload.needsApproval = true;
+        else payload.projectId = this.onsiteForm.projectId;
+        this.shiftsService.bulkAssignRoster(payload).subscribe({
+          next: (r) => {
+            this.toast.success(this.noProject()
+              ? `${r.written} day(s) sent for Administrator & HR approval`
+              : `Rostered on-site for ${r.written} day(s)`);
+            this.closeOnsite();
+            this.closeEditor();
+            this.load();
+            this.refreshApprovals();
+          },
+          error: (e) => { this.toast.error(e.error?.message || 'Failed to update roster'); this.onsiteSubmitting.set(false); },
+        });
+        return;
+      }
+
       const payload: RosterAssignmentPayload = {
-        employeeId: ctx.row.employee.id,
+        employeeId,
         date: ctx.cell.date,
         shiftId: ctx.shiftId,
-        address,
+        address, startTime, endTime,
       };
       if (this.noProject()) payload.needsApproval = true;
       else payload.projectId = this.onsiteForm.projectId;
@@ -328,7 +446,7 @@ export class ShiftRosterComponent implements OnInit {
         shiftId: ctx.shiftId,
         skipNonWorkingDays: b.skipNonWorkingDays,
         overwriteExisting: b.overwriteExisting,
-        address,
+        address, startTime, endTime,
       };
       if (this.noProject()) payload.needsApproval = true;
       else payload.projectId = this.onsiteForm.projectId;
@@ -418,8 +536,7 @@ export class ShiftRosterComponent implements OnInit {
     // On-site shift → ask for the project / address before applying the bulk.
     const shift = this.grid().shifts.find(s => s.id === shiftId);
     if (!this.bulkForm.isDayOff && shift && this.isOnSiteShift(shift)) {
-      this.onsiteForm = { projectId: null, address: '' };
-      this.noProject.set(false);
+      this.resetOnsiteForm(this.bulkForm.start, shift);
       this.onsiteCtx.set({
         source: 'bulk',
         shiftId: shift.id,

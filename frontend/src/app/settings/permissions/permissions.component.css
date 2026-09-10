@@ -57,7 +57,7 @@
 
 .tab-btn.active {
   background: #fff;
-  color: #ff5722;
+  color: var(--color-primary);
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
@@ -131,9 +131,9 @@
 }
 
 .role-btn.active {
-  background: #ff5722;
+  background: var(--color-primary);
   color: white;
-  border-color: #ff5722;
+  border-color: var(--color-primary);
   box-shadow: 0 4px 6px -1px rgba(255, 87, 34, 0.2);
 }
 
@@ -303,7 +303,7 @@
 }
 
 input:checked + .slider {
-  background-color: #ff5722;
+  background-color: var(--color-primary);
 }
 
 input:checked + .slider:before {
@@ -373,7 +373,7 @@ input:checked + .slider:before {
   width: 24px;
   height: 24px;
   border: 3px solid #f3f4f6;
-  border-top-color: #ff5722;
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }

@@ -24,7 +24,7 @@
         </tr>
         <tr *ngFor="let o of orders">
           <td><span class="fw-semibold">{{o.orderNumber}}</span></td>
-          <td>{{o.client?.name}}</td>
+          <td>{{o.client.name}}</td>
           <td>{{o.date | date}}</td>
           <td>₹{{o.total | number:'1.0-2'}}</td>
           <td>
@@ -81,7 +81,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Client</label>
-          <div class="fw-semibold">{{selectedOrder.client?.name}}</div>
+          <div class="fw-semibold">{{selectedOrder.client.name}}</div>
         </div>
         <div class="form-group">
           <label>Date</label>

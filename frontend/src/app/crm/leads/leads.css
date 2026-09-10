@@ -2361,7 +2361,7 @@ textarea:focus {
 }
 
 .contacts-toolbar-actions .btn-primary-pill {
-  background: #ff5200;
+  background: var(--color-primary);
   color: #ffffff;
   border: none;
   padding: 9px 18px;

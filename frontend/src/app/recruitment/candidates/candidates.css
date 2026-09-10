@@ -3117,7 +3117,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: #FF5200;
+  background: var(--color-primary);
   color: #FFFFFF;
   font-weight: 700;
   font-size: 12px;
@@ -3318,7 +3318,7 @@
   height: 40px;
   border-radius: 12px;
   background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
-  color: #ff5a1f;
+  color: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3585,7 +3585,7 @@
 
 .status-dropdown:focus {
   background: #ffffff;
-  border-color: #ff5a1f;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.14);
 }
 
@@ -3615,7 +3615,7 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  background: linear-gradient(135deg, #FF5A1F 0%, #FF3800 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%);
   color: #ffffff;
   border: none;
   box-shadow: 0 2px 8px rgba(255, 90, 31, 0.3);
@@ -4180,9 +4180,9 @@
   width: 100%;
   margin-top: 10px;
   padding: 11px 16px;
-  border: 1px solid #ff5a1f;
+  border: 1px solid var(--color-primary);
   border-radius: 8px;
-  background: #ff5a1f;
+  background: var(--color-primary);
   color: #ffffff;
   font-size: 13.5px;
   font-weight: 600;
@@ -4254,8 +4254,8 @@
 }
 
 .btn-edit-terms:hover {
-  border-color: #ff5a1f;
-  color: #ff5a1f;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
   background: #fff7ed;
 }
 

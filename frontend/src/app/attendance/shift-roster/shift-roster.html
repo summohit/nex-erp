@@ -245,7 +245,11 @@
         <h2>On-site Details</h2>
         <p class="modal-sub">
           <ng-container *ngIf="onsiteCtx()?.source === 'cell'">
-            {{ onsiteCtx()?.row?.employee?.name }} · {{ onsiteCtx()?.cell?.date }}
+            {{ onsiteCtx()?.row?.employee?.name }} ·
+            <ng-container *ngIf="onsiteForm.span === 'day'">{{ onsiteForm.start }}</ng-container>
+            <ng-container *ngIf="onsiteForm.span === 'range'">
+              {{ onsiteForm.start }} → {{ onsiteForm.end }}
+            </ng-container>
           </ng-container>
           <ng-container *ngIf="onsiteCtx()?.source === 'bulk'">
             {{ onsiteCtx()?.bulk?.employeeIds?.length }} employee(s) · {{ bulkForm.start }} → {{ bulkForm.end }}
@@ -289,6 +293,65 @@
         </small>
       </div>
 
+      <!-- How long the stint runs. Bulk assign already carries its own range,
+           so this only appears when a single roster cell was clicked. -->
+      <div class="form-group" *ngIf="onsiteCtx()?.source === 'cell'">
+        <label>How long?</label>
+        <div class="span-toggle">
+          <button type="button" class="span-btn" [class.active]="onsiteForm.span === 'day'"
+                  (click)="onsiteForm.span = 'day'">Just this day</button>
+          <button type="button" class="span-btn" [class.active]="onsiteForm.span === 'range'"
+                  (click)="onsiteForm.span = 'range'">Date range</button>
+        </div>
+
+        <div class="onsite-range" *ngIf="onsiteForm.span === 'range'">
+          <div class="range-fields">
+            <label class="range-field">
+              <span>From</span>
+              <input type="date" class="form-control" [(ngModel)]="onsiteForm.start">
+            </label>
+            <label class="range-field">
+              <span>To</span>
+              <input type="date" class="form-control" [(ngModel)]="onsiteForm.end">
+            </label>
+          </div>
+          <div class="range-quick">
+            <button type="button" class="chip-btn" (click)="quickRange('week')">Rest of the week</button>
+            <button type="button" class="chip-btn" (click)="quickRange('month')">Rest of the month</button>
+          </div>
+          <small class="onsite-hint" *ngIf="!onsiteRangeError">
+            {{ onsiteDayCount }} day(s). Existing roster entries in this range are replaced;
+            days the shift doesn't operate are marked off rather than on-site.
+          </small>
+          <small class="onsite-hint warn" *ngIf="onsiteRangeError">{{ onsiteRangeError }}</small>
+        </div>
+      </div>
+
+      <!-- Site hours. Blank on both = the shift's own timing applies. -->
+      <div class="form-group">
+        <label>On-site hours</label>
+        <div class="range-fields">
+          <label class="range-field">
+            <span>Start</span>
+            <input type="time" class="form-control" [(ngModel)]="onsiteForm.startTime">
+          </label>
+          <label class="range-field">
+            <span>End</span>
+            <input type="time" class="form-control" [(ngModel)]="onsiteForm.endTime">
+          </label>
+          <button type="button" class="chip-btn"
+                  (click)="onsiteForm.startTime = ''; onsiteForm.endTime = ''">Use shift timing</button>
+        </div>
+        <small class="onsite-hint" *ngIf="!onsiteTimeError && onsiteWindowChanged">
+          Clock-in and clock-out on these days are judged against this window, not
+          <strong>{{ onsiteCtx()?.shiftName }}</strong>'s usual hours.
+        </small>
+        <small class="onsite-hint" *ngIf="!onsiteTimeError && !onsiteWindowChanged">
+          Using <strong>{{ onsiteCtx()?.shiftName }}</strong>'s own hours. Change them if the site runs different times.
+        </small>
+        <small class="onsite-hint warn" *ngIf="onsiteTimeError">{{ onsiteTimeError }}</small>
+      </div>
+
       <div class="onsite-note" *ngIf="noProject()">
         This request won't apply until an Administrator or HR member approves it.
       </div>
@@ -298,7 +361,10 @@
       <span class="spacer"></span>
       <button class="btn-outline" (click)="closeOnsite()">Cancel</button>
       <button class="btn-primary" [disabled]="!canSubmitOnsite || onsiteSubmitting()" (click)="submitOnsite()">
-        {{ noProject() ? 'Send for Approval' : 'Assign On-site' }}
+        <ng-container *ngIf="noProject()">Send for Approval</ng-container>
+        <ng-container *ngIf="!noProject()">
+          Assign On-site<ng-container *ngIf="onsiteDayCount > 1"> · {{ onsiteDayCount }} days</ng-container>
+        </ng-container>
       </button>
     </div>
   </div>

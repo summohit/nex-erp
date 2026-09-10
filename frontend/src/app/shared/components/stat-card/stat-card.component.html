@@ -1,7 +1,12 @@
 <div class="kpi-card" [ngClass]="colorClass">
-  <div class="kpi-icon"><ng-content select="[icon]"></ng-content></div>
-  <div class="kpi-data">
-    <span class="kpi-label">{{ label }}</span>
-    <span class="kpi-value">{{ value }}</span>
+  <div class="kpi-card-top">
+    <div class="kpi-icon"><ng-content select="[icon]"></ng-content></div>
+    <span class="kpi-badge" *ngIf="badge">{{ badge }}</span>
   </div>
+  <div class="kpi-data">
+    <span class="kpi-value">{{ value }}</span>
+    <span class="kpi-label">{{ label }}</span>
+    <span class="kpi-subtitle" *ngIf="subtitle">{{ subtitle }}</span>
+  </div>
+  <div class="kpi-accent-bar"></div>
 </div>

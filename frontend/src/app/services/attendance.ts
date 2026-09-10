@@ -41,12 +41,21 @@ export class AttendanceService {
     return this.http.get<AttendanceRecord>(`${this.apiUrl}/me`);
   }
 
-  getMyHistory(): Observable<AttendanceRecord[]> {
-    return this.http.get<AttendanceRecord[]>(`${this.apiUrl}/history/me`);
+  /**
+   * `from`/`to` are ISO dates. The grid renders one month, so passing that
+   * month keeps the response to ~30 rows; omitting them makes the server fall
+   * back to a bounded recent window rather than the whole history.
+   */
+  getMyHistory(from?: string, to?: string): Observable<AttendanceRecord[]> {
+    return this.http.get<AttendanceRecord[]>(`${this.apiUrl}/history/me`, {
+      params: from && to ? { from, to } : {},
+    });
   }
 
-  getEmployeeHistory(employeeId: number): Observable<AttendanceRecord[]> {
-    return this.http.get<AttendanceRecord[]>(`${this.apiUrl}/employee/${employeeId}`);
+  getEmployeeHistory(employeeId: number, from?: string, to?: string): Observable<AttendanceRecord[]> {
+    return this.http.get<AttendanceRecord[]>(`${this.apiUrl}/employee/${employeeId}`, {
+      params: from && to ? { from, to } : {},
+    });
   }
 
   clockIn(lat?: number, lng?: number) {

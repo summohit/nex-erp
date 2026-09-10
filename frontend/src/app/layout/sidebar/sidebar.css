@@ -271,12 +271,12 @@
 }
 
 .nav-item:hover .nav-icon {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 /* All active nav items (leaf and parent menus) */
 .nav-item.active {
-  background: linear-gradient(135deg, #FF5A1F 0%, #FF3800 100%) !important;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%) !important;
   color: #ffffff !important;
   font-weight: 650;
   box-shadow: 0 4px 12px -2px rgba(255, 90, 31, 0.35) !important;

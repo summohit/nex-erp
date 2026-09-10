@@ -82,7 +82,7 @@
 }
 
 .mail-icon {
-  color: var(--color-primary, #FF5200);
+  color: var(--color-primary, var(--color-primary));
   position: relative;
   z-index: 2;
 }
@@ -139,7 +139,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.85rem 1.25rem;
-  background-color: var(--color-primary, #FF5200);
+  background-color: var(--color-primary, var(--color-primary));
   color: #ffffff;
   font-weight: 600;
   font-size: 0.95rem;
@@ -191,7 +191,7 @@
 }
 
 .back-login-link:hover {
-  color: var(--color-primary, #FF5200);
+  color: var(--color-primary, var(--color-primary));
 }
 
 .arrow-back {

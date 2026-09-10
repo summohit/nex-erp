@@ -9,10 +9,30 @@
   --color-secondary: #7000FF;     /* Purple */
   --color-accent: #FF2D55;        /* Pinkish Red */
   
-  /* UI Colors */
-  --color-success: #27c93f;
-  --color-warning: #ffbd2e;
-  --color-danger: #ff5f56;
+  /* Status colours — TWO ROLES PER HUE, and they are not interchangeable.
+   *
+   * The plain token is a FILL: bars, dots, chips, progress tracks, badge
+   * backgrounds. 3:1 against the surface is the bar there, and these clear it.
+   *
+   * The -text token is for anything that becomes a WORD — "Late", "Absent",
+   * "Pending". WCAG AA wants 4.5:1 for that, and the fill values measure
+   * 2.1–3.8:1, i.e. unreadable. Reach for -text whenever the colour is applied
+   * to type or an icon that has to be identified.
+   *
+   * Hues match mobile's theme.ts so a status chip is the same colour on both
+   * platforms. They replace the old #27c93f / #ffbd2e / #ff5f56, which were
+   * picked for the decorative macOS window mock on the login page and then
+   * reused as app-wide semantics. */
+  --color-success: #10B981;
+  --color-success-text: #047857;   /* 5.48:1 on white */
+  --color-warning: #F59E0B;
+  --color-warning-text: #B45309;   /* 5.02:1 on white */
+  --color-danger: #EF4444;
+  --color-danger-text: #B91C1C;    /* 6.47:1 on white */
+
+  /* The brand orange is 3.25:1 on white — fine as a fill or for large text,
+   * but not for body copy. Use this when the brand colour has to be read. */
+  --color-primary-text: #C2410C;   /* 5.18:1 on white */
   
   /* Logo Gradients (Mock fallback) */
   --gradient-logo: linear-gradient(45deg, #FF5200, #FF2D55, #7000FF);
@@ -54,7 +74,7 @@
 
   /* Borders & Shadows */
   --border-light: #e2e8f0;
-  --border-focus: #FF5200;
+  --border-focus: var(--color-primary);
   --border-subtle: #e4dede;
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.1);
   --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);

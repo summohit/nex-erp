@@ -236,7 +236,7 @@
 
 .global-search-input:focus {
   background: #ffffff;
-  border-color: #ff5a1f;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
 }
 
@@ -575,7 +575,7 @@
 }
 
 .menu-link:hover svg {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .profile-menu-footer {

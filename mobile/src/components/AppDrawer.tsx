@@ -37,6 +37,7 @@ import {
   Package,
   Ticket,
   Bug,
+  ShieldCheck,
   Rocket,
   LayoutDashboard,
   Award,
@@ -113,6 +114,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'package': Package,
   'ticket': Ticket,
   'bug': Bug,
+  'shield-check': ShieldCheck,
   'rocket': Rocket,
   'life-buoy': LifeBuoy,
 };
@@ -237,6 +239,7 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/assets/hardware-requests': { screen: 'HardwareRequests' },
   '/field-visits': { screen: 'FieldVisit' },
   '/employees/me/profile': { screen: 'Profile' },
+  '/settings/security': { screen: 'Security' },
   '/attendance/holidays': { screen: 'Attendance', params: { initialTab: 'holidays' } },
   '/payroll/expenses': { screen: 'Attendance', params: { initialTab: 'expenses' } },
 };
@@ -274,6 +277,9 @@ const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string;
   { group: 'WORKSPACE', id: 'notifications', title: 'Notifications', icon: 'bell', route: '/notifications' },
   { group: 'FINANCE', id: 'payslips', title: 'Payslips', icon: 'file-text', route: '/payroll/payslips' },
   { group: 'FINANCE', id: 'hardware-requests', title: 'Hardware Requests', icon: 'package', route: '/assets/requests' },
+  // Self-service two-factor setup. Listed here as well as coming from the
+  // server menu, so it is reachable even before that Menu row propagates.
+  { group: 'SYSTEM', id: 'settings/security', title: 'Security', icon: 'shield-check', route: '/settings/security' },
 ];
 
 function resolveNav(item: MenuItem): { screen: string; params?: any } | null {

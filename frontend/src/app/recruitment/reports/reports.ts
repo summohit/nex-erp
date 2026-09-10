@@ -39,12 +39,11 @@ export interface RecruiterReportItem {
   selector: 'app-hiring-reports',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink, DatePipe,
+    CommonModule, FormsModule, RouterLink,
     LucideBarChart3, LucideClock, LucideUsers, LucideArrowLeft,
-    LucideSearch, LucideFilter, LucideDownload, LucideExternalLink,
-    LucideBriefcase, LucideBuilding, LucideMapPin, LucideCheckCircle,
-    LucideXCircle, LucideSparkles, LucideAward, LucideTrendingUp,
-    LucideChevronRight, LucideX, LucideFileText
+    LucideSearch, LucideDownload,
+    LucideBriefcase, LucideCheckCircle,
+    LucideChevronRight, LucideX
   ],
   templateUrl: './reports.html',
   styleUrls: ['./reports.css']

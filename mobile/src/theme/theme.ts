@@ -1,8 +1,12 @@
 export const theme = {
   colors: {
-    // Brand Colors
-    primary: '#FF5722', // Vibrant Orange (used in Web CRM)
-    primaryHover: '#E64A19', // Darker Orange
+    // Brand Colors — must match frontend/src/variables.css exactly. These used
+    // to be #FF5722/#E64A19, a slightly different orange from the web's, which
+    // read as a rendering fault when the two were seen side by side.
+    primary: '#FF5200',
+    primaryHover: '#E64A00',
+    /** Brand orange is 3.25:1 on white — use this wherever it becomes text. */
+    primaryText: '#C2410C',
     
     // Backgrounds
     background: '#F9FAFB', // Gray 50
@@ -13,10 +17,17 @@ export const theme = {
     textSecondary: '#6B7280', // Gray 500
     textMuted: '#9CA3AF', // Gray 400
     
-    // Status Colors
+    // Status Colors — two roles per hue, matching the web tokens.
+    //
+    // The plain value is a FILL: chips, dots, bars, badge backgrounds.
+    // The *Text value is for anything that becomes a WORD, where the fills
+    // measure only 2.1–3.8:1 against white and cannot be read at body size.
     success: '#10B981', // Emerald 500
+    successText: '#047857', // 5.48:1 on white
     danger: '#EF4444', // Red 500
+    dangerText: '#B91C1C', // 6.47:1 on white
     warning: '#F59E0B', // Amber 500
+    warningText: '#B45309', // 5.02:1 on white
     
     // Borders
     border: '#E5E7EB', // Gray 200

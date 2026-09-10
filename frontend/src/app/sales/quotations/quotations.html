@@ -30,7 +30,7 @@
         </tr>
         <tr *ngFor="let q of quotations">
           <td><span class="fw-semibold">{{q.quoteNumber}}</span></td>
-          <td>{{q.client?.name}}</td>
+          <td>{{q.client.name}}</td>
           <td>{{q.date | date}}</td>
           <td>₹{{q.total | number:'1.2-2'}}</td>
           <td>

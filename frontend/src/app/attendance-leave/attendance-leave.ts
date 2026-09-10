@@ -1310,29 +1310,40 @@ export class AttendanceLeaveComponent implements OnInit {
   });
 
   selectAttendanceEmp(empId: number | null) {
-    this.isLoadingTimesheet.set(true);
-    if (empId === null) {
-      this.selectedAttendanceEmployeeId.set(null);
-      this.attendanceService.getMyHistory().subscribe({
-        next: (res: any) => {
-          this.myHistory.set(res);
-          this.generateGrid();
-          this.isLoadingTimesheet.set(false);
-        },
-        error: () => this.isLoadingTimesheet.set(false)
-      });
-    } else {
-      this.selectedAttendanceEmployeeId.set(empId);
-      this.attendanceService.getEmployeeHistory(empId).subscribe({
-        next: (res: any) => {
-          this.myHistory.set(res);
-          this.generateGrid();
-          this.isLoadingTimesheet.set(false);
-        },
-        error: () => this.isLoadingTimesheet.set(false)
-      });
-    }
+    this.selectedAttendanceEmployeeId.set(empId);
+    this.loadTimesheetHistory();
     this.closeEmpDropdown();
+  }
+
+  /**
+   * Loads exactly the month the grid is showing.
+   *
+   * The endpoint used to return the employee's entire history on every call —
+   * hundreds of rows, each carrying a duplicate copy of the employee record —
+   * which the grid then filtered down to about thirty. Asking for the month
+   * directly is roughly a tenth of the data, and it means navigating past the
+   * server's default window still works.
+   */
+  private loadTimesheetHistory() {
+    const year = Number(this.selectedYear());
+    const month = Number(this.selectedMonth()); // 0-indexed
+    const from = this.getLocalDateString(new Date(year, month, 1));
+    const to = this.getLocalDateString(new Date(year, month + 1, 0));
+
+    const empId = this.selectedAttendanceEmployeeId();
+    const request = empId === null
+      ? this.attendanceService.getMyHistory(from, to)
+      : this.attendanceService.getEmployeeHistory(empId, from, to);
+
+    this.isLoadingTimesheet.set(true);
+    request.subscribe({
+      next: (res: any) => {
+        this.myHistory.set(res);
+        this.generateGrid();
+        this.isLoadingTimesheet.set(false);
+      },
+      error: () => this.isLoadingTimesheet.set(false)
+    });
   }
 
   openDayDetailsModal(day: DayStatus) { console.log("Clicked day:", day); 
@@ -1511,10 +1522,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
   loadData() {
     this.attendanceService.getTodayAttendance().subscribe((res: any) => this.todayAttendance.set(res));
-    this.attendanceService.getMyHistory().subscribe((res: any) => {
-      this.myHistory.set(res);
-      this.generateGrid();
-    });
+    this.loadTimesheetHistory();
     this.leavesService.getMyBalances().subscribe((res: any) => this.myBalances.set(res));
     this.leavesService.getMyRequests().subscribe((res: any) => {
       this.myRequests.set(res);
@@ -1548,7 +1556,7 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   onPeriodChange() {
-    this.generateGrid();
+    this.loadTimesheetHistory();
   }
 
   prevMonth() {
@@ -1560,7 +1568,7 @@ export class AttendanceLeaveComponent implements OnInit {
     }
     this.selectedMonth.set(m);
     this.selectedYear.set(y);
-    this.generateGrid();
+    this.loadTimesheetHistory();
   }
 
   nextMonth() {
@@ -1572,14 +1580,14 @@ export class AttendanceLeaveComponent implements OnInit {
     }
     this.selectedMonth.set(m);
     this.selectedYear.set(y);
-    this.generateGrid();
+    this.loadTimesheetHistory();
   }
 
   jumpToCurrentMonth() {
     const today = new Date();
     this.selectedMonth.set(today.getMonth());
     this.selectedYear.set(today.getFullYear());
-    this.generateGrid();
+    this.loadTimesheetHistory();
   }
 
   private getLocalDateString(date: Date): string {

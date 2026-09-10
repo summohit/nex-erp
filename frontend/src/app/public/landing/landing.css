@@ -188,12 +188,12 @@
 }
 
 .lp-nav-link:hover {
-  color: #ff5a1f;
+  color: var(--color-primary);
   background: rgba(255, 90, 31, 0.07);
 }
 
 .lp-nav-link.active {
-  color: #ff5a1f;
+  color: var(--color-primary);
   background: rgba(255, 90, 31, 0.09);
   font-weight: 700;
   box-shadow: inset 0 0 0 1px rgba(255, 90, 31, 0.22);
@@ -204,7 +204,7 @@
   align-items: center;
   padding: 2px 6px;
   background: linear-gradient(135deg, rgba(255, 90, 31, 0.12) 0%, rgba(255, 61, 0, 0.18) 100%);
-  color: #ff5a1f;
+  color: var(--color-primary);
   border-radius: 6px;
   font-size: 10px;
   font-weight: 700;
@@ -248,7 +248,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, #ff5a1f 0%, #ff3800 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #ff3800 100%);
   color: #ffffff;
   border: none;
   border-radius: 10px;
@@ -332,12 +332,12 @@
 
 .lp-mobile-link:hover {
   background: #f8fafc;
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .lp-mobile-link.active {
   background: rgba(255, 90, 31, 0.08);
-  color: #ff5a1f;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -472,7 +472,7 @@
 }
 
 .lp-accent-gradient {
-  background: linear-gradient(135deg, #FF5A1F 0%, #FF3800 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -533,7 +533,7 @@
 }
 
 .hero-pill-btn svg {
-  color: #ff5a1f;
+  color: var(--color-primary);
   width: 15px;
   height: 15px;
   transition: transform 0.2s ease;
@@ -542,7 +542,7 @@
 .hero-pill-btn:hover {
   border-color: #ffd9c2;
   background: #fffbf9;
-  color: #ff5a1f;
+  color: var(--color-primary);
   transform: translateY(-1.5px);
   box-shadow: 0 4px 12px rgba(255, 90, 31, 0.12);
 }
@@ -552,8 +552,8 @@
 }
 
 .hero-pill-btn.active {
-  background: linear-gradient(135deg, #FF5A1F 0%, #FF3800 100%);
-  border-color: #ff5a1f;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%);
+  border-color: var(--color-primary);
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(255, 90, 31, 0.35);
   transform: translateY(-1.5px);
@@ -594,7 +594,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, #FF5A1F 0%, #FF3800 100%) !important;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%) !important;
   color: #ffffff !important;
   border: none !important;
   border-radius: 12px !important;
@@ -645,7 +645,7 @@
   border-color: #cbd5e1 !important;
   background: #f8fafc !important;
   transform: translateY(-1.5px) !important;
-  color: #ff5a1f !important;
+  color: var(--color-primary) !important;
 }
 
 .lp-hero-trust-bar {
@@ -1251,7 +1251,7 @@
 .stat-number {
   font-size: 2.25rem;
   font-weight: 800;
-  color: #ff5a1f;
+  color: var(--color-primary);
   letter-spacing: -0.03em;
   line-height: 1;
 }
@@ -1305,7 +1305,7 @@ section[id] {
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: #ff5a1f;
+  color: var(--color-primary);
   background: rgba(255, 90, 31, 0.08);
   border: 1px solid rgba(255, 90, 31, 0.2);
   border-radius: 9999px;
@@ -1385,7 +1385,7 @@ section[id] {
 }
 
 .tour-tab-btn:hover svg {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .tour-tab-btn.active {
@@ -1395,7 +1395,7 @@ section[id] {
 }
 
 .tour-tab-btn.active svg {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .lp-tour-container {
@@ -1578,7 +1578,7 @@ section[id] {
 .val-badge {
   font-size: 0.725rem;
   font-weight: 700;
-  color: #ff5a1f;
+  color: var(--color-primary);
   background: rgba(255, 90, 31, 0.08);
   padding: 3px 9px;
   border-radius: 6px;
@@ -1994,7 +1994,7 @@ section[id] {
 
 /* Tour Tab CTA Button */
 .pane-details .lp-btn-primary {
-  background: linear-gradient(135deg, #FF5A1F 0%, #FF3800 100%) !important;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%) !important;
   color: #ffffff !important;
   border: none !important;
   border-radius: 12px !important;
@@ -2277,7 +2277,7 @@ section[id] {
   height: 40px;
   border-radius: 10px;
   background: linear-gradient(135deg, rgba(255, 90, 31, 0.15) 0%, rgba(255, 56, 0, 0.2) 100%);
-  color: #ff5a1f;
+  color: var(--color-primary);
   flex-shrink: 0;
 }
 
@@ -2545,7 +2545,7 @@ section[id] {
 }
 
 .lp-phone-punch-card {
-  background: linear-gradient(135deg, #FF5A1F 0%, #FF3800 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%);
   border-radius: 14px;
   padding: 14px;
   color: #ffffff;
@@ -2866,7 +2866,7 @@ section[id] {
 
 .lp-faq-item.open .faq-chevron-pill {
   background: rgba(255, 90, 31, 0.12);
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .faq-answer-body {
@@ -2891,7 +2891,7 @@ section[id] {
   gap: 6px;
   font-size: 0.6875rem;
   font-weight: 700;
-  color: #ff5a1f;
+  color: var(--color-primary);
   background: rgba(255, 90, 31, 0.08);
   border: 1px solid rgba(255, 90, 31, 0.18);
   padding: 3px 9px;
@@ -2907,7 +2907,7 @@ section[id] {
   box-sizing: border-box;
   background:
     radial-gradient(900px 500px at 50% 15%, rgba(255, 255, 255, 0.22), transparent 65%),
-    linear-gradient(135deg, #FF5A1F 0%, #FF3800 45%, #D83300 100%);
+    linear-gradient(135deg, var(--color-primary) 0%, #FF3800 45%, #D83300 100%);
   padding: 100px 24px;
   text-align: center;
   position: relative;

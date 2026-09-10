@@ -758,8 +758,8 @@ select.form-control:disabled {
   gap: 0.45rem;
   padding: 0.55rem 1rem;
   background: #fff;
-  border: 1px solid #FF5200;
-  color: #FF5200;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 600;
@@ -780,7 +780,7 @@ select.form-control:disabled {
   width: 14px;
   height: 14px;
   border: 2px solid rgba(255, 82, 0, 0.3);
-  border-top-color: #FF5200;
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: reset-spin 0.7s linear infinite;
 }

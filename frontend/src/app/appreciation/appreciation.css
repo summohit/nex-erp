@@ -182,7 +182,7 @@
 
 .pill-toggle button.active {
   background: #FFFFFF;
-  color: var(--color-primary, #FF5200);
+  color: var(--color-primary, var(--color-primary));
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
@@ -283,7 +283,7 @@
 
 .award-icon-box.color-orange {
   background: #FFF7ED;
-  color: #FF5200;
+  color: var(--color-primary);
   border: 1px solid #FFEDD5;
 }
 
@@ -473,7 +473,7 @@
 
 /* Compact Primary Button */
 .btn-primary-sm {
-  background: linear-gradient(135deg, var(--color-primary, #FF5200) 0%, #FF7332 100%);
+  background: linear-gradient(135deg, var(--color-primary, var(--color-primary)) 0%, #FF7332 100%);
   color: white;
   border: none;
   padding: 0 18px;
@@ -521,9 +521,9 @@
 }
 
 .action-pill-btn:hover {
-  background: var(--color-primary, #FF5200);
+  background: var(--color-primary, var(--color-primary));
   color: #FFFFFF;
-  border-color: var(--color-primary, #FF5200);
+  border-color: var(--color-primary, var(--color-primary));
   box-shadow: 0 3px 8px rgba(255, 82, 0, 0.25);
 }
 
@@ -649,7 +649,7 @@
 
 .modal-header-icon.bg-orange {
   background: #FFF7ED;
-  color: #FF5200;
+  color: var(--color-primary);
 }
 
 .modal-header-icon.bg-purple {
@@ -718,7 +718,7 @@
 .styled-input:focus,
 .styled-select:focus,
 .styled-textarea:focus {
-  border-color: var(--color-primary, #FF5200);
+  border-color: var(--color-primary, var(--color-primary));
   box-shadow: 0 0 0 3px rgba(255, 82, 0, 0.12);
   outline: none;
 }
@@ -734,7 +734,7 @@
 }
 
 .file-upload-dropzone:hover {
-  border-color: var(--color-primary, #FF5200);
+  border-color: var(--color-primary, var(--color-primary));
   background: #FFF7ED;
 }
 

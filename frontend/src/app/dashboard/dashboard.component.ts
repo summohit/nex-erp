@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
@@ -13,7 +13,10 @@ import {
   LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
   LucideAlertCircle, LucideArrowRight, LucideBuilding, LucideLayers,
   LucideShield, LucideAward, LucideBanknote, LucideReceipt, LucideTrendingUp,
-  LucideShoppingCart, LucideTarget, LucideCake, LucidePartyPopper, LucideGift
+  LucideShoppingCart, LucideTarget, LucideCake, LucidePartyPopper, LucideGift,
+  LucideSparkles, LucidePlay, LucideSquare, LucideMapPin, LucideZap,
+  LucideArrowUpRight, LucideCalendarPlus, LucideChevronRight, LucideFolderKanban,
+  LucideCheck, LucideX
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
@@ -29,12 +32,15 @@ import { HotToastService } from '@ngneat/hot-toast';
     LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
     LucideAlertCircle, LucideArrowRight, LucideBuilding, LucideLayers,
     LucideShield, LucideAward, LucideBanknote, LucideReceipt, LucideTrendingUp,
-    LucideShoppingCart, LucideTarget, LucideCake, LucidePartyPopper, LucideGift
+    LucideShoppingCart, LucideTarget, LucideCake, LucidePartyPopper, LucideGift,
+    LucideSparkles, LucidePlay, LucideSquare, LucideMapPin, LucideZap,
+    LucideArrowUpRight, LucideCalendarPlus, LucideChevronRight, LucideFolderKanban,
+    LucideCheck, LucideX
   ],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css']
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private router = inject(Router);
   private onboardingService = inject(OnboardingService);
@@ -51,6 +57,46 @@ export class DashboardComponent implements OnInit {
   todayAttendance = signal<AttendanceRecord | null>(null);
   todayDate = new Date();
   isClocking = signal<boolean>(false);
+
+  // Live Real-Time Clock & Shift Duration
+  currentTime = signal<Date>(new Date());
+  private clockInterval: any = null;
+
+  greetingText = computed(() => {
+    const hour = this.currentTime().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  });
+
+  formattedTime = computed(() => {
+    return this.currentTime().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  });
+
+  formattedDate = computed(() => {
+    return this.currentTime().toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  });
+
+  workedDuration = computed(() => {
+    const att = this.todayAttendance();
+    if (!att || !att.clockIn) return '0h 0m';
+    const start = new Date(att.clockIn).getTime();
+    const end = att.clockOut ? new Date(att.clockOut).getTime() : this.currentTime().getTime();
+    const diffMs = Math.max(0, end - start);
+    const hrs = Math.floor(diffMs / 3600000);
+    const mins = Math.floor((diffMs % 3600000) / 60000);
+    return `${hrs}h ${mins}m`;
+  });
 
   // Role Computation
   userRole = computed(() => this.user()?.role || 'EMPLOYEE');
@@ -167,6 +213,10 @@ export class DashboardComponent implements OnInit {
   );
 
   ngOnInit() {
+    this.clockInterval = setInterval(() => {
+      this.currentTime.set(new Date());
+    }, 1000);
+
     this.authService.getMe().subscribe({
       next: (user) => {
         if (!user.company?.onboardingCompleted) {
@@ -184,6 +234,14 @@ export class DashboardComponent implements OnInit {
       }
     });
   }
+
+  ngOnDestroy() {
+    if (this.clockInterval) {
+      clearInterval(this.clockInterval);
+      this.clockInterval = null;
+    }
+  }
+
 
   loadDashboard() {
     this.isLoadingMetrics.set(true);

@@ -1,14 +1,20 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   LucideShieldCheck,
   LucideKeyRound,
   LucideArrowRight,
+  LucideArrowLeft,
   LucideCopy,
   LucideDownload,
   LucideSmartphone,
+  LucideCheck,
+  LucideLock,
+  LucideQrCode,
+  LucideSparkles,
+  LucideInfo,
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../services/auth.service';
@@ -23,12 +29,19 @@ export const CHALLENGE_MODE_KEY = 'twoFactorMode';
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     LucideShieldCheck,
     LucideKeyRound,
     LucideArrowRight,
+    LucideArrowLeft,
     LucideCopy,
     LucideDownload,
     LucideSmartphone,
+    LucideCheck,
+    LucideLock,
+    LucideQrCode,
+    LucideSparkles,
+    LucideInfo,
   ],
   templateUrl: './two-factor.html',
   styleUrls: ['./two-factor.css'],
@@ -47,6 +60,8 @@ export class TwoFactorComponent implements OnInit {
 
   code = '';
   isSubmitting = signal(false);
+  isCodeFocused = false;
+  isBackupMode = false;
 
   // Enrolment payload from the server; the QR arrives ready-rendered so the
   // frontend needs no QR library.
@@ -54,6 +69,10 @@ export class TwoFactorComponent implements OnInit {
   secret = signal<string>('');
   backupCodes = signal<string[]>([]);
   acknowledged = signal(false);
+
+  secretCopied = signal(false);
+  backupCodesCopied = signal(false);
+  copiedCodeIndex = signal<number | null>(null);
 
   /**
    * Held in sessionStorage rather than localStorage on purpose: it dies with the
@@ -83,6 +102,30 @@ export class TwoFactorComponent implements OnInit {
     return (this.secret().match(/.{1,4}/g) || []).join(' ');
   }
 
+  getCodeDigit(index: number): string {
+    const clean = (this.code || '').replace(/\D/g, '');
+    return clean[index] || '';
+  }
+
+  isDigitActive(index: number): boolean {
+    const clean = (this.code || '').replace(/\D/g, '');
+    return this.isCodeFocused && clean.length === index;
+  }
+
+  onCodeInput() {
+    if (this.step !== 'verify' || !this.isBackupMode) {
+      this.code = (this.code || '').replace(/\D/g, '').slice(0, 6);
+      if (this.code.length === 6 && !this.isSubmitting()) {
+        this.submit();
+      }
+    }
+  }
+
+  toggleBackupMode() {
+    this.isBackupMode = !this.isBackupMode;
+    this.code = '';
+  }
+
   private beginEnrolment() {
     this.isSubmitting.set(true);
     this.authService.startChallengeEnrolment(this.challengeToken).subscribe({
@@ -101,7 +144,16 @@ export class TwoFactorComponent implements OnInit {
   submit() {
     const code = this.code.trim();
     if (!code) {
-      this.toast.error('Enter the code from your authenticator app.');
+      this.toast.error(
+        this.isBackupMode
+          ? 'Enter your emergency backup code.'
+          : 'Enter the 6-digit code from your authenticator app.'
+      );
+      return;
+    }
+
+    if (!this.isBackupMode && code.length < 6) {
+      this.toast.error('Please enter all 6 digits of your authentication code.');
       return;
     }
 
@@ -127,7 +179,7 @@ export class TwoFactorComponent implements OnInit {
 
         if (res.usedBackupCode) {
           this.toast.success(
-            `Signed in with a backup code. ${res.backupCodesRemaining} remaining.`,
+            `Signed in with a backup code. ${res.backupCodesRemaining} remaining.`
           );
         }
         this.finish();
@@ -141,25 +193,51 @@ export class TwoFactorComponent implements OnInit {
   }
 
   copySecret() {
+    if (!this.secret()) return;
     navigator.clipboard.writeText(this.secret()).then(
-      () => this.toast.success('Setup key copied'),
+      () => {
+        this.toast.success('Setup key copied to clipboard');
+        this.secretCopied.set(true);
+        setTimeout(() => this.secretCopied.set(false), 2200);
+      },
       () => this.toast.error('Could not copy the setup key'),
     );
   }
 
   copyBackupCodes() {
     navigator.clipboard.writeText(this.backupCodes().join('\n')).then(
-      () => this.toast.success('Backup codes copied'),
+      () => {
+        this.toast.success('All backup codes copied');
+        this.backupCodesCopied.set(true);
+        setTimeout(() => this.backupCodesCopied.set(false), 2200);
+      },
       () => this.toast.error('Could not copy the codes'),
     );
   }
 
+  copySingleBackupCode(codeStr: string, index: number) {
+    navigator.clipboard.writeText(codeStr).then(() => {
+      this.toast.success(`Copied backup code #${index + 1}`);
+      this.copiedCodeIndex.set(index);
+      setTimeout(() => {
+        if (this.copiedCodeIndex() === index) {
+          this.copiedCodeIndex.set(null);
+        }
+      }, 2000);
+    });
+  }
+
   downloadBackupCodes() {
     const body = [
-      'NEX ERP — two-factor backup codes',
-      'Each code works once. Keep them somewhere safe and private.',
+      '========================================',
+      'NEX ERP — Two-Factor Emergency Backup Codes',
+      '========================================',
+      'IMPORTANT: Keep these codes in a safe, offline location.',
+      'Each code can only be used once.',
       '',
-      ...this.backupCodes(),
+      ...this.backupCodes().map((c, i) => `Code ${String(i + 1).padStart(2, '0')}: ${c}`),
+      '',
+      `Generated on: ${new Date().toLocaleString()}`,
     ].join('\n');
 
     const url = URL.createObjectURL(new Blob([body], { type: 'text/plain' }));

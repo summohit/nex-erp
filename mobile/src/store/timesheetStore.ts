@@ -10,8 +10,8 @@ interface TimesheetState {
   currentMonth: Date;
   isLoading: boolean;
   error: string | null;
-  fetchData: () => Promise<void>;
-  changeMonth: (date: Date) => void;
+  fetchData: (month?: Date) => Promise<void>;
+  changeMonth: (date: Date) => Promise<void>;
   requestRegularization: (data: { date: string; proposedClockIn?: string; proposedClockOut?: string; reason: string }) => Promise<boolean>;
 }
 
@@ -24,11 +24,21 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  fetchData: async () => {
+  /**
+   * Fetches one month, not the whole history. The grid only ever renders a
+   * single month, and pulling everything meant shipping hundreds of rows on
+   * every open — the main contributor to the API's data-transfer bill.
+   */
+  fetchData: async (month?: Date) => {
+    const target = month ?? get().currentMonth ?? new Date();
+    const from = new Date(target.getFullYear(), target.getMonth(), 1);
+    const to = new Date(target.getFullYear(), target.getMonth() + 1, 0);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+
     set({ isLoading: true, error: null });
     try {
       const [history, regs, hols, leaves] = await Promise.allSettled([
-        attendanceService.getMyHistory(),
+        attendanceService.getMyHistory(iso(from), iso(to)),
         attendanceService.getMyRegularizations(),
         attendanceService.getHolidays(),
         leaveService.getMyRequests(),
@@ -45,8 +55,11 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
     }
   },
 
-  changeMonth: (date: Date) => {
+  changeMonth: async (date: Date) => {
+    // The server now returns only the requested month, so moving months has to
+    // refetch rather than filter data that was never downloaded.
     set({ currentMonth: date });
+    await get().fetchData(date);
   },
 
   requestRegularization: async (data) => {

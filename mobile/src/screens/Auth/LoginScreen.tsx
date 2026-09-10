@@ -16,6 +16,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../api/apiClient';
 import { theme } from '../../theme/theme';
+import TwoFactorPanel from './TwoFactorPanel';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, X, MailCheck } from 'lucide-react-native';
 
 export default function LoginScreen() {
@@ -33,6 +34,9 @@ export default function LoginScreen() {
   // so the modal turns into a resend-verification prompt instead of a dead end.
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resending, setResending] = useState(false);
+
+  /** Non-null while the user owes a second factor. Deliberately not persisted. */
+  const [challenge, setChallenge] = useState<{ token: string; mode: 'VERIFY' | 'ENROL' } | null>(null);
   const [resendSent, setResendSent] = useState(false);
 
   const showError = (title: string, message: string, canVerify = false) => {
@@ -71,6 +75,45 @@ export default function LoginScreen() {
     }
   };
 
+  /**
+   * Turns a real token pair into a signed-in session. Shared by the plain
+   * password path and the post-two-factor path so the two cannot drift.
+   */
+  const completeSignIn = async (data: { access_token: string; refresh_token: string }) => {
+    const { access_token, refresh_token } = data;
+
+    // Simple base64 decode for JWT
+    const decodeBase64 = (str: string) => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+      let output = '';
+      str = String(str).replace(/=+$/, '');
+      for (
+        let bc = 0, bs, buffer, idx = 0;
+        (buffer = str.charAt(idx++));
+        ~buffer && ((bs = bc % 4 ? bs! * 64 + buffer : buffer), bc++ % 4) ? (output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)))) : 0
+      ) {
+        buffer = chars.indexOf(buffer);
+      }
+      return output;
+    };
+
+    const tokenParts = access_token.split('.');
+    const payload = JSON.parse(decodeBase64(tokenParts[1]));
+
+    const user = {
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role,
+      companyId: payload.companyId,
+      employeeId: payload.employeeId,
+    };
+
+    // The refresh token is what keeps the session alive past the access
+    // token's one-hour life; it was previously read and thrown away.
+    await login(user, access_token, refresh_token);
+    refreshUserProfile().catch(() => {});
+  };
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       showError('Required Fields', 'Please enter both email address and password.');
@@ -84,54 +127,23 @@ export default function LoginScreen() {
         password: password.trim(),
       });
 
-      // Two-factor challenge. This MUST come before the decode below: a
-      // challenge response carries no access_token, and `access_token.split`
-      // would throw into the generic catch, leaving the user at a dead end with
-      // a "server error" and no way in.
+      // Two-factor challenge. This MUST come before completeSignIn: a challenge
+      // response carries no access_token, and decoding one would throw into the
+      // generic catch and leave the user at a dead end.
       //
-      // Interim behaviour — the in-app challenge screen lands in a later
-      // release, and an already-installed build has to cope until then.
-      if (response.data?.twoFactorRequired) {
+      // The token is held in component state only — never AsyncStorage, never
+      // the auth store — so the app cannot mistake a half-finished challenge
+      // for a session.
+      if (response.data?.twoFactorRequired && response.data?.challengeToken) {
         setLoading(false);
-        showError(
-          'Two-Factor Authentication Required',
-          'Your account is protected with an authenticator app. Please sign in on the web app to continue — support in this app is coming in the next update.',
-        );
+        setChallenge({
+          token: response.data.challengeToken,
+          mode: response.data.mode === 'ENROL' ? 'ENROL' : 'VERIFY',
+        });
         return;
       }
 
-      const { access_token, refresh_token } = response.data;
-      
-      // Simple base64 decode for JWT
-      const decodeBase64 = (str: string) => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-        let output = '';
-        str = String(str).replace(/=+$/, '');
-        for (
-          let bc = 0, bs, buffer, idx = 0;
-          (buffer = str.charAt(idx++));
-          ~buffer && ((bs = bc % 4 ? bs! * 64 + buffer : buffer), bc++ % 4) ? (output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)))) : 0
-        ) {
-          buffer = chars.indexOf(buffer);
-        }
-        return output;
-      };
-      
-      const tokenParts = access_token.split('.');
-      const payload = JSON.parse(decodeBase64(tokenParts[1]));
-      
-      const user = {
-        id: payload.sub,
-        email: payload.email,
-        role: payload.role,
-        companyId: payload.companyId,
-        employeeId: payload.employeeId,
-      };
-      
-      // The refresh token is what keeps the session alive past the access
-      // token's one-hour life; it was previously read and thrown away.
-      await login(user, access_token, refresh_token);
-      refreshUserProfile().catch(() => {});
+      await completeSignIn(response.data);
     } catch (error: any) {
       console.error('Login RAW error:', error?.message, 'Code:', error?.code, 'BaseURL:', error?.config?.baseURL);
       const status = error?.response?.status;
@@ -161,6 +173,23 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="dark-content" />
+
+      {/* The second factor replaces the credential form rather than stacking on
+          top of it, so there is no way to resubmit a password mid-challenge. */}
+      {challenge ? (
+        <TwoFactorPanel
+          challengeToken={challenge.token}
+          mode={challenge.mode}
+          onAuthenticated={async (tokens) => {
+            setChallenge(null);
+            await completeSignIn(tokens);
+          }}
+          onCancel={() => {
+            setChallenge(null);
+            setPassword('');
+          }}
+        />
+      ) : (
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -271,6 +300,7 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
+      )}
 
       {/* Custom Error Modal */}
       <Modal

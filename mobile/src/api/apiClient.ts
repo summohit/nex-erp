@@ -9,6 +9,11 @@ export const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
+    // Identifies this client to the server's temporary two-factor bypass.
+    // It is not a credential and proves nothing — anyone can send the same
+    // header — so the server must never treat it as evidence of anything.
+    // Remove once that bypass is retired.
+    'X-Client-Platform': 'mobile',
   },
 });
 

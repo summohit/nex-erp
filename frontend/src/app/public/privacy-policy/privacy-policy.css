@@ -157,7 +157,7 @@
   gap: 16px;
   background-color: #fff7ed;
   border: 1px solid #ffedd5;
-  border-left: 4px solid #FF5200;
+  border-left: 4px solid var(--color-primary);
   border-radius: 10px;
   padding: 18px 22px;
   margin-bottom: 40px;
@@ -264,7 +264,7 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #FF5200, #ff7a38);
+  background: linear-gradient(135deg, var(--color-primary), #ff7a38);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -289,7 +289,7 @@
 .contact-email {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #FF5200;
+  color: var(--color-primary);
   text-decoration: none;
   transition: color 0.15s ease;
 }

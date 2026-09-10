@@ -1,134 +1,302 @@
-<div class="tf-wrapper">
-  <div class="glow-bg glow-bg-1"></div>
-  <div class="glow-bg glow-bg-2"></div>
+<div class="auth-centered">
+  <!-- Dynamic ambient glows matching /login -->
+  <div class="auth-ambient-glow glow-top-left"></div>
+  <div class="auth-ambient-glow glow-bottom-right"></div>
+  <div class="auth-ambient-glow glow-center"></div>
+  <div class="auth-pattern-overlay"></div>
 
-  <div class="tf-card">
+  <div class="auth-container">
 
-    <div class="icon-badge">
-      <div class="icon-ping"></div>
-      <svg *ngIf="step === 'verify'" lucideShieldCheck size="44" class="badge-icon"></svg>
-      <svg *ngIf="step === 'enrol'" lucideSmartphone size="44" class="badge-icon"></svg>
-      <svg *ngIf="step === 'codes'" lucideKeyRound size="44" class="badge-icon"></svg>
+    <!-- BRAND LOGO & HEADER (Above Card) -->
+    <div class="brand-section">
+      <a routerLink="/" title="Back to home" class="brand-logo-wrap">
+        <img src="/logo.png" class="brand-logo" alt="NEX ERP logo">
+      </a>
+
+      <!-- Dynamic Header based on Step -->
+      <ng-container [ngSwitch]="step">
+        <div *ngSwitchCase="'verify'">
+          <h1 class="auth-title">Two-Step Verification</h1>
+          <p class="auth-subtitle">Enter the security code from your authenticator app</p>
+        </div>
+        <div *ngSwitchCase="'enrol'">
+          <h1 class="auth-title">Set Up Two-Step Verification</h1>
+          <p class="auth-subtitle">Scan the QR code with your mobile authenticator app</p>
+        </div>
+        <div *ngSwitchCase="'codes'">
+          <h1 class="auth-title">Emergency Recovery Codes</h1>
+          <p class="auth-subtitle">Save these one-time codes in a safe place</p>
+        </div>
+      </ng-container>
     </div>
 
-    <!-- STEP: VERIFY — the user already has an authenticator -->
-    <div *ngIf="step === 'verify'" class="step-panel">
-      <h2 class="title">Two-Step Verification</h2>
-      <p class="subtitle">
-        Open your authenticator app and enter the 6-digit code for
-        <span class="highlight">NEX ERP</span>.
-      </p>
+    <!-- MAIN LOGIN-CARD -->
+    <div class="login-card">
+      <div class="card-accent-bar"></div>
 
-      <div class="form-group">
-        <label>Verification code</label>
-        <input
-          type="text"
-          class="form-control code-input"
-          [(ngModel)]="code"
-          (keyup.enter)="submit()"
-          placeholder="000000"
-          maxlength="14"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          autofocus
-        >
+      <!-- =============================================================== -->
+      <!-- STEP: VERIFY (Routine 2FA Prompt on Login) -->
+      <!-- =============================================================== -->
+      <div *ngIf="step === 'verify'" class="form-panel">
+        
+        <!-- MODE A: Standard TOTP Authenticator Code -->
+        <div *ngIf="!isBackupMode" class="form-content">
+          <div class="form-group">
+            <label class="form-label" for="verify-code">
+              <span>Authentication Code</span>
+              <span class="label-hint">6-digit TOTP</span>
+            </label>
+            <div class="input-wrapper" [class.has-focus]="isCodeFocused">
+              <div class="input-icon-left">
+                <svg lucideShieldCheck size="18"></svg>
+              </div>
+              <input
+                id="verify-code"
+                type="text"
+                class="auth-input code-input"
+                [(ngModel)]="code"
+                (focus)="isCodeFocused = true"
+                (blur)="isCodeFocused = false"
+                (input)="onCodeInput()"
+                (keyup.enter)="submit()"
+                placeholder="000 000"
+                maxlength="6"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                autofocus
+              />
+            </div>
+          </div>
+
+          <div class="auth-options-row">
+            <span class="helper-hint">Updated every 30s in your app</span>
+            <a class="toggle-link" (click)="toggleBackupMode()">Use backup code</a>
+          </div>
+
+          <button 
+            type="button" 
+            class="auth-submit-btn" 
+            (click)="submit()" 
+            [disabled]="isSubmitting()"
+          >
+            <span *ngIf="!isSubmitting()" class="btn-content">
+              <span>Verify &amp; Continue</span>
+              <svg lucideArrowRight size="18" class="btn-arrow"></svg>
+            </span>
+            <span *ngIf="isSubmitting()" class="btn-loader">
+              <span class="spinner-ring"></span>
+              <span>Verifying code...</span>
+            </span>
+          </button>
+        </div>
+
+        <!-- MODE B: Emergency Backup Code -->
+        <div *ngIf="isBackupMode" class="form-content">
+          <div class="form-group">
+            <label class="form-label" for="backup-code">
+              <span>Emergency Backup Code</span>
+              <span class="label-hint">Single-use</span>
+            </label>
+            <div class="input-wrapper">
+              <div class="input-icon-left">
+                <svg lucideKeyRound size="18"></svg>
+              </div>
+              <input
+                id="backup-code"
+                type="text"
+                class="auth-input mono-input"
+                [(ngModel)]="code"
+                (keyup.enter)="submit()"
+                placeholder="Enter your backup code"
+                autocomplete="off"
+                autofocus
+              />
+            </div>
+          </div>
+
+          <div class="auth-options-row">
+            <span class="helper-hint">Lost your mobile device?</span>
+            <a class="toggle-link" (click)="toggleBackupMode()">Use authenticator app</a>
+          </div>
+
+          <button 
+            type="button" 
+            class="auth-submit-btn" 
+            (click)="submit()" 
+            [disabled]="isSubmitting()"
+          >
+            <span *ngIf="!isSubmitting()" class="btn-content">
+              <span>Sign In with Backup Code</span>
+              <svg lucideArrowRight size="18" class="btn-arrow"></svg>
+            </span>
+            <span *ngIf="isSubmitting()" class="btn-loader">
+              <span class="spinner-ring"></span>
+              <span>Verifying code...</span>
+            </span>
+          </button>
+        </div>
+
+        <!-- CARD FOOTER -->
+        <div class="card-footer">
+          <span class="footer-text">Need to change account?</span>
+          <a class="signup-link" (click)="cancel()">
+            <span>Back to Login</span>
+            <svg lucideArrowRight size="14" class="inline-arrow"></svg>
+          </a>
+        </div>
+
       </div>
 
-      <button class="primary-btn" (click)="submit()" [disabled]="isSubmitting()">
-        <span *ngIf="!isSubmitting()">Verify &amp; Sign In</span>
-        <span *ngIf="isSubmitting()" class="loader"></span>
-      </button>
-
-      <p class="hint">
-        Lost your phone? Enter one of your backup codes above instead.
-      </p>
-
-      <button class="ghost-btn" (click)="cancel()">
-        <svg lucideArrowRight size="16" class="arrow-back"></svg>
-        <span>Back to Login</span>
-      </button>
-    </div>
-
-    <!-- STEP: ENROL — the company requires 2FA and this user has none yet -->
-    <div *ngIf="step === 'enrol'" class="step-panel">
-      <h2 class="title">Set Up Two-Step Verification</h2>
-      <p class="subtitle">
-        Your company requires an authenticator app. Scan this with
-        Google Authenticator, Authy, 1Password or any TOTP app.
-      </p>
-
-      <div class="qr-block" *ngIf="qrDataUri(); else qrLoading">
-        <img [src]="qrDataUri()" alt="Two-factor setup QR code" class="qr-image">
-
-        <div class="secret-block">
-          <span class="secret-label">Can't scan? Enter this key by hand</span>
-          <div class="secret-row">
-            <code class="secret-value">{{ formattedSecret() }}</code>
-            <button type="button" class="icon-btn" (click)="copySecret()" title="Copy setup key">
-              <svg lucideCopy size="16"></svg>
+      <!-- =============================================================== -->
+      <!-- STEP: ENROL (Scan QR Code & Register 2FA) -->
+      <!-- =============================================================== -->
+      <div *ngIf="step === 'enrol'" class="form-panel">
+        
+        <!-- QR Code Preview Card -->
+        <div class="qr-setup-box" *ngIf="qrDataUri(); else qrLoading">
+          <div class="qr-canvas-frame">
+            <img [src]="qrDataUri()" alt="2FA QR code" class="qr-img">
+          </div>
+          
+          <div class="setup-key-row">
+            <div class="key-label">Setup Key:</div>
+            <code class="key-val">{{ formattedSecret() }}</code>
+            <button type="button" class="btn-copy-chip" (click)="copySecret()" [title]="secretCopied() ? 'Copied' : 'Copy'">
+              <svg *ngIf="!secretCopied()" lucideCopy size="13"></svg>
+              <svg *ngIf="secretCopied()" lucideCheck size="13" class="text-green"></svg>
+              <span>{{ secretCopied() ? 'Copied' : 'Copy' }}</span>
             </button>
           </div>
         </div>
-      </div>
 
-      <ng-template #qrLoading>
-        <div class="qr-placeholder"><span class="loader dark"></span></div>
-      </ng-template>
+        <ng-template #qrLoading>
+          <div class="qr-loading-box">
+            <span class="spinner-ring dark"></span>
+            <span>Generating encryption key...</span>
+          </div>
+        </ng-template>
 
-      <div class="form-group">
-        <label>Enter the 6-digit code to confirm</label>
-        <input
-          type="text"
-          class="form-control code-input"
-          [(ngModel)]="code"
-          (keyup.enter)="submit()"
-          placeholder="000000"
-          maxlength="6"
-          inputmode="numeric"
-          autocomplete="one-time-code"
+        <!-- Confirmation Code Input -->
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label" for="enrol-code">
+            <span>Confirmation Code</span>
+            <span class="label-hint">From authenticator app</span>
+          </label>
+          <div class="input-wrapper" [class.has-focus]="isCodeFocused">
+            <div class="input-icon-left">
+              <svg lucideKeyRound size="18"></svg>
+            </div>
+            <input
+              id="enrol-code"
+              type="text"
+              class="auth-input code-input"
+              [(ngModel)]="code"
+              (focus)="isCodeFocused = true"
+              (blur)="isCodeFocused = false"
+              (input)="onCodeInput()"
+              (keyup.enter)="submit()"
+              placeholder="000 000"
+              maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              autofocus
+            />
+          </div>
+        </div>
+
+        <button 
+          type="button" 
+          class="auth-submit-btn" 
+          (click)="submit()" 
+          [disabled]="isSubmitting() || !qrDataUri()"
+          style="margin-top: 16px;"
         >
+          <span *ngIf="!isSubmitting()" class="btn-content">
+            <span>Confirm &amp; Activate 2FA</span>
+            <svg lucideArrowRight size="18" class="btn-arrow"></svg>
+          </span>
+          <span *ngIf="isSubmitting()" class="btn-loader">
+            <span class="spinner-ring"></span>
+            <span>Activating...</span>
+          </span>
+        </button>
+
+        <div class="card-footer">
+          <span class="footer-text">Want to complete this later?</span>
+          <a class="signup-link" (click)="cancel()">
+            <span>Back to Login</span>
+            <svg lucideArrowRight size="14" class="inline-arrow"></svg>
+          </a>
+        </div>
+
       </div>
 
-      <button class="primary-btn" (click)="submit()" [disabled]="isSubmitting() || !qrDataUri()">
-        <span *ngIf="!isSubmitting()">Confirm &amp; Continue</span>
-        <span *ngIf="isSubmitting()" class="loader"></span>
-      </button>
+      <!-- =============================================================== -->
+      <!-- STEP: CODES (Save Backup Codes) -->
+      <!-- =============================================================== -->
+      <div *ngIf="step === 'codes'" class="form-panel">
+        
+        <div class="vault-warning-box">
+          <svg lucideLock size="16" class="warn-icon"></svg>
+          <p>These codes will <strong>never be shown again</strong>. Save them in a password manager.</p>
+        </div>
 
-      <button class="ghost-btn" (click)="cancel()">
-        <svg lucideArrowRight size="16" class="arrow-back"></svg>
-        <span>Back to Login</span>
-      </button>
+        <div class="codes-list-grid">
+          <div 
+            *ngFor="let c of backupCodes(); let i = index" 
+            class="code-chip-item"
+            (click)="copySingleBackupCode(c, i)"
+            [class.is-copied]="copiedCodeIndex() === i"
+          >
+            <span class="c-num">{{ i + 1 < 10 ? '0' + (i + 1) : (i + 1) }}</span>
+            <code class="c-code">{{ c }}</code>
+            <svg *ngIf="copiedCodeIndex() !== i" lucideCopy size="12" class="c-icon"></svg>
+            <svg *ngIf="copiedCodeIndex() === i" lucideCheck size="12" class="c-icon text-green"></svg>
+          </div>
+        </div>
+
+        <div class="codes-btn-row">
+          <button type="button" class="btn-outline-action" (click)="copyBackupCodes()">
+            <svg *ngIf="!backupCodesCopied()" lucideCopy size="14"></svg>
+            <svg *ngIf="backupCodesCopied()" lucideCheck size="14" class="text-green"></svg>
+            <span>{{ backupCodesCopied() ? 'Copied All' : 'Copy All' }}</span>
+          </button>
+          <button type="button" class="btn-outline-action" (click)="downloadBackupCodes()">
+            <svg lucideDownload size="14"></svg>
+            <span>Download .txt</span>
+          </button>
+        </div>
+
+        <label class="ack-checkbox-label">
+          <input 
+            type="checkbox" 
+            [checked]="acknowledged()" 
+            (change)="acknowledged.set(!acknowledged())"
+            class="custom-check"
+          />
+          <span>I have saved these backup codes in a safe place.</span>
+        </label>
+
+        <button 
+          type="button" 
+          class="auth-submit-btn" 
+          (click)="finish()" 
+          [disabled]="!acknowledged()"
+        >
+          <span class="btn-content">
+            <span>Continue to Workspace</span>
+            <svg lucideArrowRight size="18" class="btn-arrow"></svg>
+          </span>
+        </button>
+
+      </div>
+
     </div>
 
-    <!-- STEP: CODES — shown exactly once, so acknowledgement is mandatory -->
-    <div *ngIf="step === 'codes'" class="step-panel">
-      <h2 class="title">Save Your Backup Codes</h2>
-      <p class="subtitle">
-        These are the only way in if you lose your phone. Each one works
-        <strong>once</strong>. <span class="warning-text">They will not be shown again.</span>
-      </p>
-
-      <div class="codes-grid">
-        <code class="backup-code" *ngFor="let c of backupCodes()">{{ c }}</code>
-      </div>
-
-      <div class="codes-actions">
-        <button type="button" class="secondary-btn" (click)="copyBackupCodes()">
-          <svg lucideCopy size="15"></svg><span>Copy</span>
-        </button>
-        <button type="button" class="secondary-btn" (click)="downloadBackupCodes()">
-          <svg lucideDownload size="15"></svg><span>Download</span>
-        </button>
-      </div>
-
-      <label class="ack-row">
-        <input type="checkbox" [checked]="acknowledged()" (change)="acknowledged.set(!acknowledged())">
-        <span>I have saved these codes somewhere safe</span>
-      </label>
-
-      <button class="primary-btn" (click)="finish()" [disabled]="!acknowledged()">
-        <span>Continue to NEX ERP</span>
-      </button>
+    <!-- SECURITY BADGE (Below Card matching /login) -->
+    <div class="security-badge">
+      <svg lucideShieldCheck size="15" class="shield-icon"></svg>
+      <span>256-bit SSL Encrypted • Single Sign-On Ready</span>
     </div>
 
   </div>

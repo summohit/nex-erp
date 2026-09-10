@@ -198,7 +198,7 @@ input.error {
 button.btn-primary,
 .btn-orange,
 .btn.btn-primary {
-  background: #FF5A1F !important;
+  background: var(--color-primary) !important;
   color: #FFFFFF !important;
   border-radius: 9999px !important;
   padding: 10px 24px !important;
@@ -343,9 +343,11 @@ button.btn-outline:hover,
 }
 
 /* Global Utilities & Spacing Helpers */
-.text-danger { color: var(--color-danger); }
-.text-success { color: var(--color-success); }
-.text-warning { color: var(--color-warning); }
+/* These apply colour to type, so they take the -text variants. The fill values
+   sit between 2.1:1 and 3.8:1 on white and cannot be read at body size. */
+.text-danger { color: var(--color-danger-text); }
+.text-success { color: var(--color-success-text); }
+.text-warning { color: var(--color-warning-text); }
 .text-muted { color: var(--text-muted); }
 
 /* Margin Helpers */
@@ -587,7 +589,7 @@ button.btn-outline:hover,
 
   /* Checkbox */
   --ag-checkbox-background-color: #FFFFFF;
-  --ag-checkbox-checked-color: #FF5A1F;
+  --ag-checkbox-checked-color: var(--color-primary);
   --ag-checkbox-border-radius: 4px;
 }
 
@@ -783,7 +785,7 @@ button.btn-outline:hover,
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #FF5A1F;
+  background: var(--color-primary);
   color: #FFFFFF;
   font-weight: 700;
   font-size: 12px;
@@ -999,9 +1001,13 @@ button.btn-outline:hover,
   height: 8px;
   border-radius: var(--radius-full);
 }
-.mock-dot.red { background: var(--color-danger); }
-.mock-dot.yellow { background: var(--color-warning); }
-.mock-dot.green { background: var(--color-success); }
+/* The login page's fake window chrome. Deliberately the literal macOS
+   traffic-light colours rather than the status tokens — this is a drawing of a
+   window, not a status. (The markup writes .dot-red/.dot-yellow/.dot-green,
+   which auth.component.css styles; these are kept for any other consumer.) */
+.mock-dot.red,    .mock-dot.dot-red    { background: #FF5F56; }
+.mock-dot.yellow, .mock-dot.dot-yellow { background: #FFBD2E; }
+.mock-dot.green,  .mock-dot.dot-green  { background: #27C93F; }
 
 .mock-browser-body {
   height: 250px;

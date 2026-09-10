@@ -47,7 +47,7 @@ const DEFAULT_TERMS = `1. Validity: This quotation is valid for the period state
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    LucidePlus, LucideFileText, LucideCheck, LucideTrash2, LucideArrowRight, LucideX, LucideIndianRupee,
+    LucidePlus, LucideCheck, LucideTrash2, LucideArrowRight, LucideX,
     LucideUpload,
     SearchableSelectComponent, DialogHostComponent
   ],

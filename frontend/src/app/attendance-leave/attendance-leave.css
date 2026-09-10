@@ -1167,7 +1167,7 @@
 }
 
 .holiday-card.is-today .holiday-date-badge {
-  background: linear-gradient(135deg, var(--color-primary, #FF5200) 0%, #FF7332 100%);
+  background: linear-gradient(135deg, var(--color-primary, var(--color-primary)) 0%, #FF7332 100%);
   color: white;
   border-color: #EA580C;
   box-shadow: 0 3px 8px rgba(255, 82, 0, 0.3);
@@ -1189,7 +1189,7 @@
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--color-primary, #FF5200);
+  color: var(--color-primary, var(--color-primary));
   margin-top: 2px;
 }
 
@@ -1237,7 +1237,7 @@
 }
 
 .status-pill.status-today {
-  background: linear-gradient(135deg, var(--color-primary, #FF5200) 0%, #FF7332 100%);
+  background: linear-gradient(135deg, var(--color-primary, var(--color-primary)) 0%, #FF7332 100%);
   color: white;
   box-shadow: 0 2px 6px rgba(255, 82, 0, 0.3);
 }
@@ -1400,8 +1400,8 @@
 
 .cal-nav-btn:hover {
   background: #FFF7ED;
-  border-color: var(--color-primary, #FF5200);
-  color: var(--color-primary, #FF5200);
+  border-color: var(--color-primary, var(--color-primary));
+  color: var(--color-primary, var(--color-primary));
   box-shadow: 0 3px 8px rgba(255, 82, 0, 0.15);
   transform: translateY(-1px);
 }
@@ -1424,7 +1424,7 @@
 .current-date-badge {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-primary, #FF5200);
+  color: var(--color-primary, var(--color-primary));
 }
 
 .jump-today-pill {
@@ -1440,7 +1440,7 @@
 }
 
 .jump-today-pill:hover {
-  background: var(--color-primary, #FF5200);
+  background: var(--color-primary, var(--color-primary));
   color: white;
 }
 
@@ -1454,7 +1454,7 @@
 .today-tag {
   font-size: 9px;
   font-weight: 800;
-  background: var(--color-primary, #FF5200);
+  background: var(--color-primary, var(--color-primary));
   color: white;
   padding: 2px 6px;
   border-radius: 4px;
@@ -1479,7 +1479,7 @@
 }
 
 .weekday.is-weekend {
-  color: var(--color-primary, #FF5200);
+  color: var(--color-primary, var(--color-primary));
 }
 
 .calendar-cell.is-holiday {
@@ -1620,7 +1620,7 @@
 }
 
 .calendar-cell.is-today {
-  border: 2px solid var(--color-primary, #FF5200);
+  border: 2px solid var(--color-primary, var(--color-primary));
   box-shadow: 0 0 0 3px rgba(255, 82, 0, 0.12);
 }
 
@@ -1647,7 +1647,7 @@
 }
 
 .holiday-badge {
-  background: linear-gradient(135deg, var(--color-primary, #FF5200) 0%, #FF7332 100%);
+  background: linear-gradient(135deg, var(--color-primary, var(--color-primary)) 0%, #FF7332 100%);
   color: white;
   font-size: 11px;
   font-weight: 600;
@@ -1711,7 +1711,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: #FF5200;
+  background: var(--color-primary);
   color: #FFFFFF;
   font-weight: 800;
   font-size: 12px;

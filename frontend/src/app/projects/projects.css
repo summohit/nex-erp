@@ -1056,7 +1056,7 @@
 }
 
 .pm-select-trigger:focus-within {
-  border-color: #FF5A1F;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.12);
 }
 
@@ -1215,8 +1215,8 @@
 }
 
 .pm-item-check.checked {
-  background: #FF5A1F;
-  border-color: #FF5A1F;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .pm-item-avatar {

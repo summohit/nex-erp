@@ -84,7 +84,7 @@ export interface AssetActionCellParams extends ICellRendererParams {
       color: #0F172A;
       border-color: #CBD5E1;
     }
-    .text-primary { color: #FF5A1F !important; font-weight: 600; }
+    .text-primary { color: var(--color-primary) !important; font-weight: 600; }
     .text-success { color: #059669 !important; font-weight: 600; }
     .text-danger { color: #DC2626 !important; font-weight: 600; }
   `]

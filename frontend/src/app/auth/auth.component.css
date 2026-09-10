@@ -122,14 +122,14 @@
   border-radius: 9999px;
   font-size: 11px;
   font-weight: 700;
-  color: #ff5a1f;
+  color: var(--color-primary);
   letter-spacing: 0.4px;
   text-transform: uppercase;
   margin-bottom: 12px;
 }
 
 .badge-icon {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .auth-title {
@@ -171,7 +171,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #ff5a1f 0%, #ff8a4c 45%, #6366f1 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, #ff8a4c 45%, #6366f1 100%);
 }
 
 .login-form {
@@ -222,7 +222,7 @@
 
 .input-wrapper:focus-within {
   background: #ffffff;
-  border-color: #ff5a1f;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3.5px rgba(255, 90, 31, 0.12);
 }
 
@@ -247,7 +247,7 @@
 }
 
 .input-wrapper:focus-within .input-icon-left {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .input-wrapper.has-error .input-icon-left {
@@ -321,7 +321,7 @@
 .custom-checkbox {
   width: 16px;
   height: 16px;
-  accent-color: #ff5a1f;
+  accent-color: var(--color-primary);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -335,7 +335,7 @@
 .forgot-link {
   font-size: 13px;
   font-weight: 600;
-  color: #ff5a1f;
+  color: var(--color-primary);
   text-decoration: none;
   cursor: pointer;
   transition: color 0.15s ease, transform 0.15s ease;
@@ -350,7 +350,7 @@
 .auth-submit-btn {
   width: 100% !important;
   height: 46px !important;
-  background: linear-gradient(135deg, #FF5A1F 0%, #FF3800 100%) !important;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%) !important;
   color: #ffffff !important;
   border: none !important;
   border-radius: 12px !important;
@@ -443,7 +443,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #ff5a1f;
+  color: var(--color-primary);
   font-weight: 700;
   cursor: pointer;
   text-decoration: none;
@@ -499,7 +499,7 @@
 }
 
 .legal-link:hover {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 /* -------------------- Responsive Breakpoints -------------------- */
@@ -570,7 +570,7 @@
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #ff5a1f 0%, #ff3800 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #ff3800 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -772,7 +772,7 @@
 }
 
 .feature-icon-box {
-  color: #ff5a1f;
+  color: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -837,7 +837,7 @@
 }
 
 .brand-text {
-  color: #ff5a1f;
+  color: var(--color-primary);
 }
 
 .form-card-subtitle {

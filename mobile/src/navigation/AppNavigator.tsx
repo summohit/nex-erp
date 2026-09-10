@@ -24,6 +24,7 @@ import SplashScreen from '../components/SplashScreen';
 import FieldVisitScreen from '../screens/FieldVisit/FieldVisitScreen';
 import HardwareRequestScreen from '../screens/Assets/HardwareRequestScreen';
 import TicketsScreen from '../screens/Tickets/TicketsScreen';
+import SecurityScreen from '../screens/Security/SecurityScreen';
 import PermissionOnboardingScreen, { PERMISSIONS_ONBOARDED_KEY } from '../screens/Onboarding/PermissionOnboardingScreen';
 
 // How long the branded splash stays up at minimum, so its animation reads as
@@ -144,6 +145,7 @@ export default function AppNavigator() {
             <Stack.Screen name="FieldVisit" component={FieldVisitScreen} />
             <Stack.Screen name="HardwareRequests" component={HardwareRequestScreen} />
             <Stack.Screen name="Tickets" component={TicketsScreen} />
+            <Stack.Screen name="Security" component={SecurityScreen} />
           </>
         )}
       </Stack.Navigator>

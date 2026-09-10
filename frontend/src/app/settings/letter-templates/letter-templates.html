@@ -240,14 +240,14 @@
             <td>
               <div class="employee-cell">
                 <img 
-                  *ngIf="l.employee?.avatarUrl" 
+                  *ngIf="l.employee.avatarUrl" 
                   [src]="l.employee.avatarUrl" 
                   [alt]="l.employee.firstName" 
                   class="employee-avatar-img"
                   (error)="l.employee.avatarUrl = null"
                 />
                 <div 
-                  *ngIf="!l.employee?.avatarUrl"
+                  *ngIf="!l.employee.avatarUrl"
                   class="employee-avatar" 
                   [style.backgroundColor]="getAvatarBg(l.employee.firstName + ' ' + l.employee.lastName)">
                   {{ getInitials(l.employee.firstName, l.employee.lastName) }}
