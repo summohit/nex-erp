@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Post,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard, seconds } from '@nestjs/throttler';
@@ -97,9 +98,11 @@ export class TwoFactorController {
   @HttpCode(HttpStatus.OK)
   @Post('setup')
   setup(@Req() req: any, @Body() body: { password?: string }) {
-    return this.twoFactor.startEnrolmentWithPassword(
-      { id: req.user.sub, email: req.user.email },
-      body?.password,
+    return this.asForbidden(
+      this.twoFactor.startEnrolmentWithPassword(
+        { id: req.user.sub, email: req.user.email },
+        body?.password,
+      ),
     );
   }
 
@@ -108,9 +111,8 @@ export class TwoFactorController {
   @HttpCode(HttpStatus.OK)
   @Post('enable')
   async enable(@Req() req: any, @Body() body: { code?: string }) {
-    const { backupCodes } = await this.twoFactor.confirmEnrolment(
-      req.user.sub,
-      body?.code,
+    const { backupCodes } = await this.asForbidden(
+      this.twoFactor.confirmEnrolment(req.user.sub, body?.code),
     );
     return { enabled: true, backupCodes };
   }
@@ -120,11 +122,13 @@ export class TwoFactorController {
   @HttpCode(HttpStatus.OK)
   @Post('disable')
   disable(@Req() req: any, @Body() body: { password?: string; code?: string }) {
-    return this.twoFactor.disable(
-      req.user.sub,
-      req.user.companyId,
-      body?.password,
-      body?.code,
+    return this.asForbidden(
+      this.twoFactor.disable(
+        req.user.sub,
+        req.user.companyId,
+        body?.password,
+        body?.code,
+      ),
     );
   }
 
@@ -140,10 +144,12 @@ export class TwoFactorController {
     @Req() req: any,
     @Body() body: { password?: string; code?: string },
   ) {
-    return this.twoFactor.startRotation(
-      { id: req.user.sub, email: req.user.email },
-      body?.password,
-      body?.code,
+    return this.asForbidden(
+      this.twoFactor.startRotation(
+        { id: req.user.sub, email: req.user.email },
+        body?.password,
+        body?.code,
+      ),
     );
   }
 
@@ -152,7 +158,9 @@ export class TwoFactorController {
   @HttpCode(HttpStatus.OK)
   @Post('rotate/confirm')
   confirmRotation(@Req() req: any, @Body() body: { code?: string }) {
-    return this.twoFactor.confirmRotation(req.user.sub, body?.code);
+    return this.asForbidden(
+      this.twoFactor.confirmRotation(req.user.sub, body?.code),
+    );
   }
 
   @UseGuards(AuthGuard)
@@ -170,10 +178,12 @@ export class TwoFactorController {
     @Req() req: any,
     @Body() body: { password?: string; code?: string },
   ) {
-    return this.twoFactor.regenerateBackupCodes(
-      req.user.sub,
-      body?.password,
-      body?.code,
+    return this.asForbidden(
+      this.twoFactor.regenerateBackupCodes(
+        req.user.sub,
+        body?.password,
+        body?.code,
+      ),
     );
   }
 
@@ -192,6 +202,32 @@ export class TwoFactorController {
   resetForUser(@Req() req: any, @Param('userId', ParseIntPipe) userId: number) {
     this.assertSuperAdmin(req);
     return this.twoFactor.adminReset(req.user, userId);
+  }
+
+  /**
+   * Turn the shared verifier's 401 into a 403 on the AUTHENTICATED routes.
+   *
+   * UnauthorizedException is right for the sign-in challenge — a wrong code
+   * there really is a failed login. On these routes the user already has a
+   * valid session, and both clients read a 401 as an expired one: the web pops
+   * its session-expired modal, mobile refreshes and then logs out. So a
+   * mistyped code was logging people out instead of saying "wrong code" —
+   * worst of all part-way through moving to a new phone.
+   *
+   * Both clients' comments already documented this behaviour; nothing actually
+   * implemented it. This is the boundary where the distinction exists, so it
+   * belongs here rather than in the service, which serves both groups.
+   */
+  private async asForbidden<T>(work: Promise<T>): Promise<T> {
+    try {
+      return await work;
+    } catch (err) {
+      if (err instanceof UnauthorizedException) {
+        const body = err.getResponse() as any;
+        throw new ForbiddenException(body?.message ?? err.message);
+      }
+      throw err;
+    }
   }
 
   /** Matches the inline role check SystemSettingsController already uses. */

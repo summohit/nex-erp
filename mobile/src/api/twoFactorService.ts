@@ -6,6 +6,9 @@ export interface TwoFactorStatus {
   backupCodesRemaining: number;
   companyRequires: boolean;
   canDisable: boolean;
+  /** A device move was started and never finished; the old app still works. */
+  rotationPending?: boolean;
+  rotationStartedAt?: string | null;
 }
 
 export interface EnrolmentPayload {
@@ -15,6 +18,13 @@ export interface EnrolmentPayload {
   secret: string;
   /** otpauth:// URI, used for the "open in authenticator" hand-off. */
   otpauthUri: string;
+}
+
+export interface RotationStart extends EnrolmentPayload {
+  /** True when a backup code was spent to start the move instead of a live code. */
+  usedBackupCode: boolean;
+  backupCodesRemaining: number;
+  expiresInSeconds: number;
 }
 
 export const twoFactorService = {
@@ -59,6 +69,28 @@ export const twoFactorService = {
 
   regenerateBackupCodes: async (password: string, code: string): Promise<{ backupCodes: string[] }> => {
     const res = await apiClient.post('/auth/2fa/backup-codes/regenerate', { password, code });
+    return res.data;
+  },
+
+  // ── Moving the authenticator to a new device ───────────────────────────────
+  // Two steps, and 2FA stays on throughout: the replacement secret only goes
+  // live once the new device proves it works. That is why this is available
+  // even when the company policy forbids turning 2FA off.
+
+  /** `code` is a live code from the CURRENT device, or a backup code if it is gone. */
+  startRotation: async (password: string, code: string): Promise<RotationStart> => {
+    const res = await apiClient.post('/auth/2fa/rotate/start', { password, code });
+    return res.data;
+  },
+
+  /** Only a real TOTP code finishes this — a backup code proves nothing about the new phone. */
+  confirmRotation: async (code: string): Promise<{ enabled: boolean; rotatedAt: string }> => {
+    const res = await apiClient.post('/auth/2fa/rotate/confirm', { code });
+    return res.data;
+  },
+
+  cancelRotation: async (): Promise<{ rotationPending: boolean }> => {
+    const res = await apiClient.post('/auth/2fa/rotate/cancel', {});
     return res.data;
   },
 };
