@@ -1,24 +1,33 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { AgGridModule } from 'ag-grid-angular';
-import { ColDef, GridApi, GridReadyEvent, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import { ColDef, GridApi, GridReadyEvent, GridOptions, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideDownload, LucideRefreshCw, LucideX,
   LucideTriangleAlert, LucideCalendarDays,
+  LucideSearch, LucideClock, LucideCheckCircle2,
+  LucideTrendingUp, LucidePieChart, LucideUsers,
+  LucideFilter, LucideChevronRight, LucideInfo,
+  LucideFileText, LucideAlertCircle
 } from '@lucide/angular';
 
 import { LeavesService, QuotaReport, QuotaRow } from '../../services/leaves';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
+export type QuickFilterType = 'ALL' | 'LOW_REMAINING' | 'HIGH_USED' | 'UNASSIGNED';
+
 @Component({
   selector: 'app-leave-quota',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, AgGridModule,
+    CommonModule, FormsModule, RouterModule, AgGridModule,
     LucideDownload, LucideRefreshCw, LucideX, LucideTriangleAlert, LucideCalendarDays,
+    LucideSearch, LucideClock, LucideCheckCircle2, LucideTrendingUp, LucidePieChart,
+    LucideUsers, LucideFilter, LucideChevronRight, LucideInfo, LucideFileText, LucideAlertCircle,
   ],
   templateUrl: './leave-quota.html',
   styleUrls: ['./leave-quota.css'],
@@ -26,7 +35,6 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 export class LeaveQuotaComponent implements OnInit {
   private leavesService = inject(LeavesService);
   private toast = inject(HotToastService);
-
 
   loading = signal(true);
   report = signal<QuotaReport | null>(null);
@@ -36,6 +44,7 @@ export class LeaveQuotaComponent implements OnInit {
   /** null = every leave type, totalled. Otherwise one type's figures. */
   leaveTypeId = signal<number | null>(null);
   search = signal('');
+  quickFilter = signal<QuickFilterType>('ALL');
 
   detailRow = signal<QuotaRow | null>(null);
 
@@ -70,6 +79,16 @@ export class LeaveQuotaComponent implements OnInit {
     this.load();
   }
 
+  setQuickFilter(filter: QuickFilterType) {
+    this.quickFilter.set(filter);
+  }
+
+  clearFilters() {
+    this.search.set('');
+    this.leaveTypeId.set(null);
+    this.quickFilter.set('ALL');
+  }
+
   // ── the figures being shown ────────────────────────────────────────────────
 
   /**
@@ -85,33 +104,88 @@ export class LeaveQuotaComponent implements OnInit {
     const report = this.report();
     if (!report) return [];
     const term = this.search().trim().toLowerCase();
+    const filter = this.quickFilter();
 
     return report.rows
-      .filter((r) =>
-        !term ||
-        r.employee.name.toLowerCase().includes(term) ||
-        (r.employee.employeeCode ?? '').toLowerCase().includes(term) ||
-        (r.employee.department ?? '').toLowerCase().includes(term),
-      )
       .map((r) => {
         const cell = this.cellFor(r);
+        const entitlement = cell.allocated + cell.carriedOver;
+        const utilisation = entitlement > 0 ? (cell.used / entitlement) * 100 : 0;
         return {
           ...r,
           allocated: cell.allocated,
           used: cell.used,
           carriedOver: cell.carriedOver,
           remaining: cell.remaining,
-          // Entitlement is what they were given plus what rolled in; used
-          // against that is the only utilisation figure that means anything.
-          utilisation: cell.allocated + cell.carriedOver > 0
-            ? (cell.used / (cell.allocated + cell.carriedOver)) * 100
-            : 0,
+          utilisation,
         };
+      })
+      .filter((r) => {
+        // Search filter
+        if (term) {
+          const matchesTerm =
+            r.employee.name.toLowerCase().includes(term) ||
+            (r.employee.employeeCode ?? '').toLowerCase().includes(term) ||
+            (r.employee.department ?? '').toLowerCase().includes(term) ||
+            (r.employee.designation ?? '').toLowerCase().includes(term);
+          if (!matchesTerm) return false;
+        }
+
+        // Quick filter
+        if (filter === 'LOW_REMAINING') {
+          return !r.hasNoBalances && r.remaining <= 2;
+        }
+        if (filter === 'HIGH_USED') {
+          return !r.hasNoBalances && r.utilisation >= 75;
+        }
+        if (filter === 'UNASSIGNED') {
+          return r.hasNoBalances;
+        }
+
+        return true;
       });
   });
 
+  quickFilterCounts = computed(() => {
+    const report = this.report();
+    if (!report) return { all: 0, lowRemaining: 0, highUsed: 0, unassigned: 0 };
+    let lowRemaining = 0;
+    let highUsed = 0;
+    let unassigned = 0;
+
+    for (const r of report.rows) {
+      if (r.hasNoBalances) {
+        unassigned++;
+      } else {
+        const cell = this.cellFor(r);
+        const entitlement = cell.allocated + cell.carriedOver;
+        const util = entitlement > 0 ? (cell.used / entitlement) * 100 : 0;
+        if (cell.remaining <= 2) lowRemaining++;
+        if (util >= 75) highUsed++;
+      }
+    }
+
+    return {
+      all: report.rows.length,
+      lowRemaining,
+      highUsed,
+      unassigned,
+    };
+  });
+
   summary = computed(() => {
-    const rows = this.rows();
+    const report = this.report();
+    const rows = report ? report.rows.map((r) => {
+      const cell = this.cellFor(r);
+      return {
+        ...r,
+        allocated: cell.allocated,
+        carriedOver: cell.carriedOver,
+        used: cell.used,
+        remaining: cell.remaining,
+      };
+    }) : [];
+
     const totals = rows.reduce(
       (acc, r) => ({
         allocated: acc.allocated + r.allocated,
@@ -125,9 +199,8 @@ export class LeaveQuotaComponent implements OnInit {
     return {
       ...totals,
       people: rows.length,
+      filteredPeople: this.rows().length,
       utilisation: entitlement > 0 ? (totals.used / entitlement) * 100 : 0,
-      // Nobody can take leave they were never allocated, so this is the row
-      // that actually needs fixing before the report means anything.
       missingBalances: rows.filter((r) => r.hasNoBalances).length,
     };
   });
@@ -146,69 +219,146 @@ export class LeaveQuotaComponent implements OnInit {
     return this.report()?.leaveTypes.find((t) => t.id === id)?.name ?? 'All leave types';
   });
 
-  // ── grid ───────────────────────────────────────────────────────────────────
+  // ── grid options matching system standards ───────────────────────────────
+
+  gridOptions: GridOptions = {
+    theme: 'legacy' as const,
+    animateRows: true,
+  };
 
   columnDefs: ColDef[] = [
     {
       field: 'employee.name',
-      headerName: 'EMPLOYEE',
-      flex: 1,
-      minWidth: 220,
-      maxWidth: 380,
+      headerName: 'Employee',
+      flex: 1.5,
+      minWidth: 260,
+      maxWidth: 420,
       pinned: 'left',
       cellRenderer: (p: any) => {
         const e = p.data?.employee;
         if (!e) return '';
-        const initials = (e.name || '?').split(' ').map((s: string) => s[0]).slice(0, 2).join('');
-        const avatar = e.avatarUrl
-          ? `<img class="q-avatar-img" src="${this.escape(e.avatarUrl)}" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span class="q-avatar" style="display:none;">${this.escape(initials)}</span>`
-          : `<span class="q-avatar">${this.escape(initials)}</span>`;
+        const name = (e.name || '?').trim();
+        const initials = name.split(' ').map((s: string) => s[0]).slice(0, 2).join('').toUpperCase();
+        const avatarHtml = e.avatarUrl
+          ? `<img src="${this.escape(e.avatarUrl)}" class="avatar-img-sm" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><div class="avatar-circle-sm" style="display:none;">${initials}</div>`
+          : `<div class="avatar-circle-sm">${initials}</div>`;
         const sub = [e.designation, e.department].filter(Boolean).join(' · ');
+        const code = e.employeeCode ? `<span class="tag-mono">${this.escape(e.employeeCode)}</span>` : '';
+        const inactive = e.isActive ? '' : '<span class="status-round status-archived" style="padding: 1px 6px; font-size: 10px;"><span class="status-dot"></span>Inactive</span>';
+
         return `
-          <div class="q-emp">
-            ${avatar}
-            <div class="q-emp-text">
-              <span class="q-emp-name">${this.escape(e.name)}${e.isActive ? '' : ' <span class="q-inactive">inactive</span>'}</span>
-              <span class="q-emp-sub">${this.escape(sub)}</span>
+          <div class="cell-user-avatar-row">
+            ${avatarHtml}
+            <div class="user-text-stack">
+              <div class="cell-title-bold" style="display: flex; align-items: center; gap: 6px;">
+                <span>${this.escape(name)}</span>
+                ${inactive}
+              </div>
+              <div class="cell-subtitle-row">
+                ${code}
+                <span title="${this.escape(sub)}">${this.escape(sub || 'Staff')}</span>
+              </div>
             </div>
           </div>`;
       },
     },
-    { field: 'allocated', headerName: 'ALLOCATED', width: 125, type: 'numericColumn', valueFormatter: (p) => this.days(p.value) },
-    { field: 'carriedOver', headerName: 'CARRIED IN', width: 125, type: 'numericColumn', valueFormatter: (p) => this.days(p.value) },
-    { field: 'used', headerName: 'USED', width: 110, type: 'numericColumn', valueFormatter: (p) => this.days(p.value) },
     {
-      field: 'remaining',
-      headerName: 'REMAINING',
-      width: 135,
+      field: 'allocated',
+      headerName: 'Allocated',
+      width: 125,
       type: 'numericColumn',
       valueFormatter: (p) => this.days(p.value),
-      cellClass: (p) => (p.value <= 0 ? 'q-none-left' : p.value <= 2 ? 'q-low-left' : ''),
+      cellRenderer: (p: any) => `<span class="cell-title-bold" style="font-variant-numeric: tabular-nums;">${this.days(p.value)}</span>`
+    },
+    {
+      field: 'carriedOver',
+      headerName: 'Carried In',
+      width: 125,
+      type: 'numericColumn',
+      valueFormatter: (p) => this.days(p.value),
+      cellRenderer: (p: any) => {
+        if (!p.value || p.value === 0) {
+          return '<span style="color: #94A3B8; font-weight: 500;">—</span>';
+        }
+        return `<span style="color: #7000FF; font-weight: 700; font-variant-numeric: tabular-nums;">+${this.days(p.value)}</span>`;
+      }
+    },
+    {
+      field: 'used',
+      headerName: 'Used',
+      width: 115,
+      type: 'numericColumn',
+      valueFormatter: (p) => this.days(p.value),
+      cellRenderer: (p: any) => `<span class="cell-title-bold" style="font-variant-numeric: tabular-nums;">${this.days(p.value)}</span>`
+    },
+    {
+      field: 'remaining',
+      headerName: 'Remaining',
+      width: 155,
+      type: 'numericColumn',
+      valueFormatter: (p) => this.days(p.value),
+      cellRenderer: (p: any) => {
+        if (p.data?.hasNoBalances) {
+          return '<span class="status-round status-archived"><span class="status-dot"></span>Unassigned</span>';
+        }
+        const val = Number(p.value ?? 0);
+        if (val <= 0) {
+          return `<span class="status-round status-rejected"><span class="status-dot"></span>${this.days(val)} left</span>`;
+        }
+        if (val <= 2) {
+          return `<span class="status-round status-pending"><span class="status-dot"></span>${this.days(val)} left</span>`;
+        }
+        return `<span class="status-round status-available"><span class="status-dot"></span>${this.days(val)} left</span>`;
+      },
     },
     {
       field: 'utilisation',
-      headerName: 'USED %',
-      width: 150,
+      headerName: 'Used %',
+      width: 170,
       cellRenderer: (p: any) => {
-        if (p.data?.hasNoBalances) return '<span class="q-muted">no balance set</span>';
+        if (p.data?.hasNoBalances) {
+          return '<span style="color: #94A3B8; font-size: 11.5px;">—</span>';
+        }
         const pct = Math.min(100, Math.max(0, p.value || 0));
+        let barColor = '#10B981';
+        let textColor = '#047857';
+        if (pct >= 80) {
+          barColor = '#EF4444';
+          textColor = '#B91C1C';
+        } else if (pct >= 50) {
+          barColor = '#F59E0B';
+          textColor = '#B45309';
+        }
+
         return `
-          <div class="q-bar-wrap" title="${pct.toFixed(0)}% of entitlement used">
-            <div class="q-bar"><div class="q-bar-fill" style="width:${pct}%"></div></div>
-            <span class="q-bar-label">${pct.toFixed(0)}%</span>
+          <div style="display: flex; align-items: center; gap: 8px; width: 100%; height: 100%;">
+            <div style="flex: 1; height: 6px; background: #F1F5F9; border-radius: 9999px; overflow: hidden;">
+              <div style="height: 100%; width: ${pct}%; background: ${barColor}; border-radius: 9999px; transition: width 0.3s ease;"></div>
+            </div>
+            <span style="font-size: 12px; font-weight: 700; color: ${textColor}; min-width: 34px; text-align: right; font-variant-numeric: tabular-nums;">${pct.toFixed(0)}%</span>
           </div>`;
       },
     },
     {
-      headerName: '',
-      width: 96,
+      headerName: 'Action',
+      width: 125,
       sortable: false,
-      cellRenderer: () => '<button class="q-view-btn" type="button">Breakdown</button>',
+      cellRenderer: () => `
+        <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+          <button class="btn-view" type="button" title="View leave breakdown">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Breakdown</span>
+          </button>
+        </div>`,
       onCellClicked: (p: any) => this.openDetail(p.data),
     },
   ];
 
-  defaultColDef: ColDef = { sortable: true, resizable: true, filter: false };
+  defaultColDef: ColDef = {
+    sortable: true,
+    resizable: true,
+    filter: false,
+  };
 
   onGridReady(e: GridReadyEvent) {
     this.gridApi = e.api;
@@ -218,8 +368,6 @@ export class LeaveQuotaComponent implements OnInit {
     if (!this.gridApi) return;
     this.gridApi.exportDataAsCsv({
       fileName: `leave-quota-${this.year()}${this.leaveTypeId() ? '-' + this.slug(this.selectedTypeName()) : ''}.csv`,
-      // The Breakdown button would export as empty text, and the progress bar
-      // as markup — the raw percentage is what belongs in a spreadsheet.
       columnKeys: ['employee.name', 'allocated', 'carriedOver', 'used', 'remaining', 'utilisation'],
     });
   }

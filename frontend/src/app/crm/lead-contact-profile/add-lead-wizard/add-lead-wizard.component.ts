@@ -305,7 +305,7 @@ customSource = '';
     const isTab2Valid = this.newLeadData.status?.trim()
       && this.newLeadData.source?.trim()
       && this.newLeadData.dealCategory?.trim()
-      && this.newLeadData.value !== null && this.newLeadData.value !== undefined
+      && this.newLeadData.value !== null && this.newLeadData.value !== undefined && this.newLeadData.value > 0
       && this.newLeadData.expectedCloseDate;
 
     if (!isTab2Valid) {

@@ -198,25 +198,27 @@
               <option *ngFor="let cat of DEAL_CATEGORIES" [value]="cat.id">{{cat.name}}</option>
             </select>
             <span class="error-msg" *ngIf="isSubmitted && !newLeadData.dealCategory?.trim()">Lead Category is required.</span>
+          </div>
+          <div class="form-group" *ngIf="newLeadData.dealCategory === 'Other'">
+            <label>Specify Custom Category <span class="required-asterisk">*</span></label>
             <input
-              *ngIf="newLeadData.dealCategory === 'Other'"
               type="text"
               [(ngModel)]="customCategory"
-              placeholder="Specify custom Lead Category..."
-              style="margin-top: 8px;"
+              placeholder="Enter custom category..."
               [disabled]="isSaving"
             />
           </div>
+          <div class="form-group" *ngIf="newLeadData.dealCategory !== 'Other'"></div>
         </div>
 
         <div class="form-row">
-          <div class="form-group" [class.has-error]="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined)">
+          <div class="form-group" [class.has-error]="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined || newLeadData.value <= 0)">
             <label>Expected Lead Value <span class="required-asterisk">*</span></label>
             <div class="input-with-prefix">
               <span class="currency-symbol-addon">₹</span>
               <input
                 type="number"
-                min="0"
+                min="0.01"
                 step="any"
                 [(ngModel)]="newLeadData.value"
                 (keydown)="preventNegative($event)"
@@ -226,7 +228,7 @@
                 class="currency-input"
               />
             </div>
-            <span class="error-msg" *ngIf="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined)">Deal Value is required.</span>
+            <span class="error-msg" *ngIf="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined || newLeadData.value <= 0)">Deal Value must be greater than 0.</span>
           </div>
           <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.expectedCloseDate">
             <label>Expected Close Date <span class="required-asterisk">*</span></label>

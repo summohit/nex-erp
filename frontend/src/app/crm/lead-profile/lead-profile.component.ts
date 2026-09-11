@@ -9,7 +9,7 @@ import {
   LucideGlobe, LucideExternalLink, LucideCalendar, LucideDollarSign,
   LucideUser, LucideUserCheck, LucideBriefcase, LucideLayoutList,
   LucideMessageSquare, LucideFileText, LucideTarget, LucideChevronRight,
-  LucideUpload, LucideDownload, LucideTrash2, LucideEdit, LucideCheckCircle,
+  LucideUpload, LucideDownload, LucideTrash2, LucideEdit2, LucideCheckCircle,
   LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
   LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
   LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock
@@ -31,7 +31,7 @@ interface PipelineStage {
     LucideGlobe, LucideExternalLink, LucideCalendar, LucideDollarSign,
     LucideUser, LucideUserCheck, LucideBriefcase, LucideLayoutList,
     LucideMessageSquare, LucideFileText, LucideTarget, LucideChevronRight,
-    LucideUpload, LucideDownload, LucideTrash2, LucideEdit, LucideCheckCircle,
+    LucideUpload, LucideDownload, LucideTrash2, LucideEdit2, LucideCheckCircle,
     LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
     LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
     LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock
@@ -62,6 +62,8 @@ export class LeadProfileComponent implements OnInit {
 
   // Loading states
   loadingFiles = false;
+  uploadingFile = false;
+  uploadingFileName = '';
   loadingFollowUps = false;
   loadingProposals = false;
   loadingNotes = false;
@@ -248,16 +250,22 @@ export class LeadProfileComponent implements OnInit {
 
   uploadFile(file: File) {
     if (this.leadId == null) return;
+    this.uploadingFile = true;
+    this.uploadingFileName = file.name;
     const formData = new FormData();
     formData.append('file', file);
     this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/files`, formData).subscribe({
       next: (data) => {
         this.files.unshift(data);
+        this.uploadingFile = false;
+        this.uploadingFileName = '';
         this.dialog.success('File uploaded successfully.');
         this.loadHistory();
       },
       error: (err) => {
         console.error(err);
+        this.uploadingFile = false;
+        this.uploadingFileName = '';
         this.dialog.error('Failed to upload file. Please try again.');
       }
     });

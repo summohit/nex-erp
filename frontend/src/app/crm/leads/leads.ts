@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { CommonModule } from '@angular/common';
@@ -875,7 +875,8 @@ csvImporting = false;
       c.phone?.toLowerCase().includes(q) ||
       c.mobile?.toLowerCase().includes(q) ||
       c.leadSource?.toLowerCase().includes(q) ||
-      (c.addedBy && `${c.addedBy.firstName} ${c.addedBy.lastName}`.toLowerCase().includes(q))
+      (c.addedBy && `${c.addedBy.firstName} ${c.addedBy.lastName}`.toLowerCase().includes(q)) ||
+      (c.leadsBrought && c.leadsBrought.some((l: any) => l.dealCategory?.toLowerCase().includes(q)))
     );
   }
 
@@ -1187,7 +1188,8 @@ csvImporting = false;
         lead.companyName?.toLowerCase().includes(q) ||
         lead.contactName?.toLowerCase().includes(q) ||
         lead.email?.toLowerCase().includes(q) ||
-        lead.phone?.toLowerCase().includes(q);
+        lead.phone?.toLowerCase().includes(q) ||
+        lead.dealCategory?.toLowerCase().includes(q);
 
       const normalized = this.normalizeStatus(lead.status);
       const matchesStage =
@@ -1475,15 +1477,17 @@ csvImporting = false;
     this.onFilterChange();
   }
 
-  getFilteredCategoriesForFilter(): any[] {
-    // New category list, plus any legacy categories still present on loaded
-    // leads so nothing becomes unfilterable after the list changed.
+  getAllCategoriesForFilter(): any[] {
     const legacy = this.leads
       .map(l => l.dealCategory)
       .filter((c): c is string => !!c && !this.DEAL_CATEGORIES.some(d => d.id === c))
       .filter((v, i, a) => a.indexOf(v) === i)
       .map(c => ({ id: c, name: c, hint: '' }));
-    const all = [...this.DEAL_CATEGORIES, ...legacy];
+    return [...this.DEAL_CATEGORIES, ...legacy];
+  }
+
+  getFilteredCategoriesForFilter(): any[] {
+    const all = this.getAllCategoriesForFilter();
     if (!this.categorySearchQuery.trim()) return all;
     const q = this.categorySearchQuery.toLowerCase();
     return all.filter(c => c.name.toLowerCase().includes(q));
@@ -1829,7 +1833,7 @@ csvImporting = false;
     const isTab2Valid = this.newLeadData.status?.trim()
       && this.newLeadData.source?.trim()
       && this.newLeadData.dealCategory?.trim()
-      && this.newLeadData.value !== null && this.newLeadData.value !== undefined
+      && this.newLeadData.value !== null && this.newLeadData.value !== undefined && this.newLeadData.value > 0
       && this.newLeadData.expectedCloseDate;
 
     if (!isTab2Valid) {

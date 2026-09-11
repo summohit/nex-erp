@@ -139,32 +139,72 @@
               <span class="header-icon bg-indigo-light text-indigo"><svg lucidePaperclip size="16"></svg></span>
               <h3>Files</h3>
             </div>
-            <button class="btn-primary-pill" (click)="triggerFileUpload()"><svg lucidePlus size="16"></svg> Upload File</button>
+            <button class="btn-primary-pill" (click)="triggerFileUpload()" [disabled]="uploadingFile">
+              <svg lucideLoader2 size="16" class="spin-icon" *ngIf="uploadingFile"></svg>
+              <svg lucidePlus size="16" *ngIf="!uploadingFile"></svg>
+              <span>{{ uploadingFile ? 'Uploading...' : 'Upload File' }}</span>
+            </button>
           </div>
           <input type="file" id="dealFileInput" hidden (change)="onFileSelected($event)">
 
           <div class="loading-box" *ngIf="loadingFiles"><div class="spinner small"></div><span>Loading files...</span></div>
 
-          <div class="table-scroll" *ngIf="!loadingFiles && files.length">
+          <!-- File Uploading Progress Banner -->
+          <div class="file-uploading-banner" *ngIf="uploadingFile">
+            <div class="file-uploading-banner-main">
+              <div class="file-uploading-spinner">
+                <svg lucideLoader2 size="20" class="spin-icon"></svg>
+              </div>
+              <div class="file-uploading-info">
+                <div class="file-uploading-title">
+                  Uploading <strong>{{ uploadingFileName || 'file' }}</strong>...
+                </div>
+                <div class="file-uploading-sub">Please wait while the file is being uploaded and attached to this deal.</div>
+              </div>
+            </div>
+            <div class="file-uploading-progress-track">
+              <div class="file-uploading-progress-bar"></div>
+            </div>
+          </div>
+
+          <div class="table-scroll" *ngIf="!loadingFiles && (files.length || uploadingFile)">
             <table class="leads-table">
               <thead><tr><th>File Name</th><th>Type</th><th>Size</th><th>Uploaded By</th><th>Date</th><th>Action</th></tr></thead>
               <tbody>
+                <tr class="row-uploading" *ngIf="uploadingFile">
+                  <td>
+                    <div class="table-user-name file-name-cell">
+                      <span class="file-icon-m uploading-icon"><svg lucideLoader2 [size]="15" class="spin-icon"></svg></span>
+                      <span class="uploading-file-name">{{ uploadingFileName || 'Uploading file...' }}</span>
+                      <span class="uploading-badge">Uploading</span>
+                    </div>
+                  </td>
+                  <td><span class="category-pill uploading-pill">Processing</span></td>
+                  <td>—</td>
+                  <td><span class="table-user-name">Uploading...</span></td>
+                  <td>Just now</td>
+                  <td>
+                    <div class="table-actions-group">
+                      <span class="uploading-spinner-text"><svg lucideLoader2 [size]="14" class="spin-icon"></svg></span>
+                    </div>
+                  </td>
+                </tr>
                 <tr *ngFor="let f of files">
-                  <td><div class="table-user-name file-name-cell"><span class="file-icon-m {{ fileIcon(f) }}"><svg lucideFile size="15"></svg></span> {{ f.fileName }}</div></td>
+                  <td><div class="table-user-name file-name-cell"><span class="file-icon-m {{ fileIcon(f) }}"><svg lucideFile [size]="15"></svg></span> {{ f.fileName }}</div></td>
                   <td><span class="category-pill">{{ (f.fileType || '—').split('/').pop() }}</span></td>
                   <td>{{ formatFileSize(f.fileSize) }}</td>
                   <td><span class="table-user-name">{{ employeeName(f.uploadedBy) }}</span></td>
                   <td>{{ f.createdAt | date:'mediumDate' }}</td>
                   <td><div class="table-actions-group">
-                    <button class="btn-action-icon" title="View" (click)="downloadFile(f)"><svg lucideEye size="15"></svg></button>
-                    <button class="btn-action-icon" title="Download" (click)="downloadFile(f)"><svg lucideDownload size="15"></svg></button>
-                    <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFile(f)"><svg lucideTrash2 size="15"></svg></button>
+                    <button class="btn-action-icon" title="View" (click)="downloadFile(f)"><svg lucideEye [size]="15"></svg></button>
+                    <button class="btn-action-icon" title="Download" (click)="downloadFile(f)"><svg lucideDownload [size]="15"></svg></button>
+                    <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFile(f)"><svg lucideTrash2 [size]="15"></svg></button>
                   </div></td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div class="empty-state-box" *ngIf="!loadingFiles && !files.length">
+          <div class="empty-state-box" *ngIf="!loadingFiles && !files.length && !uploadingFile">
             <svg lucidePaperclip size="24" style="margin-bottom:6px;opacity:.5"></svg>
             <div>No files uploaded yet.</div>
           </div>
@@ -270,11 +310,21 @@
                         <span class="fup-status-saving" *ngIf="followUpStatusSaving[fu.id]"><svg lucideLoader2 size="13" class="spin-icon"></svg></span>
                       </div>
                     </td>
+<<<<<<< Updated upstream
                     <td class="col-actions-sticky">
                       <button type="button" class="fu-actions-trigger" title="Actions" (click)="toggleFollowUpActionsMenu(fu, $event)">
                         <svg lucideMoreVertical size="16"></svg>
                       </button>
                   </td>
+=======
+                    <td>
+                      <div class="table-actions-group">
+                        <button class="btn-action-icon" title="Edit" (click)="openEditFollowUp(fu)"><svg lucideEdit2 [size]="15"></svg></button>
+                        <button class="btn-action-icon" title="Mark as Completed" *ngIf="fu.status !== 'COMPLETED'" (click)="markFollowUpComplete(fu)"><svg lucideCheckCircle [size]="15"></svg></button>
+                        <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFollowUp(fu)"><svg lucideTrash2 [size]="15"></svg></button>
+                      </div>
+                    </td>
+>>>>>>> Stashed changes
                   </tr>
                 </tbody>
               </table>
@@ -328,7 +378,7 @@
                   <td><span class="followup-type-pill {{ dealStatusPill(q.status) }}">{{ q.status }}</span></td>
                   <td><span class="deal-status-badge {{ dealStatusPill(q.status) }}">{{ dealStatusLabel(q.status) }}</span></td>
                   <td><div class="table-actions-group">
-                    <button class="btn-action-icon" title="View" (click)="goToQuotations()"><svg lucideEye size="15"></svg></button>
+                    <button class="btn-action-icon" title="View" (click)="goToQuotations()"><svg lucideEye [size]="15"></svg></button>
                   </div></td>
                 </tr>
               </tbody>
@@ -359,9 +409,9 @@
                   <td><div class="table-user-name note-cell">{{ n.content }}</div><div class="table-user-sub">by {{ employeeName(n.createdBy) }}</div></td>
                   <td>{{ n.createdAt | date:'medium' }}</td>
                   <td><div class="table-actions-group">
-                    <button class="btn-action-icon" title="View" (click)="openEditNote(n)"><svg lucideEye size="15"></svg></button>
-                    <button class="btn-action-icon" title="Edit" (click)="openEditNote(n)"><svg lucideEdit size="15"></svg></button>
-                    <button class="btn-action-icon danger-action" title="Delete" (click)="deleteNote(n)"><svg lucideTrash2 size="15"></svg></button>
+                    <button class="btn-action-icon" title="View" (click)="openEditNote(n)"><svg lucideEye [size]="15"></svg></button>
+                    <button class="btn-action-icon" title="Edit" (click)="openEditNote(n)"><svg lucideEdit2 [size]="15"></svg></button>
+                    <button class="btn-action-icon danger-action" title="Delete" (click)="deleteNote(n)"><svg lucideTrash2 [size]="15"></svg></button>
                   </div></td>
                 </tr>
               </tbody>
@@ -539,9 +589,15 @@
 
             <div class="form-group" style="margin-top: 16px;">
               <label>Attachments</label>
+<<<<<<< Updated upstream
               <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp" />
               <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp">
                 <svg lucideUpload size="15"></svg>
+=======
+              <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles" />
+              <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles">
+                <svg lucideUpload [size]="15"></svg>
+>>>>>>> Stashed changes
                 <span>Attach Files / Documents</span>
               </button>
               <span class="fum-stage-hint">Attach files now; they are uploaded after scheduling and shown in the follow-up table.</span>
@@ -666,7 +722,7 @@
           </button>
           <button *ngIf="!isViewingFollowUp && followUpTab === 'schedule'" type="button" class="btn-fum-submit" (click)="saveFollowUp()" [disabled]="isSavingFollowUp">
             <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingFollowUp"></svg>
-            <svg lucideCalendar size="15" *ngIf="!isSavingFollowUp"></svg>
+            <svg lucideCalendar [size]="15" *ngIf="!isSavingFollowUp"></svg>
             <span>{{ isSavingFollowUp ? 'Scheduling...' : (isEditingFollowUp ? 'Update Follow-Up' : 'Schedule Follow-Up') }}</span>
           </button>
         </div>
@@ -787,7 +843,7 @@
                 </div>
                 <div class="li-col-del">
                   <button class="btn-icon-del" (click)="removeProposalItem(i)" *ngIf="proposalForm.items.length > 1" title="Remove item" type="button">
-                    <svg lucideTrash2 size="15"></svg>
+                    <svg lucideTrash2 [size]="15"></svg>
                   </button>
                 </div>
               </div>

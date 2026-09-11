@@ -386,6 +386,47 @@ export class TicketsService {
       },
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
+
+    // Resolve Assignee IDs to names for activities to make the UI friendly
+    const assigneeIdsToFetch = new Set<number>();
+    for (const act of ticket.activities) {
+      if (act.action === 'ASSIGNEEID_CHANGED') {
+        if (act.oldValue) assigneeIdsToFetch.add(Number(act.oldValue));
+        if (act.newValue) assigneeIdsToFetch.add(Number(act.newValue));
+      }
+    }
+    
+    if (assigneeIdsToFetch.size > 0) {
+      const emps = await this.prisma.employee.findMany({
+        where: { id: { in: Array.from(assigneeIdsToFetch) }, companyId },
+        select: { id: true, firstName: true, lastName: true }
+      });
+      const empMap = new Map(emps.map(e => [e.id, `${e.firstName} ${e.lastName}`]));
+      
+      for (const act of ticket.activities) {
+        if (act.action === 'ASSIGNEEID_CHANGED') {
+          // Format the action beautifully for the UI
+          act.action = 'ASSIGNEE_CHANGED';
+          
+          if (act.oldValue && empMap.has(Number(act.oldValue))) {
+            act.oldValue = empMap.get(Number(act.oldValue))!;
+          } else if (act.oldValue && act.oldValue !== 'null') {
+            act.oldValue = `User ${act.oldValue}`;
+          } else {
+            act.oldValue = 'Unassigned';
+          }
+          
+          if (act.newValue && empMap.has(Number(act.newValue))) {
+            act.newValue = empMap.get(Number(act.newValue))!;
+          } else if (act.newValue && act.newValue !== 'null') {
+            act.newValue = `User ${act.newValue}`;
+          } else {
+            act.newValue = 'Unassigned';
+          }
+        }
+      }
+    }
+
     return ticket;
   }
 

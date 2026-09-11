@@ -188,10 +188,17 @@
   transition: all 0.2s ease;
 }
 
-.btn-primary-pill:hover {
+.btn-primary-pill:hover:not(:disabled) {
   background: #e04800;
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(255, 82, 0, 0.35);
+}
+
+.btn-primary-pill:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-outline-pill {
@@ -891,10 +898,13 @@
   background: #f1f5f9;
   color: #334155;
   border: none;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1728,6 +1738,118 @@ input:checked + .toggle-slider:before {
 .file-icon-m.pdf { background: #fee2e2; color: #dc2626; }
 .file-icon-m.word { background: #dbeafe; color: #1d4ed8; }
 .file-icon-m.excel { background: #dcfce7; color: #15803d; }
+
+/* ─── File Uploading Progress Banner & Row ─── */
+.file-uploading-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.file-uploading-banner-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-uploading-spinner {
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-uploading-info {
+  flex: 1;
+}
+
+.file-uploading-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #9a3412;
+}
+
+.file-uploading-title strong {
+  color: #c2410c;
+}
+
+.file-uploading-sub {
+  font-size: 12px;
+  color: #ea580c;
+  margin-top: 2px;
+}
+
+.file-uploading-progress-track {
+  width: 100%;
+  height: 5px;
+  background: #ffedd5;
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.file-uploading-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, #ea580c, #f97316);
+  border-radius: 9999px;
+  animation: fileIndeterminate 1.4s infinite ease-in-out;
+}
+
+@keyframes fileIndeterminate {
+  0% { left: -40%; width: 40%; }
+  50% { left: 30%; width: 50%; }
+  100% { left: 100%; width: 30%; }
+}
+
+.row-uploading {
+  background: #fffaf5 !important;
+  opacity: 0.95;
+}
+
+.uploading-file-name {
+  color: #ea580c;
+  font-weight: 600;
+}
+
+.uploading-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: #ffedd5;
+  color: #c2410c;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.uploading-pill {
+  background: #ffedd5 !important;
+  color: #c2410c !important;
+  font-weight: 600;
+}
+
+.uploading-icon {
+  background: #ffedd5 !important;
+  color: #ea580c !important;
+}
+
+.uploading-spinner-text {
+  color: #ea580c;
+  display: inline-flex;
+  align-items: center;
+}
 
 /* ─── Follow-up status badges ─── */
 .fu-status-pending { background: #fef3c7; color: #b45309; }

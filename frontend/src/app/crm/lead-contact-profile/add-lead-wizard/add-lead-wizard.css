@@ -247,6 +247,7 @@
   display: flex;
   align-items: stretch;
   width: 100%;
+  gap: 0 !important;
 }
 
 .currency-symbol-addon {
@@ -271,10 +272,11 @@
 }
 
 .currency-select {
-  border: 1.5px solid #e2e8f0;
-  border-right: none;
-  background: #f8fafc;
-  border-radius: 10px 0 0 10px;
+  border: 1.5px solid #cbd5e1 !important;
+  border-right: none !important;
+  background: #f8fafc !important;
+  border-radius: 10px 0 0 10px !important;
+  margin: 0 !important;
   padding: 0 12px;
   color: #475569;
   font-weight: 700;
@@ -300,18 +302,16 @@
 
 .currency-input {
   flex: 1;
-  background-color: #fff;
+  background-color: #fff !important;
   transition: all 0.2s;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   border-radius: 0 10px 10px 0 !important;
   border: 1.5px solid #cbd5e1 !important;
-  border-left: 1.5px solid #e2e8f0 !important;
+  margin: 0 !important;
   padding-left: 14px !important;
   width: auto !important;
   font-weight: 600;
-  font-size: 15px;
-  color: #0f172a;
-  height: 44px !important;
+  height: 44px;
 }
 
 .currency-input:focus {

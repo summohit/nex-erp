@@ -1,184 +1,385 @@
-<div class="quota-page">
+<div class="all-attendance-container page-container quota-page">
 
-  <!-- ── Header ──────────────────────────────────────────────────────────── -->
-  <div class="quota-header">
-    <div class="quota-title-block">
-      <h1>Leave Quota Report</h1>
-      <p class="quota-sub">
-        What each person was allocated for {{ year() }}, what they have taken, and what is left.
+  <!-- ── Enhanced Page Header Card ─────────────────────────────────────────── -->
+  <div class="page-header-card">
+    <div class="header-title-group">
+      <div class="header-title-row">
+        <h1>Leave Quota Report</h1>
+        <span class="attendance-count-pill">{{ summary().people }} {{ summary().people === 1 ? 'Employee' : 'Employees' }}</span>
         <span *ngIf="report()?.scope === 'SELF'" class="scope-pill">Your own figures</span>
+      </div>
+      <p class="header-subtitle">
+        Annual leave allocations, carry-over balances, utilized time off, and remaining quota for {{ year() }}.
       </p>
     </div>
 
-    <div class="quota-actions">
-      <label class="filter-field">
-        <span>Year</span>
-        <select class="form-control" [value]="year()" (change)="onYearChange($any($event.target).value)">
-          <option *ngFor="let y of years()" [value]="y">{{ y }}</option>
-        </select>
-      </label>
-
-      <label class="filter-field">
-        <span>Leave type</span>
-        <select class="form-control"
-                [ngModel]="leaveTypeId()"
-                (ngModelChange)="leaveTypeId.set($event === 'null' || $event === null ? null : +$event)">
-          <option [ngValue]="null">All leave types</option>
-          <option *ngFor="let t of report()?.leaveTypes || []" [ngValue]="t.id">{{ t.name }}</option>
-        </select>
-      </label>
-
-      <label class="filter-field grow">
-        <span>Search</span>
-        <input class="form-control" type="text" placeholder="Name, code or department"
-               [ngModel]="search()" (ngModelChange)="search.set($event)">
-      </label>
-
-      <button class="btn-outline" (click)="load()" [disabled]="loading()" title="Reload">
-        <svg lucideRefreshCw size="15"></svg>
-        <span>Refresh</span>
-      </button>
-
-      <button class="btn-primary" (click)="exportCsv()" [disabled]="loading() || !rows().length">
-        <svg lucideDownload size="15"></svg>
+    <div class="header-actions-group">
+      <!-- Export CSV Button -->
+      <button class="btn-header-primary" (click)="exportCsv()" [disabled]="loading() || !rows().length" title="Export current quota report to CSV">
+        <svg lucideDownload [size]="15"></svg>
         <span>Export CSV</span>
       </button>
+
+      <!-- Refresh Button -->
+      <button class="btn-header-secondary" (click)="load()" [disabled]="loading()" title="Reload report data">
+        <svg lucideRefreshCw [size]="15" [class.spin-anim]="loading()"></svg>
+        <span>Refresh</span>
+      </button>
     </div>
   </div>
 
-  <!-- Carry-forward has not run for this year, so Remaining understates for any
-       type that carries. Better to say it than to let the number imply it. -->
-  <div class="quota-notice warn" *ngIf="carryForwardPending()">
-    <svg lucideTriangleAlert size="16"></svg>
-    <div>
-      <strong>Carry-forward hasn't been applied for {{ year() }}.</strong>
-      Unused days from {{ year() - 1 }} roll in on 1 January. Until that runs,
-      <em>Carried in</em> is zero and <em>Remaining</em> is understated for any type that carries forward.
+  <!-- ── Alert Notices ─────────────────────────────────────────────────────── -->
+  <div class="notices-container" *ngIf="carryForwardPending() || summary().missingBalances > 0">
+    <!-- Carry-forward pending -->
+    <div class="quota-notice-card warn" *ngIf="carryForwardPending()">
+      <div class="notice-icon-wrapper warn">
+        <svg lucideTriangleAlert [size]="18"></svg>
+      </div>
+      <div class="notice-content">
+        <div class="notice-title">Carry-forward hasn't been applied for {{ year() }}</div>
+        <div class="notice-desc">
+          Unused days from {{ year() - 1 }} will roll in on 1 January. Until that job executes,
+          <em>Carried in</em> is zero and <em>Remaining</em> balances are understated for any eligible carry-forward leave types.
+        </div>
+      </div>
+    </div>
+
+    <!-- Missing Balances (Task callout) -->
+    <div class="quota-notice-card alert" *ngIf="summary().missingBalances > 0">
+      <div class="notice-icon-wrapper alert">
+        <svg lucideAlertCircle [size]="18"></svg>
+      </div>
+      <div class="notice-content">
+        <div class="notice-title">
+          {{ summary().missingBalances }} {{ summary().missingBalances === 1 ? 'person has' : 'people have' }}
+          no leave balance configured for {{ year() }}
+        </div>
+        <div class="notice-desc">
+          Employees without assigned quota rows cannot submit time-off requests until an allocation is established.
+        </div>
+      </div>
+      <a routerLink="/attendance/balances" class="notice-action-btn" title="Go to Leave Balances management">
+        <span>Manage Balances</span>
+        <svg lucideChevronRight [size]="14"></svg>
+      </a>
     </div>
   </div>
 
-  <!-- Somebody with no balance row cannot take leave at all, so this is the
-       one number on the page that is a task rather than a statistic. -->
-  <div class="quota-notice info" *ngIf="summary().missingBalances > 0">
-    <svg lucideCalendarDays size="16"></svg>
-    <div>
-      <strong>{{ summary().missingBalances }} {{ summary().missingBalances === 1 ? 'person has' : 'people have' }}
-        no leave balance for {{ year() }}.</strong>
-      They cannot request leave until one is assigned, under Attendance &amp; Leave → Manage Balances.
+  <!-- ── KPI / Summary Cards ───────────────────────────────────────────────── -->
+  <div class="stats-row" *ngIf="!loading()">
+    <!-- Entitlement -->
+    <div class="stat-card stat-blue">
+      <div class="stat-icon-wrapper">
+        <svg lucideCalendarDays [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Total Entitlement</span>
+        <div class="stat-value">
+          {{ days(summary().allocated + summary().carriedOver) }}
+          <span class="stat-unit">days</span>
+        </div>
+        <span class="stat-subtext">
+          {{ days(summary().allocated) }} allocated
+          <ng-container *ngIf="summary().carriedOver"> · +{{ days(summary().carriedOver) }} carried in</ng-container>
+        </span>
+      </div>
+    </div>
+
+    <!-- Taken / Used -->
+    <div class="stat-card stat-amber">
+      <div class="stat-icon-wrapper">
+        <svg lucideClock [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Days Consumed</span>
+        <div class="stat-value">
+          {{ days(summary().used) }}
+          <span class="stat-unit">days</span>
+        </div>
+        <div class="stat-progress-wrap">
+          <div class="stat-progress-bar">
+            <div class="stat-progress-fill amber" [style.width.%]="summary().utilisation"></div>
+          </div>
+          <span class="stat-subtext">{{ summary().utilisation | number:'1.0-0' }}% of entitlement</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Remaining -->
+    <div class="stat-card stat-emerald">
+      <div class="stat-icon-wrapper">
+        <svg lucideCheckCircle2 [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Remaining Available</span>
+        <div class="stat-value accent-emerald">
+          {{ days(summary().remaining) }}
+          <span class="stat-unit">days</span>
+        </div>
+        <span class="stat-subtext">Available across {{ summary().people }} employees</span>
+      </div>
+    </div>
+
+    <!-- Overall Utilisation -->
+    <div class="stat-card stat-purple">
+      <div class="stat-icon-wrapper">
+        <svg lucideTrendingUp [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Utilisation Rate</span>
+        <div class="stat-value">
+          {{ summary().utilisation | number:'1.1-1' }}%
+        </div>
+        <span class="stat-subtext" *ngIf="summary().missingBalances === 0">
+          Tracking {{ selectedTypeName() }}
+        </span>
+        <span class="stat-subtext text-warning-strong" *ngIf="summary().missingBalances > 0">
+          ⚠️ {{ summary().missingBalances }} pending setup
+        </span>
+      </div>
     </div>
   </div>
 
-  <!-- ── Summary ─────────────────────────────────────────────────────────── -->
-  <div class="quota-summary" *ngIf="!loading()">
-    <div class="sum-card">
-      <span class="sum-label">Entitlement</span>
-      <span class="sum-value">{{ days(summary().allocated + summary().carriedOver) }}</span>
-      <span class="sum-foot">
-        {{ days(summary().allocated) }} allocated
-        <ng-container *ngIf="summary().carriedOver"> · {{ days(summary().carriedOver) }} carried in</ng-container>
-      </span>
+  <!-- ── Filter & Search Toolbar Card ─────────────────────────────────────── -->
+  <div class="filter-bar-card">
+    <div class="filter-bar-main-row">
+      <!-- Search Input -->
+      <div class="search-input-wrapper">
+        <svg lucideSearch [size]="16" class="search-icon"></svg>
+        <input
+          type="text"
+          placeholder="Search by name, code or department…"
+          [ngModel]="search()"
+          (ngModelChange)="search.set($event)"
+          aria-label="Search employees" />
+        <button
+          *ngIf="search()"
+          type="button"
+          class="btn-clear-search"
+          (click)="search.set('')"
+          title="Clear search">
+          <svg lucideX [size]="14"></svg>
+        </button>
+      </div>
+
+      <!-- Dropdown Filters Group -->
+      <div class="filter-dropdowns-group">
+        <!-- Year Select -->
+        <div class="filter-select-wrapper">
+          <span class="filter-select-label">Year:</span>
+          <select class="custom-select" [value]="year()" (change)="onYearChange($any($event.target).value)">
+            <option *ngFor="let y of years()" [value]="y">{{ y }}</option>
+          </select>
+        </div>
+
+        <!-- Leave Type Select -->
+        <div class="filter-select-wrapper">
+          <span class="filter-select-label">Type:</span>
+          <select
+            class="custom-select"
+            [ngModel]="leaveTypeId()"
+            (ngModelChange)="leaveTypeId.set($event === 'null' || $event === null ? null : +$event)">
+            <option [ngValue]="null">All leave types</option>
+            <option *ngFor="let t of report()?.leaveTypes || []" [ngValue]="t.id">{{ t.name }}</option>
+          </select>
+        </div>
+      </div>
     </div>
-    <div class="sum-card">
-      <span class="sum-label">Taken</span>
-      <span class="sum-value">{{ days(summary().used) }}</span>
-      <span class="sum-foot">{{ summary().utilisation | number:'1.0-0' }}% of entitlement</span>
-    </div>
-    <div class="sum-card">
-      <span class="sum-label">Remaining</span>
-      <span class="sum-value accent">{{ days(summary().remaining) }}</span>
-      <span class="sum-foot">across {{ summary().people }} {{ summary().people === 1 ? 'person' : 'people' }}</span>
-    </div>
-    <div class="sum-card">
-      <span class="sum-label">Showing</span>
-      <span class="sum-value">{{ selectedTypeName() }}</span>
-      <span class="sum-foot">{{ year() }}</span>
+
+    <!-- Quick Filter Chips Row -->
+    <div class="quick-filters-row">
+      <div class="chips-group">
+        <button
+          type="button"
+          class="filter-chip"
+          [class.active]="quickFilter() === 'ALL'"
+          (click)="setQuickFilter('ALL')">
+          <span>All Employees</span>
+          <span class="chip-count">{{ quickFilterCounts().all }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="filter-chip chip-warning"
+          [class.active]="quickFilter() === 'LOW_REMAINING'"
+          (click)="setQuickFilter('LOW_REMAINING')">
+          <span class="chip-dot warning"></span>
+          <span>Low Balance (≤ 2d)</span>
+          <span class="chip-count">{{ quickFilterCounts().lowRemaining }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="filter-chip chip-danger"
+          [class.active]="quickFilter() === 'HIGH_USED'"
+          (click)="setQuickFilter('HIGH_USED')">
+          <span class="chip-dot danger"></span>
+          <span>High Utilisation (≥ 75%)</span>
+          <span class="chip-count">{{ quickFilterCounts().highUsed }}</span>
+        </button>
+
+        <button
+          *ngIf="quickFilterCounts().unassigned > 0"
+          type="button"
+          class="filter-chip chip-purple"
+          [class.active]="quickFilter() === 'UNASSIGNED'"
+          (click)="setQuickFilter('UNASSIGNED')">
+          <span class="chip-dot purple"></span>
+          <span>No Balance Set</span>
+          <span class="chip-count">{{ quickFilterCounts().unassigned }}</span>
+        </button>
+      </div>
+
+      <div class="filter-status-info" *ngIf="search() || leaveTypeId() !== null || quickFilter() !== 'ALL'">
+        <span class="filter-match-count">
+          Showing <strong>{{ rows().length }}</strong> of {{ report()?.rows?.length || 0 }}
+        </span>
+        <button type="button" class="btn-reset-filters" (click)="clearFilters()">
+          <svg lucideX [size]="12"></svg>
+          <span>Reset Filters</span>
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- ── Grid ────────────────────────────────────────────────────────────── -->
-  <div class="quota-grid-card">
-    <div class="quota-loading" *ngIf="loading()">Loading…</div>
+  <!-- ── Table Container Card ──────────────────────────────────────────────── -->
+  <div class="card widget-card">
+    <div class="widget-header">
+      <div class="table-header-left">
+        <h3>Employee Leave Quota Balances</h3>
+        <span class="tag-mono">{{ selectedTypeName() }} · {{ year() }}</span>
+      </div>
+      <div class="table-header-right" *ngIf="!loading()">
+        <span class="text-muted" style="font-size: 13px; font-weight: 500;">
+          Showing <strong>{{ rows().length }}</strong> {{ rows().length === 1 ? 'employee' : 'employees' }}
+        </span>
+      </div>
+    </div>
 
+    <!-- Loading State -->
+    <div class="quota-loading" *ngIf="loading()">
+      <div class="loading-spinner"></div>
+      <span>Loading leave quota figures for {{ year() }}…</span>
+    </div>
+
+    <!-- Empty State -->
     <div class="quota-empty" *ngIf="!loading() && !rows().length">
-      No leave balances found for {{ year() }}.
+      <svg lucideCalendarDays [size]="40" class="empty-icon"></svg>
+      <h3>No leave quota records found</h3>
+      <p *ngIf="search() || quickFilter() !== 'ALL'">
+        No employees match the active search or filters. Try clearing your filters.
+      </p>
+      <p *ngIf="!search() && quickFilter() === 'ALL'">
+        No leave balances have been assigned for {{ year() }}.
+      </p>
+      <button *ngIf="search() || quickFilter() !== 'ALL'" class="btn-reset-empty" (click)="clearFilters()">
+        Clear All Filters
+      </button>
     </div>
 
-    <ag-grid-angular
-      *ngIf="!loading() && rows().length"
-      class="ag-theme-quartz quota-grid"
-      [rowData]="rows()"
-      [columnDefs]="columnDefs"
-      [defaultColDef]="defaultColDef"
-      [rowHeight]="56"
-      [pagination]="true"
-      [paginationPageSize]="20"
-      [paginationPageSizeSelector]="[10, 20, 50, 100]"
-      (gridReady)="onGridReady($event)">
-    </ag-grid-angular>
+    <!-- AG Grid matching system standards -->
+    <div class="table-container" *ngIf="!loading() && rows().length">
+      <ag-grid-angular
+        class="ag-theme-quartz"
+        [theme]="'legacy'"
+        style="width: 100%; height: 600px;"
+        [rowData]="rows()"
+        [columnDefs]="columnDefs"
+        [defaultColDef]="defaultColDef"
+        [gridOptions]="gridOptions"
+        [rowHeight]="64"
+        [headerHeight]="52"
+        [pagination]="true"
+        [paginationPageSize]="20"
+        [paginationPageSizeSelector]="[10, 20, 50, 100]"
+        (gridReady)="onGridReady($event)">
+      </ag-grid-angular>
+    </div>
   </div>
 </div>
 
-<!-- ── Per-type breakdown ─────────────────────────────────────────────────── -->
+<!-- ── Per-type Breakdown Modal ────────────────────────────────────────────── -->
 <div class="modal-overlay" *ngIf="detailRow() as row" (click)="closeDetail()">
   <div class="modal-card" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
     <div class="modal-header">
-      <div>
-        <h2>{{ row.employee.name }}</h2>
-        <p class="modal-sub">
-          {{ row.employee.designation || 'Staff' }}
-          <ng-container *ngIf="row.employee.department"> · {{ row.employee.department }}</ng-container>
-          · {{ year() }}
-        </p>
+      <div class="modal-header-user">
+        <div class="modal-avatar">
+          {{ (row.employee.name || '?').slice(0, 2) }}
+        </div>
+        <div>
+          <div class="modal-name-row">
+            <h2>{{ row.employee.name }}</h2>
+            <span class="modal-year-pill">{{ year() }}</span>
+          </div>
+          <p class="modal-sub">
+            {{ row.employee.designation || 'Staff' }}
+            <ng-container *ngIf="row.employee.department"> · {{ row.employee.department }}</ng-container>
+            <ng-container *ngIf="row.employee.employeeCode"> · ID: {{ row.employee.employeeCode }}</ng-container>
+          </p>
+        </div>
       </div>
-      <button class="icon-btn" (click)="closeDetail()" aria-label="Close">
-        <svg lucideX size="20"></svg>
+      <button class="icon-btn" (click)="closeDetail()" aria-label="Close modal">
+        <svg lucideX [size]="20"></svg>
       </button>
     </div>
 
+    <!-- Modal Body -->
     <div class="modal-body">
-      <table class="detail-table">
-        <thead>
-          <tr>
-            <th>Leave type</th>
-            <th class="num">Allocated</th>
-            <th class="num">Carried in</th>
-            <th class="num">Used</th>
-            <th class="num">Remaining</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let line of detailLines()" [class.is-empty]="!line.allocated && !line.carriedOver && !line.used">
-            <td>
-              {{ line.type.name }}
-              <span class="type-flag" *ngIf="!line.type.isPaid">unpaid</span>
-              <span class="type-flag carry" *ngIf="line.type.carryForward">
-                carries {{ line.type.carryForwardLimit > 0 ? 'up to ' + line.type.carryForwardLimit : 'over' }}
-              </span>
-            </td>
-            <td class="num">{{ days(line.allocated) }}</td>
-            <td class="num">{{ days(line.carriedOver) }}</td>
-            <td class="num">{{ days(line.used) }}</td>
-            <td class="num" [class.none-left]="line.remaining <= 0">{{ days(line.remaining) }}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td>Total</td>
-            <td class="num">{{ days(row.totals.allocated) }}</td>
-            <td class="num">{{ days(row.totals.carriedOver) }}</td>
-            <td class="num">{{ days(row.totals.used) }}</td>
-            <td class="num">{{ days(row.totals.remaining) }}</td>
-          </tr>
-        </tfoot>
-      </table>
+      <div class="modal-table-container">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Leave Type</th>
+              <th class="num">Allocated</th>
+              <th class="num">Carried In</th>
+              <th class="num">Used</th>
+              <th class="num">Remaining</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let line of detailLines()" [class.is-empty]="!line.allocated && !line.carriedOver && !line.used">
+              <td class="type-cell">
+                <span class="type-name">{{ line.type.name }}</span>
+                <span class="type-flag" *ngIf="!line.type.isPaid">unpaid</span>
+                <span class="type-flag carry" *ngIf="line.type.carryForward">
+                  carries {{ line.type.carryForwardLimit > 0 ? 'up to ' + line.type.carryForwardLimit : 'over' }}
+                </span>
+              </td>
+              <td class="num">{{ days(line.allocated) }}</td>
+              <td class="num">
+                <span *ngIf="line.carriedOver" class="text-carried">+{{ days(line.carriedOver) }}</span>
+                <span *ngIf="!line.carriedOver" class="text-muted">—</span>
+              </td>
+              <td class="num font-semibold">{{ days(line.used) }}</td>
+              <td class="num font-bold" [class.none-left]="line.remaining <= 0" [class.low-left]="line.remaining > 0 && line.remaining <= 2">
+                {{ days(line.remaining) }}
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td class="num">{{ days(row.totals.allocated) }}</td>
+              <td class="num">
+                {{ row.totals.carriedOver ? '+' + days(row.totals.carriedOver) : '0' }}
+              </td>
+              <td class="num">{{ days(row.totals.used) }}</td>
+              <td class="num total-remaining">{{ days(row.totals.remaining) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
-      <p class="detail-note" *ngIf="row.hasNoBalances">
-        No balance has been assigned to this person for {{ year() }}, so every figure above is zero.
-      </p>
+      <div class="detail-note" *ngIf="row.hasNoBalances">
+        <svg lucideAlertCircle [size]="16"></svg>
+        <span>No leave balance has been configured for this employee in {{ year() }}. All figures are currently zero.</span>
+      </div>
     </div>
 
+    <!-- Modal Footer -->
     <div class="modal-footer">
-      <button class="btn-outline" (click)="closeDetail()">Close</button>
+      <button class="btn-modal-close" (click)="closeDetail()">Close</button>
     </div>
   </div>
 </div>
