@@ -1480,6 +1480,24 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && phoneInvalid">
+            <label>Phone Number</label>
+            <div class="input-with-prefix">
+              <select class="currency-select phone-code-select" [(ngModel)]="newLeadData.phoneCode" [disabled]="isSaving" title="Country code">
+                <option *ngFor="let c of phoneCountryCodes" [ngValue]="c.code">{{ c.name }} {{ c.code }}</option>
+              </select>
+              <input type="tel" [(ngModel)]="newLeadData.phone" placeholder="e.g. 98765 43210" [disabled]="isSaving" class="currency-input" inputmode="tel" />
+            </div>
+            <span class="error-msg" *ngIf="isSubmitted && phoneInvalid">Enter a valid phone number with country code.</span>
+          </div>
+          <div class="form-group" [class.has-error]="isSubmitted && emailInvalid">
+            <label>Email ID</label>
+            <input type="email" [(ngModel)]="newLeadData.email" placeholder="e.g. contact@company.com" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && emailInvalid">Enter a valid email address.</span>
+          </div>
+        </div>
+
         <div *ngIf="newLeadData.contactName?.trim() && isContactEmailNew && !isEditing" style="display:flex;align-items:center;gap:8px;margin-top:4px;padding:10px 12px;background:var(--bg-subtle,#f8f9fc);border:1px solid var(--border-color,#e5e7eb);border-radius:8px;">
           <input type="checkbox" id="saveContactFromLead" [checked]="contactCheckboxChecked" (change)="onContactCheckboxChange($any($event.target).checked)" [disabled]="isSaving" style="width:15px;height:15px;accent-color:var(--primary-color,#E25E3E);cursor:pointer;flex-shrink:0;" />
           <label for="saveContactFromLead" style="font-size:13px;color:var(--text-secondary,#374151);cursor:pointer;margin:0;line-height:1.4;">

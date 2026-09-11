@@ -2129,6 +2129,15 @@
   border-color: #ea580c;
 }
 
+/* Country dial-code picker on the Phone Number field (left addon in the same
+   joined control pattern as the currency select). */
+.phone-code-select {
+  max-width: 168px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .currency-input {
   flex: 1;
   background-color: #fff;
