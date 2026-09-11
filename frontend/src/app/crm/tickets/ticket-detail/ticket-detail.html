@@ -265,8 +265,9 @@
           <span class="tracker-time">{{ formatDuration(totalTrackedTime) }}</span>
           <span class="tracker-label">Total Time Logged</span>
         </div>
-        <button class="btn-timer" [class.btn-timer-active]="activeTimeEntry" (click)="toggleTimer()">
-          {{ activeTimeEntry ? 'Stop Timer' : 'Start Timer' }}
+        <button class="btn-timer" [class.btn-timer-active]="activeTimeEntry"
+                [disabled]="timerBusy" (click)="toggleTimer()">
+          {{ timerBusy ? 'Working…' : (activeTimeEntry ? 'Stop Timer' : 'Start Timer') }}
         </button>
       </div>
     </div>

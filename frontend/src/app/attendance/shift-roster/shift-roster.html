@@ -18,47 +18,50 @@
     </div>
   </div>
 
-  <!-- Toolbar: range navigation + filters -->
-  <div class="roster-toolbar">
-    <div class="range-nav">
-      <button class="icon-btn" (click)="shift(-1)" title="Previous">
-        <svg lucideChevronLeft size="18"></svg>
-      </button>
-      <span class="range-label">{{ rangeLabel() }}</span>
-      <button class="icon-btn" (click)="shift(1)" title="Next">
-        <svg lucideChevronRight size="18"></svg>
-      </button>
-      <button class="btn-today" (click)="today()">
-        <svg lucideCalendar size="14"></svg> Today
-      </button>
+  <!-- Sticky controls section (toolbar + legend) -->
+  <div class="roster-sticky-header">
+    <!-- Toolbar: range navigation + filters -->
+    <div class="roster-toolbar">
+      <div class="range-nav">
+        <button class="icon-btn" (click)="shift(-1)" title="Previous">
+          <svg lucideChevronLeft size="18"></svg>
+        </button>
+        <span class="range-label">{{ rangeLabel() }}</span>
+        <button class="icon-btn" (click)="shift(1)" title="Next">
+          <svg lucideChevronRight size="18"></svg>
+        </button>
+        <button class="btn-today" (click)="today()">
+          <svg lucideCalendar size="14"></svg> Today
+        </button>
+      </div>
+
+      <div class="view-toggle">
+        <button class="toggle-btn" [class.active]="viewMode() === 'week'" (click)="setView('week')">Weekly</button>
+        <button class="toggle-btn" [class.active]="viewMode() === 'month'" (click)="setView('month')">Monthly</button>
+      </div>
+
+      <div class="filters">
+        <select class="form-control" [ngModel]="filterDepartmentId()"
+                (ngModelChange)="filterDepartmentId.set($event ? +$event : null); load()">
+          <option [ngValue]="null">All Departments</option>
+          <option *ngFor="let d of departments()" [ngValue]="d.id">{{ d.name }}</option>
+        </select>
+        <input type="text" class="form-control" placeholder="Search employee…"
+               [ngModel]="search()" (ngModelChange)="search.set($event)">
+      </div>
     </div>
 
-    <div class="view-toggle">
-      <button class="toggle-btn" [class.active]="viewMode() === 'week'" (click)="setView('week')">Weekly</button>
-      <button class="toggle-btn" [class.active]="viewMode() === 'month'" (click)="setView('month')">Monthly</button>
+    <!-- Legend -->
+    <div class="legend">
+      <span *ngFor="let s of grid().shifts" class="legend-chip"
+            [style.background]="s.colorCode || '#94A3B8'">
+        <ng-container *ngIf="s.shortCode">{{ s.shortCode }} : </ng-container>{{ s.name }}
+      </span>
+      <span class="legend-chip chip-neutral">Day Off</span>
+      <span class="legend-chip chip-leave-legend">On Leave</span>
+      <span class="legend-chip chip-pending-legend" *ngIf="pendingOnsite().length > 0">⏳ On-site — pending approval</span>
+      <span class="legend-note">Faded cells are the employee's standing shift, not a rostered one.</span>
     </div>
-
-    <div class="filters">
-      <select class="form-control" [ngModel]="filterDepartmentId()"
-              (ngModelChange)="filterDepartmentId.set($event ? +$event : null); load()">
-        <option [ngValue]="null">All Departments</option>
-        <option *ngFor="let d of departments()" [ngValue]="d.id">{{ d.name }}</option>
-      </select>
-      <input type="text" class="form-control" placeholder="Search employee…"
-             [ngModel]="search()" (ngModelChange)="search.set($event)">
-    </div>
-  </div>
-
-  <!-- Legend -->
-  <div class="legend">
-    <span *ngFor="let s of grid().shifts" class="legend-chip"
-          [style.background]="s.colorCode || '#94A3B8'">
-      <ng-container *ngIf="s.shortCode">{{ s.shortCode }} : </ng-container>{{ s.name }}
-    </span>
-    <span class="legend-chip chip-neutral">Day Off</span>
-    <span class="legend-chip chip-leave-legend">On Leave</span>
-    <span class="legend-chip chip-pending-legend" *ngIf="pendingOnsite().length > 0">⏳ On-site — pending approval</span>
-    <span class="legend-note">Faded cells are the employee's standing shift, not a rostered one.</span>
   </div>
 
   <div class="roster-scroll" [class.is-loading]="loading()">
@@ -173,66 +176,219 @@
   </div>
 </div>
 
-<!-- Bulk assign -->
+<!-- Bulk assign ("Automate Shifts") Modal -->
 <div class="modal-overlay" *ngIf="bulkOpen()" (click)="closeBulk()">
-  <div class="modal-card wide" (click)="$event.stopPropagation()">
+  <div class="modal-card automate-modal-card" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <div>
-        <h2>Automate Shifts</h2>
-        <p class="modal-sub">Roster one shift across a date range for many employees.</p>
+      <div class="modal-title-group">
+        <div class="modal-icon-badge automate-badge">
+          <svg lucideWandSparkles size="20"></svg>
+        </div>
+        <div>
+          <h2>Automate Shifts</h2>
+          <p class="modal-sub">Roster one shift or off-day across a date range for multiple team members.</p>
+        </div>
       </div>
-      <button class="icon-btn" (click)="closeBulk()"><svg lucideX size="20"></svg></button>
+      <button class="icon-btn-close" (click)="closeBulk()" title="Close dialog">
+        <svg lucideX size="18"></svg>
+      </button>
     </div>
 
     <div class="modal-body">
-      <div class="bulk-grid">
-        <div class="form-group">
-          <label>Shift</label>
-          <select class="form-control" [(ngModel)]="bulkForm.shiftId" [disabled]="bulkForm.isDayOff">
-            <option *ngFor="let s of grid().shifts" [ngValue]="s.id">{{ s.name }}</option>
-          </select>
+      <!-- Target Shift and Date Range Config -->
+      <div class="automate-config-grid">
+        <div class="form-group" [class.field-disabled]="bulkForm.isDayOff">
+          <div class="form-label-row">
+            <label class="form-label">
+              <span>Target Shift</span>
+              <span class="req-star" *ngIf="!bulkForm.isDayOff">*</span>
+            </label>
+            <span class="label-badge" *ngIf="!bulkForm.isDayOff">{{ grid().shifts.length }} available</span>
+            <span class="day-off-pill" *ngIf="bulkForm.isDayOff">Day Off Selected</span>
+          </div>
+
+          <app-searchable-select
+            [options]="shiftOptions()"
+            [value]="bulkForm.shiftId"
+            [disabled]="bulkForm.isDayOff"
+            [fullWidth]="true"
+            placeholder="Select a shift to assign…"
+            (valueChange)="bulkForm.shiftId = $event"
+          >
+            <svg prefix lucideClock size="15"></svg>
+          </app-searchable-select>
         </div>
+
         <div class="form-group">
-          <label>From</label>
-          <input type="date" class="form-control" [(ngModel)]="bulkForm.start">
-        </div>
-        <div class="form-group">
-          <label>To</label>
-          <input type="date" class="form-control" [(ngModel)]="bulkForm.end">
+          <div class="form-label-row">
+            <label class="form-label">
+              <span>Date Range</span>
+              <span class="req-star">*</span>
+            </label>
+            <span class="days-selected-pill" *ngIf="bulkDayCount > 0">
+              {{ bulkDayCount }} day(s) selected
+            </span>
+          </div>
+
+          <div class="range-inputs-grid">
+            <div class="range-input-col">
+              <span class="range-col-label">From</span>
+              <div class="input-with-icon">
+                <svg lucideCalendar size="14"></svg>
+                <input type="date" class="form-control-enhanced" [(ngModel)]="bulkForm.start">
+              </div>
+            </div>
+            <div class="range-input-col">
+              <span class="range-col-label">To</span>
+              <div class="input-with-icon">
+                <svg lucideCalendar size="14"></svg>
+                <input type="date" class="form-control-enhanced" [(ngModel)]="bulkForm.end">
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-range-bar">
+            <span class="quick-lbl">Presets:</span>
+            <button type="button" class="preset-chip" (click)="setBulkPreset('this_week')">This Week</button>
+            <button type="button" class="preset-chip" (click)="setBulkPreset('next_week')">Next Week</button>
+            <button type="button" class="preset-chip" (click)="setBulkPreset('this_month')">This Month</button>
+          </div>
         </div>
       </div>
 
-      <div class="bulk-options">
-        <label><input type="checkbox" [(ngModel)]="bulkForm.isDayOff"> Mark as Day Off instead of a shift</label>
-        <label><input type="checkbox" [(ngModel)]="bulkForm.skipNonWorkingDays"> Skip days the shift doesn't run (otherwise they become days off)</label>
-        <label><input type="checkbox" [(ngModel)]="bulkForm.overwriteExisting"> Overwrite existing roster entries in this range</label>
+      <!-- Option Toggles Grid -->
+      <div class="automate-options-grid">
+        <label class="automate-option-card" [class.is-active]="bulkForm.isDayOff">
+          <input type="checkbox" [(ngModel)]="bulkForm.isDayOff" class="custom-check-input">
+          <div class="option-card-content">
+            <span class="option-title">Mark as Day Off</span>
+            <span class="option-desc">Assign off-day instead of a shift</span>
+          </div>
+        </label>
+
+        <label class="automate-option-card" [class.is-active]="bulkForm.skipNonWorkingDays">
+          <input type="checkbox" [(ngModel)]="bulkForm.skipNonWorkingDays" class="custom-check-input">
+          <div class="option-card-content">
+            <span class="option-title">Skip Off-Days</span>
+            <span class="option-desc">Preserve existing weekly offs</span>
+          </div>
+        </label>
+
+        <label class="automate-option-card" [class.is-active]="bulkForm.overwriteExisting">
+          <input type="checkbox" [(ngModel)]="bulkForm.overwriteExisting" class="custom-check-input">
+          <div class="option-card-content">
+            <span class="option-title">Overwrite Existing</span>
+            <span class="option-desc">Replace already rostered shifts</span>
+          </div>
+        </label>
       </div>
 
-      <div class="bulk-employees">
-        <div class="bulk-emp-head">
-          <label>
-            <input type="checkbox" [checked]="bulkSelection().size === visibleRows().length && visibleRows().length > 0"
-                   (change)="toggleAllSelected()">
-            Employees ({{ bulkSelection().size }} selected)
-          </label>
+      <!-- Employee Multi-Selection Box -->
+      <div class="automate-emp-box">
+        <div class="automate-emp-header">
+          <div class="emp-head-left">
+            <label class="emp-select-all-label">
+              <input 
+                type="checkbox" 
+                [checked]="bulkSelection().size === visibleRows().length && visibleRows().length > 0"
+                (change)="toggleAllSelected()"
+                class="custom-check-input"
+              />
+              <span class="emp-head-title">Team Members</span>
+            </label>
+            <span class="emp-count-badge">
+              {{ bulkSelection().size }} of {{ visibleRows().length }} selected
+            </span>
+          </div>
+
+          <div class="emp-head-actions">
+            <button type="button" class="btn-text-action" (click)="selectAllFiltered()" title="Select all filtered employees">
+              Select All
+            </button>
+            <span class="action-divider">·</span>
+            <button type="button" class="btn-text-action" (click)="deselectAllFiltered()" title="Clear employee selection">
+              Clear
+            </button>
+          </div>
         </div>
-        <div class="bulk-emp-list">
-          <label *ngFor="let row of visibleRows(); trackBy: trackRow" class="bulk-emp-item">
-            <input type="checkbox" [checked]="isSelected(row.employee.id)" (change)="toggleSelected(row.employee.id)">
-            <span>{{ row.employee.name }}</span>
-            <small>{{ row.employee.designation || row.employee.department || '' }}</small>
+
+        <!-- In-Modal Filter Bar -->
+        <div class="automate-emp-search">
+          <svg lucideSearch size="14"></svg>
+          <input 
+            type="text" 
+            [ngModel]="bulkEmpSearch()" 
+            (ngModelChange)="bulkEmpSearch.set($event)"
+            placeholder="Search team members by name or designation…"
+            class="emp-search-input"
+          />
+          <button 
+            *ngIf="bulkEmpSearch()" 
+            type="button" 
+            class="btn-clear-search" 
+            (click)="bulkEmpSearch.set('')"
+          >
+            <svg lucideX size="12"></svg>
+          </button>
+        </div>
+
+        <!-- Employee List -->
+        <div class="automate-emp-list">
+          <label 
+            *ngFor="let row of filteredBulkRows(); trackBy: trackRow" 
+            class="automate-emp-item"
+            [class.is-selected]="isSelected(row.employee.id)"
+          >
+            <input 
+              type="checkbox" 
+              [checked]="isSelected(row.employee.id)" 
+              (change)="toggleSelected(row.employee.id)"
+              class="custom-check-input"
+            />
+            <div class="emp-avatar-mini" *ngIf="row.employee.avatarUrl">
+              <img [src]="row.employee.avatarUrl" alt="">
+            </div>
+            <div class="emp-avatar-mini emp-initial-mini" *ngIf="!row.employee.avatarUrl">
+              {{ row.employee.name.charAt(0) }}
+            </div>
+            <div class="emp-info-col">
+              <span class="emp-name-text">{{ row.employee.name }}</span>
+              <span class="emp-desig-text">{{ row.employee.designation || row.employee.department || '—' }}</span>
+            </div>
+            <span class="emp-check-indicator" *ngIf="isSelected(row.employee.id)">
+              <svg lucideCheck size="14"></svg>
+            </span>
           </label>
+
+          <div class="automate-emp-empty" *ngIf="filteredBulkRows().length === 0">
+            No employees match "{{ bulkEmpSearch() }}"
+          </div>
         </div>
       </div>
     </div>
 
     <div class="modal-footer">
-      <button class="btn-outline danger" (click)="clearSelectedRange()">
-        <svg lucideTrash2 size="15"></svg> Clear range
+      <button 
+        class="btn-modal-clear" 
+        (click)="clearSelectedRange()" 
+        [disabled]="bulkSelection().size === 0"
+        title="Remove rostered shifts for selected employees in this date range"
+      >
+        <svg lucideTrash2 size="14"></svg>
+        <span>Clear Range</span>
       </button>
-      <span class="spacer"></span>
-      <button class="btn-outline" (click)="closeBulk()">Cancel</button>
-      <button class="btn-primary" (click)="submitBulk()">Apply</button>
+      <div class="spacer"></div>
+      <button class="btn-modal-cancel" (click)="closeBulk()">Cancel</button>
+      <button 
+        class="btn-modal-submit" 
+        [disabled]="bulkSelection().size === 0 || (!bulkForm.isDayOff && !bulkForm.shiftId)" 
+        (click)="submitBulk()"
+      >
+        <span class="btn-inner-content">
+          <span>Apply Shifts <ng-container *ngIf="bulkSelection().size > 0">({{ bulkSelection().size }})</ng-container></span>
+          <svg lucideWandSparkles size="15"></svg>
+        </span>
+      </button>
     </div>
   </div>
 </div>

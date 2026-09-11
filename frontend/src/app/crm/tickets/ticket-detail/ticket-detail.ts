@@ -110,6 +110,7 @@ export class TicketDetailComponent implements OnInit {
   activeTimeEntry: any = null;
   timerInterval: any = null;
   elapsedSeconds = 0;
+  timerBusy = false;
 
   isOverdue(dateString?: string): boolean {
     if (!dateString) return false;
@@ -136,7 +137,12 @@ export class TicketDetailComponent implements OnInit {
   }
 
   checkActiveTimer() {
-    const active = this.ticket.timeEntries?.find(te => !te.endTime);
+    const me = this.myEmployeeId;
+    const running = (this.ticket.timeEntries || []).filter(te => !te.endTime);
+    // Match the server, which starts and stops on the caller's own entry.
+    // Picking up a colleague's open timer would show time this user never
+    // logged and make Stop fail with "no running timer found".
+    const active = me != null ? running.find(te => te.userId === me) : undefined;
     if (active) {
       this.activeTimeEntry = active;
       this.startLocalTimer(new Date(active.startTime));
@@ -169,10 +175,29 @@ export class TicketDetailComponent implements OnInit {
   }
 
   toggleTimer() {
+    if (this.timerBusy) return;
+    this.timerBusy = true;
+
+    const done = () => { this.timerBusy = false; this.refreshTicket(); };
+    // These used to be bare subscribe() calls with no error branch, so a
+    // rejected start ("Timer is already running for this ticket") looked
+    // exactly like nothing happening at all.
+    const fail = (e: any, fallback: string) => {
+      this.timerBusy = false;
+      this.toast.error(e?.error?.message || fallback);
+      this.refreshTicket();
+    };
+
     if (this.activeTimeEntry) {
-      this.ticketService.stopTimer(this.ticket.id, 'Session stopped').subscribe(() => this.refreshTicket());
+      this.ticketService.stopTimer(this.ticket.id, 'Session stopped').subscribe({
+        next: done,
+        error: (e) => fail(e, 'Could not stop the timer'),
+      });
     } else {
-      this.ticketService.startTimer(this.ticket.id).subscribe(() => this.refreshTicket());
+      this.ticketService.startTimer(this.ticket.id).subscribe({
+        next: done,
+        error: (e) => fail(e, 'Could not start the timer'),
+      });
     }
   }
 
@@ -209,7 +234,12 @@ export class TicketDetailComponent implements OnInit {
   }
 
   get currentUser() {
-    return this.authService.currentUser as any;
+    return this.authService.currentUser() as any;
+  }
+
+  /** The logged-in employee, however it is available. */
+  private get myEmployeeId(): number | null {
+    return this.permissions?.employeeId ?? this.currentUser?.employeeId ?? null;
   }
 
   formatLabel(val: string | undefined | null) {

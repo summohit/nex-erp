@@ -6,7 +6,7 @@ import {
   LucideChevronLeft, LucideChevronRight, LucideX, LucideCalendar,
   LucideRotateCcw, LucideWandSparkles, LucideTrash2, LucideBadgeCheck, LucideXCircle,
   LucideBuilding2, LucideMapPin, LucideClock, LucideAlertCircle, LucideCheckCircle2,
-  LucideArrowRight, LucideBriefcase, LucideInfo, LucideUserCheck
+  LucideArrowRight, LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck
 } from '@lucide/angular';
 import { ShiftsService, RosterAssignmentPayload, RosterCell, RosterGrid, RosterRow, RosterShift } from '../../services/shifts.service';
 import { MasterDataService } from '../../services/master-data.service';
@@ -36,7 +36,8 @@ interface OnSiteCtx {
     LucideCalendar, LucideRotateCcw, LucideWandSparkles, LucideTrash2,
     LucideBadgeCheck, LucideXCircle, LucideBuilding2, LucideMapPin,
     LucideClock, LucideAlertCircle, LucideCheckCircle2, LucideArrowRight,
-    LucideBriefcase, LucideInfo, LucideUserCheck, SearchableSelectComponent
+    LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck,
+    SearchableSelectComponent
   ],
   templateUrl: './shift-roster.html',
   styleUrls: ['./shift-roster.css'],
@@ -59,6 +60,14 @@ export class ShiftRosterComponent implements OnInit {
       id: p.id,
       name: p.name,
       subtitle: p.address || p.client?.name || undefined
+    }));
+  });
+
+  shiftOptions = computed<SearchableSelectOption[]>(() => {
+    return this.grid().shifts.map(s => ({
+      id: s.id,
+      name: s.name,
+      subtitle: `${s.startTime || 'Flexible'} – ${s.endTime || 'Flexible'}${s.shortCode ? ' (' + s.shortCode + ')' : ''}`,
     }));
   });
 
@@ -500,6 +509,50 @@ export class ShiftRosterComponent implements OnInit {
   }
 
   // ── bulk ────────────────────────────────────────────────────────────────
+  bulkEmpSearch = signal('');
+
+  filteredBulkRows = computed(() => {
+    const q = this.bulkEmpSearch().toLowerCase().trim();
+    const rows = this.visibleRows();
+    if (!q) return rows;
+    return rows.filter(r =>
+      r.employee.name.toLowerCase().includes(q) ||
+      (r.employee.designation && r.employee.designation.toLowerCase().includes(q)) ||
+      (r.employee.department && r.employee.department.toLowerCase().includes(q))
+    );
+  });
+
+  get bulkDayCount(): number {
+    if (!this.bulkForm.start || !this.bulkForm.end) return 0;
+    const a = Date.parse(`${this.bulkForm.start}T00:00:00Z`);
+    const b = Date.parse(`${this.bulkForm.end}T00:00:00Z`);
+    if (isNaN(a) || isNaN(b) || b < a) return 0;
+    return Math.round((b - a) / 86400000) + 1;
+  }
+
+  setBulkPreset(preset: 'this_week' | 'next_week' | 'this_month') {
+    const now = new Date();
+    if (preset === 'this_week') {
+      const mon = this.startOfWeek(now);
+      const sun = new Date(mon);
+      sun.setUTCDate(sun.getUTCDate() + 6);
+      this.bulkForm.start = this.fmt(mon);
+      this.bulkForm.end = this.fmt(sun);
+    } else if (preset === 'next_week') {
+      const nextMon = this.startOfWeek(now);
+      nextMon.setUTCDate(nextMon.getUTCDate() + 7);
+      const nextSun = new Date(nextMon);
+      nextSun.setUTCDate(nextSun.getUTCDate() + 6);
+      this.bulkForm.start = this.fmt(nextMon);
+      this.bulkForm.end = this.fmt(nextSun);
+    } else if (preset === 'this_month') {
+      const first = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+      const last = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
+      this.bulkForm.start = this.fmt(first);
+      this.bulkForm.end = this.fmt(last);
+    }
+  }
+
   openBulk() {
     this.bulkForm = {
       shiftId: this.grid().shifts[0]?.id ?? null,
@@ -509,6 +562,7 @@ export class ShiftRosterComponent implements OnInit {
       skipNonWorkingDays: true,
       overwriteExisting: true,
     };
+    this.bulkEmpSearch.set('');
     this.bulkSelection.set(new Set());
     this.bulkOpen.set(true);
   }
@@ -527,6 +581,18 @@ export class ShiftRosterComponent implements OnInit {
     const rows = this.visibleRows();
     this.bulkSelection.set(
       this.bulkSelection().size === rows.length ? new Set() : new Set(rows.map(r => r.employee.id)));
+  }
+
+  selectAllFiltered() {
+    const current = new Set(this.bulkSelection());
+    this.filteredBulkRows().forEach(r => current.add(r.employee.id));
+    this.bulkSelection.set(current);
+  }
+
+  deselectAllFiltered() {
+    const current = new Set(this.bulkSelection());
+    this.filteredBulkRows().forEach(r => current.delete(r.employee.id));
+    this.bulkSelection.set(current);
   }
 
   submitBulk() {

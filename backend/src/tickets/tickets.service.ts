@@ -373,6 +373,16 @@ export class TicketsService {
           include: { actor: { select: EMPLOYEE_SELECT } },
           orderBy: { createdAt: 'desc' },
         },
+        // Without this the detail panel's timer widget has nothing to read:
+        // it looks for a running entry in ticket.timeEntries, found none, and
+        // so never left the "Start Timer" state even while the server was
+        // happily opening a new entry on every click.
+        // EMPLOYEE_SELECT, not `user: true` — the raw relation carries the
+        // password hash.
+        timeEntries: {
+          include: { user: { select: EMPLOYEE_SELECT } },
+          orderBy: { startTime: 'desc' },
+        },
       },
     });
     if (!ticket) throw new NotFoundException('Ticket not found');

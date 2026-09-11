@@ -21,7 +21,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: 580px;
+  width: 760px;
   max-width: 95vw;
   background: #ffffff;
   border-left: 1px solid #e2e8f0;
@@ -512,6 +512,13 @@
   border: 1px solid #f1f5f9;
   border-radius: 8px;
   padding: 12px 14px;
+  /* Quill writes every space as &nbsp;, so a pasted paragraph arrives as one
+     unbreakable "word" and runs straight off the panel at any width. `anywhere`
+     is what permits a break inside it — `break-word` would not, because it only
+     applies where a word cannot fit on a line of its own, and these can. It
+     also feeds min-content sizing, so the box stops forcing its parent wide. */
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 /* Activity Timeline */
@@ -1004,6 +1011,10 @@
    RICH TEXT DESCRIPTION (Quill output)
    ═══════════════════════════════════════════ */
 
+/* This variant is rendered HTML, not plain text — let the markup control the
+   breaks instead of the whitespace that happens to sit between the tags. */
+.description-content.rich-text { white-space: normal; }
+
 .description-content.rich-text p { margin: 0 0 8px; }
 .description-content.rich-text p:last-child { margin-bottom: 0; }
 .description-content.rich-text ul,
@@ -1013,6 +1024,11 @@
 .description-content.rich-text h2 { font-size: 15.5px; font-weight: 700; margin: 10px 0 6px; }
 .description-content.rich-text h3 { font-size: 14px; font-weight: 650; margin: 9px 0 5px; }
 .description-content.rich-text a { color: #2563eb; text-decoration: underline; }
+.description-content.rich-text img { max-width: 100%; height: auto; }
+/* Code and tables can't wrap, so they scroll inside their own box rather than
+   pushing the panel sideways. */
+.description-content.rich-text pre,
+.description-content.rich-text table { max-width: 100%; overflow-x: auto; }
 
 .description-content.rich-text blockquote {
   margin: 8px 0;
@@ -1262,6 +1278,11 @@
 
 .btn-timer:hover {
   background: #e2e8f0;
+}
+
+.btn-timer:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 .btn-timer-active {

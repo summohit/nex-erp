@@ -206,15 +206,22 @@ export class TicketsComponent implements OnInit {
     {
       field: 'title',
       headerName: 'TITLE & TYPE',
-      flex: 2,
-      minWidth: 240,
+      // sizeColumnsToFit() distributes the grid's width by ratio, so flex: 2
+      // handed this column every spare pixel and squeezed the rest below the
+      // width they declare — which is what truncated their headers. The cap is
+      // what gives that width back. A title longer than the cap ellipsises
+      // (the cell is nowrap, and a 48px row has no room for a second line),
+      // so the renderer carries a title attribute for the full text.
+      flex: 1,
+      minWidth: 220,
+      maxWidth: 360,
       cellRenderer: (p: any) => {
         const typeKey = p.data?.type || 'BUG';
         const typeLabel = typeKey.replace(/_/g, ' ');
         const typeBadgeClass = this.typeBadgeClasses[typeKey] || 'type-improvement';
         return `
           <div class="cell-ticket-title-wrapper">
-            <div class="cell-title-text">${this.escapeHtml(p.value || '')}</div>
+            <div class="cell-title-text" title="${this.escapeHtml(p.value || '')}">${this.escapeHtml(p.value || '')}</div>
             <div class="cell-meta-row">
               <span class="type-pill ${typeBadgeClass}">${typeLabel}</span>
             </div>
@@ -226,6 +233,7 @@ export class TicketsComponent implements OnInit {
       field: 'platform',
       headerName: 'PLATFORM',
       width: 95,
+      minWidth: 95,
       cellRenderer: (p: any) => {
         const val = p.value || 'WEB';
         return `<span class="platform-tag platform-${val.toLowerCase()}">${val}</span>`;
@@ -237,6 +245,7 @@ export class TicketsComponent implements OnInit {
       colId: 'raisedByDept',
       headerName: 'RAISED BY DEPT',
       width: 150,
+      minWidth: 150,
       valueGetter: (p: any) =>
         p.data?.raisedByDepartment?.name ?? p.data?.reporter?.department?.name ?? '—',
       cellRenderer: (p: any) => `<span class="dept-pill">${this.escapeHtml(p.value)}</span>`,
@@ -245,6 +254,7 @@ export class TicketsComponent implements OnInit {
       field: 'priority',
       headerName: 'PRIORITY',
       width: 110,
+      minWidth: 110,
       cellRenderer: (p: any) => {
         const cls = this.priorityColors[p.value] ?? 'priority-low';
         const dotColor = this.priorityDotColors[p.value] ?? '#94a3b8';
@@ -255,6 +265,7 @@ export class TicketsComponent implements OnInit {
       field: 'status',
       headerName: 'STATUS',
       width: 120,
+      minWidth: 120,
       cellRenderer: (p: any) => {
         const cls = this.statusColors[p.value] ?? 'status-closed';
         const label = (p.value || '').replace(/_/g, ' ');
@@ -265,6 +276,7 @@ export class TicketsComponent implements OnInit {
       field: 'assignee',
       headerName: 'ASSIGNEE',
       width: 155,
+      minWidth: 155,
       cellRenderer: (p: any) => {
         const a = p.data?.assignee;
         if (!a) {
@@ -288,6 +300,7 @@ export class TicketsComponent implements OnInit {
       field: 'reporter',
       headerName: 'RAISED BY',
       width: 175,
+      minWidth: 175,
       cellRenderer: (p: any) => {
         const r = p.data?.reporter;
         if (!r) return `<span class="text-muted">—</span>`;
@@ -310,6 +323,7 @@ export class TicketsComponent implements OnInit {
       field: 'dueDate',
       headerName: 'DEADLINE',
       width: 110,
+      minWidth: 110,
       valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
       cellRenderer: (p: any) => {
         if (!p.value) return '—';
@@ -326,17 +340,20 @@ export class TicketsComponent implements OnInit {
       field: 'createdAt',
       headerName: 'CREATED',
       width: 110,
+      minWidth: 110,
       valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
     },
     {
       field: 'closedAt',
       headerName: 'CLOSED',
       width: 110,
+      minWidth: 110,
       valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
     },
     {
       headerName: 'ACTIONS',
       width: 95,
+      minWidth: 95,
       sortable: false,
       filter: false,
       pinned: 'right',
