@@ -1,0 +1,239 @@
+<!-- Add Lead wizard — same 2-step flow as the Leads board modal. From a contact
+     profile the "Lead Brought By" source is locked to this contact. -->
+<div class="modal-backdrop" (click)="close()">
+  <div class="modal-card enhanced-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-icon-badge">
+          <svg lucideUser size="20" style="color: #ea580c;"></svg>
+        </div>
+        <div>
+          <h3>Add New Lead</h3>
+          <p class="modal-subtitle">Enter details to add a new lead to your pipeline.</p>
+        </div>
+      </div>
+      <button class="btn-icon-close" (click)="close()" [disabled]="isSaving">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+
+    <!-- Wizard Steps Stepper -->
+    <div class="wizard-stepper">
+      <div class="wizard-step" [class.active]="activeTab === 1" [class.completed]="activeTab > 1" (click)="activeTab = 1">
+        <div class="step-badge">
+          <span *ngIf="activeTab <= 1">1</span>
+          <svg lucideCheckCircle size="14" *ngIf="activeTab > 1"></svg>
+        </div>
+        <span class="step-label">Primary Contact</span>
+      </div>
+      <div class="step-connector" [class.active]="activeTab > 1"></div>
+      <div class="wizard-step" [class.active]="activeTab === 2" [class.completed]="activeTab > 2" (click)="activeTab = 2">
+        <div class="step-badge">
+          <span *ngIf="activeTab <= 2">2</span>
+          <svg lucideCheckCircle size="14" *ngIf="activeTab > 2"></svg>
+        </div>
+        <span class="step-label">Deal Tracking</span>
+      </div>
+    </div>
+
+    <div class="modal-body enhanced-body">
+      <!-- Step 1: Primary Contact Information -->
+      <div *ngIf="activeTab === 1" class="step-content-anim">
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.title.trim()">
+            <label>Opportunity Title <span class="required-asterisk">*</span></label>
+            <input type="text" [(ngModel)]="newLeadData.title" placeholder="e.g., Enterprise Software Package" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.title.trim()">Opportunity Title is required.</span>
+          </div>
+          <div class="form-group">
+            <label>Subject Line / Deal Summary</label>
+            <input type="text" [(ngModel)]="newLeadData.subjectLine" placeholder="e.g., SD-WAN Multi-Branch Setup" [disabled]="isSaving" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && phoneInvalid">
+            <label>Phone Number</label>
+            <div class="input-with-prefix">
+              <select class="currency-select phone-code-select" [(ngModel)]="newLeadData.phoneCode" [disabled]="isSaving" title="Country code">
+                <option *ngFor="let c of phoneCountryCodes" [ngValue]="c.code">{{ c.name }} {{ c.code }}</option>
+              </select>
+              <input type="tel" [(ngModel)]="newLeadData.phone" placeholder="e.g. 98765 43210" [disabled]="isSaving" class="currency-input" inputmode="tel" />
+            </div>
+            <span class="error-msg" *ngIf="isSubmitted && phoneInvalid">Enter a valid phone number with country code.</span>
+          </div>
+          <div class="form-group" [class.has-error]="isSubmitted && emailInvalid">
+            <label>Email ID</label>
+            <input type="email" [(ngModel)]="newLeadData.email" placeholder="e.g. contact@company.com" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && emailInvalid">Enter a valid email address.</span>
+          </div>
+        </div>
+
+        <div class="form-group" *ngIf="newLeadData.broughtByContactId && selectedContactCode" style="margin-top: 12px;">
+          <label>Lead Contact ID</label>
+          <input type="text" [value]="selectedContactCode" readonly class="is-locked" />
+          <span class="builder-hint">Linked to the selected lead contact/source record.</span>
+        </div>
+
+        <div class="form-row">
+          <!-- Lead Brought By (locked from the profile's contact) -->
+          <div class="form-group">
+            <div class="field-label-row">
+              <label>Lead Brought By (Source Generator)</label>
+            </div>
+            <div class="owner-select-trigger is-locked" style="cursor: default;">
+              <div class="selected-owner-display" *ngIf="contact">
+                <div class="owner-avatar-circle contact-avatar-badge">
+                  {{ contact.name ? contact.name[0].toUpperCase() : 'C' }}
+                </div>
+                <div class="owner-info-text">
+                  <span class="owner-name">
+                    {{ contact.name }}
+                    <span class="contact-pill-tag">Contact</span>
+                  </span>
+                  <span class="owner-designation">{{ contact.companyName || (contact.contactCode || 'Lead Contact') }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lead Owner / Assigned To -->
+          <div class="form-group custom-select-group">
+            <label>Lead Owner / Assigned Rep (Sales, Finance &amp; Admin)</label>
+            <div class="owner-select-trigger" (click)="showOwnerDropdown = !showOwnerDropdown" [class.active]="showOwnerDropdown">
+              <div *ngIf="getSelectedOwner() as owner" class="selected-owner-display">
+                <div class="owner-avatar-circle" *ngIf="!owner.avatarUrl">
+                  {{ owner.firstName ? owner.firstName[0] : '' }}{{ owner.lastName ? owner.lastName[0] : '' }}
+                </div>
+                <img *ngIf="owner.avatarUrl" [src]="owner.avatarUrl" class="owner-avatar-img" />
+                <div class="owner-info-text">
+                  <span class="owner-name">{{ owner.firstName }} {{ owner.lastName }}</span>
+                  <span class="owner-designation" *ngIf="owner.designation?.name">{{ owner.designation?.name }}</span>
+                </div>
+                <button type="button" class="btn-clear-owner" (click)="$event.stopPropagation(); selectOwner(null)">
+                  <svg lucideX size="14"></svg>
+                </button>
+              </div>
+              <div *ngIf="!getSelectedOwner()" class="unassigned-placeholder">
+                <div class="owner-avatar-circle unassigned-avatar">
+                  <svg lucideUser size="14"></svg>
+                </div>
+                <span class="placeholder-text">Select Rep...</span>
+                <svg lucideChevronDown size="16" class="chevron-icon"></svg>
+              </div>
+            </div>
+            <div class="owner-dropdown-menu" *ngIf="showOwnerDropdown">
+              <div class="owner-search-box">
+                <svg lucideSearch size="14" class="owner-search-icon"></svg>
+                <input type="text" placeholder="Search by name, role..." [(ngModel)]="ownerSearchQuery" (click)="$event.stopPropagation()" />
+              </div>
+              <div class="owner-list-scroll">
+                <div class="owner-item" (click)="selectOwner(null)" [class.selected]="!newLeadData.assignedToId">
+                  <div class="owner-avatar-circle unassigned-avatar">
+                    <svg lucideUser size="14"></svg>
+                  </div>
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">Unassigned</span>
+                    <span class="owner-item-sub">No owner assigned yet</span>
+                  </div>
+                </div>
+                <div class="owner-list-subheader" *ngIf="getFilteredEmployees().length > 0">
+                  <svg lucideUsers size="13"></svg>
+                  <span>Internal Team Members</span>
+                </div>
+                <div class="owner-item" *ngFor="let emp of getFilteredEmployees()" (click)="selectOwner(emp)" [class.selected]="newLeadData.assignedToId === emp.id">
+                  <div class="owner-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{ emp.firstName ? emp.firstName[0] : '' }}{{ emp.lastName ? emp.lastName[0] : '' }}
+                  </div>
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="owner-avatar-img" />
+                  <div class="owner-item-details">
+                    <span class="owner-item-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                    <span class="owner-designation" *ngIf="emp.designation?.name">
+                      {{ emp.designation?.name }}
+                      <span *ngIf="emp.department?.name" style="opacity: 0.75; font-size: 0.95em;">({{ emp.department?.name }})</span>
+                    </span>
+                    <span class="owner-designation" *ngIf="!emp.designation?.name && emp.department?.name">{{ emp.department.name }}</span>
+                  </div>
+                </div>
+                <div *ngIf="getFilteredEmployees().length === 0" class="no-owners-found">
+                  No matching reps found
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Deal & Pipeline Tracking -->
+      <div *ngIf="activeTab === 2" class="step-content-anim">
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.status?.trim()">
+            <label>Initial Pipeline Stage <span class="required-asterisk">*</span></label>
+            <select [(ngModel)]="newLeadData.status" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
+            </select>
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.status?.trim()">Pipeline Stage is required.</span>
+          </div>
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.source?.trim()">
+            <label>Lead Source <span class="required-asterisk">*</span></label>
+            <select [(ngModel)]="newLeadData.source" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let src of LEAD_SOURCES" [value]="src">{{src}}</option>
+            </select>
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.source?.trim()">Lead Source is required.</span>
+            <input
+              *ngIf="newLeadData.source === 'Other'"
+              type="text"
+              [(ngModel)]="customSource"
+              placeholder="Specify custom source channel..."
+              style="margin-top: 8px;"
+              [disabled]="isSaving"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined)">
+            <label>Expected Deal Value <span class="required-asterisk">*</span></label>
+            <div class="input-with-prefix">
+              <span class="currency-symbol-addon">$</span>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                [(ngModel)]="newLeadData.value"
+                (keydown)="preventNegative($event)"
+                (input)="validateDealValue()"
+                placeholder="0.00"
+                [disabled]="isSaving"
+                class="currency-input"
+              />
+            </div>
+            <span class="error-msg" *ngIf="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined)">Deal Value is required.</span>
+          </div>
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.expectedCloseDate">
+            <label>Expected Close Date <span class="required-asterisk">*</span></label>
+            <input type="date" [(ngModel)]="newLeadData.expectedCloseDate" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.expectedCloseDate">Close Date is required.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer enhanced-footer">
+      <button class="btn-secondary" (click)="activeTab = activeTab - 1" *ngIf="activeTab > 1" [disabled]="isSaving">
+        Previous
+      </button>
+      <div *ngIf="activeTab === 1"></div>
+      <div class="footer-right-actions">
+        <button class="btn-secondary" (click)="close()" [disabled]="isSaving">Cancel</button>
+        <button class="btn-primary" (click)="activeTab = activeTab + 1" *ngIf="activeTab === 1" [disabled]="isSaving">
+          Next Step
+        </button>
+        <button class="btn-primary btn-save" (click)="createLead()" *ngIf="activeTab === 2" [disabled]="isSaving">
+          <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving"></svg>
+          <span>{{ isSaving ? 'Creating Deal...' : 'Submit & Save Deal' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

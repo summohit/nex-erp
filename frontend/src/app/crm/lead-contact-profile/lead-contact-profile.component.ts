@@ -13,6 +13,7 @@ import {
   LucideTrendingUp, LucideCheckCircle, LucideClock
 } from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
+import { AddLeadWizardComponent } from './add-lead-wizard/add-lead-wizard.component';
 
 const LEAD_SOURCES = [
   'Friend Reference', 'Google Search', 'Social Media', 'Website', 'Cold Call',
@@ -29,7 +30,8 @@ const LEAD_SOURCES = [
     LucideUserCheck, LucideBriefcase, LucideLayoutList, LucideMessageSquare,
     LucideMoreVertical, LucideEdit2, LucideUserPlus, LucideX, LucidePlus, LucideDownload,
     LucideEye, LucideEdit, LucideTrash2, LucideSearch, LucideChevronLeft, LucideChevronRight,
-    LucideTrendingUp, LucideCheckCircle, LucideClock
+    LucideTrendingUp, LucideCheckCircle, LucideClock,
+    AddLeadWizardComponent
   ],
   templateUrl: './lead-contact-profile.html',
   styleUrls: ['./lead-contact-profile.css']
@@ -59,9 +61,7 @@ export class LeadContactProfileComponent implements OnInit {
   readonly leadStages = ['New', 'Interested', 'Proposal Sent', 'Schedule Meeting', 'Negotiation', 'Win', 'On Hold', 'Lost'];
 
   employees: any[] = [];
-  dealModalOpen = false;
-  isSavingDeal = false;
-  dealForm: any = {};
+  wizardOpen = false;
   isExporting = false;
 
   // ── Notes tab ──────────────────────────────────────────────
@@ -518,52 +518,12 @@ export class LeadContactProfileComponent implements OnInit {
   }
 
   openAddDeal() {
-    const c = this.contact;
-    this.dealForm = {
-      title: '',
-      subjectLine: '',
-      dealCategory: '',
-      companyName: c?.companyName || '',
-      contactName: c?.name || '',
-      email: c?.email || '',
-      phone: c?.phone || c?.mobile || '',
-      website: c?.website || '',
-      address: c?.address || '',
-      value: null,
-      currency: 'INR',
-      expectedCloseDate: '',
-      status: 'New',
-      source: c?.leadSource || '',
-      assignedToId: null,
-      broughtByContactId: c?.id ?? null,
-      description: ''
-    };
-    this.dealModalOpen = true;
+    this.wizardOpen = true;
   }
 
-  closeAddDeal() {
-    if (this.isSavingDeal) return;
-    this.dealModalOpen = false;
-  }
-
-  saveDeal(form: NgForm) {
-    if (!this.dealForm.title || !this.dealForm.title.trim()) return;
-    this.isSavingDeal = true;
-    const payload: any = { ...this.dealForm };
-    if (!payload.broughtByContactId) delete payload.broughtByContactId;
-    if (!payload.assignedToId) payload.assignedToId = null;
-    if (payload.value === '' || payload.value == null) payload.value = null;
-    this.http.post<any>(`${environment.apiUrl}/crm/leads`, payload).subscribe({
-      next: () => {
-        this.isSavingDeal = false;
-        this.dealModalOpen = false;
-        this.loadContact(this.contact.id);
-      },
-      error: (err) => {
-        this.isSavingDeal = false;
-        alert(err?.error?.message || 'Failed to add deal.');
-      }
-    });
+  onWizardSaved(lead: any) {
+    this.wizardOpen = false;
+    if (this.contact) this.loadContact(this.contact.id);
   }
 
   exportLeadsCsv() {
