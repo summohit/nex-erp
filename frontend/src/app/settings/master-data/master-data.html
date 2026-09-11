@@ -605,6 +605,13 @@
         <div class="form-group full-width" *ngIf="activeTab() === 'leave-types' && formData.carryForward">
           <label>Carry Forward Limit (Max Days)</label>
           <input type="number" class="form-control" [(ngModel)]="formData.carryForwardLimit" min="0">
+          <!-- The field only appears once carry-forward is switched on, so a cap
+               of zero would make the switch do nothing. Say what 0 means rather
+               than leaving people to find out in January. -->
+          <small class="form-hint">
+            Unused days roll into next year on 1 January, up to this many.
+            Leave it at <strong>0</strong> for no limit.
+          </small>
         </div>
         
         <div class="form-group full-width" *ngIf="activeTab() === 'leave-types'">

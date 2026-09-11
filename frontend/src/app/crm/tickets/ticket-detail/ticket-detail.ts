@@ -195,7 +195,15 @@ export class TicketDetailComponent implements OnInit {
       });
     } else {
       this.ticketService.startTimer(this.ticket.id).subscribe({
-        next: done,
+        next: (res: any) => {
+          // Starting here stops your timer on any other ticket. Say so — a
+          // silent move would look like the other ticket lost its time.
+          const moved: string[] = res?.stoppedOnOtherTickets || [];
+          if (moved.length) {
+            this.toast.info(`Timer moved here — stopped on ${moved.join(', ')}.`);
+          }
+          done();
+        },
         error: (e) => fail(e, 'Could not start the timer'),
       });
     }

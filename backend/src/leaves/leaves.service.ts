@@ -1,61 +1,15 @@
-import { Injectable, BadRequestException, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
-export class LeavesService implements OnModuleInit {
+export class LeavesService {
   private readonly logger = new Logger(LeavesService.name);
 
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService
   ) {}
-
-  onModuleInit() {
-    this.startAccrualCron();
-  }
-
-  private startAccrualCron() {
-    // Run once a day at midnight
-    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-    setInterval(() => {
-      this.processAutomatedAccruals().catch(err => this.logger.error('Failed to process accruals', err));
-    }, ONE_DAY_MS);
-    
-    // Also run immediately on startup if needed, but usually we just let it run on schedule
-  }
-
-  async processAutomatedAccruals() {
-    this.logger.log('Running automated leave accruals check...');
-    const now = new Date();
-    // Only run on the 1st of the month for MONTHLY accruals, or Jan 1st for YEARLY.
-    // For simplicity in this implementation, we will assume it runs and checks logic.
-    const isFirstOfMonth = now.getDate() === 1;
-    const isFirstOfYear = now.getMonth() === 0 && now.getDate() === 1;
-    const year = now.getFullYear();
-
-    if (!isFirstOfMonth && !isFirstOfYear) return;
-
-    const leaveTypes = await this.prisma.leaveType.findMany({
-      where: { accrualAmount: { gt: 0 } }
-    });
-
-    for (const lt of leaveTypes) {
-      if (lt.accrualFrequency === 'MONTHLY' && isFirstOfMonth) {
-        await this.prisma.leaveBalance.updateMany({
-          where: { leaveTypeId: lt.id, year },
-          data: { allocated: { increment: lt.accrualAmount } }
-        });
-        this.logger.log(`Credited ${lt.accrualAmount} for Monthly Leave Type: ${lt.name}`);
-      } else if (lt.accrualFrequency === 'YEARLY' && isFirstOfYear) {
-        await this.prisma.leaveBalance.updateMany({
-          where: { leaveTypeId: lt.id, year },
-          data: { allocated: { increment: lt.accrualAmount } }
-        });
-        this.logger.log(`Credited ${lt.accrualAmount} for Yearly Leave Type: ${lt.name}`);
-      }
-    }
-  }
 
   async assignLeaveBalance(data: { employeeId: number, leaveTypeId: number, allocated: number, year: number }) {
     return this.prisma.leaveBalance.upsert({

@@ -487,6 +487,17 @@ model LeaveBalance {
   used        Float     @default(0)
   carriedOver Float     @default(0)
   year        Int
+
+  /// Which accrual period this row has already been credited for — "2026-09"
+  /// for MONTHLY types, "2026" for YEARLY. The credit is applied in a single
+  /// UPDATE that also stamps this, so a process restart on the 1st cannot
+  /// double-credit: the second run matches zero rows.
+  lastAccruedPeriod String?
+
+  /// The year this row's carriedOver was rolled in from. Set once, and checked
+  /// before rolling again — carriedOver being 0 is a legitimate outcome, so it
+  /// cannot serve as the guard itself.
+  carriedForwardFromYear Int?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

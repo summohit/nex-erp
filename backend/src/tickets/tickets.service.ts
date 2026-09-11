@@ -654,19 +654,47 @@ export class TicketsService {
 
   async startTimer(companyId: number, ticketId: number, userId: number) {
     await this.ensureTicketExists(companyId, ticketId);
-    
-    // Check if a timer is already running for this user and ticket
-    const runningTimer = await this.prisma.ticketTimeEntry.findFirst({
-      where: { ticketId, userId, endTime: null }
+
+    // Already running on THIS ticket is a double-start, not a move. Say so —
+    // the panel shows Stop in that state, so it means something went wrong.
+    const alreadyHere = await this.prisma.ticketTimeEntry.findFirst({
+      where: { ticketId, userId, endTime: null },
     });
-    
-    if (runningTimer) {
+    if (alreadyHere) {
       throw new BadRequestException('Timer is already running for this ticket');
     }
 
-    return this.prisma.ticketTimeEntry.create({
-      data: { ticketId, userId, startTime: new Date() }
+    // Running on a DIFFERENT ticket is the common case, and used to go
+    // unnoticed: the check above was scoped to one ticket, so one person could
+    // accumulate a timer per ticket and leave them all going. Nobody works on
+    // two tickets at once, so starting here closes the other one properly —
+    // with its real duration, exactly as pressing Stop would have.
+    const elsewhere = await this.prisma.ticketTimeEntry.findMany({
+      where: { userId, endTime: null, ticket: { companyId } },
+      include: { ticket: { select: { ticketNumber: true } } },
     });
+
+    const now = new Date();
+    const stopped: string[] = [];
+    for (const open of elsewhere) {
+      await this.prisma.ticketTimeEntry.update({
+        where: { id: open.id },
+        data: {
+          endTime: now,
+          duration: Math.max(0, Math.floor((now.getTime() - open.startTime.getTime()) / 1000)),
+          notes: open.notes ?? 'Stopped automatically when a timer was started on another ticket',
+        },
+      });
+      if (open.ticket?.ticketNumber) stopped.push(open.ticket.ticketNumber);
+    }
+
+    const entry = await this.prisma.ticketTimeEntry.create({
+      data: { ticketId, userId, startTime: now },
+    });
+
+    // Returned so the client can say which ticket it took the timer off,
+    // rather than silently moving it.
+    return { ...entry, stoppedOnOtherTickets: stopped };
   }
 
   async stopTimer(companyId: number, ticketId: number, userId: number, notes?: string) {
