@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../api/apiClient';
 import { theme } from '../../theme/theme';
 import TwoFactorPanel from './TwoFactorPanel';
+import { challengeStorage } from '../../api/challengeStorage';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, X, MailCheck } from 'lucide-react-native';
 
 export default function LoginScreen() {
@@ -35,9 +36,45 @@ export default function LoginScreen() {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resending, setResending] = useState(false);
 
-  /** Non-null while the user owes a second factor. Deliberately not persisted. */
+  /**
+   * Non-null while the user owes a second factor.
+   *
+   * This IS persisted, and has to be: reading the code means leaving the app
+   * for the authenticator, and Android is free to tear the activity down while
+   * it is in the background — which dropped the user back to a blank login form
+   * with their password already cleared.
+   *
+   * Persisting it is safe. The challenge token is signed with a separate secret
+   * (JWT_SECRET + '_2fa') and carries `typ: '2fa'`, both of which AuthGuard
+   * rejects, so on disk it is worth exactly what it is worth in memory: proof
+   * that a password was checked, still useless without the code. It lives at
+   * its own key, never the session's, and is cleared the moment it is spent,
+   * cancelled, or past its ten minutes.
+   */
   const [challenge, setChallenge] = useState<{ token: string; mode: 'VERIFY' | 'ENROL' } | null>(null);
+  /** Blocks the first paint so a restorable challenge does not flash the login form. */
+  const [restoringChallenge, setRestoringChallenge] = useState(true);
   const [resendSent, setResendSent] = useState(false);
+
+  const clearChallenge = useCallback(async () => {
+    setChallenge(null);
+    await challengeStorage.clear();
+  }, []);
+
+  const beginChallenge = useCallback(async (next: { token: string; mode: 'VERIFY' | 'ENROL' }) => {
+    setChallenge(next);
+    await challengeStorage.save(next);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    challengeStorage.restore().then((saved) => {
+      if (cancelled) return;
+      if (saved) setChallenge(saved);
+      setRestoringChallenge(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const showError = (title: string, message: string, canVerify = false) => {
     setErrorTitle(title);
@@ -131,12 +168,12 @@ export default function LoginScreen() {
       // response carries no access_token, and decoding one would throw into the
       // generic catch and leave the user at a dead end.
       //
-      // The token is held in component state only — never AsyncStorage, never
-      // the auth store — so the app cannot mistake a half-finished challenge
-      // for a session.
+      // The token is persisted (see challengeStorage) but never touches the
+      // auth store, so the app cannot mistake a half-finished challenge for a
+      // session.
       if (response.data?.twoFactorRequired && response.data?.challengeToken) {
         setLoading(false);
-        setChallenge({
+        await beginChallenge({
           token: response.data.challengeToken,
           mode: response.data.mode === 'ENROL' ? 'ENROL' : 'VERIFY',
         });
@@ -176,18 +213,23 @@ export default function LoginScreen() {
 
       {/* The second factor replaces the credential form rather than stacking on
           top of it, so there is no way to resubmit a password mid-challenge. */}
-      {challenge ? (
+      {restoringChallenge ? (
+        // One tick, not a spinner the user perceives — but without it a
+        // restorable challenge flashes the login form first.
+        <View style={styles.restoreGate} />
+      ) : challenge ? (
         <TwoFactorPanel
           challengeToken={challenge.token}
           mode={challenge.mode}
           onAuthenticated={async (tokens) => {
-            setChallenge(null);
+            await clearChallenge();
             await completeSignIn(tokens);
           }}
-          onCancel={() => {
-            setChallenge(null);
+          onCancel={async () => {
+            await clearChallenge();
             setPassword('');
           }}
+          onExpired={clearChallenge}
         />
       ) : (
       <ScrollView
@@ -376,6 +418,9 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  /** Occupies the frame for the single tick the challenge restore takes. */
+  restoreGate: { flex: 1 },
+
   keyboardContainer: {
     flex: 1,
     backgroundColor: '#F8FAFC',

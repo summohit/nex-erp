@@ -108,7 +108,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Keep versionName in step with backend/uploads/app/version.json, which
         // drives the version label on the landing page's download button.
-        versionCode 243
+        versionCode 244
         versionName "2.4.2"
     }
     signingConfigs {
