@@ -1140,6 +1140,15 @@
           </span>
         </div>
         <div class="ldm-header-actions">
+          <!-- The modal is a summary; the profile page has the pipeline,
+               proposals and follow-up history. Close first so the overlay does
+               not linger over the page we navigate to. -->
+          <button type="button" class="btn-detail-view"
+                  (click)="viewLeadProfile(selectedLead)"
+                  title="Open the full lead profile">
+            <svg lucideExternalLink size="13"></svg>
+            <span>View Details</span>
+          </button>
           <button type="button" class="btn-detail-followup" (click)="openFollowUpModal(selectedLead, $event)" title="Schedule & View Follow-ups">
             <svg lucideCalendar size="14"></svg>
             <span>Follow Up</span>
@@ -1362,6 +1371,50 @@
         </div>
       </div>
 
+      <!-- Proposals -->
+      <div class="ldm-section">
+        <div class="ldm-section-title">
+          <svg lucideFileText size="14"></svg> Proposals
+          <span class="ldm-prop-count" *ngIf="modalProposals.length">{{ modalProposals.length }}</span>
+        </div>
+
+        <div class="ldm-prop-loading" *ngIf="loadingModalProposals">Loading proposals…</div>
+
+        <div class="ldm-prop-table-wrap" *ngIf="!loadingModalProposals && modalProposals.length">
+          <table class="ldm-prop-table">
+            <thead>
+              <tr>
+                <th>Proposal No.</th>
+                <th>Total</th>
+                <th>Date</th>
+                <th>Valid Till</th>
+                <th>Status</th>
+                <th class="ldm-prop-action-col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let q of modalProposals">
+                <td class="ldm-prop-number">{{ q.quoteNumber }}</td>
+                <td class="ldm-prop-amount">{{ q.total | currency:(q.currency || 'INR'):'symbol-narrow':'1.0-2' }}</td>
+                <td>{{ q.date | date:'dd MMM yyyy' }}</td>
+                <td>{{ q.validUntil | date:'dd MMM yyyy' }}</td>
+                <td><span class="ldm-prop-status ldm-prop-status-{{ (q.status || '') | lowercase }}">{{ q.status }}</span></td>
+                <td class="ldm-prop-action-col">
+                  <button type="button" class="ldm-prop-trigger" title="Actions"
+                          (click)="toggleProposalActionsMenu(q, $event)">
+                    <svg lucideMoreVertical [size]="16"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ldm-prop-empty" *ngIf="!loadingModalProposals && !modalProposals.length">
+          No proposals have been raised for this deal yet.
+        </div>
+      </div>
+
       <!-- Description -->
       <div class="ldm-section" *ngIf="selectedLead.description">
         <div class="ldm-section-title">
@@ -1382,6 +1435,34 @@
     <div class="ldm-footer">
       <button class="btn-secondary" (click)="closeDetailModal()">Close</button>
     </div>
+  </div>
+
+  <div class="dropdown-backdrop-transparent" *ngIf="proposalActionsMenu" (click)="closeProposalActionsMenu(); $event.stopPropagation()"></div>
+
+  <div class="ldm-prop-menu" *ngIf="proposalActionsMenu" (click)="$event.stopPropagation()"
+       [ngStyle]="{'top.px': proposalActionsMenuPos.top, 'left.px': proposalActionsMenuPos.left}">
+    <button type="button" class="ldm-prop-menu-item"
+            (click)="viewProposal(proposalActionsMenu); closeProposalActionsMenu()">
+      <svg lucideEye [size]="14"></svg><span>View</span>
+    </button>
+    <button type="button" class="ldm-prop-menu-item"
+            (click)="editProposal(proposalActionsMenu); closeProposalActionsMenu()">
+      <svg lucideEdit2 [size]="14"></svg><span>Edit</span>
+    </button>
+    <button type="button" class="ldm-prop-menu-item"
+            (click)="downloadProposal(proposalActionsMenu); closeProposalActionsMenu()">
+      <svg lucideDownload [size]="14"></svg><span>Download</span>
+    </button>
+    <button type="button" class="ldm-prop-menu-item"
+            [disabled]="sendingProposalId === proposalActionsMenu.id"
+            (click)="sendProposalByEmail(proposalActionsMenu); closeProposalActionsMenu()">
+      <svg lucideMail [size]="14"></svg>
+      <span>{{ sendingProposalId === proposalActionsMenu.id ? 'Sending…' : 'Send via email' }}</span>
+    </button>
+    <button type="button" class="ldm-prop-menu-item danger"
+            (click)="deleteProposal(proposalActionsMenu); closeProposalActionsMenu()">
+      <svg lucideTrash2 [size]="14"></svg><span>Delete</span>
+    </button>
   </div>
 </div>
 

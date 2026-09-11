@@ -30,7 +30,8 @@
         </tr>
         <tr *ngFor="let q of quotations">
           <td><span class="fw-semibold">{{q.quoteNumber}}</span></td>
-          <td>{{q.client.name}}</td>
+          <!-- A deal-only quote has no client; fall back to what it recorded. -->
+          <td>{{ q.client?.name || q.billingCompanyName || q.lead?.companyName || q.lead?.title || '—' }}</td>
           <td>{{q.date | date}}</td>
           <td>₹{{q.total | number:'1.2-2'}}</td>
           <td>

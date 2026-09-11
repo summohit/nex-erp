@@ -14,6 +14,12 @@ export class SalesService {
   async createQuotation(companyId: number, data: any, userId: number) {
     const { items, attachments, ...quoteData } = data;
 
+    // A quotation belongs to a DEAL; the client link is optional. But it has to
+    // belong to something, or it is an orphan document nothing can find again.
+    if (!quoteData.clientId && !quoteData.leadId) {
+      throw new BadRequestException('A quotation must belong to a deal or a client.');
+    }
+
     // Convert date strings to DateTime
     if (quoteData.date && typeof quoteData.date === 'string') {
       quoteData.date = new Date(quoteData.date);
@@ -34,7 +40,15 @@ export class SalesService {
     const total = subtotal + tax;
     delete quoteData.taxRate; // avoid double-writing; stored separately below
 
-    const quoteNumber = `QT-${Date.now().toString().slice(-8)}`;
+    // Use the company's configured prefix rather than a hardcoded one —
+    // otherwise the Company Profile field is settings that do nothing. Blank
+    // falls back to "QT", which is what every existing quotation uses.
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { quotationPrefix: true },
+    });
+    const prefix = (company?.quotationPrefix || 'QT').trim().replace(/-+$/, '');
+    const quoteNumber = `${prefix}-${Date.now().toString().slice(-8)}`;
 
     // Check if total requires approval (e.g. > 10,000)
     let approvalStatus = 'APPROVED';
@@ -82,7 +96,7 @@ export class SalesService {
           roles: ['SUPERADMIN', 'ADMIN', 'FINANCE'],
           excludeUserId: userId,
           title: 'Quotation Awaiting Approval',
-          message: `${created.quoteNumber} for ${created.client?.name ?? 'a client'} totals ${total.toFixed(2)} and needs approval.`,
+          message: `${created.quoteNumber} for ${created.client?.name ?? created.billingCompanyName ?? 'a deal'} totals ${total.toFixed(2)} and needs approval.`,
           type: 'ACTION_REQUIRED',
           linkUrl: '/sales/quotations',
         })
@@ -97,6 +111,10 @@ export class SalesService {
       where: { companyId },
       include: {
         client: true,
+        // A quote raised against a deal may have no client, and the list has to
+        // show something. Selected narrowly rather than `lead: true`, which
+        // would ship the whole lead row per quotation.
+        lead: { select: { id: true, title: true, companyName: true } },
         items: true,
         attachments: true,
         approvedBy: { select: { employee: { select: { firstName: true, lastName: true } } } }
@@ -138,7 +156,17 @@ export class SalesService {
       data: { status: 'ACCEPTED' }
     });
 
-    // Generate Sales Order
+    // Generate Sales Order.
+    //
+    // Quotations may now belong to a deal with no client, but an order is a
+    // commitment against a party, so SalesOrder.clientId stays required. Say
+    // what to do about it rather than letting Prisma throw a null violation.
+    if (!quote.clientId) {
+      throw new BadRequestException(
+        'This quotation belongs to a deal with no client record. Link a client to the deal before converting it to a sales order.',
+      );
+    }
+
     return this.prisma.salesOrder.create({
       data: {
         orderNumber: `SO-${Date.now().toString().slice(-6)}`,

@@ -493,6 +493,19 @@ export class LeadsComponent implements OnInit {
     this.router.navigate(['/crm/leads', leadId]);
   }
 
+  /**
+   * Leave the summary modal for the full profile.
+   *
+   * The id has to be read BEFORE closing: closeDetailModal() nulls
+   * selectedLead, and template statements run in order, so doing both inline
+   * would dereference null.
+   */
+  viewLeadProfile(lead: Lead | null) {
+    const leadId = lead?.id;
+    this.closeDetailModal();
+    if (leadId) this.openLeadProfile(leadId);
+  }
+
   openLeadContactProfile(contactId: number) {
     this.router.navigate(['/crm/lead-contacts', contactId]);
   }
@@ -1926,11 +1939,153 @@ csvImporting = false;
   openDetailModal(lead: Lead) {
     this.selectedLead = lead;
     this.showDetailModal = true;
+    this.loadModalProposals(lead.id);
   }
 
   closeDetailModal() {
     this.showDetailModal = false;
     this.selectedLead = null;
+    this.modalProposals = [];
+    this.proposalActionsMenu = null;
+  }
+
+  // ── proposals inside the detail modal ─────────────────────────────────────
+  //
+  // The list endpoint does not carry quotations, so the modal fetches the full
+  // lead once it opens. Same actions as the Proposals tab on the detail page,
+  // deliberately: someone who found the deal in the grid should not have to
+  // navigate away to send or download its quotation.
+
+  modalProposals: any[] = [];
+  loadingModalProposals = false;
+  proposalActionsMenu: any = null;
+  proposalActionsMenuPos = { top: 0, left: 0 };
+  sendingProposalId: number | null = null;
+
+  private loadModalProposals(leadId: number) {
+    this.modalProposals = [];
+    this.loadingModalProposals = true;
+    this.http.get<any>(`${environment.apiUrl}/crm/leads/${leadId}`).subscribe({
+      next: (data) => {
+        this.modalProposals = data?.quotations || [];
+        this.loadingModalProposals = false;
+      },
+      error: () => {
+        this.loadingModalProposals = false;
+      },
+    });
+  }
+
+  toggleProposalActionsMenu(q: any, event: Event) {
+    if (event) event.stopPropagation();
+    if (this.proposalActionsMenu?.id === q.id) {
+      this.proposalActionsMenu = null;
+      return;
+    }
+    const btn = (event.target as HTMLElement).closest('.ldm-prop-trigger') as HTMLElement | null;
+    if (btn) {
+      // Floated off the trigger's rect rather than nested in the cell, because
+      // the modal body scrolls and would otherwise clip it. Flips above when
+      // there is no room below — the rows sit low in the viewport.
+      const rect = btn.getBoundingClientRect();
+      const menuWidth = 190;
+      const menuHeight = 218;
+      const gap = 6;
+      const margin = 8;
+      const fitsBelow = rect.bottom + gap + menuHeight <= window.innerHeight - margin;
+      this.proposalActionsMenuPos = {
+        top: fitsBelow ? rect.bottom + gap : Math.max(margin, rect.top - gap - menuHeight),
+        left: Math.max(margin, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - margin)),
+      };
+    }
+    this.proposalActionsMenu = q;
+  }
+
+  closeProposalActionsMenu() {
+    this.proposalActionsMenu = null;
+  }
+
+  /** Fetched as a blob rather than opened by URL: the endpoint sits behind the
+   *  auth guard, so a plain window.open would come back 401. */
+  viewProposal(q: any) {
+    this.http
+      .get(`${environment.apiUrl}/sales/quotations/${q.id}/pdf`, { responseType: 'blob' })
+      .subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          const win = window.open(url, '_blank');
+          if (!win) this.toast.error('Allow pop-ups to view the quotation, or download it instead.');
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        },
+        error: () => this.toast.error('Could not generate the quotation PDF.'),
+      });
+  }
+
+  downloadProposal(q: any) {
+    this.http
+      .get(`${environment.apiUrl}/sales/quotations/${q.id}/pdf`, { responseType: 'blob' })
+      .subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${q.quoteNumber || 'quotation'}.pdf`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        },
+        error: () => this.toast.error('Could not generate the quotation PDF.'),
+      });
+  }
+
+  /** The proposal form lives on the deal page, so editing hands off to it with
+   *  the quote to open — rather than keeping a second copy of that form here. */
+  editProposal(q: any) {
+    const leadId = this.selectedLead?.id;
+    this.closeDetailModal();
+    if (leadId == null) return;
+    this.router.navigate(['/crm/leads', leadId], {
+      queryParams: { tab: 'proposals', edit: q.id },
+    });
+  }
+
+  /**
+   * Email the quotation to the buyer. Confirmed first, and the confirmation
+   * names the recipient: this leaves the building and cannot be recalled.
+   */
+  sendProposalByEmail(q: any) {
+    const to = (q.billingEmail || this.selectedLead?.email || '').trim();
+    if (!to) {
+      this.toast.error('There is no email address on this proposal or its deal. Add one, then send.');
+      return;
+    }
+    if (!confirm(`Send quotation ${q.quoteNumber} to ${to}? The PDF will be attached.`)) return;
+
+    this.sendingProposalId = q.id;
+    this.http
+      .post<any>(`${environment.apiUrl}/sales/quotations/${q.id}/email`, { to })
+      .subscribe({
+        next: (res) => {
+          this.sendingProposalId = null;
+          this.toast.success(`Quotation ${q.quoteNumber} sent to ${res?.to || to}.`);
+        },
+        error: (err) => {
+          this.sendingProposalId = null;
+          this.toast.error(err?.error?.message || 'The quotation could not be sent.');
+        },
+      });
+  }
+
+  /** The server refuses once a quote is accepted or converted to an order, so
+   *  its message is surfaced verbatim rather than second-guessed here. */
+  deleteProposal(q: any) {
+    if (!confirm(`Delete quotation ${q.quoteNumber}? This cannot be undone.`)) return;
+    this.http.delete(`${environment.apiUrl}/sales/quotations/${q.id}`).subscribe({
+      next: () => {
+        this.modalProposals = this.modalProposals.filter(p => p.id !== q.id);
+        this.toast.success('Proposal deleted.');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'The proposal could not be deleted.'),
+    });
   }
 
   getStatusLabel(status: string): string {

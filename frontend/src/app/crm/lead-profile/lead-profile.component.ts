@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { DEFAULT_QUOTATION_TERMS } from '../../shared/constants/quotation-terms';
+import { SystemSettingsService } from '../../services/system-settings.service';
 import { environment } from '../../../environments/environment';
 import {
   LucideArrowLeft, LucideMail, LucidePhone, LucideBuilding, LucideMapPin,
@@ -12,7 +14,8 @@ import {
   LucideUpload, LucideDownload, LucideTrash2, LucideEdit2, LucideCheckCircle,
   LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
   LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
-  LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock
+  LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
+  LucideList
 } from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
 import { ClientsService } from '../../services/clients';
@@ -34,7 +37,8 @@ interface PipelineStage {
     LucideUpload, LucideDownload, LucideTrash2, LucideEdit2, LucideCheckCircle,
     LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
     LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
-    LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock
+    LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
+    LucideList
   ],
   templateUrl: './lead-profile.html',
   styleUrls: ['./lead-profile.css']
@@ -45,6 +49,7 @@ export class LeadProfileComponent implements OnInit {
   private router = inject(Router);
   private dialog = inject(DialogService);
   private clientsService = inject(ClientsService);
+  private systemSettingsService = inject(SystemSettingsService);
 
   lead: any = null;
   leadId: number | null = null;
@@ -141,6 +146,7 @@ export class LeadProfileComponent implements OnInit {
   isSavingFollowUp = false;
   isUploadingFollowUpFiles = false;
   pendingFollowUpFiles: File[] = [];
+  existingFollowUpFiles: any[] = [];
   followUpStatusSaving: Record<number, boolean> = {};
   renamingFollowUpFileIndex: number | null = null;
   renameFollowUpFileName = '';
@@ -192,12 +198,42 @@ export class LeadProfileComponent implements OnInit {
         this.proposals = data.quotations || [];
         this.isLoading = false;
         this.loadAllTabData();
+        this.applyDeepLink();
       },
       error: (err) => {
         console.error('Error loading lead profile', err);
         this.isLoading = false;
       }
     });
+  }
+
+  /**
+   * Honour ?tab= and ?edit= from the deal grid's proposal menu, which hands off
+   * here rather than keeping its own copy of the proposal form.
+   *
+   * Run after the quotations have loaded, since ?edit= names one of them. An id
+   * that no longer exists just lands on the tab — the quote was probably deleted
+   * between the two screens, and an error would say nothing useful.
+   */
+  private applyDeepLink() {
+    const params = this.route.snapshot.queryParamMap;
+    const tab = params.get('tab');
+    if (tab === 'proposals' || tab === 'followups' || tab === 'notes' || tab === 'history' || tab === 'files') {
+      this.activeTab = tab as any;
+    }
+    const editId = Number(params.get('edit'));
+    if (editId) {
+      const quote = this.proposals.find(p => p.id === editId);
+      if (quote) this.editProposal(quote);
+    }
+    if (tab || editId) {
+      // Clear them so a refresh, or a back-navigation, does not reopen the form.
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: {},
+        replaceUrl: true,
+      });
+    }
   }
 
   loadAllTabData() {
@@ -350,6 +386,7 @@ export class LeadProfileComponent implements OnInit {
     };
     this.setQuickFollowUpTime('tomorrow_morning');
     this.pendingFollowUpFiles = [];
+    this.existingFollowUpFiles = [];
     this.showFollowUpModal = true;
   }
 
@@ -359,6 +396,7 @@ export class LeadProfileComponent implements OnInit {
     this.followUpTab = 'schedule';
     this.followUpStageMenuOpen = false;
     this.followUpActionsMenu = null;
+    this.existingFollowUpFiles = fu.files ? [...fu.files] : [];
     this.followUpForm = {
       id: fu.id,
       title: fu.title || 'Follow-up',
@@ -381,6 +419,7 @@ export class LeadProfileComponent implements OnInit {
     this.followUpTab = 'schedule';
     this.followUpStageMenuOpen = false;
     this.followUpActionsMenu = null;
+    this.existingFollowUpFiles = fu.files ? [...fu.files] : [];
     this.followUpForm = {
       id: fu.id,
       title: fu.title || 'Follow-up',
@@ -407,8 +446,8 @@ export class LeadProfileComponent implements OnInit {
     const btn = (event.target as HTMLElement).closest('.fu-actions-trigger') as HTMLElement | null;
     if (btn) {
       const rect = btn.getBoundingClientRect();
-      const menuWidth = 160;
-      const menuHeight = 128;
+      const menuWidth = 140;
+      const menuHeight = 116;
       let left = rect.right - menuWidth;
       left = Math.min(Math.max(left, 8), window.innerWidth - menuWidth - 8);
       const spaceBelow = window.innerHeight - rect.bottom - 6;
@@ -461,14 +500,22 @@ export class LeadProfileComponent implements OnInit {
     };
 
     if (this.isEditingFollowUp) {
+      this.isSavingFollowUp = true;
       this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/follow-ups/${this.followUpForm.id}`, payload).subscribe({
         next: (data) => {
+          this.isSavingFollowUp = false;
           this.followUps = this.followUps.map(f => f.id === data.id ? data : f).sort((a, b) => this.sortFollowUpsDesc(a, b));
+          const files = [...this.pendingFollowUpFiles];
+          this.pendingFollowUpFiles = [];
+          if (files.length) {
+            this.uploadFollowUpFiles(data.id, files);
+          }
           this.showFollowUpModal = false;
-          this.dialog.success('Follow-up updated.');
+          this.dialog.success(files.length ? 'Follow-up updated; uploading attachments.' : 'Follow-up updated.');
           this.loadHistory();
         },
         error: (err) => {
+          this.isSavingFollowUp = false;
           console.error(err);
           this.dialog.error('Failed to update follow-up.');
         }
@@ -598,6 +645,24 @@ export class LeadProfileComponent implements OnInit {
   cancelRenameFollowUpFile() {
     this.renamingFollowUpFileIndex = null;
     this.renameFollowUpFileName = '';
+  }
+
+  async deleteExistingFollowUpFile(file: any) {
+    if (this.leadId == null) return;
+    const confirmed = await this.dialog.confirm(`Delete attachment "${file.fileName}"?`, 'Delete attachment');
+    if (!confirmed) return;
+    this.http.delete(`${environment.apiUrl}/crm/leads/${this.leadId}/files/${file.id}`).subscribe({
+      next: () => {
+        this.existingFollowUpFiles = this.existingFollowUpFiles.filter(f => f.id !== file.id);
+        this.dialog.success('Attachment deleted.');
+        this.loadFollowUps();
+        this.loadHistory();
+      },
+      error: (err) => {
+        console.error(err);
+        this.dialog.error('Failed to delete attachment.');
+      }
+    });
   }
 
   uploadFollowUpFiles(followUpId: number, files: File[]) {
@@ -952,6 +1017,18 @@ export class LeadProfileComponent implements OnInit {
     return `${a.firstName || ''} ${a.lastName || ''}`.trim();
   }
 
+  /** The external contact this deal came from, when one is linked. */
+  get leadContactId(): number | null {
+    return this.lead?.broughtByContact?.id ?? null;
+  }
+
+  /** Open that contact's profile. Only reachable when leadContactId is set —
+   *  a deal can carry a contact name with no contact record behind it. */
+  openLeadContactProfile() {
+    const id = this.leadContactId;
+    if (id != null) this.router.navigate(['/crm/lead-contacts', id]);
+  }
+
   get broughtByName(): string {
     const b = this.lead?.broughtByContact;
     if (!b) return '';
@@ -1122,16 +1199,6 @@ export class LeadProfileComponent implements OnInit {
 
   proposalForm: any = this.freshProposalForm();
 
-  private static readonly PROPOSAL_DEFAULT_TERMS =
-    '1. Validity: This proposal is valid for the period stated above.\n' +
-    '2. Payment Terms: 50% advance against Purchase Order and balance before dispatch / on delivery.\n' +
-    '3. Taxes: Prices are exclusive of GST unless stated otherwise. GST will be charged at the applicable rate.\n' +
-    '4. Delivery: Delivery/implementation timelines will be communicated upon order confirmation.\n' +
-    '5. Warranty: Standard manufacturer warranty applies from the date of delivery.\n' +
-    '6. Force Majeure: Neither party shall be liable for delays caused by events beyond reasonable control.\n' +
-    '7. Acceptance: This proposal is subject to our standard terms of sale and acceptance of a Purchase Order.\n' +
-    '8. Governing Law: This proposal shall be governed by the laws of India and subject to jurisdiction of the courts.';
-
   private freshProposalForm() {
     return {
       clientId: (this.lead?.client?.id ?? null) as number | null,
@@ -1141,33 +1208,328 @@ export class LeadProfileComponent implements OnInit {
       currency: this.lead?.currency || 'INR',
       taxRate: 18,
       notes: '',
-      terms: LeadProfileComponent.PROPOSAL_DEFAULT_TERMS,
-      items: [{ description: '', quantity: 1, unit: 'number', unitPrice: 0 }],
+      terms: this.companyQuotationTerms ?? DEFAULT_QUOTATION_TERMS,
+      // Seeded from the lead, then editable — the quote records who it was
+      // addressed to at the time, so later edits to the lead cannot rewrite it.
+      billingCompanyName: this.lead?.companyName || '',
+      billingAddress: this.lead?.address || '',
+      billingContactName: this.lead?.contactName || '',
+      billingMobile: this.lead?.phone || '',
+      billingEmail: this.lead?.email || '',
+      billingGstin: '',
+      billingPan: '',
+      billingPlaceOfSupply: '',
+      items: [this.freshProposalItem()],
       attachments: []
     };
   }
 
+  /** Company-configured quotation terms; null means use the built-in defaults. */
+  private companyQuotationTerms: string | null = null;
+
+  /** Set while editing an existing quote; null for a new one. */
+  editingProposalId: number | null = null;
+  /** Only for the modal heading, so an edit is not labelled "New Proposal". */
+  editingProposalNumber: string | null = null;
+
   openNewProposal() {
     this.isProposalSubmitted = false;
     this.uploadingProposalCount = 0;
+    this.editingProposalId = null;
+    this.editingProposalNumber = null;
     this.proposalForm = this.freshProposalForm();
     this.showProposalModal = true;
     this.loadProposalClients();
+    this.applyCompanyQuotationTerms();
+  }
+
+  /**
+   * Pull the company's standard terms into the open form.
+   *
+   * Fetched when the modal opens rather than on page load, so the request only
+   * happens for someone actually raising a proposal. The form is seeded with the
+   * built-in defaults first, so a slow or failed settings call leaves usable
+   * terms rather than an empty box.
+   */
+  private applyCompanyQuotationTerms() {
+    this.systemSettingsService.getSettings().subscribe({
+      next: (settings) => {
+        this.companyQuotationTerms = settings?.quotationTerms ?? null;
+        if (!this.showProposalModal) return;
+        // Don't stamp over anything already typed in the few hundred ms this took.
+        if (this.proposalForm.terms === DEFAULT_QUOTATION_TERMS) {
+          this.proposalForm.terms = this.companyQuotationTerms ?? DEFAULT_QUOTATION_TERMS;
+        }
+      },
+      error: () => { /* the built-in defaults are already in the form */ },
+    });
+  }
+
+  /**
+   * Open the printable quotation for a saved quote.
+   *
+   * Fetched as a blob rather than pointing a tab at the URL: the endpoint is
+   * behind AuthGuard, and a plain window.open sends no Authorization header, so
+   * it would land on a 401 instead of the document.
+   */
+  openQuotationPdf(quotationId: number) {
+    this.http
+      .get(`${environment.apiUrl}/sales/quotations/${quotationId}/pdf`, { responseType: 'blob' })
+      .subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          const opened = window.open(url, '_blank');
+          if (!opened) {
+            // Popup blocked. DialogService has no info(), and the quote DID
+            // save — so title it accordingly rather than "Something went wrong".
+            this.dialog.error(
+              'Allow pop-ups to see the quotation, or open it from the Proposals list.',
+              'Proposal saved',
+            );
+          }
+          // Freed on the next tick; the new tab has already taken a reference.
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        },
+        error: () => this.dialog.error('The proposal was saved, but the PDF could not be generated.'),
+      });
+  }
+
+  // ── proposal row actions ───────────────────────────────────────────────────
+
+  /** The proposal whose action menu is open, and where to float it. */
+  proposalActionsMenu: any = null;
+  proposalActionsMenuPos = { top: 0, left: 0 };
+  sendingProposalId: number | null = null;
+
+  toggleProposalActionsMenu(q: any, event: Event) {
+    if (event) event.stopPropagation();
+    if (this.proposalActionsMenu?.id === q.id) {
+      this.proposalActionsMenu = null;
+      return;
+    }
+    const btn = (event.target as HTMLElement).closest('.prop-actions-trigger') as HTMLElement | null;
+    if (btn) {
+      // Positioned from the trigger's rect and rendered outside the table, so a
+      // later row's cell can never clip it — same approach as the follow-up menu.
+      const rect = btn.getBoundingClientRect();
+      const menuWidth = 190;
+      // Five items plus padding. Rows near the bottom of the window are the
+      // normal case in this table, and opening downwards there pushed the last
+      // item off-screen — so flip above the trigger when it will not fit.
+      const menuHeight = 218;
+      const gap = 6;
+      const margin = 8;
+      const fitsBelow = rect.bottom + gap + menuHeight <= window.innerHeight - margin;
+
+      this.proposalActionsMenuPos = {
+        top: fitsBelow
+          ? rect.bottom + gap
+          : Math.max(margin, rect.top - gap - menuHeight),
+        left: Math.max(margin, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - margin)),
+      };
+    }
+    this.proposalActionsMenu = q;
+  }
+
+  closeProposalActionsMenu() {
+    this.proposalActionsMenu = null;
+  }
+
+  /** Same document as the download, just rendered in a tab instead of saved. */
+  viewProposal(q: any) {
+    this.openQuotationPdf(q.id);
+  }
+
+  downloadProposal(q: any) {
+    this.http
+      .get(`${environment.apiUrl}/sales/quotations/${q.id}/pdf`, { responseType: 'blob' })
+      .subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${q.quoteNumber || 'quotation'}.pdf`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        },
+        error: () => this.dialog.error('Could not generate the quotation PDF.'),
+      });
+  }
+
+  /**
+   * Reopen the proposal modal populated from an existing quote.
+   *
+   * Saving PATCHes rather than POSTs — editingProposalId is what tells
+   * saveProposal which it is.
+   */
+  editProposal(q: any) {
+    this.isProposalSubmitted = false;
+    this.uploadingProposalCount = 0;
+    this.editingProposalId = q.id;
+    this.editingProposalNumber = q.quoteNumber || null;
+    this.proposalForm = {
+      ...this.freshProposalForm(),
+      clientId: q.clientId ?? null,
+      date: (q.date || '').toString().split('T')[0],
+      validUntil: (q.validUntil || '').toString().split('T')[0],
+      currency: q.currency || 'INR',
+      taxRate: Number(q.taxRate ?? 18),
+      notes: q.notes || '',
+      terms: q.terms || '',
+      billingCompanyName: q.billingCompanyName || '',
+      billingAddress: q.billingAddress || '',
+      billingContactName: q.billingContactName || '',
+      billingMobile: q.billingMobile || '',
+      billingEmail: q.billingEmail || '',
+      billingGstin: q.billingGstin || '',
+      billingPan: q.billingPan || '',
+      billingPlaceOfSupply: q.billingPlaceOfSupply || '',
+      items: (q.items || []).length
+        ? q.items.map((i: any) => ({
+            name: i.name || '',
+            description: i.description || '',
+            quantity: i.quantity ?? 1,
+            unit: i.unit || 'number',
+            unitPrice: i.unitPrice ?? 0,
+          }))
+        : [this.freshProposalItem()],
+      attachments: q.attachments || [],
+    };
+    this.showProposalModal = true;
+    this.loadProposalClients();
+  }
+
+  /**
+   * Email the quotation to the buyer.
+   *
+   * Confirmed first, and the confirmation names the recipient: this leaves the
+   * building and cannot be recalled, so the user has to see the address before
+   * it goes.
+   */
+  async sendProposalByEmail(q: any) {
+    const to = (q.billingEmail || this.lead?.email || '').trim();
+    if (!to) {
+      this.dialog.error(
+        'There is no email address on this proposal or its deal. Add one, then send.',
+        'Nothing to send to',
+      );
+      return;
+    }
+
+    const ok = await this.dialog.confirm(
+      `Send quotation ${q.quoteNumber} to ${to}? The PDF will be attached.`,
+      'Send this quotation?',
+      'Send',
+      'Cancel',
+    );
+    if (!ok) return;
+
+    this.sendingProposalId = q.id;
+    this.http
+      .post<any>(`${environment.apiUrl}/sales/quotations/${q.id}/email`, { to })
+      .subscribe({
+        next: (res) => {
+          this.sendingProposalId = null;
+          this.dialog.success(`Quotation ${q.quoteNumber} sent to ${res?.to || to}.`);
+          this.loadLead(this.leadId!);
+        },
+        error: (err) => {
+          this.sendingProposalId = null;
+          this.dialog.error(err?.error?.message || 'The quotation could not be sent.');
+        },
+      });
+  }
+
+  /**
+   * Delete a proposal.
+   *
+   * The server refuses once a quote has been accepted or converted to an
+   * order — that paper trail is not ours to erase — so the error it returns is
+   * shown verbatim rather than being second-guessed here.
+   */
+  async deleteProposal(q: any) {
+    const confirmed = await this.dialog.confirm(
+      `Delete quotation ${q.quoteNumber}? This cannot be undone.`,
+      'Delete proposal',
+      'Delete',
+      'Cancel',
+    );
+    if (!confirmed) return;
+
+    this.http.delete(`${environment.apiUrl}/sales/quotations/${q.id}`).subscribe({
+      next: () => {
+        this.proposals = this.proposals.filter(p => p.id !== q.id);
+        if (this.lead?.quotations) {
+          this.lead.quotations = this.lead.quotations.filter((p: any) => p.id !== q.id);
+        }
+        this.dialog.success('Proposal deleted.');
+      },
+      error: (err) => this.dialog.error(
+        err?.error?.message || 'The proposal could not be deleted.',
+      ),
+    });
   }
 
   closeProposalModal() {
     this.showProposalModal = false;
     this.isProposalSubmitted = false;
+    this.editingProposalId = null;
+    this.editingProposalNumber = null;
   }
 
+  /** Still resolves a client silently when one matches — the link is what
+   *  allows a later conversion to a sales order — but it is never asked for. */
   private loadProposalClients() {
     this.clientsService.getClients('ACTIVE').subscribe((data: any[]) => {
       this.clients = (data || []).filter(c => c.id !== (this.lead?.client?.id ?? null));
+      this.autoSelectProposalClient(data || []);
     });
   }
 
+  /**
+   * Pre-pick the client so the commonest case needs no dropdown at all.
+   *
+   * A lead linked to a client already resolves in freshProposalForm(); this
+   * covers the rest by matching the lead's company name, which is what the
+   * Lead Contact Detail panel shows. Matching is case- and whitespace-
+   * insensitive, and an ambiguous match is left unselected rather than
+   * guessed — putting a quotation against the wrong client is worse than
+   * asking.
+   */
+  private autoSelectProposalClient(allClients: any[]) {
+    if (this.proposalForm.clientId) return;
+
+    const target = (this.lead?.companyName || '').trim().toLowerCase();
+    if (!target) return;
+
+    const matches = allClients.filter(
+      (c) => (c?.name || '').trim().toLowerCase() === target,
+    );
+    if (matches.length === 1) {
+      this.proposalForm.clientId = matches[0].id;
+      // Prefer the client's own address once one is resolved; fall back to the
+      // lead's, which is all we had before.
+      this.proposalForm.billingCompanyName ||= matches[0].name || '';
+      this.proposalForm.billingAddress ||= matches[0].address || '';
+    }
+  }
+
+  /** Shown read-only on the quote — the contact is the lead's, not the quote's. */
+  get proposalLeadContact(): string {
+    return this.lead?.contactName || this.lead?.title || '—';
+  }
+
+  /** 0% GST means there is no tax line worth showing. */
+  get proposalHasTax(): boolean {
+    return (Number(this.proposalForm.taxRate) || 0) > 0;
+  }
+
+  private freshProposalItem() {
+    return { name: '', description: '', quantity: 1, unit: 'number', unitPrice: 0 };
+  }
+
   addProposalItem() {
-    this.proposalForm.items.push({ description: '', quantity: 1, unit: 'number', unitPrice: 0 });
+    this.proposalForm.items.push(this.freshProposalItem());
   }
 
   removeProposalItem(index: number) {
@@ -1267,19 +1629,28 @@ export class LeadProfileComponent implements OnInit {
 
   saveProposal() {
     this.isProposalSubmitted = true;
-    if (!this.proposalForm.clientId || !this.proposalForm.items.length) return;
+    // Quotations belong to the deal; leadId is what the server requires.
+    if (!this.proposalForm.items.length) return;
     if (this.uploadingProposalCount > 0) {
       this.dialog.error('Please wait for all attachments to finish uploading.');
       return;
     }
 
     this.isSavingProposal = true;
-    this.http.post(`${environment.apiUrl}/sales/quotations`, this.proposalForm).subscribe({
-      next: () => {
+    const editingId = this.editingProposalId;
+    const request = editingId
+      ? this.http.patch<any>(`${environment.apiUrl}/sales/quotations/${editingId}`, this.proposalForm)
+      : this.http.post<any>(`${environment.apiUrl}/sales/quotations`, this.proposalForm);
+
+    request.subscribe({
+      next: (saved) => {
         this.isSavingProposal = false;
         this.closeProposalModal();
-        this.dialog.success('Proposal created successfully.');
+        this.dialog.success(editingId ? 'Proposal updated successfully.' : 'Proposal created successfully.');
         this.loadLead(this.leadId!);
+        // Only pop the PDF on creation. Reopening a tab on every small edit is
+        // noise, and the row's View action is right there.
+        if (!editingId && saved?.id) this.openQuotationPdf(saved.id);
       },
       error: (err) => {
         this.isSavingProposal = false;

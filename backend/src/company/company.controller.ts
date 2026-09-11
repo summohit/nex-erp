@@ -15,7 +15,7 @@ export class CompanyController {
   @Put('profile')
   updateProfile(
     @Request() req,
-    @Body() data: { name?: string, domain?: string, industry?: string, size?: string, timezone?: string, logoUrl?: string }
+    @Body() data: { name?: string, domain?: string, industry?: string, size?: string, timezone?: string, logoUrl?: string, mobile?: string, email?: string, address?: string, gstin?: string, panNumber?: string, udyamRegNo?: string, quotationPrefix?: string, bankAccountName?: string, bankName?: string, bankBranch?: string, bankIfsc?: string, bankAccountNumber?: string }
   ) {
     return this.companyService.updateCompanyProfile(req.user.companyId, data);
   }

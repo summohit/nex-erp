@@ -333,6 +333,78 @@ export class MailService {
    * signing page is the only place it can be read, so the document stays behind
    * the password and every view is recorded against the envelope.
    */
+  /**
+   * Email a quotation with the PDF attached.
+   *
+   * Deliberately does NOT use the Brevo HTTP path that the other methods prefer.
+   * sendBrevoEmail takes only { to, subject, html } — an attachment passed to it
+   * is silently dropped, and a quotation email without the quotation is worse
+   * than a failure, because nobody notices. SMTP via sendWithRetry is the only
+   * transport here that carries attachments.
+   */
+  async sendQuotationEmail(params: {
+    to: string;
+    quoteNumber: string;
+    companyName: string;
+    buyerName?: string;
+    totalLabel: string;
+    validUntil?: string;
+    message?: string;
+    pdf: Buffer;
+    fileName: string;
+  }) {
+    const { to, quoteNumber, companyName, buyerName, totalLabel, validUntil, message, pdf, fileName } = params;
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color:#0f172a; margin:0 0 6px;">Quotation ${quoteNumber}</h2>
+        <p style="color:#64748b; font-size:14px; margin:0 0 22px;">from <strong style="color:#0f172a;">${companyName}</strong></p>
+
+        <p style="color:#475569; font-size:15px; line-height:1.6;">Dear ${buyerName || 'Sir/Madam'},</p>
+        <p style="color:#475569; font-size:15px; line-height:1.6;">
+          Please find our quotation attached for your consideration.
+        </p>
+
+        ${message ? `<p style="color:#475569; font-size:15px; line-height:1.6; white-space:pre-wrap;">${message}</p>` : ''}
+
+        <table style="width:100%; border-collapse:collapse; margin:18px 0; padding:12px; background:#f8fafc; border-radius:8px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;font-size:14px;">Quotation No.</td>
+            <td style="padding:6px 0;color:#0f172a;font-size:14px;font-weight:600;text-align:right;">${quoteNumber}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;font-size:14px;">Total</td>
+            <td style="padding:6px 0;color:#0f172a;font-size:14px;font-weight:600;text-align:right;">${totalLabel}</td>
+          </tr>
+          ${validUntil ? `<tr>
+            <td style="padding:6px 0;color:#64748b;font-size:14px;">Valid until</td>
+            <td style="padding:6px 0;color:#0f172a;font-size:14px;font-weight:600;text-align:right;">${validUntil}</td>
+          </tr>` : ''}
+        </table>
+
+        <p style="color:#94a3b8; font-size:13px; line-height:1.6;">
+          If you have any questions about this quotation, simply reply to this email.
+        </p>
+      </div>
+    `;
+
+    try {
+      this.logger.log(`Sending quotation ${quoteNumber} to ${to} via SMTP (attachment required).`);
+      const info = await this.sendWithRetry({
+        from: `"${companyName}" <${this.fromEmail}>`,
+        to,
+        envelope: { from: this.fromEmail, to },
+        subject: `Quotation ${quoteNumber} from ${companyName}`,
+        html: htmlContent,
+        attachments: [{ filename: fileName, content: pdf, contentType: 'application/pdf' }],
+      });
+      return info;
+    } catch (error) {
+      this.logger.error(`Failed to send quotation ${quoteNumber} to ${to}: ${this.errorDetail(error)}`);
+      throw new Error(`Could not send the quotation email. (${this.errorDetail(error)})`);
+    }
+  }
+
   async sendOfferLetterEmail(params: {
     email: string;
     candidateName: string;

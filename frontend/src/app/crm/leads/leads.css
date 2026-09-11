@@ -3742,6 +3742,32 @@ textarea:focus {
   flex-shrink: 0;
 }
 
+/* Opens the full lead profile. Styled as a neutral sibling of Edit rather than
+   another orange button — it navigates away, so it should not compete with the
+   primary actions in the modal. */
+.btn-detail-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-detail-view:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
 .btn-detail-edit {
   display: inline-flex;
   align-items: center;
@@ -6348,3 +6374,124 @@ textarea:focus {
 /* Modal "External Lead Contact" owner card — clickable */
 .ldm-contact-card-link { cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; }
 .ldm-contact-card-link:hover { border-color: #fdba74; box-shadow: 0 4px 14px -6px rgba(234,88,12,.25); }
+
+/* ── Proposals inside the lead detail modal ───────────────────────────────── */
+.ldm-prop-count {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ldm-prop-loading,
+.ldm-prop-empty {
+  padding: 14px 16px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+}
+.ldm-prop-table-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  /* Wide content scrolls inside its own box rather than widening the modal. */
+  overflow-x: auto;
+}
+.ldm-prop-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ldm-prop-table thead th {
+  padding: 9px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  white-space: nowrap;
+}
+.ldm-prop-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #475569;
+  white-space: nowrap;
+}
+.ldm-prop-table tbody tr:last-child td { border-bottom: none; }
+.ldm-prop-table tbody tr:hover { background: #fff7ed; }
+.ldm-prop-number { font-weight: 600; color: #1e293b; }
+.ldm-prop-amount { font-weight: 600; color: #1e293b; font-variant-numeric: tabular-nums; }
+.ldm-prop-action-col { width: 44px; text-align: right; }
+.ldm-prop-status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.ldm-prop-status-accepted { background: #dcfce7; color: #166534; }
+.ldm-prop-status-sent { background: #dbeafe; color: #1d4ed8; }
+.ldm-prop-status-draft { background: #f1f5f9; color: #475569; }
+.ldm-prop-status-rejected { background: #fee2e2; color: #b91c1c; }
+.ldm-prop-status-expired { background: #fef3c7; color: #92400e; }
+.ldm-prop-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ldm-prop-trigger:hover { background: #f1f5f9; color: #1e293b; }
+
+/* Floated off the trigger, so it must clear the modal card it escapes. */
+.modal-backdrop > .dropdown-backdrop-transparent { z-index: 1100; }
+.ldm-prop-menu {
+  position: fixed;
+  z-index: 1200;
+  width: 190px;
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ldm-prop-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ldm-prop-menu-item:hover:not(:disabled) { background: #f1f5f9; color: #0f172a; }
+.ldm-prop-menu-item:disabled { opacity: 0.55; cursor: not-allowed; }
+.ldm-prop-menu-item.danger { color: #b91c1c; }
+.ldm-prop-menu-item.danger:hover { background: #fef2f2; }

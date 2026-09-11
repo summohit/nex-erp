@@ -22,7 +22,8 @@ import {
   LucideInfo,
   LucideExternalLink,
   LucideTicket,
-  LucideChevronDown
+  LucideChevronDown,
+  LucidePenLine
 } from '@lucide/angular';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import {
@@ -30,8 +31,10 @@ import {
   SystemSetting,
   PlaceholderGroup
 } from '../../services/system-settings.service';
+import { DEFAULT_QUOTATION_TERMS } from '../../shared/constants/quotation-terms';
 import { AuthService } from '../../services/auth.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
+import { CompanyService } from '../../services/company';
 import { environment } from '../../../environments/environment';
 
 @Component({
@@ -57,7 +60,8 @@ import { environment } from '../../../environments/environment';
     LucideInfo,
     LucideExternalLink,
     LucideTicket,
-    LucideChevronDown
+    LucideChevronDown,
+    LucidePenLine
   ],
   templateUrl: './system-settings.html',
   styleUrls: ['./system-settings.css']
@@ -69,6 +73,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private auth = inject(AuthService);
   private employeeService = inject(EmployeeService);
+  private companyService = inject(CompanyService);
 
   private sanitizer = inject(DomSanitizer);
 
@@ -76,6 +81,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   isLoading = signal(true);
   isSaving = signal(false);
   isUploading = signal(false);
+  isUploadingSignature = signal(false);
   isDragging = signal(false);
   copiedTag = signal<string | null>(null);
 
@@ -235,6 +241,75 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Shown when the company has saved none, so the screen displays what a
+   *  quote would actually use rather than an empty box. */
+  readonly defaultQuotationTerms = DEFAULT_QUOTATION_TERMS;
+
+  setQuotationTerms(value: string) {
+    const current = this.settings();
+    if (!current) return;
+    // Blank means "use the built-in defaults", so store null rather than an
+    // empty string — otherwise a quote would open with no terms at all.
+    const trimmed = (value ?? '').trim();
+    this.settings.set({ ...current, quotationTerms: trimmed ? value : null });
+  }
+
+  resetQuotationTerms() {
+    const current = this.settings();
+    if (!current) return;
+    this.settings.set({ ...current, quotationTerms: null });
+  }
+
+  setSignatoryName(value: string) {
+    const current = this.settings();
+    if (!current) return;
+    // Blank means "fall back to the company name", so store null rather than an
+    // empty string — the template only falls back on a nullish value.
+    const trimmed = (value ?? '').trim();
+    this.settings.set({ ...current, quotationSignatoryName: trimmed || null });
+  }
+
+  triggerSignatureInput() {
+    document.getElementById('signatureUpload')?.click();
+  }
+
+  onSignatureSelected(event: any) {
+    const file: File = event.target.files?.[0];
+    // Clear the input so re-picking the same file still fires a change event.
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      this.toast.error('The signature must be an image file');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      this.toast.error('File must be less than 2MB');
+      return;
+    }
+
+    this.isUploadingSignature.set(true);
+    // Same generic /upload endpoint the company logo uses; nothing about it is
+    // logo-specific, it just stores the file and hands back a URL.
+    this.companyService.uploadLogo(file).subscribe({
+      next: (res) => {
+        const current = this.settings();
+        if (current) this.settings.set({ ...current, quotationSignatureUrl: res.url });
+        this.isUploadingSignature.set(false);
+        this.toast.success('Signature uploaded. Save to apply it to quotations.');
+      },
+      error: () => {
+        this.isUploadingSignature.set(false);
+        this.toast.error('Failed to upload the signature');
+      }
+    });
+  }
+
+  removeSignature() {
+    const current = this.settings();
+    if (!current) return;
+    this.settings.set({ ...current, quotationSignatureUrl: null });
+  }
+
   toggleTwoFactorRequired() {
     const current = this.settings();
     if (!current) return;
@@ -251,7 +326,12 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
       offerLetterTemplateHtml: current.offerLetterTemplateHtml,
       offerLetterTemplateDocxUrl: current.offerLetterTemplateDocxUrl,
       offerLetterConfig: current.offerLetterConfig,
-      defaultTicketAssigneeId: current.defaultTicketAssigneeId ?? null
+      defaultTicketAssigneeId: current.defaultTicketAssigneeId ?? null,
+      // Explicitly sent: this is an allow-list, not a spread, so anything left
+      // out here silently never reaches the server.
+      quotationTerms: current.quotationTerms ?? null,
+      quotationSignatoryName: current.quotationSignatoryName ?? null,
+      quotationSignatureUrl: current.quotationSignatureUrl ?? null
     }).subscribe({
       next: (data) => {
         this.settings.set(data);

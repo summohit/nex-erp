@@ -12,6 +12,23 @@ export interface CompanyProfile {
   size?: string;
   timezone?: string;
   logoUrl?: string;
+
+  /** Statutory and contact details shown on quotations and letterheads. */
+  mobile?: string;
+  email?: string;
+  address?: string;
+  gstin?: string;
+  panNumber?: string;
+  udyamRegNo?: string;
+  /** Prefix for generated quote numbers; blank falls back to "QT". */
+  quotationPrefix?: string;
+
+  /** Bank account printed on quotations so a client can pay against it. */
+  bankAccountName?: string;
+  bankName?: string;
+  bankBranch?: string;
+  bankIfsc?: string;
+  bankAccountNumber?: string;
 }
 
 @Injectable({

@@ -15,6 +15,28 @@ model Company {
   industry            String?
   size                String?
   timezone            String?
+
+  /// Statutory and contact details that appear on quotations, invoices and
+  /// letterheads. All optional — a company can operate without them, and
+  /// nothing should refuse to save because a registration number is blank.
+  mobile              String?
+  email               String?
+  address             String?              @db.Text
+  gstin               String?
+  panNumber           String?
+  udyamRegNo          String?
+
+  /// Prefix for generated quote numbers. Blank falls back to "QT", which is
+  /// what every existing quotation already uses.
+  quotationPrefix     String?
+
+  /// Bank details printed on quotations so a client can pay against them.
+  bankAccountName     String?
+  bankName            String?
+  bankBranch          String?
+  bankIfsc            String?
+  bankAccountNumber   String?
+
   onboardingCompleted Boolean              @default(false)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -2285,6 +2307,15 @@ model SystemSetting {
   // migration — see OfferLetterConfig in offer-letters.service.ts for the shape.
   offerLetterConfig              Json?
   defaultTicketAssigneeId        Int?     // Employee auto-assigned as default ticket assignee
+  // Standard terms pre-filled into every new quotation. Editable on the quote
+  // itself, so this is a starting point rather than a policy — null falls back
+  // to the built-in defaults, which is what every quote used before.
+  quotationTerms                 String?  @db.Text
+  // Signature block printed at the foot of a quotation. The name is what
+  // follows "AUTHORISED SIGNATORY FOR"; the image is the signature or stamp
+  // placed above it. Both optional — the block degrades to the company name.
+  quotationSignatoryName         String?
+  quotationSignatureUrl          String?
   // SUPERADMIN switch: when true, every user in the company must complete TOTP
   // enrolment at next sign-in, and nobody may turn their own 2FA off.
   twoFactorRequired              Boolean  @default(false)
@@ -2446,8 +2477,12 @@ model LeadActivity {
 model Quotation {
   id             Int             @id @default(autoincrement())
   quoteNumber    String
-  clientId       Int
-  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /// Optional: a quotation belongs to a DEAL. A client link is kept for quotes
+  /// raised directly from Sales, and is what a Sales Order is later created
+  /// against — but a quote against a lead with no client record is valid.
+  /// createQuotation enforces that at least one of clientId / leadId is set.
+  clientId       Int?
+  client         Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
   leadId         Int?
   lead           Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
   date           DateTime
@@ -2459,6 +2494,22 @@ model Quotation {
   currency       String
   notes          String?
   terms          String?
+  /// Billed-to details, seeded from the lead and editable on the quote. Stored
+  /// rather than read back through the relation so that editing the lead later
+  /// cannot rewrite a quotation that has already gone to the client.
+  billingCompanyName String?
+  billingAddress     String? @db.Text
+  /// The rest of the BILL TO block, captured on the quote at the moment it was
+  /// raised. A lead's details changing next month must not rewrite a document
+  /// already sent to a client — the same reason billingAddress is stored here
+  /// rather than read back through the lead.
+  billingContactName String?
+  billingMobile      String?
+  billingEmail       String?
+  billingGstin       String?
+  billingPan         String?
+  /// Drives the CGST+SGST vs IGST split on the printed quote.
+  billingPlaceOfSupply String?
   status         String          @default("DRAFT") // DRAFT, PENDING_APPROVAL, SENT, ACCEPTED, REJECTED
   approvalStatus String          @default("APPROVED") // PENDING, APPROVED, REJECTED
   approvedById   Int?
@@ -2477,6 +2528,9 @@ model QuotationItem {
   id          Int       @id @default(autoincrement())
   quotationId Int
   quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  /// Short label for the item. Null on rows created before the quote form
+  /// split name from description.
+  name        String?
   description String
   quantity    Float
   unit        String?

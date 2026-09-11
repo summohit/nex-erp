@@ -14,6 +14,14 @@ export interface SystemSetting {
   defaultTicketAssigneeId?: number | null;
   /** SuperAdmin switch: every user must enrol in two-factor auth to sign in. */
   twoFactorRequired?: boolean;
+  /** Terms pre-filled into every new quotation. Null uses the built-in text. */
+  quotationTerms?: string | null;
+  /** Printed after "AUTHORISED SIGNATORY FOR" on a quotation. Null falls back
+   *  to the company name, which is what the template printed before this. */
+  quotationSignatoryName?: string | null;
+  /** Signature or stamp image placed above that line. Optional — a quotation
+   *  must still generate when nobody has uploaded one. */
+  quotationSignatureUrl?: string | null;
 }
 
 export interface PlaceholderTag {

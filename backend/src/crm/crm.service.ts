@@ -343,7 +343,15 @@ export class CrmService {
         },
         broughtByContact: true,
         client: true,
-        quotations: true,
+        // Items and attachments are relations, so `quotations: true` alone
+        // returns the scalars and nothing else — which is why reopening a
+        // proposal to edit it came up with an empty line-items table.
+        quotations: {
+          include: {
+            items: { orderBy: { id: 'asc' } },
+            attachments: true,
+          },
+        },
         followUps: {
           orderBy: { scheduledAt: 'desc' },
           include: {

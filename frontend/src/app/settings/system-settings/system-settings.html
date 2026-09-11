@@ -45,6 +45,85 @@
       </div>
     </div>
 
+    <!-- Card: default quotation terms -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap">
+          <svg lucideFileText size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <h3>Default Quotation Terms</h3>
+          <p>Pre-filled into the Terms &amp; Conditions of every new proposal. Staff can still edit them on an individual quote, so this is a starting point rather than a policy.</p>
+        </div>
+      </div>
+      <textarea
+        class="terms-textarea"
+        rows="10"
+        [ngModel]="s.quotationTerms ?? defaultQuotationTerms"
+        (ngModelChange)="setQuotationTerms($event)"
+        placeholder="Enter the standard terms for your quotations..."></textarea>
+      <div class="card-footer-note">
+        <svg lucideInfo size="14"></svg>
+        <span *ngIf="s.quotationTerms == null">Showing the built-in defaults. Editing them here saves them as your company's terms.</span>
+        <span *ngIf="s.quotationTerms != null">
+          Saved as your company's terms.
+          <button type="button" class="link-reset" (click)="resetQuotationTerms()">Restore the built-in defaults</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- Card: quotation signatory -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap">
+          <svg lucidePenLine size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <h3>Quotation Signatory</h3>
+          <p>Printed at the foot of every quotation as &ldquo;AUTHORISED SIGNATORY FOR&rdquo;, with the signature or stamp above it.</p>
+        </div>
+      </div>
+
+      <div class="sig-row">
+        <div class="sig-field">
+          <label for="signatoryName">Authorised signatory for</label>
+          <input
+            id="signatoryName"
+            type="text"
+            class="sig-input"
+            [ngModel]="s.quotationSignatoryName"
+            (ngModelChange)="setSignatoryName($event)"
+            placeholder="Your company name">
+          <small>Leave blank to print your company name.</small>
+        </div>
+
+        <div class="sig-field">
+          <label>Signature image</label>
+          <div class="sig-preview" [class.has-image]="s.quotationSignatureUrl">
+            <img *ngIf="s.quotationSignatureUrl" [src]="s.quotationSignatureUrl" alt="Authorised signature">
+            <span *ngIf="!s.quotationSignatureUrl">No signature uploaded</span>
+          </div>
+          <input id="signatureUpload" type="file" accept="image/*" hidden (change)="onSignatureSelected($event)">
+          <div class="sig-actions">
+            <button type="button" class="btn-sig-upload" (click)="triggerSignatureInput()" [disabled]="isUploadingSignature()">
+              <svg lucideLoader2 size="14" *ngIf="isUploadingSignature()" class="spin"></svg>
+              <svg lucideUploadCloud size="14" *ngIf="!isUploadingSignature()"></svg>
+              <span>{{ s.quotationSignatureUrl ? 'Replace' : 'Upload' }}</span>
+            </button>
+            <button type="button" class="btn-sig-remove" *ngIf="s.quotationSignatureUrl" (click)="removeSignature()" [disabled]="isUploadingSignature()">
+              <svg lucideTrash2 size="14"></svg>
+              <span>Remove</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer-note">
+        <svg lucideInfo size="14"></svg>
+        <span>A transparent PNG reproduces best. Max 2MB. Quotations still generate normally when no signature is uploaded.</span>
+      </div>
+    </div>
+
     <!-- Card: Company-wide two-factor authentication -->
     <div class="setting-card">
       <div class="card-top">

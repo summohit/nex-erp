@@ -28,6 +28,9 @@ export class SystemSettingsService {
       offerLetterConfig?: any;
       defaultTicketAssigneeId?: number | null;
       twoFactorRequired?: boolean;
+      quotationTerms?: string | null;
+      quotationSignatoryName?: string | null;
+      quotationSignatureUrl?: string | null;
     },
   ) {
     return this.prisma.systemSetting.upsert({
@@ -40,6 +43,9 @@ export class SystemSettingsService {
         offerLetterConfig: data.offerLetterConfig ?? undefined,
         defaultTicketAssigneeId: data.defaultTicketAssigneeId ?? null,
         twoFactorRequired: data.twoFactorRequired ?? false,
+        quotationTerms: data.quotationTerms ?? null,
+        quotationSignatoryName: data.quotationSignatoryName ?? null,
+        quotationSignatureUrl: data.quotationSignatureUrl ?? null,
       },
       update: {
         shiftRosterVisibleToEmployees: data.shiftRosterVisibleToEmployees,
@@ -49,6 +55,11 @@ export class SystemSettingsService {
         offerLetterConfig: data.offerLetterConfig ?? undefined,
         ...(data.defaultTicketAssigneeId !== undefined && { defaultTicketAssigneeId: data.defaultTicketAssigneeId }),
         ...(data.twoFactorRequired !== undefined && { twoFactorRequired: data.twoFactorRequired }),
+        // Spread-guarded like the others: a PUT that omits the field must not
+        // wipe the saved terms back to null.
+        ...(data.quotationTerms !== undefined && { quotationTerms: data.quotationTerms }),
+        ...(data.quotationSignatoryName !== undefined && { quotationSignatoryName: data.quotationSignatoryName }),
+        ...(data.quotationSignatureUrl !== undefined && { quotationSignatureUrl: data.quotationSignatureUrl }),
       },
     });
   }

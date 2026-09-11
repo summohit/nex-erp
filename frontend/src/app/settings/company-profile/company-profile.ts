@@ -1,14 +1,58 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CompanyService, CompanyProfile } from '../../services/company';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideBuilding2, LucideUpload, LucideSave, LucideLoader2 } from '@lucide/angular';
+import {
+  LucideBuilding2,
+  LucideUpload,
+  LucideSave,
+  LucideLoader2,
+  LucideFileText,
+  LucideLandmark,
+  LucideImage,
+  LucideGlobe,
+  LucidePhone,
+  LucideMail,
+  LucideMapPin,
+  LucideShieldCheck,
+  LucideCreditCard,
+  LucideCheck,
+  LucideCopy,
+  LucideTrash2,
+  LucideExternalLink,
+  LucideInfo,
+  LucideSparkles
+} from '@lucide/angular';
+
+export type CompanyTab = 'general' | 'statutory' | 'banking' | 'branding';
 
 @Component({
   selector: 'app-company-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideBuilding2, LucideUpload, LucideSave, LucideLoader2],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideBuilding2,
+    LucideUpload,
+    LucideSave,
+    LucideLoader2,
+    LucideFileText,
+    LucideLandmark,
+    LucideImage,
+    LucideGlobe,
+    LucidePhone,
+    LucideMail,
+    LucideMapPin,
+    LucideShieldCheck,
+    LucideCreditCard,
+    LucideCheck,
+    LucideCopy,
+    LucideTrash2,
+    LucideExternalLink,
+    LucideInfo,
+    LucideSparkles
+  ],
   templateUrl: './company-profile.html',
   styleUrls: ['./company-profile.css']
 })
@@ -20,6 +64,19 @@ export class CompanyProfileComponent implements OnInit {
   isLoading = signal(true);
   isSaving = signal(false);
   isUploading = signal(false);
+  activeTab = signal<CompanyTab>('general');
+  copiedField = signal<string | null>(null);
+
+  quotePreview = computed(() => {
+    const prefix = (this.profile().quotationPrefix || 'QT').trim();
+    return `${prefix}-2026-0042`;
+  });
+
+  maskedAccount = computed(() => {
+    const num = this.profile().bankAccountNumber;
+    if (!num) return '•••• •••• ••••';
+    return num.replace(/(\d{4})(?=\d)/g, '$1 ');
+  });
 
   ngOnInit() {
     this.loadProfile();
@@ -84,5 +141,43 @@ export class CompanyProfileComponent implements OnInit {
 
   triggerFileInput() {
     document.getElementById('logoUpload')?.click();
+  }
+
+  getWebsiteUrl(domain?: string): string {
+    if (!domain) return '';
+    return domain.startsWith('http://') || domain.startsWith('https://') ? domain : `https://${domain}`;
+  }
+
+  setTab(tab: CompanyTab) {
+    this.activeTab.set(tab);
+  }
+
+  copyToClipboard(text?: string, fieldName = 'Value') {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    this.copiedField.set(fieldName);
+    this.toast.success(`${fieldName} copied to clipboard`);
+    setTimeout(() => {
+      if (this.copiedField() === fieldName) {
+        this.copiedField.set(null);
+      }
+    }, 2000);
+  }
+
+  removeLogo() {
+    this.profile.update(p => ({ ...p, logoUrl: undefined }));
+    this.toast.success('Logo removed. Click "Save Changes" to apply.');
+  }
+
+  copyAllBankDetails() {
+    const p = this.profile();
+    const details = [
+      `Beneficiary: ${p.bankAccountName || 'N/A'}`,
+      `Bank: ${p.bankName || 'N/A'}`,
+      `Account No: ${p.bankAccountNumber || 'N/A'}`,
+      `IFSC: ${p.bankIfsc || 'N/A'}`,
+      p.bankBranch ? `Branch: ${p.bankBranch}` : ''
+    ].filter(Boolean).join('\n');
+    this.copyToClipboard(details, 'Complete Bank Details');
   }
 }

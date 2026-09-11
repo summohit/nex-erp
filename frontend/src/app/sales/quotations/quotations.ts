@@ -25,7 +25,11 @@ interface QuotationAttachment {
 interface Quotation {
   id: number;
   quoteNumber: string;
-  client: { name: string };
+  /** Optional: a quotation raised against a deal may have no client record. */
+  client?: { name: string } | null;
+  /** Who the quote was addressed to, captured on the quote itself. */
+  billingCompanyName?: string | null;
+  lead?: { title?: string | null; companyName?: string | null } | null;
   date: string;
   total: number;
   currency: string;

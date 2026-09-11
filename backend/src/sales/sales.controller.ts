@@ -1,5 +1,7 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Request, UseGuards, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Request, UseGuards, ParseIntPipe, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { SalesService } from './sales.service';
+import { QuotationPdfService } from './quotation-pdf.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -7,7 +9,43 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 @Controller('sales')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SalesController {
-  constructor(private readonly salesService: SalesService) {}
+  constructor(
+    private readonly salesService: SalesService,
+    private readonly quotationPdfService: QuotationPdfService,
+  ) {}
+
+  /**
+   * The printable quotation. Streamed rather than uploaded anywhere — it is
+   * derived entirely from the quotation and the company profile, so there is
+   * nothing to store and it always reflects the current details.
+   */
+  @Get('quotations/:id/pdf')
+  async quotationPdf(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const { buffer, isPdf, fileName } = await this.quotationPdfService.generate(req.user.companyId, id);
+    res.setHeader('Content-Type', isPdf ? 'application/pdf' : 'text/html');
+    // inline, so it opens in a tab rather than dropping into Downloads — the
+    // common case is checking it before sending, not filing it.
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.send(buffer);
+  }
+
+  /**
+   * Email the quotation to the buyer. Outward-facing and not undoable, so the
+   * client confirms before calling this — the server does not send on its own.
+   */
+  @Post('quotations/:id/email')
+  @Permissions('sales/quotations')
+  emailQuotation(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { to?: string; message?: string },
+  ) {
+    return this.quotationPdfService.emailToBuyer(req.user.companyId, id, body?.to, body?.message);
+  }
 
   // --- Quotations ---
   @Post('quotations')

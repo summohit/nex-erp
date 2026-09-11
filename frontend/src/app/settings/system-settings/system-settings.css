@@ -1034,3 +1034,120 @@
   inset: 0;
   z-index: 30;
 }
+
+/* Default quotation terms — a long, line-oriented block, so it gets a
+   monospaced face and room to breathe rather than a one-line input. */
+.terms-textarea {
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: #0f172a;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  resize: vertical;
+  min-height: 200px;
+  box-sizing: border-box;
+}
+
+.terms-textarea:focus {
+  outline: none;
+  background: #fff;
+  border-color: var(--color-primary);
+}
+
+.link-reset {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.link-reset:hover { color: var(--color-primary-hover); }
+
+/* --- Quotation signatory ------------------------------------------------ */
+.sig-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 4px;
+}
+@media (max-width: 720px) {
+  .sig-row { grid-template-columns: 1fr; }
+}
+.sig-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sig-field label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.sig-field small { font-size: 12px; color: #94a3b8; }
+.sig-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e293b;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.sig-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+/* Fixed height so the card does not jump between the empty and uploaded
+   states, and the image is contained rather than cropped. */
+.sig-preview {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 13px;
+  overflow: hidden;
+}
+.sig-preview.has-image { border-style: solid; background: #fff; }
+.sig-preview img { max-height: 80px; max-width: 100%; object-fit: contain; }
+.sig-actions { display: flex; gap: 8px; }
+.btn-sig-upload,
+.btn-sig-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.btn-sig-upload {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+.btn-sig-upload:hover:not(:disabled) { filter: brightness(0.95); }
+.btn-sig-remove {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #b91c1c;
+}
+.btn-sig-remove:hover:not(:disabled) { background: #fef2f2; border-color: #fecaca; }
+.btn-sig-upload:disabled,
+.btn-sig-remove:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-sig-upload .spin { animation: spin 1s linear infinite; }

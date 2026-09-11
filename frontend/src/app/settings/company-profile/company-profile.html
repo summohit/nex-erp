@@ -1,113 +1,532 @@
-<div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1>Company Profile</h1>
-      <p>Manage your company's branding and global settings</p>
+<div class="page-container company-page-wrapper">
+  <!-- Loading State -->
+  <div *ngIf="isLoading()" class="loading-state-container">
+    <div class="loading-spinner-box">
+      <svg lucideLoader2 class="spinner" [size]="36"></svg>
+      <span>Loading company profile...</span>
     </div>
-    <button class="btn-primary" (click)="save()" [disabled]="isLoading() || isSaving()">
-      <svg *ngIf="!isSaving()" lucideSave size="18"></svg>
-      <span *ngIf="!isSaving()">Save Changes</span>
-      <span *ngIf="isSaving()" class="loader-text">Saving...</span>
-    </button>
   </div>
 
-  <div *ngIf="isLoading()" class="loading-state">
-    <svg lucideLoader2 class="spinner" size="32"></svg>
-    <p>Loading profile...</p>
-  </div>
-
-  <div class="profile-content" *ngIf="!isLoading()">
-    <!-- Left Column: Settings -->
-    <div class="settings-card">
-      <div class="card-header">
-        <h2>General Information</h2>
-        <p>Update your company's core details and localization</p>
-      </div>
-      
-      <div class="form-grid">
-        <div class="form-group full-width">
-          <label>Company Name <span class="required">*</span></label>
-          <input type="text" class="form-control" [(ngModel)]="profile().name" placeholder="Acme Corp">
+  <div *ngIf="!isLoading()" class="company-profile-layout">
+    <!-- ════════════════ HERO HEADER CARD ════════════════ -->
+    <div class="company-hero-card">
+      <div class="hero-main-row">
+        <div class="hero-identity">
+          <div class="hero-avatar-box">
+            <img *ngIf="profile().logoUrl" [src]="profile().logoUrl" alt="Company Logo" class="hero-avatar-img">
+            <div *ngIf="!profile().logoUrl" class="hero-avatar-placeholder">
+              <svg lucideBuilding2 [size]="32"></svg>
+            </div>
+          </div>
+          
+          <div class="hero-details">
+            <div class="hero-title-group">
+              <h1 class="company-title">{{ profile().name || 'Company Profile' }}</h1>
+              <span class="badge-status">
+                <svg lucideShieldCheck [size]="13"></svg>
+                <span>Verified Entity</span>
+              </span>
+            </div>
+            
+            <p class="hero-description">Manage your organization's identity, legal compliance, banking coordinates, and letterhead branding.</p>
+            
+            <div class="hero-meta-list">
+              <a *ngIf="profile().domain as dom" [href]="getWebsiteUrl(dom)" target="_blank" class="meta-tag link-tag" title="Open official website">
+                <svg lucideGlobe [size]="13"></svg>
+                <span>{{ dom }}</span>
+                <svg lucideExternalLink [size]="11"></svg>
+              </a>
+              <span *ngIf="profile().industry" class="meta-tag">
+                <svg lucideBuilding2 [size]="13"></svg>
+                <span>{{ profile().industry }}</span>
+              </span>
+              <span *ngIf="profile().size" class="meta-tag">
+                <span>{{ profile().size }}</span>
+              </span>
+              <span *ngIf="profile().gstin" class="meta-tag mono-tag">
+                <span class="tag-label">GSTIN:</span>
+                <span>{{ profile().gstin }}</span>
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div class="form-group full-width">
-          <label>Company Website</label>
-          <input type="text" class="form-control" [(ngModel)]="profile().domain" placeholder="https://example.com">
-        </div>
-
-        <div class="form-group">
-          <label>Industry</label>
-          <select class="form-control" [(ngModel)]="profile().industry">
-            <option [ngValue]="undefined" disabled selected>Select industry</option>
-            <option [ngValue]="null" disabled hidden>Select industry</option>
-            <option value="Technology">Technology</option>
-            <option value="Healthcare">Healthcare</option>
-            <option value="Finance">Finance</option>
-            <option value="Retail">Retail</option>
-            <option value="Manufacturing">Manufacturing</option>
-            <option value="Education">Education</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Company Size</label>
-          <select class="form-control" [(ngModel)]="profile().size">
-            <option [ngValue]="undefined" disabled selected>Select size</option>
-            <option [ngValue]="null" disabled hidden>Select size</option>
-            <option value="1-10">1-10 employees</option>
-            <option value="11-50">11-50 employees</option>
-            <option value="51-200">51-200 employees</option>
-            <option value="201-500">201-500 employees</option>
-            <option value="500+">500+ employees</option>
-          </select>
-        </div>
-
-        <div class="form-group full-width">
-          <label>Timezone</label>
-          <select class="form-control" [(ngModel)]="profile().timezone">
-            <option [ngValue]="undefined" disabled selected>Select timezone</option>
-            <option [ngValue]="null" disabled hidden>Select timezone</option>
-            <option value="UTC">UTC</option>
-            <option value="EST">Eastern Time (EST)</option>
-            <option value="PST">Pacific Time (PST)</option>
-            <option value="IST">India Standard Time (IST)</option>
-            <!-- Others -->
-            <option value="America/Chicago">Central Time (CT)</option>
-            <option value="America/Denver">Mountain Time (MT)</option>
-            <option value="Europe/London">London (GMT)</option>
-            <option value="Asia/Tokyo">Tokyo (JST)</option>
-            <option value="Australia/Sydney">Sydney (AEST)</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right Column: Logo -->
-    <div class="branding-card">
-      <div class="card-header">
-        <h2>Company Logo</h2>
-        <p>This will be displayed in the sidebar and reports.</p>
-      </div>
-
-      <div class="logo-upload-container">
-        <div class="current-logo" *ngIf="profile().logoUrl">
-          <img [src]="profile().logoUrl" alt="Company Logo">
-        </div>
-        <div class="logo-placeholder" *ngIf="!profile().logoUrl">
-          <svg lucideBuilding2 size="48" color="#9ca3af"></svg>
-        </div>
-
-        <div class="upload-actions">
-          <input type="file" id="logoUpload" (change)="onFileSelected($event)" accept="image/png, image/jpeg, image/svg+xml" style="display: none;">
-          <button class="btn-outline" (click)="triggerFileInput()" [disabled]="isUploading()">
-            <svg *ngIf="!isUploading()" lucideUpload size="16"></svg>
-            <span *ngIf="!isUploading()">Upload new logo</span>
-            <span *ngIf="isUploading()">Uploading...</span>
+        <div class="hero-actions">
+          <button type="button" class="btn-save-changes" (click)="save()" [disabled]="isSaving()">
+            <svg *ngIf="!isSaving()" lucideSave [size]="16"></svg>
+            <svg *ngIf="isSaving()" lucideLoader2 class="spinner" [size]="16"></svg>
+            <span *ngIf="!isSaving()">Save Changes</span>
+            <span *ngIf="isSaving()">Saving...</span>
           </button>
-          <p class="help-text">JPG, PNG or SVG. Max size 2MB.</p>
         </div>
       </div>
+    </div>
+
+    <!-- ════════════════ SEGMENTED TAB NAVIGATION ════════════════ -->
+    <div class="profile-tabs-wrapper">
+      <nav class="profile-tabs-nav" role="tablist">
+        <button type="button" role="tab" class="nav-pill-btn" [class.active]="activeTab() === 'general'" (click)="setTab('general')">
+          <svg lucideBuilding2 [size]="16"></svg>
+          <span>General Information</span>
+        </button>
+
+        <button type="button" role="tab" class="nav-pill-btn" [class.active]="activeTab() === 'statutory'" (click)="setTab('statutory')">
+          <svg lucideFileText [size]="16"></svg>
+          <span>Contact &amp; Statutory</span>
+        </button>
+
+        <button type="button" role="tab" class="nav-pill-btn" [class.active]="activeTab() === 'banking'" (click)="setTab('banking')">
+          <svg lucideLandmark [size]="16"></svg>
+          <span>Bank Details</span>
+        </button>
+
+        <button type="button" role="tab" class="nav-pill-btn" [class.active]="activeTab() === 'branding'" (click)="setTab('branding')">
+          <svg lucideImage [size]="16"></svg>
+          <span>Branding &amp; Logo</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- ════════════════ TAB BODIES ════════════════ -->
+    <div class="tab-body-container">
+
+      <!-- ────── TAB 1: GENERAL INFORMATION ────── -->
+      <div class="tab-pane" *ngIf="activeTab() === 'general'">
+        <div class="content-card form-card-elevated">
+          <div class="card-header-styled">
+            <div class="header-icon-box bg-orange-light text-orange">
+              <svg lucideBuilding2 [size]="18"></svg>
+            </div>
+            <div class="header-text-group">
+              <h3>General Information</h3>
+              <p>Configure primary company identity, industry category, and localization settings</p>
+            </div>
+          </div>
+
+          <div class="form-grid-layout">
+            <div class="form-field-group full-width">
+              <label class="field-label">Company Name <span class="required-star">*</span></label>
+              <div class="input-affix-wrapper">
+                <svg lucideBuilding2 [size]="16" class="affix-icon"></svg>
+                <input type="text" class="form-input with-affix" [(ngModel)]="profile().name" placeholder="e.g. Acme Technologies Inc.">
+              </div>
+              <span class="field-helper-text">The official company name printed across all quotation headers, tax invoices, and system emails.</span>
+            </div>
+
+            <div class="form-field-group full-width">
+              <label class="field-label">Company Website</label>
+              <div class="input-affix-wrapper">
+                <svg lucideGlobe [size]="16" class="affix-icon"></svg>
+                <input type="text" class="form-input with-affix" [(ngModel)]="profile().domain" placeholder="https://example.com">
+                <a *ngIf="profile().domain as dom" [href]="getWebsiteUrl(dom)" target="_blank" class="affix-action-btn" title="Open website in new tab">
+                  <svg lucideExternalLink [size]="14"></svg>
+                </a>
+              </div>
+            </div>
+
+            <div class="form-field-group">
+              <label class="field-label">Industry</label>
+              <select class="form-input form-select" [(ngModel)]="profile().industry">
+                <option [ngValue]="undefined" disabled selected>Select industry</option>
+                <option [ngValue]="null" disabled hidden>Select industry</option>
+                <option value="Technology">Technology &amp; Software</option>
+                <option value="Healthcare">Healthcare &amp; Pharmaceuticals</option>
+                <option value="Finance">Finance &amp; Banking</option>
+                <option value="Retail">Retail &amp; E-commerce</option>
+                <option value="Manufacturing">Manufacturing &amp; Engineering</option>
+                <option value="Education">Education &amp; Training</option>
+                <option value="Consulting">Professional Consulting</option>
+                <option value="Real Estate">Real Estate &amp; Construction</option>
+                <option value="Logistics">Logistics &amp; Supply Chain</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="form-field-group">
+              <label class="field-label">Company Size</label>
+              <select class="form-input form-select" [(ngModel)]="profile().size">
+                <option [ngValue]="undefined" disabled selected>Select size</option>
+                <option [ngValue]="null" disabled hidden>Select size</option>
+                <option value="1-10">1-10 employees</option>
+                <option value="11-50">11-50 employees</option>
+                <option value="51-200">51-200 employees</option>
+                <option value="201-500">201-500 employees</option>
+                <option value="500+">500+ employees</option>
+              </select>
+            </div>
+
+            <div class="form-field-group full-width">
+              <label class="field-label">Timezone</label>
+              <select class="form-input form-select" [(ngModel)]="profile().timezone">
+                <option [ngValue]="undefined" disabled selected>Select timezone</option>
+                <option [ngValue]="null" disabled hidden>Select timezone</option>
+                <option value="IST">India Standard Time (IST - UTC+05:30)</option>
+                <option value="UTC">Coordinated Universal Time (UTC)</option>
+                <option value="EST">Eastern Time (EST - UTC-05:00)</option>
+                <option value="CST">Central Time (CST - UTC-06:00)</option>
+                <option value="PST">Pacific Time (PST - UTC-08:00)</option>
+                <option value="Europe/London">London (GMT / BST)</option>
+                <option value="Asia/Tokyo">Tokyo (JST - UTC+09:00)</option>
+                <option value="Australia/Sydney">Sydney (AEST - UTC+10:00)</option>
+              </select>
+              <span class="field-helper-text">Governs appointment reminders, follow-up calendar times, and analytics logging.</span>
+            </div>
+          </div>
+
+          <div class="info-banner-box">
+            <svg lucideInfo [size]="18" class="info-banner-icon"></svg>
+            <div class="info-banner-content">
+              <span class="info-banner-title">Organization Identity</span>
+              <p>Your company name and domain are referenced across quotation emails, client invoices, and internal employee directories.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ────── TAB 2: CONTACT & STATUTORY ────── -->
+      <div class="tab-pane" *ngIf="activeTab() === 'statutory'">
+        <div class="dual-card-grid">
+          <!-- Card A: Contact & Address -->
+          <div class="content-card form-card-elevated">
+            <div class="card-header-styled">
+              <div class="header-icon-box bg-blue-light text-blue">
+                <svg lucideMapPin [size]="18"></svg>
+              </div>
+              <div class="header-text-group">
+                <h3>Contact &amp; Address</h3>
+                <p>Official communication details printed on quotation headers and invoices</p>
+              </div>
+            </div>
+
+            <div class="form-vertical-stack">
+              <div class="form-field-group">
+                <label class="field-label">Mobile Number</label>
+                <div class="input-affix-wrapper">
+                  <svg lucidePhone [size]="16" class="affix-icon"></svg>
+                  <input type="tel" class="form-input with-affix" [(ngModel)]="profile().mobile" placeholder="e.g. 9891835387">
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">Official Email</label>
+                <div class="input-affix-wrapper">
+                  <svg lucideMail [size]="16" class="affix-icon"></svg>
+                  <input type="email" class="form-input with-affix" [(ngModel)]="profile().email" placeholder="e.g. info@ces-pl.com">
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">Registered / Billing Address</label>
+                <textarea class="form-input form-textarea" rows="4" [(ngModel)]="profile().address" placeholder="Registered office address, street, city, state, and PIN code"></textarea>
+                <span class="field-helper-text">This exact multi-line address will be rendered on legal proposals and tax invoices.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card B: Statutory & Quotation -->
+          <div class="content-card form-card-elevated">
+            <div class="card-header-styled">
+              <div class="header-icon-box bg-emerald-light text-emerald">
+                <svg lucideShieldCheck [size]="18"></svg>
+              </div>
+              <div class="header-text-group">
+                <h3>Statutory &amp; Quotation</h3>
+                <p>Tax identifiers, government registrations, and quotation sequence prefix</p>
+              </div>
+            </div>
+
+            <div class="form-vertical-stack">
+              <div class="form-field-group">
+                <label class="field-label">GSTIN (15 Digits)</label>
+                <div class="input-action-wrapper">
+                  <input type="text" class="form-input mono-input" [(ngModel)]="profile().gstin" placeholder="09AAECN8946R1ZD" maxlength="15">
+                  <button type="button" class="field-copy-btn" (click)="copyToClipboard(profile().gstin, 'GSTIN')" [disabled]="!profile().gstin" title="Copy GSTIN">
+                    <svg *ngIf="copiedField() !== 'GSTIN'" lucideCopy [size]="14"></svg>
+                    <svg *ngIf="copiedField() === 'GSTIN'" lucideCheck [size]="14" class="text-emerald"></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">PAN Number (10 Digits)</label>
+                <div class="input-action-wrapper">
+                  <input type="text" class="form-input mono-input" [(ngModel)]="profile().panNumber" placeholder="AAECN8946R" maxlength="10">
+                  <button type="button" class="field-copy-btn" (click)="copyToClipboard(profile().panNumber, 'PAN Number')" [disabled]="!profile().panNumber" title="Copy PAN">
+                    <svg *ngIf="copiedField() !== 'PAN Number'" lucideCopy [size]="14"></svg>
+                    <svg *ngIf="copiedField() === 'PAN Number'" lucideCheck [size]="14" class="text-emerald"></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">Udyam Registration No.</label>
+                <div class="input-action-wrapper">
+                  <input type="text" class="form-input mono-input" [(ngModel)]="profile().udyamRegNo" placeholder="UDYAM-UP-28-01048">
+                  <button type="button" class="field-copy-btn" (click)="copyToClipboard(profile().udyamRegNo, 'Udyam Reg. No.')" [disabled]="!profile().udyamRegNo" title="Copy Udyam No.">
+                    <svg *ngIf="copiedField() !== 'Udyam Reg. No.'" lucideCopy [size]="14"></svg>
+                    <svg *ngIf="copiedField() === 'Udyam Reg. No.'" lucideCheck [size]="14" class="text-emerald"></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">Quotation No. Prefix</label>
+                <input type="text" class="form-input mono-input" [(ngModel)]="profile().quotationPrefix" placeholder="QT" maxlength="12">
+                <div class="quote-prefix-chip">
+                  <span class="chip-prefix-label">Generated Sample:</span>
+                  <span class="chip-prefix-value">{{ quotePreview() }}</span>
+                </div>
+                <span class="field-helper-text">Used as the prefix on generated quote numbers. Leave blank for default <strong>QT</strong>.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ────── TAB 3: BANK DETAILS ────── -->
+      <div class="tab-pane" *ngIf="activeTab() === 'banking'">
+        <div class="banking-split-grid">
+          <!-- Form Section -->
+          <div class="content-card form-card-elevated">
+            <div class="card-header-styled">
+              <div class="header-icon-box bg-purple-light text-purple">
+                <svg lucideLandmark [size]="18"></svg>
+              </div>
+              <div class="header-text-group">
+                <h3>Bank Account Coordinates</h3>
+                <p>Official bank details for receiving client wire and RTGS / NEFT remittances</p>
+              </div>
+            </div>
+
+            <div class="form-grid-layout">
+              <div class="form-field-group full-width">
+                <label class="field-label">Beneficiary / Account Name</label>
+                <input type="text" class="form-input" [(ngModel)]="profile().bankAccountName" placeholder="e.g. N-Expert Solutions Private Limited">
+                <span class="field-helper-text">Exact legal name registered with the banking institution.</span>
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">Bank Name</label>
+                <input type="text" class="form-input" [(ngModel)]="profile().bankName" placeholder="e.g. ICICI Bank">
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">Branch Name</label>
+                <input type="text" class="form-input" [(ngModel)]="profile().bankBranch" placeholder="e.g. Delhi Mayur Vihar">
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">IFSC Code</label>
+                <div class="input-action-wrapper">
+                  <input type="text" class="form-input mono-input" [(ngModel)]="profile().bankIfsc" placeholder="ICIC0006297" maxlength="11">
+                  <button type="button" class="field-copy-btn" (click)="copyToClipboard(profile().bankIfsc, 'IFSC Code')" [disabled]="!profile().bankIfsc" title="Copy IFSC Code">
+                    <svg *ngIf="copiedField() !== 'IFSC Code'" lucideCopy [size]="14"></svg>
+                    <svg *ngIf="copiedField() === 'IFSC Code'" lucideCheck [size]="14" class="text-emerald"></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="field-label">Account Number</label>
+                <div class="input-action-wrapper">
+                  <input type="text" class="form-input mono-input" [(ngModel)]="profile().bankAccountNumber" placeholder="629705016115" inputmode="numeric">
+                  <button type="button" class="field-copy-btn" (click)="copyToClipboard(profile().bankAccountNumber, 'Account Number')" [disabled]="!profile().bankAccountNumber" title="Copy Account Number">
+                    <svg *ngIf="copiedField() !== 'Account Number'" lucideCopy [size]="14"></svg>
+                    <svg *ngIf="copiedField() === 'Account Number'" lucideCheck [size]="14" class="text-emerald"></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preview & Summary Section -->
+          <div class="banking-preview-col">
+            <!-- Visual Bank Card -->
+            <div class="virtual-bank-card">
+              <div class="card-metallic-glow"></div>
+              <div class="card-top-bar">
+                <div class="gold-emv-chip">
+                  <div class="chip-circuit-line"></div>
+                  <div class="chip-circuit-line"></div>
+                </div>
+                <div class="card-bank-badge">
+                  <svg lucideLandmark [size]="14"></svg>
+                  <span>{{ profile().bankName || 'BANK ACCOUNT' }}</span>
+                </div>
+              </div>
+
+              <div class="card-account-digits">
+                {{ maskedAccount() }}
+              </div>
+
+              <div class="card-footer-meta">
+                <div class="meta-col-holder">
+                  <span class="meta-sub">BENEFICIARY</span>
+                  <span class="meta-val">{{ profile().bankAccountName || 'BENEFICIARY NAME' }}</span>
+                </div>
+                <div class="meta-col-ifsc">
+                  <span class="meta-sub">IFSC</span>
+                  <span class="meta-val mono">{{ profile().bankIfsc || '•••••••••••' }}</span>
+                </div>
+              </div>
+
+              <div class="card-branch-tag" *ngIf="profile().bankBranch">
+                <svg lucideMapPin [size]="11"></svg>
+                <span>{{ profile().bankBranch }}</span>
+              </div>
+            </div>
+
+            <button type="button" class="btn-copy-bank-suite" (click)="copyAllBankDetails()">
+              <svg lucideCopy [size]="15"></svg>
+              <span>Copy Full Bank Coordinates</span>
+            </button>
+
+            <div class="info-banner-box bank-banner">
+              <svg lucideInfo [size]="16" class="info-banner-icon text-purple"></svg>
+              <div class="info-banner-content">
+                <p>These bank coordinates will be printed directly in the remittance section of client quotation PDFs and tax invoices.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ────── TAB 4: BRANDING & LOGO ────── -->
+      <div class="tab-pane" *ngIf="activeTab() === 'branding'">
+        <div class="branding-split-grid">
+          <!-- Logo Studio Card -->
+          <div class="content-card form-card-elevated">
+            <div class="card-header-styled">
+              <div class="header-icon-box bg-amber-light text-amber">
+                <svg lucideImage [size]="18"></svg>
+              </div>
+              <div class="header-text-group">
+                <h3>Company Logo</h3>
+                <p>Upload your organization's official high-resolution branding asset</p>
+              </div>
+            </div>
+
+            <div class="logo-studio-body">
+              <div class="logo-canvas-frame" [class.has-image]="profile().logoUrl">
+                <img *ngIf="profile().logoUrl" [src]="profile().logoUrl" alt="Company Logo" class="logo-canvas-img">
+                
+                <div *ngIf="!profile().logoUrl" class="logo-empty-canvas">
+                  <div class="logo-empty-icon-ring">
+                    <svg lucideBuilding2 [size]="40"></svg>
+                  </div>
+                  <span class="empty-canvas-title">No company logo uploaded</span>
+                  <span class="empty-canvas-desc">Upload SVG, PNG, or JPG (max 2MB)</span>
+                </div>
+              </div>
+
+              <div class="logo-action-buttons">
+                <input type="file" id="logoUpload" (change)="onFileSelected($event)" accept="image/png, image/jpeg, image/svg+xml" style="display: none;">
+                
+                <button type="button" class="btn-logo-upload" (click)="triggerFileInput()" [disabled]="isUploading()">
+                  <svg *ngIf="!isUploading()" lucideUpload [size]="16"></svg>
+                  <svg *ngIf="isUploading()" lucideLoader2 class="spinner" [size]="16"></svg>
+                  <span *ngIf="!isUploading()">{{ profile().logoUrl ? 'Replace Logo' : 'Upload New Logo' }}</span>
+                  <span *ngIf="isUploading()">Uploading Logo...</span>
+                </button>
+
+                <button *ngIf="profile().logoUrl" type="button" class="btn-logo-remove" (click)="removeLogo()" [disabled]="isUploading()" title="Remove logo">
+                  <svg lucideTrash2 [size]="15"></svg>
+                  <span>Remove</span>
+                </button>
+              </div>
+
+              <div class="specs-checklist">
+                <div class="spec-item">
+                  <span class="spec-dot"></span>
+                  <span>Supported formats: <strong>SVG, PNG, JPG</strong></span>
+                </div>
+                <div class="spec-item">
+                  <span class="spec-dot"></span>
+                  <span>Maximum size: <strong>2 MB</strong></span>
+                </div>
+                <div class="spec-item">
+                  <span class="spec-dot"></span>
+                  <span>Recommended: High-res transparent PNG or vector SVG (min 400×120px)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Letterhead Mockup Preview -->
+          <div class="content-card form-card-elevated letterhead-container-card">
+            <div class="card-header-styled">
+              <div class="header-icon-box bg-orange-light text-orange">
+                <svg lucideSparkles [size]="18"></svg>
+              </div>
+              <div class="header-text-group">
+                <h3>Live Document Preview</h3>
+                <p>Real-time rendering of your company branding on official quotes &amp; letterheads</p>
+              </div>
+            </div>
+
+            <div class="paper-mockup">
+              <div class="paper-header-row">
+                <div class="paper-brand">
+                  <img *ngIf="profile().logoUrl" [src]="profile().logoUrl" alt="Logo" class="paper-logo-img">
+                  <div *ngIf="!profile().logoUrl" class="paper-logo-icon">
+                    <svg lucideBuilding2 [size]="22"></svg>
+                  </div>
+                  <div class="paper-company-names">
+                    <span class="paper-comp-h1">{{ profile().name || 'Company Name' }}</span>
+                    <span class="paper-comp-domain" *ngIf="profile().domain">{{ profile().domain }}</span>
+                  </div>
+                </div>
+
+                <div class="paper-quote-badge">
+                  <span class="quote-label">QUOTATION</span>
+                  <span class="quote-no">{{ quotePreview() }}</span>
+                </div>
+              </div>
+
+              <div class="paper-hairline"></div>
+
+              <div class="paper-address-block">
+                <div class="address-left-col">
+                  <span class="paper-field-head">OFFICIAL REGISTERED ADDRESS</span>
+                  <p class="paper-address-text">{{ profile().address || 'Address not configured yet' }}</p>
+                </div>
+                <div class="address-right-col">
+                  <div class="paper-meta-row" *ngIf="profile().gstin">
+                    <span class="paper-m-key">GSTIN:</span>
+                    <span class="paper-m-val mono">{{ profile().gstin }}</span>
+                  </div>
+                  <div class="paper-meta-row" *ngIf="profile().panNumber">
+                    <span class="paper-m-key">PAN:</span>
+                    <span class="paper-m-val mono">{{ profile().panNumber }}</span>
+                  </div>
+                  <div class="paper-meta-row" *ngIf="profile().mobile">
+                    <span class="paper-m-key">Phone:</span>
+                    <span class="paper-m-val">{{ profile().mobile }}</span>
+                  </div>
+                  <div class="paper-meta-row" *ngIf="profile().email">
+                    <span class="paper-m-key">Email:</span>
+                    <span class="paper-m-val">{{ profile().email }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="paper-dummy-body">
+                <div class="dummy-bar bar-100"></div>
+                <div class="dummy-bar bar-75"></div>
+                <div class="dummy-bar bar-45"></div>
+              </div>
+
+              <div class="paper-footer-bank" *ngIf="profile().bankAccountNumber">
+                <div class="paper-bank-pill">
+                  <svg lucideLandmark [size]="13"></svg>
+                  <span>Remittance Bank: <strong>{{ profile().bankName || 'Bank' }}</strong> &bull; A/C: <strong>{{ profile().bankAccountNumber }}</strong> &bull; IFSC: <strong>{{ profile().bankIfsc || '—' }}</strong></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
