@@ -1,12 +1,12 @@
-﻿<div class="leads-container page-container">
+<div class="leads-container page-container">
   <!-- Enhanced Page Header Card -->
-  <div class="page-header-card">
+  <div class="page-header-card" *ngIf="activeMainTab !== 'contacts'">
     <div class="header-title-group">
       <div class="header-title-row">
-        <h1>CRM Leads Board</h1>
+        <h1>{{ boardFlow === 'PRE_SALES' ? 'CRM Pre-Sales Board' : 'CRM Leads Board' }}</h1>
         <span class="leads-count-pill">{{ leads.length }} Deal{{ leads.length === 1 ? '' : 's' }}</span>
       </div>
-      <p>Manage, track, and convert sales pipeline opportunities</p>
+      <p>{{ boardFlow === 'PRE_SALES' ? 'Track, evaluate, and hand deals to Sales once validated' : 'Manage, track, and convert sales pipeline opportunities' }}</p>
     </div>
     
     <div class="header-actions-group">
@@ -16,15 +16,15 @@
           <svg lucideTrendingUp size="16"></svg>
         </div>
         <div class="kpi-info-col">
-          <span class="kpi-label">Total Pipeline Value</span>
+          <span class="kpi-label">{{ boardFlow === 'PRE_SALES' ? 'Pre-Sales Pipeline Value' : 'Total Pipeline Value' }}</span>
           <span class="kpi-amount">{{ getTotalPipelineValue() | currency:'INR' }}</span>
         </div>
       </div>
 
-      <!-- Lead Insights Button (Admin only) -->
+      <!-- Lead Insights Button (Admin only, sales board) -->
       <button
         class="btn-header-insights"
-        *ngIf="auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'SUPERADMIN'"
+        *ngIf="(auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'SUPERADMIN') && boardFlow === 'SALES'"
         (click)="goToLeadsDashboard()"
         title="View AI & Pipeline Analytics">
         <svg lucideSparkles size="15"></svg>
@@ -37,26 +37,29 @@
         <span>Add Lead Contact</span>
       </button>
 
-      <!-- New Lead Button (Primary) -->
-      <button class="btn-header-primary" (click)="openModal()" title="Create New Lead Opportunity">
+      <!-- New Deal Button (Primary) -->
+      <button class="btn-header-primary" (click)="openModal()" title="{{ boardFlow === 'PRE_SALES' ? 'Create New Pre-Sales Deal' : 'Create New Lead Opportunity' }}">
         <svg lucidePlus size="16"></svg>
-        <span>New Lead</span>
+        <span>{{ boardFlow === 'PRE_SALES' ? 'New Pre-Sales Deal' : 'New Lead' }}</span>
       </button>
     </div>
   </div>
 
   <!-- Main Tab Switcher -->
   <div class="main-tab-switcher">
-    <button type="button" [class.active]="activeMainTab === 'leads'" (click)="activeMainTab = 'leads'">
+    <button type="button" [class.active]="activeMainTab === 'leads'" (click)="activateMainTab('leads')">
       Leads
     </button>
-    <button type="button" [class.active]="activeMainTab === 'contacts'" (click)="activeMainTab = 'contacts'">
+    <button type="button" [class.active]="activeMainTab === 'presales'" (click)="activateMainTab('presales')">
+      Pre-Sales
+    </button>
+    <button type="button" [class.active]="activeMainTab === 'contacts'" (click)="activateMainTab('contacts')">
       Lead Contacts
       <span class="tab-count-pill" *ngIf="leadContacts.length > 0">{{ leadContacts.length }}</span>
     </button>
   </div>
 
-  <ng-container *ngIf="activeMainTab === 'leads'">
+  <ng-container *ngIf="activeMainTab !== 'contacts'">
 
   <!-- Filter & Search Bar -->
   <div class="filter-bar-card filter-bar-card-wrap">
@@ -187,7 +190,7 @@
                 <button type="button" class="popover-search-clear" *ngIf="stageSearchQuery" (click)="stageSearchQuery = ''"><svg lucideX size="11"></svg></button>
               </div>
               <div class="popover-header-actions">
-                <span>{{ selectedStages.length }} of {{ LEAD_STATUSES.length }} Selected</span>
+                <span>{{ selectedStages.length }} of {{ activeStatuses.length }} Selected</span>
                 <button type="button" class="popover-clear-btn" *ngIf="selectedStages.length > 0" (click)="clearStages()">Clear</button>
               </div>
               <div class="popover-options-scroll">
@@ -255,9 +258,9 @@
           </div>
         </div>
 
-        <!-- 3. Deal Category (searchable) -->
+        <!-- 3. Lead Category (searchable) -->
         <div class="adv-filter-item category">
-          <label><svg lucideTag size="13"></svg> Deal Category</label>
+          <label><svg lucideTag size="13"></svg> Lead Category</label>
           <div class="searchable-filter-dropdown">
             <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedCategory !== 'ALL'" (click)="openFilterDropdown($event,'category',['stage','rep','source','contact','added'])">
               <span class="trigger-text">{{ getSelectedCategoryLabel() }}</span>
@@ -577,6 +580,9 @@
               <div class="card-header-row">
                 <h4 class="lead-title" [class.strike-through]="col.id === 'Lost'">{{lead.title}}</h4>
                 <div class="card-actions-group">
+                  <button type="button" class="btn-card-action btn-card-convert" *ngIf="boardFlow === 'PRE_SALES'" (click)="convertToSalesLead(lead, $event)" [disabled]="convertingLeadId === lead.id" title="Convert to Sales Lead">
+                    <svg lucideArrowRightLeft size="13"></svg>
+                  </button>
                   <button type="button" class="btn-card-action btn-card-edit" (click)="openEditModal(lead, $event)" title="Edit Lead">
                     <svg lucideEdit2 size="13"></svg>
                   </button>
@@ -738,7 +744,7 @@
                   <svg lucideChevronDown size="12" class="table-status-caret"></svg>
                 </button>
                 <div class="status-menu" *ngIf="statusMenuOpen === lead.id">
-                  <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES"
+                  <button type="button" class="status-menu-item" *ngFor="let st of activeStatuses"
                           [class.selected]="st === lead.status"
                           (click)="selectStatus(lead, st, $event)">
                     <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
@@ -768,6 +774,9 @@
                 <div class="action-menu" *ngIf="actionMenuOpen === lead.id">
                   <button type="button" class="action-menu-item" (click)="openDetailModal(lead)">
                     <svg lucideEye size="14"></svg> View Details
+                  </button>
+                  <button type="button" class="action-menu-item" *ngIf="boardFlow === 'PRE_SALES'" (click)="convertToSalesLead(lead, $event)">
+                    <svg lucideArrowRightLeft size="14"></svg> {{ convertingLeadId === lead.id ? 'Converting...' : 'Convert to Sales Lead' }}
                   </button>
                   <button type="button" class="action-menu-item" (click)="openEditModal(lead, $event)">
                     <svg lucideEdit2 size="14"></svg> Edit
@@ -880,7 +889,7 @@
                                 <svg lucideChevronDown size="12" class="table-status-caret"></svg>
                               </button>
                               <div class="status-menu" *ngIf="followUpTableStageMenu === fu.id">
-                                <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES"
+                                <button type="button" class="status-menu-item" *ngFor="let st of activeStatuses"
                                         [class.selected]="st === getFollowUpStage(fu.status)"
                                         (click)="selectFollowUpTableStage(lead, fu, st, $event)">
                                   <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
@@ -1003,7 +1012,7 @@
                   <svg lucideBuilding size="13"></svg>
                   <span>{{ contact.companyName }}</span>
                 </div>
-                <span class="no-data-dash" *ngIf="!contact.companyName">â€”</span>
+                <span class="no-data-dash" *ngIf="!contact.companyName">—</span>
                 <a *ngIf="contact.website" [href]="contact.website.startsWith('http') ? contact.website : 'https://' + contact.website" target="_blank" class="contact-web-link">
                   <svg lucideGlobe size="11"></svg>
                   <span>{{ contact.website.replace('https://', '').replace('http://', '').replace('www.', '') }}</span>
@@ -1023,7 +1032,7 @@
                   <svg lucidePhone size="12"></svg>
                   <span>{{ contact.phone || contact.mobile }}</span>
                 </a>
-                <span class="no-data-dash" *ngIf="!contact.email && !contact.phone && !contact.mobile">â€”</span>
+                <span class="no-data-dash" *ngIf="!contact.email && !contact.phone && !contact.mobile">—</span>
               </div>
             </td>
 
@@ -1032,7 +1041,7 @@
               <span class="source-tag" *ngIf="contact.leadSource">
                 {{ contact.leadSource }}
               </span>
-              <span class="no-data-dash" *ngIf="!contact.leadSource">â€”</span>
+              <span class="no-data-dash" *ngIf="!contact.leadSource">—</span>
             </td>
 
             <!-- Added By -->
@@ -1393,8 +1402,8 @@
           <svg lucideUser size="20" style="color: #ea580c;"></svg>
         </div>
         <div>
-          <h3>{{ isEditing ? 'Edit Opportunity / Lead' : 'Add New Lead' }}</h3>
-          <p class="modal-subtitle">{{ isEditing ? 'Update details, assignment, and pipeline stages for this lead.' : 'Enter details to add a new lead to your pipeline.' }}</p>
+          <h3>{{ isEditing ? 'Edit Deal' : (boardFlow === 'PRE_SALES' ? 'Add Pre-Sales Deal' : 'Add New Lead') }}</h3>
+          <p class="modal-subtitle">{{ isEditing ? 'Update details, assignment, and pipeline stages for this deal.' : (boardFlow === 'PRE_SALES' ? 'Enter details to add a new deal to your pre-sales pipeline.' : 'Enter details to add a new lead to your pipeline.') }}</p>
         </div>
       </div>
       <button class="btn-icon-close" (click)="closeModal()" [disabled]="isSaving">
@@ -1616,7 +1625,7 @@
 
           <!-- 2. Lead Owner / Assigned To -->
           <div class="form-group custom-select-group">
-            <label>Lead Owner / Assigned Rep (Sales, Finance & Admin)</label>
+            <label>Lead Owner</label>
             <div class="owner-select-trigger" (click)="showOwnerDropdown = !showOwnerDropdown" [class.active]="showOwnerDropdown">
               <div *ngIf="getSelectedOwner() as owner" class="selected-owner-display">
                 <div class="owner-avatar-circle" *ngIf="!owner.avatarUrl">
@@ -1684,7 +1693,7 @@
           <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.status?.trim()">
             <label>Initial Pipeline Stage <span class="required-asterisk">*</span></label>
             <select [(ngModel)]="newLeadData.status" [disabled]="isSaving" class="enhanced-select">
-              <option *ngFor="let status of LEAD_STATUSES" [value]="status">{{status}}</option>
+              <option *ngFor="let status of activeStatuses" [value]="status">{{status}}</option>
             </select>
             <span class="error-msg" *ngIf="isSubmitted && !newLeadData.status?.trim()">Pipeline Stage is required.</span>
           </div>
@@ -1706,10 +1715,28 @@
         </div>
 
         <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.dealCategory?.trim()">
+            <label>Lead Category <span class="required-asterisk">*</span></label>
+            <select [(ngModel)]="newLeadData.dealCategory" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let cat of DEAL_CATEGORIES" [value]="cat.id">{{cat.name}}</option>
+            </select>
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.dealCategory?.trim()">Lead Category is required.</span>
+            <input
+              *ngIf="newLeadData.dealCategory === 'Other'"
+              type="text"
+              [(ngModel)]="customCategory"
+              placeholder="Specify custom Lead Category..."
+              style="margin-top: 8px;"
+              [disabled]="isSaving"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
           <div class="form-group" [class.has-error]="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined)">
-            <label>Expected Deal Value <span class="required-asterisk">*</span></label>
+            <label>Expected Lead Value <span class="required-asterisk">*</span></label>
             <div class="input-with-prefix">
-              <span class="currency-symbol-addon">$</span>
+              <span class="currency-symbol-addon">₹</span>
               <input 
                 type="number" 
                 min="0" 
@@ -1894,11 +1921,11 @@
 
       <div class="form-row form-row-2">
         <div class="form-group">
-          <label>Mobile</label>
+          <label>Primary Phone Number</label>
           <input type="text" [(ngModel)]="leadContactForm.mobile" placeholder="e.g. 1234567890" [disabled]="isSavingLeadContact" />
         </div>
         <div class="form-group">
-          <label>Office Phone Number</label>
+          <label>Secondary Phone Number</label>
           <input type="text" [(ngModel)]="leadContactForm.officePhoneNumber" placeholder="e.g. +1 555 123 4567" [disabled]="isSavingLeadContact" />
         </div>
       </div>
@@ -2094,7 +2121,16 @@
         <!-- Future Date & Time Schedule -->
         <div class="form-group">
           <label>Scheduled Date & Time (Future) <span class="required-asterisk">*</span></label>
-          <input type="datetime-local" [(ngModel)]="newFollowUp.scheduledAt" [disabled]="isSavingFollowUp" class="fum-datetime-input" />
+          <div class="form-row form-row-2 fum-datetime-row">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" [ngModel]="followUpDatePart" (ngModelChange)="setFollowUpDatePart($event)" [disabled]="isSavingFollowUp" />
+            </div>
+            <div class="form-group">
+              <label>Time</label>
+              <input type="time" [ngModel]="followUpTimePart" (ngModelChange)="setFollowUpTimePart($event)" [disabled]="isSavingFollowUp" />
+            </div>
+          </div>
           <!-- Quick preset chips -->
           <div class="fum-presets">
             <span class="preset-label">Quick Set:</span>
@@ -2152,7 +2188,7 @@
               <svg lucideChevronDown size="12" class="table-status-caret"></svg>
             </button>
             <div class="status-menu" *ngIf="followUpStageMenuOpen">
-              <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES" [class.selected]="st === newFollowUp.stage" (click)="selectFollowUpStage(st, $event)">
+              <button type="button" class="status-menu-item" *ngFor="let st of activeStatuses" [class.selected]="st === newFollowUp.stage" (click)="selectFollowUpStage(st, $event)">
                 <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
                 <span class="status-menu-label">{{ st }}</span>
                 <svg lucideCheck size="14" class="status-menu-check" *ngIf="st === newFollowUp.stage"></svg>
@@ -2428,7 +2464,7 @@
                     <div class="blm-contact-sub" *ngIf="lead.contactName">
                       <svg lucideUser size="12"></svg>
                       <span>{{ lead.contactName }}</span>
-                      <span class="blm-dot-separator" *ngIf="lead.email || lead.phone">â€¢</span>
+                      <span class="blm-dot-separator" *ngIf="lead.email || lead.phone">•</span>
                       <span *ngIf="lead.phone || lead.email">{{ lead.phone || lead.email }}</span>
                     </div>
                   </div>
@@ -2442,7 +2478,7 @@
                 <td>
                   <div class="blm-deal-value">
                     <span class="currency-amt" *ngIf="lead.expectedDealValue">{{ lead.expectedDealValue | currency:'INR':'symbol':'1.0-0' }}</span>
-                    <span class="no-data-dash" *ngIf="!lead.expectedDealValue">â€”</span>
+                    <span class="no-data-dash" *ngIf="!lead.expectedDealValue">—</span>
                   </div>
                 </td>
                 <td>
@@ -2450,7 +2486,7 @@
                     <svg lucideCalendar size="12"></svg>
                     <span>{{ lead.expectedCloseDate | date:'mediumDate' }}</span>
                   </div>
-                  <span class="no-data-dash" *ngIf="!lead.expectedCloseDate">â€”</span>
+                  <span class="no-data-dash" *ngIf="!lead.expectedCloseDate">—</span>
                 </td>
                 <td>
                   <div class="blm-rep-cell" *ngIf="lead.assignedTo">

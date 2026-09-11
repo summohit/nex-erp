@@ -2319,6 +2319,10 @@ model Lead {
   company             Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   clientId            Int?
   client              Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  flow                String         @default("SALES") // SALES (main pipeline) | PRE_SALES (evaluation pipeline)
+  convertedToSalesId  Int?           // Set once a PRE_SALES deal is handed off to Sales
+  convertedToSales    Lead?          @relation("LeadConversion", fields: [convertedToSalesId], references: [id], onDelete: SetNull)
+  convertedFrom       Lead[]         @relation("LeadConversion")
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   quotations          Quotation[]

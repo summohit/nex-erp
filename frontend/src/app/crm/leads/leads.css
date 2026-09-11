@@ -1429,6 +1429,14 @@
 .dot-won { background: #059669; }
 .dot-lost { background: #dc2626; }
 
+/* Pre-Sales pipeline dots */
+.dot-new-lead { background: #2563eb; }
+.dot-requirement-gathering { background: #0891b2; }
+.dot-solutioning-demo { background: #7c3aed; }
+.dot-proposal-technical-validation { background: #d97706; }
+.dot-poc { background: #ea580c; }
+.dot-converted-won { background: #059669; }
+
 .column-title {
   font-size: 0.75rem /* 12px */;
   font-weight: 700;
@@ -1562,6 +1570,14 @@
 .card-accent-won { border-left-color: #059669; }
 .card-accent-lost { border-left-color: #dc2626; opacity: 0.75; }
 
+/* Pre-Sales pipeline accents */
+.card-accent-new-lead { border-left-color: #2563eb; }
+.card-accent-requirement-gathering { border-left-color: #0891b2; }
+.card-accent-solutioning-demo { border-left-color: #7c3aed; }
+.card-accent-proposal-technical-validation { border-left-color: #d97706; }
+.card-accent-poc { border-left-color: #ea580c; }
+.card-accent-converted-won { border-left-color: #059669; }
+
 .card-just-created {
   animation: leadCardPulse 1.4s ease-in-out 2;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35), 0 4px 12px rgba(15, 23, 42, 0.1);
@@ -1690,6 +1706,27 @@
   color: #dc2626;
   background: #fef2f2;
   border-color: #fee2e2;
+}
+
+.btn-card-convert {
+  color: #059669;
+  opacity: 0;
+}
+
+.kanban-card:hover .btn-card-convert {
+  opacity: 0.8;
+}
+
+.btn-card-convert:hover:not(:disabled) {
+  opacity: 1 !important;
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #d1fae5;
+}
+
+.btn-card-convert:disabled {
+  opacity: 0.4;
+  cursor: wait;
 }
 
 .card-pills-row {
@@ -4408,6 +4445,8 @@ textarea:focus {
 
 .fum-schedule-form input[type="text"],
 .fum-schedule-form input[type="email"],
+.fum-schedule-form input[type="date"],
+.fum-schedule-form input[type="time"],
 .fum-schedule-form input[type="datetime-local"],
 .fum-schedule-form textarea {
   width: 100%;
@@ -5715,7 +5754,7 @@ textarea:focus {
 .lead-followups-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   margin-bottom: 10px;
 }

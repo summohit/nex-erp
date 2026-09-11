@@ -16,8 +16,8 @@ import { DialogService } from '../../shared/services/dialog.service';
 import { AddLeadWizardComponent } from './add-lead-wizard/add-lead-wizard.component';
 
 const LEAD_SOURCES = [
-  'Friend Reference', 'Google Search', 'Social Media', 'Website', 'Cold Call',
-  'Email Campaign', 'Event', 'Referral', 'Advertisement', 'Walk-In', 'Other'
+  'Google Search', 'Website', 'Social Media (LinkedIn, Faceboo, Instagram)', 'Client Reference',
+  'Email Campaign', 'Events', 'Paid Ads', 'Partner Reference', 'Direct Approach', 'Other'
 ];
 
 @Component({

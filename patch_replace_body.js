@@ -82,7 +82,7 @@ if (startIdx !== -1 && endIdx !== -1) {
 
         <div class="form-row">
           <div class="form-group">
-            <label>Expected Deal Value</label>
+            <label>Expected Lead Value</label>
             <div class="input-with-icon">
               <span class="input-prefix">$</span>
               <input type="number" [(ngModel)]="newLeadData.value" placeholder="0.00" [disabled]="isSaving" class="currency-input" />

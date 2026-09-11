@@ -48,6 +48,12 @@ export class CrmService {
     else if (out.expectedCloseDate) out.expectedCloseDate = new Date(out.expectedCloseDate);
 
     if (out.value !== undefined) out.value = out.value ? parseFloat(out.value) : null;
+
+    // Pipeline discriminator — only the two known flows are stored; anything
+    // else falls back to the column default (SALES).
+    if (out.flow !== undefined && out.flow !== 'SALES' && out.flow !== 'PRE_SALES') {
+      delete out.flow;
+    }
     return out;
   }
 
@@ -158,8 +164,8 @@ export class CrmService {
   }
 
   /**
-   * Builds the next human-readable reference, e.g. L0926-001 / LC-0926-001:
-   * prefix + MMYY + a sequence that restarts each month.
+   * Builds the next human-readable reference, e.g. L0926-001 / LC-0926-001 /
+   * PS-0926-001: prefix + MMYY + a sequence that restarts each month.
    *
    * The sequence comes from the highest existing code for this month rather than
    * a counter table, so it stays correct if rows are deleted or backfilled. Two
@@ -168,26 +174,27 @@ export class CrmService {
    * not this read.
    */
   private async nextEntityCode(
-    kind: 'LEAD' | 'CONTACT',
+    kind: 'LEAD' | 'CONTACT' | 'PRESALES',
     companyId: number,
   ): Promise<string> {
-    const prefix = kind === 'LEAD' ? 'L' : 'LC-';
+    const isContact = kind === 'CONTACT';
+    const prefix = kind === 'LEAD' ? 'L' : isContact ? 'LC-' : 'PS-';
     const now = new Date();
     const mmyy = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getFullYear()).slice(-2)}`;
     const stem = `${prefix}${mmyy}-`;
 
     // Scoped by company: two companies each get their own -001 for the month.
     const latest =
-      kind === 'LEAD'
-        ? await this.prisma.lead.findFirst({
-            where: { companyId, leadCode: { startsWith: stem } },
-            orderBy: { leadCode: 'desc' },
-            select: { leadCode: true },
-          })
-        : await this.prisma.leadContact.findFirst({
+      isContact
+        ? await this.prisma.leadContact.findFirst({
             where: { companyId, contactCode: { startsWith: stem } },
             orderBy: { contactCode: 'desc' },
             select: { contactCode: true },
+          })
+        : await this.prisma.lead.findFirst({
+            where: { companyId, leadCode: { startsWith: stem } },
+            orderBy: { leadCode: 'desc' },
+            select: { leadCode: true },
           });
 
     const current = (latest as any)?.leadCode ?? (latest as any)?.contactCode ?? null;
@@ -201,7 +208,7 @@ export class CrmService {
    * fail — the second simply recomputes and takes the next number.
    */
   private async withEntityCode<T>(
-    kind: 'LEAD' | 'CONTACT',
+    kind: 'LEAD' | 'CONTACT' | 'PRESALES',
     companyId: number,
     create: (code: string) => Promise<T>,
   ): Promise<T> {
@@ -215,12 +222,14 @@ export class CrmService {
       }
     }
     // Never block the record itself on the label.
-    return create(`${kind === 'LEAD' ? 'L' : 'LC'}-${Date.now()}`);
+    return create(`${kind === 'LEAD' ? 'L' : kind === 'PRESALES' ? 'PS' : 'LC'}-${Date.now()}`);
   }
 
   async createLead(companyId: number, data: any, creatorEmployeeId?: number | null) {
     const sanitized = this.sanitizeLead(data);
     const requestedLeadCode = sanitized.leadCode;
+    const flow = sanitized.flow === 'PRE_SALES' ? 'PRE_SALES' : 'SALES';
+    const codeKind = flow === 'PRE_SALES' ? 'PRESALES' : 'LEAD';
 
     // No explicit contact chosen — link by identity so the new deal shows up
     // under its Lead Contact profile immediately.
@@ -251,7 +260,7 @@ export class CrmService {
     try {
       lead = requestedLeadCode
         ? await create(requestedLeadCode)
-        : await this.withEntityCode('LEAD', companyId, create);
+        : await this.withEntityCode(codeKind, companyId, create);
     } catch (error: any) {
       if (error?.code === 'P2002') {
         throw new ConflictException(`Lead ID "${requestedLeadCode}" already exists. Please enter a different unique ID.`);
@@ -282,8 +291,13 @@ export class CrmService {
     return lead;
   }
 
-  async getLeads(companyId: number, user: { role?: string; employeeId?: number | null }) {
+  async getLeads(
+    companyId: number,
+    user: { role?: string; employeeId?: number | null },
+    flow?: string,
+  ) {
     const where: any = { companyId };
+    if (flow) where.flow = flow;
 
     const isUnrestricted = user.role === 'SUPERADMIN' || user.role === 'ADMIN';
     if (!isUnrestricted) {
@@ -417,6 +431,130 @@ export class CrmService {
     }
 
     return updatedLead;
+  }
+
+  /**
+   * Hand a PRE_SALES deal over to the main sales pipeline. A sales lead is
+   * created from the pre-sale record (status New) and the pre-sale is marked
+   * 'Converted / Won' with a link to the new lead. Engagement history
+   * (follow-ups, notes, files, quotations) moves across with it.
+   */
+  async convertPreSaleToSales(
+    companyId: number,
+    preSaleId: number,
+    actorEmployeeId?: number | null,
+  ) {
+    const preSale = await this.prisma.lead.findFirst({
+      where: { id: preSaleId, companyId },
+    });
+    if (!preSale) throw new NotFoundException('Pre-sales lead not found');
+    if (preSale.flow !== 'PRE_SALES') {
+      throw new BadRequestException('This record is not a pre-sales lead.');
+    }
+    if (preSale.convertedToSalesId) {
+      throw new BadRequestException('This pre-sales deal has already been converted to a sales lead.');
+    }
+
+    // Quotations already raised during evaluation move to the new lead so the
+    // Quote Status filter on the sales board sees them from day one.
+    const quotations = await this.prisma.quotation.findMany({
+      where: { leadId: preSale.id },
+      select: { id: true },
+    });
+    const followUps = await this.prisma.leadFollowUp.findMany({
+      where: { leadId: preSale.id },
+      select: {
+        title: true, contactPerson: true, contactPhone: true, contactEmail: true,
+        type: true, scheduledAt: true, notes: true, status: true, assignedToId: true,
+      },
+    });
+    const notes = await this.prisma.leadNote.findMany({
+      where: { leadId: preSale.id },
+      select: { content: true, createdById: true },
+    });
+    const files = await this.prisma.leadFile.findMany({
+      where: { leadId: preSale.id },
+      select: { fileName: true, fileUrl: true, fileType: true, fileSize: true, purpose: true, uploadedById: true },
+    });
+
+    const create = (leadCode: string) => this.prisma.lead.create({
+      data: {
+        title: preSale.title,
+        subjectLine: preSale.subjectLine,
+        dealCategory: preSale.dealCategory,
+        companyName: preSale.companyName,
+        contactName: preSale.contactName,
+        email: preSale.email,
+        phone: preSale.phone,
+        value: preSale.value,
+        currency: preSale.currency,
+        source: preSale.source,
+        status: 'New',
+        description: preSale.description,
+        qualificationReason: preSale.qualificationReason,
+        assignedToId: preSale.assignedToId,
+        addedById: actorEmployeeId ?? preSale.addedById,
+        broughtByContactId: preSale.broughtByContactId,
+        expectedCloseDate: preSale.expectedCloseDate,
+        website: preSale.website,
+        address: preSale.address,
+        clientId: preSale.clientId,
+        companyId,
+        flow: 'SALES',
+        leadCode,
+      },
+    });
+
+    const salesLead = await this.withEntityCode('LEAD', companyId, create);
+
+    if (followUps.length) {
+      await this.prisma.leadFollowUp.createMany({
+        data: followUps.map((fu) => ({ ...fu, leadId: salesLead.id, companyId })),
+      });
+    }
+    if (notes.length) {
+      await this.prisma.leadNote.createMany({
+        data: notes.map((n) => ({ ...n, leadId: salesLead.id, companyId })),
+      });
+    }
+    if (files.length) {
+      await this.prisma.leadFile.createMany({
+        data: files.map((f) => ({ ...f, leadId: salesLead.id, companyId })),
+      });
+    }
+    if (quotations.length) {
+      await this.prisma.quotation.updateMany({
+        where: { leadId: preSale.id, companyId },
+        data: { leadId: salesLead.id },
+      });
+    }
+
+    await this.prisma.lead.update({
+      where: { id: preSale.id },
+      data: { status: 'Converted / Won', convertedToSalesId: salesLead.id },
+    });
+
+    await this.logActivity(
+      companyId,
+      preSale.id,
+      'CONVERTED_TO_SALES',
+      `Pre-sales deal converted to sales lead ${salesLead.leadCode}`,
+      actorEmployeeId ?? preSale.addedById,
+      { salesLeadId: salesLead.id, salesLeadCode: salesLead.leadCode },
+    );
+    await this.logActivity(
+      companyId,
+      salesLead.id,
+      'DEAL_CREATED',
+      `Deal "${salesLead.title}" created from pre-sales hand-off`,
+      actorEmployeeId || salesLead.addedById,
+      { fromPreSaleId: preSale.id },
+    );
+
+    return {
+      preSale: { ...preSale, status: 'Converted / Won', convertedToSalesId: salesLead.id },
+      salesLead,
+    };
   }
   
   async updateLead(companyId: number, leadId: number, data: any, actorEmployeeId?: number | null) {
@@ -584,6 +722,31 @@ export class CrmService {
     );
 
     return deleted;
+  }
+
+  async renameLeadFile(companyId: number, leadId: number, fileId: number, fileName: string) {
+    const file = await this.prisma.leadFile.findFirst({ where: { id: fileId, leadId, companyId } });
+    if (!file) throw new NotFoundException('File not found');
+
+    const name = String(fileName || '').trim();
+    if (!name) throw new BadRequestException('File name is required.');
+    if (name.length > 200) throw new BadRequestException('File name must be 200 characters or fewer.');
+
+    const updated = await this.prisma.leadFile.update({
+      where: { id: fileId },
+      data: { fileName: name },
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'FILE_RENAMED',
+      `File renamed from "${file.fileName}" to "${updated.fileName}"`,
+      null,
+      { fileId, from: file.fileName, to: updated.fileName },
+    );
+
+    return updated;
   }
 
   // ═══════════════════════════════════════════

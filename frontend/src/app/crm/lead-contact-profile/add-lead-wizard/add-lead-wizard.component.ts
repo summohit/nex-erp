@@ -39,16 +39,28 @@ export class AddLeadWizardComponent implements OnInit {
   ];
 
   readonly LEAD_SOURCES = [
-    'Website / Inbound',
-    'Referral',
-    'Social Media',
-    'Cold Outreach',
+    'Google Search',
+    'Website',
+    'Social Media (LinkedIn, Facebook, Instagram)',
+    'Client Reference',
     'Email Campaign',
-    'Event / Trade Show',
-    'Partner / Reseller',
+    'Events',
     'Paid Ads',
-    'Direct / Walk-In',
+    'Partner Reference',
+    'Direct Approach',
     'Other'
+  ];
+
+  readonly DEAL_CATEGORIES = [
+    { id: 'Implementation & Deployment', name: 'Implementation & Deployment', hint: 'Implementation and deployment services' },
+    { id: 'Implementation & Migration', name: 'Implementation & Migration', hint: 'Implementation and migration projects' },
+    { id: 'Products', name: 'Products', hint: 'Product sales' },
+    { id: 'AMC (Annual Maintenance Contract)', name: 'AMC (Annual Maintenance Contract)', hint: 'Annual maintenance contracts' },
+    { id: 'FMS (Resource Contract)', name: 'FMS (Resource Contract)', hint: 'Resource / facility management contracts' },
+    { id: 'Rental', name: 'Rental', hint: 'Equipment or asset rentals' },
+    { id: 'Corporate Training', name: 'Corporate Training', hint: 'Corporate training programs' },
+    { id: 'POC', name: 'POC', hint: 'Proof of concept engagements' },
+    { id: 'Other', name: 'Other', hint: 'Specify a custom category' }
   ];
 
   readonly phoneCountryCodes: { code: string; name: string }[] = [
@@ -126,7 +138,8 @@ export class AddLeadWizardComponent implements OnInit {
   isSaving = false;
   isSubmitted = false;
   activeTab = 1;
-  customSource = '';
+customSource = '';
+  customCategory = '';
 
   ownerSearchQuery = '';
   showOwnerDropdown = false;
@@ -141,17 +154,18 @@ export class AddLeadWizardComponent implements OnInit {
 
   resetForm() {
     const c = this.contact;
-    const contactSource = (c?.leadSource && this.LEAD_SOURCES.includes(c.leadSource)) ? c.leadSource : 'Website / Inbound';
+    const contactSource = (c?.leadSource && this.LEAD_SOURCES.includes(c.leadSource)) ? c.leadSource : 'Google Search';
     this.isSaving = false;
     this.isSubmitted = false;
     this.activeTab = 1;
     this.customSource = '';
+    this.customCategory = '';
     this.showOwnerDropdown = false;
     this.ownerSearchQuery = '';
     this.newLeadData = {
       title: '',
       subjectLine: '',
-      dealCategory: 'Inbound',
+      dealCategory: 'Implementation & Deployment',
       companyName: c?.companyName || '',
       contactName: c?.name || '',
       email: c?.email || '',
@@ -287,9 +301,10 @@ export class AddLeadWizardComponent implements OnInit {
       return;
     }
 
-    // Validation: Stage, Source, Deal Value, and Close Date are required on tab 2
+    // Validation: Stage, Source, Lead Category, Deal Value, and Close Date are required on tab 2
     const isTab2Valid = this.newLeadData.status?.trim()
       && this.newLeadData.source?.trim()
+      && this.newLeadData.dealCategory?.trim()
       && this.newLeadData.value !== null && this.newLeadData.value !== undefined
       && this.newLeadData.expectedCloseDate;
 
@@ -311,6 +326,9 @@ export class AddLeadWizardComponent implements OnInit {
     }
     if (payload.source === 'Other' && this.customSource.trim()) {
       payload.source = this.customSource.trim();
+    }
+    if (payload.dealCategory === 'Other' && this.customCategory.trim()) {
+      payload.dealCategory = this.customCategory.trim();
     }
 
     this.http.post<any>(`${environment.apiUrl}/crm/leads`, payload).subscribe({

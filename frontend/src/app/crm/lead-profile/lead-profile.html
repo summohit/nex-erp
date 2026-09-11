@@ -88,9 +88,9 @@
         <div class="info-tiles-grid">
           <div class="info-tile"><div class="tile-icon"><svg lucideBriefcase size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Name</span><span class="tile-value">{{ lead.title || '—' }}</span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideUser size="16"></svg></div><div class="tile-content"><span class="tile-label">Lead Contact</span><span class="tile-value">{{ lead.contactName || '—' }}</span></div></div>
-          <div class="info-tile"><div class="tile-icon"><svg lucideMail size="16"></svg></div><div class="tile-content"><span class="tile-label">Email</span><span class="tile-value">{{ lead.email || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideMail size="16"></svg></div><div class="tile-content"><span class="tile-label">Email</span><span class="tile-value"><a *ngIf="lead.email" [href]="'mailto:' + lead.email" class="meta-link">{{ lead.email }}</a><span *ngIf="!lead.email">—</span></span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideBuilding size="16"></svg></div><div class="tile-content"><span class="tile-label">Company Name</span><span class="tile-value">{{ lead.companyName || '—' }}</span></div></div>
-          <div class="info-tile"><div class="tile-icon"><svg lucideTarget size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Category</span><span class="tile-value">{{ lead.dealCategory || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideTarget size="16"></svg></div><div class="tile-content"><span class="tile-label">Lead Category</span><span class="tile-value">{{ lead.dealCategory || '—' }}</span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideUserCheck size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Agent</span><span class="tile-value">{{ assignedName }}</span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideUserCheck size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Watcher</span><span class="tile-value watcher-cell"><span class="mini-avatar" *ngIf="lead.addedBy?.avatarUrl"><img [src]="lead.addedBy.avatarUrl" alt=""></span><span class="mini-avatar initials" *ngIf="!lead.addedBy?.avatarUrl">{{ getInitials(addedByName) }}</span><span class="watcher-name">{{ addedByName || '—' }}<span class="watcher-role" *ngIf="lead.addedBy?.designation?.name">{{ lead.addedBy.designation.name }}</span></span></span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideCalendar size="16"></svg></div><div class="tile-content"><span class="tile-label">Close Date</span><span class="tile-value">{{ (lead.expectedCloseDate | date:'mediumDate') || '—' }}</span></div></div>
@@ -109,7 +109,7 @@
         </div>
         <div class="info-tiles-grid single-col">
           <div class="info-tile"><div class="tile-icon"><svg lucideUser size="16"></svg></div><div class="tile-content"><span class="tile-label">Lead Contact</span><span class="tile-value">{{ lead.contactName || '—' }}</span></div></div>
-          <div class="info-tile"><div class="tile-icon"><svg lucideMail size="16"></svg></div><div class="tile-content"><span class="tile-label">Email</span><span class="tile-value">{{ lead.email || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideMail size="16"></svg></div><div class="tile-content"><span class="tile-label">Email</span><span class="tile-value"><a *ngIf="lead.email" [href]="'mailto:' + lead.email" class="meta-link">{{ lead.email }}</a><span *ngIf="!lead.email">—</span></span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucidePhone size="16"></svg></div><div class="tile-content"><span class="tile-label">Mobile</span><span class="tile-value"><a *ngIf="lead.phone" [href]="'tel:' + lead.phone" class="meta-link">{{ lead.phone }}</a><span *ngIf="!lead.phone">—</span></span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideBuilding size="16"></svg></div><div class="tile-content"><span class="tile-label">Company Name</span><span class="tile-value">{{ lead.companyName || '—' }}</span></div></div>
         </div>
@@ -298,7 +298,7 @@
               <span class="header-icon bg-emerald-light text-emerald"><svg lucideFileText size="16"></svg></span>
               <h3>Proposals</h3>
             </div>
-            <button class="btn-primary-pill" (click)="goToQuotations()"><svg lucidePlus size="16"></svg> Create Proposal</button>
+            <button class="btn-primary-pill" (click)="openNewProposal()"><svg lucidePlus size="16"></svg> Create Proposal</button>
           </div>
 
           <div class="loading-box" *ngIf="loadingProposals"><div class="spinner small"></div><span>Loading proposals...</span></div>
@@ -447,22 +447,22 @@
             <div class="form-group">
               <label>Follow-Up Medium / Type</label>
               <div class="fum-type-grid">
-                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'CALL'" (click)="followUpForm.type = 'CALL'">
+                <button type="button" class="fum-type-btn type-call" [class.active]="followUpForm.type === 'CALL'" (click)="followUpForm.type = 'CALL'">
                   <div class="type-icon-box"><svg lucidePhone size="14"></svg></div><span>Phone Call</span>
                 </button>
-                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'MEETING'" (click)="followUpForm.type = 'MEETING'">
+                <button type="button" class="fum-type-btn type-meeting" [class.active]="followUpForm.type === 'MEETING'" (click)="followUpForm.type = 'MEETING'">
                   <div class="type-icon-box"><svg lucideVideo size="14"></svg></div><span>Meeting / VC</span>
                 </button>
-                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'DEMO'" (click)="followUpForm.type = 'DEMO'">
+                <button type="button" class="fum-type-btn type-demo" [class.active]="followUpForm.type === 'DEMO'" (click)="followUpForm.type = 'DEMO'">
                   <div class="type-icon-box"><svg lucideEye size="14"></svg></div><span>Product Demo</span>
                 </button>
-                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'EMAIL'" (click)="followUpForm.type = 'EMAIL'">
+                <button type="button" class="fum-type-btn type-email" [class.active]="followUpForm.type === 'EMAIL'" (click)="followUpForm.type = 'EMAIL'">
                   <div class="type-icon-box"><svg lucideMail size="14"></svg></div><span>Email</span>
                 </button>
-                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'FIELD_VISIT'" (click)="followUpForm.type = 'FIELD_VISIT'">
+                <button type="button" class="fum-type-btn type-field" [class.active]="followUpForm.type === 'FIELD_VISIT'" (click)="followUpForm.type = 'FIELD_VISIT'">
                   <div class="type-icon-box"><svg lucideMapPin size="14"></svg></div><span>Field Visit</span>
                 </button>
-                <button type="button" class="fum-type-btn" [class.active]="followUpForm.type === 'NOTE'" (click)="followUpForm.type = 'NOTE'">
+                <button type="button" class="fum-type-btn type-note" [class.active]="followUpForm.type === 'NOTE'" (click)="followUpForm.type = 'NOTE'">
                   <div class="type-icon-box"><svg lucideFileText size="14"></svg></div><span>Note / Task</span>
                 </button>
               </div>
@@ -470,7 +470,7 @@
 
             <div class="fum-section-box">
               <div class="fum-section-header">
-                <svg lucideUser size="14"></svg>
+                <svg lucideUser size="14" style="color: #ea580c;"></svg>
                 <span>Whom to Follow Up With (Client Contact)</span>
               </div>
               <div class="form-row">
@@ -491,7 +491,16 @@
 
             <div class="form-group">
               <label>Scheduled Date &amp; Time (Future) <span class="required-asterisk">*</span></label>
-              <input type="datetime-local" [(ngModel)]="followUpForm.scheduledAt" [disabled]="isSavingFollowUp" class="fum-datetime-input" />
+              <div class="form-row form-row-2 fum-datetime-row">
+                <div class="form-group">
+                  <label>Date</label>
+                  <input type="date" [ngModel]="followUpDatePart" (ngModelChange)="setFollowUpDatePart($event)" [disabled]="isSavingFollowUp" />
+                </div>
+                <div class="form-group">
+                  <label>Time</label>
+                  <input type="time" [ngModel]="followUpTimePart" (ngModelChange)="setFollowUpTimePart($event)" [disabled]="isSavingFollowUp" />
+                </div>
+              </div>
               <div class="fum-presets">
                 <span class="preset-label">Quick Set:</span>
                 <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('today_afternoon')">Today 3 PM</button>
@@ -501,21 +510,21 @@
               </div>
             </div>
 
-            <div class="fum-section-box" *ngIf="getPreviousFollowUpNote() as prev">
+            <div class="fum-section-box" *ngIf="getPreviousFollowUpNote() as prev" style="background:#f8fafc;">
               <div class="fum-section-header">
-                <svg lucideHistory size="14"></svg>
+                <svg lucideHistory size="14" style="color: #64748b;"></svg>
                 <span>Last Follow-Up ({{ prev.scheduledAt | date:'d MMM, h:mm a' }})</span>
               </div>
-              <p *ngIf="prev.notes">{{ prev.notes }}</p>
-              <p *ngIf="!prev.notes">No notes were recorded.</p>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: #475569;" *ngIf="prev.notes">{{ prev.notes }}</p>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; font-style: italic;" *ngIf="!prev.notes">No notes were recorded.</p>
             </div>
 
-            <div class="form-group">
-              <label>Remarks</label>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label> Remarks</label>
               <textarea [(ngModel)]="followUpForm.notes" placeholder="Outline key discussion points, questions to ask, or proposal items to clarify..." rows="3" [disabled]="isSavingFollowUp"></textarea>
             </div>
 
-            <div class="form-group">
+            <div class="form-group" style="margin-top: 16px;">
               <label>Attachments</label>
               <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles" />
               <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles">
@@ -540,7 +549,7 @@
                   <svg lucideChevronDown size="12" class="table-status-caret"></svg>
                 </button>
                 <div class="status-menu" *ngIf="followUpStageMenuOpen">
-                  <button type="button" class="status-menu-item" *ngFor="let st of LEAD_STATUSES" [class.selected]="st === followUpForm.stage" (click)="selectFollowUpStage(st, $event)">
+                  <button type="button" class="status-menu-item" *ngFor="let st of activeStatuses" [class.selected]="st === followUpForm.stage" (click)="selectFollowUpStage(st, $event)">
                     <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(st)}"></span>
                     <span class="status-menu-label">{{ st }}</span>
                     <svg lucideCheck size="14" class="status-menu-check" *ngIf="st === followUpForm.stage"></svg>
@@ -553,6 +562,12 @@
 
           <!-- TAB 2: TIMELINE & HISTORY -->
           <div *ngIf="followUpTab === 'history'" class="fum-history-view">
+            <!-- Loading State -->
+            <div *ngIf="loadingFollowUps" class="fum-loading-state">
+              <svg lucideLoader2 size="24" class="spin-icon"></svg>
+              <span>Loading follow-up timeline...</span>
+            </div>
+
             <div class="fum-empty-state" *ngIf="!loadingFollowUps && followUps.length === 0">
               <div class="empty-icon-circle"><svg lucideCalendar size="32"></svg></div>
               <h4>No Follow-Ups Scheduled Yet</h4>
@@ -573,6 +588,7 @@
                     <div class="fum-meta-item" *ngIf="f.contactPerson"><svg lucideUser size="13"></svg><span><strong>Contact:</strong> {{ f.contactPerson }}</span></div>
                     <div class="fum-meta-item" *ngIf="f.contactPhone"><svg lucidePhone size="13"></svg><a [href]="'tel:' + f.contactPhone">{{ f.contactPhone }}</a></div>
                     <div class="fum-meta-item" *ngIf="f.contactEmail"><svg lucideMail size="13"></svg><a [href]="'mailto:' + f.contactEmail">{{ f.contactEmail }}</a></div>
+                    <div class="fum-meta-item" *ngIf="f.assignedTo"><svg lucideUserCheck size="13"></svg><span><strong>Rep:</strong> {{ f.assignedTo.firstName }} {{ f.assignedTo.lastName }}</span></div>
                   </div>
                   <p class="fum-card-notes" *ngIf="f.notes">{{ f.notes }}</p>
                   <div class="followup-file-links" *ngIf="f.files?.length">
@@ -596,8 +612,9 @@
                   <div class="followup-file-links" *ngIf="f.files?.length">
                     <a *ngFor="let file of f.files" [href]="file.fileUrl" target="_blank" rel="noopener"><svg lucideFileText size="12"></svg> {{ file.fileName }}</a>
                   </div>
-                  <div class="fum-card-meta" *ngIf="f.contactPerson">
-                    <div class="fum-meta-item"><svg lucideUser size="13"></svg><span>{{ f.contactPerson }}</span></div>
+                  <div class="fum-card-meta" *ngIf="f.contactPerson || f.assignedTo">
+                    <div class="fum-meta-item" *ngIf="f.contactPerson"><svg lucideUser size="13"></svg><span>{{ f.contactPerson }}</span></div>
+                    <div class="fum-meta-item" *ngIf="f.assignedTo"><svg lucideUserCheck size="13"></svg><span>Handled by {{ f.assignedTo.firstName }} {{ f.assignedTo.lastName }}</span></div>
                   </div>
                   <div class="fum-card-actions">
                     <button type="button" class="btn-card-del" (click)="deleteFollowUp(f)" title="Delete Follow-up"><svg lucideTrash2 size="13"></svg></button>
@@ -634,6 +651,189 @@
         <div class="modal-footer-styled">
           <button class="btn-outline-pill" (click)="closeNoteModal()">Cancel</button>
           <button class="btn-primary-pill" (click)="saveNote()">{{ isEditingNote ? 'Update' : 'Save' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ PROPOSAL MODAL ══════════════════════════ -->
+    <div class="modal-overlay" *ngIf="showProposalModal" (click)="closeProposalModal()">
+      <div class="modal-card fum-modal-card prop-modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header-styled">
+          <div class="modal-header-text">
+            <h3>New Proposal</h3>
+            <p>Create a quotation for <strong>{{ lead?.companyName || lead?.title || 'this lead' }}</strong></p>
+          </div>
+          <button class="close-btn" (click)="closeProposalModal()" title="Close"><svg lucideX size="18"></svg></button>
+        </div>
+
+        <div class="modal-body-styled prop-body">
+          <div class="prop-form">
+            <!-- Client & Lead -->
+            <div class="prop-section">
+              <div class="prop-section-title">Client Details</div>
+              <div class="form-row form-row-single">
+                <div class="form-group" [class.has-error]="isProposalSubmitted && !proposalForm.clientId">
+                  <label>Client <span class="required-asterisk">*</span></label>
+                  <select class="prop-input" [(ngModel)]="proposalForm.clientId" name="propClient">
+                    <option [ngValue]="null">-- Select client --</option>
+                    <option *ngIf="lead?.client" [ngValue]="lead.client.id">{{ lead.client.name }}</option>
+                    <option *ngFor="let c of clients" [ngValue]="c.id">{{ c.name }}</option>
+                  </select>
+                  <span class="error-msg" *ngIf="isProposalSubmitted && !proposalForm.clientId">Please select a client.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quote Settings -->
+            <div class="prop-section">
+              <div class="prop-section-title">Quote Settings</div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Date</label>
+                  <input type="date" class="prop-input" [(ngModel)]="proposalForm.date" name="propDate" />
+                </div>
+                <div class="form-group">
+                  <label>Valid Until</label>
+                  <input type="date" class="prop-input" [(ngModel)]="proposalForm.validUntil" name="propValidUntil" />
+                </div>
+                <div class="form-group">
+                  <label>Currency</label>
+                  <select class="prop-input" [(ngModel)]="proposalForm.currency" name="propCurrency">
+                    <option value="INR">INR (&#8377;)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (&#8364;)</option>
+                    <option value="GBP">GBP (&#163;)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Tax Rate</label>
+                  <select class="prop-input" [(ngModel)]="proposalForm.taxRate" name="propTaxRate">
+                    <option *ngFor="let t of proposalTaxOptions" [ngValue]="t">{{ t }}% GST</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Line Items -->
+            <div class="prop-section">
+              <div class="prop-section-title">Line Items</div>
+              <div class="li-head">
+                <div class="li-col-desc">Description</div>
+                <div class="li-col-qty">Qty</div>
+                <div class="li-col-unit">Unit</div>
+                <div class="li-col-price">Unit Price</div>
+                <div class="li-col-total">Total</div>
+                <div class="li-col-del"></div>
+              </div>
+              <div class="li-row" *ngFor="let item of proposalForm.items; let i = index">
+                <div class="li-col-desc">
+                  <input type="text" class="prop-input" [(ngModel)]="item.description"
+                    [name]="'propDesc_' + i" placeholder="Item description" />
+                </div>
+                <div class="li-col-qty">
+                  <input type="number" class="prop-input li-input-num" [(ngModel)]="item.quantity"
+                    [name]="'propQty_' + i" min="1" />
+                </div>
+                <div class="li-col-unit">
+                  <select class="prop-input" [(ngModel)]="item.unit" [name]="'propUnit_' + i">
+                    <option *ngFor="let u of proposalUnitOptions" [value]="u">{{ u }}</option>
+                  </select>
+                </div>
+                <div class="li-col-price">
+                  <div class="price-input-wrap">
+                    <span class="price-currency">{{ proposalCurrencySymbol() }}</span>
+                    <input type="number" class="prop-input li-input-price" [(ngModel)]="item.unitPrice"
+                      [name]="'propPrice_' + i" min="0" step="0.01" />
+                  </div>
+                </div>
+                <div class="li-col-total">
+                  <span class="li-total-val">{{ proposalCurrencySymbol() }}{{ (item.quantity * item.unitPrice) | number:'1.2-2' }}</span>
+                </div>
+                <div class="li-col-del">
+                  <button class="btn-icon-del" (click)="removeProposalItem(i)" *ngIf="proposalForm.items.length > 1" title="Remove item" type="button">
+                    <svg lucideTrash2 size="15"></svg>
+                  </button>
+                </div>
+              </div>
+              <button class="btn-add-item" (click)="addProposalItem()" type="button">
+                <svg lucidePlus size="14"></svg> Add Line Item
+              </button>
+            </div>
+
+            <!-- Notes -->
+            <div class="prop-section">
+              <div class="prop-section-title">Notes</div>
+              <textarea class="prop-input" [(ngModel)]="proposalForm.notes" name="propNotes"
+                placeholder="Terms, conditions, or additional notes..."></textarea>
+            </div>
+
+            <!-- Terms & Conditions -->
+            <div class="prop-section">
+              <div class="prop-section-title">
+                <span>Terms &amp; Conditions</span>
+                <span class="tc-hint">Pre-filled with standard terms - edit as needed</span>
+              </div>
+              <textarea class="prop-input prop-terms-textarea" [(ngModel)]="proposalForm.terms" name="propTerms"
+                placeholder="Enter terms and conditions..."></textarea>
+            </div>
+
+            <!-- Attachments -->
+            <div class="prop-section">
+              <div class="prop-section-title">
+                <span>Attachments</span>
+                <span class="label-attachment-counter" [class.has-files]="proposalForm.attachments.length > 0">
+                  {{ proposalForm.attachments.length }}/{{ proposalMaxAttachments }} attached
+                </span>
+              </div>
+              <div class="att-dropzone" (click)="propAttFileInput.click()">
+                <svg lucideUpload size="18"></svg>
+                <span>Click to upload files&nbsp;<em>(up to {{ proposalMaxAttachments }}, 20MB each)</em></span>
+                <input #propAttFileInput type="file" multiple (change)="onProposalAttachments($event)" hidden />
+              </div>
+              <div class="att-grid" *ngIf="proposalForm.attachments.length || uploadingProposalCount > 0">
+                <div class="att-thumb" *ngFor="let a of proposalForm.attachments; let i = index">
+                  <img *ngIf="isProposalImage(a.fileName)" [src]="a.fileUrl" [alt]="a.fileName" />
+                  <div *ngIf="!isProposalImage(a.fileName)" class="att-file-badge" [ngClass]="proposalFileClass(a.fileName)">
+                    {{ proposalFileType(a.fileName) }}
+                  </div>
+                  <div class="att-meta">
+                    <span class="att-name" [title]="a.fileName">{{ a.fileName }}</span>
+                    <button type="button" class="att-remove" (click)="removeProposalAttachment(i)" title="Remove">
+                      <svg lucideX size="14"></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="att-thumb att-uploading" *ngFor="let n of [1,2,3,4,5,6,7,8].slice(0, uploadingProposalCount)">
+                  <div class="att-spinner"></div>
+                  <span class="att-uploading-label">Uploading...</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="quote-summary">
+              <div class="summary-row">
+                <span>Subtotal</span>
+                <span>{{ proposalCurrencySymbol() }}{{ proposalSubtotal | number:'1.2-2' }}</span>
+              </div>
+              <div class="summary-row">
+                <span>Tax ({{ proposalForm.taxRate }}% GST)</span>
+                <span>{{ proposalCurrencySymbol() }}{{ proposalTax | number:'1.2-2' }}</span>
+              </div>
+              <div class="summary-row summary-total-row">
+                <span class="summary-total-label">Total</span>
+                <span class="summary-total-val">{{ proposalCurrencySymbol() }}{{ proposalTotal | number:'1.2-2' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer-styled">
+          <button class="btn-outline-pill" (click)="closeProposalModal()" [disabled]="isSavingProposal">Cancel</button>
+          <button class="btn-primary-pill" (click)="saveProposal()" [disabled]="isSavingProposal">
+            <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingProposal"></svg>
+            {{ isSavingProposal ? 'Saving...' : 'Save Proposal' }}
+          </button>
         </div>
       </div>
     </div>

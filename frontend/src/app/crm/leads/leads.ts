@@ -35,7 +35,8 @@ import {
   LucideUsers, LucideAward, LucideExternalLink,
   LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
   LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
-  LucideUpload, LucideDownload, LucideCalendarRange, LucideFolder, LucideChevronRight, LucideBriefcase
+  LucideUpload, LucideDownload, LucideCalendarRange, LucideFolder, LucideChevronRight, LucideBriefcase,
+  LucideArrowRightLeft
 } from '@lucide/angular';
 
 export interface FollowUp {
@@ -119,6 +120,7 @@ interface Lead {
     LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
     LucideUpload, LucideDownload,
     LucideBriefcase, LucideCalendarRange, LucideChevronRight,
+    LucideArrowRightLeft,
   ],
   templateUrl: './leads.html',
   styleUrls: ['./leads.css']
@@ -201,29 +203,48 @@ export class LeadsComponent implements OnInit {
     'Win', 'On Hold', 'Lost'
   ];
 
+  // Pre-sales pipeline stages, left to right on the Pre-Sales Kanban board.
+  PRE_SALES_STATUSES = [
+    'New Lead', 'Requirement Gathering', 'Solutioning / Demo',
+    'Proposal / Technical Validation', 'POC', 'Converted / Won', 'Lost'
+  ];
+
+  // Which pipeline the board currently shows; drives columns, status lists,
+  // labels and the create/convert actions.
+  boardFlow: 'SALES' | 'PRE_SALES' = 'SALES';
+
+  get activeStatuses(): string[] {
+    return this.boardFlow === 'PRE_SALES' ? this.PRE_SALES_STATUSES : this.LEAD_STATUSES;
+  }
+
   // Standard Lead Sources
   LEAD_SOURCES = [
-    'Website / Inbound',
-    'Referral',
-    'Social Media',
-    'Cold Outreach',
+    'Google Search',
+    'Website',
+    'Social Media (LinkedIn, Facebook, Instagram)',
+    'Client Reference',
     'Email Campaign',
-    'Event / Trade Show',
-    'Partner / Reseller',
+    'Events',
     'Paid Ads',
-    'Direct / Walk-In',
+    'Partner Reference',
+    'Direct Approach',
     'Other'
   ];
   customSource = '';
 
   // Deal Categories with strategy hints
   DEAL_CATEGORIES = [
-    { id: 'Inbound', name: 'Inbound', hint: 'The buyer comes directly to you (Organic marketing, SEO, website, content, social media, contact form)' },
-    { id: 'Outbound', name: 'Outbound', hint: 'Your team initiates first contact (Cold emailing, direct messaging, cold calling, SDR prospecting)' },
-    { id: 'Referral', name: 'Referral', hint: 'Introduced by a third party (Existing clients, business partners, affiliates, network connections)' },
-    { id: 'Enterprise', name: 'Enterprise', hint: 'Large corporate or high-value clients with custom pricing and proposals' },
-    { id: 'Retainer', name: 'Retainer', hint: 'Ongoing monthly or quarterly recurring service contracts' }
+    { id: 'Implementation & Deployment', name: 'Implementation & Deployment', hint: 'Implementation and deployment services' },
+    { id: 'Implementation & Migration', name: 'Implementation & Migration', hint: 'Implementation and migration projects' },
+    { id: 'Products', name: 'Products', hint: 'Product sales' },
+    { id: 'AMC (Annual Maintenance Contract)', name: 'AMC (Annual Maintenance Contract)', hint: 'Annual maintenance contracts' },
+    { id: 'FMS (Resource Contract)', name: 'FMS (Resource Contract)', hint: 'Resource / facility management contracts' },
+    { id: 'Rental', name: 'Rental', hint: 'Equipment or asset rentals' },
+    { id: 'Corporate Training', name: 'Corporate Training', hint: 'Corporate training programs' },
+    { id: 'POC', name: 'POC', hint: 'Proof of concept engagements' },
+    { id: 'Other', name: 'Other', hint: 'Specify a custom category' }
   ];
+  customCategory = '';
   
   viewMode: 'kanban' | 'table' = 'kanban';
 
@@ -318,7 +339,7 @@ export class LeadsComponent implements OnInit {
     leadCode: '',
     title: '',
     subjectLine: '',
-    dealCategory: 'Inbound',
+    dealCategory: 'Implementation & Deployment',
     companyName: '',
     contactName: '',
     email: '',
@@ -335,11 +356,12 @@ export class LeadsComponent implements OnInit {
     addedById: null as number | null,
     broughtByContactId: null as number | null,
     description: '',
-    qualificationReason: ''
+    qualificationReason: '',
+    flow: 'SALES' as 'SALES' | 'PRE_SALES'
   };
 
   // Main board tabs: pipeline leads vs. external lead-contact directory
-  activeMainTab: 'leads' | 'contacts' = 'leads';
+  activeMainTab: 'leads' | 'presales' | 'contacts' = 'leads';
 
   // Lead Contacts (external brokers/partners selectable as "Lead Brought By")
   leadContacts: any[] = [];
@@ -409,6 +431,33 @@ export class LeadsComponent implements OnInit {
     stage: ''
   };
 
+  // Kept in sync with newFollowUp.scheduledAt so the schedule form can offer an
+  // easy separate Date and Time input instead of one combined datetime-local.
+  followUpDatePart = '';
+  followUpTimePart = '';
+  private syncFollowUpParts() {
+    const at = this.newFollowUp.scheduledAt || '';
+    this.followUpDatePart = at.length >= 10 ? at.slice(0, 10) : '';
+    this.followUpTimePart = at.length >= 16 ? at.slice(11, 16) : '';
+  }
+  private syncScheduledAtFromParts() {
+    if (this.followUpDatePart && this.followUpTimePart) {
+      this.newFollowUp.scheduledAt = `${this.followUpDatePart}T${this.followUpTimePart}`;
+    } else if (this.followUpDatePart) {
+      this.newFollowUp.scheduledAt = this.followUpDatePart;
+    } else {
+      this.newFollowUp.scheduledAt = this.followUpTimePart || this.newFollowUp.scheduledAt;
+    }
+  }
+  setFollowUpDatePart(value: string) {
+    this.followUpDatePart = value || '';
+    this.syncScheduledAtFromParts();
+  }
+  setFollowUpTimePart(value: string) {
+    this.followUpTimePart = (value || '').slice(0, 5);
+    this.syncScheduledAtFromParts();
+  }
+
   // Field Visits
 
   constructor(private http: HttpClient, private router: Router, public auth: AuthService, private toast: HotToastService) {}
@@ -424,6 +473,18 @@ export class LeadsComponent implements OnInit {
 
   goToLeadsDashboard() {
     this.router.navigate(['/crm/leads/dashboard']);
+  }
+
+  activateMainTab(tab: 'leads' | 'presales' | 'contacts') {
+    this.activeMainTab = tab;
+    this.statusMenuOpen = null;
+    this.actionMenuOpen = null;
+    if (tab === 'contacts') return;
+    this.boardFlow = tab === 'presales' ? 'PRE_SALES' : 'SALES';
+    // Stage selections are pipeline-specific; don't carry sales stages into
+    // the pre-sales board (or vice versa).
+    this.selectedStages = [];
+    this.loadLeads();
   }
 
   openLeadProfile(leadId: number) {
@@ -444,7 +505,9 @@ export class LeadsComponent implements OnInit {
 
   loadLeads(onLoaded?: () => void) {
     this.isLoading = true;
-    this.http.get<Lead[]>(`${environment.apiUrl}/crm/leads`).subscribe(data => {
+    this.http.get<Lead[]>(`${environment.apiUrl}/crm/leads`, {
+      params: { flow: this.boardFlow }
+    }).subscribe(data => {
       this.leads = data;
       this.distributeLeads();
       this.isLoading = false;
@@ -983,8 +1046,25 @@ csvImporting = false;
   }
 
   normalizeStatus(status: string | undefined | null): string {
-    if (!status) return 'New';
-    const s = status.trim().toUpperCase();
+    const raw = String(status || '').trim();
+
+    // Pre-sales pipeline: resolve its own stage names (plus legacy spellings)
+    // and never let the sales mappings recast them.
+    if (this.boardFlow === 'PRE_SALES') {
+      if (!raw) return 'New Lead';
+      const s = raw.toUpperCase();
+      const direct = this.PRE_SALES_STATUSES.find(
+        st => st.toUpperCase() === s || st.toUpperCase() === s.replace(/_+/g, ' ').replace(/\s+/g, ' ')
+      );
+      if (direct) return direct;
+      if (s === 'NEW') return 'New Lead';
+      if (s === 'CONVERTED' || s === 'WON' || s === 'WIN') return 'Converted / Won';
+      if (s === 'LOST') return 'Lost';
+      return 'New Lead';
+    }
+
+    if (!raw) return 'New';
+    const s = raw.toUpperCase();
     if (s === 'NEW') return 'New';
     if (s === 'INTERESTED' || s === 'QUALIFIED' || s === 'ASSIGNED' || s === 'CONTACTED' || s === 'ATTEMPTED TO CONTACT' || s === 'CONNECTED' || s === 'FOLLOW-UP REQUIRED' || s === 'FOLLOW_UP_REQUIRED') return 'Interested';
     if (s === 'PROPOSAL' || s === 'PROPOSAL SENT' || s === 'PROPOSAL_SENT' || s === 'DEMO SCHEDULED' || s === 'DEMO COMPLETED') return 'Proposal Sent';
@@ -995,7 +1075,7 @@ csvImporting = false;
     if (s === 'SCHEDULE MEETING' || s === 'SCHEDULE_MEETING') return 'Schedule Meeting';
     
     // Direct match from active statuses
-    const directMatch = this.LEAD_STATUSES.find(st => st.toLowerCase() === status.toLowerCase());
+    const directMatch = this.LEAD_STATUSES.find(st => st.toLowerCase() === raw.toLowerCase());
     if (directMatch) return directMatch;
 
     return 'New';
@@ -1194,7 +1274,7 @@ csvImporting = false;
 
   distributeLeads() {
     const filtered = this.getFilteredLeads();
-    this.kanbanColumns = this.LEAD_STATUSES.map(status => ({
+    this.kanbanColumns = this.activeStatuses.map(status => ({
       id: status,
       name: status,
       leads: filtered.filter(l => this.normalizeStatus(l.status) === status)
@@ -1223,14 +1303,14 @@ csvImporting = false;
   }
 
   getConnectedLists(): string[] {
-    return this.LEAD_STATUSES;
+    return this.activeStatuses;
   }
 
   // --- Stage multi-select dropdown ---
   getFilteredStages(): string[] {
-    if (!this.stageSearchQuery.trim()) return this.LEAD_STATUSES;
+    if (!this.stageSearchQuery.trim()) return this.activeStatuses;
     const q = this.stageSearchQuery.toLowerCase();
-    return this.LEAD_STATUSES.filter(s => s.toLowerCase().includes(q));
+    return this.activeStatuses.filter(s => s.toLowerCase().includes(q));
   }
 
   toggleStage(status: string) {
@@ -1387,9 +1467,17 @@ csvImporting = false;
   }
 
   getFilteredCategoriesForFilter(): any[] {
-    if (!this.categorySearchQuery.trim()) return this.DEAL_CATEGORIES;
+    // New category list, plus any legacy categories still present on loaded
+    // leads so nothing becomes unfilterable after the list changed.
+    const legacy = this.leads
+      .map(l => l.dealCategory)
+      .filter((c): c is string => !!c && !this.DEAL_CATEGORIES.some(d => d.id === c))
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .map(c => ({ id: c, name: c, hint: '' }));
+    const all = [...this.DEAL_CATEGORIES, ...legacy];
+    if (!this.categorySearchQuery.trim()) return all;
     const q = this.categorySearchQuery.toLowerCase();
-    return this.DEAL_CATEGORIES.filter(c => c.name.toLowerCase().includes(q));
+    return all.filter(c => c.name.toLowerCase().includes(q));
   }
 
   selectCategoryFilter(categoryId: string) {
@@ -1406,9 +1494,16 @@ csvImporting = false;
   }
 
   getFilteredSourcesForFilter(): string[] {
-    if (!this.sourceSearchQuery.trim()) return this.LEAD_SOURCES;
+    // New source list, plus any legacy sources still present on loaded leads so
+    // nothing becomes unfilterable after the category list changed.
+    const legacy = this.leads
+      .map(l => l.source)
+      .filter((s): s is string => !!s && !this.LEAD_SOURCES.includes(s))
+      .filter((v, i, a) => a.indexOf(v) === i);
+    const all = [...this.LEAD_SOURCES, ...legacy];
+    if (!this.sourceSearchQuery.trim()) return all;
     const q = this.sourceSearchQuery.toLowerCase();
-    return this.LEAD_SOURCES.filter(s => s.toLowerCase().includes(q));
+    return all.filter(s => s.toLowerCase().includes(q));
   }
 
   selectSourceFilter(source: string) {
@@ -1575,10 +1670,11 @@ csvImporting = false;
     this.isSaving = false;
     this.activeTab = 1;
     this.customSource = '';
+    this.customCategory = '';
     this.newLeadData = {
-      leadCode: '', title: '', subjectLine: '', dealCategory: 'Inbound', companyName: '', contactName: '', email: '', phone: '', phoneCode: '+91', website: '', address: '',
-      value: 0, currency: 'INR', status: 'New', source: 'Website / Inbound', assignedToId: null, addedById: null, broughtByContactId: null,
-      description: '', qualificationReason: '', expectedCloseDate: ''
+      leadCode: '', title: '', subjectLine: '', dealCategory: 'Implementation & Deployment', companyName: '', contactName: '', email: '', phone: '', phoneCode: '+91', website: '', address: '',
+      value: 0, currency: 'INR', status: this.boardFlow === 'PRE_SALES' ? 'New Lead' : 'New', source: 'Google Search', assignedToId: null, addedById: null, broughtByContactId: null,
+      description: '', qualificationReason: '', expectedCloseDate: '', flow: this.boardFlow
     };
     // Otherwise the next deal opens with fields still locked from the last one.
     this.lockedFromContact = false;
@@ -1601,11 +1697,19 @@ csvImporting = false;
       leadSource = 'Other';
     }
 
+    // A stored category not in the current list is kept as a custom "Other" value.
+    this.customCategory = '';
+    let dealCategory = lead.dealCategory || 'Implementation & Deployment';
+    if (dealCategory && !this.DEAL_CATEGORIES.some(c => c.id === dealCategory)) {
+      this.customCategory = dealCategory;
+      dealCategory = 'Other';
+    }
+
     this.newLeadData = {
       leadCode: lead.leadCode || '',
       title: lead.title || '',
       subjectLine: lead.subjectLine || '',
-      dealCategory: lead.dealCategory || 'Inbound',
+      dealCategory: dealCategory,
       companyName: lead.companyName || '',
       contactName: lead.contactName || '',
       email: lead.email || '',
@@ -1622,7 +1726,8 @@ csvImporting = false;
       broughtByContactId: (lead as any).broughtByContact?.id || (lead as any).broughtByContactId || null,
       description: lead.description || '',
       qualificationReason: lead.qualificationReason || '',
-      expectedCloseDate: lead.expectedCloseDate ? lead.expectedCloseDate.split('T')[0] : ''
+      expectedCloseDate: lead.expectedCloseDate ? lead.expectedCloseDate.split('T')[0] : '',
+      flow: (lead as any).flow === 'PRE_SALES' ? 'PRE_SALES' : 'SALES'
     };
     // Re-split the stored international number into dial code + local part.
     this.applyPhone(this.newLeadData.phone || '');
@@ -1656,6 +1761,7 @@ csvImporting = false;
     this.isEditing = false;
     this.editingLeadId = null;
     this.customSource = '';
+    this.customCategory = '';
     this.saveContactFromLead = null;
   }
 
@@ -1710,9 +1816,10 @@ csvImporting = false;
       return;
     }
 
-    // Validation: Stage, Source, Deal Value, and Close Date are required on tab 2
+    // Validation: Stage, Source, Lead Category, Deal Value, and Close Date are required on tab 2
     const isTab2Valid = this.newLeadData.status?.trim()
       && this.newLeadData.source?.trim()
+      && this.newLeadData.dealCategory?.trim()
       && this.newLeadData.value !== null && this.newLeadData.value !== undefined
       && this.newLeadData.expectedCloseDate;
 
@@ -1738,6 +1845,9 @@ csvImporting = false;
     }
     if (payload.source === 'Other' && this.customSource.trim()) {
       payload.source = this.customSource.trim();
+    }
+    if (payload.dealCategory === 'Other' && this.customCategory.trim()) {
+      payload.dealCategory = this.customCategory.trim();
     }
 
     if (this.isEditing && this.editingLeadId) {
@@ -1824,6 +1934,12 @@ csvImporting = false;
     'on-hold': '#64748b',
     'win': '#059669',
     'lost': '#dc2626',
+    'new-lead': '#2563eb',
+    'requirement-gathering': '#0891b2',
+    'solutioning-demo': '#7c3aed',
+    'proposal-technical-validation': '#d97706',
+    'poc': '#ea580c',
+    'converted-won': '#059669',
   };
 
   statusDotColor(status: string): string {
@@ -1948,6 +2064,26 @@ csvImporting = false;
     }
   }
 
+  // The pre-sales deal whose "Convert to Sales Lead" request is in flight.
+  convertingLeadId: number | null = null;
+
+  convertToSalesLead(lead: Lead, event?: Event) {
+    if (event) event.stopPropagation();
+    if (this.convertingLeadId) return;
+    this.convertingLeadId = lead.id;
+    this.http.post(`${environment.apiUrl}/crm/leads/${lead.id}/convert-to-sales`, {}).subscribe({
+      next: () => {
+        this.convertingLeadId = null;
+        this.toast.success('Pre-sales deal converted to a Sales Lead.');
+        this.loadLeads();
+      },
+      error: (err) => {
+        this.convertingLeadId = null;
+        this.toast.error(err?.error?.message || 'Failed to convert the pre-sales deal.');
+      }
+    });
+  }
+
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FOLLOW-UP MANAGEMENT METHODS
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -1977,6 +2113,7 @@ csvImporting = false;
       stage: this.normalizeStatus(lead.status)
     };
     this.pendingFollowUpFiles = [];
+    this.syncFollowUpParts();
 
     this.loadLeadFollowUps(lead.id);
   }
@@ -2072,11 +2209,14 @@ csvImporting = false;
     }
     const tzOffset = d.getTimezoneOffset() * 60000;
     this.newFollowUp.scheduledAt = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
+    this.syncFollowUpParts();
   }
 
   createFollowUp() {
     if (!this.selectedLead) return;
-    if (!this.newFollowUp.title.trim() || !this.newFollowUp.scheduledAt) {
+    const scheduled = this.newFollowUp.scheduledAt || '';
+    const hasFullSchedule = scheduled.includes('T') && scheduled.length >= 16;
+    if (!this.newFollowUp.title.trim() || !hasFullSchedule) {
       alert('Please enter a follow-up title and scheduled date & time.');
       return;
     }
@@ -2186,7 +2326,7 @@ csvImporting = false;
       case 'PENDING':
       case 'COMPLETED':
       case '':
-      case 'NEW': return 'New';
+      case 'NEW': return this.boardFlow === 'PRE_SALES' ? 'New Lead' : 'New';
       case 'CANCELLED':
       case 'LOST': return 'Lost';
       default: return this.normalizeStatus(status);

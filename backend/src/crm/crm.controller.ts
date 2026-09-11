@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Request, Query, UseGuards, ParseIntPipe, ForbiddenException, UseInterceptors, UploadedFile, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Request, Query, UseGuards, ParseIntPipe, ForbiddenException, UseInterceptors, UploadedFile, HttpException, HttpStatus } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -73,8 +73,13 @@ export class CrmController {
   }
 
   @Get('leads')
-  getLeads(@Request() req) {
-    return this.crmService.getLeads(req.user.companyId, req.user);
+  getLeads(@Request() req, @Query('flow') flow?: string) {
+    return this.crmService.getLeads(req.user.companyId, req.user, flow);
+  }
+
+  @Post('leads/:id/convert-to-sales')
+  convertPreSaleToSales(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.crmService.convertPreSaleToSales(req.user.companyId, id, req.user.employeeId);
   }
 
   @Get('leads/dashboard')
@@ -198,6 +203,16 @@ export class CrmController {
     @Param('fileId', ParseIntPipe) fileId: number,
   ) {
     return this.crmService.deleteLeadFile(req.user.companyId, id, fileId);
+  }
+
+  @Patch('leads/:id/files/:fileId')
+  renameLeadFile(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @Body('fileName') fileName: string,
+  ) {
+    return this.crmService.renameLeadFile(req.user.companyId, id, fileId, fileName);
   }
 
   // ═══════════════════════════════════════════

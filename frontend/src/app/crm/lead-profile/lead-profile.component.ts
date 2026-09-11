@@ -15,6 +15,7 @@ import {
   LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock
 } from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
+import { ClientsService } from '../../services/clients';
 
 interface PipelineStage {
   key: string;
@@ -43,6 +44,7 @@ export class LeadProfileComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dialog = inject(DialogService);
+  private clientsService = inject(ClientsService);
 
   lead: any = null;
   leadId: number | null = null;
@@ -98,6 +100,30 @@ export class LeadProfileComponent implements OnInit {
     contactEmail: '',
     title: ''
   };
+  followUpDatePart = '';
+  followUpTimePart = '';
+  private syncFollowUpParts() {
+    const at = (this.followUpForm.scheduledAt as string) || '';
+    this.followUpDatePart = at.length >= 10 ? at.slice(0, 10) : '';
+    this.followUpTimePart = at.length >= 16 ? at.slice(11, 16) : '';
+  }
+  private syncScheduledAtFromParts() {
+    if (this.followUpDatePart && this.followUpTimePart) {
+      this.followUpForm.scheduledAt = `${this.followUpDatePart}T${this.followUpTimePart}`;
+    } else if (this.followUpDatePart) {
+      this.followUpForm.scheduledAt = this.followUpDatePart;
+    } else {
+      this.followUpForm.scheduledAt = this.followUpTimePart || this.followUpForm.scheduledAt;
+    }
+  }
+  setFollowUpDatePart(value: string) {
+    this.followUpDatePart = value || '';
+    this.syncScheduledAtFromParts();
+  }
+  setFollowUpTimePart(value: string) {
+    this.followUpTimePart = (value || '').slice(0, 5);
+    this.syncScheduledAtFromParts();
+  }
   isEditingFollowUp = false;
   followUpTab: 'schedule' | 'history' = 'schedule';
   followUpStageMenuOpen = false;
@@ -109,6 +135,21 @@ export class LeadProfileComponent implements OnInit {
 
   // Must stay in step with LEAD_STATUSES on the leads board.
   readonly LEAD_STATUSES = ['New', 'Interested', 'Proposal Sent', 'Schedule Meeting', 'Negotiation', 'Win', 'On Hold', 'Lost'];
+
+  // Pre-sales pipeline stages, mirroring the leads board.
+  readonly PRE_SALES_STATUSES = [
+    'New Lead', 'Requirement Gathering', 'Solutioning / Demo',
+    'Proposal / Technical Validation', 'POC', 'Converted / Won', 'Lost'
+  ];
+
+  // Stage list shown in the follow-up modal / table; resolved per deal flow.
+  get activeStatuses(): string[] {
+    return this.isPreSalesLead ? this.PRE_SALES_STATUSES : this.LEAD_STATUSES;
+  }
+
+  get isPreSalesLead(): boolean {
+    return this.lead?.flow === 'PRE_SALES';
+  }
 
   // Note form
   noteForm: any = { id: null, content: '' };
@@ -307,6 +348,7 @@ export class LeadProfileComponent implements OnInit {
       contactEmail: fu.contactEmail || '',
       stage: this.normalizeStatus(this.lead?.status)
     };
+    this.syncFollowUpParts();
     this.pendingFollowUpFiles = [];
     this.showFollowUpModal = true;
   }
@@ -320,7 +362,9 @@ export class LeadProfileComponent implements OnInit {
 
   saveFollowUp() {
     if (this.leadId == null) return;
-    if (!this.followUpForm.scheduledAt || !(this.followUpForm.title || '').trim()) {
+    const scheduled = (this.followUpForm.scheduledAt as string) || '';
+    const hasFullSchedule = scheduled.includes('T') && scheduled.length >= 16;
+    if (!hasFullSchedule || !(this.followUpForm.title || '').trim()) {
       this.dialog.error('Please fill in the follow-up title and scheduled date & time.');
       return;
     }
@@ -447,6 +491,7 @@ export class LeadProfileComponent implements OnInit {
     }
     const tzOffset = d.getTimezoneOffset() * 60000;
     this.followUpForm.scheduledAt = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
+    this.syncFollowUpParts();
   }
 
   onFollowUpFilesSelected(event: Event) {
@@ -567,8 +612,25 @@ export class LeadProfileComponent implements OnInit {
   }
 
   normalizeStatus(status: string | undefined | null): string {
-    if (!status) return 'New';
-    const s = status.trim().toUpperCase();
+    const raw = String(status || '').trim();
+
+    // Pre-sales pipeline: resolve its own stage names (plus legacy spellings)
+    // and never let the sales mappings recast them.
+    if (this.isPreSalesLead) {
+      if (!raw) return 'New Lead';
+      const s = raw.toUpperCase();
+      const direct = this.PRE_SALES_STATUSES.find(
+        st => st.toUpperCase() === s || st.toUpperCase() === s.replace(/_+/g, ' ').replace(/\s+/g, ' ')
+      );
+      if (direct) return direct;
+      if (s === 'NEW') return 'New Lead';
+      if (s === 'CONVERTED' || s === 'WON' || s === 'WIN') return 'Converted / Won';
+      if (s === 'LOST') return 'Lost';
+      return 'New Lead';
+    }
+
+    if (!raw) return 'New';
+    const s = raw.toUpperCase();
     if (s === 'NEW') return 'New';
     if (s === 'INTERESTED' || s === 'QUALIFIED' || s === 'ASSIGNED' || s === 'CONTACTED' || s === 'ATTEMPTED TO CONTACT' || s === 'CONNECTED' || s === 'FOLLOW-UP REQUIRED' || s === 'FOLLOW_UP_REQUIRED') return 'Interested';
     if (s === 'PROPOSAL' || s === 'PROPOSAL SENT' || s === 'PROPOSAL_SENT' || s === 'DEMO SCHEDULED' || s === 'DEMO COMPLETED') return 'Proposal Sent';
@@ -577,7 +639,7 @@ export class LeadProfileComponent implements OnInit {
     if (s === 'CONVERTED' || s === 'WON' || s === 'WIN') return 'Win';
     if (s === 'LOST') return 'Lost';
     if (s === 'SCHEDULE MEETING' || s === 'SCHEDULE_MEETING') return 'Schedule Meeting';
-    const directMatch = this.LEAD_STATUSES.find(st => st.toLowerCase() === status.toLowerCase());
+    const directMatch = this.LEAD_STATUSES.find(st => st.toLowerCase() === raw.toLowerCase());
     if (directMatch) return directMatch;
     return 'New';
   }
@@ -594,7 +656,7 @@ export class LeadProfileComponent implements OnInit {
       case 'PENDING':
       case 'COMPLETED':
       case '':
-      case 'NEW': return 'New';
+      case 'NEW': return this.isPreSalesLead ? 'New Lead' : 'New';
       case 'CANCELLED':
       case 'LOST': return 'Lost';
       default: return this.normalizeStatus(status);
@@ -610,6 +672,12 @@ export class LeadProfileComponent implements OnInit {
     'on-hold': '#64748b',
     'win': '#059669',
     'lost': '#dc2626',
+    'new-lead': '#2563eb',
+    'requirement-gathering': '#0891b2',
+    'solutioning-demo': '#7c3aed',
+    'proposal-technical-validation': '#d97706',
+    'poc': '#ea580c',
+    'converted-won': '#059669',
   };
 
   statusDotColor(status: string): string {
@@ -940,6 +1008,188 @@ export class LeadProfileComponent implements OnInit {
 
   goToQuotations() {
     this.router.navigate(['/sales/quotations']);
+  }
+
+  // ═══════════════════════════════════════════
+  // PROPOSALS (quotations created for this lead)
+  // ═══════════════════════════════════════════
+
+  clients: any[] = [];
+  showProposalModal = false;
+  isSavingProposal = false;
+  isProposalSubmitted = false;
+  uploadingProposalCount = 0;
+  readonly proposalUnitOptions = ['number', 'piece', 'hour', 'day', 'kg', 'litre', 'meter', 'roll', 'box', 'bundle'];
+  readonly proposalTaxOptions = [0, 5, 12, 18, 28];
+  readonly proposalMaxAttachments = 8;
+  readonly proposalMaxAttachmentBytes = 20 * 1024 * 1024;
+
+  proposalForm: any = this.freshProposalForm();
+
+  private static readonly PROPOSAL_DEFAULT_TERMS =
+    '1. Validity: This proposal is valid for the period stated above.\n' +
+    '2. Payment Terms: 50% advance against Purchase Order and balance before dispatch / on delivery.\n' +
+    '3. Taxes: Prices are exclusive of GST unless stated otherwise. GST will be charged at the applicable rate.\n' +
+    '4. Delivery: Delivery/implementation timelines will be communicated upon order confirmation.\n' +
+    '5. Warranty: Standard manufacturer warranty applies from the date of delivery.\n' +
+    '6. Force Majeure: Neither party shall be liable for delays caused by events beyond reasonable control.\n' +
+    '7. Acceptance: This proposal is subject to our standard terms of sale and acceptance of a Purchase Order.\n' +
+    '8. Governing Law: This proposal shall be governed by the laws of India and subject to jurisdiction of the courts.';
+
+  private freshProposalForm() {
+    return {
+      clientId: (this.lead?.client?.id ?? null) as number | null,
+      leadId: this.leadId,
+      date: new Date().toISOString().split('T')[0],
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      currency: this.lead?.currency || 'INR',
+      taxRate: 18,
+      notes: '',
+      terms: LeadProfileComponent.PROPOSAL_DEFAULT_TERMS,
+      items: [{ description: '', quantity: 1, unit: 'number', unitPrice: 0 }],
+      attachments: []
+    };
+  }
+
+  openNewProposal() {
+    this.isProposalSubmitted = false;
+    this.uploadingProposalCount = 0;
+    this.proposalForm = this.freshProposalForm();
+    this.showProposalModal = true;
+    this.loadProposalClients();
+  }
+
+  closeProposalModal() {
+    this.showProposalModal = false;
+    this.isProposalSubmitted = false;
+  }
+
+  private loadProposalClients() {
+    this.clientsService.getClients('ACTIVE').subscribe((data: any[]) => {
+      this.clients = (data || []).filter(c => c.id !== (this.lead?.client?.id ?? null));
+    });
+  }
+
+  addProposalItem() {
+    this.proposalForm.items.push({ description: '', quantity: 1, unit: 'number', unitPrice: 0 });
+  }
+
+  removeProposalItem(index: number) {
+    if (this.proposalForm.items.length > 1) {
+      this.proposalForm.items.splice(index, 1);
+    }
+  }
+
+  get proposalSubtotal(): number {
+    return this.proposalForm.items.reduce((s: number, i: any) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
+  }
+
+  get proposalTax(): number {
+    const rate = Number(this.proposalForm.taxRate) || 0;
+    return this.proposalSubtotal * (rate / 100);
+  }
+
+  get proposalTotal(): number {
+    return this.proposalSubtotal + this.proposalTax;
+  }
+
+  proposalCurrencySymbol(): string {
+    const map: Record<string, string> = { INR: '\u20B9', USD: '$', EUR: '\u20AC', GBP: '\u00A3' };
+    return map[this.proposalForm.currency] || '\u20B9';
+  }
+
+  private proposalFileExtension(name: string): string {
+    const i = (name || '').lastIndexOf('.');
+    return i === -1 ? '' : name.slice(i).toLowerCase();
+  }
+
+  isProposalImage(fileName: string): boolean {
+    return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic']
+      .includes(this.proposalFileExtension(fileName));
+  }
+
+  proposalFileType(fileName: string): string {
+    return this.proposalFileExtension(fileName).replace('.', '').toUpperCase() || 'FILE';
+  }
+
+  proposalFileClass(fileName: string): string {
+    const ext = this.proposalFileExtension(fileName);
+    if (['.pdf'].includes(ext)) return 'file-pdf';
+    if (['.doc', '.docx', '.odt', '.rtf'].includes(ext)) return 'file-doc';
+    if (['.xls', '.xlsx', '.ods', '.csv'].includes(ext)) return 'file-sheet';
+    if (['.ppt', '.pptx', '.odp'].includes(ext)) return 'file-slide';
+    if (['.zip', '.rar', '.7z'].includes(ext)) return 'file-archive';
+    return 'file-generic';
+  }
+
+  onProposalAttachments(event: Event) {
+    const files: File[] = Array.from((event.target as HTMLInputElement).files || []);
+    if (!files.length) return;
+    this.uploadProposalAttachments(files);
+    if (event.target) (event.target as HTMLInputElement).value = '';
+  }
+
+  removeProposalAttachment(index: number) {
+    if (this.uploadingProposalCount > 0) return;
+    this.proposalForm.attachments.splice(index, 1);
+  }
+
+  private uploadProposalAttachments(files: File[]) {
+    const remaining = this.proposalMaxAttachments - this.proposalForm.attachments.length - this.uploadingProposalCount;
+    if (remaining <= 0) {
+      this.dialog.error(`You can attach at most ${this.proposalMaxAttachments} files.`);
+      return;
+    }
+    const accepted = files.slice(0, remaining);
+    if (files.length > remaining) {
+      this.dialog.error(`Only ${remaining} more file${remaining === 1 ? '' : 's'} can be attached.`);
+    }
+
+    for (const file of accepted) {
+      if (file.size > this.proposalMaxAttachmentBytes) {
+        this.dialog.error(`"${file.name}" is larger than 20MB.`);
+        continue;
+      }
+      this.uploadingProposalCount++;
+      const form = new FormData();
+      form.append('file', file);
+      this.http.post<{ url: string }>(`${environment.apiUrl}/upload`, form).subscribe({
+        next: (res) => {
+          this.proposalForm.attachments = [
+            ...this.proposalForm.attachments,
+            { fileName: file.name, fileUrl: res.url, fileSize: file.size }
+          ];
+          this.uploadingProposalCount--;
+        },
+        error: () => {
+          this.dialog.error(`Failed to upload "${file.name}".`);
+          this.uploadingProposalCount--;
+        }
+      });
+    }
+  }
+
+  saveProposal() {
+    this.isProposalSubmitted = true;
+    if (!this.proposalForm.clientId || !this.proposalForm.items.length) return;
+    if (this.uploadingProposalCount > 0) {
+      this.dialog.error('Please wait for all attachments to finish uploading.');
+      return;
+    }
+
+    this.isSavingProposal = true;
+    this.http.post(`${environment.apiUrl}/sales/quotations`, this.proposalForm).subscribe({
+      next: () => {
+        this.isSavingProposal = false;
+        this.closeProposalModal();
+        this.dialog.success('Proposal created successfully.');
+        this.loadLead(this.leadId!);
+      },
+      error: (err) => {
+        this.isSavingProposal = false;
+        this.dialog.error(err?.error?.message || 'Failed to create proposal.');
+      }
+    });
   }
 
   goBack() {

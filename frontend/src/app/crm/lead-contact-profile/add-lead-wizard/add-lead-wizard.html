@@ -192,10 +192,28 @@
         </div>
 
         <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.dealCategory?.trim()">
+            <label>Lead Category <span class="required-asterisk">*</span></label>
+            <select [(ngModel)]="newLeadData.dealCategory" [disabled]="isSaving" class="enhanced-select">
+              <option *ngFor="let cat of DEAL_CATEGORIES" [value]="cat.id">{{cat.name}}</option>
+            </select>
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.dealCategory?.trim()">Lead Category is required.</span>
+            <input
+              *ngIf="newLeadData.dealCategory === 'Other'"
+              type="text"
+              [(ngModel)]="customCategory"
+              placeholder="Specify custom Lead Category..."
+              style="margin-top: 8px;"
+              [disabled]="isSaving"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
           <div class="form-group" [class.has-error]="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined)">
-            <label>Expected Deal Value <span class="required-asterisk">*</span></label>
+            <label>Expected Lead Value <span class="required-asterisk">*</span></label>
             <div class="input-with-prefix">
-              <span class="currency-symbol-addon">$</span>
+              <span class="currency-symbol-addon">₹</span>
               <input
                 type="number"
                 min="0"
