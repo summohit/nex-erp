@@ -1867,8 +1867,21 @@ input:checked + .toggle-slider:before {
 
 .fu-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
+}
+/* Fluid columns: flexible cells take remaining space, nowrap cells keep size,
+   so the action column stays on-screen (no horizontal clipping of buttons). */
+.fu-table th.col-nowrap,
+.fu-table td.col-nowrap {
+  width: auto;
+  white-space: nowrap;
+}
+.fu-table th.col-flex,
+.fu-table td.col-flex {
+  width: auto;
+  min-width: 120px;
 }
 .fu-table th {
   text-align: left;
@@ -3410,4 +3423,201 @@ input:checked + .toggle-slider:before {
 
 .followup-file-links a:hover {
   text-decoration: underline;
+}
+/* ==========================================================================
+   FOLLOW-UPS TABLE — STICKY ACTION COLUMN + VISIBLE ICON BUTTONS
+   ========================================================================== */
+
+/* Pin the action column to the right edge of the scroll area so the
+   icon buttons are always visible, mirroring the leads board table. */
+.lead-followups-table-wrap .fu-table th.col-actions-sticky,
+.lead-followups-table-wrap .fu-table td.col-actions-sticky {
+  position: sticky;
+  right: 0;
+  z-index: 5;
+  min-width: 132px;
+  background: #f8fafc;
+  box-shadow: -4px 0 8px rgba(16, 24, 40, 0.08);
+  white-space: nowrap;
+}
+.lead-followups-table-wrap .fu-table td.col-actions-sticky {
+  vertical-align: middle;
+}
+.lead-followups-table-wrap .fu-table th.col-actions-sticky {
+  z-index: 6;
+  background: #f8fafc;
+}
+.lead-followups-table-wrap .fu-table td.col-actions-sticky {
+  background: #ffffff;
+}
+.lead-followups-table-wrap .fu-table tr:hover td.col-actions-sticky {
+  background: #ffffff;
+}
+.lead-followups-table-wrap .fu-table tr.row-overdue td.col-actions-sticky {
+  background: #fff8f6;
+}
+
+/* Visible square icon buttons for follow-up row actions */
+.lead-followups-table-wrap .fu-table .table-actions-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.lead-followups-table-wrap .fu-table .btn-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  pointer-events: auto;
+  position: relative;
+  z-index: 7;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.lead-followups-table-wrap .fu-table .btn-action-icon:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+.lead-followups-table-wrap .fu-table .btn-action-icon.danger-action {
+  margin-left: 0;
+  color: #dc2626;
+}
+.lead-followups-table-wrap .fu-table .btn-action-icon.danger-action:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.lead-followups-table-wrap .fu-table .btn-action-icon:active {
+  transform: scale(0.95);
+}
+.lead-followups-table-wrap .fu-table .btn-action-icon:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* PENDING FOLLOW-UP FILE RENAME - PROFILE - PLACEHOLDER */
+.pending-file-chip .chip-file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.pending-file-chip .chip-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.pending-file-chip .chip-icon-btn:hover {
+  color: #334155;
+  background: #e2e8f0;
+}
+.pending-file-chip .chip-icon-btn.chip-del-btn:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}
+.pending-file-chip .chip-icon-btn.color-ok:hover {
+  color: #059669;
+  background: #d1fae5;
+}
+.pending-file-chip .chip-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.pending-file-chip .chip-rename-input {
+  width: 160px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 12px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+}
+.pending-file-chip .chip-rename-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
+}
+/* FOLLOW-UP 3-DOT ACTION MENU - PLACEHOLDER */
+.lead-followups-table-wrap .fu-actions-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.lead-followups-table-wrap .fu-actions-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.lead-followups-table-wrap .fu-actions-trigger:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+.fu-actions-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 160px;
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px -6px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+.fu-actions-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.fu-actions-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.fu-actions-item.danger {
+  color: #dc2626;
+}
+.fu-actions-item.danger:hover {
+  background: #fee2e2;
+  color: #b91c1c;
 }

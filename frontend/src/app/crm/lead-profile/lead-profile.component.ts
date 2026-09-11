@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, HostListener, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
@@ -125,13 +125,23 @@ export class LeadProfileComponent implements OnInit {
     this.syncScheduledAtFromParts();
   }
   isEditingFollowUp = false;
+  isViewingFollowUp = false;
   followUpTab: 'schedule' | 'history' = 'schedule';
   followUpStageMenuOpen = false;
   followUpTableStageMenu: number | null = null;
+  followUpActionsMenu: any | null = null;
+  followUpActionsMenuPos: { top: number; left: number } = { top: 0, left: 0 };
+
+  @HostListener('document:click')
+  onDocumentClick() {
+    this.followUpActionsMenu = null;
+  }
   isSavingFollowUp = false;
   isUploadingFollowUpFiles = false;
   pendingFollowUpFiles: File[] = [];
   followUpStatusSaving: Record<number, boolean> = {};
+  renamingFollowUpFileIndex: number | null = null;
+  renameFollowUpFileName = '';
 
   // Must stay in step with LEAD_STATUSES on the leads board.
   readonly LEAD_STATUSES = ['New', 'Interested', 'Proposal Sent', 'Schedule Meeting', 'Negotiation', 'Win', 'On Hold', 'Lost'];
@@ -315,8 +325,10 @@ export class LeadProfileComponent implements OnInit {
 
   openNewFollowUp() {
     this.isEditingFollowUp = false;
+    this.isViewingFollowUp = false;
     this.followUpTab = 'schedule';
     this.followUpStageMenuOpen = false;
+    this.followUpActionsMenu = null;
     this.followUpForm = {
       id: null,
       title: this.lead ? `Follow-up with ${this.lead.contactName || this.lead.companyName || 'Client'}` : '',
@@ -335,8 +347,10 @@ export class LeadProfileComponent implements OnInit {
 
   openEditFollowUp(fu: any) {
     this.isEditingFollowUp = true;
+    this.isViewingFollowUp = false;
     this.followUpTab = 'schedule';
     this.followUpStageMenuOpen = false;
+    this.followUpActionsMenu = null;
     this.followUpForm = {
       id: fu.id,
       title: fu.title || 'Follow-up',
@@ -353,11 +367,62 @@ export class LeadProfileComponent implements OnInit {
     this.showFollowUpModal = true;
   }
 
+  viewFollowUp(fu: any) {
+    this.isEditingFollowUp = false;
+    this.isViewingFollowUp = true;
+    this.followUpTab = 'schedule';
+    this.followUpStageMenuOpen = false;
+    this.followUpActionsMenu = null;
+    this.followUpForm = {
+      id: fu.id,
+      title: fu.title || 'Follow-up',
+      type: fu.type,
+      scheduledAt: this.toLocalDateTime(new Date(fu.scheduledAt)),
+      notes: fu.notes || '',
+      contactPerson: fu.contactPerson || '',
+      contactPhone: fu.contactPhone || '',
+      contactEmail: fu.contactEmail || '',
+      stage: this.normalizeStatus(this.lead?.status)
+    };
+    this.syncFollowUpParts();
+    this.pendingFollowUpFiles = [];
+    this.showFollowUpModal = true;
+  }
+
+  toggleFollowUpActionsMenu(fu: any, event: Event) {
+    if (event) event.stopPropagation();
+    if (this.followUpActionsMenu?.id === fu.id) {
+      this.followUpActionsMenu = null;
+      return;
+    }
+    this.followUpTableStageMenu = null;
+    const btn = (event.target as HTMLElement).closest('.fu-actions-trigger') as HTMLElement | null;
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      const menuWidth = 160;
+      const menuHeight = 128;
+      let left = rect.right - menuWidth;
+      left = Math.min(Math.max(left, 8), window.innerWidth - menuWidth - 8);
+      const spaceBelow = window.innerHeight - rect.bottom - 6;
+      const top = spaceBelow >= menuHeight ? rect.bottom + 6 : Math.max(8, rect.top - menuHeight - 6);
+      this.followUpActionsMenuPos = { top, left };
+    }
+    this.followUpActionsMenu = fu;
+  }
+
+  closeFollowUpActionsMenu() {
+    this.followUpActionsMenu = null;
+  }
+
   closeFollowUpModal() {
     this.showFollowUpModal = false;
     this.followUpStageMenuOpen = false;
     this.followUpTableStageMenu = null;
+    this.followUpActionsMenu = null;
+    this.isViewingFollowUp = false;
     this.pendingFollowUpFiles = [];
+    this.renamingFollowUpFileIndex = null;
+    this.renameFollowUpFileName = '';
   }
 
   saveFollowUp() {
@@ -442,6 +507,7 @@ export class LeadProfileComponent implements OnInit {
   // Stage column in the follow-up table — keeps the follow-up and the lead in sync.
   toggleFollowUpTableStageMenu(fu: any, event: Event) {
     if (event) event.stopPropagation();
+    this.followUpActionsMenu = null;
     this.followUpTableStageMenu = this.followUpTableStageMenu === fu.id ? null : fu.id;
   }
 
@@ -502,6 +568,28 @@ export class LeadProfileComponent implements OnInit {
 
   removePendingFollowUpFile(index: number) {
     this.pendingFollowUpFiles.splice(index, 1);
+    if (this.renamingFollowUpFileIndex === index) this.cancelRenameFollowUpFile();
+    else if (this.renamingFollowUpFileIndex != null && index < this.renamingFollowUpFileIndex) this.renamingFollowUpFileIndex--;
+  }
+
+  startRenameFollowUpFile(index: number) {
+    this.renamingFollowUpFileIndex = index;
+    this.renameFollowUpFileName = this.pendingFollowUpFiles[index]?.name || '';
+  }
+
+  saveRenameFollowUpFile() {
+    const i = this.renamingFollowUpFileIndex;
+    const newName = (this.renameFollowUpFileName || '').trim();
+    this.cancelRenameFollowUpFile();
+    if (i == null || i < 0 || i >= this.pendingFollowUpFiles.length) return;
+    const original = this.pendingFollowUpFiles[i];
+    if (!newName || newName === original.name) return;
+    this.pendingFollowUpFiles[i] = new File([original], newName, { type: original.type, lastModified: original.lastModified });
+  }
+
+  cancelRenameFollowUpFile() {
+    this.renamingFollowUpFileIndex = null;
+    this.renameFollowUpFileName = '';
   }
 
   uploadFollowUpFiles(followUpId: number, files: File[]) {

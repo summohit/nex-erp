@@ -3193,10 +3193,8 @@ textarea:focus {
   border-color: #e2e8f0;
 }
 .action-menu {
-  position: absolute;
-  z-index: 80;
-  top: calc(100% + 6px);
-  right: 0;
+  position: fixed;
+  z-index: 9999;
   min-width: 160px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -6244,3 +6242,98 @@ textarea:focus {
 }
 
 .purchase-order-modal { max-width: 520px; }
+/* PENDING FOLLOW-UP FILE RENAME - PLACEHOLDER */
+.pending-file-chip .chip-file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.pending-file-chip .chip-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.pending-file-chip .chip-icon-btn:hover {
+  color: #334155;
+  background: #e2e8f0;
+}
+.pending-file-chip .chip-icon-btn.chip-del-btn:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}
+.pending-file-chip .chip-icon-btn.color-ok:hover {
+  color: #059669;
+  background: #d1fae5;
+}
+.pending-file-chip .chip-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.pending-file-chip .chip-rename-input {
+  width: 160px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 12px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+}
+.pending-file-chip .chip-rename-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
+}
+
+/* ── Contact-profile links ─────────────────────────────────────────── */
+.lead-contact-name-link {
+  display: block;
+  font-weight: 500;
+  font-size: inherit;
+  font-family: inherit;
+  color: #2563eb;
+  background: none;
+  border: none;
+  padding: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  cursor: pointer;
+}
+.lead-contact-name-link:hover { color: #1d4ed8; text-decoration: underline; }
+
+/* Modal header contact chip — clickable variant */
+.ldm-contact-chip-link { cursor: pointer; }
+.ldm-contact-chip-link:hover { color: #c2410c !important; text-decoration: underline; }
+
+/* Modal "Primary Contact Name" value as link button */
+.ldm-info-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.ldm-info-link:hover { text-decoration: underline; }
+
+/* Modal "External Lead Contact" owner card — clickable */
+.ldm-contact-card-link { cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; }
+.ldm-contact-card-link:hover { border-color: #fdba74; box-shadow: 0 4px 14px -6px rgba(234,88,12,.25); }

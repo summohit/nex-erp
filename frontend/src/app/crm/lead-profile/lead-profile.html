@@ -189,13 +189,13 @@
               <table class="fu-table">
                 <thead>
                   <tr>
-                    <th style="width: 150px;">Type</th>
-                    <th style="width: 240px;">Objective / Notes</th>
-                    <th style="width: 240px;">Contact Details</th>
-                    <th style="width: 250px;">Scheduled For</th>
-                    <th style="width: 180px;">Attachments</th>
-                    <th style="width: 160px;">Stage</th>
-                    <th style="width: 130px;">Action</th>
+                    <th class="col-nowrap">Type</th>
+                    <th class="col-flex">Objective / Notes</th>
+                    <th class="col-flex">Contact Details</th>
+                    <th class="col-nowrap">Scheduled For</th>
+                    <th class="col-flex">Attachments</th>
+                    <th class="col-nowrap">Stage</th>
+                    <th class="col-nowrap col-actions-sticky">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -215,13 +215,13 @@
                         <span>{{ getFollowUpTypeBadge(fu.type).label }}</span>
                       </span>
                     </td>
-                    <td>
+                    <td class="col-flex">
                       <div class="objective-cell">
                         <span class="fu-title-text" [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)">{{ fu.title || 'Follow-up' }}</span>
                         <span class="fu-notes-snippet" *ngIf="fu.notes" [title]="fu.notes">"{{ fu.notes }}"</span>
                       </div>
                     </td>
-                    <td>
+                    <td class="col-flex">
                       <div class="contact-details-cell">
                         <span class="contact-name" *ngIf="fu.contactPerson"><svg lucideUser size="12"></svg> {{ fu.contactPerson }}</span>
                         <a class="contact-link" *ngIf="fu.contactPhone" [href]="'tel:' + fu.contactPhone"><svg lucidePhone size="12"></svg> {{ fu.contactPhone }}</a>
@@ -242,7 +242,7 @@
                         <span class="relative-pill pill-tomorrow" *ngIf="isFollowUpTomorrow(fu.scheduledAt)">Tomorrow</span>
                       </div>
                     </td>
-                    <td>
+                    <td class="col-flex">
                       <div class="followup-file-links" *ngIf="fu.files?.length; else noFollowUpFiles">
                         <a *ngFor="let file of fu.files" [href]="file.fileUrl" target="_blank" rel="noopener" [title]="'Open ' + file.fileName"><svg lucideFileText size="12"></svg> {{ file.fileName }}</a>
                       </div>
@@ -270,16 +270,29 @@
                         <span class="fup-status-saving" *ngIf="followUpStatusSaving[fu.id]"><svg lucideLoader2 size="13" class="spin-icon"></svg></span>
                       </div>
                     </td>
-                    <td>
-                      <div class="table-actions-group">
-                        <button class="btn-action-icon" title="Edit" (click)="openEditFollowUp(fu)"><svg lucideEdit size="15"></svg></button>
-                        <button class="btn-action-icon" title="Mark as Completed" *ngIf="fu.status !== 'COMPLETED'" (click)="markFollowUpComplete(fu)"><svg lucideCheckCircle size="15"></svg></button>
-                        <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFollowUp(fu)"><svg lucideTrash2 size="15"></svg></button>
-                      </div>
-                    </td>
+                    <td class="col-actions-sticky">
+                      <button type="button" class="fu-actions-trigger" title="Actions" (click)="toggleFollowUpActionsMenu(fu, $event)">
+                        <svg lucideMoreVertical size="16"></svg>
+                      </button>
+                  </td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Floating 3-dot action menu: rendered outside the table so it
+                 always overlays the section and is never clipped or covered
+                 by later rows' sticky cells. Positioned via the trigger rect. -->
+            <div class="fu-actions-menu" *ngIf="followUpActionsMenu" [ngStyle]="{'top.px': followUpActionsMenuPos.top, 'left.px': followUpActionsMenuPos.left}">
+              <button type="button" class="fu-actions-item" (click)="viewFollowUp(followUpActionsMenu); closeFollowUpActionsMenu()">
+                <svg lucideEye size="14"></svg> View
+              </button>
+              <button type="button" class="fu-actions-item" (click)="openEditFollowUp(followUpActionsMenu); closeFollowUpActionsMenu()">
+                <svg lucideEdit size="14"></svg> Edit
+              </button>
+              <button type="button" class="fu-actions-item danger" (click)="deleteFollowUp(followUpActionsMenu); closeFollowUpActionsMenu()">
+                <svg lucideTrash2 size="14"></svg> Delete
+              </button>
             </div>
 
             <div class="empty-state-box" *ngIf="!followUps.length">
@@ -441,28 +454,28 @@
           <div *ngIf="followUpTab === 'schedule'" class="fum-schedule-form">
             <div class="form-group">
               <label>Follow-Up Title / Purpose <span class="required-asterisk">*</span></label>
-              <input type="text" [(ngModel)]="followUpForm.title" placeholder="e.g. Discuss revised pricing quote & implementation timeline" [disabled]="isSavingFollowUp" />
+              <input type="text" [(ngModel)]="followUpForm.title" placeholder="e.g. Discuss revised pricing quote & implementation timeline" [disabled]="isSavingFollowUp || isViewingFollowUp" />
             </div>
 
             <div class="form-group">
               <label>Follow-Up Medium / Type</label>
               <div class="fum-type-grid">
-                <button type="button" class="fum-type-btn type-call" [class.active]="followUpForm.type === 'CALL'" (click)="followUpForm.type = 'CALL'">
+                <button type="button" class="fum-type-btn type-call" [class.active]="followUpForm.type === 'CALL'" (click)="followUpForm.type = 'CALL'" [disabled]="isViewingFollowUp">
                   <div class="type-icon-box"><svg lucidePhone size="14"></svg></div><span>Phone Call</span>
                 </button>
-                <button type="button" class="fum-type-btn type-meeting" [class.active]="followUpForm.type === 'MEETING'" (click)="followUpForm.type = 'MEETING'">
+                <button type="button" class="fum-type-btn type-meeting" [class.active]="followUpForm.type === 'MEETING'" (click)="followUpForm.type = 'MEETING'" [disabled]="isViewingFollowUp">
                   <div class="type-icon-box"><svg lucideVideo size="14"></svg></div><span>Meeting / VC</span>
                 </button>
-                <button type="button" class="fum-type-btn type-demo" [class.active]="followUpForm.type === 'DEMO'" (click)="followUpForm.type = 'DEMO'">
+                <button type="button" class="fum-type-btn type-demo" [class.active]="followUpForm.type === 'DEMO'" (click)="followUpForm.type = 'DEMO'" [disabled]="isViewingFollowUp">
                   <div class="type-icon-box"><svg lucideEye size="14"></svg></div><span>Product Demo</span>
                 </button>
-                <button type="button" class="fum-type-btn type-email" [class.active]="followUpForm.type === 'EMAIL'" (click)="followUpForm.type = 'EMAIL'">
+                <button type="button" class="fum-type-btn type-email" [class.active]="followUpForm.type === 'EMAIL'" (click)="followUpForm.type = 'EMAIL'" [disabled]="isViewingFollowUp">
                   <div class="type-icon-box"><svg lucideMail size="14"></svg></div><span>Email</span>
                 </button>
-                <button type="button" class="fum-type-btn type-field" [class.active]="followUpForm.type === 'FIELD_VISIT'" (click)="followUpForm.type = 'FIELD_VISIT'">
+                <button type="button" class="fum-type-btn type-field" [class.active]="followUpForm.type === 'FIELD_VISIT'" (click)="followUpForm.type = 'FIELD_VISIT'" [disabled]="isViewingFollowUp">
                   <div class="type-icon-box"><svg lucideMapPin size="14"></svg></div><span>Field Visit</span>
                 </button>
-                <button type="button" class="fum-type-btn type-note" [class.active]="followUpForm.type === 'NOTE'" (click)="followUpForm.type = 'NOTE'">
+                <button type="button" class="fum-type-btn type-note" [class.active]="followUpForm.type === 'NOTE'" (click)="followUpForm.type = 'NOTE'" [disabled]="isViewingFollowUp">
                   <div class="type-icon-box"><svg lucideFileText size="14"></svg></div><span>Note / Task</span>
                 </button>
               </div>
@@ -476,15 +489,15 @@
               <div class="form-row">
                 <div class="form-group">
                   <label>Contact Person</label>
-                  <input type="text" [(ngModel)]="followUpForm.contactPerson" placeholder="e.g. John Doe - Decision Maker" />
+                  <input type="text" [(ngModel)]="followUpForm.contactPerson" placeholder="e.g. John Doe - Decision Maker" [disabled]="isViewingFollowUp" />
                 </div>
                 <div class="form-group">
                   <label>Direct Phone Number</label>
-                  <input type="text" [(ngModel)]="followUpForm.contactPhone" placeholder="Phone Number" />
+                  <input type="text" [(ngModel)]="followUpForm.contactPhone" placeholder="Phone Number" [disabled]="isViewingFollowUp" />
                 </div>
                 <div class="form-group">
                   <label>Direct Email Address</label>
-                  <input type="email" [(ngModel)]="followUpForm.contactEmail" placeholder="contact@company.com" />
+                  <input type="email" [(ngModel)]="followUpForm.contactEmail" placeholder="contact@company.com" [disabled]="isViewingFollowUp" />
                 </div>
               </div>
             </div>
@@ -494,19 +507,19 @@
               <div class="form-row form-row-2 fum-datetime-row">
                 <div class="form-group">
                   <label>Date</label>
-                  <input type="date" [ngModel]="followUpDatePart" (ngModelChange)="setFollowUpDatePart($event)" [disabled]="isSavingFollowUp" />
+                  <input type="date" [ngModel]="followUpDatePart" (ngModelChange)="setFollowUpDatePart($event)" [disabled]="isSavingFollowUp || isViewingFollowUp" />
                 </div>
                 <div class="form-group">
                   <label>Time</label>
-                  <input type="time" [ngModel]="followUpTimePart" (ngModelChange)="setFollowUpTimePart($event)" [disabled]="isSavingFollowUp" />
+                  <input type="time" [ngModel]="followUpTimePart" (ngModelChange)="setFollowUpTimePart($event)" [disabled]="isSavingFollowUp || isViewingFollowUp" />
                 </div>
               </div>
               <div class="fum-presets">
                 <span class="preset-label">Quick Set:</span>
-                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('today_afternoon')">Today 3 PM</button>
-                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('tomorrow_morning')">Tomorrow 10 AM</button>
-                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('in_2_days')">In 2 Days</button>
-                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('next_week')">Next Week</button>
+                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('today_afternoon')" [disabled]="isViewingFollowUp">Today 3 PM</button>
+                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('tomorrow_morning')" [disabled]="isViewingFollowUp">Tomorrow 10 AM</button>
+                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('in_2_days')" [disabled]="isViewingFollowUp">In 2 Days</button>
+                <button type="button" class="preset-chip" (click)="setQuickFollowUpTime('next_week')" [disabled]="isViewingFollowUp">Next Week</button>
               </div>
             </div>
 
@@ -521,21 +534,40 @@
 
             <div class="form-group" style="margin-bottom: 0;">
               <label> Remarks</label>
-              <textarea [(ngModel)]="followUpForm.notes" placeholder="Outline key discussion points, questions to ask, or proposal items to clarify..." rows="3" [disabled]="isSavingFollowUp"></textarea>
+              <textarea [(ngModel)]="followUpForm.notes" placeholder="Outline key discussion points, questions to ask, or proposal items to clarify..." rows="3" [disabled]="isSavingFollowUp || isViewingFollowUp"></textarea>
             </div>
 
             <div class="form-group" style="margin-top: 16px;">
               <label>Attachments</label>
-              <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles" />
-              <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles">
+              <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp" />
+              <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp">
                 <svg lucideUpload size="15"></svg>
                 <span>Attach Files / Documents</span>
               </button>
               <span class="fum-stage-hint">Attach files now; they are uploaded after scheduling and shown in the follow-up table.</span>
               <div *ngIf="pendingFollowUpFiles.length" class="pending-file-list">
                 <span *ngFor="let file of pendingFollowUpFiles; let i = index" class="pending-file-chip">
-                  {{ file.name }}
-                  <button type="button" (click)="removePendingFollowUpFile(i)" [disabled]="isSavingFollowUp">&times;</button>
+                  <ng-container *ngIf="renamingFollowUpFileIndex !== i; else renameFollowUpFileTpl">
+                    <span class="chip-file-name" [title]="file.name">
+                      <svg lucideFile size="12"></svg>
+                      {{ file.name }}
+                    </span>
+                    <button type="button" class="chip-icon-btn" title="Rename" (click)="startRenameFollowUpFile(i)" [disabled]="isSavingFollowUp">
+                      <svg lucideEdit size="12"></svg>
+                    </button>
+                    <button type="button" title="Remove" (click)="removePendingFollowUpFile(i)" [disabled]="isSavingFollowUp">&times;</button>
+                  </ng-container>
+                  <ng-template #renameFollowUpFileTpl>
+                    <input class="chip-rename-input" [(ngModel)]="renameFollowUpFileName"
+                           (keydown.enter)="saveRenameFollowUpFile()"
+                           (keydown.escape)="cancelRenameFollowUpFile()" />
+                    <button type="button" class="chip-icon-btn color-ok" title="Save name" (click)="saveRenameFollowUpFile()">
+                      <svg lucideCheck size="13"></svg>
+                    </button>
+                    <button type="button" class="chip-icon-btn" title="Cancel" (click)="cancelRenameFollowUpFile()">
+                      <svg lucideX size="13"></svg>
+                    </button>
+                  </ng-template>
                 </span>
               </div>
             </div>
@@ -543,7 +575,7 @@
             <div class="form-group">
               <label>Pipeline Stage</label>
               <div class="status-dropdown fum-stage-dropdown" [class.open]="followUpStageMenuOpen">
-                <button type="button" class="table-status-trigger ldm-status-badge ldm-status-{{ (followUpForm.stage | lowercase) || 'new' }}" (click)="toggleFollowUpStageMenu($event)">
+                <button type="button" class="table-status-trigger ldm-status-badge ldm-status-{{ (followUpForm.stage | lowercase) || 'new' }}" (click)="toggleFollowUpStageMenu($event)" [disabled]="isViewingFollowUp">
                   <span class="table-status-dot" [ngStyle]="{'background': statusDotColor(followUpForm.stage)}"></span>
                   <span class="table-status-text">{{ getStatusLabel(followUpForm.stage) }}</span>
                   <svg lucideChevronDown size="12" class="table-status-caret"></svg>
@@ -628,7 +660,11 @@
         <!-- Footer -->
         <div class="fum-footer">
           <button type="button" class="btn-fum-cancel" (click)="closeFollowUpModal()">Cancel</button>
-          <button *ngIf="followUpTab === 'schedule'" type="button" class="btn-fum-submit" (click)="saveFollowUp()" [disabled]="isSavingFollowUp">
+          <button *ngIf="isViewingFollowUp" type="button" class="btn-fum-submit" (click)="closeFollowUpModal()">
+            <svg lucideCheck size="15"></svg>
+            <span>Close</span>
+          </button>
+          <button *ngIf="!isViewingFollowUp && followUpTab === 'schedule'" type="button" class="btn-fum-submit" (click)="saveFollowUp()" [disabled]="isSavingFollowUp">
             <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingFollowUp"></svg>
             <svg lucideCalendar size="15" *ngIf="!isSavingFollowUp"></svg>
             <span>{{ isSavingFollowUp ? 'Scheduling...' : (isEditingFollowUp ? 'Update Follow-Up' : 'Schedule Follow-Up') }}</span>

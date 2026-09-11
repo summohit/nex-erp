@@ -715,7 +715,8 @@
             </td>
             <td>{{lead.companyName || '-'}}</td>
             <td class="lead-contact-cell">
-              <div class="lead-contact-name" *ngIf="lead.contactName">{{lead.contactName}}</div>
+              <button type="button" class="lead-contact-name-link" *ngIf="lead.contactName && lead.broughtByContact?.id" title="Open contact profile" (click)="openLeadBroughtContact(lead)">{{lead.contactName}}</button>
+              <div class="lead-contact-name" *ngIf="lead.contactName && !lead.broughtByContact?.id">{{lead.contactName}}</div>
               <div class="lead-contact-email" *ngIf="lead.email">{{lead.email}}</div>
             </td>
             <td class="lead-phone-cell">
@@ -771,7 +772,8 @@
                         (click)="toggleActionMenu(lead, $event)">
                   <svg lucideMoreVertical size="16"></svg>
                 </button>
-                <div class="action-menu" *ngIf="actionMenuOpen === lead.id">
+                <div class="action-menu" *ngIf="actionMenuOpen === lead.id"
+                     [ngStyle]="{'top.px': actionMenuPos.top, 'left.px': actionMenuPos.left}">
                   <button type="button" class="action-menu-item" (click)="openDetailModal(lead)">
                     <svg lucideEye size="14"></svg> View Details
                   </button>
@@ -1156,7 +1158,10 @@
             <span class="ldm-meta-chip" *ngIf="selectedLead.companyName">
               <svg lucideBuilding2 size="12"></svg> {{selectedLead.companyName}}
             </span>
-            <span class="ldm-meta-chip" *ngIf="selectedLead.contactName">
+            <span class="ldm-meta-chip ldm-meta-link ldm-contact-chip-link" *ngIf="selectedLead.contactName && selectedLead.broughtByContact?.id" (click)="openLeadBroughtContact(selectedLead)" title="Open contact profile">
+              <svg lucideUser size="12"></svg> {{selectedLead.contactName}}
+            </span>
+            <span class="ldm-meta-chip" *ngIf="selectedLead.contactName && !selectedLead.broughtByContact?.id">
               <svg lucideUser size="12"></svg> {{selectedLead.contactName}}
             </span>
             <span class="ldm-meta-chip ldm-meta-link" *ngIf="selectedLead.email">
@@ -1204,7 +1209,10 @@
               <span class="ldm-info-icon"><svg lucideUser size="14"></svg></span>
               <div>
                 <div class="ldm-info-label">Primary Contact Name</div>
-                <div class="ldm-info-value">{{selectedLead.contactName || 'Not specified'}}</div>
+                <div class="ldm-info-value">
+                  <button type="button" class="ldm-link ldm-info-link" *ngIf="selectedLead.contactName && selectedLead.broughtByContact?.id" (click)="openLeadBroughtContact(selectedLead)" title="Open contact profile">{{selectedLead.contactName}}</button>
+                  <span *ngIf="!selectedLead.contactName || !selectedLead.broughtByContact?.id">{{selectedLead.contactName || 'Not specified'}}</span>
+                </div>
               </div>
             </div>
             <div class="ldm-info-item">
@@ -1304,7 +1312,7 @@
             </div>
 
             <!-- External Lead Contact -->
-            <div class="ldm-owner-card ldm-contact-card" *ngIf="!selectedLead.addedBy && selectedLead.broughtByContact">
+            <div class="ldm-owner-card ldm-contact-card ldm-contact-card-link" *ngIf="!selectedLead.addedBy && selectedLead.broughtByContact" (click)="openLeadBroughtContact(selectedLead)" title="Open contact profile">
               <div class="owner-avatar-circle contact-avatar-badge">
                 {{ selectedLead.broughtByContact.name ? selectedLead.broughtByContact.name[0].toUpperCase() : 'C' }}
               </div>
@@ -2172,8 +2180,27 @@
           <span class="fum-stage-hint">Attach files now; they are uploaded after scheduling and shown in the follow-up table.</span>
           <div *ngIf="pendingFollowUpFiles.length" class="pending-file-list">
             <span *ngFor="let file of pendingFollowUpFiles; let i = index" class="pending-file-chip">
-              {{ file.name }}
-              <button type="button" (click)="removePendingFollowUpFile(i)" [disabled]="isSavingFollowUp">&times;</button>
+              <ng-container *ngIf="renamingFollowUpFileIndex !== i; else renameFollowUpFileTpl">
+                <span class="chip-file-name" [title]="file.name">
+                  <svg lucideFileText size="12"></svg>
+                  {{ file.name }}
+                </span>
+                <button type="button" class="chip-icon-btn" title="Rename" (click)="startRenameFollowUpFile(i)" [disabled]="isSavingFollowUp">
+                  <svg lucideEdit2 size="12"></svg>
+                </button>
+                <button type="button" title="Remove" (click)="removePendingFollowUpFile(i)" [disabled]="isSavingFollowUp">&times;</button>
+              </ng-container>
+              <ng-template #renameFollowUpFileTpl>
+                <input class="chip-rename-input" [(ngModel)]="renameFollowUpFileName"
+                       (keydown.enter)="saveRenameFollowUpFile()"
+                       (keydown.escape)="cancelRenameFollowUpFile()" />
+                <button type="button" class="chip-icon-btn color-ok" title="Save name" (click)="saveRenameFollowUpFile()">
+                  <svg lucideCheck size="13"></svg>
+                </button>
+                <button type="button" class="chip-icon-btn" title="Cancel" (click)="cancelRenameFollowUpFile()">
+                  <svg lucideX size="13"></svg>
+                </button>
+              </ng-template>
             </span>
           </div>
         </div>

@@ -400,6 +400,8 @@ export class LeadsComponent implements OnInit {
   followUpStageMenuOpen = false;
   pendingFollowUpFiles: File[] = [];
   isUploadingFollowUpFiles = false;
+  renamingFollowUpFileIndex: number | null = null;
+  renameFollowUpFileName = '';
 
   // A Win transition is deliberately paused until a purchase order is attached.
   showPurchaseOrderModal = false;
@@ -493,6 +495,13 @@ export class LeadsComponent implements OnInit {
 
   openLeadContactProfile(contactId: number) {
     this.router.navigate(['/crm/lead-contacts', contactId]);
+  }
+
+  // Opens the lead-contact profile for the external contact linked to a lead
+  // (lead.broughtByContact). Safe when the lead has no linked contact.
+  openLeadBroughtContact(lead: any) {
+    const contactId = lead?.broughtByContact?.id;
+    if (contactId != null) this.openLeadContactProfile(contactId);
   }
 
   loadEmployees() {
@@ -1969,10 +1978,23 @@ csvImporting = false;
 
   // The lead id whose row action menu is currently open (null = all closed).
   actionMenuOpen: number | null = null;
+  actionMenuPos: { top: number; left: number } = { top: 0, left: 0 };
 
   toggleActionMenu(lead: Lead, event: Event) {
     if (event) event.stopPropagation();
-    this.actionMenuOpen = this.actionMenuOpen === lead.id ? null : lead.id;
+    if (this.actionMenuOpen === lead.id) {
+      this.actionMenuOpen = null;
+      return;
+    }
+    const btn = (event.target as HTMLElement).closest('.btn-action-trigger') as HTMLElement | null;
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      const menuWidth = 180;
+      let left = rect.right - menuWidth;
+      if (left < 8) left = 8;
+      this.actionMenuPos = { top: rect.bottom + 6, left };
+    }
+    this.actionMenuOpen = lead.id;
   }
 
   closeActionMenu() {
@@ -2133,6 +2155,8 @@ csvImporting = false;
     this.showFollowUpModal = false;
     this.followUpStageMenuOpen = false;
     this.pendingFollowUpFiles = [];
+    this.renamingFollowUpFileIndex = null;
+    this.renameFollowUpFileName = '';
   }
 
   onFollowUpFilesSelected(event: Event) {
@@ -2142,6 +2166,28 @@ csvImporting = false;
 
   removePendingFollowUpFile(index: number) {
     this.pendingFollowUpFiles.splice(index, 1);
+    if (this.renamingFollowUpFileIndex === index) this.cancelRenameFollowUpFile();
+    else if (this.renamingFollowUpFileIndex != null && index < this.renamingFollowUpFileIndex) this.renamingFollowUpFileIndex--;
+  }
+
+  startRenameFollowUpFile(index: number) {
+    this.renamingFollowUpFileIndex = index;
+    this.renameFollowUpFileName = this.pendingFollowUpFiles[index]?.name || '';
+  }
+
+  saveRenameFollowUpFile() {
+    const i = this.renamingFollowUpFileIndex;
+    const newName = (this.renameFollowUpFileName || '').trim();
+    this.cancelRenameFollowUpFile();
+    if (i == null || i < 0 || i >= this.pendingFollowUpFiles.length) return;
+    const original = this.pendingFollowUpFiles[i];
+    if (!newName || newName === original.name) return;
+    this.pendingFollowUpFiles[i] = new File([original], newName, { type: original.type, lastModified: original.lastModified });
+  }
+
+  cancelRenameFollowUpFile() {
+    this.renamingFollowUpFileIndex = null;
+    this.renameFollowUpFileName = '';
   }
 
   private uploadFollowUpFiles(leadId: number, followUpId: number, files: File[]) {
