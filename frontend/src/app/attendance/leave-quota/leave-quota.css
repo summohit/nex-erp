@@ -1,0 +1,452 @@
+.quota-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 28px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.quota-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.quota-title-block h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.quota-sub {
+  margin: 0;
+  font-size: 13px;
+  color: #64748B;
+}
+
+.scope-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary-text);
+  background: var(--color-primary-light);
+  border-radius: 999px;
+}
+
+.quota-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.filter-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.filter-field.grow { flex: 1 1 200px; }
+
+.filter-field .form-control {
+  height: 38px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #0F172A;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 9px;
+}
+
+.filter-field .form-control:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.quota-actions .btn-outline,
+.quota-actions .btn-primary {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.quota-actions .btn-outline {
+  color: #334155;
+  background: #fff;
+  border: 1px solid var(--border-light);
+}
+
+.quota-actions .btn-outline:hover:not(:disabled) { background: var(--surface-hover); }
+
+.quota-actions .btn-primary {
+  color: #fff;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.quota-actions .btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+
+.quota-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Notices ────────────────────────────────────────────────────────────── */
+
+.quota-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  border-radius: 10px;
+}
+
+.quota-notice svg { flex-shrink: 0; margin-top: 1px; }
+.quota-notice strong { display: block; font-weight: 650; }
+
+.quota-notice.warn {
+  color: var(--color-warning-text);
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+}
+
+.quota-notice.info {
+  color: #1E3A8A;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+}
+
+/* ── Summary ────────────────────────────────────────────────────────────── */
+
+.quota-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.sum-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+}
+
+.sum-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.sum-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0F172A;
+  font-variant-numeric: tabular-nums;
+  /* "All leave types" is a value in the last card and must not clip. */
+  overflow-wrap: anywhere;
+}
+
+.sum-value.accent { color: var(--color-primary-text); }
+.sum-foot { font-size: 11.5px; color: #94A3B8; }
+
+/* ── Grid ───────────────────────────────────────────────────────────────── */
+
+.quota-grid-card {
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.quota-grid { width: 100%; height: 620px; }
+
+.quota-loading,
+.quota-empty {
+  padding: 48px 16px;
+  font-size: 13.5px;
+  color: #94A3B8;
+  text-align: center;
+}
+
+/* Cell renderers live outside this component's view encapsulation because
+   ag-Grid injects the markup itself, so these need ::ng-deep. */
+::ng-deep .q-emp {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 100%;
+}
+
+::ng-deep .q-avatar,
+::ng-deep .q-avatar-img {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+::ng-deep .q-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-primary-text);
+  background: var(--color-primary-light);
+  text-transform: uppercase;
+}
+
+::ng-deep .q-emp-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+::ng-deep .q-emp-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F172A;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+::ng-deep .q-emp-sub {
+  font-size: 11px;
+  color: #94A3B8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+::ng-deep .q-inactive {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748B;
+  background: #F1F5F9;
+  border-radius: 999px;
+}
+
+::ng-deep .q-none-left { color: var(--color-danger-text); font-weight: 700; }
+::ng-deep .q-low-left  { color: var(--color-warning-text); font-weight: 700; }
+::ng-deep .q-muted     { font-size: 11.5px; color: #94A3B8; }
+
+/* Utilisation bar */
+::ng-deep .q-bar-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 100%;
+}
+
+::ng-deep .q-bar {
+  flex: 1;
+  height: 6px;
+  background: #F1F5F9;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+::ng-deep .q-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 999px;
+}
+
+::ng-deep .q-bar-label {
+  min-width: 32px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748B;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+::ng-deep .q-view-btn {
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+::ng-deep .q-view-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* ── Breakdown modal ────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.modal-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.modal-header h2 { margin: 0 0 3px; font-size: 17px; font-weight: 700; color: #0F172A; }
+.modal-sub { margin: 0; font-size: 12.5px; color: #64748B; }
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #64748B;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.icon-btn:hover { background: var(--surface-hover); }
+
+/* min-height: 0 lets this actually scroll inside the flex column. */
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.detail-table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.detail-table th {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.detail-table td {
+  padding: 9px 10px;
+  color: #0F172A;
+  border-bottom: 1px solid #F8FAFC;
+}
+
+.detail-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.detail-table tr.is-empty td { color: #CBD5E1; }
+.detail-table td.none-left { color: var(--color-danger-text); font-weight: 700; }
+
+.detail-table tfoot td {
+  font-weight: 700;
+  border-top: 2px solid var(--border-light);
+  border-bottom: 0;
+}
+
+.type-flag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748B;
+  background: #F1F5F9;
+  border-radius: 999px;
+}
+
+.type-flag.carry {
+  color: var(--color-primary-text);
+  background: var(--color-primary-light);
+}
+
+.detail-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: #1E3A8A;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 9px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 20px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.modal-footer .btn-outline {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .quota-page { padding: 16px 14px 24px; }
+  .quota-actions { width: 100%; }
+  .quota-grid { height: 520px; }
+}

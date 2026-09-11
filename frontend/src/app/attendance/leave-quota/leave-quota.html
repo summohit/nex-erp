@@ -1,0 +1,184 @@
+<div class="quota-page">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <div class="quota-header">
+    <div class="quota-title-block">
+      <h1>Leave Quota Report</h1>
+      <p class="quota-sub">
+        What each person was allocated for {{ year() }}, what they have taken, and what is left.
+        <span *ngIf="report()?.scope === 'SELF'" class="scope-pill">Your own figures</span>
+      </p>
+    </div>
+
+    <div class="quota-actions">
+      <label class="filter-field">
+        <span>Year</span>
+        <select class="form-control" [value]="year()" (change)="onYearChange($any($event.target).value)">
+          <option *ngFor="let y of years()" [value]="y">{{ y }}</option>
+        </select>
+      </label>
+
+      <label class="filter-field">
+        <span>Leave type</span>
+        <select class="form-control"
+                [ngModel]="leaveTypeId()"
+                (ngModelChange)="leaveTypeId.set($event === 'null' || $event === null ? null : +$event)">
+          <option [ngValue]="null">All leave types</option>
+          <option *ngFor="let t of report()?.leaveTypes || []" [ngValue]="t.id">{{ t.name }}</option>
+        </select>
+      </label>
+
+      <label class="filter-field grow">
+        <span>Search</span>
+        <input class="form-control" type="text" placeholder="Name, code or department"
+               [ngModel]="search()" (ngModelChange)="search.set($event)">
+      </label>
+
+      <button class="btn-outline" (click)="load()" [disabled]="loading()" title="Reload">
+        <svg lucideRefreshCw size="15"></svg>
+        <span>Refresh</span>
+      </button>
+
+      <button class="btn-primary" (click)="exportCsv()" [disabled]="loading() || !rows().length">
+        <svg lucideDownload size="15"></svg>
+        <span>Export CSV</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Carry-forward has not run for this year, so Remaining understates for any
+       type that carries. Better to say it than to let the number imply it. -->
+  <div class="quota-notice warn" *ngIf="carryForwardPending()">
+    <svg lucideTriangleAlert size="16"></svg>
+    <div>
+      <strong>Carry-forward hasn't been applied for {{ year() }}.</strong>
+      Unused days from {{ year() - 1 }} roll in on 1 January. Until that runs,
+      <em>Carried in</em> is zero and <em>Remaining</em> is understated for any type that carries forward.
+    </div>
+  </div>
+
+  <!-- Somebody with no balance row cannot take leave at all, so this is the
+       one number on the page that is a task rather than a statistic. -->
+  <div class="quota-notice info" *ngIf="summary().missingBalances > 0">
+    <svg lucideCalendarDays size="16"></svg>
+    <div>
+      <strong>{{ summary().missingBalances }} {{ summary().missingBalances === 1 ? 'person has' : 'people have' }}
+        no leave balance for {{ year() }}.</strong>
+      They cannot request leave until one is assigned, under Attendance &amp; Leave → Manage Balances.
+    </div>
+  </div>
+
+  <!-- ── Summary ─────────────────────────────────────────────────────────── -->
+  <div class="quota-summary" *ngIf="!loading()">
+    <div class="sum-card">
+      <span class="sum-label">Entitlement</span>
+      <span class="sum-value">{{ days(summary().allocated + summary().carriedOver) }}</span>
+      <span class="sum-foot">
+        {{ days(summary().allocated) }} allocated
+        <ng-container *ngIf="summary().carriedOver"> · {{ days(summary().carriedOver) }} carried in</ng-container>
+      </span>
+    </div>
+    <div class="sum-card">
+      <span class="sum-label">Taken</span>
+      <span class="sum-value">{{ days(summary().used) }}</span>
+      <span class="sum-foot">{{ summary().utilisation | number:'1.0-0' }}% of entitlement</span>
+    </div>
+    <div class="sum-card">
+      <span class="sum-label">Remaining</span>
+      <span class="sum-value accent">{{ days(summary().remaining) }}</span>
+      <span class="sum-foot">across {{ summary().people }} {{ summary().people === 1 ? 'person' : 'people' }}</span>
+    </div>
+    <div class="sum-card">
+      <span class="sum-label">Showing</span>
+      <span class="sum-value">{{ selectedTypeName() }}</span>
+      <span class="sum-foot">{{ year() }}</span>
+    </div>
+  </div>
+
+  <!-- ── Grid ────────────────────────────────────────────────────────────── -->
+  <div class="quota-grid-card">
+    <div class="quota-loading" *ngIf="loading()">Loading…</div>
+
+    <div class="quota-empty" *ngIf="!loading() && !rows().length">
+      No leave balances found for {{ year() }}.
+    </div>
+
+    <ag-grid-angular
+      *ngIf="!loading() && rows().length"
+      class="ag-theme-quartz quota-grid"
+      [rowData]="rows()"
+      [columnDefs]="columnDefs"
+      [defaultColDef]="defaultColDef"
+      [rowHeight]="56"
+      [pagination]="true"
+      [paginationPageSize]="20"
+      [paginationPageSizeSelector]="[10, 20, 50, 100]"
+      (gridReady)="onGridReady($event)">
+    </ag-grid-angular>
+  </div>
+</div>
+
+<!-- ── Per-type breakdown ─────────────────────────────────────────────────── -->
+<div class="modal-overlay" *ngIf="detailRow() as row" (click)="closeDetail()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2>{{ row.employee.name }}</h2>
+        <p class="modal-sub">
+          {{ row.employee.designation || 'Staff' }}
+          <ng-container *ngIf="row.employee.department"> · {{ row.employee.department }}</ng-container>
+          · {{ year() }}
+        </p>
+      </div>
+      <button class="icon-btn" (click)="closeDetail()" aria-label="Close">
+        <svg lucideX size="20"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th>Leave type</th>
+            <th class="num">Allocated</th>
+            <th class="num">Carried in</th>
+            <th class="num">Used</th>
+            <th class="num">Remaining</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let line of detailLines()" [class.is-empty]="!line.allocated && !line.carriedOver && !line.used">
+            <td>
+              {{ line.type.name }}
+              <span class="type-flag" *ngIf="!line.type.isPaid">unpaid</span>
+              <span class="type-flag carry" *ngIf="line.type.carryForward">
+                carries {{ line.type.carryForwardLimit > 0 ? 'up to ' + line.type.carryForwardLimit : 'over' }}
+              </span>
+            </td>
+            <td class="num">{{ days(line.allocated) }}</td>
+            <td class="num">{{ days(line.carriedOver) }}</td>
+            <td class="num">{{ days(line.used) }}</td>
+            <td class="num" [class.none-left]="line.remaining <= 0">{{ days(line.remaining) }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            <td class="num">{{ days(row.totals.allocated) }}</td>
+            <td class="num">{{ days(row.totals.carriedOver) }}</td>
+            <td class="num">{{ days(row.totals.used) }}</td>
+            <td class="num">{{ days(row.totals.remaining) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <p class="detail-note" *ngIf="row.hasNoBalances">
+        No balance has been assigned to this person for {{ year() }}, so every figure above is zero.
+      </p>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-outline" (click)="closeDetail()">Close</button>
+    </div>
+  </div>
+</div>

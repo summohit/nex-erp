@@ -24,6 +24,40 @@ export interface LeaveBalance {
   };
 }
 
+/** One employee's figures for a single leave type, in the quota report. */
+export interface QuotaCell {
+  allocated: number;
+  used: number;
+  carriedOver: number;
+  remaining: number;
+}
+
+export interface QuotaRow {
+  employee: {
+    id: number;
+    name: string;
+    employeeCode: string | null;
+    avatarUrl: string | null;
+    designation: string | null;
+    department: string | null;
+    isActive: boolean;
+  };
+  byType: Record<number, QuotaCell>;
+  totals: QuotaCell;
+  /** No balance row exists at all — different from a zero balance, and fixable. */
+  hasNoBalances: boolean;
+}
+
+export interface QuotaReport {
+  year: number;
+  leaveTypes: { id: number; name: string; isPaid: boolean; carryForward: boolean; carryForwardLimit: number }[];
+  rows: QuotaRow[];
+  /** 'SELF' when the caller may only see their own figures. */
+  scope: 'ALL' | 'SELF';
+  /** False until the 1 January job has run — remaining figures understate until then. */
+  carryForwardApplied: boolean;
+}
+
 export interface LeaveRequest {
   id: number;
   employeeId: number;
@@ -66,6 +100,14 @@ export class LeavesService {
     const params: any = {};
     if (year) params.year = year.toString();
     return this.http.get<LeaveBalance[]>(`${this.apiUrl}/balances`, { params });
+  }
+
+  /** The quota report. The server scopes non-admins to their own row. */
+  getQuotaReport(year?: number, employeeId?: number): Observable<QuotaReport> {
+    const params: any = {};
+    if (year) params.year = year.toString();
+    if (employeeId) params.employeeId = employeeId.toString();
+    return this.http.get<QuotaReport>(`${this.apiUrl}/reports/quota`, { params });
   }
 
   requestLeave(data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }): Observable<LeaveRequest> {

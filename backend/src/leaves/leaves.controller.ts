@@ -24,6 +24,23 @@ export class LeavesController {
     return this.leavesService.getAllBalances(req.user.companyId, y);
   }
 
+  /** Leave quota report. Non-admins are scoped to themselves by the service. */
+  @Get('reports/quota')
+  getQuotaReport(
+    @Request() req,
+    @Query('year') year?: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
+    const y = year ? parseInt(year, 10) : new Date().getFullYear();
+    const emp = employeeId ? parseInt(employeeId, 10) : undefined;
+    return this.leavesService.getQuotaReport(
+      req.user.companyId,
+      { sub: req.user.sub, role: req.user.role },
+      Number.isFinite(y) ? y : new Date().getFullYear(),
+      emp && Number.isFinite(emp) ? emp : undefined,
+    );
+  }
+
   @Post('request')
   requestLeave(@Request() req, @Body() data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
     return this.leavesService.requestLeave(req.user.sub, data);

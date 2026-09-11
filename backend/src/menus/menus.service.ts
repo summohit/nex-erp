@@ -273,6 +273,12 @@ export class MenusService implements OnModuleInit {
     // against a project, so there is no separate module for an admin to grant.
     if (allowedModules.has('projects')) allowedModules.add('field-visits');
 
+    // The leave quota report is a read-only view of balances that the
+    // attendance permission already covers, and the endpoint scopes anyone who
+    // is not an admin or HR to their own row — so there is nothing extra for an
+    // administrator to grant, and no separate module to invent.
+    if (allowedModules.has('attendance')) allowedModules.add('attendance/leave-quota');
+
     // If role has NO permissions defined yet, apply a safe default fallback
     if (rolePermissions.length === 0) {
       if (['ADMIN', 'HR', 'FINANCE'].includes(roleName)) {

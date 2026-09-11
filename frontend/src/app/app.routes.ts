@@ -158,6 +158,14 @@ export const routes: Routes = [
         loadComponent: () => import('./attendance/shift-roster/shift-roster').then(m => m.ShiftRosterComponent)
       },
       {
+        // Must precede 'attendance/:tab', which would otherwise swallow it —
+        // same reason attendance/all and attendance/shift-roster sit above.
+        path: 'attendance/leave-quota',
+        canActivate: [permissionGuard],
+        data: { module: 'attendance' },
+        loadComponent: () => import('./attendance/leave-quota/leave-quota').then(m => m.LeaveQuotaComponent)
+      },
+      {
         path: 'attendance/:tab',
         canActivate: [permissionGuard],
         data: { module: 'attendance' },

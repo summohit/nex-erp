@@ -2,6 +2,43 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
+/** One employee's figures for a single leave type in the quota report. */
+export interface QuotaCell {
+  allocated: number;
+  used: number;
+  carriedOver: number;
+  remaining: number;
+}
+
+export interface QuotaRow {
+  employee: {
+    id: number;
+    name: string;
+    employeeCode: string | null;
+    avatarUrl: string | null;
+    designation: string | null;
+    department: string | null;
+    isActive: boolean;
+  };
+  byType: Record<number, QuotaCell>;
+  totals: QuotaCell;
+  /** No balance row exists at all — distinct from a zero balance, and fixable. */
+  hasNoBalances: boolean;
+}
+
+export interface QuotaReport {
+  year: number;
+  leaveTypes: {
+    id: number; name: string; isPaid: boolean;
+    carryForward: boolean; carryForwardLimit: number;
+  }[];
+  rows: QuotaRow[];
+  /** 'SELF' when the caller may only see their own figures. */
+  scope: 'ALL' | 'SELF';
+  /** False until the 1 January job has run; remaining understates until then. */
+  carryForwardApplied: boolean;
+}
+
 @Injectable()
 export class LeavesService {
   private readonly logger = new Logger(LeavesService.name);
@@ -50,6 +87,128 @@ export class LeavesService {
         leaveType: true 
       }
     });
+  }
+
+  /**
+   * The leave quota report: one row per employee, per leave type, for a year.
+   *
+   * Deliberately not built on getAllBalances, which returns the whole LeaveType
+   * on every row — 91 employees x 13 types is 1,183 copies of the same handful
+   * of type records, and this company has already been throttled once for
+   * egress. The types are sent once, and each row carries ids.
+   *
+   * Employees with no balance row still appear, as zeros. A quota report that
+   * silently omits people is worse than one that shows a gap, because the gap
+   * is the thing worth acting on.
+   */
+  private emptyQuotaReport(year: number): QuotaReport {
+    return { year, leaveTypes: [], rows: [], scope: 'SELF', carryForwardApplied: false };
+  }
+
+  async getQuotaReport(
+    companyId: number,
+    actor: { sub: number; role?: string },
+    year: number,
+    employeeId?: number,
+  ): Promise<QuotaReport> {
+    const isAdminOrHr = ['SUPERADMIN', 'ADMIN', 'HR'].includes(actor.role ?? '');
+
+    // Everyone else sees only themselves, whatever they ask for — the filter is
+    // a convenience for admins, never the thing that enforces privacy.
+    let scopeEmployeeId = employeeId;
+    if (!isAdminOrHr) {
+      const me = await this.prisma.employee.findUnique({
+        where: { userId: actor.sub },
+        select: { id: true },
+      });
+      if (!me) return this.emptyQuotaReport(year);
+      scopeEmployeeId = me.id;
+    }
+
+    const [leaveTypes, employees, balances] = await Promise.all([
+      this.prisma.leaveType.findMany({
+        where: { companyId },
+        select: { id: true, name: true, isPaid: true, carryForward: true, carryForwardLimit: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.employee.findMany({
+        where: { companyId, ...(scopeEmployeeId ? { id: scopeEmployeeId } : {}) },
+        select: {
+          id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
+          designation: { select: { name: true } },
+          department: { select: { name: true } },
+          user: { select: { status: true } },
+        },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      }),
+      this.prisma.leaveBalance.findMany({
+        where: {
+          year,
+          employee: { companyId, ...(scopeEmployeeId ? { id: scopeEmployeeId } : {}) },
+        },
+        select: {
+          employeeId: true, leaveTypeId: true,
+          allocated: true, used: true, carriedOver: true,
+          carriedForwardFromYear: true,
+        },
+      }),
+    ]);
+
+    const byEmployee = new Map<number, typeof balances>();
+    for (const b of balances) {
+      const list = byEmployee.get(b.employeeId) ?? [];
+      list.push(b);
+      byEmployee.set(b.employeeId, list);
+    }
+
+    const rows = employees.map((emp) => {
+      const mine = byEmployee.get(emp.id) ?? [];
+      const byType: Record<number, {
+        allocated: number; used: number; carriedOver: number; remaining: number;
+      }> = {};
+
+      let allocated = 0, used = 0, carriedOver = 0;
+      for (const type of leaveTypes) {
+        const b = mine.find((x) => x.leaveTypeId === type.id);
+        const a = b?.allocated ?? 0;
+        const u = b?.used ?? 0;
+        const c = b?.carriedOver ?? 0;
+        byType[type.id] = { allocated: a, used: u, carriedOver: c, remaining: a + c - u };
+        allocated += a; used += u; carriedOver += c;
+      }
+
+      return {
+        employee: {
+          id: emp.id,
+          name: `${emp.firstName} ${emp.lastName}`.trim(),
+          employeeCode: emp.employeeCode,
+          avatarUrl: emp.avatarUrl,
+          designation: emp.designation?.name ?? null,
+          department: emp.department?.name ?? null,
+          isActive: emp.user?.status !== 'SUSPENDED',
+        },
+        byType,
+        totals: { allocated, used, carriedOver, remaining: allocated + carriedOver - used },
+        // No balance row at all is a different problem from a zero balance, and
+        // it is the one somebody has to fix.
+        hasNoBalances: mine.length === 0,
+      };
+    });
+
+    // Deactivated staff stay visible — their history matters — but sink to the
+    // bottom, matching the shift roster.
+    rows.sort((a, b) => Number(a.employee.isActive === false) - Number(b.employee.isActive === false));
+
+    return {
+      year,
+      leaveTypes,
+      rows,
+      scope: isAdminOrHr ? ('ALL' as const) : ('SELF' as const),
+      // Carry-forward runs on 1 January; until it has, carriedOver is 0 and the
+      // remaining figures understate. Say so rather than let the report imply
+      // otherwise.
+      carryForwardApplied: balances.some((b) => b.carriedForwardFromYear !== null),
+    };
   }
 
   async requestLeave(userId: number, data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
