@@ -310,21 +310,11 @@
                         <span class="fup-status-saving" *ngIf="followUpStatusSaving[fu.id]"><svg lucideLoader2 size="13" class="spin-icon"></svg></span>
                       </div>
                     </td>
-<<<<<<< Updated upstream
                     <td class="col-actions-sticky">
                       <button type="button" class="fu-actions-trigger" title="Actions" (click)="toggleFollowUpActionsMenu(fu, $event)">
                         <svg lucideMoreVertical size="16"></svg>
                       </button>
                   </td>
-=======
-                    <td>
-                      <div class="table-actions-group">
-                        <button class="btn-action-icon" title="Edit" (click)="openEditFollowUp(fu)"><svg lucideEdit2 [size]="15"></svg></button>
-                        <button class="btn-action-icon" title="Mark as Completed" *ngIf="fu.status !== 'COMPLETED'" (click)="markFollowUpComplete(fu)"><svg lucideCheckCircle [size]="15"></svg></button>
-                        <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFollowUp(fu)"><svg lucideTrash2 [size]="15"></svg></button>
-                      </div>
-                    </td>
->>>>>>> Stashed changes
                   </tr>
                 </tbody>
               </table>
@@ -589,15 +579,9 @@
 
             <div class="form-group" style="margin-top: 16px;">
               <label>Attachments</label>
-<<<<<<< Updated upstream
               <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp" />
               <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp">
                 <svg lucideUpload size="15"></svg>
-=======
-              <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles" />
-              <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles">
-                <svg lucideUpload [size]="15"></svg>
->>>>>>> Stashed changes
                 <span>Attach Files / Documents</span>
               </button>
               <span class="fum-stage-hint">Attach files now; they are uploaded after scheduling and shown in the follow-up table.</span>
