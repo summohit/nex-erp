@@ -67,6 +67,8 @@ export class SecurityComponent implements OnInit {
     backupCodesRemaining: number;
     companyRequires: boolean;
     canDisable: boolean;
+    rotationPending?: boolean;
+    rotationStartedAt?: string | null;
   } | null>(null);
 
   /**
@@ -74,11 +76,12 @@ export class SecurityComponent implements OnInit {
    * 'password' — re-authenticating before a change
    * 'enrol'    — QR shown, waiting for the confirming code
    * 'codes'    — the one time backup codes are visible
+   * 'rotate'   — QR for the NEW device, waiting for its first code
    */
-  step = signal<'idle' | 'password' | 'enrol' | 'codes'>('idle');
+  step = signal<'idle' | 'password' | 'enrol' | 'codes' | 'rotate'>('idle');
 
   /** What the password prompt is gating. */
-  intent = signal<'enable' | 'disable' | 'regenerate'>('enable');
+  intent = signal<'enable' | 'disable' | 'regenerate' | 'rotate'>('enable');
 
   password = '';
   code = '';
@@ -143,7 +146,7 @@ export class SecurityComponent implements OnInit {
 
   // ── Flow control ───────────────────────────────────────────────────────────
 
-  askPassword(intent: 'enable' | 'disable' | 'regenerate') {
+  askPassword(intent: 'enable' | 'disable' | 'regenerate' | 'rotate') {
     this.intent.set(intent);
     this.password = '';
     this.code = '';
@@ -173,6 +176,11 @@ export class SecurityComponent implements OnInit {
     // same panel, so they submit straight through.
     if (!this.code.trim()) {
       this.toast.error('Enter the current code from your authenticator app.');
+      return;
+    }
+
+    if (this.intent() === 'rotate') {
+      this.beginRotation();
       return;
     }
 
@@ -221,6 +229,71 @@ export class SecurityComponent implements OnInit {
         this.toast.error(err?.error?.message || 'Could not start setup.');
       },
     });
+  }
+
+  /**
+   * Hand the new phone a fresh secret. The old one stays live until the new
+   * device is confirmed, so nothing is lost if this is abandoned here.
+   */
+  private beginRotation() {
+    this.isSubmitting.set(true);
+    this.authService.startTwoFactorRotation(this.password, this.code.trim()).subscribe({
+      next: (res) => {
+        this.isSubmitting.set(false);
+        this.password = '';
+        this.code = '';
+        this.qrDataUri.set(res.qrDataUri);
+        this.secret.set(res.secret);
+        this.step.set('rotate');
+        if (res.usedBackupCode) {
+          this.toast.info(
+            `Backup code used — ${res.backupCodesRemaining} left. Generate new ones once you are set up.`,
+          );
+        }
+      },
+      error: (err) => {
+        this.isSubmitting.set(false);
+        this.code = '';
+        this.toast.error(err?.error?.message || 'Could not start the device move.');
+      },
+    });
+  }
+
+  confirmRotation() {
+    if (!this.code.trim()) {
+      this.toast.error('Enter the 6-digit code from your new device.');
+      return;
+    }
+
+    this.isSubmitting.set(true);
+    this.authService.confirmTwoFactorRotation(this.code.trim()).subscribe({
+      next: () => {
+        this.isSubmitting.set(false);
+        this.code = '';
+        this.qrDataUri.set('');
+        this.secret.set('');
+        this.step.set('idle');
+        this.toast.success('Your new device is now the one that signs you in.');
+        this.load();
+      },
+      error: (err) => {
+        this.isSubmitting.set(false);
+        this.code = '';
+        this.toast.error(err?.error?.message || 'That code was not accepted.');
+      },
+    });
+  }
+
+  /**
+   * Abandon a move. Told to the server as well as forgotten locally, so the
+   * unused secret does not sit on the account until its 15-minute expiry.
+   */
+  abandonRotation() {
+    this.authService.cancelTwoFactorRotation().subscribe({
+      next: () => { this.toast.info('Device move cancelled — your current app still works.'); this.load(); },
+      error: () => this.toast.error('Could not cancel the device move.'),
+    });
+    this.cancel();
   }
 
   confirmEnrolment() {

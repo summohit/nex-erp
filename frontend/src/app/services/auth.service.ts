@@ -99,6 +99,24 @@ export class AuthService {
     return this.http.post(`${this.apiUrl}/2fa/backup-codes/regenerate`, { password, code });
   }
 
+  /**
+   * Moving the authenticator to a new phone. Two steps, and 2FA stays on
+   * throughout — the replacement secret only goes live once the new device
+   * proves it works, so this remains available even when the company policy
+   * forbids turning 2FA off.
+   */
+  startTwoFactorRotation(password: string, code: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/2fa/rotate/start`, { password, code });
+  }
+
+  confirmTwoFactorRotation(code: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/2fa/rotate/confirm`, { code });
+  }
+
+  cancelTwoFactorRotation(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/2fa/rotate/cancel`, {});
+  }
+
   listTwoFactorUsers(): Observable<any> {
     return this.http.get(`${this.apiUrl}/2fa/admin/users`);
   }

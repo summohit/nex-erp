@@ -103,3 +103,12 @@ export const MOBILE_PLATFORM = 'mobile';
  */
 export const mobileTwoFactorBypassEnabled = () =>
   process.env.ALLOW_MOBILE_2FA_BYPASS === 'true';
+
+/**
+ * How long a half-finished device move stays open.
+ *
+ * Long enough to install an authenticator app and scan, short enough that an
+ * abandoned attempt does not leave a second working secret parked on the
+ * account indefinitely.
+ */
+export const ROTATION_TTL_MS = 15 * 60 * 1000;

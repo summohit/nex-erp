@@ -106,7 +106,22 @@
             <svg lucideArrowRight size="15"></svg>
           </button>
 
+          <div class="rotation-pending-note" *ngIf="s.rotationPending">
+            <svg lucideSmartphone size="15"></svg>
+            <div>
+              <strong>A device move is waiting to be finished.</strong>
+              Your current app still signs you in. Start the move again to get a
+              fresh QR code, or cancel it.
+              <button type="button" class="link-btn" (click)="abandonRotation()">Cancel the move</button>
+            </div>
+          </div>
+
           <div class="card-actions-row" *ngIf="s.enabled">
+            <button class="btn-action-secondary btn-action-with-icon" (click)="askPassword('rotate')">
+              <svg lucideSmartphone size="15"></svg>
+              <span>Move to a New Device</span>
+            </button>
+
             <button class="btn-action-secondary btn-action-with-icon" (click)="askPassword('regenerate')">
               <svg lucideRefreshCw size="15"></svg>
               <span>Generate New Backup Codes</span>
@@ -126,35 +141,38 @@
         <!-- Elevated Stepper Track -->
         <div class="stepper-nav-bar">
           <!-- Step 1 -->
-          <div class="stepper-tab" [class.active]="step() === 'password'" [class.completed]="step() === 'enrol' || step() === 'codes'">
+          <div class="stepper-tab" [class.active]="step() === 'password'" [class.completed]="step() !== 'password'">
             <div class="stepper-tab-icon">
-              <svg lucideCheck size="14" *ngIf="step() === 'enrol' || step() === 'codes'"></svg>
+              <svg lucideCheck size="14" *ngIf="step() !== 'password'"></svg>
               <svg lucideLock size="14" *ngIf="step() === 'password'"></svg>
             </div>
             <div class="stepper-tab-info">
               <span class="stepper-step-num">Step 1</span>
-              <span class="stepper-step-title">Verify Password</span>
+              <span class="stepper-step-title">{{ intent() === 'rotate' ? 'Verify Identity' : 'Verify Password' }}</span>
             </div>
           </div>
 
-          <div class="stepper-divider" [class.active]="step() === 'enrol' || step() === 'codes'"></div>
+          <div class="stepper-divider" [class.active]="step() !== 'password'"></div>
 
           <!-- Step 2 -->
-          <div class="stepper-tab" [class.active]="step() === 'enrol'" [class.completed]="step() === 'codes'">
+          <div class="stepper-tab" [class.active]="step() === 'enrol' || step() === 'rotate'" [class.completed]="step() === 'codes'">
             <div class="stepper-tab-icon">
               <svg lucideCheck size="14" *ngIf="step() === 'codes'"></svg>
               <svg lucideQrCode size="14" *ngIf="step() !== 'codes'"></svg>
             </div>
             <div class="stepper-tab-info">
               <span class="stepper-step-num">Step 2</span>
-              <span class="stepper-step-title">Scan QR Code</span>
+              <span class="stepper-step-title">{{ intent() === 'rotate' ? 'Scan New Device' : 'Scan QR Code' }}</span>
             </div>
           </div>
 
-          <div class="stepper-divider" [class.active]="step() === 'codes'"></div>
+          <!-- A move issues no new backup codes — the existing ones are hashed
+               independently of the secret and stay valid — so showing a third
+               step that never activates would be a lie. -->
+          <div class="stepper-divider" [class.active]="step() === 'codes'" *ngIf="intent() !== 'rotate'"></div>
 
           <!-- Step 3 -->
-          <div class="stepper-tab" [class.active]="step() === 'codes'">
+          <div class="stepper-tab" [class.active]="step() === 'codes'" *ngIf="intent() !== 'rotate'">
             <div class="stepper-tab-icon">
               <svg lucideKeyRound size="14"></svg>
             </div>
@@ -219,14 +237,18 @@
                   (keyup.enter)="submitPassword()">
               </div>
               <div class="input-footer-hint">
-                <span>Enter the 6-digit code currently shown on your authenticator device</span>
+                <span *ngIf="intent() !== 'rotate'">Enter the 6-digit code currently shown on your authenticator device</span>
+                <span *ngIf="intent() === 'rotate'">
+                  Enter the code from your <strong>current</strong> device — or one of your
+                  backup codes if you no longer have it.
+                </span>
               </div>
             </div>
 
             <!-- Action Buttons Row -->
             <div class="wizard-action-toolbar">
               <button class="btn-action-primary" (click)="submitPassword()" [disabled]="isSubmitting() || !password">
-                <span *ngIf="!isSubmitting()">Continue to Setup</span>
+                <span *ngIf="!isSubmitting()">{{ intent() === 'rotate' ? 'Continue to New Device' : 'Continue to Setup' }}</span>
                 <span *ngIf="isSubmitting()">Verifying Password…</span>
                 <svg lucideArrowRight size="16" *ngIf="!isSubmitting()"></svg>
               </button>
@@ -295,6 +317,73 @@
                   <span>{{ isSubmitting() ? 'Verifying…' : 'Activate 2FA' }}</span>
                 </button>
                 <button class="btn-action-secondary" (click)="cancel()">
+                  <span>Cancel</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SUB-STEP: Scan on the new device ───────────────────────── -->
+        <div class="wizard-step-content" *ngIf="step() === 'rotate'">
+          <div class="enrol-clean-layout">
+            <div class="qr-showcase-panel">
+              <div class="qr-frame-box">
+                <img [src]="qrDataUri()" alt="QR code for the new device" class="qr-code-img">
+              </div>
+
+              <div class="secret-key-pill">
+                <div class="secret-key-header">
+                  <span class="secret-key-label">SETUP KEY</span>
+                  <button type="button" class="btn-copy-key" (click)="copySecret()" [title]="'Copy setup key'">
+                    <svg *ngIf="!secretCopied()" lucideCopy size="12"></svg>
+                    <svg *ngIf="secretCopied()" lucideCheck size="12" class="text-emerald"></svg>
+                    <span>{{ secretCopied() ? 'Copied' : 'Copy' }}</span>
+                  </button>
+                </div>
+                <code class="secret-key-text">{{ formattedSecret() }}</code>
+              </div>
+            </div>
+
+            <div class="verify-showcase-panel">
+              <div class="verify-instructions">
+                <h4>Scan on Your New Phone</h4>
+                <p>
+                  Add this to the authenticator app on the device you want to use from now on,
+                  then enter the code it shows.
+                </p>
+              </div>
+
+              <div class="rotation-safety-note">
+                <svg lucideShieldCheck size="15"></svg>
+                <span>
+                  Your old device keeps working until you finish. Nothing changes if you stop here.
+                </span>
+              </div>
+
+              <div class="verify-input-group">
+                <label for="rotateCodeInput">Enter 6-Digit Code from the New Device</label>
+                <div class="otp-input-wrapper">
+                  <input
+                    id="rotateCodeInput"
+                    type="text"
+                    class="otp-digit-input"
+                    [(ngModel)]="code"
+                    maxlength="6"
+                    inputmode="numeric"
+                    placeholder="000000"
+                    autocomplete="one-time-code"
+                    (keyup.enter)="confirmRotation()">
+                </div>
+                <span class="otp-hint-text">Codes refresh every 30 seconds · this move expires in 15 minutes</span>
+              </div>
+
+              <div class="enrol-action-buttons">
+                <button class="btn-action-primary" (click)="confirmRotation()" [disabled]="isSubmitting() || !code || code.length < 6">
+                  <svg lucideShieldCheck size="16"></svg>
+                  <span>{{ isSubmitting() ? 'Verifying…' : 'Switch to This Device' }}</span>
+                </button>
+                <button class="btn-action-secondary" (click)="abandonRotation()">
                   <span>Cancel</span>
                 </button>
               </div>

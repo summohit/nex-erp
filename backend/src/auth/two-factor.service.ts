@@ -29,6 +29,7 @@ import {
   EPOCH_TOLERANCE_SECONDS,
   LOCKOUT_MS,
   MAX_FAILED_ATTEMPTS,
+  ROTATION_TTL_MS,
   TOTP_DIGITS,
   TOTP_ISSUER,
   TOTP_PERIOD_SECONDS,
@@ -359,9 +360,14 @@ export class TwoFactorService {
       }),
     ]);
 
+    return this.buildEnrolmentPayload(user.email, secret);
+  }
+
+  /** Everything a client needs to add a secret to an authenticator app. */
+  private async buildEnrolmentPayload(email: string, secret: string) {
     const otpauthUri = generateURI({
       secret,
-      label: user.email,
+      label: email,
       issuer: TOTP_ISSUER,
       digits: TOTP_DIGITS,
       period: TOTP_PERIOD_SECONDS,
@@ -459,6 +465,145 @@ export class TwoFactorService {
     });
   }
 
+  // ── Moving to a new device ─────────────────────────────────────────────────
+
+  /**
+   * Begin moving the authenticator to a different phone.
+   *
+   * Before this existed there was no route at all: disable() refuses while the
+   * company requires 2FA, startEnrolment() refuses while confirmedAt is set,
+   * and adminReset() refuses to act on the caller's own account — so a company
+   * with a single SUPERADMIN was stuck with hand-written SQL.
+   *
+   * This is a rotation, not a bypass. The caller proves the factor they already
+   * hold (password + a live code, or a backup code if the old phone is gone),
+   * and the replacement secret is parked in pendingSecretCiphertext rather than
+   * overwriting the live one — so the OLD device keeps working until the new
+   * one proves itself, and abandoning the move changes nothing.
+   */
+  async startRotation(
+    user: { id: number; email: string },
+    password: unknown,
+    code: unknown,
+  ) {
+    const record = await this.prisma.userTwoFactor.findUnique({
+      where: { userId: user.id },
+    });
+    if (!record?.confirmedAt) {
+      throw new BadRequestException(
+        'Two-factor authentication is not enabled on this account.',
+      );
+    }
+
+    // Before any bcrypt or TOTP work: the backup-code path is up to ten bcrypt
+    // compares, which a locked-out attacker must not be able to spend.
+    this.assertNotLocked(record);
+    await this.assertPassword(user.id, password);
+    // Accepts a TOTP code or a backup code, and applies the same lockout.
+    const proof = await this.verifyCodeForUser(user.id, code);
+
+    const secret = this.totp.generateSecret();
+    await this.prisma.userTwoFactor.update({
+      where: { userId: user.id },
+      data: {
+        pendingSecretCiphertext: this.cryptoService.encrypt(secret),
+        pendingStartedAt: new Date(),
+      },
+    });
+
+    return {
+      ...(await this.buildEnrolmentPayload(user.email, secret)),
+      usedBackupCode: proof.usedBackupCode,
+      backupCodesRemaining: proof.backupCodesRemaining,
+      expiresInSeconds: Math.floor(ROTATION_TTL_MS / 1000),
+    };
+  }
+
+  /**
+   * Finish the move: prove the NEW device works, then promote its secret.
+   *
+   * confirmedAt is deliberately left alone — 2FA has been continuously on, and
+   * rewriting the date would claim otherwise. Backup codes are untouched too:
+   * they are hashed independently of the secret, so they stay valid.
+   */
+  async confirmRotation(userId: number, rawCode: unknown) {
+    const record = await this.prisma.userTwoFactor.findUnique({
+      where: { userId },
+    });
+    if (!record?.confirmedAt || !record.pendingSecretCiphertext) {
+      throw new BadRequestException(
+        'Start the device move before confirming a code.',
+      );
+    }
+
+    if (this.rotationExpired(record)) {
+      await this.clearPending(userId);
+      throw new BadRequestException(
+        'That device move timed out. Start it again.',
+      );
+    }
+
+    this.assertNotLocked(record);
+    const code = this.normaliseCode(rawCode);
+
+    // Only a TOTP code proves the new device. A backup code would prove nothing
+    // about the phone being set up.
+    if (!/^\d{6}$/.test(code)) {
+      await this.registerFailure(userId, record.failedAttempts);
+      throw new UnauthorizedException(INVALID_CODE);
+    }
+
+    const pending = this.decryptSecret({
+      secretCiphertext: record.pendingSecretCiphertext,
+    });
+    // No afterTimeStep here: the step counter was advanced by the OLD secret
+    // moments ago, and applying it to a different secret would reject the new
+    // phone's first code for up to a minute for no security benefit.
+    const result = await this.totp.verify(code, {
+      secret: pending,
+      epochTolerance: EPOCH_TOLERANCE_SECONDS,
+    });
+
+    if (!result.valid) {
+      await this.registerFailure(userId, record.failedAttempts);
+      throw new UnauthorizedException(INVALID_CODE);
+    }
+
+    await this.prisma.userTwoFactor.update({
+      where: { userId },
+      data: {
+        secretCiphertext: record.pendingSecretCiphertext,
+        pendingSecretCiphertext: null,
+        pendingStartedAt: null,
+        lastUsedStep: result.timeStep,
+        lastUsedAt: new Date(),
+        failedAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+
+    this.logger.log(`Two-factor device rotated for user ${userId}`);
+    return { enabled: true, rotatedAt: new Date() };
+  }
+
+  /** Abandon a move; the original device carries on unaffected. */
+  async cancelRotation(userId: number) {
+    await this.clearPending(userId);
+    return { rotationPending: false };
+  }
+
+  private rotationExpired(record: { pendingStartedAt: Date | null }): boolean {
+    if (!record.pendingStartedAt) return true;
+    return Date.now() - record.pendingStartedAt.getTime() > ROTATION_TTL_MS;
+  }
+
+  private async clearPending(userId: number) {
+    await this.prisma.userTwoFactor.updateMany({
+      where: { userId },
+      data: { pendingSecretCiphertext: null, pendingStartedAt: null },
+    });
+  }
+
   // ── Management ─────────────────────────────────────────────────────────────
 
   async status(userId: number, companyId: number) {
@@ -469,6 +614,10 @@ export class TwoFactorService {
     ]);
 
     const enabled = !!record?.confirmedAt;
+    const rotationPending =
+      enabled &&
+      !!record?.pendingSecretCiphertext &&
+      !this.rotationExpired(record);
     return {
       enabled,
       confirmedAt: record?.confirmedAt ?? null,
@@ -476,6 +625,10 @@ export class TwoFactorService {
       companyRequires,
       // Nobody may leave the company non-compliant by turning their own off.
       canDisable: enabled && !companyRequires,
+      // Moving to a new phone stays available even when the company requires
+      // 2FA — it rotates the secret rather than removing the factor.
+      rotationPending,
+      rotationStartedAt: rotationPending ? record?.pendingStartedAt ?? null : null,
     };
   }
 

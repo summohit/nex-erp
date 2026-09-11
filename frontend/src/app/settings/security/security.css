@@ -1709,3 +1709,54 @@
   to { transform: rotate(360deg); }
 }
 
+/* ── Moving to a new device ──────────────────────────────────────────── */
+
+/* Shown when a move was started and never finished. Deliberately reassuring
+   rather than alarming: the account is not in a degraded state, the old
+   authenticator still works, and the only cost is an unused pending secret. */
+.rotation-pending-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #1e3a8a;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+}
+
+.rotation-pending-note svg { flex-shrink: 0; margin-top: 2px; }
+.rotation-pending-note strong { display: block; font-weight: 600; }
+
+.link-btn {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #1d4ed8;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.link-btn:hover { color: #1e40af; }
+
+/* The promise that makes this safe to start: nothing is lost by stopping. */
+.rotation-safety-note {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+}
+
+.rotation-safety-note svg { flex-shrink: 0; margin-top: 1px; }

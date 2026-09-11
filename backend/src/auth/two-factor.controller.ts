@@ -128,6 +128,40 @@ export class TwoFactorController {
     );
   }
 
+  // ── Moving to a new device ────────────────────────────────────────────────
+  // Throttled like /setup and /disable: both steps re-authenticate, and the
+  // start step can spend up to ten bcrypt compares on the backup-code path.
+
+  @UseGuards(AuthGuard, ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(300), limit: 5 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('rotate/start')
+  startRotation(
+    @Req() req: any,
+    @Body() body: { password?: string; code?: string },
+  ) {
+    return this.twoFactor.startRotation(
+      { id: req.user.sub, email: req.user.email },
+      body?.password,
+      body?.code,
+    );
+  }
+
+  @UseGuards(AuthGuard, ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(60), limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('rotate/confirm')
+  confirmRotation(@Req() req: any, @Body() body: { code?: string }) {
+    return this.twoFactor.confirmRotation(req.user.sub, body?.code);
+  }
+
+  @UseGuards(AuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('rotate/cancel')
+  cancelRotation(@Req() req: any) {
+    return this.twoFactor.cancelRotation(req.user.sub);
+  }
+
   @UseGuards(AuthGuard, ThrottlerGuard)
   @Throttle({ default: { ttl: seconds(300), limit: 5 } })
   @HttpCode(HttpStatus.OK)

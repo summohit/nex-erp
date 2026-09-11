@@ -139,6 +139,14 @@ model UserTwoFactor {
   /// must test this field — never row existence.
   confirmedAt DateTime?
 
+  /// A replacement secret, held while the user moves their authenticator to a
+  /// new phone. It sits BESIDE secretCiphertext rather than replacing it, so
+  /// the old device keeps working until the new one proves itself — an
+  /// abandoned move leaves the account exactly as it was, and 2FA never lapses
+  /// even for a moment. Promoted to secretCiphertext on confirmation.
+  pendingSecretCiphertext String?
+  pendingStartedAt        DateTime?
+
   /// Highest TOTP time step already accepted, fed back to otplib as
   /// `afterTimeStep`. Stops a code observed over the shoulder being replayed
   /// while it is still inside the acceptance window.
