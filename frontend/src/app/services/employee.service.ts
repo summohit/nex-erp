@@ -14,8 +14,8 @@ export interface Employee {
   designationId?: number;
   role: string;
   isProjectManager?: boolean;
-  department?: { name: string };
-  designation?: { name: string };
+  department?: { id?: number; name: string };
+  designation?: { id?: number; name: string };
   user?: { email: string, role: string, avatarUrl?: string, status?: string };
   createdAt?: string;
   employeeCode?: string;
@@ -23,6 +23,7 @@ export interface Employee {
   pfNumber?: string;
   esiNumber?: string;
   workLocation?: string;
+  onboardingStatus?: string;
 }
 
 @Injectable({

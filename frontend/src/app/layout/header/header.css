@@ -280,6 +280,16 @@
   position: relative;
 }
 
+.ticket-btn-icon {
+  width: 17px;
+  height: 17px;
+  stroke: #2563eb;
+  stroke-width: 2;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+
 .btn-header-tickets:hover {
   background: rgba(37, 99, 235, 0.14);
   border-color: rgba(37, 99, 235, 0.35);
@@ -724,3 +734,131 @@ button.menu-link {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+
+/* ── Phone navigation trigger ──────────────────────────────────────────────
+   Hidden on desktop, where the rail is permanently visible. 44px square: the
+   minimum comfortable touch target, and the header is only 64px tall. */
+.btn-mobile-nav {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-right: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.btn-mobile-nav:active { background: #f1f5f9; }
+
+@media (max-width: 1024px) {
+  .btn-mobile-nav { display: inline-flex; }
+
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  /* The search box is the one element that can give up room; the clock widget
+     and the profile menu are both actions people reach for. */
+  .global-search-container {
+    flex: 1;
+    min-width: 0;
+  }
+  .search-kbd { display: none; }
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    padding: 0 10px;
+    gap: 6px;
+    height: 58px;
+  }
+
+  /* Hide user name and role on mobile; keep avatar only */
+  .user-details,
+  .user-profile-trigger > svg,
+  .user-profile-trigger svg[lucideChevronDown],
+  .user-profile-trigger svg.lucide-chevron-down {
+    display: none !important;
+  }
+
+  .user-profile-trigger {
+    padding: 2px;
+    gap: 0;
+  }
+
+  /* Streamline header action gap */
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  /* Streamline Tickets button on mobile */
+  .btn-header-tickets {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    padding: 0 8px !important;
+    gap: 4px !important;
+  }
+  .btn-header-tickets .btn-tickets-text,
+  .btn-header-tickets span:not(.ticket-count-badge) {
+    display: none !important;
+  }
+  .ticket-btn-icon {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
+    stroke: #2563eb !important;
+    display: inline-block !important;
+  }
+
+  /* Compact Clock-in Widget */
+  .clock-systray-widget {
+    padding: 3px 6px 3px 8px;
+    gap: 6px;
+  }
+  .timer-digits {
+    font-size: 11.5px;
+    letter-spacing: 0.2px;
+  }
+  .btn-clock-action {
+    padding: 5px 9px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  /* Hide search bar on mobile */
+  .global-search-container {
+    display: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .global-search-container,
+  .global-search-input,
+  .clock-timer-display .clock-label,
+  .clock-divider {
+    display: none !important;
+  }
+
+  .clock-systray-widget {
+    padding: 2px 4px 2px 6px;
+    gap: 4px;
+  }
+  .btn-clock-action {
+    padding: 4px 7px;
+    font-size: 10.5px;
+  }
+  .btn-header-icon {
+    width: 36px;
+    height: 36px;
+  }
+}
+

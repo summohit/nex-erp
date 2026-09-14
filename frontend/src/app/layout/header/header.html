@@ -2,6 +2,16 @@
   <!-- Spotlight Search Component -->
   <app-spotlight-search></app-spotlight-search>
 
+  <!-- Phone navigation. Hidden on desktop, where the rail is always visible. -->
+  <button
+    type="button"
+    class="btn-mobile-nav"
+    (click)="layout.toggleMobileNav()"
+    [attr.aria-expanded]="layout.isMobileNavOpen()"
+    aria-label="Menu">
+    <svg lucideMenu size="20"></svg>
+  </button>
+
   <!-- Global Search Input Trigger -->
   <div class="global-search-container" (click)="openSpotlight()">
     <svg lucideSearch size="15" class="search-icon"></svg>
@@ -53,8 +63,13 @@
     [title]="canSeeTicketAlerts() && openTicketCount() > 0
       ? openTicketCount() + ' open ticket(s) awaiting the team'
       : 'Helpdesk & Tickets'">
-    <svg lucideTicket size="16"></svg>
-    <span class="hidden sm:inline">Tickets</span>
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ticket-btn-icon">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+      <path d="M13 5v2"/>
+      <path d="M13 17v2"/>
+      <path d="M13 11v2"/>
+    </svg>
+    <span class="btn-tickets-text">Tickets</span>
 
     <span class="ticket-count-badge"
           *ngIf="canSeeTicketAlerts() && openTicketCount() > 0">

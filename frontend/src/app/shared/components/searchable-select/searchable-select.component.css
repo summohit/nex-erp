@@ -126,8 +126,8 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  min-width: 220px;
-  max-width: 320px;
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 32px));
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
@@ -136,6 +136,15 @@
   overflow: hidden;
   animation: selectDropdownFade 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+@media (max-width: 640px) {
+  .select-dropdown {
+    width: 100%;
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+  }
+}
+
 
 @keyframes selectDropdownFade {
   from { opacity: 0; transform: translateY(-4px); }

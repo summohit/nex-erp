@@ -703,11 +703,11 @@
         <ng-container *ngIf="!isLoading">
           <ng-container *ngFor="let lead of getFilteredLeads()">
           <tr class="lead-row">
-            <td class="lead-code-cell">
+            <td data-label="Lead ID" class="lead-code-cell">
               <span *ngIf="lead.leadCode" class="entity-code">{{lead.leadCode}}</span>
               <span *ngIf="!lead.leadCode" class="no-data-dash">&mdash;</span>
             </td>
-            <td class="col-lead-title">
+            <td data-label="Lead" class="col-lead-title">
               <div class="lead-title-cell">
                 <button type="button" class="lead-expand-btn" [class.expanded]="isLeadExpanded(lead)"
                         (click)="toggleLeadFollowUps(lead, $event)"
@@ -723,17 +723,17 @@
                 </span>
               </div>
             </td>
-            <td>{{lead.companyName || '-'}}</td>
-            <td class="lead-contact-cell">
+            <td data-label="Company">{{lead.companyName || '-'}}</td>
+            <td data-label="Contact" class="lead-contact-cell">
               <button type="button" class="lead-contact-name-link" *ngIf="lead.contactName && lead.broughtByContact?.id" title="Open contact profile" (click)="openLeadBroughtContact(lead)">{{lead.contactName}}</button>
               <div class="lead-contact-name" *ngIf="lead.contactName && !lead.broughtByContact?.id">{{lead.contactName}}</div>
               <div class="lead-contact-email" *ngIf="lead.email">{{lead.email}}</div>
             </td>
-            <td class="lead-phone-cell">
+            <td data-label="Phone" class="lead-phone-cell">
               <a *ngIf="lead.phone" [href]="'tel:' + lead.phone" (click)="$event.stopPropagation()">{{lead.phone}}</a>
               <span *ngIf="!lead.phone" class="no-data-dash">&mdash;</span>
             </td>
-            <td>
+            <td data-label="Owner">
               <div class="table-user-cell" *ngIf="lead.assignedTo">
                 <img *ngIf="lead.assignedTo.avatarUrl" [src]="lead.assignedTo.avatarUrl" class="table-avatar-img" />
                 <div *ngIf="!lead.assignedTo.avatarUrl" class="table-avatar-circle">
@@ -746,7 +746,7 @@
               </div>
               <span *ngIf="!lead.assignedTo" class="unassigned-text">Unassigned</span>
             </td>
-            <td>
+            <td data-label="Stage">
               <div class="status-dropdown" [class.open]="statusMenuOpen === lead.id">
                 <button type="button" class="table-status-trigger ldm-status-badge ldm-status-{{lead.status | lowercase}}"
                         (click)="toggleStatusMenu(lead, $event)">
@@ -765,8 +765,8 @@
                 </div>
               </div>
             </td>
-            <td class="lead-value-cell">{{lead.value | currency:lead.currency||'INR'}}</td>
-            <td>
+            <td data-label="Value" class="lead-value-cell">{{lead.value | currency:lead.currency||'INR'}}</td>
+            <td data-label="Next follow up">
               <ng-container *ngIf="showNextFollowUpInTable(lead)">
                 <div *ngIf="getNextFollowUpDate(lead) as fuDate" class="table-followup-cell" [class.overdue]="isFollowUpOverdue(fuDate)">
                   <svg lucideCalendarClock size="12"></svg>
@@ -776,7 +776,7 @@
               </ng-container>
               <span *ngIf="!showNextFollowUpInTable(lead)" class="no-data-dash">&mdash;</span>
             </td>
-            <td class="col-actions-sticky">
+            <td data-label="Actions" class="col-actions-sticky">
               <div class="action-dropdown" [class.open]="actionMenuOpen === lead.id">
                 <button type="button" class="btn-action-trigger" title="Actions"
                         (click)="toggleActionMenu(lead, $event)">

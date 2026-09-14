@@ -504,17 +504,31 @@ export class TicketsService {
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
 
-    // The list query hides attendance issues from everyone but HR, admins, the
-    // reporter and the assignee. Without the same check here the id alone would
-    // be enough to read one, which makes the list filter decorative.
-    if (user && ticket.type === TicketsService.ATTENDANCE_TYPE) {
+    // Access. findAll scopes the list — non-privileged callers see only what
+    // they reported — but this method took no caller at all, so the id alone
+    // was enough to read any ticket in the company: its description, comments,
+    // attachments and time entries. That made the list scoping decorative.
+    //
+    // Not found rather than forbidden, throughout: whether a given ticket
+    // exists is itself something the caller should not learn.
+    if (user) {
       const involved =
         !!user.employeeId &&
         (ticket.reporterId === user.employeeId || ticket.assigneeId === user.employeeId);
-      if (!this.canHandleAttendanceIssues(user.role) && !involved) {
-        // Not found rather than forbidden: whether a given ticket exists is
-        // itself something this caller should not learn.
-        throw new NotFoundException('Ticket not found');
+
+      if (ticket.type === TicketsService.ATTENDANCE_TYPE) {
+        // Personnel matter: the engineering bypass does not apply.
+        if (!this.canHandleAttendanceIssues(user.role) && !involved) {
+          throw new NotFoundException('Ticket not found');
+        }
+      } else {
+        // Everything else follows findAll, plus the assignee — someone a ticket
+        // is assigned to has to be able to open it, whatever their department.
+        const privileged =
+          this.canSeeAllTickets(user.role) || (await this.isEngineeringDept(user.employeeId));
+        if (!privileged && !involved) {
+          throw new NotFoundException('Ticket not found');
+        }
       }
     }
 

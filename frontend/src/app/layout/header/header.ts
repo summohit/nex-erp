@@ -9,11 +9,12 @@ import { AttendanceService } from '../../services/attendance';
 import { EmployeeService } from '../../services/employee.service';
 import { TicketService } from '../../services/ticket.service';
 import { SpotlightSearchComponent } from '../../shared/components/spotlight-search/spotlight-search.component';
+import { LayoutService } from '../../services/layout.service';
 import {
   LucideSearch, LucideBell, LucideUser, LucideLogOut,
   LucideSettings, LucideCheck, LucideChevronDown, LucideX, LucideKanban, LucideClock,
   LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket,
-  LucideArrowRight
+  LucideArrowRight, LucideMenu
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
@@ -28,12 +29,15 @@ import { HotToastService } from '@ngneat/hot-toast';
     LucideSearch, LucideBell, LucideUser, LucideLogOut,
     LucideChevronDown, LucideX, LucideKanban, LucideClock,
     LucidePlay, LucideSquare, LucideLoader2, LucideLock, LucideEye, LucideEyeOff, LucideTicket,
-    LucideArrowRight
+    LucideArrowRight, LucideMenu
   ],
   templateUrl: './header.html',
   styleUrls: ['./header.css']
 })
 export class HeaderComponent implements OnInit, OnDestroy {
+  /** Drives the phone navigation; the rail itself reads the same state. */
+  readonly layout = inject(LayoutService);
+
   private router = inject(Router);
   private authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);

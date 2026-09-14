@@ -6,7 +6,7 @@ import { AuthService } from '../../services/auth.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
 import { MasterDataService, Department, Designation } from '../../services/master-data.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucidePlus, LucideSearch, LucideX, LucideChevronRight, LucideUpload } from '@lucide/angular';
+import { LucidePlus, LucideSearch, LucideX, LucideChevronRight, LucideUpload, LucideLayoutGrid, LucideList, LucideBuilding, LucideMail, LucidePhone } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
@@ -19,11 +19,29 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 @Component({
   selector: 'app-employee-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucidePlus, LucideSearch, LucideX, LucideChevronRight, AgGridAngular, EmployeeDrawerComponent, BulkUploadModalComponent, SearchableSelectComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucidePlus,
+    LucideSearch,
+    LucideX,
+    LucideChevronRight,
+    LucideUpload,
+    LucideLayoutGrid,
+    LucideList,
+    LucideBuilding,
+    LucideMail,
+    LucidePhone,
+    AgGridAngular,
+    EmployeeDrawerComponent,
+    BulkUploadModalComponent,
+    SearchableSelectComponent
+  ],
   templateUrl: './employee-list.html',
   styleUrls: ['./employee-list.css']
 })
 export class EmployeeListComponent implements OnInit {
+
   private employeeService = inject(EmployeeService);
   private masterDataService = inject(MasterDataService);
   private toast = inject(HotToastService);
@@ -51,6 +69,7 @@ export class EmployeeListComponent implements OnInit {
     { id: 'COMPLETED', name: 'Completed' }
   ];
 
+  viewMode = signal<'table' | 'cards'>('cards');
   isDrawerOpen = false;
   isBulkUploadOpen = false;
   selectedEmployee: Employee | null = null;
@@ -293,8 +312,52 @@ export class EmployeeListComponent implements OnInit {
   }
 
   ngOnInit() {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      this.viewMode.set('cards');
+    } else {
+      this.viewMode.set('table');
+    }
     this.loadEmployees();
     this.loadMasterData();
+  }
+
+  getFilteredEmployees(): Employee[] {
+    let list = this.employees();
+    if (this.filterDepartmentId) {
+      list = list.filter(e => (e.departmentId ?? e.department?.id) === Number(this.filterDepartmentId));
+    }
+    if (this.filterDesignationId) {
+      list = list.filter(e => (e.designationId ?? e.designation?.id) === Number(this.filterDesignationId));
+    }
+    if (this.filterRole) {
+      list = list.filter(e => (e.user?.role || e.role) === this.filterRole);
+    }
+    if (this.filterOnboardingStatus) {
+      list = list.filter(e => (e.onboardingStatus || (e as any).onboardingStatus) === this.filterOnboardingStatus);
+    }
+    if (this.searchText && this.searchText.trim()) {
+      const q = this.searchText.toLowerCase().trim();
+      list = list.filter(e =>
+        (e.firstName && e.firstName.toLowerCase().includes(q)) ||
+        (e.lastName && e.lastName.toLowerCase().includes(q)) ||
+        (e.user?.email && e.user.email.toLowerCase().includes(q)) ||
+        (e.employeeCode && e.employeeCode.toLowerCase().includes(q)) ||
+        (e.department?.name && e.department.name.toLowerCase().includes(q)) ||
+        (e.designation?.name && e.designation.name.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }
+
+  getEmployeeInitials(emp: Employee): string {
+    const f = emp.firstName ? emp.firstName.charAt(0) : '';
+    const l = emp.lastName ? emp.lastName.charAt(0) : '';
+    return `${f}${l}`.toUpperCase() || 'EM';
+  }
+
+  toTitleCase(str: string): string {
+    if (!str) return '';
+    return str.toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase());
   }
 
   /**

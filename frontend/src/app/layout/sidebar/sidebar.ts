@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { LayoutService } from '../../services/layout.service';
 import { MenusService } from '../../services/menus.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug, LucideMapPin } from '@lucide/angular';
@@ -112,7 +113,21 @@ export class SidebarComponent implements OnInit {
       filter(event => event instanceof NavigationEnd)
     ).subscribe((event: any) => {
       this.checkExpandedMenu(event.urlAfterRedirects);
+      // On a phone the rail covers the page, so navigating has to close it —
+      // otherwise the destination is behind the menu you just used.
+      this.closeMobileNav();
     });
+  }
+
+  /**
+   * On a phone the rail slides over the content instead of pushing it: at 375px
+   * there is no room for a 260px sidebar and a usable page at the same time.
+   * The header's hamburger drives the same state, so it lives in LayoutService.
+   */
+  readonly layout = inject(LayoutService);
+
+  closeMobileNav() {
+    this.layout.closeMobileNav();
   }
 
   toggleSidebar() {

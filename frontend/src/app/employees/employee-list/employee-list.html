@@ -5,13 +5,25 @@
       <p>Manage your workforce, assign departments, and configure system access roles.</p>
     </div>
     <div class="header-actions">
-      <button style="background: #ffffff; border: 1px solid #d1d5db; color: #374151; font-weight: 500; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 6px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); margin-right: 12px;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#ffffff'" (click)="openBulkUpload()" *ngIf="isAdmin()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Bulk Import
+      <!-- View mode toggle -->
+      <div class="view-mode-toggle">
+        <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'cards'" (click)="viewMode.set('cards')" title="Card View">
+          <svg lucideLayoutGrid size="15"></svg>
+          <span>Cards</span>
+        </button>
+        <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'table'" (click)="viewMode.set('table')" title="Table View">
+          <svg lucideList size="15"></svg>
+          <span>Table</span>
+        </button>
+      </div>
+
+      <button class="btn-secondary" (click)="openBulkUpload()" *ngIf="isAdmin()">
+        <svg lucideUpload size="16"></svg>
+        <span>Bulk Import</span>
       </button>
       <button class="btn-primary" (click)="openDrawer()" *ngIf="isAdmin()">
         <svg lucidePlus size="16"></svg>
-        Add Employee
+        <span>Add Employee</span>
       </button>
     </div>
   </div>
@@ -75,10 +87,74 @@
     </button>
   </div>
 
-  <div class="grid-container">
+  <!-- Cards View (for mobile or toggle) -->
+  <div class="employee-cards-view" *ngIf="viewMode() === 'cards' && !isLoading()">
+    <div class="employee-cards-grid" *ngIf="getFilteredEmployees().length > 0">
+      <div class="emp-card" *ngFor="let emp of getFilteredEmployees()" (click)="openDrawer(emp)">
+        <div class="emp-card-header">
+          <div class="emp-card-avatar">
+            <img *ngIf="emp.avatarUrl || emp.user?.avatarUrl" [src]="emp.avatarUrl || emp.user?.avatarUrl" alt="Avatar">
+            <div *ngIf="!(emp.avatarUrl || emp.user?.avatarUrl)" class="emp-card-initials">
+              {{ getEmployeeInitials(emp) }}
+            </div>
+          </div>
+          <div class="emp-card-info">
+            <div class="emp-card-name-row">
+              <span class="emp-card-name">{{ toTitleCase(emp.firstName + ' ' + emp.lastName) }}</span>
+              <span class="badge-pm" *ngIf="emp.isProjectManager">PM</span>
+            </div>
+            <div class="emp-card-meta-row">
+              <span class="emp-id-badge" *ngIf="emp.employeeCode">{{ emp.employeeCode }}</span>
+              <span class="emp-role-badge" [ngClass]="'role-' + (emp.user?.role | lowercase)">{{ emp.user?.role || 'EMPLOYEE' }}</span>
+            </div>
+          </div>
+          <span class="emp-status-dot" [class.active]="emp.user?.status !== 'SUSPENDED'" [title]="emp.user?.status || 'ACTIVE'"></span>
+        </div>
+
+        <div class="emp-card-body">
+          <div class="emp-detail-row" *ngIf="emp.department?.name || emp.designation?.name">
+            <svg lucideBuilding size="14" class="emp-detail-icon"></svg>
+            <span class="emp-detail-text">{{ emp.department?.name || 'Unassigned' }} &bull; {{ emp.designation?.name || 'Staff' }}</span>
+          </div>
+          <div class="emp-detail-row" *ngIf="emp.user?.email">
+            <svg lucideMail size="14" class="emp-detail-icon"></svg>
+            <a [href]="'mailto:' + emp.user?.email" (click)="$event.stopPropagation()" class="emp-detail-link">{{ emp.user?.email }}</a>
+          </div>
+          <div class="emp-detail-row" *ngIf="emp.phone">
+            <svg lucidePhone size="14" class="emp-detail-icon"></svg>
+            <a [href]="'tel:' + emp.phone" (click)="$event.stopPropagation()" class="emp-detail-link">{{ emp.phone }}</a>
+          </div>
+        </div>
+
+        <div class="emp-card-footer">
+          <span class="onboarding-badge" [ngClass]="'status-' + ((emp.onboardingStatus || 'active') | lowercase)">
+            {{ emp.onboardingStatus || 'ACTIVE' }}
+          </span>
+          <button type="button" class="btn-card-edit" (click)="$event.stopPropagation(); openDrawer(emp)">
+            <span>View Profile</span>
+            <svg lucideChevronRight size="13"></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty-cards-state" *ngIf="getFilteredEmployees().length === 0">
+      <svg lucideSearch size="32" class="empty-icon"></svg>
+      <p>No employees match your search or filters.</p>
+      <button class="btn-clear-filters-inline" (click)="clearFilters()">Clear Filters</button>
+    </div>
+  </div>
+
+  <!-- Table View (AG Grid) -->
+  <div class="grid-container" *ngIf="viewMode() === 'table' || isLoading()">
+    <div class="table-swipe-hint" *ngIf="!isLoading() && viewMode() === 'table'">
+      <svg lucideChevronRight size="13"></svg>
+      <span>Swipe horizontally to view all columns</span>
+    </div>
+
     <!-- Skeleton Loader -->
     <ng-container *ngIf="isLoading()">
-      <div style="background: white; border-radius: 8px; padding: 0; border: 1px solid #e2e8f0; width: 100%; height: 900px; overflow: hidden;">
+      <div style="background: white; border-radius: 8px; padding: 0; border: 1px solid #e2e8f0; width: 100%; height: 600px; overflow: hidden;">
         <!-- Header -->
         <div style="display: flex; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; background: #f8fafc;">
           <div class="skeleton-line shimmer" style="width: 24px; height: 16px; margin-right: 16px;"></div>
@@ -113,7 +189,7 @@
 
     <ag-grid-angular
       *ngIf="!isLoading()"
-      style="width: 100%; height: 900px;"
+      style="width: 100%; height: 600px;"
       class="ag-theme-quartz"
       [rowData]="employees()"
       [columnDefs]="colDefs"

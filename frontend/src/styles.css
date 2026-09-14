@@ -1211,3 +1211,129 @@ button.btn-outline:hover,
     width: 240px !important;
   }
 }
+
+/* ── Phone navigation ──────────────────────────────────────────────────────
+   Set by LayoutService while the off-canvas rail is open. The rail is full
+   height, so the page behind it must not scroll under the menu. Body-level, so
+   it cannot live in a component's scoped styles. */
+body.nav-scroll-lock {
+  overflow: hidden;
+}
+
+/* The rail is hidden below 1024px, so anything that reserved room for it has
+   to stop doing so. .sidebar-collapsed is left set on the body across the
+   breakpoint — it is a desktop preference, not a layout state. */
+@media (max-width: 1024px) {
+  body.sidebar-collapsed .dashboard-layout {
+    padding-left: 0;
+  }
+}
+
+/* ── Mobile Responsive Overhauls ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .tickets-page {
+    padding: 0 !important;
+  }
+
+  .page-container {
+    padding: 0 !important;
+  }
+
+  .page-header-card,
+  .header-main-text,
+  .page-header,
+  .page-container > .header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 16px !important;
+    gap: 14px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .header-title-group,
+  .header-content,
+  .page-header-text,
+  .header-title {
+    width: 100% !important;
+  }
+
+  .page-header-card h1,
+  .header-main-text h1,
+  .page-header h1,
+  .page-container > .header h1,
+  .page-header .page-title {
+    font-size: 19px !important;
+  }
+
+  .page-header-card p,
+  .header-main-text p,
+  .page-header p,
+  .page-container > .header p,
+  .page-header .page-subtitle {
+    font-size: 13px !important;
+  }
+
+  .header-actions,
+  .header-actions-group,
+  .header-right,
+  .page-header-actions,
+  .actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+
+  .header-actions > button,
+  .header-actions-group > button,
+  .header-right > button,
+  .page-header-actions > button,
+  .actions > button,
+  .header-actions > a,
+  .header-actions-group > a,
+  .header-right > a,
+  .page-header-actions > a {
+    flex: 1 1 auto !important;
+    min-width: 120px !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Responsive AG Grid and Data Containers */
+  .ag-theme-quartz {
+    --ag-row-height: 56px;
+    --ag-header-height: 44px;
+    --ag-cell-horizontal-padding: 12px;
+    --ag-font-size: 12px;
+  }
+
+  .grid-container,
+  .table-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-header-card,
+  .header-main-text,
+  .page-header,
+  .page-container > .header {
+    padding: 14px !important;
+    border-radius: 12px !important;
+    gap: 12px !important;
+  }
+
+  .page-header-card h1,
+  .header-main-text h1,
+  .page-header h1,
+  .page-container > .header h1 {
+    font-size: 17px !important;
+  }
+}
+

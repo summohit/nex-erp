@@ -29,6 +29,11 @@ model Company {
   /// Prefix for generated quote numbers. Blank falls back to "QT", which is
   /// what every existing quotation already uses.
   quotationPrefix     String?
+  /// Counter behind sequential quotation numbers. Incremented atomically when a
+  /// number is issued, never derived from existing numbers: the quotations that
+  /// predate this carry a millisecond timestamp, and reading the highest of
+  /// those as a sequence would start the count at sixty-two million.
+  quotationSequence   Int      @default(0)
 
   /// Bank details printed on quotations so a client can pay against them.
   bankAccountName     String?

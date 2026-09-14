@@ -20,7 +20,9 @@ describe('SalesService — quotations without a client', () => {
 
   beforeEach(() => {
     prisma = {
-      company: { findUnique: jest.fn(async () => ({ quotationPrefix: null })) },
+      // Allocating a number now increments a counter on the company row and
+      // returns it, rather than reading a prefix and stamping the clock.
+      company: { update: jest.fn(async () => ({ quotationSequence: 9, quotationPrefix: null })) },
       quotation: {
         create: jest.fn(async ({ data }: any) => ({
           id: 1, quoteNumber: data.quoteNumber, total: data.total,
@@ -64,22 +66,60 @@ describe('SalesService — quotations without a client', () => {
     });
   });
 
+  /**
+   * Numbers were `<prefix>-<last 8 digits of Date.now()>` — unique by luck, and
+   * noise on a document a client keeps. They now come from a counter on the
+   * company row.
+   */
   describe('quote numbering', () => {
+    const issued = () => prisma.quotation.create.mock.calls[0][0].data.quoteNumber;
+
     it('falls back to QT when no prefix is configured', async () => {
       await service.createQuotation(COMPANY, baseQuote({ leadId: 42 }), 1);
-      expect(prisma.quotation.create.mock.calls[0][0].data.quoteNumber).toMatch(/^QT-\d+$/);
+      expect(issued()).toBe('QT-0009');
     });
 
     it("uses the company's configured prefix", async () => {
-      prisma.company.findUnique.mockResolvedValue({ quotationPrefix: 'CES' });
+      prisma.company.update.mockResolvedValue({ quotationSequence: 9, quotationPrefix: 'CES' });
       await service.createQuotation(COMPANY, baseQuote({ leadId: 42 }), 1);
-      expect(prisma.quotation.create.mock.calls[0][0].data.quoteNumber).toMatch(/^CES-\d+$/);
+      expect(issued()).toBe('CES-0009');
     });
 
     it('does not double the separator when the prefix already ends in one', async () => {
-      prisma.company.findUnique.mockResolvedValue({ quotationPrefix: 'CES-' });
+      prisma.company.update.mockResolvedValue({ quotationSequence: 9, quotationPrefix: 'CES-' });
       await service.createQuotation(COMPANY, baseQuote({ leadId: 42 }), 1);
-      expect(prisma.quotation.create.mock.calls[0][0].data.quoteNumber).toMatch(/^CES-\d+$/);
+      expect(issued()).toBe('CES-0009');
+    });
+
+    it('is sequential, not a timestamp', async () => {
+      prisma.company.update.mockResolvedValue({ quotationSequence: 10, quotationPrefix: '3111' });
+      await service.createQuotation(COMPANY, baseQuote({ leadId: 42 }), 1);
+      expect(issued()).toBe('3111-0010');
+    });
+
+    it('pads to four digits and keeps growing past them', async () => {
+      prisma.company.update.mockResolvedValue({ quotationSequence: 12345, quotationPrefix: '3111' });
+      await service.createQuotation(COMPANY, baseQuote({ leadId: 42 }), 1);
+      expect(issued()).toBe('3111-12345');
+    });
+
+    // The reason it is a counter and not max(number) + 1: the increment and the
+    // read are one statement, so two concurrent creates cannot collide.
+    it('allocates by incrementing the company counter in place', async () => {
+      await service.createQuotation(COMPANY, baseQuote({ leadId: 42 }), 1);
+      expect(prisma.company.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: COMPANY },
+          data: { quotationSequence: { increment: 1 } },
+        }),
+      );
+    });
+
+    it('does not allocate a number for a revision, which continues the lineage', async () => {
+      prisma.quotation.findFirst.mockResolvedValueOnce({ id: 16, quoteNumber: '3111-0009', version: 1 });
+      await service.createQuotation(COMPANY, baseQuote({ leadId: 42 }), 1);
+      expect(prisma.company.update).not.toHaveBeenCalled();
+      expect(issued()).toBe('3111-0009-R2');
     });
   });
 
@@ -117,7 +157,9 @@ describe('SalesService — every line must be priced', () => {
 
   beforeEach(() => {
     prisma = {
-      company: { findUnique: jest.fn(async () => ({ quotationPrefix: null })) },
+      // Allocating a number now increments a counter on the company row and
+      // returns it, rather than reading a prefix and stamping the clock.
+      company: { update: jest.fn(async () => ({ quotationSequence: 9, quotationPrefix: null })) },
       quotation: {
         create: jest.fn(async ({ data }: any) => ({ id: 1, quoteNumber: data.quoteNumber, total: data.total, client: null })),
         findFirst: jest.fn(async () => ({ id: 5, quoteNumber: '3111-11111111', version: 1, status: 'DRAFT', taxRate: 18 })),
@@ -374,7 +416,7 @@ describe('SalesService — a new proposal continues the deal lineage', () => {
 
   beforeEach(() => {
     prisma = {
-      company: { findUnique: jest.fn(async () => ({ quotationPrefix: '3111' })) },
+      company: { update: jest.fn(async () => ({ quotationSequence: 9, quotationPrefix: '3111' })) },
       quotation: {
         findFirst: jest.fn(async () => null),
         create: jest.fn(async ({ data }: any) => ({ id: 2, ...data, client: null })),
@@ -392,7 +434,7 @@ describe('SalesService — a new proposal continues the deal lineage', () => {
     const q: any = await service.createQuotation(COMPANY, draft(), 1);
     expect(q.version).toBe(1);
     expect(q.revisionOfId).toBeNull();
-    expect(q.quoteNumber).toMatch(/^3111-\d{8}$/);
+    expect(q.quoteNumber).toBe('3111-0009');
   });
 
   it('is the next version of the deal when one already exists', async () => {
@@ -416,13 +458,13 @@ describe('SalesService — a new proposal continues the deal lineage', () => {
     const q: any = await service.createQuotation(COMPANY, draft({ leadId: null, clientId: 3 }), 1);
     expect(prisma.quotation.findFirst).not.toHaveBeenCalled();
     expect(q.version).toBe(1);
-    expect(q.quoteNumber).toMatch(/^3111-\d{8}$/);
+    expect(q.quoteNumber).toBe('3111-0009');
   });
 
   it('still issues a number when the previous quotation has none', async () => {
     prisma.quotation.findFirst.mockResolvedValueOnce({ id: 16, quoteNumber: null, version: 1 });
     const q: any = await service.createQuotation(COMPANY, draft(), 1);
     expect(q.version).toBe(2);
-    expect(q.quoteNumber).toMatch(/^3111-\d{8}$/);
+    expect(q.quoteNumber).toBe('3111-0009');
   });
 });

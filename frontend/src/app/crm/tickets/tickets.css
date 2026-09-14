@@ -2342,3 +2342,12 @@ label {
 }
 .attendance-route-note svg { flex-shrink: 0; margin-top: 1px; }
 .attendance-note-cell { justify-content: flex-end; }
+
+@media (max-width: 768px) {
+  .tickets-page {
+    padding: 0 !important;
+  }
+  .page-container {
+    padding: 0 !important;
+  }
+}

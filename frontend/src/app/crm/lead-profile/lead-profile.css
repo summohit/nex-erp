@@ -4190,3 +4190,154 @@ input:checked + .toggle-slider:before {
   height: 30px;
   color: var(--color-primary);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+
+   Same two breakpoints as the shell and the leads board:
+     1024px  tablet — the two-column overview stacks, toolbars wrap
+      640px  phone  — the four tables become cards, modals become sheets
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .hero-top,
+  .card-header-styled {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Five stat chips across is three too many below a laptop. */
+  .hero-stats-grid { grid-template-columns: repeat(2, 1fr); }
+
+  .info-tiles-grid { grid-template-columns: 1fr; }
+
+  /* The tab strip is the primary navigation on this page — it scrolls rather
+     than wrapping into two ragged rows. */
+  .segmented-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .segmented-nav::-webkit-scrollbar { display: none; }
+  .nav-pill-btn { flex: 0 0 auto; }
+}
+
+@media (max-width: 640px) {
+  .hero-stats-grid { grid-template-columns: 1fr; }
+
+  .hero-top { align-items: stretch; }
+  .hero-actions { width: 100%; flex-wrap: wrap; }
+  .hero-actions > * { flex: 1 1 auto; justify-content: center; }
+  .card-header-styled .btn-primary-pill { width: 100%; justify-content: center; }
+
+  /* ── Tables become cards ────────────────────────────────────────────────
+     Files, follow-ups, proposals and notes all carry more columns than fit.
+     Each row becomes a card of labelled pairs, printed from the data-label
+     attribute that mirrors the column header it replaces. */
+  .table-scroll { overflow: visible; }
+
+  .leads-table, .leads-table thead, .leads-table tbody, .leads-table tr, .leads-table td,
+  .fu-table, .fu-table thead, .fu-table tbody, .fu-table tr, .fu-table td {
+    display: block;
+    width: auto;
+  }
+
+  .leads-table thead,
+  .fu-table thead { display: none; }
+
+  .leads-table tbody tr,
+  .fu-table tbody tr {
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .leads-table td,
+  .fu-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border: none;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: normal;
+    text-align: left;
+  }
+  .leads-table td:last-child,
+  .fu-table td:last-child { border-bottom: none; }
+
+  .leads-table td::before,
+  .fu-table td::before {
+    content: attr(data-label);
+    flex: 0 0 40%;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+  .leads-table td > *,
+  .fu-table td > * { min-width: 0; }
+
+  /* Empty-state and loading rows span the card rather than pretending to be
+     a labelled pair. */
+  .leads-table td[colspan]::before,
+  .fu-table td[colspan]::before { display: none; }
+  .leads-table td[colspan],
+  .fu-table td[colspan] { justify-content: center; }
+
+  /* The floating row menus are positioned from the trigger in script, so they
+     already follow the card; they only need to stop being 190px wide on a
+     375px screen. */
+  .fu-actions-menu { width: min(190px, calc(100vw - 24px)); }
+
+  /* ── The proposal form ──────────────────────────────────────────────────
+     A sheet, and its line-item row — name, qty, unit, price, amount — has to
+     stack or every field ends up 40px wide. */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+
+  .modal-card,
+  .prop-modal-card,
+  .send-preview-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 94vh;
+    border-radius: 18px 18px 0 0;
+  }
+
+  /* cols-2 and cols-4 are the modifiers the form actually uses. */
+  .prop-fields-grid { grid-template-columns: 1fr !important; }
+
+  .li-head-row { display: none; }
+  .li-data-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .li-c-name { grid-column: 1 / -1; }
+  .li-c-total {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 4px;
+    border-top: 1px dashed #e2e8f0;
+  }
+  .li-c-total::before {
+    content: 'Amount';
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+  .li-c-del { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+
+  .send-preview-footer { flex-direction: column; align-items: stretch; }
+  .send-preview-actions { width: 100%; }
+  .send-preview-actions button { flex: 1; justify-content: center; }
+}

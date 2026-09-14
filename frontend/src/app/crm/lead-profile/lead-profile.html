@@ -184,30 +184,30 @@
               <thead><tr><th>File Name</th><th>Type</th><th>Size</th><th>Uploaded By</th><th>Date</th><th>Action</th></tr></thead>
               <tbody>
                 <tr class="row-uploading" *ngIf="uploadingFile">
-                  <td>
+                  <td data-label="File Name">
                     <div class="table-user-name file-name-cell">
                       <span class="file-icon-m uploading-icon"><svg lucideLoader2 [size]="15" class="spin-icon"></svg></span>
                       <span class="uploading-file-name">{{ uploadingFileName || 'Uploading file...' }}</span>
                       <span class="uploading-badge">Uploading</span>
                     </div>
                   </td>
-                  <td><span class="category-pill uploading-pill">Processing</span></td>
-                  <td>—</td>
-                  <td><span class="table-user-name">Uploading...</span></td>
-                  <td>Just now</td>
-                  <td>
+                  <td data-label="Type"><span class="category-pill uploading-pill">Processing</span></td>
+                  <td data-label="Size">—</td>
+                  <td data-label="Uploaded By"><span class="table-user-name">Uploading...</span></td>
+                  <td data-label="Date">Just now</td>
+                  <td data-label="Action">
                     <div class="table-actions-group">
                       <span class="uploading-spinner-text"><svg lucideLoader2 [size]="14" class="spin-icon"></svg></span>
                     </div>
                   </td>
                 </tr>
                 <tr *ngFor="let f of files">
-                  <td><div class="table-user-name file-name-cell"><span class="file-icon-m {{ fileIcon(f) }}"><svg lucideFile [size]="15"></svg></span> {{ f.fileName }}</div></td>
-                  <td><span class="category-pill">{{ (f.fileType || '—').split('/').pop() }}</span></td>
-                  <td>{{ formatFileSize(f.fileSize) }}</td>
-                  <td><span class="table-user-name">{{ employeeName(f.uploadedBy) }}</span></td>
-                  <td>{{ f.createdAt | date:'mediumDate' }}</td>
-                  <td><div class="table-actions-group">
+                  <td data-label="File Name"><div class="table-user-name file-name-cell"><span class="file-icon-m {{ fileIcon(f) }}"><svg lucideFile [size]="15"></svg></span> {{ f.fileName }}</div></td>
+                  <td data-label="Type"><span class="category-pill">{{ (f.fileType || '—').split('/').pop() }}</span></td>
+                  <td data-label="Size">{{ formatFileSize(f.fileSize) }}</td>
+                  <td data-label="Uploaded By"><span class="table-user-name">{{ employeeName(f.uploadedBy) }}</span></td>
+                  <td data-label="Date">{{ f.createdAt | date:'mediumDate' }}</td>
+                  <td data-label="Action"><div class="table-actions-group">
                     <button class="btn-action-icon" title="View" (click)="downloadFile(f)"><svg lucideEye [size]="15"></svg></button>
                     <button class="btn-action-icon" title="Download" (click)="downloadFile(f)"><svg lucideDownload [size]="15"></svg></button>
                     <button class="btn-action-icon danger-action" title="Delete" (click)="deleteFile(f)"><svg lucideTrash2 [size]="15"></svg></button>
@@ -254,7 +254,7 @@
                   <tr *ngFor="let fu of followUps"
                       [class.row-overdue]="isFollowUpOverdue(fu.scheduledAt)"
                       [class.row-today]="isFollowUpToday(fu.scheduledAt)">
-                    <td>
+                    <td data-label="Type">
                       <span class="fu-type-badge" [ngClass]="getFollowUpTypeClass(fu.type)">
                         <span [ngSwitch]="fu.type">
                           <svg *ngSwitchCase="'CALL'" lucidePhone size="13"></svg>
@@ -267,13 +267,13 @@
                         <span>{{ getFollowUpTypeBadge(fu.type).label }}</span>
                       </span>
                     </td>
-                    <td class="col-flex">
+                    <td data-label="Objective / Notes" class="col-flex">
                       <div class="objective-cell">
                         <span class="fu-title-text" [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)">{{ fu.title || 'Follow-up' }}</span>
                         <span class="fu-notes-snippet" *ngIf="fu.notes" [title]="fu.notes">"{{ fu.notes }}"</span>
                       </div>
                     </td>
-                    <td class="col-flex">
+                    <td data-label="Contact Details" class="col-flex">
                       <div class="contact-details-cell">
                         <span class="contact-name" *ngIf="fu.contactPerson"><svg lucideUser size="12"></svg> {{ fu.contactPerson }}</span>
                         <a class="contact-link" *ngIf="fu.contactPhone" [href]="'tel:' + fu.contactPhone"><svg lucidePhone size="12"></svg> {{ fu.contactPhone }}</a>
@@ -281,7 +281,7 @@
                         <span class="unassigned-text" *ngIf="!fu.contactPerson && !fu.contactPhone && !fu.contactEmail">No Contact Info</span>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Scheduled For">
                       <div class="time-cell">
                         <div class="schedule-time-row"
                              [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)"
@@ -294,13 +294,13 @@
                         <span class="relative-pill pill-tomorrow" *ngIf="isFollowUpTomorrow(fu.scheduledAt)">Tomorrow</span>
                       </div>
                     </td>
-                    <td class="col-flex">
+                    <td data-label="Attachments" class="col-flex">
                       <div class="followup-file-links" *ngIf="fu.files?.length; else noFollowUpFiles">
                         <a *ngFor="let file of fu.files" [href]="file.fileUrl" target="_blank" rel="noopener" [title]="'Open ' + file.fileName"><svg lucideFileText size="12"></svg> {{ file.fileName }}</a>
                       </div>
                       <ng-template #noFollowUpFiles><span class="no-data-dash">&mdash;</span></ng-template>
                     </td>
-                    <td (click)="$event.stopPropagation()">
+                    <td data-label="Stage" (click)="$event.stopPropagation()">
                       <div class="status-dropdown" [class.open]="followUpTableStageMenu === fu.id">
                         <button type="button"
                                 class="table-status-trigger ldm-status-badge ldm-status-{{ getFollowUpStage(fu.status) | lowercase }}"
@@ -322,7 +322,7 @@
                         <span class="fup-status-saving" *ngIf="followUpStatusSaving[fu.id]"><svg lucideLoader2 size="13" class="spin-icon"></svg></span>
                       </div>
                     </td>
-                    <td class="col-actions-sticky">
+                    <td data-label="Action" class="col-actions-sticky">
                       <button type="button" class="fu-actions-trigger" title="Actions" (click)="toggleFollowUpActionsMenu(fu, $event)">
                         <svg lucideMoreVertical size="16"></svg>
                       </button>
@@ -379,18 +379,18 @@
               <thead><tr><th>Proposal Number</th><th>Total</th><th>Date</th><th>Valid Till</th><th>Status</th><th>Deal Status</th><th>Action</th></tr></thead>
               <tbody>
                 <tr *ngFor="let q of proposals">
-                  <td>
+                  <td data-label="Proposal Number">
                     <div class="table-user-name">
                       {{ q.quoteNumber }}
                       <span class="prop-version-badge" [class.superseded]="q.status === 'SUPERSEDED'">v{{ q.version || 1 }}</span>
                     </div>
                   </td>
-                  <td><span class="amount-cell">{{ q.total | currency:(q.currency || 'INR') }}</span></td>
-                  <td>{{ q.date | date:'mediumDate' }}</td>
-                  <td>{{ q.validUntil | date:'mediumDate' }}</td>
-                  <td><span class="followup-type-pill {{ dealStatusPill(q.status) }}">{{ q.status }}</span></td>
-                  <td><span class="deal-status-badge {{ dealStatusPill(q.status) }}">{{ dealStatusLabel(q.status) }}</span></td>
-                  <td><div class="table-actions-group">
+                  <td data-label="Total"><span class="amount-cell">{{ q.total | currency:(q.currency || 'INR') }}</span></td>
+                  <td data-label="Date">{{ q.date | date:'mediumDate' }}</td>
+                  <td data-label="Valid Till">{{ q.validUntil | date:'mediumDate' }}</td>
+                  <td data-label="Status"><span class="followup-type-pill {{ dealStatusPill(q.status) }}">{{ q.status }}</span></td>
+                  <td data-label="Deal Status"><span class="deal-status-badge {{ dealStatusPill(q.status) }}">{{ dealStatusLabel(q.status) }}</span></td>
+                  <td data-label="Action"><div class="table-actions-group">
                     <span class="prop-busy" *ngIf="busyProposalId === q.id" title="Preparing the PDF…">
                       <svg lucideLoader2 [size]="16" class="spin-icon"></svg>
                     </span>
@@ -460,9 +460,9 @@
               <thead><tr><th>Note Detail</th><th>Created</th><th>Action</th></tr></thead>
               <tbody>
                 <tr *ngFor="let n of notes">
-                  <td><div class="table-user-name note-cell">{{ n.content }}</div><div class="table-user-sub">by {{ employeeName(n.createdBy) }}</div></td>
-                  <td>{{ n.createdAt | date:'medium' }}</td>
-                  <td><div class="table-actions-group">
+                  <td data-label="Note Detail"><div class="table-user-name note-cell">{{ n.content }}</div><div class="table-user-sub">by {{ employeeName(n.createdBy) }}</div></td>
+                  <td data-label="Created">{{ n.createdAt | date:'medium' }}</td>
+                  <td data-label="Action"><div class="table-actions-group">
                     <button class="btn-action-icon" title="View" (click)="openEditNote(n)"><svg lucideEye [size]="15"></svg></button>
                     <button class="btn-action-icon" title="Edit" (click)="openEditNote(n)"><svg lucideEdit2 [size]="15"></svg></button>
                     <button class="btn-action-icon danger-action" title="Delete" (click)="deleteNote(n)"><svg lucideTrash2 [size]="15"></svg></button>

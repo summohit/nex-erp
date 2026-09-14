@@ -1,3 +1,12 @@
+<!-- Tapping anywhere off the rail closes it, which is the gesture people
+     expect from a drawer. Rendered here so it sits directly beneath the rail. -->
+<button
+  type="button"
+  class="mobile-nav-backdrop"
+  *ngIf="layout.isMobileNavOpen()"
+  (click)="closeMobileNav()"
+  aria-label="Close navigation"></button>
+
 <aside class="sidebar" [class.collapsed]="isCollapsed()">
   <div class="sidebar-header">
     <div class="logo-container" *ngIf="!isCollapsed()">

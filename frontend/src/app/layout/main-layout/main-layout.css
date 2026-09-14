@@ -17,3 +17,26 @@
   padding: var(--space-xl);
   flex: 1;
 }
+
+
+/* ── Responsive shell ──────────────────────────────────────────────────────
+   Breakpoints used across the app, and nowhere else invent another:
+     1024px  tablet — two columns become one, dense toolbars wrap
+      640px  phone  — the rail goes off-canvas, tables become cards
+
+   Below 1024 the rail is off-canvas, so the page takes the full width and the
+   260px offset would be dead space on the left of every screen. */
+@media (max-width: 1024px) {
+  .dashboard-layout {
+    padding-left: 0;
+  }
+  .content-area {
+    padding: var(--space-md, 16px);
+  }
+}
+
+@media (max-width: 640px) {
+  .content-area {
+    padding: 12px;
+  }
+}

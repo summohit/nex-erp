@@ -12,6 +12,38 @@ export class SalesService {
   // ================= QUOTATIONS =================
 
   /**
+   * The next quotation number for this company.
+   *
+   * `<prefix>-0009`, from a counter on the Company row. The prefix comes from
+   * the Company Profile rather than being hardcoded — otherwise that field is a
+   * setting that does nothing — and falls back to "QT", which is what the
+   * oldest quotations already use.
+   *
+   * The counter is incremented in place and returned, which Postgres serialises
+   * on the row: two people raising a quotation at the same moment get different
+   * numbers. That is the whole reason it is a counter and not `max(number) + 1`,
+   * which would race, and would also have to parse the millisecond timestamps
+   * that the numbers used to be — reading the highest of those as a sequence
+   * starts the count at sixty-two million.
+   *
+   * A create that fails after this point burns a number. Gaps are the right
+   * trade for never issuing the same number twice; a quotation is not a tax
+   * invoice, so nothing requires the sequence to be unbroken.
+   */
+  private async nextQuotationNumber(companyId: number): Promise<string> {
+    const company = await this.prisma.company.update({
+      where: { id: companyId },
+      data: { quotationSequence: { increment: 1 } },
+      select: { quotationSequence: true, quotationPrefix: true },
+    });
+
+    const prefix = (company.quotationPrefix || 'QT').trim().replace(/-+$/, '');
+    // Padded to four so the common case sorts correctly as text; beyond 9999 it
+    // simply grows, which sorts wrong but stays unique and readable.
+    return `${prefix}-${String(company.quotationSequence).padStart(4, '0')}`;
+  }
+
+  /**
    * Every line must carry a real amount.
    *
    * A quotation for ₹0.00 is not a quotation — it goes out to a client, gets
@@ -92,15 +124,7 @@ export class SalesService {
     if (previous?.quoteNumber) {
       quoteNumber = `${previous.quoteNumber.replace(/-R\d+$/, '')}-R${version}`;
     } else {
-      // Use the company's configured prefix rather than a hardcoded one —
-      // otherwise the Company Profile field is settings that do nothing. Blank
-      // falls back to "QT", which is what every existing quotation uses.
-      const company = await this.prisma.company.findUnique({
-        where: { id: companyId },
-        select: { quotationPrefix: true },
-      });
-      const prefix = (company?.quotationPrefix || 'QT').trim().replace(/-+$/, '');
-      quoteNumber = `${prefix}-${Date.now().toString().slice(-8)}`;
+      quoteNumber = await this.nextQuotationNumber(companyId);
     }
 
     // Check if total requires approval (e.g. > 10,000)

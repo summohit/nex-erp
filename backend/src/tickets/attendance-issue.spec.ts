@@ -177,9 +177,60 @@ describe('TicketsService — attendance issues', () => {
       await expect(read({ role: 'EMPLOYEE', employeeId: 88 })).rejects.toThrow('Ticket not found');
     });
 
-    it('leaves ordinary tickets readable as before', async () => {
+    it('an ordinary ticket is not subject to the HR rule', async () => {
       prisma.ticket.findFirst = jest.fn(async () => ({ ...attendanceTicket, type: 'BUG' }));
+      prisma.employee.findUnique = jest.fn(async () => ({ department: { name: 'Software Development' } }));
       await expect(read({ role: 'EMPLOYEE', employeeId: 88 })).resolves.toBeDefined();
+    });
+  });
+
+  /**
+   * findOne took no caller at all, so the id alone was enough to read any
+   * ticket in the company — description, comments, attachments, time entries —
+   * which made findAll's scoping decorative.
+   */
+  describe('reading an ordinary ticket', () => {
+    const bug = {
+      id: 5, companyId: COMPANY, type: 'BUG', reporterId: REPORTER, assigneeId: 3,
+      activities: [], attachments: [], comments: [], timeEntries: [],
+    };
+
+    beforeEach(() => {
+      prisma.ticket.findFirst = jest.fn(async () => bug);
+      prisma.employee.findMany = jest.fn(async () => []);
+      // Not in engineering unless a test says so.
+      prisma.employee.findUnique = jest.fn(async () => ({ department: { name: 'Finance' } }));
+    });
+
+    const read = (user: any) => service.findOne(COMPANY, 5, user);
+
+    it.each([['SUPERADMIN'], ['ADMIN'], ['MANAGER']])('%s can read it', async (role) => {
+      await expect(read({ role, employeeId: 88 })).resolves.toBeDefined();
+    });
+
+    it('someone in engineering can read it, as the list already allowed', async () => {
+      prisma.employee.findUnique = jest.fn(async () => ({ department: { name: 'Software Development' } }));
+      await expect(read({ role: 'EMPLOYEE', employeeId: 88 })).resolves.toBeDefined();
+    });
+
+    it('the reporter can read their own', async () => {
+      await expect(read({ role: 'EMPLOYEE', employeeId: REPORTER })).resolves.toBeDefined();
+    });
+
+    // Otherwise assigning a ticket outside engineering makes it unopenable for
+    // the person expected to work it.
+    it('the assignee can read it whatever their department', async () => {
+      await expect(read({ role: 'EMPLOYEE', employeeId: 3 })).resolves.toBeDefined();
+    });
+
+    it('an unrelated employee cannot, even knowing the id', async () => {
+      await expect(read({ role: 'EMPLOYEE', employeeId: 88 })).rejects.toThrow('Ticket not found');
+    });
+
+    // Called without a caller (internal use), the check is skipped rather than
+    // failing closed on undefined — the controller always passes one.
+    it('is unrestricted when no caller is supplied', async () => {
+      await expect(service.findOne(COMPANY, 5)).resolves.toBeDefined();
     });
   });
 

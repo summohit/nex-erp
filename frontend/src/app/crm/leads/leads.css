@@ -6522,3 +6522,180 @@ textarea:focus {
   height: 28px;
   color: var(--color-primary);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   
+   Two breakpoints, matching the shell and used nowhere else in this file:
+     1024px  tablet — the rail is off-canvas, dense toolbars wrap
+      640px  phone  — the table becomes cards, modals become sheets
+
+   The eleven ad-hoc breakpoints above this block predate it. They are left
+   alone rather than rewritten, because several tune specific widgets at widths
+   that have nothing to do with the shell.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .page-header-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .header-actions-group {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .pipeline-kpi-badge { flex: 1 1 100%; }
+
+  .filter-bar-main-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .search-input-wrapper { width: 100%; }
+  /* The filter row is the densest thing on the page. Rather than wrapping it
+     into four ragged lines, it scrolls sideways as one strip. */
+  .filter-controls {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .filter-controls::-webkit-scrollbar { display: none; }
+  .filter-controls > * { flex: 0 0 auto; }
+
+  /* A kanban board is horizontal by nature — let it scroll rather than
+     squeezing six columns into the width of one. */
+  .kanban-board {
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .kanban-column {
+    scroll-snap-align: start;
+    min-width: 280px;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-header-card { padding: 14px; border-radius: 14px; }
+  .header-title-row h1,
+  .header-title-row h2 { font-size: 18px; }
+  /* Full-width so both are comfortable one-handed. */
+  .btn-header-primary,
+  .btn-header-secondary { flex: 1 1 100%; justify-content: center; }
+
+  .main-tab-switcher { overflow-x: auto; scrollbar-width: none; }
+  .main-tab-switcher::-webkit-scrollbar { display: none; }
+
+  .kanban-column { min-width: 86vw; }
+
+  /* ── Table becomes cards ────────────────────────────────────────────────
+     Ten columns cannot be read on a 375px screen in any arrangement that is
+     still a table. Each row becomes a card: the lead title leads, the rest
+     are labelled pairs printed from the data-label attribute on each cell. */
+  .leads-table-scroll { overflow: visible; }
+
+  .leads-table,
+  .leads-table thead,
+  .leads-table tbody,
+  .leads-table tr,
+  .leads-table td {
+    display: block;
+    width: auto;
+  }
+
+  /* The header row is what the labels replace. */
+  .leads-table thead { display: none; }
+
+  .leads-table tr.lead-row,
+  .leads-table tr.sk-lead-row {
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .leads-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border: none;
+    border-bottom: 1px solid #f1f5f9;
+    text-align: left;
+    white-space: normal;
+  }
+  .leads-table td:last-child { border-bottom: none; }
+
+  .leads-table td::before {
+    content: attr(data-label);
+    flex: 0 0 40%;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+  /* The value side gets the remaining room and may wrap. */
+  .leads-table td > * { min-width: 0; }
+
+  /* The lead title is the card's heading, not a labelled pair. */
+  .leads-table td.col-lead-title {
+    display: block;
+    padding-top: 0;
+    padding-bottom: 10px;
+  }
+  .leads-table td.col-lead-title::before { display: none; }
+  .leads-table td.col-lead-title .lead-title-link {
+    font-size: 15px;
+    font-weight: 700;
+    white-space: normal;
+    text-align: left;
+  }
+
+  /* Sticky is meaningless once the row is a card. */
+  .leads-table td.col-actions-sticky {
+    position: static;
+    justify-content: flex-start;
+  }
+  .leads-table td.col-actions-sticky::before { flex-basis: 40%; }
+
+  .leads-table td.table-empty-cell { justify-content: center; }
+  .leads-table td.table-empty-cell::before { display: none; }
+
+  /* ── Modals become sheets ───────────────────────────────────────────────
+     A centred card with margins wastes the only screen space there is. */
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+
+  .modal-card,
+  .lead-detail-modal,
+  .followup-modal-card {
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    max-height: 94vh;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .form-row,
+  .form-row-2,
+  .form-row-3,
+  .form-row-4 {
+    grid-template-columns: 1fr !important;
+    display: grid;
+  }
+
+  /* The detail modal's own grids. */
+  .ldm-owners-row,
+  .ldm-value-banner { flex-direction: column; align-items: stretch; gap: 12px; }
+  .ldm-metric-divider { display: none; }
+
+  .ldm-prop-table-wrap { overflow-x: auto; }
+}
