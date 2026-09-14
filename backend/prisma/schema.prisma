@@ -2510,7 +2510,16 @@ model Quotation {
   billingPan         String?
   /// Drives the CGST+SGST vs IGST split on the printed quote.
   billingPlaceOfSupply String?
-  status         String          @default("DRAFT") // DRAFT, PENDING_APPROVAL, SENT, ACCEPTED, REJECTED
+  status         String          @default("DRAFT") // DRAFT, PENDING_APPROVAL, SENT, ACCEPTED, REJECTED, SUPERSEDED
+  /// Revision number within the deal. The first quotation raised on a lead is
+  /// v1; once it has gone to the client it is frozen, and a correction is a new
+  /// row at the next version rather than an edit — otherwise the document in
+  /// the client's inbox stops matching the record behind it.
+  version        Int             @default(1)
+  /// The quotation this one replaces. Null on a first version.
+  revisionOfId   Int?
+  revisionOf     Quotation?      @relation("QuotationRevisions", fields: [revisionOfId], references: [id], onDelete: SetNull)
+  revisions      Quotation[]     @relation("QuotationRevisions")
   approvalStatus String          @default("APPROVED") // PENDING, APPROVED, REJECTED
   approvedById   Int?
   approvedBy     User?           @relation("QuotationApprover", fields: [approvedById], references: [id], onDelete: SetNull)

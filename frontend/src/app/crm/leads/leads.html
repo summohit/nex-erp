@@ -1394,13 +1394,20 @@
             </thead>
             <tbody>
               <tr *ngFor="let q of modalProposals">
-                <td class="ldm-prop-number">{{ q.quoteNumber }}</td>
+                <td class="ldm-prop-number">
+                  {{ q.quoteNumber }}
+                  <span class="ldm-prop-version" [class.superseded]="q.status === 'SUPERSEDED'">v{{ q.version || 1 }}</span>
+                </td>
                 <td class="ldm-prop-amount">{{ q.total | currency:(q.currency || 'INR'):'symbol-narrow':'1.0-2' }}</td>
                 <td>{{ q.date | date:'dd MMM yyyy' }}</td>
                 <td>{{ q.validUntil | date:'dd MMM yyyy' }}</td>
                 <td><span class="ldm-prop-status ldm-prop-status-{{ (q.status || '') | lowercase }}">{{ q.status }}</span></td>
                 <td class="ldm-prop-action-col">
+                  <span class="ldm-prop-busy" *ngIf="busyProposalId === q.id" title="Preparing the PDF…">
+                    <svg lucideLoader2 [size]="16" class="spin-icon"></svg>
+                  </span>
                   <button type="button" class="ldm-prop-trigger" title="Actions"
+                          *ngIf="busyProposalId !== q.id"
                           (click)="toggleProposalActionsMenu(q, $event)">
                     <svg lucideMoreVertical [size]="16"></svg>
                   </button>
@@ -1445,9 +1452,13 @@
             (click)="viewProposal(proposalActionsMenu); closeProposalActionsMenu()">
       <svg lucideEye [size]="14"></svg><span>View</span>
     </button>
-    <button type="button" class="ldm-prop-menu-item"
+    <button type="button" class="ldm-prop-menu-item" *ngIf="canEditProposal(proposalActionsMenu)"
             (click)="editProposal(proposalActionsMenu); closeProposalActionsMenu()">
       <svg lucideEdit2 [size]="14"></svg><span>Edit</span>
+    </button>
+    <button type="button" class="ldm-prop-menu-item" *ngIf="canReviseProposal(proposalActionsMenu)"
+            (click)="reviseProposal(proposalActionsMenu); closeProposalActionsMenu()">
+      <svg lucideCopyPlus [size]="14"></svg><span>New version</span>
     </button>
     <button type="button" class="ldm-prop-menu-item"
             (click)="downloadProposal(proposalActionsMenu); closeProposalActionsMenu()">
@@ -1912,20 +1923,24 @@
             <option value="Dr.">Dr.</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" [class.has-error]="leadContactSubmitted && leadContactNameInvalid">
           <label>Name <span class="required-asterisk">*</span></label>
           <input type="text" [(ngModel)]="leadContactForm.name" placeholder="e.g. John Doe" [disabled]="isSavingLeadContact" />
+          <span class="error-msg" *ngIf="leadContactSubmitted && leadContactNameInvalid">Name is required.</span>
         </div>
-        <div class="form-group">
-          <label>Email</label>
+        <div class="form-group" [class.has-error]="leadContactSubmitted && leadContactEmailInvalid">
+          <label>Email <span class="required-asterisk">*</span></label>
           <input type="email" [(ngModel)]="leadContactForm.email" placeholder="e.g. johndoe@example.com" [disabled]="isSavingLeadContact" />
+          <span class="error-msg" *ngIf="leadContactSubmitted && leadContactEmailMissing">Email is required.</span>
+          <span class="error-msg" *ngIf="leadContactSubmitted && !leadContactEmailMissing && leadContactEmailInvalid">Enter a valid email address, like name&#64;company.com.</span>
         </div>
       </div>
 
       <div class="form-row form-row-3">
-        <div class="form-group">
+        <div class="form-group" [class.has-error]="leadContactSubmitted && leadContactPhoneInvalid('phone')">
           <label>Phone</label>
-          <input type="text" [(ngModel)]="leadContactForm.phone" placeholder="e.g. 1234567890" [disabled]="isSavingLeadContact" />
+          <input type="tel" [(ngModel)]="leadContactForm.phone" placeholder="e.g. 1234567890" [disabled]="isSavingLeadContact" />
+          <span class="error-msg" *ngIf="leadContactSubmitted && leadContactPhoneInvalid('phone')">Enter 10 to 15 digits. Spaces, dashes and a country code are fine.</span>
         </div>
         <div class="form-group">
           <label>Lead Source</label>
@@ -2021,13 +2036,15 @@
       </div>
 
       <div class="form-row form-row-2">
-        <div class="form-group">
+        <div class="form-group" [class.has-error]="leadContactSubmitted && leadContactPhoneInvalid('mobile')">
           <label>Primary Phone Number</label>
-          <input type="text" [(ngModel)]="leadContactForm.mobile" placeholder="e.g. 1234567890" [disabled]="isSavingLeadContact" />
+          <input type="tel" [(ngModel)]="leadContactForm.mobile" placeholder="e.g. 1234567890" [disabled]="isSavingLeadContact" />
+          <span class="error-msg" *ngIf="leadContactSubmitted && leadContactPhoneInvalid('mobile')">Enter 10 to 15 digits. Spaces, dashes and a country code are fine.</span>
         </div>
-        <div class="form-group">
+        <div class="form-group" [class.has-error]="leadContactSubmitted && leadContactPhoneInvalid('officePhoneNumber')">
           <label>Secondary Phone Number</label>
-          <input type="text" [(ngModel)]="leadContactForm.officePhoneNumber" placeholder="e.g. +1 555 123 4567" [disabled]="isSavingLeadContact" />
+          <input type="tel" [(ngModel)]="leadContactForm.officePhoneNumber" placeholder="e.g. +1 555 123 4567" [disabled]="isSavingLeadContact" />
+          <span class="error-msg" *ngIf="leadContactSubmitted && leadContactPhoneInvalid('officePhoneNumber')">Enter 10 to 15 digits. Spaces, dashes and a country code are fine.</span>
         </div>
       </div>
 

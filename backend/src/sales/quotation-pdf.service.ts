@@ -1,7 +1,18 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
+import axios from 'axios';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+
+/** One attachment, fetched and classified, ready to be put into the document. */
+interface FetchedAttachment {
+  fileName: string;
+  kind: 'image' | 'pdf' | 'doc' | 'unsupported';
+  data?: Buffer;
+  /** Set when the file could not be included, and shown on the index page. */
+  problem?: string;
+}
 
 /**
  * Renders a quotation as a printable A4 document.
@@ -32,6 +43,7 @@ export class QuotationPdfService {
       include: {
         items: true,
         client: true,
+        attachments: true,
         lead: { select: { companyName: true, contactName: true, email: true, phone: true, address: true } },
       },
     });
@@ -42,7 +54,10 @@ export class QuotationPdfService {
       this.prisma.systemSetting.findUnique({ where: { companyId } }),
     ]);
 
-    const html = this.buildHtml(quote, company, settings);
+    // Attachments are part of the offer, so they travel with it: the client
+    // gets one document instead of a quotation plus a folder of loose files.
+    const attachments = await this.fetchAttachments(quote.attachments || []);
+    const html = this.buildHtml(quote, company, settings) + (await this.buildAnnexureHtml(attachments));
     const fileName = `${quote.quoteNumber}.pdf`;
 
     try {
@@ -59,7 +74,11 @@ export class QuotationPdfService {
         margin: { top: '12mm', right: '12mm', bottom: '12mm', left: '12mm' },
       });
       await browser.close();
-      return { buffer: Buffer.from(pdfBuffer), isPdf: true, fileName };
+
+      // Attached PDFs cannot be rendered by the browser, so they are merged
+      // onto the end of the printed document instead.
+      const merged = await this.appendPdfAttachments(Buffer.from(pdfBuffer), attachments);
+      return { buffer: merged, isPdf: true, fileName };
     } catch (e: any) {
       // Matches PdfService: a missing Chromium should degrade to something
       // printable, not turn into a 500 on a document the user needs now.
@@ -214,6 +233,163 @@ export class QuotationPdfService {
     ));
   }
 
+  // ── attachments ────────────────────────────────────────────────────────────
+  //
+  // Everything attached to a proposal is appended after the quotation, so the
+  // client receives a single document. Three routes, by file type:
+  //
+  //   images  drawn onto their own page by the same puppeteer pass
+  //   docx    converted to HTML by mammoth and printed the same way
+  //   pdf     merged onto the end afterwards, because a browser cannot print
+  //           one PDF inside another
+  //
+  // Nothing here may break the quotation. A file that will not download, will
+  // not convert, or is too large is listed on the index page with the reason —
+  // visibly missing beats silently missing, and beats failing the whole
+  // document over an annexure.
+
+  /** One file. ImageKit serves these, and 20MB is the upload cap. */
+  private static readonly MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+  /** Everything together. Eight 20MB files would make a document nobody can email. */
+  private static readonly MAX_ATTACHMENT_TOTAL_BYTES = 40 * 1024 * 1024;
+  private static readonly ATTACHMENT_TIMEOUT_MS = 20_000;
+
+  private attachmentKind(fileName: string, contentType?: string): FetchedAttachment['kind'] {
+    const ext = (fileName.split('.').pop() || '').toLowerCase();
+    const type = (contentType || '').toLowerCase();
+    if (type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext)) return 'image';
+    if (type === 'application/pdf' || ext === 'pdf') return 'pdf';
+    if (ext === 'docx' || type.includes('wordprocessingml')) return 'doc';
+    return 'unsupported';
+  }
+
+  private async fetchAttachments(rows: any[]): Promise<FetchedAttachment[]> {
+    let budget = QuotationPdfService.MAX_ATTACHMENT_TOTAL_BYTES;
+    const out: FetchedAttachment[] = [];
+
+    for (const row of rows) {
+      const fileName = row?.fileName || 'attachment';
+      if (!row?.fileUrl) {
+        out.push({ fileName, kind: 'unsupported', problem: 'no file URL on record' });
+        continue;
+      }
+
+      try {
+        const res = await axios.get<ArrayBuffer>(row.fileUrl, {
+          responseType: 'arraybuffer',
+          timeout: QuotationPdfService.ATTACHMENT_TIMEOUT_MS,
+          maxContentLength: QuotationPdfService.MAX_ATTACHMENT_BYTES,
+        });
+        const data = Buffer.from(res.data);
+        const kind = this.attachmentKind(fileName, res.headers?.['content-type'] as string);
+
+        if (kind === 'unsupported') {
+          out.push({ fileName, kind, problem: 'file type cannot be printed' });
+          continue;
+        }
+        if (data.length > budget) {
+          out.push({ fileName, kind, problem: 'too large to include in this document' });
+          continue;
+        }
+
+        budget -= data.length;
+        out.push({ fileName, kind, data });
+      } catch (e: any) {
+        this.logger.warn(`Quotation attachment "${fileName}" could not be fetched: ${e?.message}`);
+        out.push({ fileName, kind: 'unsupported', problem: 'could not be downloaded' });
+      }
+    }
+
+    return out;
+  }
+
+  /** The index page plus a page per image or document. */
+  private async buildAnnexureHtml(attachments: FetchedAttachment[]): Promise<string> {
+    if (!attachments.length) return '';
+
+    const index = attachments
+      .map((a, i) => {
+        const note = a.problem
+          ? `<span class="ax-missing">not included — ${this.esc(a.problem)}</span>`
+          : a.kind === 'pdf'
+            ? '<span class="ax-note">attached after this section</span>'
+            : '';
+        return `<div class="ax-row"><span>${i + 1}. ${this.esc(a.fileName)}</span>${note}</div>`;
+      })
+      .join('');
+
+    const pages: string[] = [];
+    for (const a of attachments) {
+      if (a.problem || !a.data) continue;
+
+      if (a.kind === 'image') {
+        const mime = /\.png$/i.test(a.fileName) ? 'image/png'
+          : /\.gif$/i.test(a.fileName) ? 'image/gif'
+          : /\.webp$/i.test(a.fileName) ? 'image/webp'
+          : 'image/jpeg';
+        pages.push(`
+          <div class="ax-page">
+            <div class="ax-caption">${this.esc(a.fileName)}</div>
+            <img class="ax-image" src="data:${mime};base64,${a.data.toString('base64')}" alt="" />
+          </div>`);
+        continue;
+      }
+
+      if (a.kind === 'doc') {
+        try {
+          // mammoth produces semantic HTML rather than a facsimile of Word, so
+          // the content comes across and the exact layout does not.
+          const mammoth = require('mammoth');
+          const { value } = await mammoth.convertToHtml({ buffer: a.data });
+          pages.push(`
+            <div class="ax-page">
+              <div class="ax-caption">${this.esc(a.fileName)}</div>
+              <div class="ax-doc">${value || '<p>(empty document)</p>'}</div>
+            </div>`);
+        } catch (e: any) {
+          this.logger.warn(`Quotation attachment "${a.fileName}" could not be converted: ${e?.message}`);
+        }
+      }
+    }
+
+    return `
+<div class="ax-page">
+  <div class="ax-title">ANNEXURES</div>
+  <div class="ax-sub">The following ${attachments.length === 1 ? 'document forms' : 'documents form'} part of this quotation.</div>
+  <div class="ax-index">${index}</div>
+</div>
+${pages.join('')}`;
+  }
+
+  /** Merge attached PDFs onto the end of the rendered quotation. */
+  private async appendPdfAttachments(base: Buffer, attachments: FetchedAttachment[]): Promise<Buffer> {
+    const pdfs = attachments.filter((a) => a.kind === 'pdf' && a.data && !a.problem);
+    if (!pdfs.length) return base;
+
+    try {
+      const { PDFDocument } = require('pdf-lib');
+      const merged = await PDFDocument.load(base);
+
+      for (const a of pdfs) {
+        try {
+          // Some client-supplied PDFs are encrypted; loading them would throw
+          // and take the quotation with it.
+          const source = await PDFDocument.load(a.data!, { ignoreEncryption: true });
+          const pages = await merged.copyPages(source, source.getPageIndices());
+          pages.forEach((page: any) => merged.addPage(page));
+        } catch (e: any) {
+          this.logger.warn(`Quotation attachment "${a.fileName}" could not be merged: ${e?.message}`);
+        }
+      }
+
+      return Buffer.from(await merged.save());
+    } catch (e: any) {
+      // The quotation itself is fine; only the annexures are missing.
+      this.logger.warn(`Could not merge PDF attachments: ${e?.message}`);
+      return base;
+    }
+  }
+
   /** A labelled line that disappears entirely when there is no value. */
   private row(label: string, value: unknown): string {
     const v = String(value ?? '').trim();
@@ -306,6 +482,28 @@ export class QuotationPdfService {
      off the page — and the aspect ratio is left to the image. */
   .sign .stamp { display: block; margin-left: auto; max-height: 78px; max-width: 190px; margin-bottom: 6px; }
   .sign b { display: block; }
+
+  /* Annexures. Each starts on a fresh sheet so an attachment never shares a
+     page with the quotation totals or with another attachment. */
+  .ax-page { page-break-before: always; break-before: page; }
+  .ax-title { font-size: 14px; font-weight: 700; letter-spacing: .5px; color: #111827;
+              border-bottom: 2px solid #1d4ed8; padding-bottom: 6px; }
+  .ax-sub { margin-top: 8px; color: #6b7280; }
+  .ax-index { margin-top: 12px; }
+  .ax-row { display: flex; justify-content: space-between; gap: 16px;
+            padding: 7px 0; border-bottom: 1px solid #f1f3f6; }
+  .ax-missing { color: #b91c1c; }
+  .ax-note { color: #6b7280; }
+  .ax-caption { font-size: 10px; font-weight: 700; letter-spacing: .4px; color: #6b7280;
+                text-transform: uppercase; margin-bottom: 8px; }
+  /* Contained, not cropped: a wide drawing shrinks to fit rather than losing
+     its right-hand side to the page edge. */
+  .ax-image { display: block; max-width: 100%; max-height: 245mm; margin: 0 auto; object-fit: contain; }
+  .ax-doc { line-height: 1.6; color: #374151; }
+  .ax-doc img { max-width: 100%; }
+  .ax-doc table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  .ax-doc td, .ax-doc th { border: 1px solid #d1d5db; padding: 6px; }
+  .ax-doc h1, .ax-doc h2, .ax-doc h3 { color: #111827; margin: 12px 0 6px; }
 </style></head>
 <body>
   <div class="tag">QUOTATION</div>

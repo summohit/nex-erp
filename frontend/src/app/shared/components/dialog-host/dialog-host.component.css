@@ -4,7 +4,10 @@
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 2000;
+  /* Above everything, deliberately. This host renders confirms and errors, and
+     it is opened *from* other modals — several of which sit at 9999. At 2000 it
+     rendered underneath them, so a failed send looked like nothing happened. */
+  z-index: 100000;
   display: flex;
   align-items: center;
   justify-content: center;

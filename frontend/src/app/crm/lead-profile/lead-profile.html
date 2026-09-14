@@ -379,14 +379,23 @@
               <thead><tr><th>Proposal Number</th><th>Total</th><th>Date</th><th>Valid Till</th><th>Status</th><th>Deal Status</th><th>Action</th></tr></thead>
               <tbody>
                 <tr *ngFor="let q of proposals">
-                  <td><div class="table-user-name">{{ q.quoteNumber }}</div></td>
+                  <td>
+                    <div class="table-user-name">
+                      {{ q.quoteNumber }}
+                      <span class="prop-version-badge" [class.superseded]="q.status === 'SUPERSEDED'">v{{ q.version || 1 }}</span>
+                    </div>
+                  </td>
                   <td><span class="amount-cell">{{ q.total | currency:(q.currency || 'INR') }}</span></td>
                   <td>{{ q.date | date:'mediumDate' }}</td>
                   <td>{{ q.validUntil | date:'mediumDate' }}</td>
                   <td><span class="followup-type-pill {{ dealStatusPill(q.status) }}">{{ q.status }}</span></td>
                   <td><span class="deal-status-badge {{ dealStatusPill(q.status) }}">{{ dealStatusLabel(q.status) }}</span></td>
                   <td><div class="table-actions-group">
+                    <span class="prop-busy" *ngIf="busyProposalId === q.id" title="Preparing the PDF…">
+                      <svg lucideLoader2 [size]="16" class="spin-icon"></svg>
+                    </span>
                     <button type="button" class="prop-actions-trigger" title="Actions"
+                            *ngIf="busyProposalId !== q.id"
                             (click)="toggleProposalActionsMenu(q, $event)">
                       <svg lucideMoreVertical [size]="16"></svg>
                     </button>
@@ -407,9 +416,13 @@
                     (click)="viewProposal(proposalActionsMenu); closeProposalActionsMenu()">
               <svg lucideEye [size]="14"></svg><span>View</span>
             </button>
-            <button type="button" class="fu-actions-item"
+            <button type="button" class="fu-actions-item" *ngIf="canEditProposal(proposalActionsMenu)"
                     (click)="editProposal(proposalActionsMenu); closeProposalActionsMenu()">
               <svg lucideEdit2 [size]="14"></svg><span>Edit</span>
+            </button>
+            <button type="button" class="fu-actions-item" *ngIf="canReviseProposal(proposalActionsMenu)"
+                    (click)="reviseProposal(proposalActionsMenu); closeProposalActionsMenu()">
+              <svg lucideCopyPlus [size]="14"></svg><span>New version</span>
             </button>
             <button type="button" class="fu-actions-item"
                     (click)="downloadProposal(proposalActionsMenu); closeProposalActionsMenu()">
@@ -899,11 +912,12 @@
                   <div class="li-h-qty">Qty</div>
                   <div class="li-h-unit">Unit</div>
                   <div class="li-h-price">Unit Price</div>
-                  <div class="li-h-total">Amount</div>
+                  <div class="li-h-total">Amount <span class="li-req">*</span></div>
                   <div class="li-h-del"></div>
                 </div>
 
-                <div class="li-item-card" *ngFor="let item of proposalForm.items; let i = index">
+                <div class="li-item-card" *ngFor="let item of proposalForm.items; let i = index"
+                     [class.li-item-invalid]="isProposalSubmitted && proposalItemUnpriced(item)">
                   <div class="li-data-row">
                     <div class="li-c-name">
                       <input type="text" class="prop-input" [(ngModel)]="item.name"
@@ -911,6 +925,7 @@
                     </div>
                     <div class="li-c-qty">
                       <input type="number" class="prop-input li-input-num" [(ngModel)]="item.quantity"
+                        [class.has-error]="isProposalSubmitted && !(item.quantity > 0)"
                         [name]="'propQty_' + i" min="1" />
                     </div>
                     <div class="li-c-unit">
@@ -922,17 +937,22 @@
                       <div class="price-input-wrap">
                         <span class="price-currency">{{ proposalCurrencySymbol() }}</span>
                         <input type="number" class="prop-input li-input-price" [(ngModel)]="item.unitPrice"
-                          [name]="'propPrice_' + i" min="0" step="0.01" />
+                          [class.has-error]="isProposalSubmitted && !(item.unitPrice > 0)"
+                          [name]="'propPrice_' + i" min="0.01" step="0.01" />
                       </div>
                     </div>
                     <div class="li-c-total">
-                      <span class="li-total-val">{{ proposalCurrencySymbol() }}{{ (item.quantity * item.unitPrice) | number:'1.2-2' }}</span>
+                      <span class="li-total-val" [class.li-total-zero]="isProposalSubmitted && proposalItemUnpriced(item)">{{ proposalCurrencySymbol() }}{{ (item.quantity * item.unitPrice) | number:'1.2-2' }}</span>
                     </div>
                     <div class="li-c-del">
                       <button class="btn-icon-del" (click)="removeProposalItem(i)" *ngIf="proposalForm.items.length > 1" title="Remove item" type="button">
                         <svg lucideTrash2 [size]="14"></svg>
                       </button>
                     </div>
+                  </div>
+                  <div class="li-error-row" *ngIf="isProposalSubmitted && proposalItemUnpriced(item)">
+                    <svg lucideAlertCircle [size]="13"></svg>
+                    <span>Enter a quantity and a unit price — this line currently totals zero.</span>
                   </div>
                   <div class="li-desc-row">
                     <textarea class="prop-input li-desc-textarea" rows="2"
@@ -1029,6 +1049,56 @@
             <svg lucideLoader2 [size]="16" class="spin-icon" *ngIf="isSavingProposal"></svg>
             {{ isSavingProposal ? 'Saving...' : (editingProposalId ? 'Update Proposal' : 'Save Proposal') }}
           </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════ SEND PROPOSAL: PREVIEW THEN SEND ══════════ -->
+    <div class="modal-overlay" *ngIf="sendPreviewQuote" (click)="closeSendPreview()">
+      <div class="modal-card send-preview-card" (click)="$event.stopPropagation()">
+
+        <div class="prop-header">
+          <div class="prop-header-left">
+            <div class="prop-icon-badge"><svg lucideMail [size]="20" color="#fff"></svg></div>
+            <div class="prop-header-info">
+              <h3>Send {{ sendPreviewQuote.quoteNumber }}</h3>
+              <p>Check the quotation below, then send it.</p>
+            </div>
+          </div>
+          <button class="close-btn" (click)="closeSendPreview()" [disabled]="sendingProposalId !== null" title="Close">
+            <svg lucideX [size]="18"></svg>
+          </button>
+        </div>
+
+        <div class="send-preview-body">
+          <div class="send-preview-loading" *ngIf="isLoadingSendPreview">
+            <svg lucideLoader2 [size]="20" class="spin-icon"></svg>
+            <span>Rendering the quotation…</span>
+          </div>
+          <iframe *ngIf="sendPreviewUrl" class="send-preview-frame" [src]="sendPreviewUrl" title="Quotation preview"></iframe>
+        </div>
+
+        <div class="send-preview-footer">
+          <div class="send-preview-to" [class.has-error]="sendPreviewToInvalid">
+            <span class="send-preview-to-label">Send to</span>
+            <span class="send-preview-to-value">
+              <svg lucideMail [size]="14"></svg>
+              <strong>{{ sendPreviewTo }}</strong>
+            </span>
+            <span class="send-preview-error" *ngIf="sendPreviewToInvalid">
+              This address is not valid. Fix it on the proposal or the deal contact, then send.
+            </span>
+          </div>
+          <div class="send-preview-actions">
+            <button class="btn-outline-pill" (click)="closeSendPreview()" [disabled]="sendingProposalId !== null">Cancel</button>
+            <button class="btn-primary-pill" (click)="confirmSendProposal()"
+                    [disabled]="sendingProposalId !== null || isLoadingSendPreview || sendPreviewToInvalid">
+              <svg lucideLoader2 [size]="16" class="spin-icon" *ngIf="sendingProposalId !== null"></svg>
+              <svg lucideMail [size]="16" *ngIf="sendingProposalId === null"></svg>
+              {{ sendingProposalId !== null ? 'Sending…' : 'Send quotation' }}
+            </button>
+          </div>
         </div>
 
       </div>

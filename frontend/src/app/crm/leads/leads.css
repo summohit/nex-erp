@@ -6495,3 +6495,30 @@ textarea:focus {
 .ldm-prop-menu-item:disabled { opacity: 0.55; cursor: not-allowed; }
 .ldm-prop-menu-item.danger { color: #b91c1c; }
 .ldm-prop-menu-item.danger:hover { background: #fef2f2; }
+
+.ldm-prop-version {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #c2410c;
+  font-size: 10px;
+  font-weight: 700;
+}
+.ldm-prop-version.superseded {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+.ldm-prop-status-superseded { background: #f1f5f9; color: #64748b; }
+
+.ldm-prop-busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-primary);
+}

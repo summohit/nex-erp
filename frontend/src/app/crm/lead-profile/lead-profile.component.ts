@@ -1,9 +1,10 @@
-import { Component, OnInit, HostListener, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { DEFAULT_QUOTATION_TERMS } from '../../shared/constants/quotation-terms';
+import { isValidEmail } from '../../shared/constants/contact-validation';
 import { SystemSettingsService } from '../../services/system-settings.service';
 import { environment } from '../../../environments/environment';
 import {
@@ -15,9 +16,10 @@ import {
   LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
   LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
   LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
-  LucideList
+  LucideList, LucideAlertCircle, LucideCopyPlus
 } from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ClientsService } from '../../services/clients';
 
 interface PipelineStage {
@@ -38,13 +40,14 @@ interface PipelineStage {
     LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
     LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
     LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
-    LucideList
+    LucideList, LucideAlertCircle, LucideCopyPlus
   ],
   templateUrl: './lead-profile.html',
   styleUrls: ['./lead-profile.css']
 })
-export class LeadProfileComponent implements OnInit {
+export class LeadProfileComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
+  private sanitizer = inject(DomSanitizer);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private dialog = inject(DialogService);
@@ -1273,10 +1276,12 @@ export class LeadProfileComponent implements OnInit {
    * it would land on a 401 instead of the document.
    */
   openQuotationPdf(quotationId: number) {
+    this.busyProposalId = quotationId;
     this.http
       .get(`${environment.apiUrl}/sales/quotations/${quotationId}/pdf`, { responseType: 'blob' })
       .subscribe({
         next: (blob) => {
+          this.busyProposalId = null;
           const url = URL.createObjectURL(blob);
           const opened = window.open(url, '_blank');
           if (!opened) {
@@ -1290,7 +1295,10 @@ export class LeadProfileComponent implements OnInit {
           // Freed on the next tick; the new tab has already taken a reference.
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
         },
-        error: () => this.dialog.error('The proposal was saved, but the PDF could not be generated.'),
+        error: () => {
+          this.busyProposalId = null;
+          this.dialog.error('The proposal was saved, but the PDF could not be generated.');
+        },
       });
   }
 
@@ -1335,16 +1343,70 @@ export class LeadProfileComponent implements OnInit {
     this.proposalActionsMenu = null;
   }
 
+  // ── versioning ────────────────────────────────────────────────────────────
+  //
+  // A quotation freezes the moment it goes to the client, because they are then
+  // holding that document. Corrections become the next version of the deal's
+  // proposal, keeping the same quote number with an -R suffix.
+
+  /** Mirrors QUOTE_EDITABLE on the server. */
+  canEditProposal(q: any): boolean {
+    return ['DRAFT', 'PENDING_APPROVAL', 'REJECTED'].includes((q?.status || '').toUpperCase());
+  }
+
+  /** Mirrors QUOTE_REVISABLE on the server. */
+  canReviseProposal(q: any): boolean {
+    return ['SENT', 'REJECTED'].includes((q?.status || '').toUpperCase());
+  }
+
+  isProposalLocked(q: any): boolean {
+    return !this.canEditProposal(q);
+  }
+
+  async reviseProposal(q: any) {
+    const next = (Number(q?.version) || 1) + 1;
+    const ok = await this.dialog.confirm(
+      `Create v${next} of ${q.quoteNumber}? It copies everything from this version, ` +
+      `and this one becomes read-only history.`,
+      `New version of this proposal`,
+      `Create v${next}`,
+      'Cancel',
+    );
+    if (!ok) return;
+
+    this.http.post<any>(`${environment.apiUrl}/sales/quotations/${q.id}/revise`, {}).subscribe({
+      next: (revision) => {
+        this.dialog.success(`${revision.quoteNumber} created as v${revision.version}. Edit and send it when ready.`);
+        this.loadLead(this.leadId!);
+        // Straight into the form: raising a version is only ever the first half
+        // of "change something and send it again".
+        this.editProposal(revision);
+      },
+      error: (err) => this.dialog.error(err?.error?.message || 'The new version could not be created.'),
+    });
+  }
+
+  /**
+   * The proposal whose PDF is being rendered right now.
+   *
+   * The server builds the document on demand — puppeteer, plus fetching and
+   * merging any attachments — so this takes seconds. Without it the row gave no
+   * sign anything was happening and people clicked again.
+   */
+  busyProposalId: number | null = null;
+
   /** Same document as the download, just rendered in a tab instead of saved. */
   viewProposal(q: any) {
     this.openQuotationPdf(q.id);
   }
 
   downloadProposal(q: any) {
+    this.busyProposalId = q.id;
     this.http
       .get(`${environment.apiUrl}/sales/quotations/${q.id}/pdf`, { responseType: 'blob' })
       .subscribe({
         next: (blob) => {
+          this.busyProposalId = null;
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -1352,7 +1414,10 @@ export class LeadProfileComponent implements OnInit {
           a.click();
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
         },
-        error: () => this.dialog.error('Could not generate the quotation PDF.'),
+        error: () => {
+          this.busyProposalId = null;
+          this.dialog.error('Could not generate the quotation PDF.');
+        },
       });
   }
 
@@ -1399,14 +1464,21 @@ export class LeadProfileComponent implements OnInit {
     this.loadProposalClients();
   }
 
-  /**
-   * Email the quotation to the buyer.
-   *
-   * Confirmed first, and the confirmation names the recipient: this leaves the
-   * building and cannot be recalled, so the user has to see the address before
-   * it goes.
-   */
-  async sendProposalByEmail(q: any) {
+  // ── send a proposal by email ──────────────────────────────────────────────
+  //
+  // The document itself is the confirmation. A dialog that only names a file
+  // asks someone to vouch for a PDF they have not seen, and this leaves the
+  // building and cannot be recalled — so the quotation is rendered in front of
+  // them, and Send sits under it.
+
+  sendPreviewQuote: any = null;
+  sendPreviewUrl: SafeResourceUrl | null = null;
+  sendPreviewTo = '';
+  isLoadingSendPreview = false;
+  /** Held so it can be revoked — an object URL leaks its blob until it is. */
+  private sendPreviewObjectUrl: string | null = null;
+
+  sendProposalByEmail(q: any) {
     const to = (q.billingEmail || this.lead?.email || '').trim();
     if (!to) {
       this.dialog.error(
@@ -1416,20 +1488,67 @@ export class LeadProfileComponent implements OnInit {
       return;
     }
 
-    const ok = await this.dialog.confirm(
-      `Send quotation ${q.quoteNumber} to ${to}? The PDF will be attached.`,
-      'Send this quotation?',
-      'Send',
-      'Cancel',
-    );
-    if (!ok) return;
+    this.sendPreviewQuote = q;
+    this.sendPreviewTo = to;
+    this.sendPreviewUrl = null;
+    this.isLoadingSendPreview = true;
 
+    // Fetched as a blob rather than pointed at by URL: the endpoint is behind
+    // the auth guard, so an <iframe src> straight at it comes back 401.
+    this.http
+      .get(`${environment.apiUrl}/sales/quotations/${q.id}/pdf`, { responseType: 'blob' })
+      .subscribe({
+        next: (blob) => {
+          this.revokeSendPreviewUrl();
+          this.sendPreviewObjectUrl = URL.createObjectURL(blob);
+          this.sendPreviewUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.sendPreviewObjectUrl);
+          this.isLoadingSendPreview = false;
+        },
+        error: () => {
+          this.isLoadingSendPreview = false;
+          this.closeSendPreview();
+          this.dialog.error('The quotation PDF could not be generated, so there is nothing to send yet.');
+        },
+      });
+  }
+
+  closeSendPreview() {
+    if (this.sendingProposalId != null) return;
+    this.revokeSendPreviewUrl();
+    this.sendPreviewQuote = null;
+    this.sendPreviewUrl = null;
+    this.sendPreviewTo = '';
+    this.isLoadingSendPreview = false;
+  }
+
+  private revokeSendPreviewUrl() {
+    if (this.sendPreviewObjectUrl) {
+      URL.revokeObjectURL(this.sendPreviewObjectUrl);
+      this.sendPreviewObjectUrl = null;
+    }
+  }
+
+  ngOnDestroy() {
+    this.revokeSendPreviewUrl();
+  }
+
+  get sendPreviewToInvalid(): boolean {
+    return !isValidEmail(this.sendPreviewTo);
+  }
+
+  /** The irreversible step, and the only place that posts to /email. */
+  confirmSendProposal() {
+    const q = this.sendPreviewQuote;
+    if (!q || this.sendPreviewToInvalid) return;
+
+    const to = this.sendPreviewTo.trim();
     this.sendingProposalId = q.id;
     this.http
       .post<any>(`${environment.apiUrl}/sales/quotations/${q.id}/email`, { to })
       .subscribe({
         next: (res) => {
           this.sendingProposalId = null;
+          this.closeSendPreview();
           this.dialog.success(`Quotation ${q.quoteNumber} sent to ${res?.to || to}.`);
           this.loadLead(this.leadId!);
         },
@@ -1627,10 +1746,33 @@ export class LeadProfileComponent implements OnInit {
     }
   }
 
+  /** A line is only saleable once it has a real amount — quantity × price.
+   *  Used for the inline highlight and by saveProposal to block the send. */
+  proposalItemUnpriced(item: any): boolean {
+    const quantity = Number(item?.quantity);
+    const unitPrice = Number(item?.unitPrice);
+    return !(quantity > 0) || !(unitPrice > 0);
+  }
+
+  get proposalHasUnpricedItem(): boolean {
+    return (this.proposalForm.items || []).some((i: any) => this.proposalItemUnpriced(i));
+  }
+
   saveProposal() {
     this.isProposalSubmitted = true;
     // Quotations belong to the deal; leadId is what the server requires.
     if (!this.proposalForm.items.length) return;
+
+    // A quotation at ₹0.00 goes to a client and becomes a sales order. Stop it
+    // here so the offending line is highlighted, rather than letting the server
+    // reject the whole form with one message.
+    if (this.proposalHasUnpricedItem) {
+      this.dialog.error(
+        'Every line item needs a quantity and a unit price. The highlighted rows still total zero.',
+        'Amount is required',
+      );
+      return;
+    }
     if (this.uploadingProposalCount > 0) {
       this.dialog.error('Please wait for all attachments to finish uploading.');
       return;

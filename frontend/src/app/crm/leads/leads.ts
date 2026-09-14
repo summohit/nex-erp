@@ -8,6 +8,7 @@ import { environment } from '../../../environments/environment';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { AuthService } from '../../services/auth.service';
+import { isValidEmail, isValidOptionalPhone } from '../../shared/constants/contact-validation';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucidePlus,
@@ -36,7 +37,7 @@ import {
   LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
   LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
   LucideUpload, LucideDownload, LucideCalendarRange, LucideFolder, LucideChevronRight, LucideBriefcase,
-  LucideArrowRightLeft
+  LucideArrowRightLeft, LucideCopyPlus
 } from '@lucide/angular';
 
 export interface FollowUp {
@@ -120,7 +121,7 @@ interface Lead {
     LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
     LucideUpload, LucideDownload,
     LucideBriefcase, LucideCalendarRange, LucideChevronRight,
-    LucideArrowRightLeft,
+    LucideArrowRightLeft, LucideCopyPlus,
   ],
   templateUrl: './leads.html',
   styleUrls: ['./leads.css']
@@ -372,6 +373,9 @@ export class LeadsComponent implements OnInit {
   editingLeadContactId: number | null = null;
   contactAddedBySearchQuery = '';
   showContactAddedByDropdown = false;
+
+  /** Flips on the first save attempt so errors appear only after one. */
+  leadContactSubmitted = false;
 
   leadContactForm = {
     salutation: '',
@@ -928,6 +932,7 @@ csvImporting = false;
     };
     this.contactAddedBySearchQuery = '';
     this.showContactAddedByDropdown = false;
+    this.leadContactSubmitted = false;
     this.showLeadContactModal = true;
   }
 
@@ -954,6 +959,7 @@ csvImporting = false;
     };
     this.contactAddedBySearchQuery = '';
     this.showContactAddedByDropdown = false;
+    this.leadContactSubmitted = false;
     this.showLeadContactModal = true;
   }
 
@@ -964,6 +970,7 @@ csvImporting = false;
 
   closeLeadContactModal() {
     if (this.isSavingLeadContact) return;
+    this.leadContactSubmitted = false;
     this.showLeadContactModal = false;
     this.isEditingLeadContact = false;
     this.editingLeadContactId = null;
@@ -971,8 +978,42 @@ csvImporting = false;
     this.showContactAddedByDropdown = false;
   }
 
+  // ── lead contact validation ───────────────────────────────────────────────
+  //
+  // Email is required: a contact nobody can write to is a name in a list. The
+  // phone fields stay optional, but anything typed into them has to be a real
+  // number — a half-typed one is worse than an empty box, because it looks
+  // dialable right up until someone tries.
+
+  get leadContactNameInvalid(): boolean {
+    return !this.leadContactForm.name.trim();
+  }
+
+  get leadContactEmailMissing(): boolean {
+    return !this.leadContactForm.email.trim();
+  }
+
+  get leadContactEmailInvalid(): boolean {
+    return !isValidEmail(this.leadContactForm.email);
+  }
+
+  leadContactPhoneInvalid(field: 'phone' | 'mobile' | 'officePhoneNumber'): boolean {
+    return !isValidOptionalPhone(this.leadContactForm[field]);
+  }
+
+  get leadContactFormInvalid(): boolean {
+    return (
+      this.leadContactNameInvalid ||
+      this.leadContactEmailInvalid ||
+      this.leadContactPhoneInvalid('phone') ||
+      this.leadContactPhoneInvalid('mobile') ||
+      this.leadContactPhoneInvalid('officePhoneNumber')
+    );
+  }
+
   submitLeadContact() {
-    if (!this.leadContactForm.name.trim()) return;
+    this.leadContactSubmitted = true;
+    if (this.leadContactFormInvalid) return;
 
     this.isSavingLeadContact = true;
     if (this.isEditingLeadContact && this.editingLeadContactId) {
@@ -2005,27 +2046,69 @@ csvImporting = false;
     this.proposalActionsMenu = null;
   }
 
+  /** Mirrors QUOTE_EDITABLE on the server: a quotation the client already has
+   *  is frozen, and a correction becomes a new version. */
+  canEditProposal(q: any): boolean {
+    return ['DRAFT', 'PENDING_APPROVAL', 'REJECTED'].includes((q?.status || '').toUpperCase());
+  }
+
+  canReviseProposal(q: any): boolean {
+    return ['SENT', 'REJECTED'].includes((q?.status || '').toUpperCase());
+  }
+
+  /** Creating the version happens here; editing it hands off to the deal page,
+   *  which is where the proposal form lives. */
+  reviseProposal(q: any) {
+    const next = (Number(q?.version) || 1) + 1;
+    if (!confirm(`Create v${next} of ${q.quoteNumber}? It copies everything from this version, and this one becomes read-only history.`)) return;
+
+    const leadId = this.selectedLead?.id;
+    this.http.post<any>(`${environment.apiUrl}/sales/quotations/${q.id}/revise`, {}).subscribe({
+      next: (revision) => {
+        this.toast.success(`${revision.quoteNumber} created as v${revision.version}.`);
+        this.closeDetailModal();
+        if (leadId != null) {
+          this.router.navigate(['/crm/leads', leadId], {
+            queryParams: { tab: 'proposals', edit: revision.id },
+          });
+        }
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'The new version could not be created.'),
+    });
+  }
+
+  /** The proposal whose PDF the server is rendering. It is built on demand, so
+   *  the wait is seconds and the row has to say so. */
+  busyProposalId: number | null = null;
+
   /** Fetched as a blob rather than opened by URL: the endpoint sits behind the
    *  auth guard, so a plain window.open would come back 401. */
   viewProposal(q: any) {
+    this.busyProposalId = q.id;
     this.http
       .get(`${environment.apiUrl}/sales/quotations/${q.id}/pdf`, { responseType: 'blob' })
       .subscribe({
         next: (blob) => {
+          this.busyProposalId = null;
           const url = URL.createObjectURL(blob);
           const win = window.open(url, '_blank');
           if (!win) this.toast.error('Allow pop-ups to view the quotation, or download it instead.');
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
         },
-        error: () => this.toast.error('Could not generate the quotation PDF.'),
+        error: () => {
+          this.busyProposalId = null;
+          this.toast.error('Could not generate the quotation PDF.');
+        },
       });
   }
 
   downloadProposal(q: any) {
+    this.busyProposalId = q.id;
     this.http
       .get(`${environment.apiUrl}/sales/quotations/${q.id}/pdf`, { responseType: 'blob' })
       .subscribe({
         next: (blob) => {
+          this.busyProposalId = null;
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -2033,7 +2116,10 @@ csvImporting = false;
           a.click();
           setTimeout(() => URL.revokeObjectURL(url), 60_000);
         },
-        error: () => this.toast.error('Could not generate the quotation PDF.'),
+        error: () => {
+          this.busyProposalId = null;
+          this.toast.error('Could not generate the quotation PDF.');
+        },
       });
   }
 

@@ -11,6 +11,36 @@ export class SalesService {
 
   // ================= QUOTATIONS =================
 
+  /**
+   * Every line must carry a real amount.
+   *
+   * A quotation for ₹0.00 is not a quotation — it goes out to a client, gets
+   * converted to a sales order and drives revenue, so a blank price is a
+   * mistake every time. Enforced here rather than only in the form, because a
+   * rule that lives in the browser is a suggestion.
+   *
+   * Quantity is checked too: the amount is quantity × price, and zero of
+   * something is the same empty document by another route.
+   */
+  private assertItemsPriced(items: any[]) {
+    if (!Array.isArray(items) || !items.length) {
+      throw new BadRequestException('A quotation needs at least one line item.');
+    }
+
+    items.forEach((item: any, i: number) => {
+      const quantity = Number(item?.quantity);
+      const unitPrice = Number(item?.unitPrice);
+      const where = item?.name ? `"${item.name}"` : `line ${i + 1}`;
+
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        throw new BadRequestException(`Enter a quantity greater than zero for ${where}.`);
+      }
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        throw new BadRequestException(`Enter a unit price for ${where}. A line cannot be quoted at zero.`);
+      }
+    });
+  }
+
   async createQuotation(companyId: number, data: any, userId: number) {
     const { items, attachments, ...quoteData } = data;
 
@@ -28,6 +58,8 @@ export class SalesService {
       quoteData.validUntil = new Date(quoteData.validUntil);
     }
 
+    this.assertItemsPriced(items);
+
     // Auto-calculate subtotal, tax, total
     let subtotal = 0;
     items.forEach(item => {
@@ -40,15 +72,36 @@ export class SalesService {
     const total = subtotal + tax;
     delete quoteData.taxRate; // avoid double-writing; stored separately below
 
-    // Use the company's configured prefix rather than a hardcoded one —
-    // otherwise the Company Profile field is settings that do nothing. Blank
-    // falls back to "QT", which is what every existing quotation uses.
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: { quotationPrefix: true },
-    });
-    const prefix = (company?.quotationPrefix || 'QT').trim().replace(/-+$/, '');
-    const quoteNumber = `${prefix}-${Date.now().toString().slice(-8)}`;
+    // A deal carries one proposal, which evolves — so a proposal raised on a
+    // deal that already has one is the next version of it, not an unrelated
+    // document that happens to sit alongside. Same rule as reviseQuotation;
+    // the only difference is that this one starts from a blank form.
+    const previous = quoteData.leadId
+      ? await this.prisma.quotation.findFirst({
+          where: { companyId, leadId: quoteData.leadId },
+          orderBy: [{ version: 'desc' }, { id: 'desc' }],
+          select: { id: true, quoteNumber: true, version: true },
+        })
+      : null;
+    const version = (previous?.version ?? 0) + 1;
+
+    let quoteNumber: string;
+    // The version follows from the deal either way; the number can only follow
+    // if the previous quotation actually has one to continue. Being unable to
+    // raise a quotation at all is a far worse outcome than a fresh number.
+    if (previous?.quoteNumber) {
+      quoteNumber = `${previous.quoteNumber.replace(/-R\d+$/, '')}-R${version}`;
+    } else {
+      // Use the company's configured prefix rather than a hardcoded one —
+      // otherwise the Company Profile field is settings that do nothing. Blank
+      // falls back to "QT", which is what every existing quotation uses.
+      const company = await this.prisma.company.findUnique({
+        where: { id: companyId },
+        select: { quotationPrefix: true },
+      });
+      const prefix = (company?.quotationPrefix || 'QT').trim().replace(/-+$/, '');
+      quoteNumber = `${prefix}-${Date.now().toString().slice(-8)}`;
+    }
 
     // Check if total requires approval (e.g. > 10,000)
     let approvalStatus = 'APPROVED';
@@ -62,6 +115,8 @@ export class SalesService {
       data: {
         ...quoteData,
         quoteNumber,
+        version,
+        revisionOfId: previous?.id ?? null,
         companyId,
         subtotal,
         taxRate,
@@ -204,10 +259,23 @@ export class SalesService {
     SENT: ['ACCEPTED', 'REJECTED'],
     REJECTED: ['DRAFT'],
     ACCEPTED: [],
+    // Terminal. A superseded quotation is history: the version that replaced it
+    // is the one that moves.
+    SUPERSEDED: [],
   };
 
-  /** Statuses whose line items and totals may still be corrected. */
-  private static readonly QUOTE_EDITABLE = ['DRAFT', 'PENDING_APPROVAL', 'SENT', 'REJECTED'];
+  /**
+   * Statuses whose line items and totals may still be corrected.
+   *
+   * SENT is deliberately absent. Once a quotation has gone to the client they
+   * are holding that document; editing the row in place makes the record
+   * disagree with their copy and nobody finds out. A correction is a new
+   * version — see reviseQuotation.
+   */
+  private static readonly QUOTE_EDITABLE = ['DRAFT', 'PENDING_APPROVAL', 'REJECTED'];
+
+  /** Statuses a new version can be raised from. */
+  private static readonly QUOTE_REVISABLE = ['SENT', 'REJECTED'];
 
   private async findQuotation(companyId: number, quoteId: number) {
     const quote = await this.prisma.quotation.findFirst({ where: { id: quoteId, companyId } });
@@ -265,7 +333,7 @@ export class SalesService {
     const updateData: any = { ...quoteData };
 
     if (Array.isArray(items)) {
-      if (!items.length) throw new BadRequestException('A quotation needs at least one line item');
+      this.assertItemsPriced(items);
 
       let subtotal = 0;
       const priced = items.map((i: any) => {
@@ -284,11 +352,119 @@ export class SalesService {
       updateData.items = { deleteMany: {}, create: priced };
     }
 
+    // Attachments were destructured out of the payload here and then never
+    // used, so anything uploaded while editing was silently dropped on save.
+    //
+    // Reconciled rather than replaced wholesale: the client sends the full
+    // list, existing rows carrying their id and new ones not. Deleting and
+    // recreating the lot would work but would reset createdAt on files that
+    // never moved, and churn ids the UI may already be holding.
+    if (Array.isArray(attachments)) {
+      const keptIds = attachments
+        .map((a: any) => Number(a?.id))
+        .filter((id: number) => Number.isFinite(id) && id > 0);
+
+      const added = attachments
+        .filter((a: any) => !(Number(a?.id) > 0) && a?.fileUrl)
+        .map((a: any) => ({
+          fileName: a.fileName || 'attachment',
+          fileUrl: a.fileUrl,
+          fileSize: a.fileSize ? Number(a.fileSize) : null,
+        }));
+
+      updateData.attachments = {
+        // Anything the payload no longer names has been removed in the form.
+        deleteMany: keptIds.length ? { id: { notIn: keptIds } } : {},
+        ...(added.length ? { create: added } : {}),
+      };
+    }
+
     return this.prisma.quotation.update({
       where: { id: quoteId },
       data: updateData,
-      include: { client: true, items: true },
+      include: { client: true, items: true, attachments: true },
     });
+  }
+
+  /**
+   * Raise the next version of a deal's proposal.
+   *
+   * Copies the frozen quotation wholesale — lines, bill-to, terms, tax,
+   * attachments — into a fresh DRAFT, and marks the original SUPERSEDED so the
+   * pipeline does not show two live quotes for one deal.
+   *
+   * The quote number is kept and suffixed (3111-59710474 → -R2) so the client
+   * sees a revision of the document they already hold rather than an unrelated
+   * one. The version is the next ordinal on the deal, which is what "each new
+   * proposal is a new version of the previous one" means in practice.
+   */
+  async reviseQuotation(companyId: number, quoteId: number) {
+    const source = await this.prisma.quotation.findFirst({
+      where: { id: quoteId, companyId },
+      include: { items: true, attachments: true },
+    });
+    if (!source) throw new NotFoundException('Quotation not found');
+
+    if (!SalesService.QUOTE_REVISABLE.includes(source.status)) {
+      throw new BadRequestException(
+        source.status === 'DRAFT' || source.status === 'PENDING_APPROVAL'
+          ? 'This quotation has not gone to the client yet — edit it directly instead of versioning it.'
+          : source.status === 'SUPERSEDED'
+            ? 'This version has already been replaced. Raise the new version from the current one.'
+            : 'An accepted quotation has become an order and cannot be revised.',
+      );
+    }
+
+    // Scope by deal where there is one. A quote raised straight from Sales has
+    // no lead, so its chain is the only thing that can define "next".
+    const siblings = source.leadId
+      ? await this.prisma.quotation.findMany({
+          where: { companyId, leadId: source.leadId },
+          select: { version: true },
+        })
+      : [{ version: source.version }];
+    const nextVersion = Math.max(...siblings.map((q) => q.version ?? 1)) + 1;
+
+    // Strip any existing suffix first, so v3 is -R3 and never -R2-R3.
+    const baseNumber = source.quoteNumber.replace(/-R\d+$/, '');
+
+    // Keep the validity window the client was given rather than inventing one.
+    const windowMs = new Date(source.validUntil).getTime() - new Date(source.date).getTime();
+    const date = new Date();
+    const validUntil = new Date(date.getTime() + (Number.isFinite(windowMs) && windowMs > 0 ? windowMs : 30 * 24 * 60 * 60 * 1000));
+
+    const {
+      id: _id, quoteNumber: _qn, version: _v, revisionOfId: _r, status: _s, approvalStatus: _as,
+      approvedById: _ab, createdAt: _c, updatedAt: _u, items, attachments, ...carried
+    } = source as any;
+
+    const [revision] = await this.prisma.$transaction([
+      this.prisma.quotation.create({
+        data: {
+          ...carried,
+          quoteNumber: `${baseNumber}-R${nextVersion}`,
+          version: nextVersion,
+          revisionOfId: source.id,
+          status: 'DRAFT',
+          approvalStatus: 'APPROVED',
+          date,
+          validUntil,
+          items: {
+            create: items.map(({ id, quotationId, ...i }: any) => i),
+          },
+          ...(attachments.length
+            ? { attachments: { create: attachments.map(({ id, quotationId, createdAt, ...a }: any) => a) } }
+            : {}),
+        },
+        include: { items: true, attachments: true, client: true },
+      }),
+      this.prisma.quotation.update({
+        where: { id: source.id },
+        data: { status: 'SUPERSEDED' },
+      }),
+    ]);
+
+    return revision;
   }
 
   async deleteQuotation(companyId: number, quoteId: number) {

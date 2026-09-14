@@ -95,3 +95,101 @@ describe('QuotationPdfService.buildHtml', () => {
     });
   });
 });
+
+/**
+ * Attachment handling. The rule that matters: an annexure must never be able to
+ * break the quotation. A file that will not download, will not convert, or is
+ * the wrong type is reported on the index page — visibly missing beats silently
+ * missing, and beats a 500 on a document the salesperson needs now.
+ */
+describe('QuotationPdfService — attachments', () => {
+  const service: any = new QuotationPdfService({} as any, {} as any);
+
+  describe('classification', () => {
+    it.each([
+      ['photo.JPG', undefined, 'image'],
+      ['diagram.png', undefined, 'image'],
+      ['anything', 'image/webp', 'image'],
+      ['spec.pdf', undefined, 'pdf'],
+      ['spec', 'application/pdf', 'pdf'],
+      // ImageKit commonly serves office files as octet-stream, so the
+      // extension has to carry it.
+      ['scope.docx', 'application/octet-stream', 'doc'],
+      ['archive.zip', 'application/zip', 'unsupported'],
+      ['notes.txt', 'text/plain', 'unsupported'],
+    ])('%s (%s) is %s', (name, type, expected) => {
+      expect(service.attachmentKind(name, type)).toBe(expected);
+    });
+  });
+
+  describe('the index page', () => {
+    const html = (attachments: any[]) => service.buildAnnexureHtml(attachments);
+
+    it('is omitted entirely when nothing is attached', async () => {
+      expect(await html([])).toBe('');
+    });
+
+    it('names every file, including the ones that could not be included', async () => {
+      const out = await html([
+        { fileName: 'spec.pdf', kind: 'pdf', data: Buffer.from('x') },
+        { fileName: 'archive.zip', kind: 'unsupported', problem: 'file type cannot be printed' },
+      ]);
+      expect(out).toContain('spec.pdf');
+      expect(out).toContain('archive.zip');
+      expect(out).toContain('file type cannot be printed');
+    });
+
+    it('escapes the file name, which is user-supplied', async () => {
+      const out = await html([{ fileName: '<img src=x onerror=alert(1)>.png', kind: 'unsupported', problem: 'no' }]);
+      expect(out).not.toContain('<img src=x');
+      expect(out).toContain('&lt;img src=x');
+    });
+
+    it('embeds an image as a data URI rather than a link the renderer must fetch', async () => {
+      const out = await html([{ fileName: 'a.png', kind: 'image', data: Buffer.from('PNGDATA') }]);
+      expect(out).toContain('data:image/png;base64,' + Buffer.from('PNGDATA').toString('base64'));
+    });
+
+    it('does not render a page for a file that failed', async () => {
+      const out = await html([{ fileName: 'a.png', kind: 'image', problem: 'could not be downloaded' }]);
+      expect(out).not.toContain('data:image');
+      expect(out).toContain('could not be downloaded');
+    });
+  });
+
+  describe('merging attached PDFs', () => {
+    it('returns the quotation untouched when there is nothing to merge', async () => {
+      const base = Buffer.from('%PDF-1.4 pretend');
+      expect(await service.appendPdfAttachments(base, [])).toBe(base);
+    });
+
+    // The guarantee: a corrupt annexure costs you the annexure, not the quote.
+    it('returns the quotation rather than throwing when an attachment is unreadable', async () => {
+      const { PDFDocument } = require('pdf-lib');
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const base = Buffer.from(await doc.save());
+
+      const out = await service.appendPdfAttachments(base, [
+        { fileName: 'corrupt.pdf', kind: 'pdf', data: Buffer.from('not a pdf at all') },
+      ]);
+      const reloaded = await PDFDocument.load(out);
+      expect(reloaded.getPageCount()).toBe(1);
+    });
+
+    it('appends every page of a valid attachment', async () => {
+      const { PDFDocument } = require('pdf-lib');
+      const base = await PDFDocument.create();
+      base.addPage();
+      const attached = await PDFDocument.create();
+      attached.addPage();
+      attached.addPage();
+
+      const out = await service.appendPdfAttachments(Buffer.from(await base.save()), [
+        { fileName: 'spec.pdf', kind: 'pdf', data: Buffer.from(await attached.save()) },
+      ]);
+      expect((await PDFDocument.load(out)).getPageCount()).toBe(3);
+    });
+  });
+});
+

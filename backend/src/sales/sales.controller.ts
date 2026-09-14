@@ -85,6 +85,17 @@ export class SalesController {
     return this.salesService.updateQuotationStatus(req.user.companyId, id, status);
   }
 
+  /**
+   * Raise the next version of a quotation that has already gone to the client.
+   * Not idempotent — each call supersedes the source and creates a new draft —
+   * so it is a POST and the UI confirms first.
+   */
+  @Post('quotations/:id/revise')
+  @Permissions('sales/quotations')
+  reviseQuotation(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.salesService.reviseQuotation(req.user.companyId, id);
+  }
+
   @Delete('quotations/:id')
   @Permissions('sales/quotations')
   deleteQuotation(@Request() req, @Param('id', ParseIntPipe) id: number) {

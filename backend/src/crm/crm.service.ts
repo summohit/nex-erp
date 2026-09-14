@@ -1454,7 +1454,43 @@ export class CrmService {
     return contact;
   }
 
+  /**
+   * Mirror of frontend/src/app/shared/constants/contact-validation.ts. Keep the
+   * two in step.
+   *
+   * Format only — presence is not checked here. A lead created without an email
+   * can still spawn its contact (leads.ts does exactly that), and 12 contacts
+   * predating this rule have no address at all; refusing them at the API would
+   * make those records uneditable. The form is where "email is required" is
+   * enforced, in front of the person who can actually supply one.
+   *
+   * Blank is accepted and stored as null. Anything non-blank has to be real:
+   * a half-typed number looks dialable right up until someone tries it.
+   */
+  private assertContactFormats(data: any) {
+    const email = String(data?.email ?? '').trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email)) {
+      throw new BadRequestException(`"${email}" is not a valid email address.`);
+    }
+
+    const phones: [string, string][] = [
+      ['phone', 'Phone'],
+      ['mobile', 'Primary phone number'],
+      ['officePhoneNumber', 'Secondary phone number'],
+    ];
+    for (const [field, label] of phones) {
+      const raw = String(data?.[field] ?? '').trim();
+      if (!raw) continue;
+      const digits = raw.replace(/\D/g, '');
+      if (!/^\+?[0-9\s\-().]{6,25}$/.test(raw) || digits.length < 10 || digits.length > 15) {
+        throw new BadRequestException(`${label} must be 10 to 15 digits. Spaces, dashes and a country code are fine.`);
+      }
+    }
+  }
+
   async createLeadContact(companyId: number, userId: number | null, data: any) {
+    this.assertContactFormats(data);
+
     let addedById: number | null = data.addedById || null;
     // Public form submissions have no signed-in user. Without this guard the
     // lookup would run with userId undefined and attach an arbitrary employee.
@@ -1518,6 +1554,8 @@ export class CrmService {
   async updateLeadContact(companyId: number, id: number, data: any) {
     const contact = await this.prisma.leadContact.findFirst({ where: { id, companyId } });
     if (!contact) throw new NotFoundException('Lead Contact not found');
+
+    this.assertContactFormats(data);
 
     const updateData: any = {};
     if (data.salutation !== undefined) updateData.salutation = data.salutation;
