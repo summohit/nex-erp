@@ -27,6 +27,7 @@ export class SystemSettingsService {
       offerLetterTemplateDocxUrl?: string;
       offerLetterConfig?: any;
       defaultTicketAssigneeId?: number | null;
+      attendanceTicketAssigneeId?: number | null;
       twoFactorRequired?: boolean;
       quotationTerms?: string | null;
       quotationSignatoryName?: string | null;
@@ -42,6 +43,7 @@ export class SystemSettingsService {
         offerLetterTemplateDocxUrl: data.offerLetterTemplateDocxUrl,
         offerLetterConfig: data.offerLetterConfig ?? undefined,
         defaultTicketAssigneeId: data.defaultTicketAssigneeId ?? null,
+        attendanceTicketAssigneeId: data.attendanceTicketAssigneeId ?? null,
         twoFactorRequired: data.twoFactorRequired ?? false,
         quotationTerms: data.quotationTerms ?? null,
         quotationSignatoryName: data.quotationSignatoryName ?? null,
@@ -54,6 +56,7 @@ export class SystemSettingsService {
         // undefined leaves the stored JSON untouched; only overwrite when sent.
         offerLetterConfig: data.offerLetterConfig ?? undefined,
         ...(data.defaultTicketAssigneeId !== undefined && { defaultTicketAssigneeId: data.defaultTicketAssigneeId }),
+        ...(data.attendanceTicketAssigneeId !== undefined && { attendanceTicketAssigneeId: data.attendanceTicketAssigneeId }),
         ...(data.twoFactorRequired !== undefined && { twoFactorRequired: data.twoFactorRequired }),
         // Spread-guarded like the others: a PUT that omits the field must not
         // wipe the saved terms back to null.

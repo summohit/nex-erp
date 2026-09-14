@@ -2068,3 +2068,25 @@
 .status-filter-pill.active .filter-count {
   background: #1D4ED8;
 }
+
+/* Raise this day's attendance with HR. Deliberately quieter than the primary
+   actions on the screen — it is an exception path, not the main one. */
+.btn-report-attendance {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: max-content;
+  padding: 6px 16px;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  background: #FEF2F2;
+  color: #B91C1C;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.btn-report-attendance:hover {
+  background: #FEE2E2;
+  border-color: #FCA5A5;
+}

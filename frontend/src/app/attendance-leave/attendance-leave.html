@@ -1274,7 +1274,18 @@
         </div>
       </div>
 
-      <div style="display: flex; justify-content: flex-end; margin-top: 12px; border-top: 1px solid #E2E8F0; padding-top: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; border-top: 1px solid #E2E8F0; padding-top: 12px;">
+        <!-- Own record only: the ticket's reporter comes from the session, so
+             reporting from a colleague's month would file it under your name. -->
+        <button
+          *ngIf="isViewingOwnAttendance"
+          class="btn btn-report-attendance"
+          (click)="reportAttendanceIssue()"
+          title="Raise this with HR as a ticket">
+          <svg lucideFlag size="15"></svg>
+          Report an issue
+        </button>
+        <span *ngIf="!isViewingOwnAttendance"></span>
         <button class="btn btn-outline" (click)="closeDayDetailsModal()" style="width: max-content; padding: 6px 18px;">Close Log</button>
       </div>
     </div>

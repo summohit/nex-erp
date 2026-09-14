@@ -39,6 +39,65 @@ export class TicketsService {
     return `TKT-${String(count + 1).padStart(3, '0')}`;
   }
 
+  /**
+   * Attendance issues are HR's, not engineering's.
+   *
+   * Everything else in this module is hardwired to the development team — the
+   * owning department is resolved by keyword and the assignee comes from one
+   * company-wide setting. An attendance complaint routed there would put a
+   * personnel matter in the dev queue, so it gets its own handler.
+   */
+  static readonly ATTENDANCE_TYPE = 'ATTENDANCE_ISSUE';
+  private static readonly HR_DEPT_KEYWORDS = ['human resource', 'hr', 'people'];
+
+  private isAttendanceIssue(type: unknown): boolean {
+    return String(type ?? '') === TicketsService.ATTENDANCE_TYPE;
+  }
+
+  /** The configured handler, else any active HR user, else nobody. */
+  private async attendanceAssigneeId(companyId: number): Promise<number | null> {
+    const setting = await this.prisma.systemSetting.findUnique({
+      where: { companyId },
+      select: { attendanceTicketAssigneeId: true },
+    });
+    if (setting?.attendanceTicketAssigneeId) {
+      // Guard against a stale setting pointing at someone who has left.
+      const configured = await this.prisma.employee.findFirst({
+        where: { id: setting.attendanceTicketAssigneeId, companyId },
+        select: { id: true },
+      });
+      if (configured) return configured.id;
+    }
+
+    const hr = await this.prisma.employee.findFirst({
+      where: { companyId, user: { role: 'HR', status: 'ACTIVE' } },
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+    return hr?.id ?? null;
+  }
+
+  /** The HR department, so the ticket is owned even when nobody is assigned. */
+  private async hrDepartmentId(companyId: number, assigneeId: number | null): Promise<number | null> {
+    if (assigneeId) {
+      const assignee = await this.prisma.employee.findFirst({
+        where: { id: assigneeId, companyId },
+        select: { departmentId: true },
+      });
+      if (assignee?.departmentId) return assignee.departmentId;
+    }
+
+    const departments = await this.prisma.department.findMany({
+      where: { companyId },
+      select: { id: true, name: true },
+    });
+    for (const keyword of TicketsService.HR_DEPT_KEYWORDS) {
+      const match = departments.find((d) => d.name.toLowerCase().includes(keyword));
+      if (match) return match.id;
+    }
+    return null;
+  }
+
   private async defaultAssigneeId(companyId: number): Promise<number | null> {
     const setting = await this.prisma.systemSetting.findUnique({
       where: { companyId },
@@ -106,11 +165,39 @@ export class TicketsService {
   // ─── CREATE ────────────────────────────────────────────────────────────────
 
   async create(companyId: number, reporterId: number, data: any) {
+    const attendanceIssue = this.isAttendanceIssue(data.type);
+    const attachmentsIn: any[] = Array.isArray(data.attachments) ? data.attachments : [];
+
+    let attendanceDate: Date | null = null;
+    if (attendanceIssue) {
+      // Evidence is the whole point: HR is being asked to overrule a clock
+      // record, and "I was there" with nothing attached is not actionable.
+      if (!attachmentsIn.some((a) => a?.fileUrl)) {
+        throw new BadRequestException(
+          'Attach evidence — a screenshot, photo or document — before raising an attendance issue.',
+        );
+      }
+      const parsed = data.attendanceDate ? new Date(data.attendanceDate) : null;
+      if (!parsed || Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException('Select the date the attendance issue happened on.');
+      }
+      if (parsed.getTime() > Date.now()) {
+        throw new BadRequestException('The attendance date cannot be in the future.');
+      }
+      attendanceDate = parsed;
+    }
+
     const ticketNumber = await this.nextTicketNumber(companyId);
-    const assigneeId = await this.defaultAssigneeId(companyId);
-    
-    // The owning team is always software development — the reporter never picks it.
-    const departmentId = await this.devDepartmentId(companyId, assigneeId);
+    const assigneeId = attendanceIssue
+      ? await this.attendanceAssigneeId(companyId)
+      : await this.defaultAssigneeId(companyId);
+
+    // The owning team is software development for everything except attendance,
+    // which belongs to HR. Falls back to the usual resolution when this company
+    // has no HR department configured, so the ticket is never orphaned.
+    const departmentId = attendanceIssue
+      ? (await this.hrDepartmentId(companyId, assigneeId)) ?? (await this.devDepartmentId(companyId, assigneeId))
+      : await this.devDepartmentId(companyId, assigneeId);
 
     // Which department the issue is raised on behalf of. Selectable (IT may log a
     // bug for Finance), defaulting to the reporter's own department.
@@ -120,8 +207,7 @@ export class TicketsService {
       data.raisedByDepartmentId,
     );
 
-    const attachments: { fileName: string; fileUrl: string; fileSize?: number | null }[] =
-      Array.isArray(data.attachments) ? data.attachments : [];
+    const attachments: { fileName: string; fileUrl: string; fileSize?: number | null }[] = attachmentsIn;
 
     const ticket = await this.prisma.ticket.create({
       data: {
@@ -132,6 +218,7 @@ export class TicketsService {
         priority: data.priority ?? 'MEDIUM',
         platform: data.platform ?? 'WEB',
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        attendanceDate,
         companyId,
         departmentId,
         raisedByDepartmentId,
@@ -223,6 +310,16 @@ export class TicketsService {
     return ['SUPERADMIN', 'ADMIN', 'MANAGER'].includes(role ?? '');
   }
 
+  /**
+   * Who may read any attendance issue. Deliberately narrower than
+   * canSeeAllTickets: MANAGER is not on it, because a manager reading
+   * complaints raised against their own team is the situation this is meant to
+   * avoid.
+   */
+  private canHandleAttendanceIssues(role?: string): boolean {
+    return ['SUPERADMIN', 'ADMIN', 'HR'].includes(role ?? '');
+  }
+
   private async isEngineeringDept(employeeId: number | null | undefined): Promise<boolean> {
     if (!employeeId) return false;
     const emp = await this.prisma.employee.findUnique({
@@ -266,6 +363,22 @@ export class TicketsService {
     const privileged = this.canSeeAllTickets(user.role) || (await this.isEngineeringDept(user.employeeId));
     if (!privileged && user.employeeId) {
       where.reporterId = user.employeeId;
+    }
+
+    // Attendance issues are personnel matters. The blanket visibility that the
+    // engineering department enjoys over every other ticket must not extend to
+    // them — a developer has no business reading a complaint about a colleague's
+    // attendance. Only HR, admins, the person who raised it and whoever it is
+    // assigned to can see one.
+    if (!this.canHandleAttendanceIssues(user.role)) {
+      const mine: any[] = [];
+      if (user.employeeId) {
+        mine.push({ reporterId: user.employeeId }, { assigneeId: user.employeeId });
+      }
+      where.OR = [
+        { type: { not: TicketsService.ATTENDANCE_TYPE as any } },
+        ...(mine.length ? [{ AND: [{ type: TicketsService.ATTENDANCE_TYPE as any }, { OR: mine }] }] : []),
+      ];
     }
 
     // "Department" means the one the ticket was raised BY — the owning team is
@@ -353,7 +466,11 @@ export class TicketsService {
 
   // ─── FIND ONE ──────────────────────────────────────────────────────────────
 
-  async findOne(companyId: number, id: number) {
+  async findOne(
+    companyId: number,
+    id: number,
+    user?: { role?: string; employeeId?: number | null },
+  ) {
     const ticket = await this.prisma.ticket.findFirst({
       where: { id, companyId },
       include: {
@@ -386,6 +503,20 @@ export class TicketsService {
       },
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
+
+    // The list query hides attendance issues from everyone but HR, admins, the
+    // reporter and the assignee. Without the same check here the id alone would
+    // be enough to read one, which makes the list filter decorative.
+    if (user && ticket.type === TicketsService.ATTENDANCE_TYPE) {
+      const involved =
+        !!user.employeeId &&
+        (ticket.reporterId === user.employeeId || ticket.assigneeId === user.employeeId);
+      if (!this.canHandleAttendanceIssues(user.role) && !involved) {
+        // Not found rather than forbidden: whether a given ticket exists is
+        // itself something this caller should not learn.
+        throw new NotFoundException('Ticket not found');
+      }
+    }
 
     // Resolve Assignee IDs to names for activities to make the UI friendly
     const assigneeIdsToFetch = new Set<number>();

@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef, GridApi, GridReadyEvent, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -11,7 +12,7 @@ import {
   LucideCheckCircle2, LucideFlame, LucideEye, LucideUser,
   LucideInbox, LucideCheck, LucideSlidersHorizontal, LucideSparkles,
   LucideLaptop, LucideSmartphone, LucideHelpCircle, LucideClock,
-  LucideImagePlus, LucideTrash2, LucideLoader2
+  LucideImagePlus, LucideTrash2, LucideLoader2, LucideInfo
 } from '@lucide/angular';
 import { QuillModule } from 'ngx-quill';
 import { TicketService, Ticket, TicketStats, NewTicketAttachment, TicketPermissions } from '../../services/ticket.service';
@@ -35,7 +36,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideCheckCircle2, LucideFlame, LucideEye, LucideUser,
     LucideInbox, LucideCheck, LucideSlidersHorizontal, LucideSparkles,
     LucideLaptop, LucideSmartphone, LucideHelpCircle, LucideClock,
-    LucideImagePlus, LucideTrash2, LucideLoader2,
+    LucideImagePlus, LucideTrash2, LucideLoader2, LucideInfo,
     TicketDetailComponent, ChartCardComponent, SkeletonComponent,
   ],
   templateUrl: './tickets.html',
@@ -46,6 +47,8 @@ export class TicketsComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private authService = inject(AuthService);
   private toast = inject(HotToastService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   tickets: Ticket[] = [];
   stats: TicketStats | null = null;
@@ -114,6 +117,20 @@ export class TicketsComponent implements OnInit {
     priority: 'MEDIUM',
     platform: 'WEB',
   };
+
+  /**
+   * An attendance issue goes to HR rather than the development team, and asks
+   * HR to overrule a clock record — so it needs the day it concerns and proof,
+   * both of which the server also insists on.
+   */
+  get isAttendanceIssue(): boolean {
+    return this.newTicket.type === 'ATTENDANCE_ISSUE';
+  }
+
+  /** Today, as the date input wants it — an issue cannot be in the future. */
+  get todayIso(): string {
+    return new Date().toISOString().split('T')[0];
+  }
   creating = false;
 
   // Image attachments (uploaded to ImageKit before the ticket is submitted)
@@ -149,7 +166,7 @@ export class TicketsComponent implements OnInit {
 
   readonly statusOptions = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED'];
   readonly priorityOptions = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
-  readonly typeOptions = ['BUG', 'FEATURE_REQUEST', 'IMPROVEMENT', 'QUESTION'];
+  readonly typeOptions = ['BUG', 'FEATURE_REQUEST', 'IMPROVEMENT', 'QUESTION', 'ATTENDANCE_ISSUE'];
   readonly platformOptions = ['WEB', 'MOBILE', 'BOTH'];
 
   /**
@@ -171,6 +188,7 @@ export class TicketsComponent implements OnInit {
     FEATURE_REQUEST: 'type-feature',
     IMPROVEMENT: 'type-improvement',
     QUESTION: 'type-question',
+    ATTENDANCE_ISSUE: 'type-attendance',
   };
 
   readonly priorityColors: Record<string, string> = {
@@ -378,6 +396,28 @@ export class TicketsComponent implements OnInit {
 
   ngOnInit() {
     this.loadAll();
+
+    // Handed off from the attendance screen's "Report an issue" button, which
+    // knows the date but nothing about tickets. Opening the form here keeps one
+    // copy of it, with its evidence rule and HR routing intact.
+    const params = this.route.snapshot.queryParamMap;
+    if (params.get('report') === 'attendance') {
+      this.openAttendanceIssue(params.get('date'));
+      // Cleared so a refresh, or going back, does not reopen the form.
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    }
+  }
+
+  /** Open the create form as an attendance issue, seeded with the day. */
+  openAttendanceIssue(date?: string | null) {
+    this.openCreateModal();
+    const valid = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+    this.newTicket = {
+      ...this.newTicket,
+      type: 'ATTENDANCE_ISSUE',
+      attendanceDate: valid,
+      title: valid ? `Attendance issue on ${new Date(valid + 'T00:00:00').toLocaleDateString()}` : '',
+    } as Partial<Ticket>;
   }
 
   onGridReady(params: GridReadyEvent) {
@@ -872,7 +912,8 @@ export class TicketsComponent implements OnInit {
       // Defaults to the reporter's own department; they can change it if the
       // issue is being raised on another team's behalf.
       raisedByDepartmentId: this.permissions?.departmentId ?? null,
-    };
+      attendanceDate: null,
+    } as Partial<Ticket>;
     this.pendingAttachments = [];
     this.uploadingCount = 0;
     this.isDraggingFiles = false;
@@ -1011,6 +1052,18 @@ export class TicketsComponent implements OnInit {
     if (this.uploadingCount > 0) {
       this.toast.error('Please wait for images to finish uploading');
       return;
+    }
+    if (this.isAttendanceIssue) {
+      if (!(this.newTicket as any).attendanceDate) {
+        this.toast.error('Select the date the attendance issue happened on');
+        return;
+      }
+      // Checked here as well as on the server so the person sees it before the
+      // round trip, not as a red toast after it.
+      if (!this.pendingAttachments.length) {
+        this.toast.error('Attach evidence before raising an attendance issue');
+        return;
+      }
     }
 
     this.creating = true;

@@ -41,7 +41,10 @@ export class TicketsController {
 
   @Get(':id')
   findOne(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.ticketsService.findOne(req.user.companyId, id);
+    return this.ticketsService.findOne(req.user.companyId, id, {
+      role: req.user.role,
+      employeeId: req.user.employeeId ?? null,
+    });
   }
 
   @Get(':id/assignable-members')

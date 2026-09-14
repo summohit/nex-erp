@@ -222,6 +222,40 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
     return emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${id}`;
   }
 
+  // ─── Attendance issue handler (HR) ────────────────────────────────────────
+  //
+  // Separate from the default assignee on purpose: that one points at the
+  // development team's PM, and an attendance complaint must not land in the dev
+  // queue. Falls back to any active HR user when nobody is chosen.
+
+  showAttendanceAssigneeDropdown = signal(false);
+  attendanceAssigneeSearchQuery = signal('');
+
+  setAttendanceTicketAssignee(employeeId: number | null) {
+    const current = this.settings();
+    if (!current) return;
+    this.settings.set({ ...current, attendanceTicketAssigneeId: employeeId });
+    this.showAttendanceAssigneeDropdown.set(false);
+    this.attendanceAssigneeSearchQuery.set('');
+  }
+
+  getAttendanceAssigneeLabel(): string {
+    const id = this.settings()?.attendanceTicketAssigneeId;
+    if (!id) return 'Any HR user (automatic)';
+    const emp = this.employees().find(e => e.id === id);
+    return emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${id}`;
+  }
+
+  getFilteredAttendanceEmployees() {
+    const q = this.attendanceAssigneeSearchQuery().toLowerCase().trim();
+    if (!q) return this.employees();
+    return this.employees().filter(e =>
+      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+      (e.department?.name ?? '').toLowerCase().includes(q) ||
+      (e.designation?.name ?? '').toLowerCase().includes(q)
+    );
+  }
+
   getFilteredEmployees() {
     const q = this.assigneeSearchQuery().toLowerCase().trim();
     if (!q) return this.employees();
@@ -327,6 +361,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
       offerLetterTemplateDocxUrl: current.offerLetterTemplateDocxUrl,
       offerLetterConfig: current.offerLetterConfig,
       defaultTicketAssigneeId: current.defaultTicketAssigneeId ?? null,
+      attendanceTicketAssigneeId: current.attendanceTicketAssigneeId ?? null,
       // Explicitly sent: this is an allow-list, not a spread, so anything left
       // out here silently never reaches the server.
       quotationTerms: current.quotationTerms ?? null,

@@ -12,6 +12,8 @@ export interface SystemSetting {
   offerLetterConfig?: Record<string, any> | null;
   /** Employee every new ticket is auto-assigned to (the software dev PM). */
   defaultTicketAssigneeId?: number | null;
+  /** Who attendance-issue tickets go to. Null means any active HR user. */
+  attendanceTicketAssigneeId?: number | null;
   /** SuperAdmin switch: every user must enrol in two-factor auth to sign in. */
   twoFactorRequired?: boolean;
   /** Terms pre-filled into every new quotation. Null uses the built-in text. */

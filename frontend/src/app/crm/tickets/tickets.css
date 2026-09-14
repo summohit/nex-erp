@@ -2319,3 +2319,26 @@ label {
 .table-container ::ng-deep .ag-row.ag-row-hover {
   background-color: #eef2f7 !important;
 }
+
+/* ── Attendance issues ───────────────────────────────────────────────────── */
+.type-pill.type-attendance {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #ddd6fe;
+}
+/* Says where the ticket is going before it is raised, because this type is the
+   one that does not go to the development team. */
+.attendance-route-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #ddd6fe;
+  border-radius: 8px;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.attendance-route-note svg { flex-shrink: 0; margin-top: 1px; }
+.attendance-note-cell { justify-content: flex-end; }

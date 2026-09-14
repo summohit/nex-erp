@@ -72,6 +72,58 @@
       </div>
     </div>
 
+    <!-- Card: Attendance issue handler -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap ticket-icon">
+          <svg lucideCalendarClock size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <h3>Attendance Issue Handler</h3>
+          <p>Attendance issues raised as tickets go to this person instead of the development team. They are visible only to the employee who raised them, HR and admins.</p>
+        </div>
+      </div>
+
+      <div class="assignee-picker">
+        <button type="button" class="assignee-trigger" [class.has-selection]="s.attendanceTicketAssigneeId" (click)="showAttendanceAssigneeDropdown.set(!showAttendanceAssigneeDropdown())">
+          <span>{{ getAttendanceAssigneeLabel() }}</span>
+          <svg lucideChevronDown size="15" class="trigger-chevron" [class.rotated]="showAttendanceAssigneeDropdown()"></svg>
+        </button>
+
+        <div class="assignee-popover" *ngIf="showAttendanceAssigneeDropdown()">
+          <div class="assignee-search">
+            <input
+              type="text"
+              placeholder="Search by name, department, or role..."
+              [ngModel]="attendanceAssigneeSearchQuery()"
+              (ngModelChange)="attendanceAssigneeSearchQuery.set($event)" />
+          </div>
+          <div class="assignee-options">
+            <div class="assignee-option" (click)="setAttendanceTicketAssignee(null)" [class.selected]="!s.attendanceTicketAssigneeId">
+              <span class="option-none">Any HR user (automatic)</span>
+              <svg lucideCheck size="14" *ngIf="!s.attendanceTicketAssigneeId"></svg>
+            </div>
+            <div class="assignee-option" *ngFor="let e of getFilteredAttendanceEmployees()" (click)="setAttendanceTicketAssignee(e.id)" [class.selected]="s.attendanceTicketAssigneeId === e.id">
+              <div class="option-person">
+                <span class="option-name">{{ e.firstName }} {{ e.lastName }}</span>
+                <span class="option-sub">{{ e.designation?.name || 'No designation' }} · {{ e.department?.name || 'No department' }}</span>
+              </div>
+              <svg lucideCheck size="14" *ngIf="s.attendanceTicketAssigneeId === e.id"></svg>
+            </div>
+            <div class="assignee-empty" *ngIf="getFilteredAttendanceEmployees().length === 0">
+              No employees match "{{ attendanceAssigneeSearchQuery() }}"
+            </div>
+          </div>
+        </div>
+        <div class="assignee-backdrop" *ngIf="showAttendanceAssigneeDropdown()" (click)="showAttendanceAssigneeDropdown.set(false)"></div>
+      </div>
+
+      <div class="card-footer-note">
+        <svg lucideInfo size="14"></svg>
+        <span>Leave this unset and the ticket goes to the first active HR user. If the company has no HR user at all, it stays unassigned but owned by the HR department.</span>
+      </div>
+    </div>
+
     <!-- Card: quotation signatory -->
     <div class="setting-card">
       <div class="card-top">

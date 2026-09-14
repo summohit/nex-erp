@@ -34,7 +34,8 @@ import {
   LucideList,
   LucideChevronLeft,
   LucideChevronRight,
-  LucideClock
+  LucideClock,
+  LucideFlag
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -81,7 +82,8 @@ export interface DayStatus {
     LucideList,
     LucideChevronLeft,
     LucideChevronRight,
-    LucideClock
+    LucideClock,
+    LucideFlag
   ],
   providers: [DatePipe],
   templateUrl: './attendance-leave.html',
@@ -1343,6 +1345,29 @@ export class AttendanceLeaveComponent implements OnInit {
         this.isLoadingTimesheet.set(false);
       },
       error: () => this.isLoadingTimesheet.set(false)
+    });
+  }
+
+  /**
+   * Raising an attendance issue hands off to the ticket form rather than
+   * duplicating it here: the ticket carries evidence, routing to HR and its own
+   * validation, none of which belongs on the attendance screen.
+   *
+   * Only offered for your own record. The server takes the reporter from the
+   * token, so reporting while looking at a colleague's month would file a
+   * complaint about them under your name.
+   */
+  get isViewingOwnAttendance(): boolean {
+    return !this.selectedAttendanceEmployeeId();
+  }
+
+  reportAttendanceIssue() {
+    const day = this.selectedDayDetails()?.day;
+    if (!day?.date) return;
+    const date = this.getLocalDateString(new Date(day.date));
+    this.closeDayDetailsModal();
+    this.router.navigate(['/crm/tickets'], {
+      queryParams: { report: 'attendance', date },
     });
   }
 

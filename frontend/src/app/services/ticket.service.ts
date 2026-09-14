@@ -64,7 +64,7 @@ export interface Ticket {
   ticketNumber: string;
   title: string;
   description?: string;
-  type: 'BUG' | 'FEATURE_REQUEST' | 'IMPROVEMENT' | 'QUESTION';
+  type: 'BUG' | 'FEATURE_REQUEST' | 'IMPROVEMENT' | 'QUESTION' | 'ATTENDANCE_ISSUE';
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
   priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   platform: 'WEB' | 'MOBILE' | 'BOTH';
@@ -78,6 +78,8 @@ export interface Ticket {
   assigneeId?: number | null;
   assignee?: TicketEmployee;
   dueDate?: string | null;
+  /** The day an ATTENDANCE_ISSUE concerns. Null on every other type. */
+  attendanceDate?: string | null;
   resolvedAt?: string | null;
   closedAt?: string | null;
   createdAt: string;
