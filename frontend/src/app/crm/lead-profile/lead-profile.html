@@ -322,7 +322,7 @@
                         <span class="fup-status-saving" *ngIf="followUpStatusSaving[fu.id]"><svg lucideLoader2 size="13" class="spin-icon"></svg></span>
                       </div>
                     </td>
-                    <td data-label="Action" class="col-actions-sticky">
+<td data-label="Action" class="col-actions-sticky">
                       <button type="button" class="fu-actions-trigger" title="Actions" (click)="toggleFollowUpActionsMenu(fu, $event)">
                         <svg lucideMoreVertical size="16"></svg>
                       </button>
@@ -643,7 +643,7 @@
 
             <div class="form-group" style="margin-top: 16px;">
               <label>Attachments</label>
-              <input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,image/*" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp" />
+<input #followUpFileInput class="visually-hidden-file-input" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,image/*" (change)="onFollowUpFilesSelected($event); followUpFileInput.value = ''" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp" />
               <button type="button" class="btn-fum-attach" (click)="followUpFileInput.click()" [disabled]="isSavingFollowUp || isUploadingFollowUpFiles || isViewingFollowUp">
                 <svg lucideUpload [size]="15"></svg>
                 <span>Attach Files / Documents</span>
