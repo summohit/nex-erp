@@ -137,6 +137,7 @@ export class AddLeadWizardComponent implements OnInit {
 
   isSaving = false;
   isSubmitted = false;
+  valueFieldTouched = false;
   activeTab = 1;
 customSource = '';
   customCategory = '';
@@ -157,6 +158,7 @@ customSource = '';
     const contactSource = (c?.leadSource && this.LEAD_SOURCES.includes(c.leadSource)) ? c.leadSource : 'Google Search';
     this.isSaving = false;
     this.isSubmitted = false;
+    this.valueFieldTouched = false;
     this.activeTab = 1;
     this.customSource = '';
     this.customCategory = '';
@@ -275,11 +277,17 @@ customSource = '';
   }
 
   validateDealValue() {
+    this.valueFieldTouched = true;
     if (this.newLeadData.value !== undefined && this.newLeadData.value !== null) {
       if (this.newLeadData.value < 0) {
         this.newLeadData.value = 0;
       }
     }
+  }
+
+  get valueInvalid(): boolean {
+    const v = this.newLeadData.value;
+    return v === null || v === undefined || v <= 0;
   }
 
   close() {
@@ -301,9 +309,8 @@ customSource = '';
       return;
     }
 
-    // Validation: Stage, Source, Lead Category, Deal Value, and Close Date are required on tab 2
+    // Validation: Stage, Lead Category, Deal Value, and Close Date are required on tab 2
     const isTab2Valid = this.newLeadData.status?.trim()
-      && this.newLeadData.source?.trim()
       && this.newLeadData.dealCategory?.trim()
       && this.newLeadData.value !== null && this.newLeadData.value !== undefined && this.newLeadData.value > 0
       && this.newLeadData.expectedCloseDate;

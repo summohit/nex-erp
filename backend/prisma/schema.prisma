@@ -102,6 +102,10 @@ model Company {
   leadContactNotes    LeadContactNote[]
   leadForms           LeadForm[]
   offerLetters        OfferLetter[]
+  preSalesRequests    PreSalesRequest[]
+  preSalesMembers     PreSalesTeamMember[]
+  preSalesTasks       PreSalesTask[]
+  preSalesMom         PreSalesMoM[]
   tickets             Ticket[]
 }
 
@@ -383,6 +387,14 @@ model Employee {
   regularizations          AttendanceRegularization[]
   shiftRotations           ShiftRotation[]
   shiftRosterEntries       ShiftRosterEntry[]
+
+  preSalesRequestsRaised   PreSalesRequest[]  @relation("PreSalesRequestRequester")
+  preSalesRequestsForMe    PreSalesRequest[]  @relation("PreSalesRequestedEmployee")
+  preSalesRequestsApproved PreSalesRequest[]  @relation("PreSalesRequestApprover")
+  preSalesTeamMemberships  PreSalesTeamMember[]
+  preSalesTasksAssignedTo  PreSalesTask[]     @relation("PreSalesTaskAssignee")
+  preSalesTasksAssignedBy  PreSalesTask[]     @relation("PreSalesTaskAssigner")
+  preSalesMomUploads       PreSalesMoM[]
   generatedLetters         GeneratedLetter[]
   uploadedProjectDocuments ProjectDocument[]
   assignedLeads            Lead[]                     @relation("LeadAssignee")
@@ -2381,6 +2393,10 @@ model Lead {
   files               LeadFile[]
   notes               LeadNote[]
   activities          LeadActivity[]
+  preSalesMembers     PreSalesTeamMember[]
+  preSalesRequests    PreSalesRequest[]
+  preSalesTasks       PreSalesTask[]
+  preSalesMom         PreSalesMoM[]
 }
 
 // External contact (broker/partner/referrer) who can be selected as the source
@@ -2481,6 +2497,108 @@ model LeadActivity {
   companyId   Int
   company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
+}
+
+// ═══════════════════════════════════════════
+// PRE-SALES ENGAGEMENT
+// ═══════════════════════════════════════════
+
+// A pre-sales person (e.g. a technical member) engaged on a deal, tracked on an
+// hourly / on-demand basis. Approving a PreSalesRequest upserts this record and
+// adds the granted hours. Additional hours are requested again via a new
+// PreSalesRequest with isAdditional = true.
+model PreSalesTeamMember {
+  id             Int      @id @default(autoincrement())
+  companyId      Int
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadId         Int
+  lead           Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  employeeId     Int
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  allocatedHours Float    @default(0)
+  status         String   @default("ACTIVE") // ACTIVE, REMOVED
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([leadId, employeeId])
+  @@index([companyId, leadId])
+}
+
+// A request raised by a sales person to engage a pre-sales person on a deal for
+// a meeting / on an on-demand basis. The admin approves or rejects it from the
+// same modal, with a remarks field.
+model PreSalesRequest {
+  id            Int       @id @default(autoincrement())
+  companyId     Int
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadId        Int
+  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  requestedById Int
+  requestedBy   Employee  @relation("PreSalesRequestRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  employeeId    Int
+  employee      Employee  @relation("PreSalesRequestedEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  hours         Float
+  reason        String?   @db.Text
+  remarks       String?   @db.Text
+  isAdditional  Boolean   @default(false) // true when re-engaging a member for extra hours
+  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedById  Int?
+  approvedBy    Employee? @relation("PreSalesRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([companyId, leadId])
+}
+
+// A task assigned by the sales person to a pre-sales person on a deal, tracked
+// on an hourly basis. The pre-sales person uploads the minutes of meeting (MoM)
+// into the task when done.
+model PreSalesTask {
+  id           Int            @id @default(autoincrement())
+  companyId    Int
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadId       Int
+  lead         Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedById Int
+  assignedBy   Employee       @relation("PreSalesTaskAssigner", fields: [assignedById], references: [id], onDelete: Cascade)
+  assignedToId Int
+  assignedTo   Employee       @relation("PreSalesTaskAssignee", fields: [assignedToId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?        @db.Text
+  hours        Float          @default(0)
+  status       String         @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  dueDate      DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  moms         PreSalesMoM[]
+
+  @@index([companyId, leadId])
+}
+
+// Minutes of Meeting uploaded by the pre-sales person against a task on a deal.
+model PreSalesMoM {
+  id           Int           @id @default(autoincrement())
+  companyId    Int
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadId       Int
+  lead         Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  taskId       Int?
+  task         PreSalesTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  uploadedById Int
+  uploadedBy   Employee      @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  title        String
+  meetingDate  DateTime?
+  summary      String?       @db.Text
+  fileUrl      String?
+  fileName     String?
+  fileType     String?
+  fileSize     Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([companyId, leadId])
 }
 
 model Quotation {

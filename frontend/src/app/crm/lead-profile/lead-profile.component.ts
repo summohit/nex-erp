@@ -18,9 +18,14 @@ import {
   LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
   LucideList, LucideAlertCircle, LucideCopyPlus
 } from '@lucide/angular';
+import {
+  LucideUsers, LucideUserPlus, LucideClipboardList, LucideFileUp,
+  LucidePlusCircle, LucideHourglass, LucideAlertCircle,
+} from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ClientsService } from '../../services/clients';
+import { AuthService } from '../../services/auth.service';
 
 interface PipelineStage {
   key: string;
@@ -40,7 +45,8 @@ interface PipelineStage {
     LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
     LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
     LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
-    LucideList, LucideAlertCircle, LucideCopyPlus
+    LucideList, LucideAlertCircle, LucideCopyPlus, LucideUsers, LucideUserPlus,
+    LucideClipboardList, LucideFileUp, LucidePlusCircle, LucideHourglass
   ],
   templateUrl: './lead-profile.html',
   styleUrls: ['./lead-profile.css']
@@ -53,13 +59,14 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
   private dialog = inject(DialogService);
   private clientsService = inject(ClientsService);
   private systemSettingsService = inject(SystemSettingsService);
+  private auth = inject(AuthService);
 
   lead: any = null;
   leadId: number | null = null;
   isLoading = true;
 
   // Tabs
-  activeTab: 'files' | 'followups' | 'proposals' | 'notes' | 'history' = 'files';
+  activeTab: 'files' | 'followups' | 'proposals' | 'notes' | 'history' | 'presales' = 'files';
 
   // Tab data
   files: any[] = [];
@@ -202,6 +209,10 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
         this.isLoading = false;
         this.loadAllTabData();
         this.applyDeepLink();
+        if (data?.flow === 'PRE_SALES') {
+          this.loadPresalesEmployees();
+          this.loadPresalesInfo();
+        }
       },
       error: (err) => {
         console.error('Error loading lead profile', err);
@@ -221,7 +232,7 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
   private applyDeepLink() {
     const params = this.route.snapshot.queryParamMap;
     const tab = params.get('tab');
-    if (tab === 'proposals' || tab === 'followups' || tab === 'notes' || tab === 'history' || tab === 'files') {
+    if (tab === 'proposals' || tab === 'followups' || tab === 'notes' || tab === 'history' || tab === 'files' || tab === 'presales') {
       this.activeTab = tab as any;
     }
     const editId = Number(params.get('edit'));
@@ -251,11 +262,11 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
   // TABS
   // ═══════════════════════════════════════════
 
-  setTab(tab: 'files' | 'followups' | 'proposals' | 'notes' | 'history') {
+  setTab(tab: 'files' | 'followups' | 'proposals' | 'notes' | 'history' | 'presales') {
     this.activeTab = tab;
   }
 
-  onTabClick(tab: 'files' | 'followups' | 'proposals' | 'notes' | 'history') {
+  onTabClick(tab: 'files' | 'followups' | 'proposals' | 'notes' | 'history' | 'presales') {
     this.setTab(tab);
   }
 
@@ -1803,5 +1814,409 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
 
   goBack() {
     this.router.navigate(['/crm/leads']);
+  }
+  // ═══════════════════════════════════════════
+  // PRE-SALES ENGAGEMENT (team / requests / tasks / MoM)
+  // ═══════════════════════════════════════════
+
+  presalesInfo: any = null;
+  loadingPresales = false;
+  activePresalesSection: 'team' | 'requests' | 'tasks' | 'mom' = 'team';
+  presalesEmployees: any[] = [];
+
+  presalesMembers: any[] = [];
+  presalesRequests: any[] = [];
+  presalesTasks: any[] = [];
+  presalesMoms: any[] = [];
+
+  get isAdminOrSuperAdmin(): boolean {
+    const role = this.auth.currentUser()?.role;
+    return role === 'ADMIN' || role === 'SUPERADMIN';
+  }
+
+  loadPresalesEmployees() {
+    this.http.get<any[]>(`${environment.apiUrl}/employees`).subscribe({
+      next: (data) => (this.presalesEmployees = data || []),
+      error: (err) => console.error('Failed to load employees', err),
+    });
+  }
+
+  loadPresalesInfo() {
+    if (this.leadId == null || !this.isPreSalesLead) return;
+    this.loadingPresales = true;
+    this.http.get<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales`).subscribe({
+      next: (data) => {
+        this.presalesInfo = data;
+        this.presalesMembers = data?.members || [];
+        this.presalesRequests = data?.requests || [];
+        this.presalesTasks = data?.tasks || [];
+        this.presalesMoms = data?.moms || [];
+        this.loadingPresales = false;
+      },
+      error: (err) => {
+        console.error(err);
+        this.loadingPresales = false;
+      }
+    });
+  }
+
+  get presalesKpis(): any {
+    const members = this.presalesMembers || [];
+    const requests = this.presalesRequests || [];
+    const tasks = this.presalesTasks || [];
+    const openTasks = tasks.filter((t: any) => t.status !== 'COMPLETED');
+    const allocatedHours = members.reduce((s: number, m: any) => s + (Number(m.allocatedHours) || 0), 0);
+    const usedHours = members.reduce((s: number, m: any) => s + (Number(m.usedHours) || 0), 0);
+    return {
+      value: this.lead?.value ?? 0,
+      currency: this.lead?.currency || 'INR',
+      members: members.length,
+      allocatedHours,
+      usedHours,
+      pendingRequests: requests.filter((r: any) => r.status === 'PENDING').length,
+      openTasks: openTasks.length,
+      moms: this.presalesMoms.length,
+    };
+  }
+
+  formatHours(h: any): string {
+    const n = Number(h) || 0;
+    return n % 1 === 0 ? `${n} hr${n === 1 ? '' : 's'}` : `${n} hrs`;
+  }
+
+  getPresalesName(member: any): string {
+    const emp = member?.employee || member?.assignedTo || member;
+    return `${emp?.firstName || ''} ${emp?.lastName || ''}`.trim() || '—';
+  }
+
+  getPresalesDesignation(member: any): string {
+    const d = member?.employee?.designation || member?.designation || member?.assignedTo?.designation;
+    return d?.name || 'Pre-Sales Member';
+  }
+
+  getPresalesInitials(member: any): string {
+    const emp = member?.employee || member?.assignedTo || member;
+    return `${emp?.firstName?.[0] || ''}${emp?.lastName?.[0] || ''}`.trim() || 'PS';
+  }
+
+  getPresalesAvatar(member: any): string {
+    return member?.employee?.avatarUrl || member?.avatarUrl || member?.assignedTo?.avatarUrl || '';
+  }
+
+  preSalesStatusClass(status: string): string {
+    return (status || 'PENDING').toLowerCase();
+  }
+
+  // ── Request modal ──────────────────────────────
+
+  showRequestModal = false;
+  isRequestAdditional = false;
+  requestForm: any = { employeeId: null, memberName: '', memberHours: 0, reason: '', hours: 1 };
+  requestSearch = '';
+  savingRequest = false;
+  psCandidateOpen = false;
+  psTaskAssigneeOpen = false;
+
+  openRequestModal(member?: any) {
+    this.isRequestAdditional = !!member;
+    this.requestForm = {
+      employeeId: member?.employeeId ?? member?.employee?.id ?? null,
+      memberName: member ? this.getPresalesName(member) : '',
+      memberHours: member?.remainingHours ?? 0,
+      reason: '',
+      hours: member ? Math.max(member?.remainingHours || 0, 1) : 1,
+    };
+    this.requestSearch = '';
+    this.showRequestModal = true;
+  }
+
+  closeRequestModal() {
+    this.showRequestModal = false;
+  }
+
+  getFilteredRequestCandidates(): any[] {
+    let pool = this.presalesEmployees || [];
+    const term = this.requestSearch.trim().toLowerCase();
+    if (term) {
+      pool = pool.filter((e: any) =>
+        `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(term) ||
+        (e.designation?.name || '').toLowerCase().includes(term) ||
+        (e.department?.name || '').toLowerCase().includes(term)
+      );
+    }
+    return pool;
+  }
+
+  selectRequestCandidate(emp: any) {
+    this.requestForm.employeeId = emp ? emp.id : null;
+  }
+
+  saveRequest() {
+    if (this.leadId == null) return;
+    if (!this.requestForm.employeeId) { this.dialog.error('Select a pre-sales person.'); return; }
+    if (!this.requestForm.hours || Number(this.requestForm.hours) <= 0) { this.dialog.error('Enter hours greater than zero.'); return; }
+    this.savingRequest = true;
+    const body = {
+      employeeId: this.requestForm.employeeId,
+      hours: Number(this.requestForm.hours),
+      reason: this.requestForm.reason,
+      isAdditional: this.isRequestAdditional,
+    };
+    // Admins add members directly (no approval needed); team members request, the admin approves.
+    const url = this.isAdminOrSuperAdmin
+      ? `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/members`
+      : `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/requests`;
+    this.http.post<any>(url, body).subscribe({
+      next: () => {
+        this.savingRequest = false;
+        this.closeRequestModal();
+        this.dialog.success(this.isAdminOrSuperAdmin
+          ? (this.isRequestAdditional ? 'Hours topped up for the member.' : 'Pre-sales person added to the deal team.')
+          : (this.isRequestAdditional ? 'Additional hours requested from the admin.' : 'Pre-sales request sent to the admin for approval.'));
+        this.loadPresalesInfo();
+      },
+      error: (err) => {
+        this.savingRequest = false;
+        this.dialog.error(err?.error?.message || 'Failed to submit the request.');
+      }
+    });
+  }
+
+  // ── Approve / reject ───────────────────────────
+
+  showDecisionModal = false;
+  decisionMode: 'APPROVE' | 'REJECT' = 'APPROVE';
+  decisionRequest: any = null;
+  decisionRemarks = '';
+  submittingDecision = false;
+
+  openRequestDecisionModal(request: any, mode: 'APPROVE' | 'REJECT') {
+    this.decisionRequest = request;
+    this.decisionMode = mode;
+    this.decisionRemarks = '';
+    this.showDecisionModal = true;
+  }
+
+  closeDecisionModal() {
+    this.showDecisionModal = false;
+  }
+
+  submitDecision() {
+    if (this.leadId == null || !this.decisionRequest) return;
+    if (this.decisionMode === 'REJECT' && !this.decisionRemarks.trim()) {
+      this.dialog.error('Remarks are required when rejecting a request.');
+      return;
+    }
+    this.submittingDecision = true;
+    const url = `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/requests/${this.decisionRequest.id}/${this.decisionMode.toLowerCase()}`;
+    this.http.post<any>(url, { remarks: this.decisionRemarks }).subscribe({
+      next: () => {
+        this.submittingDecision = false;
+        this.closeDecisionModal();
+        this.dialog.success(this.decisionMode === 'APPROVE'
+          ? 'Request approved; the pre-sales person is on the deal team with the requested hours.'
+          : 'Request rejected.');
+        this.loadPresalesInfo();
+      },
+      error: (err) => {
+        this.submittingDecision = false;
+        this.dialog.error(err?.error?.message || 'Failed to process the request.');
+      }
+    });
+  }
+
+  // ── Task modal ─────────────────────────────────
+
+  showTaskModal = false;
+  editingTask: any = null;
+  taskForm: any = { assignedToId: null, title: '', description: '', hours: 1, dueDate: '' };
+  taskSearch = '';
+  savingTask = false;
+  taskStatusSavingId: number | null = null;
+
+  openTaskModal(task?: any) {
+    this.editingTask = task || null;
+    this.taskForm = task
+      ? {
+          assignedToId: task.assignedToId,
+          title: task.title,
+          description: task.description || '',
+          hours: Number(task.hours) || 0,
+          dueDate: task.dueDate ? String(task.dueDate).slice(0, 10) : '',
+        }
+      : { assignedToId: null, title: '', description: '', hours: 1, dueDate: '' };
+    this.taskSearch = '';
+    this.showTaskModal = true;
+  }
+
+  closeTaskModal() {
+    this.showTaskModal = false;
+  }
+
+  getFilteredTaskAssignees(): any[] {
+    // Only people still actively engaged on the deal team can take on tasks.
+    const memberIds = new Set((this.presalesMembers || []).filter((m: any) => m.status === 'ACTIVE').map((m: any) => m.employeeId).filter(Boolean));
+    const pool = (this.presalesEmployees || []).filter((e: any) => memberIds.has(e.id));
+    const term = this.taskSearch.trim().toLowerCase();
+    if (term) {
+      return pool.filter((e: any) => `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(term));
+    }
+    return pool;
+  }
+
+  selectTaskAssignee(emp: any) {
+    this.taskForm.assignedToId = emp ? emp.id : null;
+    this.taskSearch = '';
+    this.psTaskAssigneeOpen = false;
+  }
+
+  saveTask() {
+    if (this.leadId == null) return;
+    if (!(this.taskForm.title || '').trim()) { this.dialog.error('Task title is required.'); return; }
+    if (!this.taskForm.assignedToId) { this.dialog.error('Select the pre-sales person.'); return; }
+    this.savingTask = true;
+    const body = {
+      title: this.taskForm.title.trim(),
+      description: this.taskForm.description,
+      hours: Number(this.taskForm.hours) || 0,
+      dueDate: this.taskForm.dueDate || null,
+      assignedToId: this.taskForm.assignedToId,
+    };
+    const url = this.editingTask
+      ? `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${this.editingTask.id}`
+      : `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks`;
+    const req = this.editingTask ? this.http.put<any>(url, body) : this.http.post<any>(url, body);
+    req.subscribe({
+      next: () => {
+        this.savingTask = false;
+        this.closeTaskModal();
+        this.dialog.success(this.editingTask ? 'Task updated.' : 'Task assigned on an hourly basis.');
+        this.loadPresalesInfo();
+      },
+      error: (err) => {
+        this.savingTask = false;
+        this.dialog.error(err?.error?.message || 'Failed to save the task.');
+      }
+    });
+  }
+
+  setTaskStatus(task: any, status: string) {
+    if (this.leadId == null) return;
+    this.taskStatusSavingId = task.id;
+    this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${task.id}`, { status }).subscribe({
+      next: () => {
+        this.taskStatusSavingId = null;
+        this.loadPresalesInfo();
+      },
+      error: (err) => {
+        this.taskStatusSavingId = null;
+        this.dialog.error(err?.error?.message || 'Failed to update the task.');
+      }
+    });
+  }
+
+  async deleteTask(task: any) {
+    if (this.leadId == null) return;
+    const confirmed = await this.dialog.confirm(`Delete task "${task.title}"?`, 'Delete task');
+    if (!confirmed) return;
+    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${task.id}`).subscribe({
+      next: () => {
+        this.dialog.success('Task deleted.');
+        this.loadPresalesInfo();
+      },
+      error: (err) => {
+        this.dialog.error(err?.error?.message || 'Failed to delete the task.');
+      }
+    });
+  }
+
+  // ── MoM modal ──────────────────────────────────
+
+  showMomModal = false;
+  momTask: any = null;
+  momForm: any = { title: '', meetingDate: '', summary: '' };
+  momFile: File | null = null;
+  savingMom = false;
+
+  openMomModal(task?: any) {
+    this.momTask = task || null;
+    this.momForm = { title: task ? `MoM — ${task.title}` : '', meetingDate: '', summary: '' };
+    this.momFile = null;
+    this.showMomModal = true;
+  }
+
+  closeMomModal() {
+    this.showMomModal = false;
+  }
+
+  onMomFileSelected(event: any) {
+    const input = event.target as HTMLInputElement;
+    this.momFile = input?.files?.[0] || null;
+  }
+
+  clearMomFile() {
+    this.momFile = null;
+  }
+
+  saveMom() {
+    if (this.leadId == null) return;
+    if (!(this.momForm.title || '').trim()) { this.dialog.error('MoM title is required.'); return; }
+    this.savingMom = true;
+    const body = new FormData();
+    body.append('title', this.momForm.title.trim());
+    if (this.momTask) body.append('taskId', String(this.momTask.id));
+    if (this.momForm.meetingDate) body.append('meetingDate', this.momForm.meetingDate);
+    if (this.momForm.summary) body.append('summary', this.momForm.summary);
+    if (this.momFile) body.append('file', this.momFile);
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/mom`, body).subscribe({
+      next: () => {
+        this.savingMom = false;
+        this.closeMomModal();
+        this.dialog.success(this.momTask ? 'MoM uploaded; task marked completed.' : 'MoM uploaded.');
+        this.loadPresalesInfo();
+      },
+      error: (err) => {
+        this.savingMom = false;
+        this.dialog.error(err?.error?.message || 'Failed to upload the MoM.');
+      }
+    });
+  }
+
+  async deleteMom(mom: any) {
+    if (this.leadId == null) return;
+    const confirmed = await this.dialog.confirm(`Delete MoM "${mom.title}"?`, 'Delete MoM');
+    if (!confirmed) return;
+    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/mom/${mom.id}`).subscribe({
+      next: () => {
+        this.dialog.success('MoM deleted.');
+        this.loadPresalesInfo();
+      },
+      error: (err) => {
+        this.dialog.error(err?.error?.message || 'Failed to delete the MoM.');
+      }
+    });
+  }
+
+  openMomFile(mom: any) {
+    if (!mom?.fileUrl) { this.dialog.error('No file attached to this MoM.'); return; }
+    window.open(mom.fileUrl, '_blank');
+  }
+
+  async endPresalesAssignment(member: any) {
+    if (this.leadId == null) return;
+    const confirmed = await this.dialog.confirm(
+      `End ${this.getPresalesName(member)}'s engagement on this deal? Their tasks and MoMs stay on the deal as history, and no further hours can be used.`,
+      'End assignment'
+    );
+    if (!confirmed) return;
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/members/${member.id}/end`, {}).subscribe({
+      next: () => {
+        this.dialog.success('Assignment ended. The person was removed from the active team.');
+        this.loadPresalesInfo();
+      },
+      error: (err) => {
+        this.dialog.error(err?.error?.message || 'Failed to end the assignment.');
+      }
+    });
   }
 }

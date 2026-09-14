@@ -326,6 +326,25 @@ export class CrmService {
         // and Follow-Up Status filters, without shipping full quotation or follow-up rows.
         quotations: { select: { id: true } },
         followUps: { select: { id: true, scheduledAt: true }, orderBy: { scheduledAt: 'asc' } },
+        // Pre-sales engagement overview for the pre-sales board list (empty for SALES).
+        preSalesMembers: {
+          select: {
+            id: true,
+            employeeId: true,
+            allocatedHours: true,
+            status: true,
+            employee: {
+              select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+            },
+          },
+        },
+        preSalesRequests: {
+          select: { id: true, employeeId: true, hours: true, status: true, isAdditional: true, createdAt: true },
+        },
+        preSalesTasks: {
+          select: { id: true, assignedToId: true, title: true, hours: true, status: true, dueDate: true },
+        },
+        preSalesMom: { select: { id: true, taskId: true, title: true, fileName: true, createdAt: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -536,6 +555,13 @@ export class CrmService {
         data: { leadId: salesLead.id },
       });
     }
+
+    // Carry the pre-sales engagement (team members, requests, tasks, MoMs) over
+    // to the sales deal so the evaluation history stays on the record.
+    await this.prisma.preSalesTeamMember.updateMany({ where: { leadId: preSale.id }, data: { leadId: salesLead.id } });
+    await this.prisma.preSalesRequest.updateMany({ where: { leadId: preSale.id }, data: { leadId: salesLead.id } });
+    await this.prisma.preSalesTask.updateMany({ where: { leadId: preSale.id }, data: { leadId: salesLead.id } });
+    await this.prisma.preSalesMoM.updateMany({ where: { leadId: preSale.id }, data: { leadId: salesLead.id } });
 
     await this.prisma.lead.update({
       where: { id: preSale.id },
@@ -1749,5 +1775,657 @@ export class CrmService {
     if (!note) throw new NotFoundException('Note not found');
 
     return this.prisma.leadContactNote.delete({ where: { id: noteId } });
+  }
+
+  // ═══════════════════════════════════════════
+  // PRE-SALES ENGAGEMENT
+  // ═══════════════════════════════════════════
+  // Sales person requests a pre-sales person (hours / on-demand) → admin
+  // approves/rejects with remarks → an approved member with hours joins the
+  // deal. Tasks are assigned on an hourly basis and the pre-sales person uploads
+  // the minutes of meeting (MoM) into the task when done.
+  // ═══════════════════════════════════════════
+
+  private presalesEmployeeSelect = {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      avatarUrl: true,
+      designation: { select: { name: true } },
+      department: { select: { name: true } },
+    },
+  } as const;
+
+  private async getLeadForPreSales(companyId: number, leadId: number) {
+    const lead = await this.prisma.lead.findFirst({
+      where: { id: leadId, companyId },
+      select: { id: true, title: true, flow: true, companyName: true, value: true, currency: true },
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+    if (lead.flow !== 'PRE_SALES') {
+      throw new BadRequestException('Pre-sales actions are only available on pre-sales deals.');
+    }
+    return lead;
+  }
+
+  async getPreSalesInfo(companyId: number, leadId: number) {
+    const lead = await this.getLeadForPreSales(companyId, leadId);
+
+    const [memberRows, requests, tasks, moms] = await Promise.all([
+      this.prisma.preSalesTeamMember.findMany({
+        where: { companyId, leadId },
+        include: {
+          employee: this.presalesEmployeeSelect,
+        },
+        orderBy: { id: 'asc' },
+      }),
+      this.prisma.preSalesRequest.findMany({
+        where: { companyId, leadId },
+        include: {
+          employee: this.presalesEmployeeSelect,
+          requestedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+          approvedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.preSalesTask.findMany({
+        where: { companyId, leadId },
+        include: {
+          assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } },
+          assignedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+          _count: { select: { moms: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.preSalesMoM.findMany({
+        where: { companyId, leadId },
+        include: {
+          uploadedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+          task: { select: { id: true, title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    // enrolled hours vs hours consumed by assigned tasks, per member
+    const usage = new Map<number, { usedHours: number; openTasks: number; completedTasks: number }>();
+    for (const t of tasks) {
+      const agg = usage.get(t.assignedToId) ?? { usedHours: 0, openTasks: 0, completedTasks: 0 };
+      agg.usedHours += Number(t.hours) || 0;
+      if (t.status === 'COMPLETED') agg.completedTasks += 1;
+      else agg.openTasks += 1;
+      usage.set(t.assignedToId, agg);
+    }
+    const members = memberRows.map((m) => {
+      const agg = usage.get(m.employeeId) ?? { usedHours: 0, openTasks: 0, completedTasks: 0 };
+      const allocated = Number(m.allocatedHours) || 0;
+      // The engagement is over once the admin ends it or the enrolled hours are
+      // fully consumed — the member record stays as history.
+      const remaining = Math.max(0, allocated - agg.usedHours);
+      const effectiveStatus = m.status === 'REMOVED' ? 'REMOVED' : remaining <= 0 ? 'REMOVED' : 'ACTIVE';
+      return {
+        ...m,
+        allocatedHours: allocated,
+        usedHours: agg.usedHours,
+        remainingHours: remaining,
+        status: effectiveStatus,
+        endedAutomatically: effectiveStatus === 'REMOVED' && m.status !== 'REMOVED',
+        openTasks: agg.openTasks,
+        completedTasks: agg.completedTasks,
+      };
+    });
+    const activeMembers = members.filter((m) => m.status === 'ACTIVE');
+
+    const kpis = {
+      value: lead.value || 0,
+      currency: lead.currency || 'INR',
+      members: activeMembers.length,
+      allocatedHours: activeMembers.reduce((s, m) => s + Number(m.allocatedHours), 0),
+      usedHours: activeMembers.reduce((s, m) => s + Number(m.usedHours), 0),
+      pendingRequests: requests.filter((r) => r.status === 'PENDING').length,
+      totalRequests: requests.length,
+      openTasks: tasks.filter((t) => t.status !== 'COMPLETED').length,
+      completedTasks: tasks.filter((t) => t.status === 'COMPLETED').length,
+      totalTasks: tasks.length,
+      moms: moms.length,
+    };
+
+    return { lead: { id: lead.id, title: lead.title, companyName: lead.companyName }, members, requests, tasks, moms, kpis };
+  }
+
+  async createPreSalesRequest(
+    companyId: number,
+    leadId: number,
+    data: any,
+    actorEmployeeId?: number | null,
+  ) {
+    const lead = await this.getLeadForPreSales(companyId, leadId);
+    if (!actorEmployeeId) throw new BadRequestException('Your account is not linked to an employee.');
+
+    const employeeId = data.employeeId ? parseInt(data.employeeId, 10) : null;
+    const hours = data.hours !== undefined && data.hours !== null ? parseFloat(data.hours) : 0;
+    if (!employeeId) throw new BadRequestException('Select a pre-sales person.');
+    if (!hours || hours <= 0) throw new BadRequestException('Enter hours greater than zero.');
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    if (!employee) throw new BadRequestException('The selected person is not part of your organisation.');
+
+    const request = await this.prisma.preSalesRequest.create({
+      data: {
+        companyId,
+        leadId,
+        requestedById: actorEmployeeId,
+        employeeId,
+        hours,
+        reason: data.reason || null,
+        isAdditional: !!data.isAdditional,
+      },
+      include: {
+        employee: this.presalesEmployeeSelect,
+        requestedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'PRE_SALES_REQUESTED',
+      `${request.isAdditional ? 'Additional hours requested' : 'Pre-sales person requested'} for ${employee.firstName} ${employee.lastName} — ${hours} hrs`,
+      actorEmployeeId,
+      { employeeId, hours, isAdditional: request.isAdditional },
+    );
+
+    const extra = request.isAdditional ? ' (additional hours)' : '';
+    await this.notificationsService.notifyApprovers({
+      companyId,
+      roles: ['ADMIN', 'SUPERADMIN'],
+      title: request.isAdditional ? 'Additional pre-sales hours requested' : 'New pre-sales person request',
+      message: `${employee.firstName} ${employee.lastName} — ${hours} hrs for "${lead.title}"${extra}.`,
+      type: 'ACTION_REQUIRED',
+      linkUrl: `/crm/leads/${leadId}`,
+    });
+    await this.notificationsService.notifyEmployees([employeeId], {
+      companyId,
+      title: 'You have been requested for pre-sales work',
+      message: `${hours} hrs requested on "${lead.title}"${extra}.`,
+      excludeEmployeeId: actorEmployeeId,
+      linkUrl: `/crm/leads/${leadId}`,
+    });
+
+    return request;
+  }
+
+  async approvePreSalesRequest(
+    companyId: number,
+    leadId: number,
+    requestId: number,
+    remarks: string | undefined,
+    actorEmployeeId?: number | null,
+  ) {
+    const lead = await this.getLeadForPreSales(companyId, leadId);
+    const request = await this.prisma.preSalesRequest.findFirst({
+      where: { id: requestId, leadId, companyId },
+    });
+    if (!request) throw new NotFoundException('Pre-sales request not found');
+    if (request.status !== 'PENDING') throw new BadRequestException('This request was already decided.');
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: request.employeeId, companyId },
+      select: { firstName: true, lastName: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.preSalesRequest.update({
+        where: { id: requestId },
+        data: { status: 'APPROVED', remarks: remarks || null, approvedById: actorEmployeeId ?? null, approvedAt: new Date() },
+      });
+
+      const existing = await tx.preSalesTeamMember.findUnique({
+        where: { leadId_employeeId: { leadId, employeeId: request.employeeId } },
+      });
+      if (existing) {
+        await tx.preSalesTeamMember.update({
+          where: { id: existing.id },
+          data: { allocatedHours: (Number(existing.allocatedHours) || 0) + request.hours, status: 'ACTIVE' },
+        });
+      } else {
+        await tx.preSalesTeamMember.create({
+          data: { companyId, leadId, employeeId: request.employeeId, allocatedHours: request.hours },
+        });
+      }
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'PRE_SALES_APPROVED',
+      `Pre-sales request approved — ${employee ? `${employee.firstName} ${employee.lastName} ` : ''}${request.hours} hrs${remarks ? ` — ${remarks}` : ''}`,
+      actorEmployeeId,
+      { requestId, employeeId: request.employeeId, hours: request.hours },
+    );
+
+    await this.notificationsService.notifyEmployees([request.requestedById, request.employeeId], {
+      companyId,
+      title: 'Pre-sales request approved',
+      message: `${employee ? `${employee.firstName} ${employee.lastName} ` : ''}— ${request.hours} hrs on "${lead.title}"${remarks ? ` — ${remarks}` : ''}.`,
+      linkUrl: `/crm/leads/${leadId}`,
+    });
+
+    return { approved: true, requestId, hours: request.hours };
+  }
+
+  async rejectPreSalesRequest(
+    companyId: number,
+    leadId: number,
+    requestId: number,
+    remarks: string | undefined,
+    actorEmployeeId?: number | null,
+  ) {
+    const lead = await this.getLeadForPreSales(companyId, leadId);
+    const request = await this.prisma.preSalesRequest.findFirst({
+      where: { id: requestId, leadId, companyId },
+    });
+    if (!request) throw new NotFoundException('Pre-sales request not found');
+    if (request.status !== 'PENDING') throw new BadRequestException('This request was already decided.');
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: request.employeeId, companyId },
+      select: { firstName: true, lastName: true },
+    });
+
+    await this.prisma.preSalesRequest.update({
+      where: { id: requestId },
+      data: { status: 'REJECTED', remarks: remarks || null, approvedById: actorEmployeeId ?? null, approvedAt: new Date() },
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'PRE_SALES_REJECTED',
+      `Pre-sales request rejected — ${employee ? `${employee.firstName} ${employee.lastName} ` : ''}${request.hours} hrs${remarks ? ` — ${remarks}` : ''}`,
+      actorEmployeeId,
+      { requestId, employeeId: request.employeeId, hours: request.hours },
+    );
+
+    await this.notificationsService.notifyEmployees([request.requestedById, request.employeeId], {
+      companyId,
+      title: 'Pre-sales request rejected',
+      message: `${employee ? `${employee.firstName} ${employee.lastName} ` : ''}— ${request.hours} hrs on "${lead.title}"${remarks ? ` — ${remarks}` : ''}.`,
+      linkUrl: `/crm/leads/${leadId}`,
+    });
+
+    return { rejected: true, requestId };
+  }
+
+  // Admin directly adds a pre-sales person to a deal with hours — bypasses the
+  // request/approval cycle (used by the "Add Team Member" action). Adding the
+  // same person again tops up their enrolled hours instead of duplicating.
+  async addPreSalesMember(
+    companyId: number,
+    leadId: number,
+    data: any,
+    actorEmployeeId?: number | null,
+  ) {
+    const lead = await this.getLeadForPreSales(companyId, leadId);
+    const employeeId = data.employeeId ? parseInt(data.employeeId, 10) : null;
+    const hours = data.hours !== undefined && data.hours !== null ? parseFloat(data.hours) : 0;
+    if (!employeeId) throw new BadRequestException('Select a pre-sales person.');
+    if (!hours || hours <= 0) throw new BadRequestException('Enter hours greater than zero.');
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    if (!employee) throw new BadRequestException('The selected person is not part of your organisation.');
+
+    const member = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.preSalesTeamMember.findUnique({
+        where: { leadId_employeeId: { leadId, employeeId } },
+      });
+      if (existing) {
+        return tx.preSalesTeamMember.update({
+          where: { id: existing.id },
+          data: { allocatedHours: (Number(existing.allocatedHours) || 0) + hours, status: 'ACTIVE' },
+        });
+      }
+      return tx.preSalesTeamMember.create({
+        data: { companyId, leadId, employeeId, allocatedHours: hours },
+      });
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'PRE_SALES_MEMBER_ADDED',
+      `Pre-sales person added — ${employee.firstName} ${employee.lastName} (${hours} hrs)`,
+      actorEmployeeId,
+      { memberId: member.id, employeeId, hours },
+    );
+
+    await this.notificationsService.notifyEmployees([employeeId], {
+      companyId,
+      title: 'You have been added to a pre-sales team',
+      message: `${hours} hrs on "${lead.title}"${data.reason ? ` — ${data.reason}` : ''}.`,
+      linkUrl: `/crm/leads/${leadId}`,
+    });
+
+    return { added: true, memberId: member.id, employeeId, hours };
+  }
+
+  // Ends a member's engagement on the deal. The assignment stays on the deal as
+  // a historical record (their tasks / MoMs remain) but no new hours are used.
+  async endPreSalesMember(
+    companyId: number,
+    leadId: number,
+    memberId: number,
+    actorEmployeeId?: number | null,
+  ) {
+    const lead = await this.getLeadForPreSales(companyId, leadId);
+    const member = await this.prisma.preSalesTeamMember.findFirst({
+      where: { id: memberId, leadId, companyId },
+      include: { employee: { select: { firstName: true, lastName: true } } },
+    });
+    if (!member) throw new NotFoundException('Pre-sales team member not found');
+    if (member.status === 'REMOVED') throw new BadRequestException('This assignment has already ended.');
+
+    await this.prisma.preSalesTeamMember.update({
+      where: { id: memberId },
+      data: { status: 'REMOVED' },
+    });
+
+    const employeeName = member.employee ? `${member.employee.firstName} ${member.employee.lastName}`.trim() : 'Member';
+    await this.logActivity(
+      companyId,
+      leadId,
+      'PRE_SALES_MEMBER_ENDED',
+      `Pre-sales assignment ended — ${employeeName} (${Number(member.allocatedHours) || 0} hrs allocated)`,
+      actorEmployeeId,
+      { memberId, employeeId: member.employeeId, allocatedHours: member.allocatedHours },
+    );
+
+    await this.notificationsService.notifyEmployees([member.employeeId], {
+      companyId,
+      title: 'Pre-sales assignment ended',
+      message: `Your pre-sales engagement on "${lead.title}" has been ended by the admin.`,
+      linkUrl: `/crm/leads/${leadId}`,
+    });
+
+    return { ended: true, memberId };
+  }
+
+  async createPreSalesTask(
+    companyId: number,
+    leadId: number,
+    data: any,
+    actorEmployeeId?: number | null,
+  ) {
+    const lead = await this.getLeadForPreSales(companyId, leadId);
+    const assignedToId = data.assignedToId ? parseInt(data.assignedToId, 10) : null;
+    if (!assignedToId) throw new BadRequestException('Select a pre-sales person.');
+    if (!data.title || !String(data.title).trim()) throw new BadRequestException('Task title is required.');
+    if (!actorEmployeeId) throw new BadRequestException('Your account is not linked to an employee.');
+
+    const hours = data.hours !== undefined && data.hours !== null ? parseFloat(data.hours) : 0;
+
+    // The person must still be engaged on this deal and their remaining hours must
+    // cover the task — hours are consumed up to the enrolled amount.
+    const member = await this.prisma.preSalesTeamMember.findUnique({
+      where: { leadId_employeeId: { leadId, employeeId: assignedToId } },
+      select: { allocatedHours: true, status: true },
+    });
+    if (!member) throw new BadRequestException('This person is not part of the pre-sales team for this deal.');
+    if (member.status === 'REMOVED') {
+      throw new BadRequestException('This assignment has ended. Request additional hours to re-engage the person.');
+    }
+    const used = await this.prisma.preSalesTask.aggregate({
+      where: { leadId, assignedToId },
+      _sum: { hours: true },
+    });
+    const usedHours = Number(used._sum.hours) || 0;
+    if (hours <= 0 || usedHours + hours > Number(member.allocatedHours)) {
+      const remaining = Math.max(0, Number(member.allocatedHours) - usedHours);
+      throw new BadRequestException(`Only ${remaining} hrs remain for this person. Reduce the task hours or raise an additional-hours request.`);
+    }
+
+    const task = await this.prisma.preSalesTask.create({
+      data: {
+        companyId,
+        leadId,
+        assignedById: actorEmployeeId,
+        assignedToId,
+        title: String(data.title).trim(),
+        description: data.description || null,
+        hours: hours || 0,
+        status: data.status || 'PENDING',
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      },
+      include: {
+        assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } },
+        assignedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'PRE_SALES_TASK_ASSIGNED',
+      `Task "${task.title}" (${hours} hrs) assigned`,
+      actorEmployeeId,
+      { taskId: task.id, assignedToId, hours },
+    );
+
+    await this.notificationsService.notifyEmployees([assignedToId], {
+      companyId,
+      title: 'New pre-sales task assigned to you',
+      message: `"${task.title}" (${hours} hrs) on "${lead.title}".`,
+      excludeEmployeeId: actorEmployeeId,
+      linkUrl: `/crm/leads/${leadId}`,
+    });
+
+    return task;
+  }
+
+  async updatePreSalesTask(
+    companyId: number,
+    leadId: number,
+    taskId: number,
+    data: any,
+  ) {
+    await this.getLeadForPreSales(companyId, leadId);
+    const existing = await this.prisma.preSalesTask.findFirst({
+      where: { id: taskId, leadId, companyId },
+      select: { id: true, title: true, assignedToId: true, hours: true },
+    });
+    if (!existing) throw new NotFoundException('Task not found');
+
+    const update: any = {};
+    if (data.title !== undefined) update.title = String(data.title).trim() || existing.title;
+    if (data.description !== undefined) update.description = data.description || null;
+    if (data.hours !== undefined) update.hours = parseFloat(data.hours) || 0;
+    if (data.status !== undefined) update.status = data.status;
+    if (data.dueDate !== undefined) update.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+
+    // Keep the hours budget intact when hours / assignee change.
+    if (data.hours !== undefined || data.assignedToId !== undefined) {
+      const assignedToId = data.assignedToId !== undefined ? parseInt(data.assignedToId, 10) : existing.assignedToId;
+      const newHours = data.hours !== undefined ? (parseFloat(data.hours) || 0) : Number(existing.hours);
+      const member = await this.prisma.preSalesTeamMember.findUnique({
+        where: { leadId_employeeId: { leadId, employeeId: assignedToId } },
+        select: { allocatedHours: true, status: true },
+      });
+      if (!member) throw new BadRequestException('This person is not part of the pre-sales team for this deal.');
+      if (member.status === 'REMOVED') {
+        throw new BadRequestException('This assignment has ended. Request additional hours to re-engage the person.');
+      }
+      const used = await this.prisma.preSalesTask.aggregate({
+        where: { leadId, assignedToId },
+        _sum: { hours: true },
+      });
+      const usedHours = (Number(used._sum.hours) || 0) - Number(existing.hours);
+      if (newHours <= 0 || usedHours + newHours > Number(member.allocatedHours)) {
+        const remaining = Math.max(0, Number(member.allocatedHours) - usedHours);
+        throw new BadRequestException(`Only ${remaining} hrs remain for this person. Reduce the task hours or raise an additional-hours request.`);
+      }
+    }
+
+    const task = await this.prisma.preSalesTask.update({
+      where: { id: taskId },
+      data: update,
+      include: {
+        assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } },
+        assignedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'PRE_SALES_TASK_UPDATED',
+      `Task "${task.title}" updated`,
+      undefined,
+      { taskId, status: task.status, hours: task.hours },
+    );
+
+    return task;
+  }
+
+  async deletePreSalesTask(companyId: number, leadId: number, taskId: number) {
+    await this.getLeadForPreSales(companyId, leadId);
+    const existing = await this.prisma.preSalesTask.findFirst({
+      where: { id: taskId, leadId, companyId },
+      select: { id: true, title: true },
+    });
+    if (!existing) throw new NotFoundException('Task not found');
+
+    await this.prisma.preSalesTask.delete({ where: { id: taskId } });
+    await this.logActivity(companyId, leadId, 'PRE_SALES_TASK_DELETED', `Task "${existing.title}" deleted`, undefined);
+
+    return { deleted: true };
+  }
+
+  async uploadPreSalesMoM(
+    companyId: number,
+    leadId: number,
+    data: any,
+    actorEmployeeId?: number | null,
+    file?: { url?: string; originalname?: string; mimetype?: string; size?: number },
+  ) {
+    const lead = await this.getLeadForPreSales(companyId, leadId);
+    if (!actorEmployeeId) throw new BadRequestException('Your account is not linked to an employee.');
+    if (!data.title || !String(data.title).trim()) throw new BadRequestException('MoM title is required.');
+
+    const taskId = data.taskId ? parseInt(data.taskId, 10) : null;
+    if (taskId) {
+      const task = await this.prisma.preSalesTask.findFirst({ where: { id: taskId, leadId, companyId }, select: { id: true, assignedById: true } });
+      if (!task) throw new BadRequestException('Task not found.');
+    }
+
+    const mom = await this.prisma.preSalesMoM.create({
+      data: {
+        companyId,
+        leadId,
+        taskId,
+        uploadedById: actorEmployeeId,
+        title: String(data.title).trim(),
+        meetingDate: data.meetingDate ? new Date(data.meetingDate) : null,
+        summary: data.summary || null,
+        fileUrl: file?.url || null,
+        fileName: file?.originalname || null,
+        fileType: file?.mimetype || null,
+        fileSize: file?.size || null,
+      },
+      include: {
+        uploadedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        task: { select: { id: true, title: true, assignedById: true } },
+      },
+    });
+
+    // Uploading the minutes of meeting marks the hour-tracked task as done.
+    if (taskId) {
+      await this.prisma.preSalesTask.update({
+        where: { id: taskId },
+        data: { status: 'COMPLETED' },
+      });
+    }
+
+    await this.logActivity(
+      companyId,
+      leadId,
+      'PRE_SALES_MOM_UPLOADED',
+      `Minutes of meeting "${mom.title}" uploaded${mom.task ? ` against task "${mom.task.title}"` : ''}`,
+      actorEmployeeId,
+      { momId: mom.id, taskId },
+    );
+
+    const taskOwnerId = mom.task?.assignedById ?? null;
+    await this.notificationsService.notifyEmployees([taskOwnerId], {
+      companyId,
+      title: 'Pre-sales task completed — MoM uploaded',
+      message: `Minutes of meeting uploaded for "${mom.title}" on "${lead.title}".`,
+      excludeEmployeeId: actorEmployeeId,
+      linkUrl: `/crm/leads/${leadId}`,
+    });
+
+    return mom;
+  }
+
+  async deletePreSalesMoM(companyId: number, leadId: number, momId: number) {
+    await this.getLeadForPreSales(companyId, leadId);
+    const mom = await this.prisma.preSalesMoM.findFirst({
+      where: { id: momId, leadId, companyId },
+      select: { id: true, title: true },
+    });
+    if (!mom) throw new NotFoundException('MoM not found');
+
+    await this.prisma.preSalesMoM.delete({ where: { id: momId } });
+    await this.logActivity(companyId, leadId, 'PRE_SALES_MOM_DELETED', `Minutes of meeting "${mom.title}" deleted`, undefined);
+
+    return { deleted: true };
+  }
+
+  async getPreSalesOverview(companyId: number, user: { role?: string; employeeId?: number | null }) {
+    const where: any = { companyId, flow: 'PRE_SALES' };
+    const isUnrestricted = user.role === 'SUPERADMIN' || user.role === 'ADMIN';
+    if (!isUnrestricted) {
+      const canViewAll = await this.permissionsService.hasPermission(
+        companyId, user.role || 'EMPLOYEE', 'crm/leads', 'VIEW_ALL',
+      );
+      if (!canViewAll) {
+        where.OR = [
+          { addedById: user.employeeId ?? -1 },
+          { assignedToId: user.employeeId ?? -1 },
+        ];
+      }
+    }
+
+    const leadIds = await this.prisma.lead.findMany({
+      where,
+      select: { id: true, value: true },
+    });
+    const ids = leadIds.map((l) => l.id);
+
+    const [members, requests, tasks, moms] = await Promise.all([
+      ids.length ? this.prisma.preSalesTeamMember.findMany({ where: { companyId, leadId: { in: ids } }, select: { allocatedHours: true } }) : Promise.resolve([] as any[]),
+      ids.length ? this.prisma.preSalesRequest.findMany({ where: { companyId, leadId: { in: ids } }, select: { status: true } }) : Promise.resolve([] as any[]),
+      ids.length ? this.prisma.preSalesTask.findMany({ where: { companyId, leadId: { in: ids } }, select: { status: true } }) : Promise.resolve([] as any[]),
+      ids.length ? this.prisma.preSalesMoM.findMany({ where: { companyId, leadId: { in: ids } }, select: { id: true } }) : Promise.resolve([] as any[]),
+    ]);
+
+    return {
+      deals: leadIds.length,
+      dealValue: leadIds.reduce((s, l) => s + (Number(l.value) || 0), 0),
+      members: members.length,
+      allocatedHours: members.reduce((s, m) => s + (Number(m.allocatedHours) || 0), 0),
+      pendingRequests: requests.filter((r) => r.status === 'PENDING').length,
+      totalRequests: requests.length,
+      openTasks: tasks.filter((t) => t.status !== 'COMPLETED').length,
+      completedTasks: tasks.filter((t) => t.status === 'COMPLETED').length,
+      totalTasks: tasks.length,
+      moms: moms.length,
+    };
   }
 }

@@ -37,7 +37,9 @@ import {
   LucideTrendingUp, LucideLayers, LucideBuilding2, LucideGhost,
   LucideRotateCcw, LucideSlidersHorizontal, LucideIndianRupee, LucideArrowUpDown, LucideSparkles,
   LucideUpload, LucideDownload, LucideCalendarRange, LucideFolder, LucideChevronRight, LucideBriefcase,
-  LucideArrowRightLeft, LucideCopyPlus
+  LucideArrowRightLeft, LucideCopyPlus,
+  LucideUserPlus, LucideClipboardList, LucideFileUp, LucideBadgeCheck, LucideXCircle, LucideCircleCheck,
+  LucideFile, LucideMessageSquare, LucidePlusCircle, LucideTimer, LucideHourglass, LucideAlertCircle
 } from '@lucide/angular';
 
 export interface FollowUp {
@@ -84,6 +86,10 @@ interface Lead {
   createdAt: string;
   followUps?: FollowUp[];
   quotations?: { id: number }[];
+  preSalesMembers?: any[];
+  preSalesRequests?: any[];
+  preSalesTasks?: any[];
+  preSalesMom?: any[];
 }
 
 @Component({
@@ -122,6 +128,8 @@ interface Lead {
     LucideUpload, LucideDownload,
     LucideBriefcase, LucideCalendarRange, LucideChevronRight,
     LucideArrowRightLeft, LucideCopyPlus,
+    LucideUserPlus, LucideClipboardList, LucideFileUp, LucideBadgeCheck, LucideXCircle, LucideCircleCheck,
+    LucideFile, LucideMessageSquare, LucidePlusCircle, LucideHourglass, LucideAlertCircle,
   ],
   templateUrl: './leads.html',
   styleUrls: ['./leads.css']
@@ -130,7 +138,8 @@ export class LeadsComponent implements OnInit {
   leads: Lead[] = [];
   isLoading = true;
   isSaving = false;
-  isSubmitted = false;
+isSubmitted = false;
+  valueFieldTouched = false;
   saveContactFromLead: boolean | null = null;
   showCreateModal = false;
   showDetailModal = false;
@@ -426,6 +435,53 @@ export class LeadsComponent implements OnInit {
   followUpStartDate = '';
   followUpEndDate = '';
 
+  // ═══════════════════════════════════════════
+  // PRE-SALES ENGAGEMENT (team, requests, tasks, MoM)
+  // ═══════════════════════════════════════════
+
+  // Company-wide pre-sales KPIs for the board KPI strip.
+  preSalesOverview: any = null;
+  isLoadingPreSalesOverview = false;
+
+  // Slide-over panel per deal.
+  preSalesPanelOpen = false;
+  preSalesPanelLead: Lead | null = null;
+  preSalesInfo: any = null;
+  isLoadingPreSalesInfo = false;
+  preSalesTab: 'team' | 'requests' | 'tasks' | 'mom' = 'team';
+
+  // New request modal (sales person -> admin approval).
+  showPreSalesRequestModal = false;
+  preSalesRequestForm = { employeeId: null as number | null, hours: 0, reason: '', isAdditional: false, memberName: '', memberHours: 0 };
+  preSalesRequestSearch = '';
+  isSavingPreSalesRequest = false;
+
+  // Additional hours modal.
+  showAdditionalHoursModal = false;
+  additionalHoursMember: any = null;
+
+  // Approve / reject modal (admin), with remarks.
+  showRequestDecisionModal = false;
+  decisionRequest: any = null;
+  decisionMode: 'APPROVE' | 'REJECT' = 'APPROVE';
+  decisionRemarks = '';
+  isSubmittingDecision = false;
+
+  // Task modal.
+  showPreSalesTaskModal = false;
+  editingPreSalesTask: any = null;
+  preSalesTaskForm = { assignedToId: null as number | null, title: '', description: '', hours: 0, dueDate: '' };
+  preSalesTaskSearch = '';
+  isSavingPreSalesTask = false;
+  taskStatusSavingId: number | null = null;
+
+  // MoM modal.
+  showMomModal = false;
+  momTask: any = null;
+  momForm = { title: '', meetingDate: '', summary: '' };
+  momFiles: File[] = [];
+  isSavingMom = false;
+
   newFollowUp = {
     title: '',
     contactPerson: '',
@@ -491,6 +547,10 @@ export class LeadsComponent implements OnInit {
     // the pre-sales board (or vice versa).
     this.selectedStages = [];
     this.loadLeads();
+    if (this.boardFlow === 'PRE_SALES') {
+      this.viewMode = 'kanban';
+      this.loadPreSalesOverview();
+    }
   }
 
   openLeadProfile(leadId: number) {
@@ -1734,6 +1794,7 @@ csvImporting = false;
     this.editingLeadId = null;
     this.showCreateModal = true;
     this.isSubmitted = false;
+    this.valueFieldTouched = false;
     this.isSaving = false;
     this.activeTab = 1;
     this.customSource = '';
@@ -1754,6 +1815,7 @@ csvImporting = false;
     this.editingLeadId = lead.id;
     this.showCreateModal = true;
     this.isSubmitted = false;
+    this.valueFieldTouched = false;
     this.isSaving = false;
     this.activeTab = 1;
 
@@ -1825,6 +1887,7 @@ csvImporting = false;
     if (this.isSaving) return;
     this.showCreateModal = false;
     this.isSubmitted = false;
+    this.valueFieldTouched = false;
     this.isEditing = false;
     this.editingLeadId = null;
     this.customSource = '';
@@ -1839,11 +1902,17 @@ csvImporting = false;
   }
 
   validateDealValue() {
+    this.valueFieldTouched = true;
     if (this.newLeadData.value !== undefined && this.newLeadData.value !== null) {
       if (this.newLeadData.value < 0) {
         this.newLeadData.value = 0;
       }
     }
+  }
+
+  get valueInvalid(): boolean {
+    const v = this.newLeadData.value;
+    return v === null || v === undefined || v <= 0;
   }
 
   getFilteredLeadContactsForNewLead(): any[] {
@@ -1883,9 +1952,8 @@ csvImporting = false;
       return;
     }
 
-    // Validation: Stage, Source, Lead Category, Deal Value, and Close Date are required on tab 2
+    // Validation: Stage, Lead Category, Deal Value, and Close Date are required on tab 2
     const isTab2Valid = this.newLeadData.status?.trim()
-      && this.newLeadData.source?.trim()
       && this.newLeadData.dealCategory?.trim()
       && this.newLeadData.value !== null && this.newLeadData.value !== undefined && this.newLeadData.value > 0
       && this.newLeadData.expectedCloseDate;
@@ -2845,5 +2913,381 @@ csvImporting = false;
   getAssignedName(assignedTo?: FollowUp['assignedTo']): string {
     if (!assignedTo) return '';
     return `${assignedTo.firstName || ''} ${assignedTo.lastName || ''}`.trim();
+  }
+
+  // ═══════════════════════════════════════════
+  // PRE-SALES ENGAGEMENT — board KPIs, panel, requests, tasks, MoM
+  // ═══════════════════════════════════════════
+
+  loadPreSalesOverview() {
+    this.isLoadingPreSalesOverview = true;
+    this.http.get<any>(`${environment.apiUrl}/crm/pre-sales/overview`).subscribe({
+      next: (kpis) => { this.preSalesOverview = kpis; this.isLoadingPreSalesOverview = false; },
+      error: (err) => { this.isLoadingPreSalesOverview = false; console.error('Failed to load pre-sales overview', err); },
+    });
+  }
+
+  // Per-deal engagement summary rendered on the pre-sales deal cards.
+  getPreSalesDealSummary(lead: any) {
+    const members = lead?.preSalesMembers || [];
+    const requests = lead?.preSalesRequests || [];
+    const tasks = lead?.preSalesTasks || [];
+    const moms = lead?.preSalesMom || [];
+    const openTasks = tasks.filter((t: any) => t.status !== 'COMPLETED');
+    const allocatedHours = members.reduce((s: number, m: any) => s + (Number(m.allocatedHours) || 0), 0);
+    return {
+      members: members.length,
+      allocatedHours,
+      pendingRequests: requests.filter((r: any) => r.status === 'PENDING').length,
+      openTasks: openTasks.length,
+      moms: moms.length,
+      hasEngagement: members.length + requests.length + tasks.length > 0,
+    };
+  }
+
+  openPreSalesPanel(lead: any) {
+    this.preSalesPanelLead = lead;
+    this.preSalesPanelOpen = true;
+    this.preSalesTab = 'team';
+    this.loadPreSalesInfo();
+  }
+
+  closePreSalesPanel() {
+    this.preSalesPanelOpen = false;
+    this.preSalesPanelLead = null;
+    this.preSalesInfo = null;
+  }
+
+  loadPreSalesInfo() {
+    if (!this.preSalesPanelLead) return;
+    this.isLoadingPreSalesInfo = true;
+    this.http.get<any>(`${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales`).subscribe({
+      next: (info) => { this.preSalesInfo = info; this.isLoadingPreSalesInfo = false; },
+      error: (err) => { this.isLoadingPreSalesInfo = false; console.error('Failed to load pre-sales info', err); },
+    });
+  }
+
+  setPreSalesTab(tab: 'team' | 'requests' | 'tasks' | 'mom') {
+    this.preSalesTab = tab;
+  }
+
+  // ── Requests ─────────────────────────────────────────
+
+  closePreSalesRequestModal() {
+    this.showPreSalesRequestModal = false;
+  }
+
+  closeAdditionalHoursModal() {
+    this.showAdditionalHoursModal = false;
+  }
+
+  closeRequestDecisionModal() {
+    this.showRequestDecisionModal = false;
+  }
+
+  closePreSalesTaskModal() {
+    this.showPreSalesTaskModal = false;
+  }
+
+  closeMomModal() {
+    this.showMomModal = false;
+  }
+
+  getFilteredPreSalesCandidates(): any[] {
+    let candidates = this.employees;
+    if (this.preSalesRequestSearch.trim()) {
+      const q = this.preSalesRequestSearch.toLowerCase();
+      candidates = candidates.filter((e) =>
+        `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+        e.designation?.name?.toLowerCase().includes(q) ||
+        e.department?.name?.toLowerCase().includes(q)
+      );
+    }
+    return candidates;
+  }
+
+  openPreSalesRequestModal(member?: any) {
+    const isAdditional = !!member;
+    this.preSalesRequestForm = {
+      employeeId: member?.employeeId ?? member?.employee?.id ?? null,
+      hours: member ? Math.max(member.remainingHours || 0, 1) : 0,
+      reason: '',
+      isAdditional,
+      memberName: member ? this.getPresalesName(member.employee || member) : '',
+      memberHours: member?.remainingHours ?? 0,
+    };
+    this.preSalesRequestSearch = '';
+    this.showPreSalesRequestModal = true;
+  }
+
+  openPreSalesRequestForDeal(deal: any) {
+    this.preSalesPanelLead = deal;
+    this.openPreSalesRequestModal();
+  }
+
+  selectPreSalesCandidate(emp: any) {
+    this.preSalesRequestForm.employeeId = emp ? emp.id : null;
+  }
+
+  savePreSalesRequest() {
+    if (!this.preSalesPanelLead) return;
+    if (!this.preSalesRequestForm.employeeId) { this.toast.error('Select a pre-sales person.'); return; }
+    if (!this.preSalesRequestForm.hours || this.preSalesRequestForm.hours <= 0) { this.toast.error('Enter hours greater than zero.'); return; }
+
+    this.isSavingPreSalesRequest = true;
+    const body = {
+      employeeId: this.preSalesRequestForm.employeeId,
+      hours: this.preSalesRequestForm.hours,
+      reason: this.preSalesRequestForm.reason,
+      isAdditional: this.preSalesRequestForm.isAdditional,
+    };
+    // Admins add members directly (no approval needed); team members request, the admin approves.
+    const url = this.isAdminOrSuperAdmin
+      ? `${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/members`
+      : `${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/requests`;
+    this.http.post<any>(url, body).subscribe({
+      next: () => {
+        this.isSavingPreSalesRequest = false;
+        this.showPreSalesRequestModal = false;
+        this.toast.success(
+          this.isAdminOrSuperAdmin
+            ? (this.preSalesRequestForm.isAdditional ? 'Hours topped up for the member.' : 'Pre-sales person added to the deal.')
+            : (this.preSalesRequestForm.isAdditional ? 'Additional hours request submitted for approval.' : 'Pre-sales person request submitted for admin approval.'),
+        );
+        this.refreshPreSalesData();
+      },
+      error: (err) => {
+        this.isSavingPreSalesRequest = false;
+        this.toast.error(err?.error?.message || 'Failed to submit the request.');
+      },
+    });
+  }
+
+  openAdditionalHoursModal(member: any) {
+    this.openPreSalesRequestModal(member);
+  }
+
+  endPresalesAssignment(member: any) {
+    if (!this.preSalesPanelLead) return;
+    if (!confirm(`End ${this.getPresalesName(member)}'s engagement on this deal? Their tasks and MoMs stay on the deal as history, and no further hours can be used.`)) return;
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/members/${member.id}/end`, {}).subscribe({
+      next: () => {
+        this.toast.success('Assignment ended. The person was removed from the active team.');
+        this.refreshPreSalesData();
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to end the assignment.'),
+    });
+  }
+
+  openRequestDecisionModal(request: any, mode: 'APPROVE' | 'REJECT') {
+    this.decisionRequest = request;
+    this.decisionMode = mode;
+    this.decisionRemarks = '';
+    this.showRequestDecisionModal = true;
+  }
+
+  submitRequestDecision() {
+    if (!this.preSalesPanelLead || !this.decisionRequest) return;
+    this.isSubmittingDecision = true;
+    const url = `${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/requests/${this.decisionRequest.id}/${this.decisionMode === 'APPROVE' ? 'approve' : 'reject'}`;
+    this.http.post<any>(url, { remarks: this.decisionRemarks }).subscribe({
+      next: () => {
+        this.isSubmittingDecision = false;
+        this.showRequestDecisionModal = false;
+        this.toast.success(this.decisionMode === 'APPROVE' ? 'Request approved. The person was added to the deal.' : 'Request rejected.');
+        this.refreshPreSalesData();
+      },
+      error: (err) => {
+        this.isSubmittingDecision = false;
+        this.toast.error(err?.error?.message || 'Failed to update the request.');
+      },
+    });
+  }
+
+  // ── Tasks ────────────────────────────────────────────
+
+  getFilteredPreSalesTaskAssignees(): any[] {
+    // Only people still actively engaged on the deal team can take on tasks.
+    const memberIds = new Set((this.preSalesInfo?.members || []).filter((m: any) => m.status === 'ACTIVE').map((m: any) => m.employeeId));
+    const pool = this.employees.filter((e) => memberIds.has(e.id));
+    if (this.preSalesTaskSearch.trim()) {
+      const q = this.preSalesTaskSearch.toLowerCase();
+      return pool.filter((e) => `${e.firstName} ${e.lastName}`.toLowerCase().includes(q));
+    }
+    return pool;
+  }
+
+  openPreSalesTaskModal(task?: any) {
+    this.editingPreSalesTask = task || null;
+    this.preSalesTaskForm = task
+      ? {
+          assignedToId: task.assignedToId,
+          title: task.title,
+          description: task.description || '',
+          hours: Number(task.hours) || 0,
+          dueDate: task.dueDate ? String(task.dueDate).slice(0, 10) : '',
+        }
+      : { assignedToId: null, title: '', description: '', hours: 0, dueDate: '' };
+    this.preSalesTaskSearch = '';
+    this.showPreSalesTaskModal = true;
+  }
+
+  savePreSalesTask() {
+    if (!this.preSalesPanelLead) return;
+    if (!this.preSalesTaskForm.title.trim()) { this.toast.error('Task title is required.'); return; }
+    if (!this.preSalesTaskForm.assignedToId) { this.toast.error('Select the pre-sales person.'); return; }
+
+    this.isSavingPreSalesTask = true;
+    const body = { ...this.preSalesTaskForm };
+    const url = this.editingPreSalesTask
+      ? `${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/tasks/${this.editingPreSalesTask.id}`
+      : `${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/tasks`;
+    const req = this.editingPreSalesTask ? this.http.put<any>(url, body) : this.http.post<any>(url, body);
+    req.subscribe({
+      next: () => {
+        this.isSavingPreSalesTask = false;
+        this.showPreSalesTaskModal = false;
+        this.toast.success(this.editingPreSalesTask ? 'Task updated.' : 'Task assigned on an hourly basis.');
+        this.refreshPreSalesData();
+      },
+      error: (err) => {
+        this.isSavingPreSalesTask = false;
+        this.toast.error(err?.error?.message || 'Failed to save the task.');
+      },
+    });
+  }
+
+  setPreSalesTaskStatus(task: any, status: string) {
+    if (!this.preSalesPanelLead) return;
+    this.taskStatusSavingId = task.id;
+    this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/tasks/${task.id}`, { status }).subscribe({
+      next: () => {
+        this.taskStatusSavingId = null;
+        this.toast.success(`Task marked ${status.toLowerCase().replace('_', ' ')}.`);
+        this.refreshPreSalesData();
+      },
+      error: (err) => {
+        this.taskStatusSavingId = null;
+        this.toast.error(err?.error?.message || 'Failed to update the task.');
+      },
+    });
+  }
+
+  deletePreSalesTask(task: any, event?: Event) {
+    if (event) event.stopPropagation();
+    if (!this.preSalesPanelLead) return;
+    if (!confirm(`Delete task "${task.title}"?`)) return;
+    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/tasks/${task.id}`).subscribe({
+      next: () => { this.toast.success('Task deleted.'); this.refreshPreSalesData(); },
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to delete the task.'),
+    });
+  }
+
+  completedTasks(task: any): boolean {
+    return task?.status === 'COMPLETED';
+  }
+
+  preSalesTaskStatusClass(status: string): string {
+    return (status || 'PENDING').toLowerCase().replace('_', '-');
+  }
+
+  // ── MoM ──────────────────────────────────────────────
+
+  openMomModal(task: any) {
+    this.momTask = task || null;
+    this.momForm = { title: task ? `MoM — ${task.title}` : '', meetingDate: '', summary: '' };
+    this.momFiles = [];
+    this.showMomModal = true;
+  }
+
+  onMomFilesSelected(event: any) {
+    const files: File[] = Array.from(event.target?.files || []);
+    this.momFiles.push(...files);
+    if (event.target) event.target.value = '';
+  }
+
+  removeMomFile(index: number) {
+    this.momFiles.splice(index, 1);
+  }
+
+  saveMom() {
+    if (!this.preSalesPanelLead) return;
+    if (!this.momForm.title.trim()) { this.toast.error('MoM title is required.'); return; }
+
+    this.isSavingMom = true;
+    const formData = new FormData();
+    formData.append('title', this.momForm.title);
+    if (this.momTask) formData.append('taskId', String(this.momTask.id));
+    if (this.momForm.meetingDate) formData.append('meetingDate', this.momForm.meetingDate);
+    if (this.momForm.summary) formData.append('summary', this.momForm.summary);
+    if (this.momFiles.length) formData.append('file', this.momFiles[0]);
+
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/mom`, formData).subscribe({
+      next: () => {
+        this.isSavingMom = false;
+        this.showMomModal = false;
+        this.toast.success('Minutes of meeting uploaded to the task.');
+        this.refreshPreSalesData();
+      },
+      error: (err) => {
+        this.isSavingMom = false;
+        this.toast.error(err?.error?.message || 'Failed to upload the MoM.');
+      },
+    });
+  }
+
+  deleteMom(mom: any, event?: Event) {
+    if (event) event.stopPropagation();
+    if (!this.preSalesPanelLead) return;
+    if (!confirm(`Delete minutes of meeting "${mom.title}"?`)) return;
+    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.preSalesPanelLead.id}/pre-sales/mom/${mom.id}`).subscribe({
+      next: () => { this.toast.success('MoM deleted.'); this.refreshPreSalesData(); },
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to delete the MoM.'),
+    });
+  }
+
+  // ── Shared helpers ───────────────────────────────────
+
+  refreshPreSalesData() {
+    this.loadPreSalesInfo();
+    this.loadLeads(() => {
+      if (this.preSalesPanelLead) {
+        const fresh = this.leads.find((l) => l.id === this.preSalesPanelLead?.id);
+        if (fresh) this.preSalesPanelLead = fresh;
+      }
+    });
+    this.loadPreSalesOverview();
+  }
+
+  getPresalesName(member: any): string {
+    const emp = member?.employee || member;
+    return `${emp?.firstName || ''} ${emp?.lastName || ''}`.trim() || '—';
+  }
+
+  getPresalesDesignation(member: any): string {
+    const d = member?.employee?.designation || member?.designation;
+    return d?.name || 'Pre-Sales Member';
+  }
+
+  getPresalesInitials(member: any): string {
+    const emp = member?.employee || member;
+    return `${emp?.firstName?.[0] || ''}${emp?.lastName?.[0] || ''}`.trim() || 'PS';
+  }
+
+  getPresalesAvatar(member: any): string {
+    return member?.employee?.avatarUrl || member?.avatarUrl || '';
+  }
+
+  preSalesStatusClass(status: string): string {
+    return (status || 'PENDING').toLowerCase();
+  }
+
+  formatHours(h: any): string {
+    const n = Number(h) || 0;
+    return n % 1 === 0 ? `${n} hr${n === 1 ? '' : 's'}` : `${n} hrs`;
+  }
+
+  getPreSalesPanelKpis(): any {
+    return this.preSalesInfo?.kpis || null;
   }
 }

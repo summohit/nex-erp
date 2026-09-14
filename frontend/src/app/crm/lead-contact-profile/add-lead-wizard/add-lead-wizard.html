@@ -39,36 +39,6 @@
     <div class="modal-body enhanced-body">
       <!-- Step 1: Primary Contact Information -->
       <div *ngIf="activeTab === 1" class="step-content-anim">
-        <div class="form-row">
-          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.title.trim()">
-            <label>Opportunity Title <span class="required-asterisk">*</span></label>
-            <input type="text" [(ngModel)]="newLeadData.title" placeholder="e.g., Enterprise Software Package" [disabled]="isSaving" />
-            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.title.trim()">Opportunity Title is required.</span>
-          </div>
-          <div class="form-group">
-            <label>Subject Line / Deal Summary</label>
-            <input type="text" [(ngModel)]="newLeadData.subjectLine" placeholder="e.g., SD-WAN Multi-Branch Setup" [disabled]="isSaving" />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group" [class.has-error]="isSubmitted && phoneInvalid">
-            <label>Phone Number</label>
-            <div class="input-with-prefix">
-              <select class="currency-select phone-code-select" [(ngModel)]="newLeadData.phoneCode" [disabled]="isSaving" title="Country code">
-                <option *ngFor="let c of phoneCountryCodes" [ngValue]="c.code">{{ c.name }} {{ c.code }}</option>
-              </select>
-              <input type="tel" [(ngModel)]="newLeadData.phone" placeholder="e.g. 98765 43210" [disabled]="isSaving" class="currency-input" inputmode="tel" />
-            </div>
-            <span class="error-msg" *ngIf="isSubmitted && phoneInvalid">Enter a valid phone number with country code.</span>
-          </div>
-          <div class="form-group" [class.has-error]="isSubmitted && emailInvalid">
-            <label>Email ID</label>
-            <input type="email" [(ngModel)]="newLeadData.email" placeholder="e.g. contact@company.com" [disabled]="isSaving" />
-            <span class="error-msg" *ngIf="isSubmitted && emailInvalid">Enter a valid email address.</span>
-          </div>
-        </div>
-
         <div class="form-group" *ngIf="newLeadData.broughtByContactId && selectedContactCode" style="margin-top: 12px;">
           <label>Lead Contact ID</label>
           <input type="text" [value]="selectedContactCode" readonly class="is-locked" />
@@ -162,6 +132,36 @@
             </div>
           </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && phoneInvalid">
+            <label>Phone Number</label>
+            <div class="input-with-prefix">
+              <select class="currency-select phone-code-select" [(ngModel)]="newLeadData.phoneCode" [disabled]="isSaving" title="Country code">
+                <option *ngFor="let c of phoneCountryCodes" [ngValue]="c.code">{{ c.name }} {{ c.code }}</option>
+              </select>
+              <input type="tel" [(ngModel)]="newLeadData.phone" placeholder="e.g. 98765 43210" [disabled]="isSaving" class="currency-input" inputmode="tel" />
+            </div>
+            <span class="error-msg" *ngIf="isSubmitted && phoneInvalid">Enter a valid phone number with country code.</span>
+          </div>
+          <div class="form-group" [class.has-error]="isSubmitted && emailInvalid">
+            <label>Email ID</label>
+            <input type="email" [(ngModel)]="newLeadData.email" placeholder="e.g. contact@company.com" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && emailInvalid">Enter a valid email address.</span>
+</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.title.trim()">
+            <label>Opportunity Title <span class="required-asterisk">*</span></label>
+            <input type="text" [(ngModel)]="newLeadData.title" placeholder="e.g., Enterprise Software Package" [disabled]="isSaving" />
+            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.title.trim()">Opportunity Title is required.</span>
+          </div>
+          <div class="form-group">
+            <label>Subject Line / Deal Summary</label>
+            <input type="text" [(ngModel)]="newLeadData.subjectLine" placeholder="e.g., SD-WAN Multi-Branch Setup" [disabled]="isSaving" />
+          </div>
+        </div>
       </div>
 
       <!-- Step 2: Deal & Pipeline Tracking -->
@@ -174,24 +174,6 @@
             </select>
             <span class="error-msg" *ngIf="isSubmitted && !newLeadData.status?.trim()">Pipeline Stage is required.</span>
           </div>
-          <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.source?.trim()">
-            <label>Lead Source <span class="required-asterisk">*</span></label>
-            <select [(ngModel)]="newLeadData.source" [disabled]="isSaving" class="enhanced-select">
-              <option *ngFor="let src of LEAD_SOURCES" [value]="src">{{src}}</option>
-            </select>
-            <span class="error-msg" *ngIf="isSubmitted && !newLeadData.source?.trim()">Lead Source is required.</span>
-            <input
-              *ngIf="newLeadData.source === 'Other'"
-              type="text"
-              [(ngModel)]="customSource"
-              placeholder="Specify custom source channel..."
-              style="margin-top: 8px;"
-              [disabled]="isSaving"
-            />
-          </div>
-        </div>
-
-        <div class="form-row">
           <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.dealCategory?.trim()">
             <label>Lead Category <span class="required-asterisk">*</span></label>
             <select [(ngModel)]="newLeadData.dealCategory" [disabled]="isSaving" class="enhanced-select">
@@ -199,20 +181,19 @@
             </select>
             <span class="error-msg" *ngIf="isSubmitted && !newLeadData.dealCategory?.trim()">Lead Category is required.</span>
           </div>
-          <div class="form-group" *ngIf="newLeadData.dealCategory === 'Other'">
-            <label>Specify Custom Category <span class="required-asterisk">*</span></label>
-            <input
-              type="text"
-              [(ngModel)]="customCategory"
-              placeholder="Enter custom category..."
-              [disabled]="isSaving"
-            />
-          </div>
-          <div class="form-group" *ngIf="newLeadData.dealCategory !== 'Other'"></div>
+        </div>
+        <div class="form-group" *ngIf="newLeadData.dealCategory === 'Other'" style="margin-bottom: 16px;">
+          <label>Specify Custom Category <span class="required-asterisk">*</span></label>
+          <input
+            type="text"
+            [(ngModel)]="customCategory"
+            placeholder="Enter custom category..."
+            [disabled]="isSaving"
+          />
         </div>
 
         <div class="form-row">
-          <div class="form-group" [class.has-error]="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined || newLeadData.value <= 0)">
+          <div class="form-group" [class.has-error]="(isSubmitted || valueFieldTouched) && valueInvalid">
             <label>Expected Lead Value <span class="required-asterisk">*</span></label>
             <div class="input-with-prefix">
               <span class="currency-symbol-addon">₹</span>
@@ -228,7 +209,7 @@
                 class="currency-input"
               />
             </div>
-            <span class="error-msg" *ngIf="isSubmitted && (newLeadData.value === null || newLeadData.value === undefined || newLeadData.value <= 0)">Deal Value must be greater than 0.</span>
+            <span class="error-msg" *ngIf="(isSubmitted || valueFieldTouched) && valueInvalid">Deal Value must be greater than 0.</span>
           </div>
           <div class="form-group" [class.has-error]="isSubmitted && !newLeadData.expectedCloseDate">
             <label>Expected Close Date <span class="required-asterisk">*</span></label>

@@ -258,6 +258,135 @@ export class CrmController {
   }
 
   // ═══════════════════════════════════════════
+  // PRE-SALES ENGAGEMENT
+  // ═══════════════════════════════════════════
+
+  @Get('pre-sales/overview')
+  getPreSalesOverview(@Request() req) {
+    return this.crmService.getPreSalesOverview(req.user.companyId, req.user);
+  }
+
+  @Get('leads/:id/pre-sales')
+  getPreSalesInfo(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.crmService.getPreSalesInfo(req.user.companyId, id);
+  }
+
+  @Post('leads/:id/pre-sales/requests')
+  createPreSalesRequest(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: any,
+  ) {
+    return this.crmService.createPreSalesRequest(req.user.companyId, id, data, req.user.employeeId);
+  }
+
+  @Post('leads/:id/pre-sales/requests/:requestId/approve')
+  approvePreSalesRequest(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('requestId', ParseIntPipe) requestId: number,
+    @Body() data: any,
+  ) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
+      throw new ForbiddenException('Only admins can approve pre-sales person requests.');
+    }
+    return this.crmService.approvePreSalesRequest(req.user.companyId, id, requestId, data?.remarks, req.user.employeeId);
+  }
+
+  @Post('leads/:id/pre-sales/requests/:requestId/reject')
+  rejectPreSalesRequest(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('requestId', ParseIntPipe) requestId: number,
+    @Body() data: any,
+  ) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
+      throw new ForbiddenException('Only admins can reject pre-sales person requests.');
+    }
+    return this.crmService.rejectPreSalesRequest(req.user.companyId, id, requestId, data?.remarks, req.user.employeeId);
+  }
+
+  @Post('leads/:id/pre-sales/members')
+  addPreSalesMember(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: any,
+  ) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
+      throw new ForbiddenException('Only admins can add pre-sales team members.');
+    }
+    return this.crmService.addPreSalesMember(req.user.companyId, id, data, req.user.employeeId);
+  }
+
+  @Post('leads/:id/pre-sales/members/:memberId/end')
+  endPreSalesMember(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('memberId', ParseIntPipe) memberId: number,
+  ) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
+      throw new ForbiddenException('Only admins can end pre-sales assignments.');
+    }
+    return this.crmService.endPreSalesMember(req.user.companyId, id, memberId, req.user.employeeId);
+  }
+
+  @Post('leads/:id/pre-sales/tasks')
+  createPreSalesTask(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: any,
+  ) {
+    return this.crmService.createPreSalesTask(req.user.companyId, id, data, req.user.employeeId);
+  }
+
+  @Put('leads/:id/pre-sales/tasks/:taskId')
+  updatePreSalesTask(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() data: any,
+  ) {
+    return this.crmService.updatePreSalesTask(req.user.companyId, id, taskId, data);
+  }
+
+  @Delete('leads/:id/pre-sales/tasks/:taskId')
+  deletePreSalesTask(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+  ) {
+    return this.crmService.deletePreSalesTask(req.user.companyId, id, taskId);
+  }
+
+  @Post('leads/:id/pre-sales/mom')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DEAL_FILE_SIZE } }))
+  async uploadPreSalesMoM(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() data: any,
+  ) {
+    let uploaded;
+    if (file) uploaded = await this.processImageKitUpload(file);
+    return this.crmService.uploadPreSalesMoM(
+      req.user.companyId,
+      id,
+      data,
+      req.user.employeeId,
+      file ? { ...file, ...uploaded } : undefined,
+    );
+  }
+
+  @Delete('leads/:id/pre-sales/mom/:momId')
+  deletePreSalesMoM(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('momId', ParseIntPipe) momId: number,
+  ) {
+    return this.crmService.deletePreSalesMoM(req.user.companyId, id, momId);
+  }
+
+  // ═══════════════════════════════════════════
   // LEAD CONTACT ENDPOINTS
   // ═══════════════════════════════════════════
 
