@@ -6515,6 +6515,14 @@ textarea:focus {
 .ldm-prop-status-superseded { background: #f1f5f9; color: #64748b; }
 
 .ldm-prop-busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-primary);
+}
+
 /* ══════════════════════════════════════════════════════
    PRE-SALES ENGAGEMENT — panel, deal cards, modals
    ══════════════════════════════════════════════════════ */
@@ -6891,6 +6899,12 @@ textarea:focus {
 
   .ldm-prop-table-wrap { overflow-x: auto; }
 }
+  .btn-ps-ghost-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   border-radius: 7px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;

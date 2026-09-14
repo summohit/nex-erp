@@ -16,11 +16,8 @@ import {
   LucideClock, LucideX, LucidePaperclip, LucideHistory, LucidePlus, LucideEye,
   LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
   LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
-  LucideList, LucideAlertCircle, LucideCopyPlus
-} from '@lucide/angular';
-import {
-  LucideUsers, LucideUserPlus, LucideClipboardList, LucideFileUp,
-  LucidePlusCircle, LucideHourglass, LucideAlertCircle,
+  LucideList, LucideAlertCircle, LucideCopyPlus, LucideUsers, LucideUserPlus,
+  LucideClipboardList, LucideFileUp, LucidePlusCircle, LucideHourglass
 } from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
