@@ -31,6 +31,18 @@
         <span>Lead Insights</span>
       </button>
 
+      <!-- Pre-Sales approval queue. Admins only; the badge is the only prompt
+           they get that someone is waiting on them. -->
+      <button
+        class="btn-header-secondary ps-queue-btn"
+        *ngIf="isAdminOrSuperAdmin"
+        (click)="openPreSalesRequestsModal()"
+        title="Pre-sales requests awaiting approval">
+        <svg lucideUserPlus size="15"></svg>
+        <span>Pre-Sales Requests</span>
+        <span class="ps-queue-badge" *ngIf="pendingPreSalesRequests.length">{{ pendingPreSalesRequests.length }}</span>
+      </button>
+
       <!-- Lead Contact Button -->
       <button class="btn-header-secondary" (click)="openLeadContactModal()" title="Add / Manage External Lead Contact">
         <svg lucideUserCheck size="15"></svg>
@@ -45,72 +57,18 @@
     </div>
   </div>
 
-  <!-- Pre-Sales KPI Strip (replaces the pipeline-value badge for the new flow) -->
-  <div class="ps-kpi-strip-wrap" *ngIf="boardFlow === 'PRE_SALES'">
-    <div class="ps-kpi-strip" *ngIf="!isLoadingPreSalesOverview && preSalesOverview">
-      <div class="ps-kpi-item ps-kpi-value">
-        <span class="ps-kpi-ic"><svg lucideTrendingUp size="15"></svg></span>
-        <div class="ps-kpi-text">
-          <span class="ps-kpi-label">Pre-Sales Pipeline Value</span>
-          <span class="ps-kpi-amount">{{ preSalesOverview.dealValue | currency:'INR' }}</span>
-        </div>
-      </div>
-      <div class="ps-kpi-item">
-        <span class="ps-kpi-ic blue"><svg lucideUsers size="15"></svg></span>
-        <div class="ps-kpi-text">
-          <span class="ps-kpi-label">Team Members</span>
-          <span class="ps-kpi-amount">{{ preSalesOverview.members }}</span>
-        </div>
-      </div>
-      <div class="ps-kpi-item">
-        <span class="ps-kpi-ic violet"><svg lucideHourglass size="15"></svg></span>
-        <div class="ps-kpi-text">
-          <span class="ps-kpi-label">Hours Allocated</span>
-          <span class="ps-kpi-amount">{{ formatHours(preSalesOverview.allocatedHours) }}</span>
-        </div>
-      </div>
-      <div class="ps-kpi-item ps-kpi-warn" *ngIf="preSalesOverview.pendingRequests > 0">
-        <span class="ps-kpi-ic amber"><svg lucideAlertCircle size="15"></svg></span>
-        <div class="ps-kpi-text">
-          <span class="ps-kpi-label">Pending Approvals</span>
-          <span class="ps-kpi-amount">{{ preSalesOverview.pendingRequests }}</span>
-        </div>
-      </div>
-      <div class="ps-kpi-item" *ngIf="preSalesOverview.pendingRequests === 0">
-        <span class="ps-kpi-ic green"><svg lucideBadgeCheck size="15"></svg></span>
-        <div class="ps-kpi-text">
-          <span class="ps-kpi-label">Pending Approvals</span>
-          <span class="ps-kpi-amount">0</span>
-        </div>
-      </div>
-      <div class="ps-kpi-item">
-        <span class="ps-kpi-ic coral"><svg lucideClipboardList size="15"></svg></span>
-        <div class="ps-kpi-text">
-          <span class="ps-kpi-label">Open Tasks</span>
-          <span class="ps-kpi-amount">{{ preSalesOverview.openTasks }}</span>
-        </div>
-      </div>
-      <div class="ps-kpi-item">
-        <span class="ps-kpi-ic teal"><svg lucideFileUp size="15"></svg></span>
-        <div class="ps-kpi-text">
-          <span class="ps-kpi-label">MoMs Uploaded</span>
-          <span class="ps-kpi-amount">{{ preSalesOverview.moms }}</span>
-        </div>
-      </div>
-    </div>
-    <div class="ps-kpi-strip ps-kpi-loading" *ngIf="isLoadingPreSalesOverview">
-      <span>Loading pre-sales KPIs...</span>
-    </div>
-  </div>
-
   <!-- Main Tab Switcher -->
   <div class="main-tab-switcher">
     <button type="button" [class.active]="activeMainTab === 'leads'" (click)="activateMainTab('leads')">
       Leads
     </button>
+    <!-- Hidden: the PRE_SALES pipeline flow is a different concept from the
+         pre-sales team on a deal, and two tabs called "Pre-Sales" read as one
+         feature. The flow itself is untouched — restore by uncommenting.
     <button type="button" [class.active]="activeMainTab === 'presales'" (click)="activateMainTab('presales')">
       Pre-Sales
     </button>
+    -->
     <button type="button" [class.active]="activeMainTab === 'contacts'" (click)="activateMainTab('contacts')">
       Lead Contacts
       <span class="tab-count-pill" *ngIf="leadContacts.length > 0">{{ leadContacts.length }}</span>
@@ -679,8 +637,30 @@
                 </div>
               </div>
 
+              <!-- Who is on this deal's pre-sales team. Stacked avatars rather
+                   than names: the card has room for presence, not a roster. -->
+              <div class="card-presales-block" *ngIf="lead.preSalesMembers?.length"
+                   [title]="preSalesTooltip(lead)">
+                <span class="card-presales-label">
+                  <svg lucideUsers size="11"></svg> Pre-Sales
+                </span>
+                <div class="card-presales-stack">
+                  <ng-container *ngFor="let m of lead.preSalesMembers | slice:0:4">
+                    <img *ngIf="m.employee?.avatarUrl" [src]="m.employee.avatarUrl" class="card-ps-avatar-img" alt="" />
+                    <span *ngIf="!m.employee?.avatarUrl" class="card-ps-avatar">{{ preSalesMemberInitials(m) }}</span>
+                  </ng-container>
+                  <span class="card-ps-more" *ngIf="extraPreSalesCount(lead) as extra">+{{ extra }}</span>
+                </div>
+                <span class="card-ps-tasks" *ngIf="openPreSalesTasks(lead) as open">{{ open }} open</span>
+              </div>
+
               <div class="card-footer-row">
-                <span class="value-badge">{{lead.value | currency:lead.currency||'INR'}}</span>
+                <!-- Hidden from a pre-sales-only viewer, for whom the server
+                     strips it rather than sending a zero. -->
+                <span class="value-badge" *ngIf="lead.value != null">{{lead.value | currency:lead.currency||'INR'}}</span>
+                <span class="value-badge value-hidden" *ngIf="lead.value == null" title="Commercial figures are not shown to pre-sales members">
+                  <svg lucideEyeOff size="11"></svg> Hidden
+                </span>
                 <div class="card-footer-right">
                   <div class="card-owner-avatar" *ngIf="lead.assignedTo" [title]="'Owner: ' + lead.assignedTo.firstName + ' ' + lead.assignedTo.lastName">
                     <img *ngIf="lead.assignedTo.avatarUrl" [src]="lead.assignedTo.avatarUrl" class="card-avatar-img" />
@@ -716,6 +696,7 @@
           <th>Stage</th>
           <th>Value</th>
           <th>Next Follow Up</th>
+          <th>Pre-Sales</th>
           <th class="col-actions-sticky">Actions</th>
         </tr>
       </thead>
@@ -747,12 +728,13 @@
             <td><app-skeleton width="80px" height="18px" radius="9px"></app-skeleton></td>
             <td><app-skeleton width="70px" height="12px"></app-skeleton></td>
             <td><app-skeleton width="72px" height="12px"></app-skeleton></td>
+            <td><app-skeleton width="60px" height="22px" radius="11px"></app-skeleton></td>
             <td><app-skeleton width="56px" height="26px" radius="6px"></app-skeleton></td>
           </tr>
         </ng-container>
         <ng-container *ngIf="!isLoading && getFilteredLeads().length === 0">
           <tr>
-            <td colspan="10" class="table-empty-cell">No leads match your filters.</td>
+            <td colspan="11" class="table-empty-cell">No leads match your filters.</td>
           </tr>
         </ng-container>
         <ng-container *ngIf="!isLoading">
@@ -830,6 +812,17 @@
                 <span *ngIf="!getNextFollowUpDate(lead)" class="no-data-dash">&mdash;</span>
               </ng-container>
               <span *ngIf="!showNextFollowUpInTable(lead)" class="no-data-dash">&mdash;</span>
+            </td>
+            <td data-label="Pre-Sales" class="lead-presales-cell">
+              <div class="table-ps-stack" *ngIf="lead.preSalesMembers?.length" [title]="preSalesTooltip(lead)">
+                <ng-container *ngFor="let m of lead.preSalesMembers | slice:0:3">
+                  <img *ngIf="m.employee?.avatarUrl" [src]="m.employee.avatarUrl" class="card-ps-avatar-img" alt="" />
+                  <span *ngIf="!m.employee?.avatarUrl" class="card-ps-avatar">{{ preSalesMemberInitials(m) }}</span>
+                </ng-container>
+                <span class="card-ps-more" *ngIf="extraTablePreSalesCount(lead) as extra">+{{ extra }}</span>
+                <span class="card-ps-tasks" *ngIf="openPreSalesTasks(lead) as open">{{ open }}</span>
+              </div>
+              <span class="no-data-dash" *ngIf="!lead.preSalesMembers?.length">&mdash;</span>
             </td>
             <td data-label="Actions" class="col-actions-sticky">
               <div class="action-dropdown" [class.open]="actionMenuOpen === lead.id">
@@ -984,143 +977,6 @@
   <!-- ═══════════════════════════════════════════ -->
   <!-- PRE-SALES DEALS LIST (new pre-sales flow) -->
   <!-- ═══════════════════════════════════════════ -->
-  <section class="pre-sales-deals-section" *ngIf="boardFlow === 'PRE_SALES'">
-    <div class="pre-sales-toolbar">
-      <div class="ps-toolbar-left">
-        <span class="ps-toolbar-title">Pre-Sales Engagements</span>
-        <span class="ps-toolbar-count">{{ getFilteredLeads().length }} lead{{ getFilteredLeads().length === 1 ? '' : 's' }}</span>
-      </div>
-      <button type="button" class="btn-header-primary" (click)="openModal()">
-        <svg lucidePlus size="15"></svg>
-        <span>New Pre-Sales Deal</span>
-      </button>
-    </div>
-
-    <ng-container *ngIf="isLoading">
-      <div class="ps-table-wrap">
-        <table class="ps-table ps-table-skeleton">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Deal</th>
-              <th>Company</th>
-              <th>Contact</th>
-              <th>Value</th>
-              <th>Stage</th>
-              <th>Team</th>
-              <th>Hours</th>
-              <th>Pending</th>
-              <th>Open Tasks</th>
-              <th>MoM</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let s of [1,2,3,4]">
-              <td><div class="ps-skel-meta skeleton-anim"></div></td>
-              <td><div class="ps-skel-title skeleton-anim"></div></td>
-              <td><div class="ps-skel-meta skeleton-anim"></div></td>
-              <td><div class="ps-skel-meta skeleton-anim"></div></td>
-              <td><div class="ps-skel-meta skeleton-anim"></div></td>
-              <td><div class="ps-skel-chips skeleton-anim"></div></td>
-              <td><div class="ps-skel-chips skeleton-anim"></div></td>
-              <td><div class="ps-skel-meta skeleton-anim"></div></td>
-              <td></td>
-              <td></td>
-              <td></td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </ng-container>
-
-    <ng-container *ngIf="!isLoading">
-      <div class="ps-table-wrap" *ngIf="getFilteredLeads().length > 0">
-        <table class="ps-table">
-          <thead>
-            <tr>
-              <th class="th-id">ID</th>
-              <th class="th-deal"><svg lucideFileText size="12"></svg>&nbsp;Deal</th>
-              <th>Company</th>
-              <th>Contact</th>
-              <th>Value</th>
-              <th>Stage</th>
-              <th>Team</th>
-              <th>Hours</th>
-              <th>Pending</th>
-              <th>Open Tasks</th>
-              <th>MoM</th>
-              <th class="th-actions">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let deal of getFilteredLeads()">
-              <td class="ps-td-id">
-                <span class="entity-code" *ngIf="deal.leadCode">{{ deal.leadCode }}</span>
-                <span class="entity-code" *ngIf="!deal.leadCode">&mdash;</span>
-              </td>
-              <td class="ps-td-deal">
-                <button type="button" class="ps-table-deal-title" [title]="deal.title" (click)="openLeadProfile(deal.id)">{{ deal.title }}</button>
-              </td>
-              <td class="ps-td-muted">
-                <svg lucideBuilding2 size="13" class="ps-td-icon"></svg> {{ deal.companyName || '—' }}
-              </td>
-              <td class="ps-td-muted">
-                <svg lucideUser size="13" class="ps-td-icon"></svg> {{ deal.contactName || '—' }}
-              </td>
-              <td class="ps-td-value">
-                <svg lucideIndianRupee size="12"></svg>
-                {{ deal.value != null ? (deal.value | currency:(deal.currency || 'INR')) : '—' }}
-              </td>
-              <td>
-                <span class="ps-deal-status ldm-status-badge ldm-status-{{ (deal.status || 'New Lead') | lowercase }}">{{ deal.status }}</span>
-              </td>
-              <td>
-                <div class="ps-member-chips" *ngIf="deal.preSalesMembers?.length">
-                  <span class="ps-member-chip" *ngFor="let m of deal.preSalesMembers">
-                    <img *ngIf="m.employee?.avatarUrl" [src]="m.employee.avatarUrl" class="ps-member-img" alt="" />
-                    <span class="ps-member-avatar" *ngIf="!m.employee?.avatarUrl">{{ getPresalesInitials(m) }}</span>
-                    <span class="ps-member-name">{{ m.employee?.firstName || 'Member' }}</span>
-                    <b class="ps-member-hours" [title]="m.allocatedHours + ' hours allocated'">{{ m.allocatedHours }}h</b>
-                  </span>
-                </div>
-                <span class="ps-team-none" *ngIf="!deal.preSalesMembers?.length">Not started</span>
-              </td>
-              <td class="ps-td-num">{{ formatHours(getPreSalesDealSummary(deal).allocatedHours) }}</td>
-              <td class="ps-td-num">
-                <span class="ps-request-badge" *ngIf="getPreSalesDealSummary(deal).pendingRequests > 0">
-                  {{ getPreSalesDealSummary(deal).pendingRequests }}
-                </span>
-                <span *ngIf="getPreSalesDealSummary(deal).pendingRequests === 0">&mdash;</span>
-              </td>
-              <td class="ps-td-num">{{ getPreSalesDealSummary(deal).openTasks || '—' }}</td>
-              <td class="ps-td-num">{{ getPreSalesDealSummary(deal).moms || '—' }}</td>
-              <td class="ps-td-actions">
-                <button type="button" class="btn-manage-presales" [title]="'Pre-sales team, tasks & MoM for ' + deal.title" (click)="openPreSalesPanel(deal)">
-                  <svg lucideUsers size="14"></svg>
-                  <span>Manage</span>
-                </button>
-                <button type="button" class="btn-request-presales" [title]="isAdminOrSuperAdmin ? 'Add a pre-sales person to this deal' : 'Request a pre-sales person for this deal'" (click)="openPreSalesRequestForDeal(deal)">
-                  <svg lucideUserPlus size="14"></svg>
-                  <span>{{ (isAdminOrSuperAdmin ? 'Add Team' : 'Request') }}</span>
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="pre-sales-empty" *ngIf="getFilteredLeads().length === 0">
-        <svg lucideUsers size="28"></svg>
-        <h3>No pre-sales leads yet</h3>
-        <p>Create a pre-sales deal, then request a pre-sales person (e.g. a technical member) from it &mdash; the admin approves with hours and tasks start flowing.</p>
-        <button type="button" class="btn-primary" (click)="openModal()">
-          <svg lucidePlus size="14"></svg> New Pre-Sales Deal
-        </button>
-      </div>
-    </ng-container>
-  </section>
 
   </ng-container>
 
@@ -1561,6 +1417,43 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Pre-Sales -->
+      <div class="ldm-section">
+        <div class="ldm-section-title">
+          <svg lucideUsers size="14"></svg> Pre-Sales
+          <span class="ldm-prop-count" *ngIf="modalPreSalesMembers.length">{{ modalPreSalesMembers.length }}</span>
+          <button type="button" class="ldm-ps-manage" (click)="openPreSalesOnProfile()">
+            Manage <svg lucideExternalLink size="12"></svg>
+          </button>
+        </div>
+
+        <div class="ldm-prop-loading" *ngIf="loadingModalPreSales">Loading pre-sales…</div>
+
+        <div class="ldm-ps-team" *ngIf="!loadingModalPreSales && modalPreSalesMembers.length">
+          <div class="ldm-ps-member" *ngFor="let m of modalPreSalesMembers">
+            <img *ngIf="m.employee?.avatarUrl" [src]="m.employee.avatarUrl" class="ldm-ps-avatar-img" alt="" />
+            <span *ngIf="!m.employee?.avatarUrl" class="ldm-ps-avatar">{{ preSalesMemberInitials(m) }}</span>
+            <div class="ldm-ps-member-id">
+              <span class="ldm-ps-name">{{ preSalesMemberName(m) }}</span>
+              <span class="ldm-ps-sub">Added by {{ preSalesMemberName(m.assignedBy) }} · {{ m.createdAt | date:'dd MMM yyyy' }}</span>
+              <span class="ldm-ps-remark" *ngIf="m.remark">{{ m.remark }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ldm-ps-tasks" *ngIf="!loadingModalPreSales && modalPreSalesTasks.length">
+          <div class="ldm-ps-task" *ngFor="let t of modalPreSalesTasks">
+            <span class="ldm-ps-task-title">{{ t.title }}</span>
+            <span class="ldm-ps-task-who">{{ preSalesMemberName(t.assignedTo) }}</span>
+            <span class="ps-status-pill {{ taskStatusPill(t.status) }}">{{ t.status.replace('_', ' ') }}</span>
+          </div>
+        </div>
+
+        <div class="ldm-prop-empty" *ngIf="!loadingModalPreSales && !modalPreSalesMembers.length">
+          No pre-sales team on this deal yet.
         </div>
       </div>
 
@@ -2643,476 +2536,6 @@
 </div>
 
 <!-- Brought Leads Modal -->
-<!-- ═══════════════════════════════════════════ -->
-  <!-- PRE-SALES ENGAGEMENT PANEL (slide-over) -->
-  <!-- ═══════════════════════════════════════════ -->
-  <div class="ps-panel-backdrop" *ngIf="preSalesPanelOpen" (click)="closePreSalesPanel()"></div>
-  <div class="ps-panel" [class.open]="preSalesPanelOpen">
-    <div class="ps-panel-header">
-      <div class="ps-panel-header-left">
-        <span class="ps-panel-kicker" *ngIf="preSalesPanelLead?.leadCode">{{ preSalesPanelLead?.leadCode }}</span>
-        <h3 class="ps-panel-title">{{ preSalesPanelLead?.title }}</h3>
-        <p class="ps-panel-sub" *ngIf="preSalesPanelLead?.companyName">{{ preSalesPanelLead?.companyName }} &middot; {{ preSalesPanelLead?.status }}</p>
-      </div>
-      <button type="button" class="ps-panel-close" (click)="closePreSalesPanel()" title="Close">
-        <svg lucideX size="16"></svg>
-      </button>
-    </div>
-
-    <div class="ps-panel-kpis" *ngIf="preSalesInfo?.kpis">
-      <div class="ps-panel-kpi">
-        <span>Value</span>
-        <b>{{ preSalesInfo.kpis.value | currency:(preSalesInfo.kpis.currency || 'INR') }}</b>
-      </div>
-      <div class="ps-panel-kpi">
-        <span>Team</span>
-        <b>{{ preSalesInfo.kpis.members }}</b>
-      </div>
-      <div class="ps-panel-kpi">
-        <span>Hours</span>
-        <b>{{ formatHours(preSalesInfo.kpis.allocatedHours) }}</b>
-      </div>
-      <div class="ps-panel-kpi">
-        <span>Used</span>
-        <b>{{ formatHours(preSalesInfo.kpis.usedHours) }}</b>
-      </div>
-      <div class="ps-panel-kpi">
-        <span>Open Tasks</span>
-        <b>{{ preSalesInfo.kpis.openTasks }}</b>
-      </div>
-      <div class="ps-panel-kpi">
-        <span>MoMs</span>
-        <b>{{ preSalesInfo.kpis.moms }}</b>
-      </div>
-    </div>
-
-    <div class="ps-panel-tabs">
-      <button type="button" [class.active]="preSalesTab === 'team'" (click)="setPreSalesTab('team')">
-        Team <span class="ps-tab-badge" *ngIf="preSalesInfo?.kpis?.members > 0">{{ preSalesInfo.kpis.members }}</span>
-      </button>
-      <button type="button" [class.active]="preSalesTab === 'requests'" (click)="setPreSalesTab('requests')">
-        Requests <span class="ps-tab-badge warn" *ngIf="preSalesInfo?.kpis?.pendingRequests > 0">{{ preSalesInfo.kpis.pendingRequests }}</span>
-      </button>
-      <button type="button" [class.active]="preSalesTab === 'tasks'" (click)="setPreSalesTab('tasks')">
-        Tasks <span class="ps-tab-badge warn" *ngIf="preSalesInfo?.kpis?.openTasks > 0">{{ preSalesInfo.kpis.openTasks }}</span>
-      </button>
-      <button type="button" [class.active]="preSalesTab === 'mom'" (click)="setPreSalesTab('mom')">
-        MoM <span class="ps-tab-badge" *ngIf="preSalesInfo?.kpis?.moms > 0">{{ preSalesInfo.kpis.moms }}</span>
-      </button>
-    </div>
-
-    <div class="ps-panel-body">
-      <div class="ps-panel-loading" *ngIf="isLoadingPreSalesInfo">
-        <svg lucideLoader2 size="18" class="spin-icon"></svg>
-        <span>Loading pre-sales engagement...</span>
-      </div>
-
-      <ng-container *ngIf="!isLoadingPreSalesInfo && preSalesInfo">
-        <!-- ── TEAM TAB ───────────────────────────── -->
-        <div class="ps-panel-section" *ngIf="preSalesTab === 'team'">
-          <div class="ps-panel-section-head">
-            <span>Team members &amp; hours</span>
-            <button type="button" class="btn-ps-ghost" (click)="openPreSalesRequestModal()">
-              <svg lucideUserPlus size="13"></svg> {{ isAdminOrSuperAdmin ? 'Add Member' : 'Request Person' }}
-            </button>
-          </div>
-
-          <div class="ps-empty" *ngIf="preSalesInfo.members.length === 0">
-            <svg lucideUsers size="18"></svg>
-            No team members yet. Request a pre-sales person &mdash; admin approval adds them with hours.
-          </div>
-
-          <div class="ps-member-row" *ngFor="let m of preSalesInfo.members">
-            <div class="ps-member-avatar-wrap">
-              <img *ngIf="getPresalesAvatar(m)" [src]="getPresalesAvatar(m)" class="ps-member-avatar-lg" alt="" />
-              <div *ngIf="!getPresalesAvatar(m)" class="ps-member-avatar-lg">{{ getPresalesInitials(m) }}</div>
-            </div>
-            <div class="ps-member-detail">
-              <span class="ps-member-name-lg">{{ getPresalesName(m) }}</span>
-              <span class="ps-member-dept">{{ getPresalesDesignation(m) }}</span>
-            </div>
-            <div class="ps-member-hours-info">
-              <span class="ps-status-pill ps-st-{{ preSalesStatusClass(m.status) }}" *ngIf="m.status === 'REMOVED'">Ended</span>
-              <span class="ps-status-pill ps-hours-badge" *ngIf="m.status !== 'REMOVED'">{{ formatHours(m.allocatedHours) }} allocated</span>
-              <span class="ps-hours-sub">{{ formatHours(m.usedHours) }} used &middot; {{ formatHours(m.remainingHours) }} left</span>
-            </div>
-            <button type="button" class="btn-ps-plus" *ngIf="m.status === 'ACTIVE'" title="Request additional hours for {{ getPresalesName(m) }}" (click)="openAdditionalHoursModal(m)">
-              <svg lucidePlusCircle size="15"></svg>
-            </button>
-            <button type="button" class="btn-ps-end" *ngIf="m.status === 'ACTIVE' && isAdminOrSuperAdmin" title="End {{ getPresalesName(m) }}'s assignment" (click)="endPresalesAssignment(m)">
-              End Assignment
-            </button>
-          </div>
-        </div>
-
-        <!-- ── REQUESTS TAB ───────────────────────── -->
-        <div class="ps-panel-section" *ngIf="preSalesTab === 'requests'">
-          <div class="ps-panel-section-head">
-            <span>Requests &amp; approvals</span>
-            <button type="button" class="btn-ps-ghost" (click)="openPreSalesRequestModal()">
-              <svg lucideUserPlus size="13"></svg> New Request
-            </button>
-          </div>
-
-          <div class="ps-empty" *ngIf="preSalesInfo.requests.length === 0">
-            <svg lucideMessageSquare size="18"></svg>
-            No requests yet. Request a pre-sales person for a meeting / on-demand, and the admin approves.
-          </div>
-
-          <div class="ps-request-card" *ngFor="let r of preSalesInfo.requests">
-            <div class="ps-member-avatar-wrap">
-              <img *ngIf="getPresalesAvatar(r)" [src]="getPresalesAvatar(r)" class="ps-member-avatar-lg" alt="" />
-              <div *ngIf="!getPresalesAvatar(r)" class="ps-member-avatar-lg">{{ getPresalesInitials(r) }}</div>
-            </div>
-            <div class="ps-request-main">
-              <span class="ps-request-name">{{ getPresalesName(r) }} <b>{{ formatHours(r.hours) }}</b></span>
-              <span class="ps-request-type">{{ r.isAdditional ? 'Additional hours request' : 'New engagement' }} &middot; raised by {{ r.requestedBy?.firstName || '' }} {{ r.requestedBy?.lastName || '' }}</span>
-              <span class="ps-request-reason" *ngIf="r.reason">&ldquo;{{ r.reason }}&rdquo;</span>
-              <span class="ps-request-remarks" *ngIf="r.remarks">Remarks: &ldquo;{{ r.remarks }}&rdquo;</span>
-            </div>
-            <div class="ps-request-status">
-              <span class="ps-status-pill ps-st-{{ preSalesStatusClass(r.status) }}">{{ r.status }}</span>
-              <div class="ps-request-actions" *ngIf="r.status === 'PENDING' && isAdminOrSuperAdmin">
-                <button type="button" class="btn-approve" (click)="openRequestDecisionModal(r, 'APPROVE')">Approve</button>
-                <button type="button" class="btn-reject" (click)="openRequestDecisionModal(r, 'REJECT')">Reject</button>
-              </div>
-              <span class="ps-request-responder" *ngIf="r.status !== 'PENDING' && r.approvedBy">
-                {{ r.status.toLowerCase() }} by {{ r.approvedBy.firstName }} {{ r.approvedBy.lastName }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── TASKS TAB ──────────────────────────── -->
-        <div class="ps-panel-section" *ngIf="preSalesTab === 'tasks'">
-          <div class="ps-panel-section-head">
-            <span>Hourly tasks</span>
-            <button type="button" class="btn-ps-ghost" (click)="openPreSalesTaskModal()">
-              <svg lucidePlus size="13"></svg> Assign Task
-            </button>
-          </div>
-
-          <div class="ps-empty" *ngIf="preSalesInfo.tasks.length === 0">
-            <svg lucideClipboardList size="18"></svg>
-            No tasks yet. Assign an hourly task to a pre-sales person.
-          </div>
-
-          <div class="ps-task-card" *ngFor="let t of preSalesInfo.tasks">
-            <div class="ps-task-top">
-              <button type="button" class="ps-task-title" [class.strike]="t.status === 'COMPLETED'" (click)="openPreSalesTaskModal(t)">{{ t.title }}</button>
-              <div class="ps-task-actions">
-                <button type="button" class="btn-ps-ghost-icon" title="Upload MoM to task" (click)="openMomModal(t)">
-                  <svg lucideFileUp size="14"></svg>
-                </button>
-                <button type="button" class="btn-ps-ghost-icon" title="Edit task" (click)="openPreSalesTaskModal(t)">
-                  <svg lucideEdit2 size="14"></svg>
-                </button>
-                <button type="button" class="btn-ps-ghost-icon danger" title="Delete task" (click)="deletePreSalesTask(t, $event)">
-                  <svg lucideTrash2 size="14"></svg>
-                </button>
-              </div>
-            </div>
-            <div class="ps-task-meta">
-              <span class="ps-task-assignee">
-                <svg lucideUser size="12"></svg> {{ getPresalesName(t) }}
-              </span>
-              <span class="ps-task-hours">
-                <svg lucideClock size="12"></svg> {{ formatHours(t.hours) }}
-              </span>
-              <span class="ps-task-due" *ngIf="t.dueDate">
-                <svg lucideCalendar size="12"></svg> {{ t.dueDate | date:'dd MMM yyyy' }}
-              </span>
-            </div>
-            <div class="ps-task-status-row">
-              <select class="ps-task-status-select" [class.st-completed]="t.status === 'COMPLETED'" [ngModel]="t.status"
-                      (ngModelChange)="setPreSalesTaskStatus(t, $event)" [disabled]="taskStatusSavingId === t.id">
-                <option value="PENDING">Pending</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
-              <span class="ps-task-mom-count" *ngIf="t._count?.moms > 0">
-                <svg lucideFileUp size="12"></svg> {{ t._count.moms }} MoM
-              </span>
-            </div>
-            <div class="ps-task-desc" *ngIf="t.description">{{ t.description }}</div>
-          </div>
-        </div>
-
-        <!-- ── MOM TAB ────────────────────────────── -->
-        <div class="ps-panel-section" *ngIf="preSalesTab === 'mom'">
-          <div class="ps-panel-section-head">
-            <span>Minutes of meeting</span>
-            <button type="button" class="btn-ps-ghost" (click)="openMomModal(null)">
-              <svg lucideFileUp size="13"></svg> Upload MoM
-            </button>
-          </div>
-
-          <div class="ps-empty" *ngIf="preSalesInfo.moms.length === 0">
-            <svg lucideFile size="18"></svg>
-            No minutes of meeting uploaded yet. The pre-sales person uploads the MoM into their tasks.
-          </div>
-
-          <div class="ps-mom-card" *ngFor="let mom of preSalesInfo.moms">
-            <div class="ps-mom-icon">
-              <svg lucideFileUp size="15"></svg>
-            </div>
-            <div class="ps-mom-main">
-              <span class="ps-mom-title">{{ mom.title }}</span>
-              <span class="ps-mom-meta">
-                <span *ngIf="mom.task?.title">Task: {{ mom.task.title }} &middot;</span>
-                by {{ mom.uploadedBy?.firstName || '' }} {{ mom.uploadedBy?.lastName || '' }} &middot;
-                {{ mom.createdAt | date:'dd MMM yyyy' }}
-              </span>
-              <span class="ps-mom-summary" *ngIf="mom.summary">{{ mom.summary }}</span>
-            </div>
-            <div class="ps-mom-actions">
-              <a class="btn-ps-ghost-icon" *ngIf="mom.fileUrl" [href]="mom.fileUrl" target="_blank" title="Open file">
-                <svg lucideExternalLink size="14"></svg>
-              </a>
-              <button type="button" class="btn-ps-ghost-icon danger" title="Delete MoM" (click)="deleteMom(mom, $event)">
-                <svg lucideTrash2 size="14"></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </ng-container>
-    </div>
-  </div>
-
-  <!-- ── PRE-SALES REQUEST MODAL (new + additional hours) ── -->
-  <div class="modal-backdrop" *ngIf="showPreSalesRequestModal" (click)="closePreSalesRequestModal()">
-    <div class="modal-card ps-modal" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <div class="modal-header-left">
-          <div class="modal-icon-badge pre-sales">
-            <svg lucideUserPlus size="16"></svg>
-          </div>
-          <div class="modal-title-stack">
-            <h2>{{ preSalesRequestForm.isAdditional ? 'Request Additional Hours' : 'Request Pre-Sales Person' }}</h2>
-            <p class="modal-subtitle">
-              {{ preSalesRequestForm.isAdditional
-                  ? 'Ask the admin for more hours for ' + preSalesRequestForm.memberName + ' on this deal.'
-                  : 'Choose a pre-sales person for ' + (preSalesPanelLead?.title || 'this deal') + '. The admin approves before they are added.' }}
-            </p>
-          </div>
-        </div>
-        <button type="button" class="ps-modal-close" (click)="closePreSalesRequestModal()" title="Close">
-          <svg lucideX size="16"></svg>
-        </button>
-      </div>
-      <div class="modal-body enhanced-body">
-        <div class="form-group">
-          <label>Pre-Sales Person</label>
-          <div class="searchable-filter-dropdown ps-candidate-wrap">
-            <input [(ngModel)]="preSalesRequestSearch" placeholder="Search name, designation, department..." />
-            <div class="popover-options-scroll ps-candidate-list">
-              <button type="button" class="popover-option-item" *ngFor="let emp of getFilteredPreSalesCandidates()"
-                      [class.selected]="preSalesRequestForm.employeeId === emp.id"
-                      (click)="selectPreSalesCandidate(emp)">
-                <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="option-avatar-img" alt="" />
-                <div class="option-avatar-circle" *ngIf="!emp.avatarUrl">{{ getPresalesInitials(emp) }}</div>
-                <div class="option-details">
-                  <span class="option-primary">{{ emp.firstName }} {{ emp.lastName }}</span>
-                  <span class="option-secondary" *ngIf="emp.designation?.name || emp.department?.name">
-                    {{ emp.designation?.name || emp.department?.name }}
-                  </span>
-                </div>
-                <svg lucideCheck size="14" class="check-icon" *ngIf="preSalesRequestForm.employeeId === emp.id"></svg>
-              </button>
-              <div class="popover-empty" *ngIf="getFilteredPreSalesCandidates().length === 0">No one matches "{{ preSalesRequestSearch }}"</div>
-            </div>
-          </div>
-        </div>
-        <div class="form-group" *ngIf="preSalesRequestForm.isAdditional">
-          <label>Currently Available</label>
-          <div class="ps-info-box">
-            <svg lucideHourglass size="14"></svg>
-            {{ preSalesRequestForm.memberName }} has {{ formatHours(preSalesRequestForm.memberHours) }} remaining.
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Hours</label>
-          <input type="number" min="0.5" step="0.5" [(ngModel)]="preSalesRequestForm.hours" placeholder="e.g. 8" />
-        </div>
-        <div class="form-group">
-          <label>Purpose / Reason</label>
-          <textarea [(ngModel)]="preSalesRequestForm.reason" rows="3" placeholder="What will the person do — meeting, demo, technical validation..."></textarea>
-        </div>
-      </div>
-      <div class="modal-footer enhanced-footer">
-        <button type="button" class="btn-secondary" (click)="closePreSalesRequestModal()">Cancel</button>
-        <button type="button" class="btn-primary" [disabled]="isSavingPreSalesRequest" (click)="savePreSalesRequest()">
-          <svg lucideLoader2 size="14" class="spin-icon" *ngIf="isSavingPreSalesRequest"></svg>
-          {{ preSalesRequestForm.isAdditional ? 'Submit Additional Hours' : 'Submit Request' }}
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── PRE-SALES REQUEST DECISION MODAL (admin) ── -->
-  <div class="modal-backdrop" *ngIf="showRequestDecisionModal" (click)="closeRequestDecisionModal()">
-    <div class="modal-card ps-modal" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <div class="modal-header-left">
-          <div class="modal-icon-badge pre-sales" [class.proceed]="decisionMode === 'APPROVE'">
-            <svg *ngIf="decisionMode === 'APPROVE'" lucideBadgeCheck size="16"></svg>
-            <svg *ngIf="decisionMode === 'REJECT'" lucideXCircle size="16"></svg>
-          </div>
-          <div class="modal-title-stack">
-            <h2>{{ decisionMode === 'APPROVE' ? 'Approve Pre-Sales Request' : 'Reject Pre-Sales Request' }}</h2>
-            <p class="modal-subtitle">
-              {{ getPresalesName(decisionRequest) }} &middot; {{ formatHours(decisionRequest?.hours) }} on {{ preSalesPanelLead?.title }}
-            </p>
-          </div>
-        </div>
-        <button type="button" class="ps-modal-close" (click)="closeRequestDecisionModal()" title="Close">
-          <svg lucideX size="16"></svg>
-        </button>
-      </div>
-      <div class="modal-body enhanced-body">
-        <div class="ps-info-box" *ngIf="decisionMode === 'APPROVE' && decisionRequest?.isAdditional">
-          <svg lucideHourglass size="14"></svg>
-          Approving adds the requested hours to the member's allocated hours on this deal.
-        </div>
-        <div class="form-group">
-          <label>Remarks {{ decisionMode === 'REJECT' ? '(required)' : '(optional)' }}</label>
-          <textarea [(ngModel)]="decisionRemarks" rows="3" placeholder="Reason for {{ decisionMode.toLowerCase() }}ing. Sent to the requester and the pre-sales person."></textarea>
-        </div>
-      </div>
-      <div class="modal-footer enhanced-footer">
-        <button type="button" class="btn-secondary" (click)="closeRequestDecisionModal()">Cancel</button>
-        <button type="button" class="btn-primary" [class.btn-danger]="decisionMode === 'REJECT'" [disabled]="isSubmittingDecision" (click)="submitRequestDecision()">
-          <svg lucideLoader2 size="14" class="spin-icon" *ngIf="isSubmittingDecision"></svg>
-          {{ decisionMode === 'APPROVE' ? 'Approve &amp; Add Member' : 'Reject Request' }}
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── PRE-SALES TASK MODAL ── -->
-  <div class="modal-backdrop" *ngIf="showPreSalesTaskModal" (click)="closePreSalesTaskModal()">
-    <div class="modal-card ps-modal" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <div class="modal-header-left">
-          <div class="modal-icon-badge pre-sales">
-            <svg lucideClipboardList size="16"></svg>
-          </div>
-          <div class="modal-title-stack">
-            <h2>{{ editingPreSalesTask ? 'Edit Hourly Task' : 'Assign Hourly Task' }}</h2>
-            <p class="modal-subtitle">Assign a task to a pre-sales person on {{ preSalesPanelLead?.title }}</p>
-          </div>
-        </div>
-        <button type="button" class="ps-modal-close" (click)="closePreSalesTaskModal()" title="Close">
-          <svg lucideX size="16"></svg>
-        </button>
-      </div>
-      <div class="modal-body enhanced-body">
-        <div class="form-group" *ngIf="!editingPreSalesTask">
-          <label>Pre-Sales Person</label>
-          <div class="searchable-filter-dropdown ps-candidate-wrap">
-            <input [(ngModel)]="preSalesTaskSearch" placeholder="Search team member..." />
-            <div class="popover-options-scroll ps-candidate-list">
-              <button type="button" class="popover-option-item" *ngFor="let emp of getFilteredPreSalesTaskAssignees()"
-                      [class.selected]="preSalesTaskForm.assignedToId === emp.id"
-                      (click)="preSalesTaskForm.assignedToId = emp.id; preSalesTaskSearch = ''">
-                <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="option-avatar-img" alt="" />
-                <div class="option-avatar-circle" *ngIf="!emp.avatarUrl">{{ getPresalesInitials(emp) }}</div>
-                <div class="option-details">
-                  <span class="option-primary">{{ emp.firstName }} {{ emp.lastName }}</span>
-                  <span class="option-secondary" *ngIf="emp.designation?.name">{{ emp.designation.name }}</span>
-                </div>
-                <svg lucideCheck size="14" class="check-icon" *ngIf="preSalesTaskForm.assignedToId === emp.id"></svg>
-              </button>
-              <div class="popover-empty" *ngIf="getFilteredPreSalesTaskAssignees().length === 0">No team members found</div>
-            </div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Task Title</label>
-          <input [(ngModel)]="preSalesTaskForm.title" placeholder="e.g. System architecture review for demo" />
-        </div>
-        <div class="form-group">
-          <label>Hours (hourly basis)</label>
-          <input type="number" min="0" step="0.5" [(ngModel)]="preSalesTaskForm.hours" placeholder="Estimated hours for this task" />
-        </div>
-        <div class="form-group">
-          <label>Due Date</label>
-          <input type="date" [(ngModel)]="preSalesTaskForm.dueDate" />
-        </div>
-        <div class="form-group">
-          <label>Description</label>
-          <textarea [(ngModel)]="preSalesTaskForm.description" rows="3" placeholder="What needs to be delivered?"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer enhanced-footer">
-        <button type="button" class="btn-secondary" (click)="closePreSalesTaskModal()">Cancel</button>
-        <button type="button" class="btn-primary" [disabled]="isSavingPreSalesTask" (click)="savePreSalesTask()">
-          <svg lucideLoader2 size="14" class="spin-icon" *ngIf="isSavingPreSalesTask"></svg>
-          {{ editingPreSalesTask ? 'Save Changes' : 'Assign Task' }}
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── PRE-SALES MOM MODAL ── -->
-  <div class="modal-backdrop" *ngIf="showMomModal" (click)="closeMomModal()">
-    <div class="modal-card ps-modal" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <div class="modal-header-left">
-          <div class="modal-icon-badge pre-sales">
-            <svg lucideFileUp size="16"></svg>
-          </div>
-          <div class="modal-title-stack">
-            <h2>Upload Minutes of Meeting</h2>
-            <p class="modal-subtitle">
-              {{ momTask ? 'Attach the MoM for task "' + momTask.title + '"' : 'Attach meeting notes to ' + preSalesPanelLead?.title }}
-            </p>
-          </div>
-        </div>
-        <button type="button" class="ps-modal-close" (click)="closeMomModal()" title="Close">
-          <svg lucideX size="16"></svg>
-        </button>
-      </div>
-      <div class="modal-body enhanced-body">
-        <div class="form-group">
-          <label>Title</label>
-          <input [(ngModel)]="momForm.title" placeholder="e.g. MoM — Requirement gathering meeting" />
-        </div>
-        <div class="form-group">
-          <label>Meeting Date</label>
-          <input type="date" [(ngModel)]="momForm.meetingDate" />
-        </div>
-        <div class="form-group">
-          <label>Summary</label>
-          <textarea [(ngModel)]="momForm.summary" rows="4" placeholder="Key points, decisions, action items..."></textarea>
-        </div>
-        <div class="form-group">
-          <label>Attachment (optional)</label>
-          <div class="ps-file-drop" (click)="momFileInput.click()">
-            <svg lucideUpload size="16"></svg>
-            <span>{{ momFiles.length ? momFiles[0].name : 'Click to attach a file' }}</span>
-            <button type="button" class="ps-file-remove" *ngIf="momFiles.length" (click)="removeMomFile(0); $event.stopPropagation()" title="Remove file">
-              <svg lucideX size="12"></svg>
-            </button>
-          </div>
-          <input #momFileInput type="file" hidden (change)="onMomFilesSelected($event)"
-                 accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg" />
-        </div>
-        <div class="ps-info-box" *ngIf="momTask">
-          <svg lucideCircleCheck size="14"></svg>
-          Uploading marks the task <b>&ldquo;{{ momTask.title }}&rdquo;</b> as completed.
-        </div>
-      </div>
-      <div class="modal-footer enhanced-footer">
-        <button type="button" class="btn-secondary" (click)="closeMomModal()">Cancel</button>
-        <button type="button" class="btn-primary" [disabled]="isSavingMom" (click)="saveMom()">
-          <svg lucideLoader2 size="14" class="spin-icon" *ngIf="isSavingMom"></svg>
-          Upload MoM
-        </button>
-      </div>
-    </div>
-  </div>
-
 <div class="modal-backdrop" *ngIf="showBroughtLeadsModal" (click)="closeBroughtLeadsModal()">
   <div class="modal-card brought-leads-modal" (click)="$event.stopPropagation()">
     <!-- Header -->
@@ -3300,6 +2723,68 @@
           <svg lucidePlus size="15"></svg>
           <span>New Lead for this Source</span>
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ PRE-SALES REQUESTS (admin) ══════════════════════════ -->
+<div class="modal-backdrop" *ngIf="showPreSalesRequestsModal" (click)="closePreSalesRequestsModal()">
+  <div class="modal-card ps-queue-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2 style="margin:0;">Pre-Sales Requests</h2>
+        <p class="modal-subtitle">Approving adds the employee to that deal's pre-sales team straight away.</p>
+      </div>
+      <button type="button" class="btn-icon-close" (click)="closePreSalesRequestsModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="modal-body enhanced-body">
+      <div class="ps-queue-loading" *ngIf="loadingPreSalesRequests">Loading requests…</div>
+
+      <div class="ps-queue-empty" *ngIf="!loadingPreSalesRequests && !preSalesRequests.length">
+        <svg lucideCheckCircle size="26"></svg>
+        <p>Nothing awaiting approval.</p>
+      </div>
+
+      <div class="ps-queue-row" *ngFor="let r of preSalesRequests" [class.is-decided]="r.status !== 'PENDING'">
+        <div class="ps-queue-main">
+          <div class="ps-queue-lead">
+            <svg lucideBriefcase size="13"></svg>
+            <span>{{ r.lead?.companyName || r.lead?.title || 'Deal' }}</span>
+          </div>
+          <div class="ps-queue-who">
+            <strong>{{ requestName(r) }}</strong>
+            <span>requested by {{ requestName(r.requestedBy) }} · {{ r.createdAt | date:'dd MMM yyyy' }}</span>
+          </div>
+          <p class="ps-queue-reason" *ngIf="r.reason">{{ r.reason }}</p>
+          <p class="ps-queue-remark" *ngIf="r.status === 'REJECTED' && r.adminRemark">
+            <strong>Admin remark:</strong> {{ r.adminRemark }}
+          </p>
+        </div>
+
+        <div class="ps-queue-actions" *ngIf="r.status === 'PENDING' && rejectingRequest?.id !== r.id">
+          <button type="button" class="btn-secondary" [disabled]="decidingRequestId !== null" (click)="startReject(r)">Reject</button>
+          <button type="button" class="btn-primary" [disabled]="decidingRequestId !== null" (click)="approvePreSalesRequest(r)">
+            {{ decidingRequestId === r.id ? 'Approving…' : 'Approve' }}
+          </button>
+        </div>
+
+        <!-- A rejection has to say why: the requester only sees this remark. -->
+        <div class="ps-queue-reject" *ngIf="rejectingRequest?.id === r.id">
+          <textarea [(ngModel)]="rejectRemark" rows="2"
+                    placeholder="e.g. This requirement can be handled by the existing pre-sales team."></textarea>
+          <div class="ps-queue-actions">
+            <button type="button" class="btn-secondary" (click)="cancelReject()">Cancel</button>
+            <button type="button" class="btn-primary" [disabled]="decidingRequestId !== null" (click)="confirmReject()">
+              {{ decidingRequestId === r.id ? 'Rejecting…' : 'Confirm Reject' }}
+            </button>
+          </div>
+        </div>
+
+        <span class="ldm-status-badge" *ngIf="r.status !== 'PENDING'">{{ r.status | titlecase }}</span>
       </div>
     </div>
   </div>

@@ -258,85 +258,67 @@ export class CrmController {
   }
 
   // ═══════════════════════════════════════════
-  // PRE-SALES ENGAGEMENT
+  // PRE-SALES
+  //
+  // Every route resolves what the caller may do from the authenticated user and
+  // the stored rows — never from anything in the body. The role checks that used
+  // to sit in this controller now live in the service, so that a second caller
+  // (a script, the mobile app) cannot reach the same operation unguarded.
   // ═══════════════════════════════════════════
 
-  @Get('pre-sales/overview')
-  getPreSalesOverview(@Request() req) {
-    return this.crmService.getPreSalesOverview(req.user.companyId, req.user);
-  }
-
+  /** The team, the tasks and the requests for one deal, shaped by who asks. */
   @Get('leads/:id/pre-sales')
   getPreSalesInfo(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.crmService.getPreSalesInfo(req.user.companyId, id);
+    return this.crmService.getPreSalesInfo(req.user.companyId, id, req.user);
   }
 
-  @Post('leads/:id/pre-sales/requests')
-  createPreSalesRequest(
-    @Request() req,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() data: any,
-  ) {
-    return this.crmService.createPreSalesRequest(req.user.companyId, id, data, req.user.employeeId);
-  }
-
-  @Post('leads/:id/pre-sales/requests/:requestId/approve')
-  approvePreSalesRequest(
-    @Request() req,
-    @Param('id', ParseIntPipe) id: number,
-    @Param('requestId', ParseIntPipe) requestId: number,
-    @Body() data: any,
-  ) {
-    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
-      throw new ForbiddenException('Only admins can approve pre-sales person requests.');
-    }
-    return this.crmService.approvePreSalesRequest(req.user.companyId, id, requestId, data?.remarks, req.user.employeeId);
-  }
-
-  @Post('leads/:id/pre-sales/requests/:requestId/reject')
-  rejectPreSalesRequest(
-    @Request() req,
-    @Param('id', ParseIntPipe) id: number,
-    @Param('requestId', ParseIntPipe) requestId: number,
-    @Body() data: any,
-  ) {
-    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
-      throw new ForbiddenException('Only admins can reject pre-sales person requests.');
-    }
-    return this.crmService.rejectPreSalesRequest(req.user.companyId, id, requestId, data?.remarks, req.user.employeeId);
-  }
-
+  /** Admin only — the one path that adds someone without approval. */
   @Post('leads/:id/pre-sales/members')
-  addPreSalesMember(
-    @Request() req,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() data: any,
-  ) {
-    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
-      throw new ForbiddenException('Only admins can add pre-sales team members.');
-    }
-    return this.crmService.addPreSalesMember(req.user.companyId, id, data, req.user.employeeId);
+  addPreSalesMembers(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.crmService.addPreSalesMembers(req.user.companyId, id, req.user, data);
   }
 
-  @Post('leads/:id/pre-sales/members/:memberId/end')
-  endPreSalesMember(
+  @Delete('leads/:id/pre-sales/members/:memberId')
+  removePreSalesMember(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
     @Param('memberId', ParseIntPipe) memberId: number,
   ) {
-    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {
-      throw new ForbiddenException('Only admins can end pre-sales assignments.');
-    }
-    return this.crmService.endPreSalesMember(req.user.companyId, id, memberId, req.user.employeeId);
+    return this.crmService.removePreSalesMember(req.user.companyId, id, memberId, req.user);
   }
 
-  @Post('leads/:id/pre-sales/tasks')
-  createPreSalesTask(
+  // ── requests ───────────────────────────────
+
+  @Post('leads/:id/pre-sales/requests')
+  createPreSalesRequest(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.crmService.createPreSalesRequest(req.user.companyId, id, req.user, data);
+  }
+
+  /** The administrator's queue, across every deal. */
+  @Get('pre-sales/requests')
+  listPreSalesRequests(@Request() req, @Query('status') status?: string) {
+    return this.crmService.listPreSalesRequests(req.user.companyId, req.user, status);
+  }
+
+  @Patch('pre-sales/requests/:requestId/approve')
+  approvePreSalesRequest(@Request() req, @Param('requestId', ParseIntPipe) requestId: number) {
+    return this.crmService.approvePreSalesRequest(req.user.companyId, requestId, req.user);
+  }
+
+  @Patch('pre-sales/requests/:requestId/reject')
+  rejectPreSalesRequest(
     @Request() req,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('requestId', ParseIntPipe) requestId: number,
     @Body() data: any,
   ) {
-    return this.crmService.createPreSalesTask(req.user.companyId, id, data, req.user.employeeId);
+    return this.crmService.rejectPreSalesRequest(req.user.companyId, requestId, req.user, data);
+  }
+
+  // ── tasks ──────────────────────────────────
+
+  @Post('leads/:id/pre-sales/tasks')
+  createPreSalesTask(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.crmService.createPreSalesTask(req.user.companyId, id, req.user, data);
   }
 
   @Put('leads/:id/pre-sales/tasks/:taskId')
@@ -346,7 +328,22 @@ export class CrmController {
     @Param('taskId', ParseIntPipe) taskId: number,
     @Body() data: any,
   ) {
-    return this.crmService.updatePreSalesTask(req.user.companyId, id, taskId, data);
+    return this.crmService.updatePreSalesTask(req.user.companyId, id, taskId, req.user, data);
+  }
+
+  /**
+   * The only way a task's status moves. Separate from the edit route because
+   * the two have different permissions: the assignee drives the status, the
+   * creator owns the details.
+   */
+  @Post('leads/:id/pre-sales/tasks/:taskId/status')
+  changePreSalesTaskStatus(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() data: any,
+  ) {
+    return this.crmService.changePreSalesTaskStatus(req.user.companyId, id, taskId, req.user, data);
   }
 
   @Delete('leads/:id/pre-sales/tasks/:taskId')
@@ -355,35 +352,16 @@ export class CrmController {
     @Param('id', ParseIntPipe) id: number,
     @Param('taskId', ParseIntPipe) taskId: number,
   ) {
-    return this.crmService.deletePreSalesTask(req.user.companyId, id, taskId);
+    return this.crmService.deletePreSalesTask(req.user.companyId, id, taskId, req.user);
   }
 
-  @Post('leads/:id/pre-sales/mom')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DEAL_FILE_SIZE } }))
-  async uploadPreSalesMoM(
+  @Get('leads/:id/pre-sales/tasks/:taskId/history')
+  getPreSalesTaskHistory(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
-    @UploadedFile() file: Express.Multer.File,
-    @Body() data: any,
+    @Param('taskId', ParseIntPipe) taskId: number,
   ) {
-    let uploaded;
-    if (file) uploaded = await this.processImageKitUpload(file);
-    return this.crmService.uploadPreSalesMoM(
-      req.user.companyId,
-      id,
-      data,
-      req.user.employeeId,
-      file ? { ...file, ...uploaded } : undefined,
-    );
-  }
-
-  @Delete('leads/:id/pre-sales/mom/:momId')
-  deletePreSalesMoM(
-    @Request() req,
-    @Param('id', ParseIntPipe) id: number,
-    @Param('momId', ParseIntPipe) momId: number,
-  ) {
-    return this.crmService.deletePreSalesMoM(req.user.companyId, id, momId);
+    return this.crmService.getPreSalesTaskHistory(req.user.companyId, id, taskId, req.user);
   }
 
   // ═══════════════════════════════════════════

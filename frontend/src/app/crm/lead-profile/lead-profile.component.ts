@@ -17,12 +17,16 @@ import {
   LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
   LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
   LucideList, LucideAlertCircle, LucideCopyPlus, LucideUsers, LucideUserPlus,
-  LucideClipboardList, LucideFileUp, LucidePlusCircle, LucideHourglass
+  LucideClipboardList, LucideFileUp, LucidePlusCircle, LucideHourglass,
+  LucidePlay, LucidePause, LucideTag, LucideCheckCircle2
 } from '@lucide/angular';
 import { DialogService } from '../../shared/services/dialog.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ClientsService } from '../../services/clients';
 import { AuthService } from '../../services/auth.service';
+
+/** Which slice of the directory a pre-sales picker is showing. */
+type PreSalesScope = 'core' | 'others' | 'all';
 
 interface PipelineStage {
   key: string;
@@ -43,7 +47,8 @@ interface PipelineStage {
     LucideFile, LucideMoreVertical, LucideRefreshCw, LucideVideo,
     LucideChevronDown, LucideCheck, LucideLoader2, LucideCalendarClock,
     LucideList, LucideAlertCircle, LucideCopyPlus, LucideUsers, LucideUserPlus,
-    LucideClipboardList, LucideFileUp, LucidePlusCircle, LucideHourglass
+    LucideClipboardList, LucideFileUp, LucidePlusCircle, LucideHourglass,
+    LucidePlay, LucidePause, LucideTag, LucideCheckCircle2
   ],
   templateUrl: './lead-profile.html',
   styleUrls: ['./lead-profile.css']
@@ -183,7 +188,18 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
   // File
   selectedFile: File | null = null;
 
+  private static readonly DEEP_LINK_TABS = ['files', 'followups', 'proposals', 'notes', 'history', 'presales'];
+
   ngOnInit() {
+    // The tab is chosen before anything is fetched. It used to be applied in
+    // applyDeepLink(), which runs inside the lead request's callback — so
+    // arriving from "Manage" showed the default tab until that resolved, and
+    // any later reset of activeTab won the race.
+    const tab = this.route.snapshot.queryParamMap.get('tab');
+    if (tab && LeadProfileComponent.DEEP_LINK_TABS.includes(tab)) {
+      this.activeTab = tab as any;
+    }
+
     this.route.paramMap.subscribe(params => {
       const id = params.get('id');
       if (id) {
@@ -206,10 +222,8 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
         this.isLoading = false;
         this.loadAllTabData();
         this.applyDeepLink();
-        if (data?.flow === 'PRE_SALES') {
-          this.loadPresalesEmployees();
-          this.loadPresalesInfo();
-        }
+        this.loadPresalesEmployees();
+        this.loadPresalesInfo();
       },
       error: (err) => {
         console.error('Error loading lead profile', err);
@@ -229,9 +243,8 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
   private applyDeepLink() {
     const params = this.route.snapshot.queryParamMap;
     const tab = params.get('tab');
-    if (tab === 'proposals' || tab === 'followups' || tab === 'notes' || tab === 'history' || tab === 'files' || tab === 'presales') {
-      this.activeTab = tab as any;
-    }
+    // The tab itself is applied in ngOnInit, before the fetch; this only has to
+    // deal with ?edit=, which needs the quotations in hand.
     const editId = Number(params.get('edit'));
     if (editId) {
       const quote = this.proposals.find(p => p.id === editId);
@@ -1813,33 +1826,45 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
     this.router.navigate(['/crm/leads']);
   }
   // ═══════════════════════════════════════════
-  // PRE-SALES ENGAGEMENT (team / requests / tasks / MoM)
+  // PRE-SALES
+  //
+  // An admin puts people on the deal; whoever added them (or an admin) raises
+  // tasks; the assignee drives each task through NEW → WORKING → ON HOLD →
+  // COMPLETED. Everything the buttons allow is decided by the server and
+  // handed back in `permissions` — this component only reflects it, so a user
+  // who tampers with the flags still gets a 403.
   // ═══════════════════════════════════════════
 
   presalesInfo: any = null;
   loadingPresales = false;
-  activePresalesSection: 'team' | 'requests' | 'tasks' | 'mom' = 'team';
-  presalesEmployees: any[] = [];
-
   presalesMembers: any[] = [];
   presalesRequests: any[] = [];
   presalesTasks: any[] = [];
-  presalesMoms: any[] = [];
+  presalesEmployees: any[] = [];
 
   get isAdminOrSuperAdmin(): boolean {
     const role = this.auth.currentUser()?.role;
     return role === 'ADMIN' || role === 'SUPERADMIN';
   }
 
+  /** Straight from the server; never inferred from the role in the browser. */
+  get presalesPermissions(): any {
+    return this.presalesInfo?.permissions || {};
+  }
+
+  get presalesFinancialsHidden(): boolean {
+    return !!this.presalesPermissions.financialsHidden;
+  }
+
   loadPresalesEmployees() {
     this.http.get<any[]>(`${environment.apiUrl}/employees`).subscribe({
       next: (data) => (this.presalesEmployees = data || []),
-      error: (err) => console.error('Failed to load employees', err),
+      error: () => (this.presalesEmployees = []),
     });
   }
 
   loadPresalesInfo() {
-    if (this.leadId == null || !this.isPreSalesLead) return;
+    if (this.leadId == null) return;
     this.loadingPresales = true;
     this.http.get<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales`).subscribe({
       next: (data) => {
@@ -1847,373 +1872,513 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
         this.presalesMembers = data?.members || [];
         this.presalesRequests = data?.requests || [];
         this.presalesTasks = data?.tasks || [];
-        this.presalesMoms = data?.moms || [];
         this.loadingPresales = false;
       },
-      error: (err) => {
-        console.error(err);
-        this.loadingPresales = false;
-      }
+      error: () => (this.loadingPresales = false),
     });
   }
 
-  get presalesKpis(): any {
-    const members = this.presalesMembers || [];
-    const requests = this.presalesRequests || [];
-    const tasks = this.presalesTasks || [];
-    const openTasks = tasks.filter((t: any) => t.status !== 'COMPLETED');
-    const allocatedHours = members.reduce((s: number, m: any) => s + (Number(m.allocatedHours) || 0), 0);
-    const usedHours = members.reduce((s: number, m: any) => s + (Number(m.usedHours) || 0), 0);
-    return {
-      value: this.lead?.value ?? 0,
-      currency: this.lead?.currency || 'INR',
-      members: members.length,
-      allocatedHours,
-      usedHours,
-      pendingRequests: requests.filter((r: any) => r.status === 'PENDING').length,
-      openTasks: openTasks.length,
-      moms: this.presalesMoms.length,
-    };
+  presalesName(row: any): string {
+    const e = row?.employee || row?.assignedTo || row?.assignedBy || row?.requestedBy || row;
+    return `${e?.firstName || ''} ${e?.lastName || ''}`.trim() || '—';
   }
 
-  formatHours(h: any): string {
-    const n = Number(h) || 0;
-    return n % 1 === 0 ? `${n} hr${n === 1 ? '' : 's'}` : `${n} hrs`;
+  presalesInitials(row: any): string {
+    const e = row?.employee || row?.assignedTo || row;
+    return `${e?.firstName?.[0] || ''}${e?.lastName?.[0] || ''}`.toUpperCase() || 'PS';
   }
 
-  getPresalesName(member: any): string {
-    const emp = member?.employee || member?.assignedTo || member;
-    return `${emp?.firstName || ''} ${emp?.lastName || ''}`.trim() || '—';
+  /** "150" → "2h 30m". Stored as minutes; only ever formatted for display. */
+  formatDuration(minutes: any): string {
+    const n = Number(minutes);
+    if (!Number.isFinite(n) || n <= 0) return '—';
+    const h = Math.floor(n / 60);
+    const m = n % 60;
+    return [h ? `${h}h` : '', m ? `${m}m` : ''].filter(Boolean).join(' ') || '—';
   }
 
-  getPresalesDesignation(member: any): string {
-    const d = member?.employee?.designation || member?.designation || member?.assignedTo?.designation;
-    return d?.name || 'Pre-Sales Member';
+  taskStatusClass(status: string): string {
+    return 'ps-status-' + String(status || 'NEW').toLowerCase().replace('_', '-');
   }
 
-  getPresalesInitials(member: any): string {
-    const emp = member?.employee || member?.assignedTo || member;
-    return `${emp?.firstName?.[0] || ''}${emp?.lastName?.[0] || ''}`.trim() || 'PS';
+  taskStatusLabel(status: string): string {
+    return String(status || 'NEW').replace('_', ' ');
   }
 
-  getPresalesAvatar(member: any): string {
-    return member?.employee?.avatarUrl || member?.avatarUrl || member?.assignedTo?.avatarUrl || '';
+  get activeMembers(): any[] {
+    return (this.presalesMembers || []).filter((m) => m.status === 'ACTIVE');
   }
 
-  preSalesStatusClass(status: string): string {
-    return (status || 'PENDING').toLowerCase();
+  get pendingRequests(): any[] {
+    return (this.presalesRequests || []).filter((r) => r.status === 'PENDING');
   }
 
-  // ── Request modal ──────────────────────────────
+  // ── add members (admin) ────────────────────────────────────────────────────
 
-  showRequestModal = false;
-  isRequestAdditional = false;
-  requestForm: any = { employeeId: null, memberName: '', memberHours: 0, reason: '', hours: 1 };
-  requestSearch = '';
-  savingRequest = false;
-  psCandidateOpen = false;
-  psTaskAssigneeOpen = false;
+  showAddPresalesModal = false;
+  addPresalesSearch = '';
+  addPresalesSelected: number[] = [];
+  addPresalesRemark = '';
+  savingAddPresales = false;
 
-  openRequestModal(member?: any) {
-    this.isRequestAdditional = !!member;
-    this.requestForm = {
-      employeeId: member?.employeeId ?? member?.employee?.id ?? null,
-      memberName: member ? this.getPresalesName(member) : '',
-      memberHours: member?.remainingHours ?? 0,
-      reason: '',
-      hours: member ? Math.max(member?.remainingHours || 0, 1) : 1,
-    };
-    this.requestSearch = '';
-    this.showRequestModal = true;
+  openAddPresalesModal() {
+    this.addPresalesScope = 'core';
+    this.addPresalesSearch = '';
+    this.addPresalesSelected = [];
+    this.addPresalesRemark = '';
+    this.showAddPresalesModal = true;
+    if (!this.presalesEmployees.length) this.loadPresalesEmployees();
   }
 
-  closeRequestModal() {
-    this.showRequestModal = false;
+  closeAddPresalesModal() {
+    if (this.savingAddPresales) return;
+    this.showAddPresalesModal = false;
   }
 
-  getFilteredRequestCandidates(): any[] {
-    let pool = this.presalesEmployees || [];
-    const term = this.requestSearch.trim().toLowerCase();
-    if (term) {
-      pool = pool.filter((e: any) =>
+  /**
+   * Roles the picker offers first. A presentation default, not a rule: the API
+   * accepts any employee of the company, and the Others tab exists precisely
+   * because the right specialist is often outside these roles.
+   */
+  private static readonly PRE_SALES_ELIGIBLE_ROLES = ['SUPERADMIN', 'ADMIN', 'SALES'];
+
+  private matchesScope(employee: any, scope: PreSalesScope): boolean {
+    if (scope === 'all') return true;
+    const core = LeadProfileComponent.PRE_SALES_ELIGIBLE_ROLES.includes(employee.user?.role);
+    return scope === 'core' ? core : !core;
+  }
+
+  /** Tab counts, so a manager can see there are others before switching. */
+  presalesScopeCount(scope: PreSalesScope): number {
+    return this.presalesCandidates('', scope).length;
+  }
+
+  /**
+   * Which tab each picker is on. Separate per modal: the add and request flows
+   * are used by different people for different reasons.
+   */
+  addPresalesScope: PreSalesScope = 'core';
+  requestPresalesScope: PreSalesScope = 'core';
+
+  /**
+   * Who can be added: on staff, not already on this team, matching the search.
+   *
+   * Suspended accounts are excluded — that is what deactivating an employee
+   * sets, and assigning pre-sales work to someone who cannot sign in is a
+   * dead end. PENDING_VERIFICATION is deliberately kept: those are real staff
+   * who simply have not clicked the email link yet.
+   *
+   * Ordered oldest first by joining date, so the long-established people a manager
+   * is looking for are at the top rather than buried under recent joiners.
+   */
+  presalesCandidates(search: string, scope: PreSalesScope = 'all'): any[] {
+    const onTeam = new Set(this.activeMembers.map((m) => m.employeeId));
+    const term = (search || '').toLowerCase().trim();
+
+    return (this.presalesEmployees || [])
+      .filter((e) => !onTeam.has(e.id))
+      .filter((e) => e.user?.status !== 'SUSPENDED')
+      .filter((e) => this.matchesScope(e, scope))
+      .filter((e) => !term ||
         `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(term) ||
         (e.designation?.name || '').toLowerCase().includes(term) ||
-        (e.department?.name || '').toLowerCase().includes(term)
-      );
-    }
-    return pool;
+        (e.department?.name || '').toLowerCase().includes(term))
+      .sort((a, b) => {
+        // Anyone without a joining date sorts last rather than to 1970.
+        const at = a.joiningDate ? new Date(a.joiningDate).getTime() : Number.MAX_SAFE_INTEGER;
+        const bt = b.joiningDate ? new Date(b.joiningDate).getTime() : Number.MAX_SAFE_INTEGER;
+        return at !== bt ? at - bt : (a.id || 0) - (b.id || 0);
+      });
   }
 
-  selectRequestCandidate(emp: any) {
-    this.requestForm.employeeId = emp ? emp.id : null;
+  togglePresalesCandidate(employeeId: number) {
+    const i = this.addPresalesSelected.indexOf(employeeId);
+    if (i >= 0) this.addPresalesSelected.splice(i, 1);
+    else this.addPresalesSelected.push(employeeId);
   }
 
-  saveRequest() {
-    if (this.leadId == null) return;
-    if (!this.requestForm.employeeId) { this.dialog.error('Select a pre-sales person.'); return; }
-    if (!this.requestForm.hours || Number(this.requestForm.hours) <= 0) { this.dialog.error('Enter hours greater than zero.'); return; }
-    this.savingRequest = true;
-    const body = {
-      employeeId: this.requestForm.employeeId,
-      hours: Number(this.requestForm.hours),
-      reason: this.requestForm.reason,
-      isAdditional: this.isRequestAdditional,
-    };
-    // Admins add members directly (no approval needed); team members request, the admin approves.
-    const url = this.isAdminOrSuperAdmin
-      ? `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/members`
-      : `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/requests`;
-    this.http.post<any>(url, body).subscribe({
-      next: () => {
-        this.savingRequest = false;
-        this.closeRequestModal();
-        this.dialog.success(this.isAdminOrSuperAdmin
-          ? (this.isRequestAdditional ? 'Hours topped up for the member.' : 'Pre-sales person added to the deal team.')
-          : (this.isRequestAdditional ? 'Additional hours requested from the admin.' : 'Pre-sales request sent to the admin for approval.'));
-        this.loadPresalesInfo();
-      },
-      error: (err) => {
-        this.savingRequest = false;
-        this.dialog.error(err?.error?.message || 'Failed to submit the request.');
-      }
-    });
+  isPresalesCandidateSelected(employeeId: number): boolean {
+    return this.addPresalesSelected.includes(employeeId);
   }
 
-  // ── Approve / reject ───────────────────────────
-
-  showDecisionModal = false;
-  decisionMode: 'APPROVE' | 'REJECT' = 'APPROVE';
-  decisionRequest: any = null;
-  decisionRemarks = '';
-  submittingDecision = false;
-
-  openRequestDecisionModal(request: any, mode: 'APPROVE' | 'REJECT') {
-    this.decisionRequest = request;
-    this.decisionMode = mode;
-    this.decisionRemarks = '';
-    this.showDecisionModal = true;
-  }
-
-  closeDecisionModal() {
-    this.showDecisionModal = false;
-  }
-
-  submitDecision() {
-    if (this.leadId == null || !this.decisionRequest) return;
-    if (this.decisionMode === 'REJECT' && !this.decisionRemarks.trim()) {
-      this.dialog.error('Remarks are required when rejecting a request.');
+  saveAddPresales() {
+    if (this.leadId == null || !this.addPresalesSelected.length) {
+      this.dialog.error('Select at least one employee.');
       return;
     }
-    this.submittingDecision = true;
-    const url = `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/requests/${this.decisionRequest.id}/${this.decisionMode.toLowerCase()}`;
-    this.http.post<any>(url, { remarks: this.decisionRemarks }).subscribe({
-      next: () => {
-        this.submittingDecision = false;
-        this.closeDecisionModal();
-        this.dialog.success(this.decisionMode === 'APPROVE'
-          ? 'Request approved; the pre-sales person is on the deal team with the requested hours.'
-          : 'Request rejected.');
-        this.loadPresalesInfo();
+    this.savingAddPresales = true;
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/members`, {
+      employeeIds: this.addPresalesSelected,
+      remark: this.addPresalesRemark,
+    }).subscribe({
+      next: (info) => {
+        this.savingAddPresales = false;
+        this.showAddPresalesModal = false;
+        this.applyPresalesInfo(info);
+        this.dialog.success('Pre-sales team updated.');
       },
       error: (err) => {
-        this.submittingDecision = false;
-        this.dialog.error(err?.error?.message || 'Failed to process the request.');
-      }
+        this.savingAddPresales = false;
+        this.dialog.error(err?.error?.message || 'Could not add the pre-sales members.');
+      },
     });
   }
 
-  // ── Task modal ─────────────────────────────────
+  private applyPresalesInfo(info: any) {
+    if (!info?.members) return this.loadPresalesInfo();
+    this.presalesInfo = info;
+    this.presalesMembers = info.members || [];
+    this.presalesRequests = info.requests || [];
+    this.presalesTasks = info.tasks || [];
+  }
+
+  async removePresalesMember(member: any) {
+    if (this.leadId == null) return;
+    const ok = await this.dialog.confirm(
+      `Remove ${this.presalesName(member)} from this deal's pre-sales team?`,
+      'Remove pre-sales member', 'Remove', 'Cancel',
+    );
+    if (!ok) return;
+
+    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/members/${member.id}`)
+      .subscribe({
+        next: (info) => { this.applyPresalesInfo(info); this.dialog.success('Member removed.'); },
+        error: (err) => this.dialog.error(err?.error?.message || 'Could not remove the member.'),
+      });
+  }
+
+  // ── request a member (non-admin) ───────────────────────────────────────────
+
+  showRequestPresalesModal = false;
+  requestPresalesSearch = '';
+  requestPresalesForm: { employeeId: number | null; reason: string } = { employeeId: null, reason: '' };
+  savingRequestPresales = false;
+
+  openRequestPresalesModal() {
+    this.requestPresalesScope = 'core';
+    this.requestPresalesSearch = '';
+    this.requestPresalesForm = { employeeId: null, reason: '' };
+    this.showRequestPresalesModal = true;
+    if (!this.presalesEmployees.length) this.loadPresalesEmployees();
+  }
+
+  closeRequestPresalesModal() {
+    if (this.savingRequestPresales) return;
+    this.showRequestPresalesModal = false;
+  }
+
+  saveRequestPresales() {
+    if (this.leadId == null) return;
+    if (!this.requestPresalesForm.employeeId) { this.dialog.error('Select an employee.'); return; }
+    if (!this.requestPresalesForm.reason.trim()) {
+      this.dialog.error('Give a reason — an administrator has to approve this without knowing the deal.');
+      return;
+    }
+    this.savingRequestPresales = true;
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/requests`, this.requestPresalesForm)
+      .subscribe({
+        next: () => {
+          this.savingRequestPresales = false;
+          this.showRequestPresalesModal = false;
+          this.loadPresalesInfo();
+          this.dialog.success('Request sent to the administrator for approval.');
+        },
+        error: (err) => {
+          this.savingRequestPresales = false;
+          this.dialog.error(err?.error?.message || 'Could not send the request.');
+        },
+      });
+  }
+
+  // ── tasks ──────────────────────────────────────────────────────────────────
+
+  readonly preSalesTaskTypes: string[] = [
+    'Client Meeting',
+    'Product Demo',
+    'Technical Requirement Gathering',
+    'Solution Architecture & Design',
+    'Proof of Concept (POC)',
+    'RFP / Tender Response',
+    'BOM (Bill of Materials) Preparation',
+    'Security & Compliance Review',
+    'Infrastructure Assessment',
+    'Client Follow-up'
+  ];
+
+  taskTypeSelection: string = '';
+  customTaskType: string = '';
+  taskErrors: { title?: string; assignedToId?: string } = {};
+  taskSubmitted = false;
 
   showTaskModal = false;
-  editingTask: any = null;
-  taskForm: any = { assignedToId: null, title: '', description: '', hours: 1, dueDate: '' };
-  taskSearch = '';
+  editingTaskId: number | null = null;
+  taskForm: any = this.freshTaskForm();
   savingTask = false;
-  taskStatusSavingId: number | null = null;
+  uploadingTaskFiles = 0;
+
+  private freshTaskForm() {
+    return {
+      title: '', taskType: '', assignedToId: null as number | null,
+      scheduledDate: '', scheduledTime: '',
+      durationHours: 0, durationMinutes: 0,
+      description: '', attachments: [] as any[],
+    };
+  }
 
   openTaskModal(task?: any) {
-    this.editingTask = task || null;
-    this.taskForm = task
-      ? {
-          assignedToId: task.assignedToId,
-          title: task.title,
-          description: task.description || '',
-          hours: Number(task.hours) || 0,
-          dueDate: task.dueDate ? String(task.dueDate).slice(0, 10) : '',
-        }
-      : { assignedToId: null, title: '', description: '', hours: 1, dueDate: '' };
-    this.taskSearch = '';
+    this.editingTaskId = task?.id ?? null;
+    this.taskErrors = {};
+    this.taskSubmitted = false;
+    if (task) {
+      const type = task.taskType || '';
+      const isPredefined = this.preSalesTaskTypes.includes(type);
+      this.taskTypeSelection = isPredefined ? type : (type ? 'Custom' : '');
+      this.customTaskType = isPredefined ? '' : type;
+      this.taskForm = {
+        title: task.title || '',
+        taskType: type,
+        assignedToId: task.assignedToId ?? null,
+        scheduledDate: task.scheduledAt ? new Date(task.scheduledAt).toISOString().slice(0, 10) : '',
+        scheduledTime: task.scheduledAt ? new Date(task.scheduledAt).toTimeString().slice(0, 5) : '',
+        durationHours: Math.floor((task.estimatedMinutes || 0) / 60),
+        durationMinutes: (task.estimatedMinutes || 0) % 60,
+        description: task.description || '',
+        attachments: [],
+      };
+    } else {
+      this.taskTypeSelection = '';
+      this.customTaskType = '';
+      this.taskForm = this.freshTaskForm();
+    }
     this.showTaskModal = true;
   }
 
-  closeTaskModal() {
-    this.showTaskModal = false;
-  }
-
-  getFilteredTaskAssignees(): any[] {
-    // Only people still actively engaged on the deal team can take on tasks.
-    const memberIds = new Set((this.presalesMembers || []).filter((m: any) => m.status === 'ACTIVE').map((m: any) => m.employeeId).filter(Boolean));
-    const pool = (this.presalesEmployees || []).filter((e: any) => memberIds.has(e.id));
-    const term = this.taskSearch.trim().toLowerCase();
-    if (term) {
-      return pool.filter((e: any) => `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(term));
+  onTaskTypeSelect() {
+    if (this.taskTypeSelection === 'Custom') {
+      this.taskForm.taskType = this.customTaskType;
+    } else {
+      this.taskForm.taskType = this.taskTypeSelection;
     }
-    return pool;
   }
 
-  selectTaskAssignee(emp: any) {
-    this.taskForm.assignedToId = emp ? emp.id : null;
-    this.taskSearch = '';
-    this.psTaskAssigneeOpen = false;
+  onCustomTaskTypeInput() {
+    this.taskForm.taskType = this.customTaskType;
+  }
+
+  closeTaskModal() {
+    if (this.savingTask) return;
+    this.showTaskModal = false;
+    this.editingTaskId = null;
+    this.taskErrors = {};
+    this.taskSubmitted = false;
+  }
+
+  onTaskFilesSelected(event: any) {
+    const files: File[] = Array.from(event.target?.files || []);
+    event.target.value = '';
+    for (const file of files) {
+      this.uploadingTaskFiles++;
+      const form = new FormData();
+      form.append('file', file);
+      // The CRM's existing upload endpoint — no second storage system.
+      this.http.post<{ url: string }>(`${environment.apiUrl}/upload`, form).subscribe({
+        next: (res) => {
+          this.taskForm.attachments = [
+            ...this.taskForm.attachments,
+            { fileName: file.name, fileUrl: res.url, fileSize: file.size },
+          ];
+          this.uploadingTaskFiles--;
+        },
+        error: () => {
+          this.uploadingTaskFiles--;
+          this.dialog.error(`Failed to upload "${file.name}".`);
+        },
+      });
+    }
+  }
+
+  removeTaskAttachment(index: number) {
+    this.taskForm.attachments.splice(index, 1);
   }
 
   saveTask() {
     if (this.leadId == null) return;
-    if (!(this.taskForm.title || '').trim()) { this.dialog.error('Task title is required.'); return; }
-    if (!this.taskForm.assignedToId) { this.dialog.error('Select the pre-sales person.'); return; }
+    this.taskSubmitted = true;
+    this.taskErrors = {};
+
+    let hasError = false;
+    if (!this.taskForm.title || !this.taskForm.title.trim()) {
+      this.taskErrors.title = 'Task title is required.';
+      hasError = true;
+    }
+    if (!this.taskForm.assignedToId) {
+      this.taskErrors.assignedToId = 'Please select a pre-sales specialist.';
+      hasError = true;
+    }
+
+    if (hasError) {
+      return;
+    }
+
+    if (this.uploadingTaskFiles > 0) {
+      this.dialog.error('Wait for the attachments to finish uploading.');
+      return;
+    }
+
+    if (this.taskTypeSelection === 'Custom') {
+      this.taskForm.taskType = (this.customTaskType || '').trim();
+    } else {
+      this.taskForm.taskType = this.taskTypeSelection;
+    }
+
     this.savingTask = true;
-    const body = {
-      title: this.taskForm.title.trim(),
-      description: this.taskForm.description,
-      hours: Number(this.taskForm.hours) || 0,
-      dueDate: this.taskForm.dueDate || null,
-      assignedToId: this.taskForm.assignedToId,
-    };
-    const url = this.editingTask
-      ? `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${this.editingTask.id}`
-      : `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks`;
-    const req = this.editingTask ? this.http.put<any>(url, body) : this.http.post<any>(url, body);
-    req.subscribe({
+    const base = `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks`;
+    const request = this.editingTaskId
+      ? this.http.put<any>(`${base}/${this.editingTaskId}`, this.taskForm)
+      : this.http.post<any>(base, this.taskForm);
+
+    request.subscribe({
       next: () => {
         this.savingTask = false;
-        this.closeTaskModal();
-        this.dialog.success(this.editingTask ? 'Task updated.' : 'Task assigned on an hourly basis.');
+        this.showTaskModal = false;
+        this.editingTaskId = null;
+        this.taskSubmitted = false;
+        this.taskErrors = {};
         this.loadPresalesInfo();
+        this.dialog.success('Task saved.');
       },
       error: (err) => {
         this.savingTask = false;
-        this.dialog.error(err?.error?.message || 'Failed to save the task.');
-      }
-    });
-  }
-
-  setTaskStatus(task: any, status: string) {
-    if (this.leadId == null) return;
-    this.taskStatusSavingId = task.id;
-    this.http.put<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${task.id}`, { status }).subscribe({
-      next: () => {
-        this.taskStatusSavingId = null;
-        this.loadPresalesInfo();
+        this.dialog.error(err?.error?.message || 'Could not save the task.');
       },
-      error: (err) => {
-        this.taskStatusSavingId = null;
-        this.dialog.error(err?.error?.message || 'Failed to update the task.');
-      }
     });
   }
 
+  /** Deleting removes the task and its history; completing keeps the record. */
   async deleteTask(task: any) {
     if (this.leadId == null) return;
-    const confirmed = await this.dialog.confirm(`Delete task "${task.title}"?`, 'Delete task');
-    if (!confirmed) return;
-    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${task.id}`).subscribe({
-      next: () => {
-        this.dialog.success('Task deleted.');
-        this.loadPresalesInfo();
-      },
-      error: (err) => {
-        this.dialog.error(err?.error?.message || 'Failed to delete the task.');
-      }
-    });
-  }
-
-  // ── MoM modal ──────────────────────────────────
-
-  showMomModal = false;
-  momTask: any = null;
-  momForm: any = { title: '', meetingDate: '', summary: '' };
-  momFile: File | null = null;
-  savingMom = false;
-
-  openMomModal(task?: any) {
-    this.momTask = task || null;
-    this.momForm = { title: task ? `MoM — ${task.title}` : '', meetingDate: '', summary: '' };
-    this.momFile = null;
-    this.showMomModal = true;
-  }
-
-  closeMomModal() {
-    this.showMomModal = false;
-  }
-
-  onMomFileSelected(event: any) {
-    const input = event.target as HTMLInputElement;
-    this.momFile = input?.files?.[0] || null;
-  }
-
-  clearMomFile() {
-    this.momFile = null;
-  }
-
-  saveMom() {
-    if (this.leadId == null) return;
-    if (!(this.momForm.title || '').trim()) { this.dialog.error('MoM title is required.'); return; }
-    this.savingMom = true;
-    const body = new FormData();
-    body.append('title', this.momForm.title.trim());
-    if (this.momTask) body.append('taskId', String(this.momTask.id));
-    if (this.momForm.meetingDate) body.append('meetingDate', this.momForm.meetingDate);
-    if (this.momForm.summary) body.append('summary', this.momForm.summary);
-    if (this.momFile) body.append('file', this.momFile);
-    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/mom`, body).subscribe({
-      next: () => {
-        this.savingMom = false;
-        this.closeMomModal();
-        this.dialog.success(this.momTask ? 'MoM uploaded; task marked completed.' : 'MoM uploaded.');
-        this.loadPresalesInfo();
-      },
-      error: (err) => {
-        this.savingMom = false;
-        this.dialog.error(err?.error?.message || 'Failed to upload the MoM.');
-      }
-    });
-  }
-
-  async deleteMom(mom: any) {
-    if (this.leadId == null) return;
-    const confirmed = await this.dialog.confirm(`Delete MoM "${mom.title}"?`, 'Delete MoM');
-    if (!confirmed) return;
-    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/mom/${mom.id}`).subscribe({
-      next: () => {
-        this.dialog.success('MoM deleted.');
-        this.loadPresalesInfo();
-      },
-      error: (err) => {
-        this.dialog.error(err?.error?.message || 'Failed to delete the MoM.');
-      }
-    });
-  }
-
-  openMomFile(mom: any) {
-    if (!mom?.fileUrl) { this.dialog.error('No file attached to this MoM.'); return; }
-    window.open(mom.fileUrl, '_blank');
-  }
-
-  async endPresalesAssignment(member: any) {
-    if (this.leadId == null) return;
-    const confirmed = await this.dialog.confirm(
-      `End ${this.getPresalesName(member)}'s engagement on this deal? Their tasks and MoMs stay on the deal as history, and no further hours can be used.`,
-      'End assignment'
+    const ok = await this.dialog.confirm(
+      `Delete "${task.title}"? Its status history and attachments go with it.`,
+      'Delete task', 'Delete', 'Cancel',
     );
-    if (!confirmed) return;
-    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/members/${member.id}/end`, {}).subscribe({
+    if (!ok) return;
+
+    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${task.id}`)
+      .subscribe({
+        next: () => { this.loadPresalesInfo(); this.dialog.success('Task deleted.'); },
+        error: (err) => this.dialog.error(err?.error?.message || 'Could not delete the task.'),
+      });
+  }
+
+  // ── task status ────────────────────────────────────────────────────────────
+
+  showStatusModal = false;
+  statusTask: any = null;
+  statusForm: any = { status: 'WORKING', remark: '', attachments: [] as any[] };
+  savingStatus = false;
+  uploadingStatusFiles = 0;
+
+  /** Which moves this task can make next. COMPLETED is terminal. */
+  nextStatuses(task: any): string[] {
+    switch (String(task?.status || 'NEW')) {
+      case 'NEW': return ['WORKING'];
+      case 'WORKING': return ['ON_HOLD', 'COMPLETED'];
+      case 'ON_HOLD': return ['WORKING', 'COMPLETED'];
+      default: return [];
+    }
+  }
+
+  openStatusModal(task: any, status: string) {
+    this.statusTask = task;
+    this.statusForm = { status, remark: '', attachments: [] };
+    this.showStatusModal = true;
+  }
+
+  closeStatusModal() {
+    if (this.savingStatus) return;
+    this.showStatusModal = false;
+    this.statusTask = null;
+  }
+
+  onStatusFilesSelected(event: any) {
+    const files: File[] = Array.from(event.target?.files || []);
+    event.target.value = '';
+    for (const file of files) {
+      this.uploadingStatusFiles++;
+      const form = new FormData();
+      form.append('file', file);
+      this.http.post<{ url: string }>(`${environment.apiUrl}/upload`, form).subscribe({
+        next: (res) => {
+          this.statusForm.attachments = [
+            ...this.statusForm.attachments,
+            { fileName: file.name, fileUrl: res.url, fileSize: file.size },
+          ];
+          this.uploadingStatusFiles--;
+        },
+        error: () => {
+          this.uploadingStatusFiles--;
+          this.dialog.error(`Failed to upload "${file.name}".`);
+        },
+      });
+    }
+  }
+
+  /** Required for ON_HOLD and COMPLETED — the server insists too. */
+  get statusRemarkRequired(): boolean {
+    return this.statusForm.status === 'ON_HOLD' || this.statusForm.status === 'COMPLETED';
+  }
+
+  saveStatus() {
+    if (this.leadId == null || !this.statusTask) return;
+    if (this.statusRemarkRequired && !this.statusForm.remark.trim()) {
+      this.dialog.error(this.statusForm.status === 'ON_HOLD'
+        ? 'Say why the task is on hold.'
+        : 'Add a completion remark before marking the task complete.');
+      return;
+    }
+    if (this.uploadingStatusFiles > 0) { this.dialog.error('Wait for the attachments to finish uploading.'); return; }
+
+    this.savingStatus = true;
+    this.http.post<any>(
+      `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${this.statusTask.id}/status`,
+      this.statusForm,
+    ).subscribe({
       next: () => {
-        this.dialog.success('Assignment ended. The person was removed from the active team.');
+        this.savingStatus = false;
+        this.showStatusModal = false;
+        this.statusTask = null;
         this.loadPresalesInfo();
+        this.dialog.success('Task updated.');
       },
       error: (err) => {
-        this.dialog.error(err?.error?.message || 'Failed to end the assignment.');
-      }
+        this.savingStatus = false;
+        this.dialog.error(err?.error?.message || 'Could not update the task.');
+      },
     });
+  }
+
+  // ── history ────────────────────────────────────────────────────────────────
+
+  showHistoryModal = false;
+  historyTask: any = null;
+  taskHistory: any[] = [];
+  loadingTaskHistory = false;
+
+  openTaskHistory(task: any) {
+    if (this.leadId == null) return;
+    this.historyTask = task;
+    this.taskHistory = [];
+    this.loadingTaskHistory = true;
+    this.showHistoryModal = true;
+    this.http.get<any[]>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${task.id}/history`)
+      .subscribe({
+        next: (rows) => { this.taskHistory = rows || []; this.loadingTaskHistory = false; },
+        error: () => { this.loadingTaskHistory = false; this.dialog.error('Could not load the task history.'); },
+      });
+  }
+
+  closeHistoryModal() {
+    this.showHistoryModal = false;
+    this.historyTask = null;
   }
 }

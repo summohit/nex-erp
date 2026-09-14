@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -308,6 +308,10 @@ export class CrmService {
         where.OR = [
           { addedById: user.employeeId ?? -1 },
           { assignedToId: user.employeeId ?? -1 },
+          // Being on a deal's pre-sales team is what lets you see the deal.
+          // Without this the assignment grants nothing and the employee cannot
+          // find the work they have been given.
+          { preSalesMembers: { some: { employeeId: user.employeeId ?? -1, status: 'ACTIVE' } } },
         ];
       }
     }
@@ -327,27 +331,59 @@ export class CrmService {
         quotations: { select: { id: true } },
         followUps: { select: { id: true, scheduledAt: true }, orderBy: { scheduledAt: 'asc' } },
         // Pre-sales engagement overview for the pre-sales board list (empty for SALES).
+        // Enough for the board's team chips and task counts; the full picture
+        // comes from getPreSalesInfo, which also applies the financial masking.
         preSalesMembers: {
+          where: { status: 'ACTIVE' },
           select: {
             id: true,
             employeeId: true,
-            allocatedHours: true,
             status: true,
             employee: {
               select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
             },
           },
         },
-        preSalesRequests: {
-          select: { id: true, employeeId: true, hours: true, status: true, isAdditional: true, createdAt: true },
-        },
         preSalesTasks: {
-          select: { id: true, assignedToId: true, title: true, hours: true, status: true, dueDate: true },
+          select: { id: true, assignedToId: true, title: true, status: true, scheduledAt: true },
         },
-        preSalesMom: { select: { id: true, taskId: true, title: true, fileName: true, createdAt: true } },
       },
       orderBy: { createdAt: 'desc' },
+    }).then((leads) => this.maskLeadsForPreSales(leads, user));
+  }
+
+  /**
+   * Remove the commercial fields from any lead the caller can only see because
+   * they are on its pre-sales team.
+   *
+   * Done here, on the way out of the service, rather than in the template: a
+   * field hidden by *ngIf is still in the JSON, and anyone can open devtools.
+   * A caller who reaches the lead another way — they created it, they own it,
+   * they have VIEW_ALL, they are an admin — keeps the full row.
+   */
+  private async maskLeadsForPreSales<T extends { id: number; addedById: number | null; assignedToId: number | null }>(
+    leads: T[],
+    user: { role?: string; employeeId?: number | null },
+  ): Promise<T[]> {
+    if (this.isPreSalesAdmin(user.role) || !user.employeeId || !leads.length) return leads;
+
+    // Deliberately NOT short-circuited by VIEW_ALL. That permission grants
+    // breadth — which leads you may see — not depth. Whether you may see a
+    // given deal's money depends on your relationship to that deal, and being
+    // on its pre-sales team and nothing else is exactly the relationship the
+    // brief says must not include commercial figures.
+    const memberships = await this.prisma.preSalesTeamMember.findMany({
+      where: { employeeId: user.employeeId, status: 'ACTIVE', leadId: { in: leads.map((l) => l.id) } },
+      select: { leadId: true },
     });
+    if (!memberships.length) return leads;
+    const preSalesOnly = new Set(memberships.map((m) => m.leadId));
+
+    return leads.map((lead) =>
+      preSalesOnly.has(lead.id) && lead.addedById !== user.employeeId && lead.assignedToId !== user.employeeId
+        ? this.maskLeadFinancials(lead)
+        : lead,
+    );
   }
 
   async getLeadById(companyId: number, id: number, user: { role?: string; employeeId?: number | null }) {
@@ -388,12 +424,21 @@ export class CrmService {
       const canViewAll = await this.permissionsService.hasPermission(
         companyId, user.role || 'EMPLOYEE', 'crm/leads', 'VIEW_ALL',
       );
-      if (!canViewAll) {
-        const scoped =
-          (lead.addedById !== null && lead.addedById === user.employeeId) ||
-          (lead.assignedToId !== null && lead.assignedToId === user.employeeId);
-        if (!scoped) throw new NotFoundException('Lead not found');
-      }
+      const owns =
+        (lead.addedById !== null && lead.addedById === user.employeeId) ||
+        (lead.assignedToId !== null && lead.assignedToId === user.employeeId);
+
+      // A pre-sales member reaches the deal through their assignment.
+      const onPreSalesTeam = !!user.employeeId && await this.prisma.preSalesTeamMember.findFirst({
+        where: { leadId: id, employeeId: user.employeeId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+
+      if (!canViewAll && !owns && !onPreSalesTeam) throw new NotFoundException('Lead not found');
+
+      // Same rule as the list: VIEW_ALL decides which deals you reach, not
+      // whether you see the money on a deal you only touch as pre-sales.
+      if (!owns && onPreSalesTeam) return this.maskLeadFinancials(lead);
     }
 
     return lead;
@@ -1797,635 +1842,755 @@ export class CrmService {
     },
   } as const;
 
-  private async getLeadForPreSales(companyId: number, leadId: number) {
-    const lead = await this.prisma.lead.findFirst({
-      where: { id: leadId, companyId },
-      select: { id: true, title: true, flow: true, companyName: true, value: true, currency: true },
-    });
-    if (!lead) throw new NotFoundException('Lead not found');
-    if (lead.flow !== 'PRE_SALES') {
-      throw new BadRequestException('Pre-sales actions are only available on pre-sales deals.');
-    }
-    return lead;
+  // ══════════════════════════════════════════════════════════════════════════
+  // PRE-SALES
+  //
+  // An admin puts employees on a deal; whoever put them there (or an admin)
+  // raises tasks for them; each task walks NEW → WORKING → ON_HOLD → COMPLETED
+  // leaving an append-only trail.
+  //
+  // Two rules here are security, not presentation, and are enforced on every
+  // path rather than in the UI:
+  //
+  //   1. Membership is what lets a pre-sales employee see the deal at all.
+  //   2. A pre-sales employee sees the deal WITHOUT its money. The masking
+  //      happens before the row leaves this service — hiding the field in a
+  //      template would still ship it over the wire to anyone with devtools.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /** Roles that may add members directly and approve requests. */
+  private isPreSalesAdmin(role?: string): boolean {
+    return role === 'SUPERADMIN' || role === 'ADMIN';
   }
 
-  async getPreSalesInfo(companyId: number, leadId: number) {
-    const lead = await this.getLeadForPreSales(companyId, leadId);
+  /**
+   * Commercial fields a pre-sales employee must never receive.
+   *
+   * Listed here rather than picked at each call site so that a new money field
+   * on Lead has exactly one place to be added.
+   */
+  private static readonly LEAD_FINANCIAL_FIELDS = [
+    'value', 'currency', 'expectedRevenue', 'budget', 'margin',
+  ] as const;
 
-    const [memberRows, requests, tasks, moms] = await Promise.all([
+  /**
+   * Strip the money out of a lead.
+   *
+   * `quotations` goes too: a quotation carries subtotal, tax and total, so
+   * leaving the relation in place would hand back the deal value by another
+   * route — the kind of gap that makes field-level masking look done when it
+   * is not.
+   */
+  private maskLeadFinancials<T extends Record<string, any>>(lead: T): T {
+    const masked: any = { ...lead };
+    for (const field of CrmService.LEAD_FINANCIAL_FIELDS) delete masked[field];
+    delete masked.quotations;
+    masked.financialsHidden = true;
+    return masked;
+  }
+
+  /**
+   * Everything a caller is allowed to do with one lead's pre-sales, resolved
+   * once from the database.
+   *
+   * Nothing here reads a role or an id from the request body — only from the
+   * authenticated user and the stored rows.
+   */
+  private async resolvePreSalesAccess(
+    companyId: number,
+    leadId: number,
+    user: { role?: string; employeeId?: number | null },
+  ) {
+    const lead = await this.prisma.lead.findFirst({
+      where: { id: leadId, companyId },
+      include: {
+        preSalesMembers: {
+          include: { employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } },
+        },
+      },
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const employeeId = user.employeeId ?? null;
+    const admin = this.isPreSalesAdmin(user.role);
+    const isCreator = !!employeeId && lead.addedById === employeeId;
+    const isOwner = !!employeeId && lead.assignedToId === employeeId;
+    const membership = employeeId
+      ? lead.preSalesMembers.find((m) => m.employeeId === employeeId && m.status === 'ACTIVE') ?? null
+      : null;
+
+    if (!admin && !isCreator && !isOwner && !membership) {
+      const canViewAll = await this.permissionsService.hasPermission(
+        companyId, user.role || 'EMPLOYEE', 'crm/leads', 'VIEW_ALL',
+      );
+      if (!canViewAll) throw new NotFoundException('Lead not found');
+    }
+
+    return {
+      lead,
+      admin,
+      isCreator,
+      isOwner,
+      membership,
+      /** Only an admin adds or removes members without approval. */
+      canManageMembers: admin,
+      /** A non-admin with a stake in the deal asks instead. */
+      canRequestMembers: !admin && (isCreator || isOwner),
+      /**
+       * Seeing the deal only because you are on its pre-sales team means seeing
+       * it without its money.
+       */
+      financialsHidden: !admin && !isCreator && !isOwner && !!membership,
+    };
+  }
+
+  /** May this caller raise tasks for this member? Admin, or whoever added them. */
+  private canCreateTaskFor(
+    member: { assignedById: number | null },
+    access: { admin: boolean },
+    employeeId: number | null,
+  ): boolean {
+    return access.admin || (!!employeeId && member.assignedById === employeeId);
+  }
+
+  /** The whole pre-sales picture for one lead, shaped by who is asking. */
+  async getPreSalesInfo(
+    companyId: number,
+    leadId: number,
+    user: { role?: string; employeeId?: number | null },
+  ) {
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    const employeeId = user.employeeId ?? null;
+
+    const employeeSelect = {
+      select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } },
+    };
+
+    const [members, requests, tasks] = await Promise.all([
       this.prisma.preSalesTeamMember.findMany({
         where: { companyId, leadId },
-        include: {
-          employee: this.presalesEmployeeSelect,
-        },
-        orderBy: { id: 'asc' },
+        include: { employee: employeeSelect, assignedBy: employeeSelect },
+        orderBy: { createdAt: 'asc' },
       }),
       this.prisma.preSalesRequest.findMany({
         where: { companyId, leadId },
-        include: {
-          employee: this.presalesEmployeeSelect,
-          requestedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-          approvedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-        },
+        include: { employee: employeeSelect, requestedBy: employeeSelect, approvedBy: employeeSelect },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.preSalesTask.findMany({
-        where: { companyId, leadId },
-        include: {
-          assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } },
-          assignedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-          _count: { select: { moms: true } },
+        where: {
+          companyId,
+          leadId,
+          // A pre-sales employee sees their own tasks; everyone else with
+          // access to the lead sees all of them.
+          ...(access.financialsHidden && employeeId ? { assignedToId: employeeId } : {}),
         },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.preSalesMoM.findMany({
-        where: { companyId, leadId },
         include: {
-          uploadedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-          task: { select: { id: true, title: true } },
+          assignedTo: employeeSelect,
+          assignedBy: employeeSelect,
+          attachments: true,
+          _count: { select: { history: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ scheduledAt: 'asc' }, { id: 'desc' }],
       }),
     ]);
 
-    // enrolled hours vs hours consumed by assigned tasks, per member
-    const usage = new Map<number, { usedHours: number; openTasks: number; completedTasks: number }>();
-    for (const t of tasks) {
-      const agg = usage.get(t.assignedToId) ?? { usedHours: 0, openTasks: 0, completedTasks: 0 };
-      agg.usedHours += Number(t.hours) || 0;
-      if (t.status === 'COMPLETED') agg.completedTasks += 1;
-      else agg.openTasks += 1;
-      usage.set(t.assignedToId, agg);
-    }
-    const members = memberRows.map((m) => {
-      const agg = usage.get(m.employeeId) ?? { usedHours: 0, openTasks: 0, completedTasks: 0 };
-      const allocated = Number(m.allocatedHours) || 0;
-      // The engagement is over once the admin ends it or the enrolled hours are
-      // fully consumed — the member record stays as history.
-      const remaining = Math.max(0, allocated - agg.usedHours);
-      const effectiveStatus = m.status === 'REMOVED' ? 'REMOVED' : remaining <= 0 ? 'REMOVED' : 'ACTIVE';
-      return {
-        ...m,
-        allocatedHours: allocated,
-        usedHours: agg.usedHours,
-        remainingHours: remaining,
-        status: effectiveStatus,
-        endedAutomatically: effectiveStatus === 'REMOVED' && m.status !== 'REMOVED',
-        openTasks: agg.openTasks,
-        completedTasks: agg.completedTasks,
-      };
-    });
-    const activeMembers = members.filter((m) => m.status === 'ACTIVE');
+    const lead: any = access.financialsHidden
+      ? this.maskLeadFinancials(access.lead)
+      : access.lead;
 
-    const kpis = {
-      value: lead.value || 0,
-      currency: lead.currency || 'INR',
-      members: activeMembers.length,
-      allocatedHours: activeMembers.reduce((s, m) => s + Number(m.allocatedHours), 0),
-      usedHours: activeMembers.reduce((s, m) => s + Number(m.usedHours), 0),
-      pendingRequests: requests.filter((r) => r.status === 'PENDING').length,
-      totalRequests: requests.length,
-      openTasks: tasks.filter((t) => t.status !== 'COMPLETED').length,
-      completedTasks: tasks.filter((t) => t.status === 'COMPLETED').length,
-      totalTasks: tasks.length,
-      moms: moms.length,
+    return {
+      lead: {
+        id: lead.id, title: lead.title, companyName: lead.companyName,
+        contactName: lead.contactName, status: lead.status,
+        ...(access.financialsHidden ? { financialsHidden: true } : { value: lead.value, currency: lead.currency }),
+      },
+      members,
+      // A pre-sales member has no business reading the debate about who else
+      // should join the deal.
+      requests: access.financialsHidden ? [] : requests,
+      tasks: tasks.map((t) => ({ ...t, canChangeStatus: !!employeeId && t.assignedToId === employeeId })),
+      permissions: {
+        canAddMembers: access.canManageMembers,
+        canRequestMembers: access.canRequestMembers,
+        canCreateTasks: access.admin || members.some((m) => this.canCreateTaskFor(m, access, employeeId)),
+        financialsHidden: access.financialsHidden,
+      },
     };
-
-    return { lead: { id: lead.id, title: lead.title, companyName: lead.companyName }, members, requests, tasks, moms, kpis };
   }
 
+  /**
+   * Admin only, and the one path that puts someone on a deal without approval.
+   *
+   * Re-adding a previously removed member reactivates their row rather than
+   * inserting a second one — the unique constraint on (leadId, employeeId) is
+   * what actually prevents duplicate active assignments.
+   */
+  async addPreSalesMembers(
+    companyId: number,
+    leadId: number,
+    user: { role?: string; employeeId?: number | null },
+    data: { employeeIds?: any; remark?: string },
+  ) {
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    if (!access.canManageMembers) {
+      throw new ForbiddenException('Only an administrator can add pre-sales members directly. Raise a request instead.');
+    }
+
+    const ids = Array.isArray(data?.employeeIds)
+      ? [...new Set(data.employeeIds.map((v: any) => Number(v)).filter((v: number) => Number.isFinite(v)))]
+      : [];
+    if (!ids.length) throw new BadRequestException('Select at least one employee.');
+
+    const employees = await this.prisma.employee.findMany({
+      where: { id: { in: ids }, companyId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    if (employees.length !== ids.length) {
+      throw new BadRequestException('One or more selected employees do not belong to this company.');
+    }
+
+    const remark = (data?.remark || '').trim() || null;
+    const added: number[] = [];
+    for (const id of ids) {
+      const row = await this.prisma.preSalesTeamMember.upsert({
+        where: { leadId_employeeId: { leadId, employeeId: id } },
+        create: { companyId, leadId, employeeId: id, assignedById: user.employeeId ?? null, remark, status: 'ACTIVE' },
+        update: { status: 'ACTIVE', removedAt: null, assignedById: user.employeeId ?? null, remark },
+      });
+      added.push(row.employeeId);
+    }
+
+    await this.notifyPreSalesAssigned(companyId, access.lead, added, user.employeeId ?? null);
+    await this.logActivity(
+      companyId, leadId, 'PRE_SALES_ADDED',
+      `Added ${employees.map((e) => `${e.firstName} ${e.lastName}`.trim()).join(', ')} to pre-sales`,
+      user.employeeId ?? null,
+    );
+
+    return this.getPreSalesInfo(companyId, leadId, user);
+  }
+
+  /** Admin only. Keeps the row so the history of who worked the deal survives. */
+  async removePreSalesMember(
+    companyId: number,
+    leadId: number,
+    memberId: number,
+    user: { role?: string; employeeId?: number | null },
+  ) {
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    if (!access.canManageMembers) {
+      throw new ForbiddenException('Only an administrator can remove pre-sales members.');
+    }
+
+    const member = await this.prisma.preSalesTeamMember.findFirst({ where: { id: memberId, companyId, leadId } });
+    if (!member) throw new NotFoundException('Pre-sales member not found');
+
+    await this.prisma.preSalesTeamMember.update({
+      where: { id: memberId },
+      data: { status: 'REMOVED', removedAt: new Date() },
+    });
+
+    return this.getPreSalesInfo(companyId, leadId, user);
+  }
+
+  private async notifyPreSalesAssigned(
+    companyId: number,
+    lead: { id: number; title: string | null; companyName: string | null },
+    employeeIds: number[],
+    actorEmployeeId: number | null,
+  ) {
+    const name = lead.companyName || lead.title || 'a deal';
+    await this.notificationsService.notifyEmployees(employeeIds, {
+      companyId,
+      excludeEmployeeId: actorEmployeeId,
+      title: 'Added to pre-sales',
+      message: `You have been added as a Pre-Sales member for Lead ${name}.`,
+      type: 'INFO',
+      linkUrl: `/crm/leads/${lead.id}`,
+    });
+  }
+
+  // ── requests ───────────────────────────────────────────────────────────────
+
+  /**
+   * A non-admin asks for someone to be put on the deal.
+   *
+   * The employee is not added here. Nothing about the team changes until an
+   * administrator approves.
+   */
   async createPreSalesRequest(
     companyId: number,
     leadId: number,
-    data: any,
-    actorEmployeeId?: number | null,
+    user: { role?: string; employeeId?: number | null; sub?: number },
+    data: { employeeId?: any; reason?: string },
   ) {
-    const lead = await this.getLeadForPreSales(companyId, leadId);
-    if (!actorEmployeeId) throw new BadRequestException('Your account is not linked to an employee.');
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    if (access.admin) {
+      throw new BadRequestException('An administrator can add pre-sales members directly — no request is needed.');
+    }
+    if (!access.canRequestMembers) {
+      throw new ForbiddenException('Only the person who created this deal, or its owner, can request pre-sales support.');
+    }
 
-    const employeeId = data.employeeId ? parseInt(data.employeeId, 10) : null;
-    const hours = data.hours !== undefined && data.hours !== null ? parseFloat(data.hours) : 0;
-    if (!employeeId) throw new BadRequestException('Select a pre-sales person.');
-    if (!hours || hours <= 0) throw new BadRequestException('Enter hours greater than zero.');
+    const employeeId = Number(data?.employeeId);
+    if (!Number.isFinite(employeeId)) throw new BadRequestException('Select an employee.');
+    const reason = (data?.reason || '').trim();
+    if (!reason) throw new BadRequestException('Give a reason — an administrator has to approve this without knowing the deal.');
 
     const employee = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId },
       select: { id: true, firstName: true, lastName: true },
     });
-    if (!employee) throw new BadRequestException('The selected person is not part of your organisation.');
+    if (!employee) throw new BadRequestException('That employee does not belong to this company.');
+
+    const active = await this.prisma.preSalesTeamMember.findFirst({
+      where: { leadId, employeeId, status: 'ACTIVE' },
+    });
+    if (active) throw new BadRequestException('That employee is already on this deal’s pre-sales team.');
+
+    const pending = await this.prisma.preSalesRequest.findFirst({
+      where: { leadId, employeeId, status: 'PENDING' },
+    });
+    if (pending) throw new BadRequestException('A request for that employee is already awaiting approval.');
 
     const request = await this.prisma.preSalesRequest.create({
-      data: {
-        companyId,
-        leadId,
-        requestedById: actorEmployeeId,
-        employeeId,
-        hours,
-        reason: data.reason || null,
-        isAdditional: !!data.isAdditional,
-      },
-      include: {
-        employee: this.presalesEmployeeSelect,
-        requestedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-      },
+      data: { companyId, leadId, employeeId, requestedById: user.employeeId ?? 0, reason, status: 'PENDING' },
+      include: { employee: { select: { firstName: true, lastName: true } } },
     });
 
-    await this.logActivity(
-      companyId,
-      leadId,
-      'PRE_SALES_REQUESTED',
-      `${request.isAdditional ? 'Additional hours requested' : 'Pre-sales person requested'} for ${employee.firstName} ${employee.lastName} — ${hours} hrs`,
-      actorEmployeeId,
-      { employeeId, hours, isAdditional: request.isAdditional },
-    );
-
-    const extra = request.isAdditional ? ' (additional hours)' : '';
+    const who = `${employee.firstName} ${employee.lastName}`.trim();
+    const leadName = access.lead.companyName || access.lead.title || 'a deal';
     await this.notificationsService.notifyApprovers({
       companyId,
-      roles: ['ADMIN', 'SUPERADMIN'],
-      title: request.isAdditional ? 'Additional pre-sales hours requested' : 'New pre-sales person request',
-      message: `${employee.firstName} ${employee.lastName} — ${hours} hrs for "${lead.title}"${extra}.`,
+      roles: ['SUPERADMIN', 'ADMIN'],
+      excludeUserId: user.sub ?? null,
+      title: 'Pre-sales request',
+      message: `A request to add ${who} as Pre-Sales for Lead ${leadName} is awaiting approval.`,
       type: 'ACTION_REQUIRED',
-      linkUrl: `/crm/leads/${leadId}`,
-    });
-    await this.notificationsService.notifyEmployees([employeeId], {
-      companyId,
-      title: 'You have been requested for pre-sales work',
-      message: `${hours} hrs requested on "${lead.title}"${extra}.`,
-      excludeEmployeeId: actorEmployeeId,
       linkUrl: `/crm/leads/${leadId}`,
     });
 
     return request;
   }
 
+  /** The administrator's queue. */
+  async listPreSalesRequests(
+    companyId: number,
+    user: { role?: string },
+    status?: string,
+  ) {
+    if (!this.isPreSalesAdmin(user.role)) {
+      throw new ForbiddenException('Only an administrator can review pre-sales requests.');
+    }
+    const employeeSelect = { select: { id: true, firstName: true, lastName: true, avatarUrl: true } };
+    return this.prisma.preSalesRequest.findMany({
+      where: { companyId, ...(status ? { status } : {}) },
+      include: {
+        employee: employeeSelect,
+        requestedBy: employeeSelect,
+        approvedBy: employeeSelect,
+        lead: { select: { id: true, title: true, companyName: true } },
+      },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
   async approvePreSalesRequest(
     companyId: number,
-    leadId: number,
     requestId: number,
-    remarks: string | undefined,
-    actorEmployeeId?: number | null,
+    user: { role?: string; employeeId?: number | null },
   ) {
-    const lead = await this.getLeadForPreSales(companyId, leadId);
-    const request = await this.prisma.preSalesRequest.findFirst({
-      where: { id: requestId, leadId, companyId },
-    });
-    if (!request) throw new NotFoundException('Pre-sales request not found');
-    if (request.status !== 'PENDING') throw new BadRequestException('This request was already decided.');
+    const request = await this.loadPendingRequest(companyId, requestId, user);
 
-    const employee = await this.prisma.employee.findFirst({
-      where: { id: request.employeeId, companyId },
-      select: { firstName: true, lastName: true },
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.preSalesRequest.update({
+    const [member] = await this.prisma.$transaction([
+      this.prisma.preSalesTeamMember.upsert({
+        where: { leadId_employeeId: { leadId: request.leadId, employeeId: request.employeeId } },
+        create: {
+          companyId, leadId: request.leadId, employeeId: request.employeeId,
+          assignedById: request.requestedById, remark: request.reason, status: 'ACTIVE',
+        },
+        update: { status: 'ACTIVE', removedAt: null, assignedById: request.requestedById, remark: request.reason },
+      }),
+      this.prisma.preSalesRequest.update({
         where: { id: requestId },
-        data: { status: 'APPROVED', remarks: remarks || null, approvedById: actorEmployeeId ?? null, approvedAt: new Date() },
-      });
+        data: { status: 'APPROVED', approvedById: user.employeeId ?? null, approvedAt: new Date() },
+      }),
+    ]);
 
-      const existing = await tx.preSalesTeamMember.findUnique({
-        where: { leadId_employeeId: { leadId, employeeId: request.employeeId } },
-      });
-      if (existing) {
-        await tx.preSalesTeamMember.update({
-          where: { id: existing.id },
-          data: { allocatedHours: (Number(existing.allocatedHours) || 0) + request.hours, status: 'ACTIVE' },
-        });
-      } else {
-        await tx.preSalesTeamMember.create({
-          data: { companyId, leadId, employeeId: request.employeeId, allocatedHours: request.hours },
-        });
-      }
-    });
+    const who = `${request.employee.firstName} ${request.employee.lastName}`.trim();
+    const leadName = request.lead.companyName || request.lead.title || 'a deal';
+    const link = `/crm/leads/${request.leadId}`;
 
-    await this.logActivity(
-      companyId,
-      leadId,
-      'PRE_SALES_APPROVED',
-      `Pre-sales request approved — ${employee ? `${employee.firstName} ${employee.lastName} ` : ''}${request.hours} hrs${remarks ? ` — ${remarks}` : ''}`,
-      actorEmployeeId,
-      { requestId, employeeId: request.employeeId, hours: request.hours },
-    );
-
-    await this.notificationsService.notifyEmployees([request.requestedById, request.employeeId], {
-      companyId,
+    await this.notificationsService.notifyEmployees([request.requestedById], {
+      companyId, excludeEmployeeId: user.employeeId ?? null,
       title: 'Pre-sales request approved',
-      message: `${employee ? `${employee.firstName} ${employee.lastName} ` : ''}— ${request.hours} hrs on "${lead.title}"${remarks ? ` — ${remarks}` : ''}.`,
-      linkUrl: `/crm/leads/${leadId}`,
+      message: `Your request to add ${who} as Pre-Sales for ${leadName} has been approved.`,
+      type: 'SUCCESS', linkUrl: link,
     });
+    await this.notifyPreSalesAssigned(companyId, request.lead, [request.employeeId], user.employeeId ?? null);
 
-    return { approved: true, requestId, hours: request.hours };
+    return member;
   }
 
   async rejectPreSalesRequest(
     companyId: number,
-    leadId: number,
     requestId: number,
-    remarks: string | undefined,
-    actorEmployeeId?: number | null,
+    user: { role?: string; employeeId?: number | null },
+    data: { adminRemark?: string },
   ) {
-    const lead = await this.getLeadForPreSales(companyId, leadId);
+    const request = await this.loadPendingRequest(companyId, requestId, user);
+    const adminRemark = (data?.adminRemark || '').trim() || null;
+
+    const updated = await this.prisma.preSalesRequest.update({
+      where: { id: requestId },
+      data: { status: 'REJECTED', approvedById: user.employeeId ?? null, approvedAt: new Date(), adminRemark },
+    });
+
+    const who = `${request.employee.firstName} ${request.employee.lastName}`.trim();
+    const leadName = request.lead.companyName || request.lead.title || 'a deal';
+    await this.notificationsService.notifyEmployees([request.requestedById], {
+      companyId, excludeEmployeeId: user.employeeId ?? null,
+      title: 'Pre-sales request rejected',
+      message: `Your request to add ${who} as Pre-Sales for ${leadName} was rejected.`
+        + (adminRemark ? ` Reason: ${adminRemark}` : ''),
+      type: 'WARNING', linkUrl: `/crm/leads/${request.leadId}`,
+    });
+
+    return updated;
+  }
+
+  private async loadPendingRequest(
+    companyId: number,
+    requestId: number,
+    user: { role?: string; employeeId?: number | null },
+  ) {
+    if (!this.isPreSalesAdmin(user.role)) {
+      throw new ForbiddenException('Only an administrator can decide pre-sales requests.');
+    }
     const request = await this.prisma.preSalesRequest.findFirst({
-      where: { id: requestId, leadId, companyId },
+      where: { id: requestId, companyId },
+      include: {
+        employee: { select: { id: true, firstName: true, lastName: true } },
+        lead: { select: { id: true, title: true, companyName: true } },
+      },
     });
     if (!request) throw new NotFoundException('Pre-sales request not found');
-    if (request.status !== 'PENDING') throw new BadRequestException('This request was already decided.');
-
-    const employee = await this.prisma.employee.findFirst({
-      where: { id: request.employeeId, companyId },
-      select: { firstName: true, lastName: true },
-    });
-
-    await this.prisma.preSalesRequest.update({
-      where: { id: requestId },
-      data: { status: 'REJECTED', remarks: remarks || null, approvedById: actorEmployeeId ?? null, approvedAt: new Date() },
-    });
-
-    await this.logActivity(
-      companyId,
-      leadId,
-      'PRE_SALES_REJECTED',
-      `Pre-sales request rejected — ${employee ? `${employee.firstName} ${employee.lastName} ` : ''}${request.hours} hrs${remarks ? ` — ${remarks}` : ''}`,
-      actorEmployeeId,
-      { requestId, employeeId: request.employeeId, hours: request.hours },
-    );
-
-    await this.notificationsService.notifyEmployees([request.requestedById, request.employeeId], {
-      companyId,
-      title: 'Pre-sales request rejected',
-      message: `${employee ? `${employee.firstName} ${employee.lastName} ` : ''}— ${request.hours} hrs on "${lead.title}"${remarks ? ` — ${remarks}` : ''}.`,
-      linkUrl: `/crm/leads/${leadId}`,
-    });
-
-    return { rejected: true, requestId };
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException(`This request has already been ${request.status.toLowerCase()}.`);
+    }
+    // Belt and braces: an admin who happens to be the requester still must not
+    // wave their own request through.
+    if (user.employeeId && request.requestedById === user.employeeId) {
+      throw new ForbiddenException('You cannot approve or reject your own pre-sales request.');
+    }
+    return request;
   }
 
-  // Admin directly adds a pre-sales person to a deal with hours — bypasses the
-  // request/approval cycle (used by the "Add Team Member" action). Adding the
-  // same person again tops up their enrolled hours instead of duplicating.
-  async addPreSalesMember(
-    companyId: number,
-    leadId: number,
-    data: any,
-    actorEmployeeId?: number | null,
-  ) {
-    const lead = await this.getLeadForPreSales(companyId, leadId);
-    const employeeId = data.employeeId ? parseInt(data.employeeId, 10) : null;
-    const hours = data.hours !== undefined && data.hours !== null ? parseFloat(data.hours) : 0;
-    if (!employeeId) throw new BadRequestException('Select a pre-sales person.');
-    if (!hours || hours <= 0) throw new BadRequestException('Enter hours greater than zero.');
+  // ── tasks ──────────────────────────────────────────────────────────────────
 
-    const employee = await this.prisma.employee.findFirst({
-      where: { id: employeeId, companyId },
-      select: { id: true, firstName: true, lastName: true },
-    });
-    if (!employee) throw new BadRequestException('The selected person is not part of your organisation.');
+  private static readonly TASK_STATUSES = ['NEW', 'WORKING', 'ON_HOLD', 'COMPLETED'];
 
-    const member = await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.preSalesTeamMember.findUnique({
-        where: { leadId_employeeId: { leadId, employeeId } },
-      });
-      if (existing) {
-        return tx.preSalesTeamMember.update({
-          where: { id: existing.id },
-          data: { allocatedHours: (Number(existing.allocatedHours) || 0) + hours, status: 'ACTIVE' },
-        });
-      }
-      return tx.preSalesTeamMember.create({
-        data: { companyId, leadId, employeeId, allocatedHours: hours },
-      });
-    });
-
-    await this.logActivity(
-      companyId,
-      leadId,
-      'PRE_SALES_MEMBER_ADDED',
-      `Pre-sales person added — ${employee.firstName} ${employee.lastName} (${hours} hrs)`,
-      actorEmployeeId,
-      { memberId: member.id, employeeId, hours },
-    );
-
-    await this.notificationsService.notifyEmployees([employeeId], {
-      companyId,
-      title: 'You have been added to a pre-sales team',
-      message: `${hours} hrs on "${lead.title}"${data.reason ? ` — ${data.reason}` : ''}.`,
-      linkUrl: `/crm/leads/${leadId}`,
-    });
-
-    return { added: true, memberId: member.id, employeeId, hours };
-  }
-
-  // Ends a member's engagement on the deal. The assignment stays on the deal as
-  // a historical record (their tasks / MoMs remain) but no new hours are used.
-  async endPreSalesMember(
-    companyId: number,
-    leadId: number,
-    memberId: number,
-    actorEmployeeId?: number | null,
-  ) {
-    const lead = await this.getLeadForPreSales(companyId, leadId);
-    const member = await this.prisma.preSalesTeamMember.findFirst({
-      where: { id: memberId, leadId, companyId },
-      include: { employee: { select: { firstName: true, lastName: true } } },
-    });
-    if (!member) throw new NotFoundException('Pre-sales team member not found');
-    if (member.status === 'REMOVED') throw new BadRequestException('This assignment has already ended.');
-
-    await this.prisma.preSalesTeamMember.update({
-      where: { id: memberId },
-      data: { status: 'REMOVED' },
-    });
-
-    const employeeName = member.employee ? `${member.employee.firstName} ${member.employee.lastName}`.trim() : 'Member';
-    await this.logActivity(
-      companyId,
-      leadId,
-      'PRE_SALES_MEMBER_ENDED',
-      `Pre-sales assignment ended — ${employeeName} (${Number(member.allocatedHours) || 0} hrs allocated)`,
-      actorEmployeeId,
-      { memberId, employeeId: member.employeeId, allocatedHours: member.allocatedHours },
-    );
-
-    await this.notificationsService.notifyEmployees([member.employeeId], {
-      companyId,
-      title: 'Pre-sales assignment ended',
-      message: `Your pre-sales engagement on "${lead.title}" has been ended by the admin.`,
-      linkUrl: `/crm/leads/${leadId}`,
-    });
-
-    return { ended: true, memberId };
-  }
-
+  /**
+   * Tasks are created by whoever put the employee on the deal, or by an admin.
+   * A pre-sales employee executes tasks; they never raise them.
+   */
   async createPreSalesTask(
     companyId: number,
     leadId: number,
+    user: { role?: string; employeeId?: number | null },
     data: any,
-    actorEmployeeId?: number | null,
   ) {
-    const lead = await this.getLeadForPreSales(companyId, leadId);
-    const assignedToId = data.assignedToId ? parseInt(data.assignedToId, 10) : null;
-    if (!assignedToId) throw new BadRequestException('Select a pre-sales person.');
-    if (!data.title || !String(data.title).trim()) throw new BadRequestException('Task title is required.');
-    if (!actorEmployeeId) throw new BadRequestException('Your account is not linked to an employee.');
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    const employeeId = user.employeeId ?? null;
 
-    const hours = data.hours !== undefined && data.hours !== null ? parseFloat(data.hours) : 0;
+    const assignedToId = Number(data?.assignedToId);
+    if (!Number.isFinite(assignedToId)) throw new BadRequestException('Choose who the task is for.');
 
-    // The person must still be engaged on this deal and their remaining hours must
-    // cover the task — hours are consumed up to the enrolled amount.
-    const member = await this.prisma.preSalesTeamMember.findUnique({
-      where: { leadId_employeeId: { leadId, employeeId: assignedToId } },
-      select: { allocatedHours: true, status: true },
+    const member = await this.prisma.preSalesTeamMember.findFirst({
+      where: { companyId, leadId, employeeId: assignedToId, status: 'ACTIVE' },
     });
-    if (!member) throw new BadRequestException('This person is not part of the pre-sales team for this deal.');
-    if (member.status === 'REMOVED') {
-      throw new BadRequestException('This assignment has ended. Request additional hours to re-engage the person.');
+    if (!member) throw new BadRequestException('That employee is not on this deal’s pre-sales team.');
+    if (!this.canCreateTaskFor(member, access, employeeId)) {
+      throw new ForbiddenException('Only an administrator, or the person who added this pre-sales member, can create tasks for them.');
     }
-    const used = await this.prisma.preSalesTask.aggregate({
-      where: { leadId, assignedToId },
-      _sum: { hours: true },
-    });
-    const usedHours = Number(used._sum.hours) || 0;
-    if (hours <= 0 || usedHours + hours > Number(member.allocatedHours)) {
-      const remaining = Math.max(0, Number(member.allocatedHours) - usedHours);
-      throw new BadRequestException(`Only ${remaining} hrs remain for this person. Reduce the task hours or raise an additional-hours request.`);
-    }
+
+    const title = (data?.title || '').trim();
+    if (!title) throw new BadRequestException('Give the task a title.');
+
+    const estimatedMinutes = this.parseDurationMinutes(data);
+    const scheduledAt = this.parseScheduledAt(data);
 
     const task = await this.prisma.preSalesTask.create({
       data: {
-        companyId,
-        leadId,
-        assignedById: actorEmployeeId,
+        companyId, leadId,
+        assignedById: employeeId ?? 0,
         assignedToId,
-        title: String(data.title).trim(),
-        description: data.description || null,
-        hours: hours || 0,
-        status: data.status || 'PENDING',
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        title,
+        taskType: (data?.taskType || '').trim() || null,
+        description: (data?.description || data?.remark || '').trim() || null,
+        scheduledAt,
+        estimatedMinutes,
+        status: 'NEW',
+        history: {
+          create: {
+            companyId, newStatus: 'NEW', previousStatus: null,
+            remark: 'Task created', changedById: employeeId ?? 0,
+          },
+        },
+        ...(Array.isArray(data?.attachments) && data.attachments.length
+          ? {
+              attachments: {
+                create: data.attachments
+                  .filter((a: any) => a?.fileUrl)
+                  .map((a: any) => ({
+                    companyId,
+                    fileName: a.fileName || 'attachment',
+                    fileUrl: a.fileUrl,
+                    fileSize: a.fileSize ? Number(a.fileSize) : null,
+                    uploadedById: employeeId ?? 0,
+                  })),
+              },
+            }
+          : {}),
       },
-      include: {
-        assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } },
-        assignedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-      },
+      include: { assignedTo: { select: { id: true, firstName: true, lastName: true } }, attachments: true },
     });
 
-    await this.logActivity(
-      companyId,
-      leadId,
-      'PRE_SALES_TASK_ASSIGNED',
-      `Task "${task.title}" (${hours} hrs) assigned`,
-      actorEmployeeId,
-      { taskId: task.id, assignedToId, hours },
-    );
-
+    const leadName = access.lead.companyName || access.lead.title || 'a deal';
     await this.notificationsService.notifyEmployees([assignedToId], {
-      companyId,
-      title: 'New pre-sales task assigned to you',
-      message: `"${task.title}" (${hours} hrs) on "${lead.title}".`,
-      excludeEmployeeId: actorEmployeeId,
-      linkUrl: `/crm/leads/${leadId}`,
+      companyId, excludeEmployeeId: employeeId,
+      title: 'New pre-sales task',
+      message: `New task assigned: ${title} (${leadName}).`,
+      type: 'ACTION_REQUIRED', linkUrl: `/crm/leads/${leadId}`,
     });
 
     return task;
   }
 
+  /** "2 hours 30 minutes" has to become 150 before it is stored. */
+  private parseDurationMinutes(data: any): number | null {
+    if (data?.estimatedMinutes != null && data.estimatedMinutes !== '') {
+      const n = Number(data.estimatedMinutes);
+      if (!Number.isFinite(n) || n < 0) throw new BadRequestException('Estimated duration is not a valid number of minutes.');
+      return Math.round(n);
+    }
+    const hours = Number(data?.durationHours ?? 0);
+    const minutes = Number(data?.durationMinutes ?? 0);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || minutes < 0) {
+      throw new BadRequestException('Estimated duration is not valid.');
+    }
+    const total = Math.round(hours * 60 + minutes);
+    return total > 0 ? total : null;
+  }
+
+  /** Date and time arrive as separate inputs and are stored as one instant. */
+  private parseScheduledAt(data: any): Date | null {
+    const date = (data?.scheduledDate || '').toString().trim();
+    if (!date) {
+      if (!data?.scheduledAt) return null;
+      const direct = new Date(data.scheduledAt);
+      if (Number.isNaN(direct.getTime())) throw new BadRequestException('The scheduled date is not valid.');
+      return direct;
+    }
+    const time = (data?.scheduledTime || '00:00').toString().trim();
+    const parsed = new Date(`${date}T${time.length === 5 ? time : '00:00'}:00`);
+    if (Number.isNaN(parsed.getTime())) throw new BadRequestException('The scheduled date or time is not valid.');
+    return parsed;
+  }
+
+  /** Title, schedule and duration — never the status, which has its own path. */
   async updatePreSalesTask(
     companyId: number,
     leadId: number,
     taskId: number,
+    user: { role?: string; employeeId?: number | null },
     data: any,
   ) {
-    await this.getLeadForPreSales(companyId, leadId);
-    const existing = await this.prisma.preSalesTask.findFirst({
-      where: { id: taskId, leadId, companyId },
-      select: { id: true, title: true, assignedToId: true, hours: true },
-    });
-    if (!existing) throw new NotFoundException('Task not found');
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    const task = await this.prisma.preSalesTask.findFirst({ where: { id: taskId, companyId, leadId } });
+    if (!task) throw new NotFoundException('Task not found');
 
-    const update: any = {};
-    if (data.title !== undefined) update.title = String(data.title).trim() || existing.title;
-    if (data.description !== undefined) update.description = data.description || null;
-    if (data.hours !== undefined) update.hours = parseFloat(data.hours) || 0;
-    if (data.status !== undefined) update.status = data.status;
-    if (data.dueDate !== undefined) update.dueDate = data.dueDate ? new Date(data.dueDate) : null;
-
-    // Keep the hours budget intact when hours / assignee change.
-    if (data.hours !== undefined || data.assignedToId !== undefined) {
-      const assignedToId = data.assignedToId !== undefined ? parseInt(data.assignedToId, 10) : existing.assignedToId;
-      const newHours = data.hours !== undefined ? (parseFloat(data.hours) || 0) : Number(existing.hours);
-      const member = await this.prisma.preSalesTeamMember.findUnique({
-        where: { leadId_employeeId: { leadId, employeeId: assignedToId } },
-        select: { allocatedHours: true, status: true },
-      });
-      if (!member) throw new BadRequestException('This person is not part of the pre-sales team for this deal.');
-      if (member.status === 'REMOVED') {
-        throw new BadRequestException('This assignment has ended. Request additional hours to re-engage the person.');
-      }
-      const used = await this.prisma.preSalesTask.aggregate({
-        where: { leadId, assignedToId },
-        _sum: { hours: true },
-      });
-      const usedHours = (Number(used._sum.hours) || 0) - Number(existing.hours);
-      if (newHours <= 0 || usedHours + newHours > Number(member.allocatedHours)) {
-        const remaining = Math.max(0, Number(member.allocatedHours) - usedHours);
-        throw new BadRequestException(`Only ${remaining} hrs remain for this person. Reduce the task hours or raise an additional-hours request.`);
-      }
+    const employeeId = user.employeeId ?? null;
+    if (!access.admin && task.assignedById !== employeeId) {
+      throw new ForbiddenException('Only an administrator, or the person who created this task, can edit it.');
     }
 
-    const task = await this.prisma.preSalesTask.update({
+    return this.prisma.preSalesTask.update({
       where: { id: taskId },
-      data: update,
-      include: {
-        assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } },
-        assignedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      data: {
+        ...(data?.title !== undefined ? { title: String(data.title).trim() } : {}),
+        ...(data?.taskType !== undefined ? { taskType: String(data.taskType).trim() || null } : {}),
+        ...(data?.description !== undefined ? { description: String(data.description).trim() || null } : {}),
+        ...(data?.assignedToId !== undefined ? { assignedToId: Number(data.assignedToId) } : {}),
+        ...(data?.scheduledDate !== undefined || data?.scheduledAt !== undefined
+          ? { scheduledAt: this.parseScheduledAt(data) } : {}),
+        ...(data?.estimatedMinutes !== undefined || data?.durationHours !== undefined
+          ? { estimatedMinutes: this.parseDurationMinutes(data) } : {}),
       },
+      include: { assignedTo: { select: { id: true, firstName: true, lastName: true } }, attachments: true },
     });
-
-    await this.logActivity(
-      companyId,
-      leadId,
-      'PRE_SALES_TASK_UPDATED',
-      `Task "${task.title}" updated`,
-      undefined,
-      { taskId, status: task.status, hours: task.hours },
-    );
-
-    return task;
   }
 
-  async deletePreSalesTask(companyId: number, leadId: number, taskId: number) {
-    await this.getLeadForPreSales(companyId, leadId);
-    const existing = await this.prisma.preSalesTask.findFirst({
-      where: { id: taskId, leadId, companyId },
-      select: { id: true, title: true },
-    });
-    if (!existing) throw new NotFoundException('Task not found');
-
-    await this.prisma.preSalesTask.delete({ where: { id: taskId } });
-    await this.logActivity(companyId, leadId, 'PRE_SALES_TASK_DELETED', `Task "${existing.title}" deleted`, undefined);
-
-    return { deleted: true };
-  }
-
-  async uploadPreSalesMoM(
+  /**
+   * Delete a task outright.
+   *
+   * Separate from a COMPLETED status: completing is a record of work done,
+   * deleting is for a task that should never have existed. Its history and
+   * attachments go with it (cascade), which is why only the person who raised
+   * it or an admin may do it — an assignee who dislikes a task must not be able
+   * to erase the fact it was assigned.
+   */
+  async deletePreSalesTask(
     companyId: number,
     leadId: number,
-    data: any,
-    actorEmployeeId?: number | null,
-    file?: { url?: string; originalname?: string; mimetype?: string; size?: number },
+    taskId: number,
+    user: { role?: string; employeeId?: number | null },
   ) {
-    const lead = await this.getLeadForPreSales(companyId, leadId);
-    if (!actorEmployeeId) throw new BadRequestException('Your account is not linked to an employee.');
-    if (!data.title || !String(data.title).trim()) throw new BadRequestException('MoM title is required.');
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    const task = await this.prisma.preSalesTask.findFirst({ where: { id: taskId, companyId, leadId } });
+    if (!task) throw new NotFoundException('Task not found');
 
-    const taskId = data.taskId ? parseInt(data.taskId, 10) : null;
-    if (taskId) {
-      const task = await this.prisma.preSalesTask.findFirst({ where: { id: taskId, leadId, companyId }, select: { id: true, assignedById: true } });
-      if (!task) throw new BadRequestException('Task not found.');
+    const employeeId = user.employeeId ?? null;
+    if (!access.admin && task.assignedById !== employeeId) {
+      throw new ForbiddenException('Only an administrator, or the person who created this task, can delete it.');
     }
 
-    const mom = await this.prisma.preSalesMoM.create({
-      data: {
-        companyId,
-        leadId,
-        taskId,
-        uploadedById: actorEmployeeId,
-        title: String(data.title).trim(),
-        meetingDate: data.meetingDate ? new Date(data.meetingDate) : null,
-        summary: data.summary || null,
-        fileUrl: file?.url || null,
-        fileName: file?.originalname || null,
-        fileType: file?.mimetype || null,
-        fileSize: file?.size || null,
-      },
-      include: {
-        uploadedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-        task: { select: { id: true, title: true, assignedById: true } },
-      },
-    });
+    await this.prisma.preSalesTask.delete({ where: { id: taskId } });
+    return { success: true };
+  }
 
-    // Uploading the minutes of meeting marks the hour-tracked task as done.
-    if (taskId) {
-      await this.prisma.preSalesTask.update({
-        where: { id: taskId },
-        data: { status: 'COMPLETED' },
-      });
+  /**
+   * The only way a task's status moves, and the only writer of its history.
+   *
+   * The assignee drives their own task; an admin or the task's creator can also
+   * move it, because someone has to be able to unstick an abandoned one.
+   */
+  async changePreSalesTaskStatus(
+    companyId: number,
+    leadId: number,
+    taskId: number,
+    user: { role?: string; employeeId?: number | null },
+    data: { status?: string; remark?: string; attachments?: any[] },
+  ) {
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    const employeeId = user.employeeId ?? null;
+
+    const task = await this.prisma.preSalesTask.findFirst({ where: { id: taskId, companyId, leadId } });
+    if (!task) throw new NotFoundException('Task not found');
+
+    const isAssignee = !!employeeId && task.assignedToId === employeeId;
+    const isCreator = !!employeeId && task.assignedById === employeeId;
+    if (!isAssignee && !isCreator && !access.admin) {
+      throw new ForbiddenException('Only the person this task is assigned to can update it.');
     }
 
-    await this.logActivity(
-      companyId,
-      leadId,
-      'PRE_SALES_MOM_UPLOADED',
-      `Minutes of meeting "${mom.title}" uploaded${mom.task ? ` against task "${mom.task.title}"` : ''}`,
-      actorEmployeeId,
-      { momId: mom.id, taskId },
-    );
+    const status = String(data?.status || '').toUpperCase();
+    if (!CrmService.TASK_STATUSES.includes(status)) {
+      throw new BadRequestException(`Status must be one of ${CrmService.TASK_STATUSES.join(', ')}.`);
+    }
+    if (status === task.status) {
+      throw new BadRequestException(`This task is already ${status.replace('_', ' ').toLowerCase()}.`);
+    }
 
-    const taskOwnerId = mom.task?.assignedById ?? null;
-    await this.notificationsService.notifyEmployees([taskOwnerId], {
-      companyId,
-      title: 'Pre-sales task completed — MoM uploaded',
-      message: `Minutes of meeting uploaded for "${mom.title}" on "${lead.title}".`,
-      excludeEmployeeId: actorEmployeeId,
-      linkUrl: `/crm/leads/${leadId}`,
-    });
-
-    return mom;
-  }
-
-  async deletePreSalesMoM(companyId: number, leadId: number, momId: number) {
-    await this.getLeadForPreSales(companyId, leadId);
-    const mom = await this.prisma.preSalesMoM.findFirst({
-      where: { id: momId, leadId, companyId },
-      select: { id: true, title: true },
-    });
-    if (!mom) throw new NotFoundException('MoM not found');
-
-    await this.prisma.preSalesMoM.delete({ where: { id: momId } });
-    await this.logActivity(companyId, leadId, 'PRE_SALES_MOM_DELETED', `Minutes of meeting "${mom.title}" deleted`, undefined);
-
-    return { deleted: true };
-  }
-
-  async getPreSalesOverview(companyId: number, user: { role?: string; employeeId?: number | null }) {
-    const where: any = { companyId, flow: 'PRE_SALES' };
-    const isUnrestricted = user.role === 'SUPERADMIN' || user.role === 'ADMIN';
-    if (!isUnrestricted) {
-      const canViewAll = await this.permissionsService.hasPermission(
-        companyId, user.role || 'EMPLOYEE', 'crm/leads', 'VIEW_ALL',
+    const remark = (data?.remark || '').trim() || null;
+    // Going on hold or completing is a handover; saying why is the point of the
+    // trail, so it is required rather than encouraged.
+    if ((status === 'ON_HOLD' || status === 'COMPLETED') && !remark) {
+      throw new BadRequestException(
+        status === 'ON_HOLD'
+          ? 'Say why the task is on hold.'
+          : 'Add a completion remark before marking the task complete.',
       );
-      if (!canViewAll) {
-        where.OR = [
-          { addedById: user.employeeId ?? -1 },
-          { assignedToId: user.employeeId ?? -1 },
-        ];
-      }
     }
 
-    const leadIds = await this.prisma.lead.findMany({
-      where,
-      select: { id: true, value: true },
+    const files = Array.isArray(data?.attachments) ? data.attachments.filter((a: any) => a?.fileUrl) : [];
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const history = await tx.preSalesTaskStatusHistory.create({
+        data: {
+          companyId, taskId, previousStatus: task.status, newStatus: status,
+          remark, changedById: employeeId ?? 0,
+        },
+      });
+
+      if (files.length) {
+        await tx.preSalesTaskAttachment.createMany({
+          data: files.map((a: any) => ({
+            companyId, taskId, historyId: history.id,
+            fileName: a.fileName || 'attachment',
+            fileUrl: a.fileUrl,
+            fileSize: a.fileSize ? Number(a.fileSize) : null,
+            uploadedById: employeeId ?? 0,
+          })),
+        });
+      }
+
+      return tx.preSalesTask.update({
+        where: { id: taskId },
+        data: { status, completedAt: status === 'COMPLETED' ? new Date() : null },
+        include: {
+          assignedTo: { select: { id: true, firstName: true, lastName: true } },
+          attachments: true,
+        },
+      });
     });
-    const ids = leadIds.map((l) => l.id);
 
-    const [members, requests, tasks, moms] = await Promise.all([
-      ids.length ? this.prisma.preSalesTeamMember.findMany({ where: { companyId, leadId: { in: ids } }, select: { allocatedHours: true } }) : Promise.resolve([] as any[]),
-      ids.length ? this.prisma.preSalesRequest.findMany({ where: { companyId, leadId: { in: ids } }, select: { status: true } }) : Promise.resolve([] as any[]),
-      ids.length ? this.prisma.preSalesTask.findMany({ where: { companyId, leadId: { in: ids } }, select: { status: true } }) : Promise.resolve([] as any[]),
-      ids.length ? this.prisma.preSalesMoM.findMany({ where: { companyId, leadId: { in: ids } }, select: { id: true } }) : Promise.resolve([] as any[]),
-    ]);
+    if (status === 'COMPLETED') await this.notifyTaskCompleted(companyId, access.lead, updated, employeeId);
 
-    return {
-      deals: leadIds.length,
-      dealValue: leadIds.reduce((s, l) => s + (Number(l.value) || 0), 0),
-      members: members.length,
-      allocatedHours: members.reduce((s, m) => s + (Number(m.allocatedHours) || 0), 0),
-      pendingRequests: requests.filter((r) => r.status === 'PENDING').length,
-      totalRequests: requests.length,
-      openTasks: tasks.filter((t) => t.status !== 'COMPLETED').length,
-      completedTasks: tasks.filter((t) => t.status === 'COMPLETED').length,
-      totalTasks: tasks.length,
-      moms: moms.length,
+    return updated;
+  }
+
+  /** Everyone with a stake: the admins, the deal's creator, the task's creator
+   *  and the rest of the deal's pre-sales team. */
+  private async notifyTaskCompleted(
+    companyId: number,
+    lead: { id: number; title: string | null; companyName: string | null; addedById: number | null },
+    task: { id: number; title: string; assignedById: number; assignedTo: { firstName: string; lastName: string } },
+    actorEmployeeId: number | null,
+  ) {
+    const team = await this.prisma.preSalesTeamMember.findMany({
+      where: { companyId, leadId: lead.id, status: 'ACTIVE' },
+      select: { employeeId: true },
+    });
+
+    const who = `${task.assignedTo.firstName} ${task.assignedTo.lastName}`.trim();
+    const leadName = lead.companyName || lead.title || 'a deal';
+    const payload = {
+      companyId,
+      excludeEmployeeId: actorEmployeeId,
+      title: 'Pre-sales task completed',
+      message: `Pre-Sales task "${task.title}" has been completed by ${who} (${leadName}).`,
+      type: 'SUCCESS',
+      linkUrl: `/crm/leads/${lead.id}`,
     };
+
+    const employeeIds = [lead.addedById, task.assignedById, ...team.map((t) => t.employeeId)];
+    await this.notificationsService.notifyEmployees(employeeIds, payload);
+    await this.notificationsService.notifyApprovers({
+      companyId, roles: ['SUPERADMIN', 'ADMIN'],
+      title: payload.title, message: payload.message, type: 'INFO', linkUrl: payload.linkUrl,
+    });
+  }
+
+  /** The append-only trail for one task. */
+  async getPreSalesTaskHistory(
+    companyId: number,
+    leadId: number,
+    taskId: number,
+    user: { role?: string; employeeId?: number | null },
+  ) {
+    await this.resolvePreSalesAccess(companyId, leadId, user);
+    const task = await this.prisma.preSalesTask.findFirst({ where: { id: taskId, companyId, leadId } });
+    if (!task) throw new NotFoundException('Task not found');
+
+    return this.prisma.preSalesTaskStatusHistory.findMany({
+      where: { companyId, taskId },
+      include: {
+        changedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        attachments: true,
+      },
+      orderBy: { changedAt: 'asc' },
+    });
   }
 }

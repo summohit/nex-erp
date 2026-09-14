@@ -7554,3 +7554,153 @@ img.ps-member-avatar-lg { object-fit: cover; }
 .pre-sales-empty svg { color: #94a3b8; }
 .pre-sales-empty h3 { margin: 0; font-size: 16px; color: #334155; }
 .pre-sales-empty p { margin: 0; font-size: 13px; max-width: 480px; line-height: 1.5; }
+
+/* ── Pre-sales approval queue (admin) ────────────────────────────────────── */
+.ps-queue-btn { position: relative; }
+.ps-queue-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px;
+  border-radius: 999px; background: #ef4444; color: #fff;
+  font-size: 11px; font-weight: 700;
+}
+
+.ps-queue-modal { max-width: 720px; min-height: 0; }
+.ps-queue-loading,
+.ps-queue-empty {
+  padding: 28px; text-align: center; color: #94a3b8; font-size: 13px;
+}
+.ps-queue-empty svg { color: #cbd5e1; margin-bottom: 6px; }
+
+.ps-queue-row {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; padding: 14px 0; border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+.ps-queue-row:last-child { border-bottom: none; }
+/* Decided rows stay in the list as a record, but read as history. */
+.ps-queue-row.is-decided { opacity: 0.62; }
+
+.ps-queue-main { flex: 1; min-width: 240px; }
+.ps-queue-lead {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+  text-transform: uppercase; color: #64748b; margin-bottom: 4px;
+}
+.ps-queue-who { display: flex; flex-direction: column; }
+.ps-queue-who strong { font-size: 14px; color: #0f172a; }
+.ps-queue-who span { font-size: 12px; color: #94a3b8; }
+.ps-queue-reason,
+.ps-queue-remark {
+  margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: #475569;
+  white-space: pre-wrap;
+}
+.ps-queue-remark { color: #b91c1c; }
+
+.ps-queue-actions { display: flex; gap: 8px; align-items: center; }
+.ps-queue-reject { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.ps-queue-reject textarea {
+  width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+  font-family: inherit; font-size: 13px; resize: vertical;
+}
+.ps-queue-reject textarea:focus {
+  outline: none; border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+.ps-queue-reject .ps-queue-actions { justify-content: flex-end; }
+
+@media (max-width: 640px) {
+  .ps-queue-row { flex-direction: column; }
+  .ps-queue-actions { width: 100%; }
+  .ps-queue-actions button { flex: 1; }
+}
+
+/* ── Pre-sales summary in the detail modal ───────────────────────────────── */
+.ldm-ps-manage {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border: 1px solid #e2e8f0; border-radius: 999px;
+  background: #fff; color: var(--color-primary);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.ldm-ps-manage:hover { background: #fff7ed; border-color: #fed7aa; }
+
+.ldm-ps-team { display: flex; flex-direction: column; gap: 10px; }
+.ldm-ps-member { display: flex; align-items: flex-start; gap: 10px; }
+.ldm-ps-avatar, .ldm-ps-avatar-img {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  background: linear-gradient(135deg, #6366f1, #4338ca); color: #fff;
+}
+.ldm-ps-avatar-img { object-fit: cover; }
+.ldm-ps-member-id { display: flex; flex-direction: column; min-width: 0; }
+.ldm-ps-name { font-size: 13.5px; font-weight: 600; color: #0f172a; }
+.ldm-ps-sub { font-size: 11.5px; color: #94a3b8; }
+.ldm-ps-remark { font-size: 12px; color: #475569; margin-top: 3px; }
+
+.ldm-ps-tasks {
+  margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ldm-ps-task { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+.ldm-ps-task-title { font-weight: 600; color: #1e293b; flex: 1; min-width: 0; }
+.ldm-ps-task-who { color: #64748b; }
+
+/* Shared with the deal page so a status reads the same in both places. */
+.ps-status-pill {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; text-transform: capitalize; white-space: nowrap;
+}
+.ps-status-new       { background: #f1f5f9; color: #475569; }
+.ps-status-working   { background: #dbeafe; color: #1d4ed8; }
+.ps-status-on-hold   { background: #fef3c7; color: #92400e; }
+.ps-status-completed { background: #dcfce7; color: #166534; }
+
+/* ── Pre-sales presence on a kanban card ─────────────────────────────────── */
+.card-presales-block {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+}
+/* Labelled, so the avatars are not mistaken for the deal owner sitting in the
+   footer row directly below them. */
+.card-presales-label {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-bottom: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: #94a3b8;
+}
+.card-presales-label svg { flex-shrink: 0; }
+.card-presales-block .card-presales-stack { display: flex; align-items: center; }
+
+/* Overlapped, because the point is "these people", not a list to read. */
+.card-presales-stack { display: flex; align-items: center; }
+.card-ps-avatar,
+.card-ps-avatar-img {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #6366f1, #4338ca); color: #fff;
+  border: 2px solid #fff; margin-left: -6px;
+}
+.card-presales-stack > :first-child { margin-left: 0; }
+.card-ps-avatar-img { object-fit: cover; }
+.card-ps-more {
+  margin-left: -6px; padding: 0 6px; height: 22px;
+  display: inline-flex; align-items: center;
+  border: 2px solid #fff; border-radius: 999px;
+  background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700;
+}
+.card-ps-tasks {
+  margin-left: auto; padding: 1px 8px; border-radius: 999px;
+  background: #eef2ff; color: #4338ca; font-size: 10.5px; font-weight: 700;
+}
+
+/* Shown in place of the amount when the server has withheld it. */
+.value-badge.value-hidden {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #f1f5f9; color: #64748b; font-weight: 600;
+}
+
+/* The same stack, in the table's Pre-Sales column. */
+.table-ps-stack { display: flex; align-items: center; gap: 0; }
+.table-ps-stack .card-ps-tasks { margin-left: 8px; }
+.lead-presales-cell { white-space: nowrap; }

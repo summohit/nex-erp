@@ -106,6 +106,8 @@ model Company {
   preSalesMembers     PreSalesTeamMember[]
   preSalesTasks       PreSalesTask[]
   preSalesMom         PreSalesMoM[]
+  preSalesTaskHistory PreSalesTaskStatusHistory[]
+  preSalesTaskFiles   PreSalesTaskAttachment[]
   tickets             Ticket[]
 }
 
@@ -392,6 +394,9 @@ model Employee {
   preSalesRequestsForMe    PreSalesRequest[]  @relation("PreSalesRequestedEmployee")
   preSalesRequestsApproved PreSalesRequest[]  @relation("PreSalesRequestApprover")
   preSalesTeamMemberships  PreSalesTeamMember[]
+  preSalesAssignedByMe     PreSalesTeamMember[] @relation("PreSalesAssigner")
+  preSalesTaskStatusChanges PreSalesTaskStatusHistory[] @relation("PreSalesTaskStatusActor")
+  preSalesTaskAttachments  PreSalesTaskAttachment[] @relation("PreSalesTaskAttachmentUploader")
   preSalesTasksAssignedTo  PreSalesTask[]     @relation("PreSalesTaskAssignee")
   preSalesTasksAssignedBy  PreSalesTask[]     @relation("PreSalesTaskAssigner")
   preSalesMomUploads       PreSalesMoM[]
@@ -2507,21 +2512,39 @@ model LeadActivity {
 // hourly / on-demand basis. Approving a PreSalesRequest upserts this record and
 // adds the granted hours. Additional hours are requested again via a new
 // PreSalesRequest with isAdditional = true.
+/// A pre-sales employee assigned to a lead.
+///
+/// Membership is what grants an employee sight of the deal, so this row is a
+/// permission as much as a record — see maskLeadFinancials in crm.service.ts
+/// for what they are then allowed to see of it.
+///
+/// One row per (lead, employee) forever: removing someone flips status to
+/// REMOVED rather than deleting, so the history of who worked a deal survives,
+/// and re-adding them reactivates the same row. That is what "prevent duplicate
+/// active assignments" means here — the unique constraint enforces it in the
+/// database rather than in a check that can be raced.
 model PreSalesTeamMember {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   companyId      Int
-  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   leadId         Int
-  lead           Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead           Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   employeeId     Int
-  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  allocatedHours Float    @default(0)
-  status         String   @default("ACTIVE") // ACTIVE, REMOVED
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// Who put them on the deal. Load-bearing: only this person and an admin may
+  /// create tasks for them.
+  assignedById   Int?
+  assignedBy     Employee? @relation("PreSalesAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+  /// Why they were added — "analyse the client's technical requirements".
+  remark         String?   @db.Text
+  status         String    @default("ACTIVE") // ACTIVE, REMOVED
+  removedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([leadId, employeeId])
   @@index([companyId, leadId])
+  @@index([employeeId, status])
 }
 
 // A request raised by a sales person to engage a pre-sales person on a deal for
@@ -2537,10 +2560,11 @@ model PreSalesRequest {
   requestedBy   Employee  @relation("PreSalesRequestRequester", fields: [requestedById], references: [id], onDelete: Cascade)
   employeeId    Int
   employee      Employee  @relation("PreSalesRequestedEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
-  hours         Float
+  /// Why this person is needed. Required — an admin approving blind is the
+  /// failure mode this whole flow exists to prevent.
   reason        String?   @db.Text
-  remarks       String?   @db.Text
-  isAdditional  Boolean   @default(false) // true when re-engaging a member for extra hours
+  /// The approver's note, shown to the requester on a rejection.
+  adminRemark   String?   @db.Text
   status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
   approvedById  Int?
   approvedBy    Employee? @relation("PreSalesRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
@@ -2566,15 +2590,69 @@ model PreSalesTask {
   assignedToId Int
   assignedTo   Employee       @relation("PreSalesTaskAssignee", fields: [assignedToId], references: [id], onDelete: Cascade)
   title        String
+  taskType     String?
   description  String?        @db.Text
-  hours        Float          @default(0)
-  status       String         @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
-  dueDate      DateTime?
+  /// When the work is scheduled — date and time in one value, because they are
+  /// never meaningful apart and storing them separately invites timezone drift.
+  scheduledAt  DateTime?
+  /// Minutes, not "2h 30m". A structured value can be summed and reported on;
+  /// formatted text cannot.
+  estimatedMinutes Int?
+  status       String         @default("NEW") // NEW, WORKING, ON_HOLD, COMPLETED
+  completedAt  DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   moms         PreSalesMoM[]
+  history      PreSalesTaskStatusHistory[]
+  attachments  PreSalesTaskAttachment[]
 
   @@index([companyId, leadId])
+  @@index([assignedToId, status])
+}
+
+/// Every status change, appended and never overwritten.
+///
+/// The point is the audit trail in §17 of the brief: who moved the task, when,
+/// why, and what they attached at that moment. A status column alone answers
+/// none of those a week later.
+model PreSalesTaskStatusHistory {
+  id             Int          @id @default(autoincrement())
+  companyId      Int
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  taskId         Int
+  task           PreSalesTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  previousStatus String?
+  newStatus      String
+  remark         String?      @db.Text
+  changedById    Int
+  changedBy      Employee     @relation("PreSalesTaskStatusActor", fields: [changedById], references: [id], onDelete: Cascade)
+  changedAt      DateTime     @default(now())
+  attachments    PreSalesTaskAttachment[]
+
+  @@index([taskId, changedAt])
+}
+
+/// A file on a task, optionally pinned to the status change it arrived with.
+/// Same shape as TicketAttachment and QuotationAttachment: the file itself
+/// lives in the existing ImageKit upload, this is only the reference.
+model PreSalesTaskAttachment {
+  id           Int          @id @default(autoincrement())
+  companyId    Int
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  taskId       Int
+  task         PreSalesTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// Set when the file was attached as part of a status change, so the history
+  /// entry can show what was handed over at that step.
+  historyId    Int?
+  history      PreSalesTaskStatusHistory? @relation(fields: [historyId], references: [id], onDelete: SetNull)
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  uploadedById Int
+  uploadedBy   Employee     @relation("PreSalesTaskAttachmentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+
+  @@index([taskId])
 }
 
 // Minutes of Meeting uploaded by the pre-sales person against a task on a deal.
