@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>NexMobileApp</string>
+	<string>MIRA</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -33,16 +33,18 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>CES Work uses your location to track field visits, record GPS routes, and geo-stamp your attendance clock-in and clock-out.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>CES Work uses your location to track field visits, record GPS routes, and geo-stamp your attendance clock-in and clock-out.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>CES Work needs camera access to take photos during field visits and update your profile picture.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>CES Work needs access to your photo library to attach images to project issues and field visit reports.</string>
+	<string>MIRA needs camera access to take photos during field visits and update your profile picture.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>MIRA uses your location to track field visits, record GPS routes, and geo-stamp your attendance clock-in and clock-out.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MIRA uses your location to track field visits, record GPS routes, and geo-stamp your attendance clock-in and clock-out.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>CES Work may save field visit photos to your library.</string>
+	<string>MIRA may save field visit photos to your library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MIRA needs access to your photo library to attach images to project issues and field visit reports.</string>
+	<key>RCTNewArchEnabled</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
