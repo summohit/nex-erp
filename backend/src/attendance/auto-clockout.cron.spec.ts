@@ -101,4 +101,17 @@ describe('AutoClockoutCron', () => {
 
     expect(prisma.attendanceLog.update).toHaveBeenCalledTimes(1);
   });
+
+  // Without the stamp the row is indistinguishable from someone who genuinely
+  // worked until 23:00 and left from where they arrived — same time, same
+  // coordinates, overtime attached. 3,887 days in this database look like that.
+  it('marks the day as auto-closed rather than leaving it to pass as a real clock-out', async () => {
+    jest.useFakeTimers().setSystemTime(ist(23, 5));
+    prisma.attendance.findMany.mockResolvedValue([openSessionAt(9)]);
+
+    await cron.autoClockOutOpenSessions();
+
+    expect(prisma.attendance.update.mock.calls[0][0].data.autoClockedOut).toBe(true);
+    expect(prisma.attendanceLog.update.mock.calls[0][0].data.autoClockedOut).toBe(true);
+  });
 });

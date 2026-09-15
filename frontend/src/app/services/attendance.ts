@@ -23,6 +23,12 @@ export interface AttendanceRecord {
   status: 'PRESENT' | 'ABSENT' | 'HALF_DAY' | 'ON_LEAVE' | 'HOLIDAY' | 'WEEKLY_OFF';
   isLate: boolean;
   isEarlyLeave: boolean;
+  /**
+   * Nobody clocked out — the 23:00 IST sweep closed the day. The clock-out is
+   * a cutoff rather than a departure, and its coordinates are the clock-in's
+   * reused, so don't render either as an observation.
+   */
+  autoClockedOut?: boolean;
   totalHours?: number;
   overtimeHours?: number;
   employeeId: number;

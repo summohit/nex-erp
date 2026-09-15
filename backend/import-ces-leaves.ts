@@ -218,7 +218,7 @@ async function main() {
       await prisma.leaveBalance.upsert({
         where: { employeeId_leaveTypeId_year: { employeeId: b.employeeId, leaveTypeId: b.leaveTypeId, year: YEAR } },
         update: { allocated: b.allocated, used: b.used },
-        create: { ...b, year: YEAR, carriedOver: 0 },
+        create: { ...b, year: YEAR },
       });
     }
   }

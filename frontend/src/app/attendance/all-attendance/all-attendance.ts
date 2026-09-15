@@ -81,6 +81,8 @@ export class AllAttendanceComponent implements OnInit {
     logs: any[];
     durationStr: string;
     isToday: boolean;
+    /** Nobody clocked out — the 23:00 sweep closed the day. */
+    autoClockedOut: boolean;
   } | null>(null);
   isDetailsModalOpen = signal(false);
 
@@ -747,7 +749,8 @@ export class AllAttendanceComponent implements OnInit {
           clockInLat: record.clockInLat,
           clockInLng: record.clockInLng,
           clockOutLat: record.clockOutLat,
-          clockOutLng: record.clockOutLng
+          clockOutLng: record.clockOutLng,
+          autoClockedOut: record.autoClockedOut
         }];
       }
 
@@ -755,7 +758,11 @@ export class AllAttendanceComponent implements OnInit {
         const diffMs = new Date(record.clockOut).getTime() - new Date(record.clockIn).getTime();
         const hours = Math.floor(diffMs / (1000 * 60 * 60));
         const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        durationStr = `${hours} hrs ${mins} mins`;
+        // The clock-out is a cutoff, not a departure, so the span it closes is
+        // not time anyone stood behind. Say "up to" rather than assert it.
+        durationStr = record.autoClockedOut
+          ? `up to ${hours} hrs ${mins} mins`
+          : `${hours} hrs ${mins} mins`;
       } else if (record.clockIn) {
         // An open session is only "active" if it's today; a past day with no
         // clock-out means the person never clocked out (imported/historical).
@@ -783,7 +790,8 @@ export class AllAttendanceComponent implements OnInit {
       status: day.status,
       logs,
       durationStr,
-      isToday: this.getLocalDateString(new Date(day.date)) === this.getLocalDateString(new Date())
+      isToday: this.getLocalDateString(new Date(day.date)) === this.getLocalDateString(new Date()),
+      autoClockedOut: !!record?.autoClockedOut
     });
 
     this.isDetailsModalOpen.set(true);

@@ -8,107 +8,108 @@ datasource db {
 
 // SaaS Tenant
 model Company {
-  id                  Int                  @id @default(autoincrement())
-  name                String
-  domain              String?              @unique
-  logoUrl             String?
-  industry            String?
-  size                String?
-  timezone            String?
+  id       Int     @id @default(autoincrement())
+  name     String
+  domain   String? @unique
+  logoUrl  String?
+  industry String?
+  size     String?
+  timezone String?
 
   /// Statutory and contact details that appear on quotations, invoices and
   /// letterheads. All optional — a company can operate without them, and
   /// nothing should refuse to save because a registration number is blank.
-  mobile              String?
-  email               String?
-  address             String?              @db.Text
-  gstin               String?
-  panNumber           String?
-  udyamRegNo          String?
+  mobile     String?
+  email      String?
+  address    String? @db.Text
+  gstin      String?
+  panNumber  String?
+  udyamRegNo String?
 
   /// Prefix for generated quote numbers. Blank falls back to "QT", which is
   /// what every existing quotation already uses.
-  quotationPrefix     String?
+  quotationPrefix   String?
   /// Counter behind sequential quotation numbers. Incremented atomically when a
   /// number is issued, never derived from existing numbers: the quotations that
   /// predate this carry a millisecond timestamp, and reading the highest of
   /// those as a sequence would start the count at sixty-two million.
-  quotationSequence   Int      @default(0)
+  quotationSequence Int     @default(0)
 
   /// Bank details printed on quotations so a client can pay against them.
-  bankAccountName     String?
-  bankName            String?
-  bankBranch          String?
-  bankIfsc            String?
-  bankAccountNumber   String?
+  bankAccountName   String?
+  bankName          String?
+  bankBranch        String?
+  bankIfsc          String?
+  bankAccountNumber String?
 
-  onboardingCompleted Boolean              @default(false)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  users               User[]
-  employees           Employee[]
-  departments         Department[]
-  designations        Designation[]
-  rolePermissions     RolePermission[]
-  onboardingTemplates OnboardingTemplate[]
-  branches            Branch[]
-  holidays            Holiday[]
-  leaveTypes          LeaveType[]
-  shifts              Shift[]
-  shiftRosterEntries  ShiftRosterEntry[]
-  letterTemplates     LetterTemplate[]
-  generatedLetters    GeneratedLetter[]
-  salaryComponents    SalaryComponent[]
-  expenseClaims       ExpenseClaim[]
-  awardTypes          AwardType[]
-  appreciations       Appreciation[]
-    assets              Asset[]
-    assetAssignments    AssetAssignment[]
-    hardwareRequests    HardwareRequest[]
-    inventoryItems      InventoryItem[]
-    inventoryTransactions InventoryTransaction[]
-  jobs                Job[]
-  jobApplications     JobApplication[]
-  projects            Project[]
-  issues              Issue[]
-  notifications       Notification[]
-  appRoles            AppRole[]
-  featureFlags        FeatureFlag[]
-  approvalWorkflows   ApprovalWorkflow[]
-  performanceGoals    PerformanceGoal[]
-  performanceReviews  PerformanceReview[]
-  companyOKRs         CompanyOKR[]
-  appraisalCycles     AppraisalCycle[]
-  peerFeedbacks       PeerFeedback[]
-  resignations        Resignation[]
-  exitInterviews      ExitInterview[]
-  offboardingTasks    OffboardingTask[]
-  shiftRotations      ShiftRotation[]
-  blackoutDates       BlackoutDate[]
-  clients             Client[]
-  kioskEnabled        Boolean              @default(false)
-  payrollSetting      PayrollSetting?
-  systemSetting       SystemSetting?
-  baseCurrency        String               @default("USD")
-  leads               Lead[]
-  quotations          Quotation[]
-  salesOrders         SalesOrder[]
-  fieldVisits         FieldVisit[]         @relation("CompanyFieldVisits")
-  leadFollowUps       LeadFollowUp[]
-  leadContacts        LeadContact[]
-  leadFiles           LeadFile[]
-  leadNotes           LeadNote[]
-  leadActivities      LeadActivity[]
-  leadContactNotes    LeadContactNote[]
-  leadForms           LeadForm[]
-  offerLetters        OfferLetter[]
-  preSalesRequests    PreSalesRequest[]
-  preSalesMembers     PreSalesTeamMember[]
-  preSalesTasks       PreSalesTask[]
-  preSalesMom         PreSalesMoM[]
-  preSalesTaskHistory PreSalesTaskStatusHistory[]
-  preSalesTaskFiles   PreSalesTaskAttachment[]
-  tickets             Ticket[]
+  onboardingCompleted   Boolean                     @default(false)
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  users                 User[]
+  employees             Employee[]
+  departments           Department[]
+  designations          Designation[]
+  rolePermissions       RolePermission[]
+  onboardingTemplates   OnboardingTemplate[]
+  branches              Branch[]
+  holidays              Holiday[]
+  leaveTypes            LeaveType[]
+  shifts                Shift[]
+  shiftRosterEntries    ShiftRosterEntry[]
+  letterTemplates       LetterTemplate[]
+  generatedLetters      GeneratedLetter[]
+  salaryComponents      SalaryComponent[]
+  expenseClaims         ExpenseClaim[]
+  awardTypes            AwardType[]
+  appreciations         Appreciation[]
+  assets                Asset[]
+  assetAssignments      AssetAssignment[]
+  hardwareRequests      HardwareRequest[]
+  inventoryItems        InventoryItem[]
+  inventoryTransactions InventoryTransaction[]
+  jobs                  Job[]
+  jobApplications       JobApplication[]
+  projects              Project[]
+  issues                Issue[]
+  notifications         Notification[]
+  appRoles              AppRole[]
+  featureFlags          FeatureFlag[]
+  approvalWorkflows     ApprovalWorkflow[]
+  performanceGoals      PerformanceGoal[]
+  performanceReviews    PerformanceReview[]
+  companyOKRs           CompanyOKR[]
+  appraisalCycles       AppraisalCycle[]
+  peerFeedbacks         PeerFeedback[]
+  resignations          Resignation[]
+  exitInterviews        ExitInterview[]
+  offboardingTasks      OffboardingTask[]
+  shiftRotations        ShiftRotation[]
+  blackoutDates         BlackoutDate[]
+  clients               Client[]
+  kioskEnabled          Boolean                     @default(false)
+  payrollSetting        PayrollSetting?
+  systemSetting         SystemSetting?
+  baseCurrency          String                      @default("USD")
+  leads                 Lead[]
+  quotations            Quotation[]
+  salesOrders           SalesOrder[]
+  fieldVisits           FieldVisit[]                @relation("CompanyFieldVisits")
+  leadFollowUps         LeadFollowUp[]
+  leadContacts          LeadContact[]
+  leadFiles             LeadFile[]
+  leadNotes             LeadNote[]
+  leadActivities        LeadActivity[]
+  leadContactNotes      LeadContactNote[]
+  leadForms             LeadForm[]
+  offerLetters          OfferLetter[]
+  preSalesRequests      PreSalesRequest[]
+  preSalesMembers       PreSalesTeamMember[]
+  preSalesTasks         PreSalesTask[]
+  preSalesMom           PreSalesMoM[]
+  preSalesTaskHistory   PreSalesTaskStatusHistory[]
+  preSalesTaskFiles     PreSalesTaskAttachment[]
+  preSalesRequestItems  PreSalesRequestItem[]
+  tickets               Ticket[]
 }
 
 // Authentication & RBAC
@@ -239,8 +240,8 @@ model Department {
   employees     Employee[]
   jobs          Job[]
   blackoutDates BlackoutDate[]
-  tickets       Ticket[]  @relation("TicketOwningTeam")
-  raisedTickets Ticket[]  @relation("TicketRaisedByDept")
+  tickets       Ticket[]       @relation("TicketOwningTeam")
+  raisedTickets Ticket[]       @relation("TicketRaisedByDept")
 }
 
 model Designation {
@@ -344,7 +345,7 @@ model Employee {
   // Work Location & Notes
   workLocation      String?
   usualWorkLocation Json?
-  
+
   // Statutory Details
   pfNumber          String?
   esiNumber         String?
@@ -358,6 +359,7 @@ model Employee {
   emergencyContacts EmergencyContact[]
   documents         EmployeeDocument[]
   leaveBalances     LeaveBalance[]
+  leaveEncashments  LeaveEncashment[]
   appreciations     Appreciation[]
   leaveRequests     LeaveRequest[]
   attendances       Attendance[]
@@ -371,55 +373,55 @@ model Employee {
   skills            EmployeeSkill[]
   resumeLines       EmployeeResume[]
 
-  ledProjects              Project[]                  @relation("ProjectLead")
-  projectMembers           ProjectMember[]
-  assignedIssues           Issue[]                    @relation("IssueAssignee")
-  reportedIssues           Issue[]                    @relation("IssueReporter")
-  cardMemberships          IssueMember[]
-  issueTimeLogs            IssueTimeLog[]
-  issueComments            IssueComment[]
-  uploadedAttachments      IssueAttachment[]
-  issueActivities          IssueActivity[]
-  performanceGoals         PerformanceGoal[]
-  reviewsGiven             PerformanceReview[]        @relation("Reviewer")
-  reviewsReceived          PerformanceReview[]        @relation("Reviewee")
-  resignations             Resignation[]
-  exitInterviews           ExitInterview[]
-  offboardingTasks         OffboardingTask[]
-  regularizations          AttendanceRegularization[]
-  shiftRotations           ShiftRotation[]
-  shiftRosterEntries       ShiftRosterEntry[]
+  ledProjects         Project[]                  @relation("ProjectLead")
+  projectMembers      ProjectMember[]
+  assignedIssues      Issue[]                    @relation("IssueAssignee")
+  reportedIssues      Issue[]                    @relation("IssueReporter")
+  cardMemberships     IssueMember[]
+  issueTimeLogs       IssueTimeLog[]
+  issueComments       IssueComment[]
+  uploadedAttachments IssueAttachment[]
+  issueActivities     IssueActivity[]
+  performanceGoals    PerformanceGoal[]
+  reviewsGiven        PerformanceReview[]        @relation("Reviewer")
+  reviewsReceived     PerformanceReview[]        @relation("Reviewee")
+  resignations        Resignation[]
+  exitInterviews      ExitInterview[]
+  offboardingTasks    OffboardingTask[]
+  regularizations     AttendanceRegularization[]
+  shiftRotations      ShiftRotation[]
+  shiftRosterEntries  ShiftRosterEntry[]
 
-  preSalesRequestsRaised   PreSalesRequest[]  @relation("PreSalesRequestRequester")
-  preSalesRequestsForMe    PreSalesRequest[]  @relation("PreSalesRequestedEmployee")
-  preSalesRequestsApproved PreSalesRequest[]  @relation("PreSalesRequestApprover")
-  preSalesTeamMemberships  PreSalesTeamMember[]
-  preSalesAssignedByMe     PreSalesTeamMember[] @relation("PreSalesAssigner")
+  preSalesRequestsRaised    PreSalesRequest[]           @relation("PreSalesRequestRequester")
+  preSalesRequestedOn       PreSalesRequestItem[]       @relation("PreSalesRequestedEmployee")
+  preSalesRequestsApproved  PreSalesRequest[]           @relation("PreSalesRequestApprover")
+  preSalesTeamMemberships   PreSalesTeamMember[]
+  preSalesAssignedByMe      PreSalesTeamMember[]        @relation("PreSalesAssigner")
   preSalesTaskStatusChanges PreSalesTaskStatusHistory[] @relation("PreSalesTaskStatusActor")
-  preSalesTaskAttachments  PreSalesTaskAttachment[] @relation("PreSalesTaskAttachmentUploader")
-  preSalesTasksAssignedTo  PreSalesTask[]     @relation("PreSalesTaskAssignee")
-  preSalesTasksAssignedBy  PreSalesTask[]     @relation("PreSalesTaskAssigner")
-  preSalesMomUploads       PreSalesMoM[]
-  generatedLetters         GeneratedLetter[]
-  uploadedProjectDocuments ProjectDocument[]
-  assignedLeads            Lead[]                     @relation("LeadAssignee")
-  createdLeads             Lead[]                     @relation("LeadCreator")
-  peerReviewsGiven         PeerFeedback[]             @relation("PeerReviewer")
-  peerReviewsReceived      PeerFeedback[]             @relation("PeerReviewee")
-  fieldVisits              FieldVisit[]               @relation("EmployeeFieldVisits")
-  followUpsAssigned        LeadFollowUp[]             @relation("FollowUpAssignee")
-  leadContactsAdded        LeadContact[]              @relation("LeadContactAddedBy")
-  leadFilesUploaded        LeadFile[]                 @relation("LeadFileUploader")
-  leadNotesCreated         LeadNote[]                 @relation("LeadNoteCreator")
-  leadActivities           LeadActivity[]             @relation("LeadActivityActor")
-  leadContactNotesCreated  LeadContactNote[]          @relation("LeadContactNoteCreator")
-  leadFormsCreated         LeadForm[]                 @relation("LeadFormCreator")
-  reportedTickets          Ticket[]                   @relation("TicketReporter")
-  assignedTickets          Ticket[]                   @relation("TicketAssignee")
-  ticketComments           TicketComment[]            @relation("TicketCommentAuthor")
-  ticketAttachments        TicketAttachment[]         @relation("TicketAttachmentUploader")
-  ticketActivities         TicketActivity[]           @relation("TicketActivityActor")
-  ticketTimeEntries        TicketTimeEntry[]
+  preSalesTaskAttachments   PreSalesTaskAttachment[]    @relation("PreSalesTaskAttachmentUploader")
+  preSalesTasksAssignedTo   PreSalesTask[]              @relation("PreSalesTaskAssignee")
+  preSalesTasksAssignedBy   PreSalesTask[]              @relation("PreSalesTaskAssigner")
+  preSalesMomUploads        PreSalesMoM[]
+  generatedLetters          GeneratedLetter[]
+  uploadedProjectDocuments  ProjectDocument[]
+  assignedLeads             Lead[]                      @relation("LeadAssignee")
+  createdLeads              Lead[]                      @relation("LeadCreator")
+  peerReviewsGiven          PeerFeedback[]              @relation("PeerReviewer")
+  peerReviewsReceived       PeerFeedback[]              @relation("PeerReviewee")
+  fieldVisits               FieldVisit[]                @relation("EmployeeFieldVisits")
+  followUpsAssigned         LeadFollowUp[]              @relation("FollowUpAssignee")
+  leadContactsAdded         LeadContact[]               @relation("LeadContactAddedBy")
+  leadFilesUploaded         LeadFile[]                  @relation("LeadFileUploader")
+  leadNotesCreated          LeadNote[]                  @relation("LeadNoteCreator")
+  leadActivities            LeadActivity[]              @relation("LeadActivityActor")
+  leadContactNotesCreated   LeadContactNote[]           @relation("LeadContactNoteCreator")
+  leadFormsCreated          LeadForm[]                  @relation("LeadFormCreator")
+  reportedTickets           Ticket[]                    @relation("TicketReporter")
+  assignedTickets           Ticket[]                    @relation("TicketAssignee")
+  ticketComments            TicketComment[]             @relation("TicketCommentAuthor")
+  ticketAttachments         TicketAttachment[]          @relation("TicketAttachmentUploader")
+  ticketActivities          TicketActivity[]            @relation("TicketActivityActor")
+  ticketTimeEntries         TicketTimeEntry[]
 
   @@unique([companyId, employeeCode])
 }
@@ -503,22 +505,30 @@ model Holiday {
 
 // Attendance & Leaves
 model LeaveType {
-  id                Int            @id @default(autoincrement())
-  name              String
-  description       String?
-  defaultDays       Int            @default(0)
-  accrualFrequency  String? // NONE, MONTHLY, YEARLY
-  accrualAmount     Float          @default(0)
-  isPaid            Boolean        @default(true)
-  allowHalfDay      Boolean        @default(true)
-  carryForward      Boolean        @default(false)
-  carryForwardLimit Int            @default(0)
-  companyId         Int
-  company           Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  leaveBalances     LeaveBalance[]
-  leaveRequests     LeaveRequest[]
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id               Int               @id @default(autoincrement())
+  name             String
+  description      String?
+  defaultDays      Int               @default(0)
+  accrualFrequency String? // NONE, MONTHLY, YEARLY
+  accrualAmount    Float             @default(0)
+  isPaid           Boolean           @default(true)
+  allowHalfDay     Boolean           @default(true)
+  /// Leave does not survive the year it was granted in. When this is on, days
+  /// still unused when the year's last payslip is generated are paid out
+  /// instead of expiring — see LeaveEncashment. Off for Sick, Maternity and
+  /// unpaid types, which are an entitlement to be absent, not a balance owed.
+  encashable       Boolean           @default(false)
+  /// Most days that may be paid out in one year. 0 means no cap — the field
+  /// only appears once encashment is switched on, so a cap of zero would make
+  /// the switch do nothing.
+  encashmentLimit  Int               @default(0)
+  companyId        Int
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leaveBalances    LeaveBalance[]
+  leaveRequests    LeaveRequest[]
+  encashments      LeaveEncashment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 model LeaveBalance {
@@ -529,7 +539,6 @@ model LeaveBalance {
   leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
   allocated   Float     @default(0)
   used        Float     @default(0)
-  carriedOver Float     @default(0)
   year        Int
 
   /// Which accrual period this row has already been credited for — "2026-09"
@@ -538,12 +547,8 @@ model LeaveBalance {
   /// double-credit: the second run matches zero rows.
   lastAccruedPeriod String?
 
-  /// The year this row's carriedOver was rolled in from. Set once, and checked
-  /// before rolling again — carriedOver being 0 is a legitimate outcome, so it
-  /// cannot serve as the guard itself.
-  carriedForwardFromYear Int?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([employeeId, leaveTypeId, year])
 }
@@ -568,50 +573,90 @@ model LeaveRequest {
   updatedAt       DateTime  @updatedAt
 }
 
+/// What an employee was paid for the leave they did not take.
+///
+/// Leave is granted per calendar year and expires with it — nothing rolls
+/// over. Whatever is left when the year's final payslip is generated is bought
+/// back at the same daily rate Loss of Pay is charged at, so a day not taken is
+/// worth exactly what a day of absence costs.
+///
+/// One row per employee, per leave type, per year. Rewritten whenever the
+/// December draft is regenerated, and frozen once that payslip is finalized.
+model LeaveEncashment {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId Int
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  /// The leave year being closed out, not the year it was paid in — they are
+  /// the same today, but a January payout for the previous year would not be.
+  year        Int
+  /// Days paid out: what was left after the cap, not what was left before it.
+  days        Float     @default(0)
+  ratePerDay  Float     @default(0)
+  amount      Float     @default(0)
+  /// The payslip that carried the payout. Null only if the slip was deleted.
+  payslipId   Int?
+  payslip     Payslip?  @relation(fields: [payslipId], references: [id], onDelete: SetNull)
+  companyId   Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([employeeId, leaveTypeId, year])
+}
+
 model Attendance {
-  id            Int             @id @default(autoincrement())
-  employeeId    Int
-  employee      Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  date          DateTime        @db.Date
-  clockIn       DateTime?
-  clockOut      DateTime?
-  clockInLat    Float?
-  clockInLng    Float?
-  clockOutLat   Float?
-  clockOutLng   Float?
-  overtimeHours Float           @default(0)
-  status        String          @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
-  isLate        Boolean         @default(false)
-  isEarlyLeave  Boolean         @default(false)
+  id             Int             @id @default(autoincrement())
+  employeeId     Int
+  employee       Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date           DateTime        @db.Date
+  clockIn        DateTime?
+  clockOut       DateTime?
+  clockInLat     Float?
+  clockInLng     Float?
+  clockOutLat    Float?
+  clockOutLng    Float?
+  overtimeHours  Float           @default(0)
+  status         String          @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
+  isLate         Boolean         @default(false)
+  isEarlyLeave   Boolean         @default(false)
+  /// The day was never clocked out of — the 23:00 IST sweep closed it. The
+  /// clock-out time is a cutoff, not an observation, and its coordinates are
+  /// the clock-in's reused because there was no device to ask. Worth saying on
+  /// screen: an 11 PM stamp otherwise reads as someone working until 11 PM.
+  autoClockedOut Boolean         @default(false)
   // What the day was judged against, captured at clock-in. Stored rather than
   // re-derived because the roster can be edited afterwards and history must
   // not silently change: a day marked late has to stay explicable.
-  shiftId       Int?
-  shift         Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  shiftId        Int?
+  shift          Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   // On-site work: which project the day belonged to, and whether the branch
   // geofence was bypassed because the person was rostered away from the office.
-  projectId     Int?
-  project       Project?        @relation("ProjectAttendance", fields: [projectId], references: [id], onDelete: SetNull)
-  isOnsite      Boolean         @default(false)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  logs          AttendanceLog[]
+  projectId      Int?
+  project        Project?        @relation("ProjectAttendance", fields: [projectId], references: [id], onDelete: SetNull)
+  isOnsite       Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  logs           AttendanceLog[]
 
   @@unique([employeeId, date])
 }
 
 model AttendanceLog {
-  id           Int        @id @default(autoincrement())
-  attendanceId Int
-  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
-  clockIn      DateTime
-  clockOut     DateTime?
-  clockInLat   Float?
-  clockInLng   Float?
-  clockOutLat  Float?
-  clockOutLng  Float?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id             Int        @id @default(autoincrement())
+  attendanceId   Int
+  attendance     Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  clockIn        DateTime
+  clockOut       DateTime?
+  clockInLat     Float?
+  clockInLng     Float?
+  clockOutLat    Float?
+  clockOutLng    Float?
+  /// Per session, because a day can hold one session the employee closed and
+  /// another the sweep did.
+  autoClockedOut Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 }
 
 model AttendanceRegularization {
@@ -631,35 +676,35 @@ model AttendanceRegularization {
 }
 
 model Shift {
-  id   Int    @id @default(autoincrement())
-  name String
+  id                  Int                @id @default(autoincrement())
+  name                String
   // Null on duration-only shifts (e.g. Comp-Off), which are defined by hours
   // worked rather than a clock window — see totalHours/halfDayHours below.
-  shortCode String? // e.g. "GS" — shown on the roster grid
-  colorCode String? // hex, e.g. "#2A97D8"
+  shortCode           String? // e.g. "GS" — shown on the roster grid
+  colorCode           String? // hex, e.g. "#2A97D8"
   // STRICT shifts are judged against the clock window below; FLEXIBLE ones only
   // against totalHours worked, so lateness and early clock-in don't apply.
-  shiftType         String  @default("STRICT")
-  startTime         String? // format "HH:mm"
-  endTime           String? // format "HH:mm"
-  bufferTimeMinutes Int     @default(15) // grace period before a clock-in is late
+  shiftType           String             @default("STRICT")
+  startTime           String? // format "HH:mm"
+  endTime             String? // format "HH:mm"
+  bufferTimeMinutes   Int                @default(15) // grace period before a clock-in is late
   // Clock time separating a full day from a half day. Not always startTime:
   // a night shift starting 21:30 has its half-day boundary at 00:30.
   halfDayTime         String? // format "HH:mm"
   halfDayHours        Float? // hours that still count as a half day
   totalHours          Float? // FLEXIBLE shifts: hours making a full day
-  earlyClockInMinutes Int     @default(0) // how early a clock-in is accepted
-  autoClockOutHours   Float   @default(0) // 0 = no auto clock-out
-  maxCheckIns         Int     @default(2) // clock-in/out pairs allowed per day
+  earlyClockInMinutes Int                @default(0) // how early a clock-in is accepted
+  autoClockOutHours   Float              @default(0) // 0 = no auto clock-out
+  maxCheckIns         Int                @default(2) // clock-in/out pairs allowed per day
   // Days the shift operates, e.g. "Monday,Tuesday,...". Null means all seven.
   workingDays         String?
   companyId           Int
-  company           Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employees         Employee[]
-  rosterEntries     ShiftRosterEntry[]
-  attendances       Attendance[]
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  company             Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employees           Employee[]
+  rosterEntries       ShiftRosterEntry[]
+  attendances         Attendance[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 }
 
 // One employee's shift on one day. Employee.shiftId is the standing default;
@@ -667,34 +712,34 @@ model Shift {
 // isDayOff and no shift is an explicit day off, distinct from having no row at
 // all (nothing rostered yet).
 model ShiftRosterEntry {
-  id         Int      @id @default(autoincrement())
-  employeeId Int
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  date       DateTime @db.Date
-  shiftId    Int?
-  shift      Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
-  isDayOff   Boolean  @default(false)
-  note       String?
+  id                   Int      @id @default(autoincrement())
+  employeeId           Int
+  employee             Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date                 DateTime @db.Date
+  shiftId              Int?
+  shift                Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  isDayOff             Boolean  @default(false)
+  note                 String?
   // On-site work details: when the assigned shift is an on-site shift the
   // roster needs to know WHERE the work happens. Project is optional — staff
   // may work at a site that no project has been created for yet.
-  projectId Int?
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  address   String?  @db.Text
+  projectId            Int?
+  project              Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  address              String?  @db.Text
   // Clock window for THIS day only, "HH:mm" IST — an on-site stint at a client
   // site rarely runs the office hours. Null means "use the shift's own window",
   // which is what every pre-existing row has, so behaviour is unchanged unless
   // someone deliberately sets a time.
-  startTime String?
-  endTime   String?
+  startTime            String?
+  endTime              String?
   // NONE = normal roster cell. PENDING = "No Project" on-site, awaiting
   // Administrator + HR approval. APPROVED / REJECTED = resolved.
-  onsiteApprovalStatus String @default("NONE") // NONE, PENDING, APPROVED, REJECTED
+  onsiteApprovalStatus String   @default("NONE") // NONE, PENDING, APPROVED, REJECTED
   approvedByUserId     Int?
-  companyId  Int
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  companyId            Int
+  company              Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@unique([employeeId, date])
   @@index([companyId, date])
@@ -742,26 +787,27 @@ model SalaryStructure {
 }
 
 model Payslip {
-  id              Int           @id @default(autoincrement())
+  id              Int               @id @default(autoincrement())
   employeeId      Int
-  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   month           Int // 1-12
   year            Int
-  workingDays     Int           @default(30)
-  presentDays     Float         @default(0)
-  absentDays      Float         @default(0)
-  halfDays        Float         @default(0)
-  totalEarnings   Float         @default(0)
-  totalDeductions Float         @default(0)
-  lossOfPay       Float         @default(0)
-  expenseAmount   Float         @default(0)
-  netPay          Float         @default(0)
-  status          String        @default("DRAFT") // DRAFT, FINALIZED, PAID
+  workingDays     Int               @default(30)
+  presentDays     Float             @default(0)
+  absentDays      Float             @default(0)
+  halfDays        Float             @default(0)
+  totalEarnings   Float             @default(0)
+  totalDeductions Float             @default(0)
+  lossOfPay       Float             @default(0)
+  expenseAmount   Float             @default(0)
+  netPay          Float             @default(0)
+  status          String            @default("DRAFT") // DRAFT, FINALIZED, PAID
   paidOn          DateTime?
   items           PayslipItem[]
+  encashments     LeaveEncashment[]
   companyId       Int
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@unique([employeeId, month, year])
 }
@@ -884,42 +930,42 @@ model AssetAssignment {
 // Separate from LeadNote which is scoped to a deal/lead. Supports CRUD and
 // export from the Lead Contact Profile "Notes" tab.
 model LeadContactNote {
-  id           Int       @id @default(autoincrement())
-  contactId    Int
-  contact      LeadContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  title        String
-  type         String    @default("GENERAL") // GENERAL, CALL, MEETING, EMAIL, FOLLOW_UP, OTHER
-  content      String    @db.Text
-  createdById  Int?
-  createdBy    Employee? @relation("LeadContactNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  companyId    Int
-  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          Int         @id @default(autoincrement())
+  contactId   Int
+  contact     LeadContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  title       String
+  type        String      @default("GENERAL") // GENERAL, CALL, MEETING, EMAIL, FOLLOW_UP, OTHER
+  content     String      @db.Text
+  createdById Int?
+  createdBy   Employee?   @relation("LeadContactNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  companyId   Int
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
 // A configurable public Lead Capture Form (Lead Form Builder). Admins configure
 // which fields are shown, their order, and required status; the form generates
 // Leads into the existing Lead system via a public URL.
 model LeadForm {
-  id              Int             @id @default(autoincrement())
-  formKey         String          @unique // public identifier (e.g. short base64 id) for /lead-form/:formKey
-  name            String
-  description     String?
-  status          String          @default("ACTIVE") // ACTIVE, INACTIVE
-  successMessage  String?         @default("Thank you! Your enquiry has been received.")
-  redirectUrl     String?
-  captchaEnabled  Boolean         @default(false)
-  source          String          @default("Lead Form") // stamped on Lead.source for created leads
-  productOptions  Json? // optional list of product options for the "Product" select field
-  createdById     Int?
-  createdBy       Employee?       @relation("LeadFormCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  companyId       Int
-  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fields          LeadFormField[]
-  leadsCreated    Lead[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id             Int             @id @default(autoincrement())
+  formKey        String          @unique // public identifier (e.g. short base64 id) for /lead-form/:formKey
+  name           String
+  description    String?
+  status         String          @default("ACTIVE") // ACTIVE, INACTIVE
+  successMessage String?         @default("Thank you! Your enquiry has been received.")
+  redirectUrl    String?
+  captchaEnabled Boolean         @default(false)
+  source         String          @default("Lead Form") // stamped on Lead.source for created leads
+  productOptions Json? // optional list of product options for the "Product" select field
+  createdById    Int?
+  createdBy      Employee?       @relation("LeadFormCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  companyId      Int
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fields         LeadFormField[]
+  leadsCreated   Lead[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 // Field configuration for a LeadForm.
@@ -962,14 +1008,14 @@ model HardwareRequest {
 
 // Product/Batch-based Inventory (Assets & IT)
 model InventoryItem {
-  id             Int       @id @default(autoincrement())
+  id             Int                    @id @default(autoincrement())
   name           String
   brand          String?
-  category       String    @default("OTHER") // LAPTOP, DESKTOP, MONITOR, PRINTER, PERIPHERAL, MOBILE, FURNITURE, PANTRY, STATIONERY, HOUSEKEEPING, OTHER
-  itemType       String    @default("CONSUMABLE") // ASSET (non-perishable) | CONSUMABLE (perishable/quantified)
-  unit           String    @default("units") // packets, pcs, boxes, bottles...
-  quantity       Int       @default(0) // total purchased quantity (immutable; changed only via transactions)
-  unitCost       Float     @default(0)
+  category       String                 @default("OTHER") // LAPTOP, DESKTOP, MONITOR, PRINTER, PERIPHERAL, MOBILE, FURNITURE, PANTRY, STATIONERY, HOUSEKEEPING, OTHER
+  itemType       String                 @default("CONSUMABLE") // ASSET (non-perishable) | CONSUMABLE (perishable/quantified)
+  unit           String                 @default("units") // packets, pcs, boxes, bottles...
+  quantity       Int                    @default(0) // total purchased quantity (immutable; changed only via transactions)
+  unitCost       Float                  @default(0)
   purchaseDate   DateTime?
   supplier       String?
   batchNumber    String?
@@ -978,41 +1024,41 @@ model InventoryItem {
   model          String?
   serialNumber   String?
   warrantyExpiry DateTime?
-  notes          String?   @db.Text
-  status         String    @default("ACTIVE") // ACTIVE, IN_REPAIR, RETIRED
+  notes          String?                @db.Text
+  status         String                 @default("ACTIVE") // ACTIVE, IN_REPAIR, RETIRED
   companyId      Int
-  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   transactions   InventoryTransaction[]
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   @@index([companyId])
 }
 
 // Transaction ledger against an InventoryItem. All quantities are derived from this history.
 model InventoryTransaction {
-  id                  Int                   @id @default(autoincrement())
+  id                  Int                    @id @default(autoincrement())
   itemId              Int
-  item                InventoryItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  type                String                // PURCHASE, ASSIGNMENT, RETURN, CONSUMPTION, EXPIRED, ADJUSTMENT
-  quantity            Int                   // units involved (signed for ADJUSTMENT)
-  date                DateTime              @default(now())
+  item                InventoryItem          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  type                String // PURCHASE, ASSIGNMENT, RETURN, CONSUMPTION, EXPIRED, ADJUSTMENT
+  quantity            Int // units involved (signed for ADJUSTMENT)
+  date                DateTime               @default(now())
   employeeId          Int?
-  employee            Employee?             @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  assigneeText        String?               // free-text person/location e.g. "Pantry - 2nd Floor"
+  employee            Employee?              @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  assigneeText        String? // free-text person/location e.g. "Pantry - 2nd Floor"
   expectedReturnDate  DateTime?
-  parentTransactionId Int?                  // RETURN links back to its ASSIGNMENT
-  parentTransaction   InventoryTransaction? @relation("InventoryTxnLink", fields: [parentTransactionId], references: [id], onDelete: SetNull)
+  parentTransactionId Int? // RETURN links back to its ASSIGNMENT
+  parentTransaction   InventoryTransaction?  @relation("InventoryTxnLink", fields: [parentTransactionId], references: [id], onDelete: SetNull)
   linkedReturns       InventoryTransaction[] @relation("InventoryTxnLink")
   purpose             String?
   conditionOnReturn   String?
-  reason              String?               // adjustment/expiry reason
+  reason              String? // adjustment/expiry reason
   createdById         Int?
-  createdBy           User?                 @relation("InventoryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy           User?                  @relation("InventoryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   companyId           Int
-  company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  company             Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   @@index([itemId])
   @@index([companyId])
@@ -1052,65 +1098,65 @@ model Job {
 }
 
 model JobApplication {
-  id              Int         @id @default(autoincrement())
-  jobId           Int
-  job             Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  companyId       Int
-  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fullName        String
-  email           String
-  phone           String
-  resumeUrl       String?
-  linkedinUrl     String?
-  portfolioUrl    String?
-  experienceYears String?
-  noticePeriod    String?
-  skills          String[]      @default([])
-  dateOfBirth     DateTime?
-  gender          String?
-  currentLocation String?
-  currentCtc      Float?
-  expectedCtc     Float?
+  id                     Int          @id @default(autoincrement())
+  jobId                  Int
+  job                    Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  companyId              Int
+  company                Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fullName               String
+  email                  String
+  phone                  String
+  resumeUrl              String?
+  linkedinUrl            String?
+  portfolioUrl           String?
+  experienceYears        String?
+  noticePeriod           String?
+  skills                 String[]     @default([])
+  dateOfBirth            DateTime?
+  gender                 String?
+  currentLocation        String?
+  currentCtc             Float?
+  expectedCtc            Float?
   // The salary budget approved for this specific candidate. When unset the
   // job's maxSalary stands in as the effective budget — see
   // ApplicationsService.effectiveProfileBudget.
-  profileBudget   Float?
-  source          String?
-  coverLetter     String?       @db.Text
-  photoUrl        String?
-  address         String?       @db.Text // Full postal address, printed on the offer letter
-  joiningDate     DateTime? // Agreed date of joining, printed on the offer letter
-  status          String        @default("NEW") // NEW, REVIEWING, SHORTLISTED, INTERVIEWING, OFFERED, REJECTED, HIRED, ONBOARDED
+  profileBudget          Float?
+  source                 String?
+  coverLetter            String?      @db.Text
+  photoUrl               String?
+  address                String?      @db.Text // Full postal address, printed on the offer letter
+  joiningDate            DateTime? // Agreed date of joining, printed on the offer letter
+  status                 String       @default("NEW") // NEW, REVIEWING, SHORTLISTED, INTERVIEWING, OFFERED, REJECTED, HIRED, ONBOARDED
   // Every pipeline stage this candidate has actually been moved through, in
   // visit order. A single `status` column cannot answer "did they pass phone
   // screening?" once the candidate has moved on, and that is exactly what the
   // mandatory-stage gate on OFFERED / HIRED needs to know.
-  completedStages String[]      @default([])
-  rejectionReason String?       @db.Text
-  offeredSalary   Float?
-  approvalStatus  String?       @default("APPROVED") // PENDING_APPROVAL, APPROVED, REJECTED
+  completedStages        String[]     @default([])
+  rejectionReason        String?      @db.Text
+  offeredSalary          Float?
+  approvalStatus         String?      @default("APPROVED") // PENDING_APPROVAL, APPROVED, REJECTED
   // Why the company is paying above the profile budget. Mandatory to raise the
   // request, and shown to the approver next to the proposed amount.
-  approvalReason  String?       @db.Text
+  approvalReason         String?      @db.Text
   // The budget the offer was measured against when approval was requested, kept
   // so the approver sees the figure that applied at request time even if the
   // candidate's profile budget is edited afterwards.
-  approvalBudget      Float?
+  approvalBudget         Float?
   // The stage the recruiter was trying to reach when approval was demanded.
   // The candidate holds their current stage while the request is open, and this
   // is where approving it finally moves them.
   approvalRequestedStage String?
-  approvalRequestedAt DateTime?
-  approvalDecidedAt   DateTime?
-  approvalDecidedById Int?
-  answers         String?       @db.Text // Store JSON string of answers
-  aiScore         Int?
-  aiSummary       String?       @db.Text
-  isAiScored      Boolean       @default(false)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  interviews      Interview[]
-  offerLetter     OfferLetter?
+  approvalRequestedAt    DateTime?
+  approvalDecidedAt      DateTime?
+  approvalDecidedById    Int?
+  answers                String?      @db.Text // Store JSON string of answers
+  aiScore                Int?
+  aiSummary              String?      @db.Text
+  isAiScored             Boolean      @default(false)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  interviews             Interview[]
+  offerLetter            OfferLetter?
 }
 
 // A generated offer letter for a hired/offered candidate. v1 uses a single
@@ -1120,26 +1166,26 @@ model JobApplication {
 // A reusable HR letter body (offer, relieving, increment, bond, …). The body is
 // HTML containing ##MERGE_TAG## placeholders resolved per employee at generation.
 model LetterTemplate {
-  id          Int               @id @default(autoincrement())
-  companyId   Int
-  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  title       String
-  body        String            @db.Text
-  description String? // short note for the template list
-  isActive    Boolean           @default(true)
+  id                Int               @id @default(autoincrement())
+  companyId         Int
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title             String
+  body              String            @db.Text
+  description       String? // short note for the template list
+  isActive          Boolean           @default(true)
   // Issue this letter automatically when a candidate is onboarded — that is the
   // first moment the employee record exists, so ##EMPLOYEE_*## tags can resolve.
-  autoOnOnboarding Boolean      @default(false)
+  autoOnOnboarding  Boolean           @default(false)
   // EMPLOYEE letters render against an Employee; CANDIDATE ones against a job
   // application, where the ##EMPLOYEE_*## tags resolve to candidate details.
-  scope            String       @default("EMPLOYEE")
+  scope             String            @default("EMPLOYEE")
   // The single CANDIDATE template the recruitment offer-letter flow renders,
   // replacing the one-off HTML previously kept in SystemSettings.
-  useForOfferLetter Boolean     @default(false)
-  displayOrder Int              @default(0)
-  letters     GeneratedLetter[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  useForOfferLetter Boolean           @default(false)
+  displayOrder      Int               @default(0)
+  letters           GeneratedLetter[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@unique([companyId, title])
 }
@@ -1170,33 +1216,33 @@ model GeneratedLetter {
 }
 
 model OfferLetter {
-  id                    Int             @id @default(autoincrement())
-  applicationId         Int             @unique
-  application           JobApplication  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  companyId             Int
-  company               Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  status                String          @default("DRAFT") // DRAFT, SENT, ACCEPTED, DECLINED
-  pdfUrl                String?
-  accessToken           String          @unique // opaque token for the candidate accept/decline link
-  issuedAt              DateTime?
-  respondedAt           DateTime?
-  
+  id            Int            @id @default(autoincrement())
+  applicationId Int            @unique
+  application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  companyId     Int
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  status        String         @default("DRAFT") // DRAFT, SENT, ACCEPTED, DECLINED
+  pdfUrl        String?
+  accessToken   String         @unique // opaque token for the candidate accept/decline link
+  issuedAt      DateTime?
+  respondedAt   DateTime?
+
   // E-Signature Fields
-  signatureName         String?
-  signatureIp           String?
-  signatureUserAgent    String?
-  countersignedPdfUrl   String?
-  signatureImage        String?   @db.Text // adopted signature as a data: URI
-  signatureType         String?   // DRAWN | TYPED | UPLOADED
-  initialsImage         String?   @db.Text
+  signatureName       String?
+  signatureIp         String?
+  signatureUserAgent  String?
+  countersignedPdfUrl String?
+  signatureImage      String? @db.Text // adopted signature as a data: URI
+  signatureType       String? // DRAWN | TYPED | UPLOADED
+  initialsImage       String? @db.Text
 
   // Signing audit trail
-  unlockedAt            DateTime?
-  viewedAt              DateTime?
-  unlockAttempts        Int       @default(0)
+  unlockedAt     DateTime?
+  viewedAt       DateTime?
+  unlockAttempts Int       @default(0)
 
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Interview {
@@ -2318,35 +2364,35 @@ model PayrollSetting {
 
 // SuperAdmin-controlled, company-wide system toggles.
 model SystemSetting {
-  id                             Int      @id @default(autoincrement())
-  companyId                      Int      @unique
-  company                        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  shiftRosterVisibleToEmployees  Boolean  @default(false)
-  offerLetterTemplateHtml        String?  @db.Text
-  offerLetterTemplateDocxUrl     String?  // ImageKit URL for the uploaded Word Template
+  id                            Int      @id @default(autoincrement())
+  companyId                     Int      @unique
+  company                       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shiftRosterVisibleToEmployees Boolean  @default(false)
+  offerLetterTemplateHtml       String?  @db.Text
+  offerLetterTemplateDocxUrl    String? // ImageKit URL for the uploaded Word Template
   // Company legal identity, statutory policy constants and salary-structure ratios
   // used to render offer letters. Kept as JSON so adding a clause doesn't require a
   // migration — see OfferLetterConfig in offer-letters.service.ts for the shape.
-  offerLetterConfig              Json?
-  defaultTicketAssigneeId        Int?     // Employee auto-assigned as default ticket assignee
+  offerLetterConfig             Json?
+  defaultTicketAssigneeId       Int? // Employee auto-assigned as default ticket assignee
   // Standard terms pre-filled into every new quotation. Editable on the quote
   // itself, so this is a starting point rather than a policy — null falls back
   // to the built-in defaults, which is what every quote used before.
-  quotationTerms                 String?  @db.Text
+  quotationTerms                String?  @db.Text
   // Signature block printed at the foot of a quotation. The name is what
   // follows "AUTHORISED SIGNATORY FOR"; the image is the signature or stamp
   // placed above it. Both optional — the block degrades to the company name.
   /// Who attendance-issue tickets are assigned to. Separate from
   /// defaultTicketAssigneeId, which points at the development team's PM —
   /// attendance is HR's business and must not land in the dev queue.
-  attendanceTicketAssigneeId     Int?
-  quotationSignatoryName         String?
-  quotationSignatureUrl          String?
+  attendanceTicketAssigneeId    Int?
+  quotationSignatoryName        String?
+  quotationSignatureUrl         String?
   // SUPERADMIN switch: when true, every user in the company must complete TOTP
   // enrolment at next sign-in, and nobody may turn their own 2FA off.
-  twoFactorRequired              Boolean  @default(false)
-  createdAt                      DateTime @default(now())
-  updatedAt                      DateTime @updatedAt
+  twoFactorRequired             Boolean  @default(false)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
 }
 
 // ═══════════════════════════════════════════
@@ -2354,13 +2400,13 @@ model SystemSetting {
 // ═══════════════════════════════════════════
 
 model Lead {
-  id                  Int            @id @default(autoincrement())
+  id                  Int                  @id @default(autoincrement())
   // Human-readable reference shown to users, e.g. L0926-001 (L + MMYY + monthly
   // sequence). Nullable so rows created before this existed stay valid.
-  leadCode            String?        @unique
+  leadCode            String?              @unique
   title               String
   subjectLine         String?
-  dealCategory        String?        @default("Inbound") // Inbound, Outbound, Referral, Enterprise, Retainer
+  dealCategory        String?              @default("Inbound") // Inbound, Outbound, Referral, Enterprise, Retainer
   companyName         String?
   contactName         String?
   email               String?
@@ -2368,31 +2414,31 @@ model Lead {
   value               Float?
   currency            String?
   source              String?
-  status              String         @default("NEW") // NEW, QUALIFIED, PROPOSAL, WON, LOST
-  description         String?        @db.Text
+  status              String               @default("NEW") // NEW, QUALIFIED, PROPOSAL, WON, LOST
+  description         String?              @db.Text
   qualificationReason String?
   proposalDate        DateTime?
   assignedToId        Int?
-  assignedTo          Employee?      @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo          Employee?            @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   addedById           Int?
-  addedBy             Employee?      @relation("LeadCreator", fields: [addedById], references: [id], onDelete: SetNull)
+  addedBy             Employee?            @relation("LeadCreator", fields: [addedById], references: [id], onDelete: SetNull)
   broughtByContactId  Int? // External source (e.g. broker/partner) who brought this lead — alternative to addedBy
-  broughtByContact    LeadContact?   @relation(fields: [broughtByContactId], references: [id], onDelete: SetNull)
+  broughtByContact    LeadContact?         @relation(fields: [broughtByContactId], references: [id], onDelete: SetNull)
   leadFormId          Int? // Lead Form that generated this lead (public capture forms)
-  leadForm            LeadForm?      @relation(fields: [leadFormId], references: [id], onDelete: SetNull)
+  leadForm            LeadForm?            @relation(fields: [leadFormId], references: [id], onDelete: SetNull)
   expectedCloseDate   DateTime?
   website             String?
-  address             String?        @db.Text
+  address             String?              @db.Text
   companyId           Int
-  company             Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company             Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   clientId            Int?
-  client              Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  flow                String         @default("SALES") // SALES (main pipeline) | PRE_SALES (evaluation pipeline)
-  convertedToSalesId  Int?           // Set once a PRE_SALES deal is handed off to Sales
-  convertedToSales    Lead?          @relation("LeadConversion", fields: [convertedToSalesId], references: [id], onDelete: SetNull)
-  convertedFrom       Lead[]         @relation("LeadConversion")
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  client              Client?              @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  flow                String               @default("SALES") // SALES (main pipeline) | PRE_SALES (evaluation pipeline)
+  convertedToSalesId  Int? // Set once a PRE_SALES deal is handed off to Sales
+  convertedToSales    Lead?                @relation("LeadConversion", fields: [convertedToSalesId], references: [id], onDelete: SetNull)
+  convertedFrom       Lead[]               @relation("LeadConversion")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   quotations          Quotation[]
   followUps           LeadFollowUp[]
   files               LeadFile[]
@@ -2407,9 +2453,9 @@ model Lead {
 // External contact (broker/partner/referrer) who can be selected as the source
 // of a lead via the "Lead Brought By" field, as an alternative to an internal Employee.
 model LeadContact {
-  id                Int       @id @default(autoincrement())
+  id                Int               @id @default(autoincrement())
   // e.g. LC0926-001 — same scheme as Lead.leadCode.
-  contactCode       String?   @unique
+  contactCode       String?           @unique
   salutation        String?
   name              String
   email             String?
@@ -2423,13 +2469,13 @@ model LeadContact {
   state             String?
   city              String?
   postalCode        String?
-  address           String?   @db.Text
+  address           String?           @db.Text
   addedById         Int?
-  addedBy           Employee? @relation("LeadContactAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  addedBy           Employee?         @relation("LeadContactAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
   companyId         Int
-  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
   leadsBrought      Lead[]
   notes             LeadContactNote[]
 }
@@ -2438,30 +2484,30 @@ model LeadContact {
 // activity note, not a task with a completion workflow. Whether it's "upcoming"
 // or "past" is computed from `scheduledAt` vs now; there is no stored status.
 model LeadFollowUp {
-  id            Int       @id @default(autoincrement())
+  id            Int        @id @default(autoincrement())
   leadId        Int
-  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead          Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
   title         String // e.g. "Follow-up call regarding pricing"
   contactPerson String? // Whom to follow up with
   contactPhone  String?
   contactEmail  String?
-  type          String    @default("CALL") // CALL, MEETING, DEMO, EMAIL, FIELD_VISIT, NOTE, OTHER
+  type          String     @default("CALL") // CALL, MEETING, DEMO, EMAIL, FIELD_VISIT, NOTE, OTHER
   scheduledAt   DateTime // When this interaction is/was planned
-  notes         String?   @db.Text // Agenda going in, remarks/outcome coming out — one running note
-  status        String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  notes         String?    @db.Text // Agenda going in, remarks/outcome coming out — one running note
+  status        String     @default("PENDING") // PENDING, COMPLETED, CANCELLED
   assignedToId  Int? // Responsible rep
-  assignedTo    Employee? @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo    Employee?  @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   companyId     Int
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
   files         LeadFile[]
 }
 
 model LeadFile {
-  id           Int       @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   leadId       Int
-  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead         Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
   // Optional because a file can belong to the whole deal, or to one follow-up.
   followUpId   Int?
   followUp     LeadFollowUp? @relation(fields: [followUpId], references: [id], onDelete: Cascade)
@@ -2469,25 +2515,25 @@ model LeadFile {
   fileUrl      String
   fileType     String?
   fileSize     Int?
-  purpose      String?   // PURCHASE_ORDER for the document required to win a deal
+  purpose      String? // PURCHASE_ORDER for the document required to win a deal
   uploadedById Int?
-  uploadedBy   Employee? @relation("LeadFileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedBy   Employee?     @relation("LeadFileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
   companyId    Int
-  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt    DateTime  @default(now())
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime      @default(now())
 }
 
 model LeadNote {
-  id           Int       @id @default(autoincrement())
-  leadId       Int
-  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  content      String    @db.Text
-  createdById  Int?
-  createdBy    Employee? @relation("LeadNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  companyId    Int
-  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  leadId      Int
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  content     String    @db.Text
+  createdById Int?
+  createdBy   Employee? @relation("LeadNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  companyId   Int
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model LeadActivity {
@@ -2537,6 +2583,13 @@ model PreSalesTeamMember {
   assignedBy     Employee? @relation("PreSalesAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
   /// Why they were added — "analyse the client's technical requirements".
   remark         String?   @db.Text
+  /// Terms the person is engaged under, carried over from the request that put
+  /// them here (or set directly by an admin). Nullable: the members added
+  /// before this existed have none, and inventing values for them would be
+  /// worse than showing nothing.
+  technology     String?
+  engagementType String? // ONSITE, VIRTUAL
+  hours          Float?
   status         String    @default("ACTIVE") // ACTIVE, REMOVED
   removedAt      DateTime?
   createdAt      DateTime  @default(now())
@@ -2551,26 +2604,32 @@ model PreSalesTeamMember {
 // a meeting / on an on-demand basis. The admin approves or rejects it from the
 // same modal, with a remarks field.
 model PreSalesRequest {
-  id            Int       @id @default(autoincrement())
+  id            Int                   @id @default(autoincrement())
   companyId     Int
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   leadId        Int
-  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead          Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
   requestedById Int
-  requestedBy   Employee  @relation("PreSalesRequestRequester", fields: [requestedById], references: [id], onDelete: Cascade)
-  employeeId    Int
-  employee      Employee  @relation("PreSalesRequestedEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  requestedBy   Employee              @relation("PreSalesRequestRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  /// One line per person asked for. A request is rarely for one specialist —
+  /// it is "a network engineer on site and a cloud architect remotely" — and
+  /// the admin approves, trims or substitutes that set as a whole.
+  items         PreSalesRequestItem[]
+  /// NEW_MEMBER asks for people to join the deal; ADDITIONAL_HOURS asks for
+  /// more of an existing member's time. Both take the same approve/reject path,
+  /// which is why they are one model rather than two.
+  type          String                @default("NEW_MEMBER")
   /// Why this person is needed. Required — an admin approving blind is the
   /// failure mode this whole flow exists to prevent.
-  reason        String?   @db.Text
+  reason        String?               @db.Text
   /// The approver's note, shown to the requester on a rejection.
-  adminRemark   String?   @db.Text
-  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  adminRemark   String?               @db.Text
+  status        String                @default("PENDING") // PENDING, APPROVED, REJECTED
   approvedById  Int?
-  approvedBy    Employee? @relation("PreSalesRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedBy    Employee?             @relation("PreSalesRequestApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
   @@index([companyId, status])
   @@index([companyId, leadId])
@@ -2579,32 +2638,62 @@ model PreSalesRequest {
 // A task assigned by the sales person to a pre-sales person on a deal, tracked
 // on an hourly basis. The pre-sales person uploads the minutes of meeting (MoM)
 // into the task when done.
+/// One person asked for on a request, with the terms they are being asked for
+/// under.
+///
+/// Kept after the decision rather than deleted: what was asked for and what was
+/// granted are different facts, and an admin swapping one specialist for
+/// another is exactly the thing worth being able to look back at.
+model PreSalesRequestItem {
+  id             Int             @id @default(autoincrement())
+  companyId      Int
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  requestId      Int
+  request        PreSalesRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  employeeId     Int
+  employee       Employee        @relation("PreSalesRequestedEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  /// What they are wanted for — "network security", "cloud architecture".
+  technology     String?
+  /// ONSITE or VIRTUAL. Drives nothing automatically; it is what the requester
+  /// is committing the person's time to, and the admin is approving.
+  engagementType String          @default("VIRTUAL")
+  /// Hours of their time being asked for.
+  hours          Float?
+  /// REQUESTED until the admin decides, then APPROVED or REMOVED. ADDED marks
+  /// someone the admin substituted in who was never asked for.
+  status         String          @default("REQUESTED")
+  createdAt      DateTime        @default(now())
+
+  @@unique([requestId, employeeId])
+  @@index([companyId, employeeId])
+}
+
 model PreSalesTask {
-  id           Int            @id @default(autoincrement())
-  companyId    Int
-  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  leadId       Int
-  lead         Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  assignedById Int
-  assignedBy   Employee       @relation("PreSalesTaskAssigner", fields: [assignedById], references: [id], onDelete: Cascade)
-  assignedToId Int
-  assignedTo   Employee       @relation("PreSalesTaskAssignee", fields: [assignedToId], references: [id], onDelete: Cascade)
-  title        String
-  taskType     String?
-  description  String?        @db.Text
+  id               Int                         @id @default(autoincrement())
+  companyId        Int
+  company          Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadId           Int
+  lead             Lead                        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedById     Int
+  assignedBy       Employee                    @relation("PreSalesTaskAssigner", fields: [assignedById], references: [id], onDelete: Cascade)
+  assignedToId     Int
+  assignedTo       Employee                    @relation("PreSalesTaskAssignee", fields: [assignedToId], references: [id], onDelete: Cascade)
+  title            String
+  taskType         String?
+  description      String?                     @db.Text
   /// When the work is scheduled — date and time in one value, because they are
   /// never meaningful apart and storing them separately invites timezone drift.
-  scheduledAt  DateTime?
+  scheduledAt      DateTime?
   /// Minutes, not "2h 30m". A structured value can be summed and reported on;
   /// formatted text cannot.
   estimatedMinutes Int?
-  status       String         @default("NEW") // NEW, WORKING, ON_HOLD, COMPLETED
-  completedAt  DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  moms         PreSalesMoM[]
-  history      PreSalesTaskStatusHistory[]
-  attachments  PreSalesTaskAttachment[]
+  status           String                      @default("NEW") // NEW, WORKING, ON_HOLD, COMPLETED
+  completedAt      DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  moms             PreSalesMoM[]
+  history          PreSalesTaskStatusHistory[]
+  attachments      PreSalesTaskAttachment[]
 
   @@index([companyId, leadId])
   @@index([assignedToId, status])
@@ -2616,17 +2705,17 @@ model PreSalesTask {
 /// why, and what they attached at that moment. A status column alone answers
 /// none of those a week later.
 model PreSalesTaskStatusHistory {
-  id             Int          @id @default(autoincrement())
+  id             Int                      @id @default(autoincrement())
   companyId      Int
-  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   taskId         Int
-  task           PreSalesTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task           PreSalesTask             @relation(fields: [taskId], references: [id], onDelete: Cascade)
   previousStatus String?
   newStatus      String
-  remark         String?      @db.Text
+  remark         String?                  @db.Text
   changedById    Int
-  changedBy      Employee     @relation("PreSalesTaskStatusActor", fields: [changedById], references: [id], onDelete: Cascade)
-  changedAt      DateTime     @default(now())
+  changedBy      Employee                 @relation("PreSalesTaskStatusActor", fields: [changedById], references: [id], onDelete: Cascade)
+  changedAt      DateTime                 @default(now())
   attachments    PreSalesTaskAttachment[]
 
   @@index([taskId, changedAt])
@@ -2636,11 +2725,11 @@ model PreSalesTaskStatusHistory {
 /// Same shape as TicketAttachment and QuotationAttachment: the file itself
 /// lives in the existing ImageKit upload, this is only the reference.
 model PreSalesTaskAttachment {
-  id           Int          @id @default(autoincrement())
+  id           Int                        @id @default(autoincrement())
   companyId    Int
-  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   taskId       Int
-  task         PreSalesTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task         PreSalesTask               @relation(fields: [taskId], references: [id], onDelete: Cascade)
   /// Set when the file was attached as part of a status change, so the history
   /// entry can show what was handed over at that step.
   historyId    Int?
@@ -2649,8 +2738,8 @@ model PreSalesTaskAttachment {
   fileUrl      String
   fileSize     Int?
   uploadedById Int
-  uploadedBy   Employee     @relation("PreSalesTaskAttachmentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
-  createdAt    DateTime     @default(now())
+  uploadedBy   Employee                   @relation("PreSalesTaskAttachmentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime                   @default(now())
 
   @@index([taskId])
 }
@@ -2680,59 +2769,59 @@ model PreSalesMoM {
 }
 
 model Quotation {
-  id             Int             @id @default(autoincrement())
-  quoteNumber    String
+  id                   Int                   @id @default(autoincrement())
+  quoteNumber          String
   /// Optional: a quotation belongs to a DEAL. A client link is kept for quotes
   /// raised directly from Sales, and is what a Sales Order is later created
   /// against — but a quote against a lead with no client record is valid.
   /// createQuotation enforces that at least one of clientId / leadId is set.
-  clientId       Int?
-  client         Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  leadId         Int?
-  lead           Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  date           DateTime
-  validUntil     DateTime
-  subtotal       Float
-  tax            Float
-  taxRate        Float           @default(18)
-  total          Float
-  currency       String
-  notes          String?
-  terms          String?
+  clientId             Int?
+  client               Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  leadId               Int?
+  lead                 Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  date                 DateTime
+  validUntil           DateTime
+  subtotal             Float
+  tax                  Float
+  taxRate              Float                 @default(18)
+  total                Float
+  currency             String
+  notes                String?
+  terms                String?
   /// Billed-to details, seeded from the lead and editable on the quote. Stored
   /// rather than read back through the relation so that editing the lead later
   /// cannot rewrite a quotation that has already gone to the client.
-  billingCompanyName String?
-  billingAddress     String? @db.Text
+  billingCompanyName   String?
+  billingAddress       String?               @db.Text
   /// The rest of the BILL TO block, captured on the quote at the moment it was
   /// raised. A lead's details changing next month must not rewrite a document
   /// already sent to a client — the same reason billingAddress is stored here
   /// rather than read back through the lead.
-  billingContactName String?
-  billingMobile      String?
-  billingEmail       String?
-  billingGstin       String?
-  billingPan         String?
+  billingContactName   String?
+  billingMobile        String?
+  billingEmail         String?
+  billingGstin         String?
+  billingPan           String?
   /// Drives the CGST+SGST vs IGST split on the printed quote.
   billingPlaceOfSupply String?
-  status         String          @default("DRAFT") // DRAFT, PENDING_APPROVAL, SENT, ACCEPTED, REJECTED, SUPERSEDED
+  status               String                @default("DRAFT") // DRAFT, PENDING_APPROVAL, SENT, ACCEPTED, REJECTED, SUPERSEDED
   /// Revision number within the deal. The first quotation raised on a lead is
   /// v1; once it has gone to the client it is frozen, and a correction is a new
   /// row at the next version rather than an edit — otherwise the document in
   /// the client's inbox stops matching the record behind it.
-  version        Int             @default(1)
+  version              Int                   @default(1)
   /// The quotation this one replaces. Null on a first version.
-  revisionOfId   Int?
-  revisionOf     Quotation?      @relation("QuotationRevisions", fields: [revisionOfId], references: [id], onDelete: SetNull)
-  revisions      Quotation[]     @relation("QuotationRevisions")
-  approvalStatus String          @default("APPROVED") // PENDING, APPROVED, REJECTED
-  approvedById   Int?
-  approvedBy     User?           @relation("QuotationApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  companyId      Int
-  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  items          QuotationItem[]
-  attachments    QuotationAttachment[]
-  salesOrders    SalesOrder[]
+  revisionOfId         Int?
+  revisionOf           Quotation?            @relation("QuotationRevisions", fields: [revisionOfId], references: [id], onDelete: SetNull)
+  revisions            Quotation[]           @relation("QuotationRevisions")
+  approvalStatus       String                @default("APPROVED") // PENDING, APPROVED, REJECTED
+  approvedById         Int?
+  approvedBy           User?                 @relation("QuotationApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  companyId            Int
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items                QuotationItem[]
+  attachments          QuotationAttachment[]
+  salesOrders          SalesOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2753,13 +2842,13 @@ model QuotationItem {
 }
 
 model QuotationAttachment {
-  id           Int       @id @default(autoincrement())
-  fileName     String
-  fileUrl      String
-  fileSize     Int?
-  quotationId  Int
-  quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
-  createdAt    DateTime  @default(now())
+  id          Int       @id @default(autoincrement())
+  fileName    String
+  fileUrl     String
+  fileSize    Int?
+  quotationId Int
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
 }
 
 model SalesOrder {
@@ -2897,39 +2986,39 @@ model Ticket {
   priority     TicketPriority @default(MEDIUM)
   platform     TicketPlatform @default(WEB)
 
-  companyId    Int
-  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // The team that works the ticket — always software development.
   departmentId Int
-  department   Department     @relation("TicketOwningTeam", fields: [departmentId], references: [id])
+  department   Department @relation("TicketOwningTeam", fields: [departmentId], references: [id])
 
   // The department the issue was raised on behalf of. Defaults to the reporter's
   // own department but is selectable, so IT can log a bug for Finance.
   raisedByDepartmentId Int?
   raisedByDepartment   Department? @relation("TicketRaisedByDept", fields: [raisedByDepartmentId], references: [id])
 
-  reporterId   Int
-  reporter     Employee       @relation("TicketReporter", fields: [reporterId], references: [id])
+  reporterId Int
+  reporter   Employee @relation("TicketReporter", fields: [reporterId], references: [id])
 
-  assigneeId   Int?
-  assignee     Employee?      @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId Int?
+  assignee   Employee? @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
-  resolvedAt   DateTime?
-  closedAt     DateTime?
-  dueDate      DateTime?
+  resolvedAt DateTime?
+  closedAt   DateTime?
+  dueDate    DateTime?
 
   /// Which day the attendance issue concerns. Required for ATTENDANCE_ISSUE and
   /// null for everything else — a complaint with no date cannot be investigated.
   attendanceDate DateTime?
 
-  comments     TicketComment[]
-  attachments  TicketAttachment[]
-  activities   TicketActivity[]
-  timeEntries  TicketTimeEntry[]
+  comments    TicketComment[]
+  attachments TicketAttachment[]
+  activities  TicketActivity[]
+  timeEntries TicketTimeEntry[]
 
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([departmentId])
@@ -2974,17 +3063,17 @@ model TicketActivity {
 }
 
 model TicketTimeEntry {
-  id          Int       @id @default(autoincrement())
-  ticketId    Int
-  ticket      Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  userId      Int
-  user        Employee  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  startTime   DateTime
-  endTime     DateTime?
-  duration    Int?      // duration in seconds
-  notes       String?   @db.Text
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        Int       @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      Employee  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startTime DateTime
+  endTime   DateTime?
+  duration  Int? // duration in seconds
+  notes     String?   @db.Text
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([ticketId])
   @@index([userId])

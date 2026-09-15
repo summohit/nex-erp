@@ -26,8 +26,8 @@ async function main() {
       description: 'Planned vacations or long personal breaks.',
       defaultDays: 15,
       isPaid: true,
-      carryForward: true,
-      carryForwardLimit: 30,
+      encashable: true,
+      encashmentLimit: 30,
       companyId: company.id,
     },
     {
@@ -35,8 +35,8 @@ async function main() {
       description: 'Short, unplanned personal matters or emergencies.',
       defaultDays: 7,
       isPaid: true,
-      carryForward: false,
-      carryForwardLimit: 0,
+      encashable: false,
+      encashmentLimit: 0,
       companyId: company.id,
     },
     {
@@ -44,8 +44,8 @@ async function main() {
       description: 'Recovery from illness or injury.',
       defaultDays: 10,
       isPaid: true,
-      carryForward: true,
-      carryForwardLimit: 20,
+      encashable: true,
+      encashmentLimit: 20,
       companyId: company.id,
     },
     {
@@ -53,8 +53,8 @@ async function main() {
       description: 'Statutory leave for childbirth and care for a newborn.',
       defaultDays: 182, // roughly 26 weeks
       isPaid: true,
-      carryForward: false,
-      carryForwardLimit: 0,
+      encashable: false,
+      encashmentLimit: 0,
       companyId: company.id,
     },
     {
@@ -62,8 +62,8 @@ async function main() {
       description: 'Time off for new fathers.',
       defaultDays: 5,
       isPaid: true,
-      carryForward: false,
-      carryForwardLimit: 0,
+      encashable: false,
+      encashmentLimit: 0,
       companyId: company.id,
     },
     {
@@ -71,8 +71,8 @@ async function main() {
       description: 'Time off to mourn the loss of an immediate family member.',
       defaultDays: 3,
       isPaid: true,
-      carryForward: false,
-      carryForwardLimit: 0,
+      encashable: false,
+      encashmentLimit: 0,
       companyId: company.id,
     },
     {
@@ -80,8 +80,8 @@ async function main() {
       description: 'Special leave granted for an employee\'s own wedding.',
       defaultDays: 5,
       isPaid: true,
-      carryForward: false,
-      carryForwardLimit: 0,
+      encashable: false,
+      encashmentLimit: 0,
       companyId: company.id,
     },
     {
@@ -89,8 +89,8 @@ async function main() {
       description: 'Leave granted in lieu of working on a weekend or public holiday.',
       defaultDays: 0,
       isPaid: true,
-      carryForward: true,
-      carryForwardLimit: 5,
+      encashable: true,
+      encashmentLimit: 5,
       companyId: company.id,
     },
     {
@@ -98,8 +98,8 @@ async function main() {
       description: 'Unpaid leave taken when all other leave balances are exhausted.',
       defaultDays: 0,
       isPaid: false,
-      carryForward: false,
-      carryForwardLimit: 0,
+      encashable: false,
+      encashmentLimit: 0,
       companyId: company.id,
     }
   ];

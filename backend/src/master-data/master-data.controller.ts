@@ -227,8 +227,8 @@ export class MasterDataController {
         defaultDays: data.defaultDays,
         isPaid: data.isPaid,
         allowHalfDay: data.allowHalfDay !== undefined ? data.allowHalfDay : true,
-        carryForward: data.carryForward,
-        carryForwardLimit: data.carryForwardLimit,
+        encashable: data.encashable,
+        encashmentLimit: data.encashmentLimit,
         companyId: req.user.companyId,
       }
     });
@@ -244,8 +244,8 @@ export class MasterDataController {
         defaultDays: data.defaultDays,
         isPaid: data.isPaid,
         allowHalfDay: data.allowHalfDay,
-        carryForward: data.carryForward,
-        carryForwardLimit: data.carryForwardLimit,
+        encashable: data.encashable,
+        encashmentLimit: data.encashmentLimit,
       }
     });
   }

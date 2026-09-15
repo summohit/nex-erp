@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, UPLOAD_TIMEOUT_MS } from './apiClient';
 
 export interface LeaveBalance {
   id: number;
@@ -67,6 +67,7 @@ export const leaveService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: UPLOAD_TIMEOUT_MS,
     });
 
     return response.data.url;

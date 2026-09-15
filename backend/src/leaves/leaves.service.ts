@@ -6,8 +6,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 export interface QuotaCell {
   allocated: number;
   used: number;
-  carriedOver: number;
   remaining: number;
+  /** Of the remaining days, how many were paid out when the year closed. */
+  encashed: number;
 }
 
 export interface QuotaRow {
@@ -30,13 +31,17 @@ export interface QuotaReport {
   year: number;
   leaveTypes: {
     id: number; name: string; isPaid: boolean;
-    carryForward: boolean; carryForwardLimit: number;
+    encashable: boolean; encashmentLimit: number;
   }[];
   rows: QuotaRow[];
   /** 'SELF' when the caller may only see their own figures. */
   scope: 'ALL' | 'SELF';
-  /** False until the 1 January job has run; remaining understates until then. */
-  carryForwardApplied: boolean;
+  /**
+   * True once the year's closing payslip has bought back its unused days.
+   * Until then the remaining figures are days still there to take; afterwards
+   * they are days already paid for, which is a different thing to read.
+   */
+  encashmentSettled: boolean;
 }
 
 @Injectable()
@@ -102,7 +107,7 @@ export class LeavesService {
    * is the thing worth acting on.
    */
   private emptyQuotaReport(year: number): QuotaReport {
-    return { year, leaveTypes: [], rows: [], scope: 'SELF', carryForwardApplied: false };
+    return { year, leaveTypes: [], rows: [], scope: 'SELF', encashmentSettled: false };
   }
 
   async getQuotaReport(
@@ -125,10 +130,10 @@ export class LeavesService {
       scopeEmployeeId = me.id;
     }
 
-    const [leaveTypes, employees, balances] = await Promise.all([
+    const [leaveTypes, employees, balances, encashments] = await Promise.all([
       this.prisma.leaveType.findMany({
         where: { companyId },
-        select: { id: true, name: true, isPaid: true, carryForward: true, carryForwardLimit: true },
+        select: { id: true, name: true, isPaid: true, encashable: true, encashmentLimit: true },
         orderBy: { name: 'asc' },
       }),
       this.prisma.employee.findMany({
@@ -148,9 +153,18 @@ export class LeavesService {
         },
         select: {
           employeeId: true, leaveTypeId: true,
-          allocated: true, used: true, carriedOver: true,
-          carriedForwardFromYear: true,
+          allocated: true, used: true,
         },
+      }),
+      // What the year's closing payslip actually paid out. Fetched separately
+      // rather than through the balance rows, which are left untouched by
+      // encashment on purpose — `used` has to keep meaning days taken.
+      this.prisma.leaveEncashment.findMany({
+        where: {
+          year,
+          employee: { companyId, ...(scopeEmployeeId ? { id: scopeEmployeeId } : {}) },
+        },
+        select: { employeeId: true, leaveTypeId: true, days: true },
       }),
     ]);
 
@@ -161,20 +175,23 @@ export class LeavesService {
       byEmployee.set(b.employeeId, list);
     }
 
+    const encashedDays = new Map<string, number>();
+    for (const e of encashments) {
+      encashedDays.set(`${e.employeeId}:${e.leaveTypeId}`, e.days);
+    }
+
     const rows = employees.map((emp) => {
       const mine = byEmployee.get(emp.id) ?? [];
-      const byType: Record<number, {
-        allocated: number; used: number; carriedOver: number; remaining: number;
-      }> = {};
+      const byType: Record<number, QuotaCell> = {};
 
-      let allocated = 0, used = 0, carriedOver = 0;
+      let allocated = 0, used = 0, encashed = 0;
       for (const type of leaveTypes) {
         const b = mine.find((x) => x.leaveTypeId === type.id);
         const a = b?.allocated ?? 0;
         const u = b?.used ?? 0;
-        const c = b?.carriedOver ?? 0;
-        byType[type.id] = { allocated: a, used: u, carriedOver: c, remaining: a + c - u };
-        allocated += a; used += u; carriedOver += c;
+        const e = encashedDays.get(`${emp.id}:${type.id}`) ?? 0;
+        byType[type.id] = { allocated: a, used: u, remaining: a - u, encashed: e };
+        allocated += a; used += u; encashed += e;
       }
 
       return {
@@ -188,7 +205,7 @@ export class LeavesService {
           isActive: emp.user?.status !== 'SUSPENDED',
         },
         byType,
-        totals: { allocated, used, carriedOver, remaining: allocated + carriedOver - used },
+        totals: { allocated, used, remaining: allocated - used, encashed },
         // No balance row at all is a different problem from a zero balance, and
         // it is the one somebody has to fix.
         hasNoBalances: mine.length === 0,
@@ -204,10 +221,7 @@ export class LeavesService {
       leaveTypes,
       rows,
       scope: isAdminOrHr ? ('ALL' as const) : ('SELF' as const),
-      // Carry-forward runs on 1 January; until it has, carriedOver is 0 and the
-      // remaining figures understate. Say so rather than let the report imply
-      // otherwise.
-      carryForwardApplied: balances.some((b) => b.carriedForwardFromYear !== null),
+      encashmentSettled: encashments.length > 0,
     };
   }
 
@@ -549,6 +563,20 @@ export class LeavesService {
       where: { employeeId: employee.id },
       include: {
         leaveType: true,
+        // The detail view identifies whose leave it is. Without this it fell
+        // back to "You" and a placeholder initial — accurate, but useless on a
+        // printed or forwarded record.
+        //
+        // An explicit select, not `employee: true`: that relation carries bank
+        // details, salary-adjacent fields and identification numbers, none of
+        // which belong in a leave list.
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true,
+            designation: { select: { name: true } },
+            department: { select: { name: true } },
+          },
+        },
         approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } }
       },
       orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }]

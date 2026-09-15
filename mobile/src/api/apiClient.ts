@@ -5,8 +5,28 @@ import { useAuthStore } from '../store/authStore';
 // Using the deployed backend URL or local IP depending on environment
 export const API_URL = 'https://nex.ces-pl.com/api';
 
+/**
+ * How long an ordinary request may wait before it is treated as lost.
+ *
+ * Axios defaults to 0, which means wait forever. On a phone that is not a
+ * theoretical setting: switching WiFi to cellular, walking into a dead zone or
+ * resuming from background all leave sockets that will never answer, and a
+ * request that never settles leaves whatever screen awaited it spinning for the
+ * rest of the session. A request that fails is recoverable — the user sees an
+ * error and can retry. One that hangs is not.
+ */
+export const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Uploads get their own budget. A visit photo over slow cellular routinely
+ * takes longer than a JSON call ever should, and timing those out at 30s would
+ * trade a hang for a fix that breaks photo upload.
+ */
+export const UPLOAD_TIMEOUT_MS = 120_000;
+
 export const apiClient = axios.create({
   baseURL: API_URL,
+  timeout: REQUEST_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
     // Identifies this client to the server's temporary two-factor bypass.
@@ -24,6 +44,9 @@ export const apiClient = axios.create({
  */
 const refreshClient = axios.create({
   baseURL: API_URL,
+  // Shorter than the rest: every request that 401s waits on this one call, so a
+  // hung refresh stalls the whole app rather than a single screen.
+  timeout: 15_000,
   headers: { 'Content-Type': 'application/json' },
 });
 

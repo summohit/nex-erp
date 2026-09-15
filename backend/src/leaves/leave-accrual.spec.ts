@@ -1,14 +1,16 @@
 import { LeaveAccrualCron } from './leave-accrual.cron';
 
 /**
- * Accrual and carry-forward run unattended, once a month, on money-adjacent
- * numbers. Two properties matter more than anything else here:
+ * Accrual and the January opening run unattended, once a month, on
+ * money-adjacent numbers. Two properties matter more than anything else here:
  *
  *  - a restart on the 1st must not credit twice (the old job had no guard at
  *    all, and its 24h-from-boot interval meant it barely ran in the first
  *    place); and
- *  - carry-forward must happen exactly once per year — carriedOver was written
- *    by no code before this, so all 728 live rows still read 0.
+ *  - opening a year must not touch a balance that already exists. Leave no
+ *    longer carries over — last year's unused days are paid out on the December
+ *    payslip — so January's allocation is a fresh grant, and re-granting it on
+ *    every boot would hand out free days all month.
  */
 describe('LeaveAccrualCron', () => {
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -20,12 +22,14 @@ describe('LeaveAccrualCron', () => {
   let cron: LeaveAccrualCron;
   let types: any[];
   let balances: any[];
+  let employees: any[];
 
   const matches = (row: any, where: any): boolean => {
     if (where.leaveTypeId !== undefined && row.leaveTypeId !== where.leaveTypeId) return false;
-    if (where.employeeId !== undefined && row.employeeId !== where.employeeId) return false;
+    if (where.employeeId?.in !== undefined) {
+      if (!where.employeeId.in.includes(row.employeeId)) return false;
+    } else if (where.employeeId !== undefined && row.employeeId !== where.employeeId) return false;
     if (where.year !== undefined && row.year !== where.year) return false;
-    if (where.carriedForwardFromYear === null && row.carriedForwardFromYear !== null) return false;
     if (where.OR) {
       const ok = where.OR.some((c: any) =>
         (c.lastAccruedPeriod === null && row.lastAccruedPeriod === null) ||
@@ -40,19 +44,32 @@ describe('LeaveAccrualCron', () => {
   beforeEach(() => {
     types = [];
     balances = [];
+    employees = [];
     prisma = {
       leaveType: {
         findMany: jest.fn(async ({ where }: any) =>
           types.filter((t) => {
-            if (where.carryForward !== undefined) return t.carryForward === where.carryForward;
+            if (where.defaultDays?.gt !== undefined) return t.defaultDays > where.defaultDays.gt;
             if (where.accrualAmount?.gt !== undefined && !(t.accrualAmount > where.accrualAmount.gt)) return false;
             if (where.accrualFrequency?.in && !where.accrualFrequency.in.includes(t.accrualFrequency)) return false;
             return true;
           }),
         ),
       },
+      employee: {
+        findMany: jest.fn(async ({ where }: any) =>
+          employees.filter((e) => where.user?.status?.not !== e.status),
+        ),
+      },
       leaveBalance: {
         findMany: jest.fn(async ({ where }: any) => balances.filter((b) => matches(b, where))),
+        createMany: jest.fn(async ({ data }: any) => {
+          const fresh = data.filter((d: any) =>
+            !balances.some((b) => b.employeeId === d.employeeId && b.leaveTypeId === d.leaveTypeId && b.year === d.year),
+          );
+          for (const d of fresh) balance(d);
+          return { count: fresh.length };
+        }),
         updateMany: jest.fn(async ({ where, data }: any) => {
           const hits = balances.filter((b) => matches(b, where));
           for (const row of hits) {
@@ -72,7 +89,7 @@ describe('LeaveAccrualCron', () => {
     const t = {
       id: types.length + 1, name: `Type ${types.length + 1}`,
       accrualFrequency: 'MONTHLY', accrualAmount: 0,
-      carryForward: false, carryForwardLimit: 0, ...o,
+      defaultDays: 0, companyId: 1, ...o,
     };
     types.push(t);
     return t;
@@ -80,18 +97,22 @@ describe('LeaveAccrualCron', () => {
   const balance = (o: Partial<any>) => {
     const b = {
       employeeId: 1, leaveTypeId: 1, year: 2026,
-      allocated: 0, used: 0, carriedOver: 0,
-      lastAccruedPeriod: null, carriedForwardFromYear: null, ...o,
+      allocated: 0, used: 0, lastAccruedPeriod: null, ...o,
     };
     balances.push(b);
     return b;
+  };
+  const employee = (o: Partial<any> = {}) => {
+    const e = { id: employees.length + 1, companyId: 1, status: 'ACTIVE', ...o };
+    employees.push(e);
+    return e;
   };
 
   describe('when it runs at all', () => {
     it('does nothing on any day but the 1st', async () => {
       type({ accrualAmount: 1.5 });
       const b = balance({});
-      await expect(cron.run(ist(2026, 9, 15))).resolves.toEqual({ accrued: 0, carried: 0 });
+      await expect(cron.run(ist(2026, 9, 15))).resolves.toEqual({ accrued: 0, opened: 0 });
       expect(b.allocated).toBe(0);
     });
 
@@ -158,77 +179,95 @@ describe('LeaveAccrualCron', () => {
     });
   });
 
-  describe('carry-forward', () => {
-    const setup = (limit: number, prev: Partial<any>) => {
-      const t = type({ carryForward: true, carryForwardLimit: limit, accrualAmount: 0 });
-      balance({ leaveTypeId: t.id, year: 2026, ...prev });
-      return balance({ leaveTypeId: t.id, year: 2027 });
-    };
+  describe('opening a new year', () => {
+    it('grants each active employee the type default, once', async () => {
+      employee();
+      employee();
+      type({ defaultDays: 12 });
 
-    it('rolls unused days into the new year, capped at the limit', async () => {
-      const next = setup(5, { allocated: 15, used: 2 }); // 13 remaining
+      await expect(cron.run(ist(2027, 1, 1))).resolves.toMatchObject({ opened: 2 });
+
+      const opened = balances.filter((b) => b.year === 2027);
+      expect(opened).toHaveLength(2);
+      expect(opened.every((b) => b.allocated === 12 && b.used === 0)).toBe(true);
+    });
+
+    // The one that costs money if it breaks: the job fires on every boot, and
+    // January has 31 days of boots in it.
+    it('does not grant twice when the process restarts', async () => {
+      employee();
+      type({ defaultDays: 12 });
+
+      await cron.run(ist(2027, 1, 1, 2));
+      await cron.run(ist(2027, 1, 1, 9));
+      await cron.run(ist(2027, 1, 15));
+
+      expect(balances.filter((b) => b.year === 2027)).toHaveLength(1);
+    });
+
+    it('leaves an allocation HR already made alone', async () => {
+      employee();
+      const t = type({ defaultDays: 12 });
+      // A negotiated 20 days, entered by hand before the job ran.
+      const existing = balance({ leaveTypeId: t.id, year: 2027, allocated: 20, used: 3 });
+
+      await expect(cron.run(ist(2027, 1, 1))).resolves.toMatchObject({ opened: 0 });
+      expect(existing.allocated).toBe(20);
+      expect(existing.used).toBe(3);
+    });
+
+    // The whole point of the policy change.
+    it('starts from the default no matter what was left last year', async () => {
+      employee();
+      const t = type({ defaultDays: 12 });
+      balance({ leaveTypeId: t.id, year: 2026, allocated: 12, used: 0 }); // 12 unused
 
       await cron.run(ist(2027, 1, 1));
 
-      expect(next.carriedOver).toBe(5);
-      expect(next.carriedForwardFromYear).toBe(2026);
+      const next = balances.find((b) => b.year === 2027)!;
+      expect(next.allocated).toBe(12);
     });
 
-    it('rolls the whole remainder when it is under the limit', async () => {
-      const next = setup(30, { allocated: 15, used: 12 }); // 3 remaining
-      await cron.run(ist(2027, 1, 1));
-      expect(next.carriedOver).toBe(3);
+    it('skips types with no entitlement to grant', async () => {
+      employee();
+      type({ defaultDays: 0 }); // unpaid LOP
+
+      await expect(cron.run(ist(2027, 1, 1))).resolves.toMatchObject({ opened: 0 });
+      expect(balances).toHaveLength(0);
     });
 
-    it("counts last year's own carry-over as available", async () => {
-      // Otherwise days rolled in one January are lost the next.
-      const next = setup(30, { allocated: 10, carriedOver: 4, used: 2 }); // 12 remaining
-      await cron.run(ist(2027, 1, 1));
-      expect(next.carriedOver).toBe(12);
+    it('skips suspended staff, who are off payroll', async () => {
+      employee({ status: 'SUSPENDED' });
+      type({ defaultDays: 12 });
+
+      await expect(cron.run(ist(2027, 1, 1))).resolves.toMatchObject({ opened: 0 });
     });
 
-    it('treats a limit of 0 as no cap, since the field only exists once carry-forward is on', async () => {
-      const next = setup(0, { allocated: 15, used: 0 });
-      await cron.run(ist(2027, 1, 1));
-      expect(next.carriedOver).toBe(15);
-    });
+    it('does not grant a type from another company', async () => {
+      employee({ companyId: 1 });
+      type({ defaultDays: 12, companyId: 2 });
 
-    it('carries nothing when the year was fully used', async () => {
-      const next = setup(5, { allocated: 10, used: 10 });
-      await cron.run(ist(2027, 1, 1));
-      expect(next.carriedOver).toBe(0);
-      expect(next.carriedForwardFromYear).toBeNull();
-    });
-
-    it('does not roll twice, even across restarts', async () => {
-      const next = setup(5, { allocated: 15, used: 2 });
-
-      await cron.run(ist(2027, 1, 1, 3));
-      await cron.run(ist(2027, 1, 1, 18));
-
-      expect(next.carriedOver).toBe(5);
-    });
-
-    it('leaves types that do not carry forward alone', async () => {
-      const t = type({ carryForward: false });
-      balance({ leaveTypeId: t.id, year: 2026, allocated: 10, used: 0 });
-      const next = balance({ leaveTypeId: t.id, year: 2027 });
-
-      await cron.run(ist(2027, 1, 1));
-      expect(next.carriedOver).toBe(0);
+      await expect(cron.run(ist(2027, 1, 1))).resolves.toMatchObject({ opened: 0 });
     });
 
     it('only runs in January', async () => {
-      const next = setup(5, { allocated: 15, used: 2 });
-      await cron.run(ist(2027, 6, 1));
-      expect(next.carriedOver).toBe(0);
+      employee();
+      type({ defaultDays: 12 });
+
+      await expect(cron.run(ist(2027, 6, 1))).resolves.toMatchObject({ opened: 0 });
+      expect(balances).toHaveLength(0);
     });
 
-    it('skips an employee with no balance row in the new year', async () => {
-      const t = type({ carryForward: true, carryForwardLimit: 5 });
-      balance({ employeeId: 99, leaveTypeId: t.id, year: 2026, allocated: 10, used: 0 });
-      // No 2027 row for employee 99.
-      await expect(cron.run(ist(2027, 1, 1))).resolves.toMatchObject({ carried: 0 });
+    // Order matters: a YEARLY type credits on 1 January too, and it has to land
+    // on the row the opening just created.
+    it('credits January accrual onto the row it just opened', async () => {
+      employee();
+      type({ defaultDays: 12, accrualFrequency: 'YEARLY', accrualAmount: 3 });
+
+      await cron.run(ist(2027, 1, 1));
+
+      const next = balances.find((b) => b.year === 2027)!;
+      expect(next.allocated).toBe(15);
     });
   });
 });

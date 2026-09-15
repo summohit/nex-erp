@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, UPLOAD_TIMEOUT_MS } from './apiClient';
 
 export interface ProjectSummary {
   metrics: {
@@ -176,6 +176,7 @@ export const projectService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: UPLOAD_TIMEOUT_MS,
     });
     return response.data;
   },
@@ -185,6 +186,7 @@ export const projectService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: UPLOAD_TIMEOUT_MS,
     });
     return response.data;
   },

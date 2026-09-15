@@ -16,6 +16,19 @@ const PREDEFINED_COMPONENTS = [
   { name: 'Employee State Insurance (ESI)', type: 'DEDUCTION', description: 'Social security and health insurance' }
 ];
 
+/**
+ * The month whose payslip closes the leave year. Leave does not carry forward —
+ * whatever is unused when this slip is generated is paid out on it.
+ */
+const LEAVE_YEAR_CLOSING_MONTH = 12;
+
+/**
+ * Prefix on the payslip line that carries a leave payout. Matched, not just
+ * written — a manual earnings edit must not rescale a payout that has already
+ * been recorded against this slip.
+ */
+const LEAVE_ENCASHMENT_PREFIX = 'Leave Encashment';
+
 @Injectable()
 export class PayrollService {
   constructor(
@@ -340,6 +353,24 @@ export class PayrollService {
       const dailyRate = workingDaysInMonth > 0 ? (totalEarnings / workingDaysInMonth) : 0;
       const lossOfPay = Math.round(dailyRate * unexcusedAbsences * 100) / 100;
 
+      // Leave encashment, on the December slip only. Deliberately after the
+      // statutory block and after dailyRate: a one-off payout must not inflate
+      // the rate its own days are priced at, and must not push the month's
+      // gross past the ESI ceiling or the TDS threshold, which are tests on
+      // regular salary rather than on everything paid in the month.
+      const encashment = Number(month) === LEAVE_YEAR_CLOSING_MONTH
+        ? await this.computeLeaveEncashment(emp.id, Number(year), dailyRate)
+        : { lines: [], days: 0, amount: 0, ratePerDay: 0 };
+
+      for (const line of encashment.lines) {
+        payslipItemsData.push({
+          componentName: `${LEAVE_ENCASHMENT_PREFIX} — ${line.leaveTypeName} (${line.days} day${line.days === 1 ? '' : 's'}, ${year})`,
+          type: 'EARNING',
+          amount: line.amount,
+        });
+        totalEarnings += line.amount;
+      }
+
       const netPay = Math.max(0, Math.round((totalEarnings - totalDeductions - lossOfPay + expenseAmount) * 100) / 100);
 
       // Upsert DRAFT Payslip
@@ -392,6 +423,27 @@ export class PayrollService {
         });
       }
 
+      // Rewritten, not appended: the December slip is a DRAFT until finalized
+      // and may be regenerated after a late leave approval, at which point last
+      // run's figures are wrong rather than additional.
+      await this.prisma.leaveEncashment.deleteMany({
+        where: { employeeId: emp.id, year: Number(year) },
+      });
+      if (encashment.lines.length > 0) {
+        await this.prisma.leaveEncashment.createMany({
+          data: encashment.lines.map(line => ({
+            employeeId: emp.id,
+            leaveTypeId: line.leaveTypeId,
+            year: Number(year),
+            days: line.days,
+            ratePerDay: encashment.ratePerDay,
+            amount: line.amount,
+            payslipId: payslip.id,
+            companyId,
+          })),
+        });
+      }
+
       if (approvedExpenses.length > 0) {
         await this.prisma.expenseClaim.updateMany({
           where: { id: { in: approvedExpenses.map(e => e.id) } },
@@ -401,6 +453,69 @@ export class PayrollService {
     }
 
     return this.getPayslips(companyId, month, year);
+  }
+
+  /**
+   * What the employee is owed for leave they were granted this year and did
+   * not take.
+   *
+   * Leave used to roll into the next year; it no longer does. A year's days
+   * expire with the year, so the unused ones are bought back on that year's
+   * last payslip instead of quietly disappearing — and January then opens with
+   * a fresh allocation (LeaveAccrualCron.openYear).
+   *
+   * Priced at the same daily rate Loss of Pay is charged at, so a day not taken
+   * is worth exactly what a day of absence costs.
+   *
+   * Only types flagged `encashable` pay out. Sick and Maternity leave are an
+   * entitlement to be absent when you need to be, not a balance the company
+   * owes money on, and paying them out would reward not taking them.
+   *
+   * The balance rows are left alone. `used` means days actually taken, which
+   * attendance and the quota report both rely on; adding encashed days to it
+   * would make an employee who took no leave look like they took all of it.
+   */
+  private async computeLeaveEncashment(employeeId: number, year: number, ratePerDay: number) {
+    const lines: { leaveTypeId: number; leaveTypeName: string; days: number; amount: number }[] = [];
+    // No salary structure, or a month with no working days: there is no rate to
+    // value a day at, so there is nothing to pay out.
+    if (ratePerDay <= 0) return { lines, ratePerDay, days: 0, amount: 0 };
+
+    const balances = await this.prisma.leaveBalance.findMany({
+      where: { employeeId, year, leaveType: { encashable: true } },
+      select: {
+        leaveTypeId: true,
+        allocated: true,
+        used: true,
+        leaveType: { select: { name: true, encashmentLimit: true } },
+      },
+    });
+
+    for (const b of balances) {
+      const remaining = b.allocated - b.used;
+      if (remaining <= 0) continue;
+
+      // A limit of 0 is no cap, not "encash nothing" — the field only appears
+      // once encashment is switched on, so a cap of zero would make the switch
+      // do nothing at all.
+      const days = b.leaveType.encashmentLimit > 0
+        ? Math.min(remaining, b.leaveType.encashmentLimit)
+        : remaining;
+
+      lines.push({
+        leaveTypeId: b.leaveTypeId,
+        leaveTypeName: b.leaveType.name,
+        days: Math.round(days * 100) / 100,
+        amount: Math.round(days * ratePerDay * 100) / 100,
+      });
+    }
+
+    return {
+      lines,
+      ratePerDay,
+      days: Math.round(lines.reduce((sum, l) => sum + l.days, 0) * 100) / 100,
+      amount: Math.round(lines.reduce((sum, l) => sum + l.amount, 0) * 100) / 100,
+    };
   }
 
   async getPayslips(companyId: number, month?: number, year?: number) {
@@ -495,14 +610,25 @@ export class PayrollService {
 
     // Sync earning line items if totalEarnings was manually adjusted
     if (data.totalEarnings !== undefined) {
-      const earningItems = await this.prisma.payslipItem.findMany({
+      const allEarnings = await this.prisma.payslipItem.findMany({
         where: { payslipId: id, type: 'EARNING' }
       });
+      // A leave payout is a recorded figure — so many days at so much a day,
+      // held in LeaveEncashment — not a share of the month's salary. Spreading
+      // an adjustment across it would leave the line disagreeing with the
+      // record behind it, so the adjustment lands on the salary lines and the
+      // payout is held out of the redistribution at its recorded amount.
+      const encashmentTotal = allEarnings
+        .filter(item => item.componentName.startsWith(LEAVE_ENCASHMENT_PREFIX))
+        .reduce((sum, item) => sum + item.amount, 0);
+      const earningItems = allEarnings.filter(item => !item.componentName.startsWith(LEAVE_ENCASHMENT_PREFIX));
+      const salaryTarget = Math.max(0, Math.round((totalEarnings - encashmentTotal) * 100) / 100);
+
       if (earningItems.length > 0) {
         const oldSum = earningItems.reduce((sum, item) => sum + item.amount, 0);
         for (let i = 0; i < earningItems.length; i++) {
           const item = earningItems[i];
-          const newAmt = oldSum > 0 ? Math.round((item.amount / oldSum) * totalEarnings * 100) / 100 : (i === 0 ? totalEarnings : 0);
+          const newAmt = oldSum > 0 ? Math.round((item.amount / oldSum) * salaryTarget * 100) / 100 : (i === 0 ? salaryTarget : 0);
           await this.prisma.payslipItem.update({
             where: { id: item.id },
             data: { amount: Math.max(0, newAmt) }

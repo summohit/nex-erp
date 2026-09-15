@@ -39,8 +39,8 @@ export interface LeaveType {
   defaultDays: number;
   isPaid: boolean;
   allowHalfDay: boolean;
-  carryForward: boolean;
-  carryForwardLimit: number;
+  encashable: boolean;
+  encashmentLimit: number;
 }
 
 export interface Holiday {

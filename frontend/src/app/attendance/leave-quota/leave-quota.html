@@ -29,17 +29,37 @@
   </div>
 
   <!-- ── Alert Notices ─────────────────────────────────────────────────────── -->
-  <div class="notices-container" *ngIf="carryForwardPending() || summary().missingBalances > 0">
-    <!-- Carry-forward pending -->
-    <div class="quota-notice-card warn" *ngIf="carryForwardPending()">
+  <div class="notices-container" *ngIf="expiryPending() || encashmentSettled() || summary().missingBalances > 0">
+    <!-- Leave expires with the year -->
+    <div class="quota-notice-card warn" *ngIf="expiryPending()">
       <div class="notice-icon-wrapper warn">
         <svg lucideTriangleAlert [size]="18"></svg>
       </div>
       <div class="notice-content">
-        <div class="notice-title">Carry-forward hasn't been applied for {{ year() }}</div>
+        <div class="notice-title">{{ days(summary().remaining) }} days still unused for {{ year() }}</div>
         <div class="notice-desc">
-          Unused days from {{ year() - 1 }} will roll in on 1 January. Until that job executes,
-          <em>Carried in</em> is zero and <em>Remaining</em> balances are understated for any eligible carry-forward leave types.
+          Leave does not carry into {{ year() + 1 }} — every year is allocated fresh.
+          <ng-container *ngIf="hasEncashableTypes()">
+            Whatever is left when December's payslips are generated is paid out with that month's salary for
+            encashable leave types; days on every other type simply lapse.
+          </ng-container>
+          <ng-container *ngIf="!hasEncashableTypes()">
+            No leave type is set to be encashed, so these days will lapse on 31 December.
+          </ng-container>
+        </div>
+      </div>
+    </div>
+
+    <!-- Year closed out -->
+    <div class="quota-notice-card" *ngIf="encashmentSettled()">
+      <div class="notice-icon-wrapper">
+        <svg lucideCalendarDays [size]="18"></svg>
+      </div>
+      <div class="notice-content">
+        <div class="notice-title">{{ year() }} has been settled</div>
+        <div class="notice-desc">
+          {{ days(summary().encashed) }} unused days were encashed with December's salary.
+          Any remaining days shown below lapsed with the year.
         </div>
       </div>
     </div>
@@ -75,12 +95,12 @@
       <div class="stat-info">
         <span class="stat-label">Total Entitlement</span>
         <div class="stat-value">
-          {{ days(summary().allocated + summary().carriedOver) }}
+          {{ days(summary().allocated) }}
           <span class="stat-unit">days</span>
         </div>
         <span class="stat-subtext">
-          {{ days(summary().allocated) }} allocated
-          <ng-container *ngIf="summary().carriedOver"> · +{{ days(summary().carriedOver) }} carried in</ng-container>
+          allocated for {{ year() }}
+          <ng-container *ngIf="summary().encashed"> · {{ days(summary().encashed) }} encashed</ng-container>
         </span>
       </div>
     </div>
@@ -332,28 +352,28 @@
             <tr>
               <th>Leave Type</th>
               <th class="num">Allocated</th>
-              <th class="num">Carried In</th>
               <th class="num">Used</th>
               <th class="num">Remaining</th>
+              <th class="num">Encashed</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let line of detailLines()" [class.is-empty]="!line.allocated && !line.carriedOver && !line.used">
+            <tr *ngFor="let line of detailLines()" [class.is-empty]="!line.allocated && !line.used">
               <td class="type-cell">
                 <span class="type-name">{{ line.type.name }}</span>
                 <span class="type-flag" *ngIf="!line.type.isPaid">unpaid</span>
-                <span class="type-flag carry" *ngIf="line.type.carryForward">
-                  carries {{ line.type.carryForwardLimit > 0 ? 'up to ' + line.type.carryForwardLimit : 'over' }}
+                <span class="type-flag carry" *ngIf="line.type.encashable">
+                  encashes {{ line.type.encashmentLimit > 0 ? 'up to ' + line.type.encashmentLimit : 'in full' }}
                 </span>
               </td>
               <td class="num">{{ days(line.allocated) }}</td>
-              <td class="num">
-                <span *ngIf="line.carriedOver" class="text-carried">+{{ days(line.carriedOver) }}</span>
-                <span *ngIf="!line.carriedOver" class="text-muted">—</span>
-              </td>
               <td class="num font-semibold">{{ days(line.used) }}</td>
               <td class="num font-bold" [class.none-left]="line.remaining <= 0" [class.low-left]="line.remaining > 0 && line.remaining <= 2">
                 {{ days(line.remaining) }}
+              </td>
+              <td class="num">
+                <span *ngIf="line.encashed" class="text-carried">{{ days(line.encashed) }}</span>
+                <span *ngIf="!line.encashed" class="text-muted">—</span>
               </td>
             </tr>
           </tbody>
@@ -361,11 +381,9 @@
             <tr>
               <td>Total</td>
               <td class="num">{{ days(row.totals.allocated) }}</td>
-              <td class="num">
-                {{ row.totals.carriedOver ? '+' + days(row.totals.carriedOver) : '0' }}
-              </td>
               <td class="num">{{ days(row.totals.used) }}</td>
               <td class="num total-remaining">{{ days(row.totals.remaining) }}</td>
+              <td class="num">{{ days(row.totals.encashed) }}</td>
             </tr>
           </tfoot>
         </table>

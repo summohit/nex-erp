@@ -1021,7 +1021,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
     const balance = this.myBalances().find(b => b.leaveType.id === Number(this.requestForm.leaveTypeId));
     if (balance) {
-      const available = balance.allocated + balance.carriedOver - balance.used;
+      const available = balance.allocated - balance.used;
       if (requestedDays > available) {
         this.toast.error(`Insufficient balance. You requested ${requestedDays} ${requestedDays === 1 ? 'day' : 'days'} but only have ${available} days available.`);
         return;
@@ -1128,8 +1128,28 @@ export class AttendanceLeaveComponent implements OnInit {
 
   leaveEmployeeName(leave: any): string {
     const emp = leave?.employee;
-    if (!emp) return 'You';
-    return emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
+    if (emp) return `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Employee';
+
+    // Own-leave rows that predate the employee being included still resolve to
+    // a real name rather than "You", by falling back to the signed-in user.
+    const me = this.authService.currentUser();
+    const mine = `${me?.employee?.firstName || me?.firstName || ''} ${me?.employee?.lastName || me?.lastName || ''}`.trim();
+    return mine || 'You';
+  }
+
+  /** Two initials for the placeholder, not one. */
+  leaveEmployeeInitials(leave: any): string {
+    const parts = this.leaveEmployeeName(leave).split(/\s+/);
+    return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || 'E';
+  }
+
+  /** Designation and department, falling back to whichever exists. */
+  leaveEmployeeSubtitle(leave: any): string {
+    const emp = leave?.employee;
+    const bits = [emp?.designation?.name, emp?.department?.name].filter(Boolean);
+    if (bits.length) return bits.join(' · ');
+    const me = this.authService.currentUser();
+    return me?.employee?.designation?.name || me?.employee?.department?.name || '—';
   }
 
   openRejectionReasonModal(reason: string) {
@@ -1192,7 +1212,7 @@ export class AttendanceLeaveComponent implements OnInit {
       }
       const empData = empMap.get(b.employeeId);
       if (b.leaveType && b.leaveType.name) {
-        const available = b.allocated + b.carriedOver - b.used;
+        const available = b.allocated - b.used;
         empData[b.leaveType.name] = `${available} / ${b.allocated}`;
       }
     });
@@ -1427,7 +1447,12 @@ export class AttendanceLeaveComponent implements OnInit {
         const diffMs = new Date(log.clockOut).getTime() - new Date(log.clockIn).getTime();
         const hours = Math.floor(diffMs / (1000 * 60 * 60));
         const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        durationStr = `${hours} hrs ${mins} mins`;
+        // On an auto-closed day the clock-out is the 23:00 cutoff, not a
+        // departure, so the span it closes is an upper bound rather than time
+        // anyone actually stood behind.
+        durationStr = log.autoClockedOut
+          ? `up to ${hours} hrs ${mins} mins`
+          : `${hours} hrs ${mins} mins`;
       }
     }
 

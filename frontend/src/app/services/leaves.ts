@@ -9,7 +9,6 @@ export interface LeaveBalance {
   leaveTypeId: number;
   allocated: number;
   used: number;
-  carriedOver: number;
   year: number;
   leaveType: {
     id: number;
@@ -28,8 +27,9 @@ export interface LeaveBalance {
 export interface QuotaCell {
   allocated: number;
   used: number;
-  carriedOver: number;
   remaining: number;
+  /** Of the remaining days, how many were paid out when the year closed. */
+  encashed: number;
 }
 
 export interface QuotaRow {
@@ -50,12 +50,16 @@ export interface QuotaRow {
 
 export interface QuotaReport {
   year: number;
-  leaveTypes: { id: number; name: string; isPaid: boolean; carryForward: boolean; carryForwardLimit: number }[];
+  leaveTypes: { id: number; name: string; isPaid: boolean; encashable: boolean; encashmentLimit: number }[];
   rows: QuotaRow[];
   /** 'SELF' when the caller may only see their own figures. */
   scope: 'ALL' | 'SELF';
-  /** False until the 1 January job has run — remaining figures understate until then. */
-  carryForwardApplied: boolean;
+  /**
+   * True once the year's closing payslip has bought back its unused days.
+   * Until then the remaining figures are days still there to take; afterwards
+   * they are days already paid for.
+   */
+  encashmentSettled: boolean;
 }
 
 export interface LeaveRequest {

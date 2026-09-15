@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey } from '../common/timezone.util';
 
 /**
- * Leave accrual and year-end carry-forward.
+ * Leave accrual and the new year's opening allocation.
  *
  * Replaces a `setInterval(…, 24h)` in LeavesService that measured 24 hours from
  * process start and then returned early unless that tick happened to land on
@@ -16,6 +16,11 @@ import { istDateKey } from '../common/timezone.util';
  * for exactly this reason — the server's own timezone is not to be trusted),
  * and idempotency held in the database rather than in memory, so a restart
  * mid-run cannot double-credit.
+ *
+ * Nothing rolls over. Leave belongs to the year it was granted in; what is left
+ * at the end of it is bought back on that year's last payslip (see
+ * PayrollService.settleLeaveEncashment) and the new year opens with a fresh
+ * allocation rather than an inherited one.
  */
 @Injectable()
 export class LeaveAccrualCron implements OnModuleInit, OnModuleDestroy {
@@ -59,13 +64,14 @@ export class LeaveAccrualCron implements OnModuleInit, OnModuleDestroy {
 
   async run(now: Date = new Date()) {
     const { year, month, day } = this.istParts(now);
-    if (day !== 1) return { accrued: 0, carried: 0 };
+    if (day !== 1) return { accrued: 0, opened: 0 };
 
+    // Open the year before accruing: a YEARLY type credits on 1 January too,
+    // and it has to credit onto the row this just created, not miss it and
+    // leave the employee a year short.
+    const opened = month === 1 ? await this.openYear(year) : 0;
     const accrued = await this.processAccruals(year, month);
-    // Carry-forward happens once, on 1 January, and reads the year that just
-    // ended. Accrual runs first so a January credit is not rolled over twice.
-    const carried = month === 1 ? await this.processCarryForward(year) : 0;
-    return { accrued, carried };
+    return { accrued, opened };
   }
 
   /**
@@ -114,67 +120,75 @@ export class LeaveAccrualCron implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Roll unused days from the year that just ended into the new one.
+   * Give every active employee their fresh allocation for the new year.
    *
-   * Never implemented before: carryForward and carryForwardLimit were editable
-   * and seeded (Earned Leave true/5), but carriedOver was written by no code,
-   * so unused days silently vanished each January.
+   * Replaces carry-forward, which rolled the previous year's unused days into
+   * the new one. Leave now ends with its year — the leftovers are paid out on
+   * the December payslip instead — so January starts from defaultDays and
+   * nothing else. What the employee did or did not take last year has no
+   * bearing on this number.
    *
-   * A limit of 0 means no cap, not "carry nothing" — the field only appears
-   * once carry-forward is switched on, and a cap of zero would make the switch
-   * do nothing at all.
+   * Types with defaultDays 0 get no row: an unpaid LOP type has no entitlement
+   * to allocate, and a row of zeros only makes the quota report noisier.
    */
-  async processCarryForward(newYear: number): Promise<number> {
-    const previousYear = newYear - 1;
-
+  async openYear(year: number): Promise<number> {
     const types = await this.prisma.leaveType.findMany({
-      where: { carryForward: true },
-      select: { id: true, name: true, carryForwardLimit: true },
+      where: { defaultDays: { gt: 0 } },
+      select: { id: true, name: true, defaultDays: true, companyId: true },
     });
     if (!types.length) return 0;
 
-    let rolled = 0;
+    // Suspended staff are off payroll and off the leave register — matching
+    // payslip generation, which skips them too.
+    const employees = await this.prisma.employee.findMany({
+      where: { user: { status: { not: 'SUSPENDED' } } },
+      select: { id: true, companyId: true },
+    });
+    if (!employees.length) return 0;
+
+    const byCompany = new Map<number, number[]>();
+    for (const emp of employees) {
+      const list = byCompany.get(emp.companyId) ?? [];
+      list.push(emp.id);
+      byCompany.set(emp.companyId, list);
+    }
+
+    let opened = 0;
     for (const type of types) {
-      const previous = await this.prisma.leaveBalance.findMany({
-        where: { leaveTypeId: type.id, year: previousYear },
-        select: { employeeId: true, allocated: true, used: true, carriedOver: true },
+      const employeeIds = byCompany.get(type.companyId) ?? [];
+      if (!employeeIds.length) continue;
+
+      // Only the ones that have no row yet. An existing row is left exactly as
+      // it is: HR may have already allocated by hand, or granted an exception,
+      // and a job that runs on every boot must not overwrite either.
+      const existing = await this.prisma.leaveBalance.findMany({
+        where: { leaveTypeId: type.id, year, employeeId: { in: employeeIds } },
+        select: { employeeId: true },
+      });
+      const has = new Set(existing.map((b) => b.employeeId));
+      const missing = employeeIds.filter((id) => !has.has(id));
+      if (!missing.length) continue;
+
+      // skipDuplicates covers the race the read above cannot: two processes
+      // both finding the row absent. The unique key is the real guard.
+      const res = await this.prisma.leaveBalance.createMany({
+        data: missing.map((employeeId) => ({
+          employeeId,
+          leaveTypeId: type.id,
+          year,
+          allocated: type.defaultDays,
+          used: 0,
+        })),
+        skipDuplicates: true,
       });
 
-      for (const row of previous) {
-        // Last year's own carry-over counts toward what is available, or days
-        // rolled in would be lost the following year.
-        const remaining = row.allocated + row.carriedOver - row.used;
-        if (remaining <= 0) continue;
-
-        const capped = type.carryForwardLimit > 0
-          ? Math.min(remaining, type.carryForwardLimit)
-          : remaining;
-
-        // updateMany, not update: the guard belongs in the WHERE so a repeat
-        // run matches nothing, and a missing target row is skipped rather than
-        // throwing. Employees with no row for the new year are left alone —
-        // they have no entitlement to add to yet.
-        const res = await this.prisma.leaveBalance.updateMany({
-          where: {
-            employeeId: row.employeeId,
-            leaveTypeId: type.id,
-            year: newYear,
-            carriedForwardFromYear: null,
-          },
-          data: {
-            carriedOver: capped,
-            carriedForwardFromYear: previousYear,
-          },
-        });
-        rolled += res.count;
-      }
-
-      if (rolled) {
-        this.logger.log(`Carried forward "${type.name}" from ${previousYear} into ${newYear}`);
+      if (res.count) {
+        opened += res.count;
+        this.logger.log(`Opened ${year} with ${type.defaultDays} day(s) of "${type.name}" for ${res.count} employee(s)`);
       }
     }
 
-    if (rolled) this.logger.log(`Carried forward ${rolled} balance(s) into ${newYear}`);
-    return rolled;
+    if (opened) this.logger.log(`Opened ${opened} leave balance(s) for ${year}`);
+    return opened;
   }
 }

@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, UPLOAD_TIMEOUT_MS } from './apiClient';
 
 export const fieldVisitService = {
   startVisit: async (data: {
@@ -42,6 +42,7 @@ export const fieldVisitService = {
   uploadVisitPhoto: async (formData: FormData) => {
     const response = await apiClient.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT_MS,
     });
     return response.data;
   },
