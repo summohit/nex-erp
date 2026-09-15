@@ -505,30 +505,40 @@ model Holiday {
 
 // Attendance & Leaves
 model LeaveType {
-  id               Int               @id @default(autoincrement())
+  id               Int     @id @default(autoincrement())
   name             String
   description      String?
-  defaultDays      Int               @default(0)
+  defaultDays      Int     @default(0)
   accrualFrequency String? // NONE, MONTHLY, YEARLY
-  accrualAmount    Float             @default(0)
-  isPaid           Boolean           @default(true)
-  allowHalfDay     Boolean           @default(true)
+  accrualAmount    Float   @default(0)
+  isPaid           Boolean @default(true)
+  allowHalfDay     Boolean @default(true)
   /// Leave does not survive the year it was granted in. When this is on, days
   /// still unused when the year's last payslip is generated are paid out
   /// instead of expiring — see LeaveEncashment. Off for Sick, Maternity and
   /// unpaid types, which are an entitlement to be absent, not a balance owed.
-  encashable       Boolean           @default(false)
+  encashable       Boolean @default(false)
   /// Most days that may be paid out in one year. 0 means no cap — the field
   /// only appears once encashment is switched on, so a cap of zero would make
   /// the switch do nothing.
-  encashmentLimit  Int               @default(0)
-  companyId        Int
-  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  leaveBalances    LeaveBalance[]
-  leaveRequests    LeaveRequest[]
-  encashments      LeaveEncashment[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  encashmentLimit  Int     @default(0)
+
+  /// DEPRECATED — replaced by `encashable` / `encashmentLimit` above. Declared
+  /// only so `prisma db push` does not drop columns the currently deployed
+  /// build still reads; nothing in this codebase writes or reads them. Delete
+  /// both, and run the drop section of 2026-09-15-leave-encashment.sql, once
+  /// every environment is running the encashment code.
+  carryForward      Boolean @default(false)
+  /// DEPRECATED — see carryForward.
+  carryForwardLimit Int     @default(0)
+
+  companyId     Int
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leaveBalances LeaveBalance[]
+  leaveRequests LeaveRequest[]
+  encashments   LeaveEncashment[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 }
 
 model LeaveBalance {
@@ -546,6 +556,14 @@ model LeaveBalance {
   /// UPDATE that also stamps this, so a process restart on the 1st cannot
   /// double-credit: the second run matches zero rows.
   lastAccruedPeriod String?
+
+  /// DEPRECATED — leave no longer carries between years; what is unused is
+  /// encashed instead (see LeaveEncashment). Kept only so `prisma db push`
+  /// does not drop columns the deployed build still reads. All 728 live rows
+  /// are 0 / NULL. Delete alongside the LeaveType pair above.
+  carriedOver            Float @default(0)
+  /// DEPRECATED — see carriedOver.
+  carriedForwardFromYear Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
