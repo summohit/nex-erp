@@ -193,3 +193,58 @@ describe('QuotationPdfService — attachments', () => {
   });
 });
 
+/**
+ * A quotation can go to several people — the buyer, their manager, procurement.
+ * People paste those from a mail client, so the separator varies.
+ */
+describe('QuotationPdfService — recipients', () => {
+  const service: any = new QuotationPdfService({} as any, {} as any);
+  const parse = (v: any) => service.parseRecipients(v);
+
+  it.each([
+    ['a@x.com, b@y.com', ['a@x.com', 'b@y.com']],
+    ['a@x.com;b@y.com', ['a@x.com', 'b@y.com']],
+    ['a@x.com\nb@y.com', ['a@x.com', 'b@y.com']],
+    ['  a@x.com ,  b@y.com  ', ['a@x.com', 'b@y.com']],
+    [['a@x.com', 'b@y.com'], ['a@x.com', 'b@y.com']],
+  ])('accepts %s', (input, expected) => {
+    expect(parse(input)).toEqual(expected);
+  });
+
+  it('takes a single address unchanged', () => {
+    expect(parse('buyer@example.com')).toEqual(['buyer@example.com']);
+  });
+
+  // Sending to three of four addresses and saying nothing is worse than
+  // refusing: nobody notices the fourth.
+  it('names the invalid address rather than dropping it', () => {
+    expect(() => parse('a@x.com, notanemail')).toThrow(/notanemail is not a valid email address/);
+  });
+
+  it('names several invalid addresses', () => {
+    expect(() => parse('bad, worse')).toThrow(/bad, worse are not valid email addresses/);
+  });
+
+  it('de-duplicates, case-insensitively', () => {
+    expect(parse('A@x.com, a@x.com')).toEqual(['a@x.com']);
+  });
+
+  it('ignores empty entries from a trailing comma', () => {
+    expect(parse('a@x.com,')).toEqual(['a@x.com']);
+  });
+
+  it('caps the number of recipients', () => {
+    const many = Array.from({ length: 11 }, (_, i) => `p${i}@x.com`).join(',');
+    expect(() => parse(many)).toThrow(/at most 10 addresses/);
+  });
+
+  it('allows exactly the cap', () => {
+    const ten = Array.from({ length: 10 }, (_, i) => `p${i}@x.com`).join(',');
+    expect(parse(ten)).toHaveLength(10);
+  });
+
+  it('returns nothing for a blank value, so the caller can fall back', () => {
+    expect(parse('')).toEqual([]);
+    expect(parse(null)).toEqual([]);
+  });
+});

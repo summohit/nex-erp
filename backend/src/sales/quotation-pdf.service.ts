@@ -94,15 +94,49 @@ export class QuotationPdfService {
    * user confirmed in the UI is the one used. Refuses rather than guessing when
    * there is none — a quotation sent to the wrong party cannot be recalled.
    */
-  async emailToBuyer(companyId: number, quotationId: number, to?: string, message?: string) {
+  /** At most this many recipients on one quotation. */
+  private static readonly MAX_RECIPIENTS = 10;
+
+  /**
+   * Turn whatever the caller sent into a validated list of addresses.
+   *
+   * Accepts a comma, semicolon or newline separated string, or an array —
+   * people paste from a mail client and the separator varies. An invalid
+   * address is named rather than silently dropped: quietly sending to three of
+   * four addresses is worse than refusing, because nobody notices the fourth.
+   */
+  private parseRecipients(to: unknown): string[] {
+    const raw = Array.isArray(to) ? to : String(to ?? '').split(/[,;\n]/);
+    const list = raw.map((v) => String(v).trim()).filter(Boolean);
+
+    const unique = [...new Set(list.map((e) => e.toLowerCase()))];
+    const invalid = unique.filter((e) => !/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(e));
+    if (invalid.length) {
+      throw new BadRequestException(
+        `${invalid.join(', ')} ${invalid.length === 1 ? 'is not a valid email address' : 'are not valid email addresses'}.`,
+      );
+    }
+    if (unique.length > QuotationPdfService.MAX_RECIPIENTS) {
+      throw new BadRequestException(
+        `A quotation can go to at most ${QuotationPdfService.MAX_RECIPIENTS} addresses at once.`,
+      );
+    }
+    return unique;
+  }
+
+  async emailToBuyer(companyId: number, quotationId: number, to?: string | string[], message?: string) {
     const quote = await this.prisma.quotation.findFirst({
       where: { id: quotationId, companyId },
       include: { client: true, lead: { select: { email: true, contactName: true, companyName: true } } },
     });
     if (!quote) throw new NotFoundException('Quotation not found');
 
-    const recipient = (to || quote.billingEmail || quote.lead?.email || '').trim();
-    if (!recipient) {
+    const recipients = this.parseRecipients(
+      to && (Array.isArray(to) ? to.length : String(to).trim())
+        ? to
+        : quote.billingEmail || quote.lead?.email || '',
+    );
+    if (!recipients.length) {
       throw new BadRequestException(
         'No email address on this quotation or its deal. Add one before sending.',
       );
@@ -119,7 +153,8 @@ export class QuotationPdfService {
     }
 
     await this.mail.sendQuotationEmail({
-      to: recipient,
+      // nodemailer takes a list; one send, every recipient on the same message.
+      to: recipients,
       quoteNumber: quote.quoteNumber,
       companyName: company?.name || 'NEX ERP',
       buyerName: quote.billingContactName || quote.lead?.contactName || quote.billingCompanyName || undefined,
@@ -136,7 +171,7 @@ export class QuotationPdfService {
       await this.prisma.quotation.update({ where: { id: quotationId }, data: { status: 'SENT' } });
     }
 
-    return { sent: true, to: recipient, quoteNumber: quote.quoteNumber };
+    return { sent: true, to: recipients, quoteNumber: quote.quoteNumber };
   }
 
   // ── tax ────────────────────────────────────────────────────────────────────

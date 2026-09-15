@@ -343,7 +343,8 @@ export class MailService {
    * transport here that carries attachments.
    */
   async sendQuotationEmail(params: {
-    to: string;
+    /** One address or several — nodemailer accepts a list and sends one message. */
+    to: string | string[];
     quoteNumber: string;
     companyName: string;
     buyerName?: string;
@@ -389,11 +390,11 @@ export class MailService {
     `;
 
     try {
-      this.logger.log(`Sending quotation ${quoteNumber} to ${to} via SMTP (attachment required).`);
+      this.logger.log(`Sending quotation ${quoteNumber} to ${Array.isArray(to) ? to.join(', ') : to} via SMTP (attachment required).`);
       const info = await this.sendWithRetry({
         from: `"${companyName}" <${this.fromEmail}>`,
         to,
-        envelope: { from: this.fromEmail, to },
+        envelope: { from: this.fromEmail, to: Array.isArray(to) ? to : [to] },
         subject: `Quotation ${quoteNumber} from ${companyName}`,
         html: htmlContent,
         attachments: [{ filename: fileName, content: pdf, contentType: 'application/pdf' }],
