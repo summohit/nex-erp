@@ -522,6 +522,83 @@
       <!-- ══════════ PRE-SALES TAB ══════════ -->
       <div class="tab-pane" *ngIf="activeTab === 'presales'">
 
+        <!-- What a pre-sales member is told, rather than leaving them to wonder
+             why the deal value is missing. -->
+        <div class="ps-masked-note" *ngIf="!loadingPresales && presalesFinancialsHidden">
+          <svg lucideAlertCircle size="14"></svg>
+          <span>You are on this deal as pre-sales. Commercial figures are not shown.</span>
+        </div>
+
+        <!-- ══════════ AWAITING APPROVAL (MOVED TO TOP & HIDDEN IF NO REQUESTS) ══════════ -->
+        <div class="content-card ps-pending-approval-card" *ngIf="!loadingPresales && pendingRequests && pendingRequests.length > 0">
+          <div class="card-header-styled ps-approval-header">
+            <div class="header-title-box">
+              <span class="header-icon bg-amber-light text-amber"><svg lucideHourglass size="16"></svg></span>
+              <div>
+                <div class="ps-approval-title-wrap">
+                  <h3>Awaiting Administrator Approval</h3>
+                  <span class="ps-pending-count-pill">{{ pendingRequests.length }} Pending</span>
+                </div>
+                <p class="ps-approval-subtitle">These pre-sales team members have been requested and require approval before joining the deal.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="ps-requests-grid">
+            <div class="ps-request-card" *ngFor="let r of pendingRequests">
+              <div class="ps-request-top">
+                <div class="ps-avatar-container">
+                  <img *ngIf="r.items?.[0]?.employee?.avatarUrl || r.employee?.avatarUrl"
+                       [src]="r.items?.[0]?.employee?.avatarUrl || r.employee?.avatarUrl" class="ps-avatar-img" alt="" />
+                  <div *ngIf="!(r.items?.[0]?.employee?.avatarUrl || r.employee?.avatarUrl)" class="ps-avatar ps-avatar-amber">
+                    {{ presalesInitials(r) }}
+                  </div>
+                </div>
+                <div class="ps-request-info">
+                  <div class="ps-request-name-row">
+                    <span class="ps-member-name">{{ presalesName(r) }}</span>
+                    <span class="ps-status-pill ps-status-pending">
+                      <span class="ps-status-dot"></span> Pending Approval
+                    </span>
+                  </div>
+                  <div class="ps-request-meta-row">
+                    <span class="ps-meta-item">
+                      <svg lucideUser size="12"></svg>
+                      <span>Requested by <strong>{{ presalesName(r.requestedBy) }}</strong></span>
+                    </span>
+                    <span class="ps-meta-dot">•</span>
+                    <span class="ps-meta-item">
+                      <svg lucideCalendar size="12"></svg>
+                      <span>{{ r.createdAt | date:'dd MMM yyyy, h:mm a' }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="ps-request-reason-bubble" *ngIf="r.reason">
+                <div class="ps-reason-header">
+                  <svg lucideMessageSquare size="12"></svg>
+                  <span>Reason / Justification</span>
+                </div>
+                <p class="ps-reason-text">{{ r.reason }}</p>
+              </div>
+
+              <!-- Admin action buttons if the user is an admin -->
+              <div class="ps-request-actions-bar" *ngIf="presalesPermissions.canAddMembers">
+                <span class="ps-admin-action-hint">Admin Review:</span>
+                <button type="button" class="btn-action-status completed" (click)="approveRequest(r)">
+                  <svg lucideCheck size="12"></svg>
+                  <span>Approve</span>
+                </button>
+                <button type="button" class="btn-action-status btn-danger-status" (click)="rejectRequest(r)">
+                  <svg lucideX size="12"></svg>
+                  <span>Reject</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Team -->
         <div class="content-card">
           <div class="card-header-styled">
@@ -544,13 +621,6 @@
           </div>
 
           <div class="loading-box" *ngIf="loadingPresales"><div class="spinner small"></div><span>Loading pre-sales…</span></div>
-
-          <!-- What a pre-sales member is told, rather than leaving them to wonder
-               why the deal value is missing. -->
-          <div class="ps-masked-note" *ngIf="!loadingPresales && presalesFinancialsHidden">
-            <svg lucideAlertCircle size="14"></svg>
-            <span>You are on this deal as pre-sales. Commercial figures are not shown.</span>
-          </div>
 
           <div class="ps-member-grid" *ngIf="!loadingPresales && activeMembers.length">
             <div class="ps-member-card" *ngFor="let m of activeMembers">
@@ -581,6 +651,30 @@
                   <svg lucideCalendar size="12"></svg>
                   <span><span class="ps-meta-label">Added:</span> {{ m.createdAt | date:'dd MMM yyyy' }}</span>
                 </div>
+                <!-- Terms the person is engaged under. Absent on members added
+                     before this existed, hence the condition. -->
+                <div class="ps-meta-pill ps-terms-pill" *ngIf="engagementSummary(m)">
+                  <svg lucideClock size="12"></svg>
+                  <span>{{ engagementSummary(m) }}</span>
+                </div>
+              </div>
+
+              <!-- The budget. Only for members who have one: those added before
+                   hours existed are uncapped, and a meter at 0/0 would read as
+                   "no time left" when the opposite is true. -->
+              <div class="ps-budget" *ngIf="m.capped">
+                <div class="ps-budget-head">
+                  <span>{{ formatMinutes(m.usedMinutes) }} of {{ formatMinutes(m.allocatedMinutes) }} planned</span>
+                  <span class="ps-budget-left" [class.is-out]="isOverBooked(m)">
+                    {{ isOverBooked(m) ? 'No time left' : formatMinutes(m.remainingMinutes) + ' left' }}
+                  </span>
+                </div>
+                <div class="ps-budget-track">
+                  <div class="ps-budget-fill" [class.is-out]="isOverBooked(m)" [style.width.%]="usagePercent(m)"></div>
+                </div>
+                <button type="button" class="ps-budget-request" (click)="openHoursRequest(m)">
+                  {{ isAdminOrSuperAdmin ? 'Add hours' : 'Request more hours' }}
+                </button>
               </div>
               <div class="ps-member-remark-box" *ngIf="m.remark">
                 <div class="ps-remark-label">
@@ -595,24 +689,6 @@
           <div class="empty-state-box" *ngIf="!loadingPresales && !activeMembers.length">
             <svg lucideUsers size="28" style="margin-bottom:8px;opacity:.4"></svg>
             <div>No pre-sales team on this deal yet.</div>
-          </div>
-        </div>
-
-        <!-- Pending requests: never shown to a pre-sales member (server sends none) -->
-        <div class="content-card" *ngIf="pendingRequests.length">
-          <div class="card-header-styled">
-            <div class="header-title-box">
-              <span class="header-icon bg-amber-light text-amber"><svg lucideHourglass size="16"></svg></span>
-              <h3>Awaiting Approval</h3>
-            </div>
-          </div>
-          <div class="ps-request-row" *ngFor="let r of pendingRequests">
-            <div class="ps-request-main">
-              <span class="ps-member-name">{{ presalesName(r) }}</span>
-              <span class="ps-request-by">requested by {{ presalesName(r.requestedBy) }} · {{ r.createdAt | date:'dd MMM yyyy' }}</span>
-              <p class="ps-member-remark" *ngIf="r.reason">{{ r.reason }}</p>
-            </div>
-            <span class="ps-status-pill ps-status-pending">Pending</span>
           </div>
         </div>
 
@@ -827,8 +903,8 @@
           </div>
           <div class="ps-pick-list">
             <label class="ps-pick-row" *ngFor="let e of presalesCandidates(requestPresalesSearch, requestPresalesScope)">
-              <input type="radio" class="ps-radio" name="requestCandidate" [checked]="requestPresalesForm.employeeId === e.id"
-                     (change)="requestPresalesForm.employeeId = e.id" />
+              <input type="checkbox" class="ps-checkbox" [checked]="isRequestCandidateSelected(e.id)"
+                     (change)="toggleRequestCandidate(e)" />
               <div class="ps-avatar-wrapper">
                 <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" class="ps-avatar-img-sm" alt="" />
                 <div *ngIf="!e.avatarUrl" class="ps-avatar-small">{{ (e.firstName?.[0] || '') + (e.lastName?.[0] || '') }}</div>
@@ -840,8 +916,41 @@
             </label>
           </div>
 
+          <!-- One line per person asked for. The terms are per-person because a
+               request is "a network engineer on site and a cloud architect
+               remotely", not one shape applied to everybody. -->
+          <div class="ps-request-items" *ngIf="requestPresalesItems.length">
+            <label class="form-label">Requested people <span class="ps-scope-count">{{ requestPresalesItems.length }}</span></label>
+            <div class="ps-request-item" *ngFor="let item of requestPresalesItems; let i = index">
+              <div class="ps-request-item-head">
+                <span class="ps-member-name">{{ item.name }}</span>
+                <button type="button" class="ps-request-item-remove" (click)="removeRequestItem(i)" title="Remove from this request">
+                  <svg lucideX [size]="13"></svg>
+                </button>
+              </div>
+              <div class="ps-request-item-fields">
+                <div class="ps-rq-field">
+                  <label>Technology</label>
+                  <input type="text" class="modern-form-control" [(ngModel)]="item.technology"
+                         [name]="'tech_' + i" placeholder="e.g. Network security" />
+                </div>
+                <div class="ps-rq-field ps-rq-narrow">
+                  <label>Type</label>
+                  <select class="modern-form-control" [(ngModel)]="item.engagementType" [name]="'type_' + i">
+                    <option *ngFor="let t of engagementTypes" [ngValue]="t">{{ t === 'ONSITE' ? 'Onsite' : 'Virtual' }}</option>
+                  </select>
+                </div>
+                <div class="ps-rq-field ps-rq-narrow">
+                  <label>Hours</label>
+                  <input type="number" min="1" step="0.5" class="modern-form-control" [(ngModel)]="item.hours"
+                         [name]="'hours_' + i" placeholder="8" />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <label class="form-label" style="margin-top: 14px;">Reason / Justification <span class="required">*</span></label>
-          <textarea class="modern-form-control" rows="3" [(ngModel)]="requestPresalesForm.reason"
+          <textarea class="modern-form-control ps-reason-textarea" rows="3" [(ngModel)]="requestPresalesReason"
                     placeholder="e.g. The client requires specialized expertise in cloud architecture and network security."></textarea>
         </div>
 
@@ -850,6 +959,42 @@
           <button class="btn-primary-pill" (click)="saveRequestPresales()" [disabled]="savingRequestPresales">
             <svg lucideLoader2 size="16" class="spin-icon" *ngIf="savingRequestPresales"></svg>
             {{ savingRequestPresales ? 'Sending…' : 'Send Request' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ MORE HOURS ══════════════════════════ -->
+    <div class="modal-overlay" *ngIf="showHoursRequestModal" (click)="closeHoursRequest()">
+      <div class="modal-card modal-card-md ps-modal-styled" (click)="$event.stopPropagation()">
+        <div class="modal-header-styled">
+          <div class="modal-header-text">
+            <h3>{{ isAdminOrSuperAdmin ? 'Add Hours' : 'Request More Hours' }}</h3>
+            <p>
+              {{ presalesName(hoursRequestMember) }} —
+              {{ formatMinutes(hoursRequestMember?.usedMinutes) }} of
+              {{ formatMinutes(hoursRequestMember?.allocatedMinutes) }} planned
+            </p>
+          </div>
+          <button class="close-btn" (click)="closeHoursRequest()"><svg lucideX size="18"></svg></button>
+        </div>
+
+        <div class="modal-body-styled">
+          <label class="form-label">Additional hours <span class="required">*</span></label>
+          <input type="number" min="0.5" step="0.5" class="modern-form-control"
+                 [(ngModel)]="hoursRequestForm.hours" name="extraHours" placeholder="e.g. 5" />
+
+          <label class="form-label" style="margin-top: 14px;">Reason <span class="required">*</span></label>
+          <textarea class="modern-form-control ps-reason-textarea" rows="3" [(ngModel)]="hoursRequestForm.reason"
+                    name="extraHoursReason"
+                    placeholder="e.g. The client added a second site, so the survey needs another day."></textarea>
+        </div>
+
+        <div class="modal-footer-styled">
+          <button class="btn-outline-pill" (click)="closeHoursRequest()" [disabled]="savingHoursRequest">Cancel</button>
+          <button class="btn-primary-pill" (click)="saveHoursRequest()" [disabled]="savingHoursRequest">
+            <svg lucideLoader2 size="16" class="spin-icon" *ngIf="savingHoursRequest"></svg>
+            {{ savingHoursRequest ? 'Sending…' : (isAdminOrSuperAdmin ? 'Add Hours' : 'Send Request') }}
           </button>
         </div>
       </div>
@@ -1675,13 +1820,20 @@
 
         <div class="send-preview-footer">
           <div class="send-preview-to" [class.has-error]="sendPreviewToInvalid">
-            <span class="send-preview-to-label">Send to</span>
-            <span class="send-preview-to-value">
-              <svg lucideMail [size]="14"></svg>
-              <strong>{{ sendPreviewTo }}</strong>
+            <label class="send-preview-to-label" for="sendPreviewTo">
+              Send to <span class="send-preview-hint">separate several with commas</span>
+            </label>
+            <input id="sendPreviewTo" type="text" [(ngModel)]="sendPreviewTo" name="sendPreviewTo"
+                   [disabled]="sendingProposalId !== null"
+                   placeholder="buyer@company.com, procurement@company.com" />
+            <span class="send-preview-count" *ngIf="sendPreviewRecipients.length > 1 && !sendPreviewToInvalid">
+              {{ sendPreviewRecipients.length }} recipients
             </span>
-            <span class="send-preview-error" *ngIf="sendPreviewToInvalid">
-              This address is not valid. Fix it on the proposal or the deal contact, then send.
+            <span class="send-preview-error" *ngIf="sendPreviewInvalidRecipients.length">
+              Not a valid address: {{ sendPreviewInvalidRecipients.join(', ') }}
+            </span>
+            <span class="send-preview-error" *ngIf="!sendPreviewRecipients.length">
+              Enter at least one email address.
             </span>
           </div>
           <div class="send-preview-actions">

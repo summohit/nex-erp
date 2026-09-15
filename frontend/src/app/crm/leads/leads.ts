@@ -153,6 +153,18 @@ isSubmitted = false;
   showRepDropdown = false;
   repSearchQuery = '';
 
+  selectedPreSalesMemberId: number | 'ALL' = 'ALL';
+  showPreSalesDropdown = false;
+  preSalesSearchQuery = '';
+
+  selectedPreSalesRequestedById: number | 'ALL' = 'ALL';
+  showPreSalesRequestedByDropdown = false;
+  preSalesRequestedBySearchQuery = '';
+
+  selectedPreSalesInvolvement: 'ALL' | 'HAS_PRESALES' | 'NO_PRESALES' | 'HAS_OPEN_TASKS' = 'ALL';
+  showPreSalesInvolvementDropdown = false;
+
+
   selectedCategory = 'ALL';
   showCategoryDropdown = false;
   categorySearchQuery = '';
@@ -528,12 +540,107 @@ isSubmitted = false;
     return `${e?.firstName || ''} ${e?.lastName || ''}`.trim() || '—';
   }
 
-  approvePreSalesRequest(request: any) {
+  requestAvatar(row: any): string | null {
+    const e = row?.employee || row?.requestedBy || row;
+    return e?.avatarUrl || null;
+  }
+
+  requestInitials(row: any): string {
+    const name = this.requestName(row);
+    if (!name || name === '—') return 'PS';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  /** "16h onsite · Network security" — the terms a line was asked for under. */
+  itemTerms(item: any): string {
+    const bits: string[] = [];
+    if (item?.hours) bits.push(`${item.hours}h`);
+    if (item?.engagementType) bits.push(String(item.engagementType).toLowerCase());
+    if (item?.technology) bits.push(item.technology);
+    return bits.join(' · ');
+  }
+
+  /**
+   * Approving opens the request for editing first: the admin may drop people
+   * from it, adjust their terms, or substitute someone who was never asked
+   * for. Confirming sends the decided set, which is what actually joins.
+   */
+  editingRequest: any = null;
+  editingItems: any[] = [];
+  addToRequestSearch = '';
+
+  startApprove(request: any) {
+    this.editingRequest = request;
+    this.addToRequestSearch = '';
+    this.editingItems = (request.items || [])
+      .filter((i: any) => i.status !== 'REMOVED')
+      .map((i: any) => ({
+        employeeId: i.employeeId,
+        name: this.requestName(i),
+        avatarUrl: i.employee?.avatarUrl || null,
+        technology: i.technology || '',
+        engagementType: i.engagementType || 'VIRTUAL',
+        hours: i.hours ?? null,
+      }));
+  }
+
+  cancelApprove() {
+    this.editingRequest = null;
+    this.editingItems = [];
+  }
+
+  dropFromRequest(index: number) {
+    this.editingItems.splice(index, 1);
+  }
+
+  /** Everyone not already on the decided set, for a substitution. */
+  substitutionCandidates(): any[] {
+    const chosen = new Set(this.editingItems.map((i) => i.employeeId));
+    const term = this.addToRequestSearch.toLowerCase().trim();
+    if (!term) return [];
+    return (this.employees || [])
+      .filter((e: any) => !chosen.has(e.id))
+      .filter((e: any) => `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(term))
+      .slice(0, 6);
+  }
+
+  addToRequest(employee: any) {
+    this.editingItems.push({
+      employeeId: employee.id,
+      name: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
+      avatarUrl: employee.avatarUrl || null,
+      technology: '',
+      engagementType: 'VIRTUAL',
+      hours: null,
+    });
+    this.addToRequestSearch = '';
+  }
+
+  confirmApprove() {
+    const request = this.editingRequest;
+    if (!request) return;
+    if (!this.editingItems.length) {
+      this.toast.error('Approve at least one person, or reject the request instead.');
+      return;
+    }
+    this.approvePreSalesRequest(request, this.editingItems);
+  }
+
+  approvePreSalesRequest(request: any, items?: any[]) {
     this.decidingRequestId = request.id;
-    this.http.patch<any>(`${environment.apiUrl}/crm/pre-sales/requests/${request.id}/approve`, {}).subscribe({
+    this.http.patch<any>(`${environment.apiUrl}/crm/pre-sales/requests/${request.id}/approve`,
+      items ? { items: items.map((i) => ({
+        employeeId: i.employeeId, technology: i.technology,
+        engagementType: i.engagementType, hours: i.hours,
+      })) } : {},
+    ).subscribe({
       next: () => {
         this.decidingRequestId = null;
-        this.toast.success(`${this.requestName(request)} added to the pre-sales team.`);
+        this.editingRequest = null;
+        this.editingItems = [];
+        this.toast.success('Pre-sales request approved.');
         this.loadPreSalesRequests();
         this.loadLeads();
       },
@@ -1404,9 +1511,24 @@ csvImporting = false;
         }
       }
 
+      const matchesPreSalesMember = this.selectedPreSalesMemberId === 'ALL' ||
+        (lead.preSalesMembers || []).some((m: any) => {
+          const e = m.employee || m.assignedTo || m.assignedBy || m;
+          return e?.id === this.selectedPreSalesMemberId;
+        });
+
+      const matchesPreSalesRequestedBy = this.selectedPreSalesRequestedById === 'ALL' ||
+        (lead.preSalesMembers || []).some((m: any) => m.assignedBy?.id === this.selectedPreSalesRequestedById);
+
+      const matchesPreSalesInvolvement = this.selectedPreSalesInvolvement === 'ALL' ||
+        (this.selectedPreSalesInvolvement === 'HAS_PRESALES' && (lead.preSalesMembers?.length || 0) > 0) ||
+        (this.selectedPreSalesInvolvement === 'NO_PRESALES' && (lead.preSalesMembers?.length || 0) === 0) ||
+        (this.selectedPreSalesInvolvement === 'HAS_OPEN_TASKS' && this.openPreSalesTasks(lead) > 0);
+
       return matchesSearch && matchesStage && matchesRep && matchesCategory &&
         matchesSource && matchesContact && matchesAddedBy && matchesMyLeads && matchesQuotation &&
-        matchesFollowUpStatus && matchesFollowUpDate && matchesMin && matchesMax && matchesDate;
+        matchesFollowUpStatus && matchesFollowUpDate && matchesMin && matchesMax && matchesDate &&
+        matchesPreSalesMember && matchesPreSalesRequestedBy && matchesPreSalesInvolvement;
     });
 
     return this.sortLeads(filtered);
@@ -1503,6 +1625,9 @@ csvImporting = false;
     const toggles: Record<string, string> = {
       stage: 'showStageDropdown',
       rep: 'showRepDropdown',
+      psRep: 'showPreSalesDropdown',
+      psReq: 'showPreSalesRequestedByDropdown',
+      psInv: 'showPreSalesInvolvementDropdown',
       category: 'showCategoryDropdown',
       source: 'showSourceDropdown',
       contact: 'showContactDropdown',
@@ -1537,6 +1662,9 @@ csvImporting = false;
   closeFilterDropdowns() {
     this.showStageDropdown = false;
     this.showRepDropdown = false;
+    this.showPreSalesDropdown = false;
+    this.showPreSalesRequestedByDropdown = false;
+    this.showPreSalesInvolvementDropdown = false;
     this.showCategoryDropdown = false;
     this.showSourceDropdown = false;
     this.showContactDropdown = false;
@@ -1574,6 +1702,49 @@ csvImporting = false;
     if (this.selectedRepId === 'ALL') return 'All Reps';
     if (this.selectedRepId === 'UNASSIGNED') return 'Unassigned';
     return this.getRepName(this.selectedRepId) || 'Selected Rep';
+  }
+
+  // Pre-Sales Dropdown logic
+  getFilteredPreSalesEmployees(): any[] {
+    if (!this.preSalesSearchQuery.trim()) return this.employees;
+    const q = this.preSalesSearchQuery.toLowerCase();
+    return this.employees.filter(e => 
+      (e.firstName && e.firstName.toLowerCase().includes(q)) || 
+      (e.lastName && e.lastName.toLowerCase().includes(q))
+    );
+  }
+
+  selectPreSalesMemberFilter(repId: number | 'ALL') {
+    this.selectedPreSalesMemberId = repId;
+    this.showPreSalesDropdown = false;
+    this.preSalesSearchQuery = '';
+    this.onFilterChange();
+  }
+
+  getSelectedPreSalesMemberLabel(): string {
+    if (this.selectedPreSalesMemberId === 'ALL') return 'All Reps';
+    return this.getRepName(this.selectedPreSalesMemberId) || 'Selected Rep';
+  }
+
+  getFilteredPreSalesRequestedByEmployees(): any[] {
+    if (!this.preSalesRequestedBySearchQuery.trim()) return this.employees;
+    const q = this.preSalesRequestedBySearchQuery.toLowerCase();
+    return this.employees.filter(e => 
+      (e.firstName && e.firstName.toLowerCase().includes(q)) || 
+      (e.lastName && e.lastName.toLowerCase().includes(q))
+    );
+  }
+
+  selectPreSalesRequestedByFilter(repId: number | 'ALL') {
+    this.selectedPreSalesRequestedById = repId;
+    this.showPreSalesRequestedByDropdown = false;
+    this.preSalesRequestedBySearchQuery = '';
+    this.onFilterChange();
+  }
+
+  getSelectedPreSalesRequestedByLabel(): string {
+    if (this.selectedPreSalesRequestedById === 'ALL') return 'All Requesters';
+    return this.getRepName(this.selectedPreSalesRequestedById) || 'Selected Requester';
   }
 
   getFilteredContactsForFilter(): any[] {
@@ -1712,6 +1883,18 @@ csvImporting = false;
       const label = this.selectedRepId === 'UNASSIGNED' ? 'Unassigned' : this.getRepName(this.selectedRepId);
       chips.push({ key: 'rep', label: `Rep: ${label}`, clear: () => { this.selectedRepId = 'ALL'; this.onFilterChange(); } });
     }
+    if (this.selectedPreSalesMemberId !== 'ALL') {
+      const label = this.getRepName(this.selectedPreSalesMemberId);
+      chips.push({ key: 'psRep', label: `PS Rep: ${label}`, clear: () => { this.selectedPreSalesMemberId = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.selectedPreSalesRequestedById !== 'ALL') {
+      const label = this.getRepName(this.selectedPreSalesRequestedById);
+      chips.push({ key: 'psRequestedBy', label: `PS Req. By: ${label}`, clear: () => { this.selectedPreSalesRequestedById = 'ALL'; this.onFilterChange(); } });
+    }
+    if (this.selectedPreSalesInvolvement !== 'ALL') {
+      const labels = { HAS_PRESALES: 'Has Pre-Sales', NO_PRESALES: 'No Pre-Sales', HAS_OPEN_TASKS: 'Has Open Tasks' };
+      chips.push({ key: 'psInvolve', label: `Pre-Sales: ${labels[this.selectedPreSalesInvolvement]}`, clear: () => { this.selectedPreSalesInvolvement = 'ALL'; this.onFilterChange(); } });
+    }
     if (this.selectedCategory !== 'ALL') {
       chips.push({ key: 'category', label: `Category: ${this.selectedCategory}`, clear: () => { this.selectedCategory = 'ALL'; this.onFilterChange(); } });
     }
@@ -1776,6 +1959,9 @@ csvImporting = false;
     this.myLeadsOnly = false;
     this.selectedStages = [];
     this.selectedRepId = 'ALL';
+    this.selectedPreSalesMemberId = 'ALL';
+    this.selectedPreSalesRequestedById = 'ALL';
+    this.selectedPreSalesInvolvement = 'ALL';
     this.selectedCategory = 'ALL';
     this.selectedSource = 'ALL';
     this.selectedContactId = 'ALL';

@@ -4146,8 +4146,32 @@ input:checked + .toggle-slider:before {
   text-transform: uppercase;
   color: #64748b;
 }
-/* Shown, not offered for editing: the address belongs to the proposal, and
-   changing it here would send to someone the record does not name. */
+/* Editable again, because a quotation often goes to several people — the
+   buyer, their manager, procurement — and only the sender knows who. */
+.send-preview-to input {
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e293b;
+  width: 100%;
+}
+.send-preview-to input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+.send-preview-to.has-error input { border-color: #ef4444; }
+.send-preview-hint {
+  margin-left: 6px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #94a3b8;
+}
+.send-preview-count { font-size: 12px; color: #4338ca; font-weight: 600; }
+
 .send-preview-to-value {
   display: inline-flex;
   align-items: center;
@@ -4576,55 +4600,264 @@ input:checked + .toggle-slider:before {
 }
 .btn-ps-end:hover { background: #ffe4e6; border-color: #fda4af; }
 
-.ps-request-card {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
+/* ══════════ AWAITING APPROVAL SECTION (TOP OF PRE-SALES) ══════════ */
+.ps-pending-approval-card {
+  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 80px, #ffffff 100%);
+  border: 1px solid #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px -2px rgba(245, 158, 11, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  margin-bottom: 20px;
+  padding: 16px 20px 20px;
 }
-.ps-request-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.ps-request-name { font-size: 13.5px; font-weight: 600; color: #0f172a; }
-.ps-request-name b { color: #d97706; }
-.ps-request-type { font-size: 12px; color: #64748b; }
-.ps-request-reason { font-size: 12.5px; color: #475569; font-style: italic; }
-.ps-request-remarks { font-size: 12px; color: #b45309; background: #fffbeb; border-radius: 6px; padding: 4px 8px; }
-.ps-request-status {
+
+.ps-approval-header {
+  border-bottom: 1px solid #fef3c7 !important;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.ps-approval-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ps-approval-title-wrap h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.ps-pending-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ps-approval-subtitle {
+  font-size: 12.5px;
+  color: #78716c;
+  margin: 3px 0 0;
+  line-height: 1.4;
+}
+
+.ps-requests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.ps-request-card {
+  background: #ffffff;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  gap: 12px;
+  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.06);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.ps-request-card:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.12);
+  transform: translateY(-2px);
+}
+
+.ps-request-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ps-avatar-container {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fef3c7;
+  border: 2px solid #fde68a;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.15);
+}
+
+.ps-avatar-container .ps-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ps-avatar-container .ps-avatar-amber {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.5px;
+}
+
+.ps-request-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ps-request-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ps-request-name-row .ps-member-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ps-status-pill.ps-status-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ps-status-pill.ps-status-pending .ps-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+  animation: pulseAmber 2s infinite ease-in-out;
+}
+
+@keyframes pulseAmber {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.ps-request-meta-row {
+  display: flex;
+  align-items: center;
   gap: 6px;
-  flex: 0 0 auto;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #64748b;
 }
-.ps-request-actions { display: flex; gap: 6px; }
-.btn-approve {
-  border: none;
-  background: #dcfce7;
-  color: #15803d;
-  font-size: 11.5px;
+
+.ps-request-meta-row .ps-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ps-request-meta-row .ps-meta-item svg {
+  color: #94a3b8;
+}
+
+.ps-request-meta-row .ps-meta-dot {
+  color: #cbd5e1;
+}
+
+.ps-request-reason-bubble {
+  background: #fefce8;
+  border: 1px dashed #fde047;
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ps-reason-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 5px 12px;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #a16207;
 }
-.btn-approve:hover { background: #bbf7d0; }
-.btn-reject {
-  border: none;
-  background: #fee2e2;
-  color: #b91c1c;
-  font-size: 11.5px;
+
+.ps-reason-header svg {
+  color: #ca8a04;
+}
+
+.ps-reason-text {
+  font-size: 12.5px;
+  color: #475569;
+  margin: 0;
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.ps-request-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  margin-top: 2px;
+}
+
+.ps-admin-action-hint {
+  margin-right: auto;
+  font-size: 11px;
   font-weight: 700;
-  padding: 5px 12px;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
-.btn-reject:hover { background: #fecaca; }
-.ps-request-responder { font-size: 11.5px; color: #94a3b8; text-align: right; }
+
+.btn-action-status.btn-danger-status {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
+}
+
+.btn-action-status.btn-danger-status:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.35);
+}
+
+@media (max-width: 768px) {
+  .ps-requests-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 .ps-task-card {
   background: #ffffff;
@@ -5811,3 +6044,69 @@ select.modern-form-control.input-error {
   margin: -4px 0 10px;
   font-size: 12px; font-weight: 600; color: var(--color-primary);
 }
+
+/* ── Request line items ──────────────────────────────────────────────────── */
+.ps-request-items { margin-top: 14px; }
+.ps-request-item {
+  margin-top: 8px; padding: 10px 12px;
+  border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc;
+}
+.ps-request-item-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+.ps-request-item-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: none; border-radius: 6px;
+  background: transparent; color: #94a3b8; cursor: pointer;
+}
+.ps-request-item-remove:hover { background: #fef2f2; color: #b91c1c; }
+/* Technology takes the room; type and hours are small fixed inputs. */
+.ps-request-item-fields { display: grid; grid-template-columns: 1fr 110px 90px; gap: 8px; }
+.ps-rq-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ps-rq-field label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: #94a3b8;
+}
+@media (max-width: 640px) {
+  .ps-request-item-fields { grid-template-columns: 1fr; }
+}
+
+/* Terms on a member card, alongside the other meta pills. */
+.ps-meta-pill.ps-terms-pill {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+  text-transform: capitalize;
+}
+
+/* The justification is what an administrator approves on, often for several
+   people at once, so it gets room to be specific rather than a three-line box. */
+.ps-reason-textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+
+/* ── Hours budget on a member card ───────────────────────────────────────── */
+.ps-budget { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; }
+.ps-budget-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 11.5px; color: #64748b; margin-bottom: 6px;
+}
+.ps-budget-left { font-weight: 700; color: #4338ca; }
+.ps-budget-left.is-out { color: #b91c1c; }
+.ps-budget-track {
+  height: 6px; border-radius: 999px; background: #e2e8f0; overflow: hidden;
+}
+.ps-budget-fill {
+  height: 100%; border-radius: 999px; background: #6366f1;
+  transition: width 0.25s ease;
+}
+/* Full is not an error in itself, but it is the thing to notice. */
+.ps-budget-fill.is-out { background: #ef4444; }
+.ps-budget-request {
+  margin-top: 8px; padding: 4px 12px;
+  border: 1px solid #e2e8f0; border-radius: 999px;
+  background: #fff; color: var(--color-primary);
+  font-size: 11.5px; font-weight: 700; cursor: pointer;
+}
+.ps-budget-request:hover { background: #fff7ed; border-color: #fed7aa; }

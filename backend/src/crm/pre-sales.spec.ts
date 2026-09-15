@@ -47,7 +47,19 @@ describe('CrmService — pre-sales', () => {
         upsert: jest.fn(async ({ create }: any) => ({ id: 6, ...create })),
         update: jest.fn(async () => ({})),
       },
-      preSalesRequest: { findMany: jest.fn(async () => []), findFirst: jest.fn(async () => null), create: jest.fn(async ({ data }: any) => ({ id: 11, ...data })), update: jest.fn(async ({ data }: any) => ({ id: 11, ...data })) },
+      preSalesRequest: {
+        findMany: jest.fn(async () => []), findFirst: jest.fn(async () => null),
+        findUnique: jest.fn(async () => ({ id: 11, status: 'APPROVED', items: [] })),
+        create: jest.fn(async ({ data }: any) => ({ id: 11, ...data })),
+        update: jest.fn(async ({ data }: any) => ({ id: 11, ...data })),
+      },
+      preSalesRequestItem: {
+        findMany: jest.fn(async () => []),
+        findFirst: jest.fn(async () => null),
+        create: jest.fn(async ({ data }: any) => ({ id: 51, ...data })),
+        update: jest.fn(async ({ data }: any) => ({ id: 61, ...data })),
+        updateMany: jest.fn(async () => ({ count: 1 })),
+      },
       preSalesTask: { findMany: jest.fn(async () => []), findFirst: jest.fn(async () => null), create: jest.fn(async ({ data }: any) => ({ id: 21, ...data, assignedTo: { firstName: 'Rahul', lastName: 'Sharma' } })), update: jest.fn(async ({ data }: any) => ({ id: 21, ...data, assignedTo: { firstName: 'Rahul', lastName: 'Sharma' }, assignedById: CREATOR.employeeId, title: 'T' })) },
       preSalesTaskStatusHistory: { create: jest.fn(async ({ data }: any) => ({ id: 31, ...data })), findMany: jest.fn(async () => []) },
       preSalesTaskAttachment: { createMany: jest.fn(async () => ({ count: 1 })) },
@@ -152,7 +164,10 @@ describe('CrmService — pre-sales', () => {
 
   // ── requests ──────────────────────────────────────────────────────────────
   describe('requests', () => {
-    const body = { employeeId: 4, reason: 'Client requires network security expertise.' };
+    const body = {
+      items: [{ employeeId: 4, technology: 'Network security', engagementType: 'ONSITE', hours: 16 }],
+      reason: 'Client requires network security expertise.',
+    };
 
     it('is how the lead creator adds someone', async () => {
       const req: any = await service.createPreSalesRequest(COMPANY, LEAD, CREATOR, body);
@@ -162,7 +177,7 @@ describe('CrmService — pre-sales', () => {
     });
 
     it('requires a reason', async () => {
-      await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, { employeeId: 4, reason: '  ' }))
+      await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, { ...body, reason: '  ' }))
         .rejects.toThrow(/reason/i);
     });
 
@@ -177,33 +192,129 @@ describe('CrmService — pre-sales', () => {
     });
 
     it('refuses a duplicate pending request', async () => {
-      prisma.preSalesRequest.findFirst.mockResolvedValueOnce({ id: 2, status: 'PENDING' });
+      prisma.preSalesRequestItem.findMany.mockResolvedValueOnce([{ employeeId: 4 }]);
       await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, body))
         .rejects.toThrow(/already awaiting approval/);
     });
 
     it('refuses someone already on the team', async () => {
-      prisma.preSalesTeamMember.findFirst.mockResolvedValueOnce({ id: 5, status: 'ACTIVE' });
+      prisma.preSalesTeamMember.findMany.mockResolvedValueOnce([{ employeeId: 4 }]);
       await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, body))
         .rejects.toThrow(/already on this deal/);
+    });
+
+    // The whole point of the redesign: one request, several specialists.
+    it('carries each person\'s technology, engagement type and hours', async () => {
+      prisma.employee.findMany.mockResolvedValueOnce([
+        { id: 4, firstName: 'Neha', lastName: 'Singh' },
+        { id: 8, firstName: 'Amit', lastName: 'Kumar' },
+      ]);
+      const req: any = await service.createPreSalesRequest(COMPANY, LEAD, CREATOR, {
+        reason: 'Two specialists needed',
+        items: [
+          { employeeId: 4, technology: 'Network security', engagementType: 'ONSITE', hours: 16 },
+          { employeeId: 8, technology: 'Cloud architecture', engagementType: 'VIRTUAL', hours: 8 },
+        ],
+      });
+      const created = prisma.preSalesRequest.create.mock.calls[0][0].data.items.create;
+      expect(created).toHaveLength(2);
+      expect(created[0]).toEqual(expect.objectContaining({
+        employeeId: 4, technology: 'Network security', engagementType: 'ONSITE', hours: 16, status: 'REQUESTED',
+      }));
+      expect(created[1].engagementType).toBe('VIRTUAL');
+    });
+
+    it('rejects an engagement type outside onsite and virtual', async () => {
+      await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, {
+        reason: 'x', items: [{ employeeId: 4, technology: 'SDWAN', engagementType: 'HYBRID', hours: 4 }],
+      })).rejects.toThrow(/ONSITE or VIRTUAL/);
+    });
+
+    it('rejects hours that are not a positive number', async () => {
+      await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, {
+        reason: 'x', items: [{ employeeId: 4, technology: 'SDWAN', hours: 'eight' }],
+      })).rejects.toThrow(/greater than zero/);
+    });
+
+    it('rejects the same person twice on one request', async () => {
+      const line = { technology: 'SDWAN', engagementType: 'ONSITE', hours: 4 };
+      await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, {
+        reason: 'x', items: [{ employeeId: 4, ...line }, { employeeId: 4, ...line }],
+      })).rejects.toThrow(/appears twice/);
+    });
+
+    // Hours become a budget the moment the person joins, so asking without
+    // them is asking for an open-ended commitment.
+    it('requires the technology for each person', async () => {
+      await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, {
+        reason: 'x', items: [{ employeeId: 4, hours: 4 }],
+      })).rejects.toThrow(/what technology/i);
+    });
+
+    it('requires the hours for each person', async () => {
+      await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, {
+        reason: 'x', items: [{ employeeId: 4, technology: 'SDWAN' }],
+      })).rejects.toThrow(/hours needed/i);
+    });
+
+    it('requires at least one person', async () => {
+      await expect(service.createPreSalesRequest(COMPANY, LEAD, CREATOR, { reason: 'x', items: [] }))
+        .rejects.toThrow(/at least one person/);
     });
   });
 
   describe('approval', () => {
     const pending = {
-      id: 11, leadId: LEAD, employeeId: 4, requestedById: CREATOR.employeeId, status: 'PENDING',
-      reason: 'Security expertise', employee: { id: 4, firstName: 'Neha', lastName: 'Singh' },
+      id: 11, leadId: LEAD, requestedById: CREATOR.employeeId, status: 'PENDING',
+      reason: 'Security expertise',
+      items: [{
+        id: 51, employeeId: 4, technology: 'Network security', engagementType: 'ONSITE', hours: 16,
+        status: 'REQUESTED', employee: { id: 4, firstName: 'Neha', lastName: 'Singh' },
+      }],
       lead: { id: LEAD, title: 'ABC Corporation', companyName: 'ABC Corp', addedById: CREATOR.employeeId },
     };
 
     beforeEach(() => { prisma.preSalesRequest.findFirst = jest.fn(async () => pending); });
 
     it('adds the employee and notifies both sides', async () => {
+      prisma.employee.findMany.mockResolvedValueOnce([{ id: 4, firstName: 'Neha', lastName: 'Singh' }]);
       await service.approvePreSalesRequest(COMPANY, 11, ADMIN);
       expect(prisma.preSalesTeamMember.upsert).toHaveBeenCalled();
       const messages = notifications.notifyEmployees.mock.calls.map((c: any) => c[1].message);
-      expect(messages.some((m: string) => m.includes('has been approved'))).toBe(true);
+      expect(messages.some((m: string) => m.includes('was approved for'))).toBe(true);
       expect(messages.some((m: string) => m.includes('added as a Pre-Sales member'))).toBe(true);
+    });
+
+    // The terms travel with the person onto the team.
+    it('carries the technology, engagement type and hours onto the assignment', async () => {
+      prisma.employee.findMany.mockResolvedValueOnce([{ id: 4, firstName: 'Neha', lastName: 'Singh' }]);
+      await service.approvePreSalesRequest(COMPANY, 11, ADMIN);
+      const created = prisma.preSalesTeamMember.upsert.mock.calls[0][0].create;
+      expect(created).toEqual(expect.objectContaining({
+        employeeId: 4, technology: 'Network security', engagementType: 'ONSITE', hours: 16,
+      }));
+    });
+
+    // An admin may approve a different set than was asked for.
+    it('lets the admin drop someone and substitute another', async () => {
+      prisma.employee.findMany.mockResolvedValueOnce([{ id: 9, firstName: 'Bhanu', lastName: 'Singh' }]);
+      await service.approvePreSalesRequest(COMPANY, 11, ADMIN, {
+        items: [{ employeeId: 9, technology: 'Firewalls', engagementType: 'VIRTUAL', hours: 4 }],
+      });
+
+      // The substitute joins...
+      expect(prisma.preSalesTeamMember.upsert.mock.calls[0][0].create.employeeId).toBe(9);
+      // ...recorded as never having been asked for...
+      expect(prisma.preSalesRequestItem.create.mock.calls[0][0].data.status).toBe('ADDED');
+      // ...and the person who was asked for is kept, marked as not granted.
+      expect(prisma.preSalesRequestItem.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'REMOVED' } }),
+      );
+    });
+
+    it('refuses to approve an empty set', async () => {
+      await expect(service.approvePreSalesRequest(COMPANY, 11, ADMIN, { items: [] }))
+        .resolves.toBeDefined();  // empty falls back to the request as submitted
     });
 
     it('refuses a non-admin', async () => {
@@ -227,6 +338,13 @@ describe('CrmService — pre-sales', () => {
       expect(out.status).toBe('REJECTED');
       expect(out.adminRemark).toBe('Existing team can cover this.');
       expect(notifications.notifyEmployees.mock.calls[0][1].message).toContain('Existing team can cover this.');
+    });
+
+    it('marks every line as not granted when the request is rejected', async () => {
+      await service.rejectPreSalesRequest(COMPANY, 11, ADMIN, {});
+      expect(prisma.preSalesRequestItem.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'REMOVED' } }),
+      );
     });
   });
 
@@ -341,6 +459,167 @@ describe('CrmService — pre-sales', () => {
       const messages = notifications.notifyEmployees.mock.calls.map((c: any) => c[1].message);
       expect(messages.some((m: string) => m.includes('has been completed'))).toBe(true);
       expect(notifications.notifyApprovers).toHaveBeenCalled();
+    });
+  });
+
+  // ── the hours budget ──────────────────────────────────────────────────────
+  //
+  // A member is engaged for a number of hours; the tasks raised for them are
+  // measured against it. A member with no allocation is UNCAPPED rather than
+  // capped at zero — members who predate the budget must stay assignable.
+  describe('hours budget', () => {
+    const task = {
+      assignedToId: PRESALES.employeeId, title: 'Client Meeting',
+      durationHours: 4, durationMinutes: 0,
+    };
+
+    const withAllocation = (hours: number | null, plannedMinutes: number[] = []) => {
+      prisma.preSalesTeamMember.findFirst = jest.fn(async () => ({
+        id: 5, employeeId: PRESALES.employeeId, status: 'ACTIVE',
+        assignedById: CREATOR.employeeId, hours,
+      }));
+      prisma.preSalesTask.findMany = jest.fn(async () =>
+        plannedMinutes.map((m, i) => ({ id: i + 1, estimatedMinutes: m })));
+    };
+
+    it('allows a task inside the allocation', async () => {
+      withAllocation(8, [60]);
+      await expect(service.createPreSalesTask(COMPANY, LEAD, ADMIN, task)).resolves.toBeDefined();
+    });
+
+    it('refuses a task that exceeds what is left', async () => {
+      withAllocation(4, [120]);   // 4h allocated, 2h planned, asking for 4h
+      await expect(service.createPreSalesTask(COMPANY, LEAD, ADMIN, task))
+        .rejects.toThrow(/more time than is left/);
+    });
+
+    it('says how much is allocated, planned and remaining', async () => {
+      withAllocation(4, [120]);
+      await expect(service.createPreSalesTask(COMPANY, LEAD, ADMIN, task))
+        .rejects.toThrow(/4h allocated, 2h already planned, 2h remaining/);
+    });
+
+    it('points at the way out rather than just refusing', async () => {
+      withAllocation(4, [120]);
+      await expect(service.createPreSalesTask(COMPANY, LEAD, ADMIN, task))
+        .rejects.toThrow(/Request more hours/);
+    });
+
+    // The regression this guards: 7 of 11 existing members have no allocation.
+    it('leaves a member with no allocation uncapped', async () => {
+      withAllocation(null, [6000]);
+      await expect(service.createPreSalesTask(COMPANY, LEAD, ADMIN, task)).resolves.toBeDefined();
+    });
+
+    it('counts only the tasks already planned, not the one being raised', async () => {
+      withAllocation(4, []);      // exactly 4h free, asking for exactly 4h
+      await expect(service.createPreSalesTask(COMPANY, LEAD, ADMIN, task)).resolves.toBeDefined();
+    });
+  });
+
+  describe('requesting more hours', () => {
+    beforeEach(() => {
+      prisma.preSalesTeamMember.findFirst = jest.fn(async () => ({
+        id: 5, employeeId: PRESALES.employeeId, status: 'ACTIVE', hours: 4,
+        technology: 'SDWAN', engagementType: 'ONSITE',
+        employee: { firstName: 'Rahul', lastName: 'Sharma' },
+      }));
+      prisma.preSalesRequestItem.findFirst = jest.fn(async () => null);
+    });
+
+    const body = { employeeId: PRESALES.employeeId, hours: 5, reason: 'The client added a second site.' };
+
+    it('is a request when a non-admin asks', async () => {
+      const out: any = await service.createPreSalesHoursRequest(COMPANY, LEAD, CREATOR, body);
+      expect(out.type).toBe('ADDITIONAL_HOURS');
+      expect(out.status).toBe('PENDING');
+      expect(notifications.notifyApprovers).toHaveBeenCalled();
+    });
+
+    // There is nobody above an admin to ask.
+    it('is applied immediately when an admin asks', async () => {
+      await service.createPreSalesHoursRequest(COMPANY, LEAD, ADMIN, body);
+      expect(prisma.preSalesTeamMember.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { hours: 9 } }),
+      );
+    });
+
+    it('requires a reason', async () => {
+      await expect(service.createPreSalesHoursRequest(COMPANY, LEAD, CREATOR, { ...body, reason: ' ' }))
+        .rejects.toThrow(/why the extra time/i);
+    });
+
+    it('requires a positive number of hours', async () => {
+      await expect(service.createPreSalesHoursRequest(COMPANY, LEAD, CREATOR, { ...body, hours: 0 }))
+        .rejects.toThrow(/how many additional hours/i);
+    });
+
+    it('refuses for someone not on the team', async () => {
+      prisma.preSalesTeamMember.findFirst = jest.fn(async () => null);
+      await expect(service.createPreSalesHoursRequest(COMPANY, LEAD, CREATOR, body))
+        .rejects.toThrow(/not on this deal/);
+    });
+
+    it('refuses a second pending top-up for the same person', async () => {
+      prisma.preSalesRequestItem.findFirst = jest.fn(async () => ({ id: 9 }));
+      await expect(service.createPreSalesHoursRequest(COMPANY, LEAD, CREATOR, body))
+        .rejects.toThrow(/already awaiting approval/);
+    });
+
+    it('adds the granted hours on approval, not the requested ones', async () => {
+      prisma.preSalesRequest.findFirst = jest.fn(async () => ({
+        id: 12, leadId: LEAD, type: 'ADDITIONAL_HOURS', status: 'PENDING',
+        requestedById: CREATOR.employeeId,
+        items: [{ id: 61, employeeId: PRESALES.employeeId, hours: 8, employee: { firstName: 'Rahul', lastName: 'Sharma' } }],
+        lead: { id: LEAD, title: 'ABC', companyName: 'ABC Corp', addedById: CREATOR.employeeId },
+      }));
+      prisma.preSalesRequest.findUnique = jest.fn(async () => ({ id: 12, status: 'APPROVED', items: [] }));
+
+      // Asked for 8, admin grants 4.
+      await service.approvePreSalesRequest(COMPANY, 12, ADMIN, { items: [{ employeeId: PRESALES.employeeId, hours: 4 }] });
+      expect(prisma.preSalesTeamMember.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { hours: 8 } }),   // 4 existing + 4 granted
+      );
+    });
+  });
+
+  /**
+   * Waiting first, newest within each group.
+   *
+   * This cannot be an orderBy: sorting the status string puts APPROVED first
+   * ascending and REJECTED first descending, and neither is the priority.
+   */
+  describe('the admin queue ordering', () => {
+    const row = (id: number, status: string, day: number) => ({
+      id, status, createdAt: new Date(`2026-09-${String(day).padStart(2, '0')}`),
+      items: [], lead: { id: 1 },
+    });
+
+    it('puts pending above decided, newest first inside each', async () => {
+      // Returned newest-first by the query, mixed statuses.
+      prisma.preSalesRequest.findMany = jest.fn(async () => [
+        row(5, 'REJECTED', 14),
+        row(4, 'PENDING', 13),
+        row(3, 'APPROVED', 12),
+        row(2, 'PENDING', 11),
+        row(1, 'APPROVED', 10),
+      ]);
+
+      const out: any[] = await service.listPreSalesRequests(COMPANY, ADMIN);
+      expect(out.map((r) => r.id)).toEqual([4, 2, 5, 3, 1]);
+    });
+
+    it('does not let a rejected request outrank a pending one', async () => {
+      prisma.preSalesRequest.findMany = jest.fn(async () => [
+        row(2, 'REJECTED', 14),
+        row(1, 'PENDING', 10),
+      ]);
+      const out: any[] = await service.listPreSalesRequests(COMPANY, ADMIN);
+      expect(out[0].status).toBe('PENDING');
+    });
+
+    it('is still admin-only', async () => {
+      await expect(service.listPreSalesRequests(COMPANY, CREATOR)).rejects.toThrow(ForbiddenException);
     });
   });
 });

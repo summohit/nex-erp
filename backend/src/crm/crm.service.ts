@@ -1974,7 +1974,11 @@ export class CrmService {
       }),
       this.prisma.preSalesRequest.findMany({
         where: { companyId, leadId },
-        include: { employee: employeeSelect, requestedBy: employeeSelect, approvedBy: employeeSelect },
+        include: {
+          items: { include: { employee: employeeSelect } },
+          requestedBy: employeeSelect,
+          approvedBy: employeeSelect,
+        },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.preSalesTask.findMany({
@@ -1999,13 +2003,34 @@ export class CrmService {
       ? this.maskLeadFinancials(access.lead)
       : access.lead;
 
+    // Each member's budget, computed from their tasks rather than stored — a
+    // stored counter would drift the first time a task was edited or deleted.
+    const usageByEmployee = new Map<number, { used: number }>();
+    for (const t of tasks) {
+      const row = usageByEmployee.get(t.assignedToId) ?? { used: 0 };
+      row.used += t.estimatedMinutes || 0;
+      usageByEmployee.set(t.assignedToId, row);
+    }
+
+    const membersWithUsage = members.map((m) => {
+      const allocatedMinutes = m.hours != null ? Math.round(m.hours * 60) : null;
+      const usedMinutes = usageByEmployee.get(m.employeeId)?.used ?? 0;
+      return {
+        ...m,
+        allocatedMinutes,
+        usedMinutes,
+        remainingMinutes: allocatedMinutes === null ? null : allocatedMinutes - usedMinutes,
+        capped: allocatedMinutes !== null,
+      };
+    });
+
     return {
       lead: {
         id: lead.id, title: lead.title, companyName: lead.companyName,
         contactName: lead.contactName, status: lead.status,
         ...(access.financialsHidden ? { financialsHidden: true } : { value: lead.value, currency: lead.currency }),
       },
-      members,
+      members: membersWithUsage,
       // A pre-sales member has no business reading the debate about who else
       // should join the deal.
       requests: access.financialsHidden ? [] : requests,
@@ -2119,11 +2144,92 @@ export class CrmService {
    * The employee is not added here. Nothing about the team changes until an
    * administrator approves.
    */
+  private static readonly ENGAGEMENT_TYPES = ['ONSITE', 'VIRTUAL'];
+
+  /**
+   * Normalise and validate one requested person's terms.
+   *
+   * Hours are the thing most likely to arrive as "8 hrs" or "" from a form, so
+   * they are parsed rather than trusted; a non-numeric value is rejected instead
+   * of being silently stored as NaN.
+   */
+  private normalisePreSalesItem(raw: any, opts: { requireDetails?: boolean } = {}) {
+    const employeeId = Number(raw?.employeeId);
+    if (!Number.isFinite(employeeId)) throw new BadRequestException('Select an employee.');
+
+    const engagementType = String(raw?.engagementType || 'VIRTUAL').toUpperCase();
+    if (!CrmService.ENGAGEMENT_TYPES.includes(engagementType)) {
+      throw new BadRequestException('Engagement type must be ONSITE or VIRTUAL.');
+    }
+
+    let hours: number | null = null;
+    if (raw?.hours !== undefined && raw?.hours !== null && String(raw.hours).trim() !== '') {
+      hours = Number(raw.hours);
+      if (!Number.isFinite(hours) || hours <= 0) {
+        throw new BadRequestException('Hours must be a number greater than zero.');
+      }
+    }
+
+    const technology = String(raw?.technology || '').trim() || null;
+
+    // Hours are a budget once the person is on the deal — tasks are measured
+    // against them — so a request that omits them is asking for an open-ended
+    // commitment. Technology is what the admin is actually approving.
+    if (opts.requireDetails) {
+      if (!technology) throw new BadRequestException('Say what technology each person is needed for.');
+      if (hours === null) throw new BadRequestException('Give the hours needed for each person.');
+    }
+
+    return { employeeId, technology, engagementType, hours };
+  }
+
+  // ── hours budget ───────────────────────────────────────────────────────────
+  //
+  // A member is engaged for a number of hours and the tasks raised for them are
+  // measured against it. A member with NULL hours is UNCAPPED, not capped at
+  // zero: members who predate this must stay assignable.
+
+  /** Allocated, used and remaining minutes for one member on one deal. */
+  private async memberHoursUsage(companyId: number, leadId: number, employeeId: number) {
+    const [member, tasks] = await Promise.all([
+      this.prisma.preSalesTeamMember.findFirst({
+        where: { companyId, leadId, employeeId, status: 'ACTIVE' },
+        select: { hours: true },
+      }),
+      this.prisma.preSalesTask.findMany({
+        where: { companyId, leadId, assignedToId: employeeId },
+        select: { id: true, estimatedMinutes: true },
+      }),
+    ]);
+
+    const allocatedMinutes = member?.hours != null ? Math.round(member.hours * 60) : null;
+    const usedMinutes = tasks.reduce((sum, t) => sum + (t.estimatedMinutes || 0), 0);
+
+    return {
+      allocatedMinutes,
+      usedMinutes,
+      remainingMinutes: allocatedMinutes === null ? null : allocatedMinutes - usedMinutes,
+      capped: allocatedMinutes !== null,
+    };
+  }
+
+  private static formatMinutes(minutes: number): string {
+    const h = Math.floor(Math.abs(minutes) / 60);
+    const m = Math.abs(minutes) % 60;
+    return [h ? `${h}h` : '', m ? `${m}m` : ''].filter(Boolean).join(' ') || '0m';
+  }
+
+  /**
+   * A non-admin asks for one or more people to be put on the deal.
+   *
+   * Nobody is added here. Nothing about the team changes until an administrator
+   * approves — and they may approve a different set than was asked for.
+   */
   async createPreSalesRequest(
     companyId: number,
     leadId: number,
     user: { role?: string; employeeId?: number | null; sub?: number },
-    data: { employeeId?: any; reason?: string },
+    data: { items?: any[]; reason?: string },
   ) {
     const access = await this.resolvePreSalesAccess(companyId, leadId, user);
     if (access.admin) {
@@ -2133,33 +2239,54 @@ export class CrmService {
       throw new ForbiddenException('Only the person who created this deal, or its owner, can request pre-sales support.');
     }
 
-    const employeeId = Number(data?.employeeId);
-    if (!Number.isFinite(employeeId)) throw new BadRequestException('Select an employee.');
     const reason = (data?.reason || '').trim();
     if (!reason) throw new BadRequestException('Give a reason — an administrator has to approve this without knowing the deal.');
 
-    const employee = await this.prisma.employee.findFirst({
-      where: { id: employeeId, companyId },
+    const raw = Array.isArray(data?.items) ? data.items : [];
+    if (!raw.length) throw new BadRequestException('Add at least one person to the request.');
+
+    const items = raw.map((r) => this.normalisePreSalesItem(r, { requireDetails: true }));
+    const unique = new Set(items.map((i) => i.employeeId));
+    if (unique.size !== items.length) {
+      throw new BadRequestException('The same person appears twice on this request.');
+    }
+
+    const employees = await this.prisma.employee.findMany({
+      where: { id: { in: [...unique] }, companyId },
       select: { id: true, firstName: true, lastName: true },
     });
-    if (!employee) throw new BadRequestException('That employee does not belong to this company.');
+    if (employees.length !== unique.size) {
+      throw new BadRequestException('One or more selected employees do not belong to this company.');
+    }
 
-    const active = await this.prisma.preSalesTeamMember.findFirst({
-      where: { leadId, employeeId, status: 'ACTIVE' },
+    const alreadyOn = await this.prisma.preSalesTeamMember.findMany({
+      where: { leadId, employeeId: { in: [...unique] }, status: 'ACTIVE' },
+      select: { employeeId: true },
     });
-    if (active) throw new BadRequestException('That employee is already on this deal’s pre-sales team.');
+    if (alreadyOn.length) {
+      const names = employees
+        .filter((e) => alreadyOn.some((a) => a.employeeId === e.id))
+        .map((e) => `${e.firstName} ${e.lastName}`.trim());
+      throw new BadRequestException(`${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} already on this deal's pre-sales team.`);
+    }
 
-    const pending = await this.prisma.preSalesRequest.findFirst({
-      where: { leadId, employeeId, status: 'PENDING' },
+    const pending = await this.prisma.preSalesRequestItem.findMany({
+      where: { employeeId: { in: [...unique] }, request: { leadId, status: 'PENDING' } },
+      select: { employeeId: true },
     });
-    if (pending) throw new BadRequestException('A request for that employee is already awaiting approval.');
+    if (pending.length) {
+      throw new BadRequestException('A request for one or more of those people is already awaiting approval.');
+    }
 
     const request = await this.prisma.preSalesRequest.create({
-      data: { companyId, leadId, employeeId, requestedById: user.employeeId ?? 0, reason, status: 'PENDING' },
-      include: { employee: { select: { firstName: true, lastName: true } } },
+      data: {
+        companyId, leadId, requestedById: user.employeeId ?? 0, reason, status: 'PENDING',
+        items: { create: items.map((i) => ({ companyId, ...i, status: 'REQUESTED' })) },
+      },
+      include: { items: { include: { employee: { select: { id: true, firstName: true, lastName: true } } } } },
     });
 
-    const who = `${employee.firstName} ${employee.lastName}`.trim();
+    const who = employees.map((e) => `${e.firstName} ${e.lastName}`.trim()).join(', ');
     const leadName = access.lead.companyName || access.lead.title || 'a deal';
     await this.notificationsService.notifyApprovers({
       companyId,
@@ -2169,6 +2296,87 @@ export class CrmService {
       message: `A request to add ${who} as Pre-Sales for Lead ${leadName} is awaiting approval.`,
       type: 'ACTION_REQUIRED',
       linkUrl: `/crm/leads/${leadId}`,
+    });
+
+    return request;
+  }
+
+  /**
+   * Ask for more of an existing member's time.
+   *
+   * Deliberately the same request model as asking for a person: it is the same
+   * decision by the same approver, and giving it its own table would mean two
+   * queues, two notification paths and two places to get the permissions wrong.
+   * The type tells approve() which of the two it is settling.
+   */
+  async createPreSalesHoursRequest(
+    companyId: number,
+    leadId: number,
+    user: { role?: string; employeeId?: number | null; sub?: number },
+    data: { employeeId?: any; hours?: any; reason?: string },
+  ) {
+    const access = await this.resolvePreSalesAccess(companyId, leadId, user);
+    if (!access.admin && !access.canRequestMembers) {
+      throw new ForbiddenException('Only the person who created this deal, or its owner, can request more hours.');
+    }
+
+    const employeeId = Number(data?.employeeId);
+    if (!Number.isFinite(employeeId)) throw new BadRequestException('Select the person who needs more time.');
+
+    const hours = Number(data?.hours);
+    if (!Number.isFinite(hours) || hours <= 0) {
+      throw new BadRequestException('Enter how many additional hours are needed.');
+    }
+
+    const reason = (data?.reason || '').trim();
+    if (!reason) throw new BadRequestException('Say why the extra time is needed.');
+
+    const member = await this.prisma.preSalesTeamMember.findFirst({
+      where: { companyId, leadId, employeeId, status: 'ACTIVE' },
+      include: { employee: { select: { firstName: true, lastName: true } } },
+    });
+    if (!member) throw new BadRequestException('That person is not on this deal\'s pre-sales team.');
+
+    const pending = await this.prisma.preSalesRequestItem.findFirst({
+      where: { employeeId, request: { leadId, status: 'PENDING', type: 'ADDITIONAL_HOURS' } },
+    });
+    if (pending) throw new BadRequestException('A request for more of their time is already awaiting approval.');
+
+    // An admin asking is an admin deciding; there is nobody above them to ask.
+    if (access.admin) {
+      const updated = await this.prisma.preSalesTeamMember.update({
+        where: { id: member.id },
+        data: { hours: (member.hours ?? 0) + hours },
+      });
+      await this.logActivity(
+        companyId, leadId, 'PRE_SALES_HOURS_ADDED',
+        `Added ${hours}h for ${member.employee.firstName} ${member.employee.lastName}`.trim(),
+        user.employeeId ?? null,
+      );
+      return updated;
+    }
+
+    const request = await this.prisma.preSalesRequest.create({
+      data: {
+        companyId, leadId, type: 'ADDITIONAL_HOURS',
+        requestedById: user.employeeId ?? 0, reason, status: 'PENDING',
+        items: {
+          create: [{
+            companyId, employeeId, hours, status: 'REQUESTED',
+            technology: member.technology, engagementType: member.engagementType || 'VIRTUAL',
+          }],
+        },
+      },
+      include: { items: { include: { employee: { select: { id: true, firstName: true, lastName: true } } } } },
+    });
+
+    const who = `${member.employee.firstName} ${member.employee.lastName}`.trim();
+    const leadName = access.lead.companyName || access.lead.title || 'a deal';
+    await this.notificationsService.notifyApprovers({
+      companyId, roles: ['SUPERADMIN', 'ADMIN'], excludeUserId: user.sub ?? null,
+      title: 'Additional pre-sales hours requested',
+      message: `${hours} more hours are requested for ${who} on Lead ${leadName}.`,
+      type: 'ACTION_REQUIRED', linkUrl: `/crm/leads/${leadId}`,
     });
 
     return request;
@@ -2184,53 +2392,201 @@ export class CrmService {
       throw new ForbiddenException('Only an administrator can review pre-sales requests.');
     }
     const employeeSelect = { select: { id: true, firstName: true, lastName: true, avatarUrl: true } };
-    return this.prisma.preSalesRequest.findMany({
+    const requests = await this.prisma.preSalesRequest.findMany({
       where: { companyId, ...(status ? { status } : {}) },
       include: {
-        employee: employeeSelect,
+        items: { include: { employee: employeeSelect } },
         requestedBy: employeeSelect,
         approvedBy: employeeSelect,
         lead: { select: { id: true, title: true, companyName: true } },
       },
-      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Waiting first, newest within each group.
+    //
+    // Not an orderBy: the database can only sort the status alphabetically, and
+    // no direction of that puts PENDING first — ascending leads with APPROVED,
+    // descending with REJECTED. Priority is not something the string encodes,
+    // so it is expressed here. The query above has already ordered by recency
+    // and Array.sort is stable, which is what preserves it inside each group.
+    return requests.sort((a, b) => {
+      const pending = (r: { status: string }) => (r.status === 'PENDING' ? 0 : 1);
+      return pending(a) - pending(b);
     });
   }
 
+  /**
+   * Approve a request — not necessarily as it was asked for.
+   *
+   * The admin may trim people from it and substitute others in, so the decided
+   * set arrives in `items` and is what gets added. Lines that were asked for
+   * but not approved are kept and marked REMOVED, and anyone the admin brought
+   * in is marked ADDED: what was asked for and what was granted are different
+   * facts, and a substitution is exactly the thing worth looking back at.
+   *
+   * Omitting `items` approves the request exactly as submitted.
+   */
   async approvePreSalesRequest(
     companyId: number,
     requestId: number,
     user: { role?: string; employeeId?: number | null },
+    data?: { items?: any[] },
   ) {
     const request = await this.loadPendingRequest(companyId, requestId, user);
 
-    const [member] = await this.prisma.$transaction([
-      this.prisma.preSalesTeamMember.upsert({
-        where: { leadId_employeeId: { leadId: request.leadId, employeeId: request.employeeId } },
-        create: {
-          companyId, leadId: request.leadId, employeeId: request.employeeId,
-          assignedById: request.requestedById, remark: request.reason, status: 'ACTIVE',
-        },
-        update: { status: 'ACTIVE', removedAt: null, assignedById: request.requestedById, remark: request.reason },
-      }),
-      this.prisma.preSalesRequest.update({
+    // Topping up an existing member's time rather than adding people.
+    if (request.type === 'ADDITIONAL_HOURS') {
+      return this.approveHoursRequest(companyId, request, user, data);
+    }
+
+    const decided = Array.isArray(data?.items) && data!.items!.length
+      ? data!.items!.map((r) => this.normalisePreSalesItem(r))
+      : request.items.map((i) => ({
+          employeeId: i.employeeId, technology: i.technology,
+          engagementType: i.engagementType, hours: i.hours,
+        }));
+
+    if (!decided.length) {
+      throw new BadRequestException('Approve at least one person, or reject the request.');
+    }
+    if (new Set(decided.map((d) => d.employeeId)).size !== decided.length) {
+      throw new BadRequestException('The same person appears twice.');
+    }
+
+    const valid = await this.prisma.employee.findMany({
+      where: { id: { in: decided.map((d) => d.employeeId) }, companyId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    if (valid.length !== decided.length) {
+      throw new BadRequestException('One or more selected employees do not belong to this company.');
+    }
+
+    const requestedIds = new Set(request.items.map((i) => i.employeeId));
+    const decidedIds = new Set(decided.map((d) => d.employeeId));
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const d of decided) {
+        await tx.preSalesTeamMember.upsert({
+          where: { leadId_employeeId: { leadId: request.leadId, employeeId: d.employeeId } },
+          create: {
+            companyId, leadId: request.leadId, employeeId: d.employeeId,
+            assignedById: request.requestedById, remark: request.reason, status: 'ACTIVE',
+            technology: d.technology, engagementType: d.engagementType, hours: d.hours,
+          },
+          update: {
+            status: 'ACTIVE', removedAt: null, assignedById: request.requestedById,
+            remark: request.reason,
+            technology: d.technology, engagementType: d.engagementType, hours: d.hours,
+          },
+        });
+
+        if (requestedIds.has(d.employeeId)) {
+          // Asked for and granted — possibly on terms the admin adjusted.
+          await tx.preSalesRequestItem.updateMany({
+            where: { requestId, employeeId: d.employeeId },
+            data: {
+              status: 'APPROVED',
+              technology: d.technology, engagementType: d.engagementType, hours: d.hours,
+            },
+          });
+        } else {
+          // Substituted in by the admin; never asked for.
+          await tx.preSalesRequestItem.create({
+            data: {
+              companyId, requestId, employeeId: d.employeeId, status: 'ADDED',
+              technology: d.technology, engagementType: d.engagementType, hours: d.hours,
+            },
+          });
+        }
+      }
+
+      // Asked for, not granted.
+      await tx.preSalesRequestItem.updateMany({
+        where: { requestId, employeeId: { notIn: Array.from(decidedIds) }, status: 'REQUESTED' },
+        data: { status: 'REMOVED' },
+      });
+
+      await tx.preSalesRequest.update({
         where: { id: requestId },
         data: { status: 'APPROVED', approvedById: user.employeeId ?? null, approvedAt: new Date() },
-      }),
-    ]);
+      });
+    });
 
-    const who = `${request.employee.firstName} ${request.employee.lastName}`.trim();
+    const names = valid.map((e) => `${e.firstName} ${e.lastName}`.trim()).join(', ');
     const leadName = request.lead.companyName || request.lead.title || 'a deal';
     const link = `/crm/leads/${request.leadId}`;
 
     await this.notificationsService.notifyEmployees([request.requestedById], {
       companyId, excludeEmployeeId: user.employeeId ?? null,
       title: 'Pre-sales request approved',
-      message: `Your request to add ${who} as Pre-Sales for ${leadName} has been approved.`,
+      // Says who was approved rather than "your request was approved", because
+      // the admin may have granted a different set than was asked for.
+      message: `Your pre-sales request for ${leadName} was approved for ${names}.`,
       type: 'SUCCESS', linkUrl: link,
     });
-    await this.notifyPreSalesAssigned(companyId, request.lead, [request.employeeId], user.employeeId ?? null);
+    await this.notifyPreSalesAssigned(
+      companyId, request.lead, decided.map((d) => d.employeeId), user.employeeId ?? null,
+    );
 
-    return member;
+    return this.prisma.preSalesRequest.findUnique({
+      where: { id: requestId },
+      include: { items: { include: { employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } } } },
+    });
+  }
+
+  /**
+   * Grant extra time, optionally less than was asked for — an admin may decide
+   * four hours is enough where eight were requested.
+   */
+  private async approveHoursRequest(
+    companyId: number,
+    request: any,
+    user: { role?: string; employeeId?: number | null },
+    data?: { items?: any[] },
+  ) {
+    const line = request.items[0];
+    if (!line) throw new BadRequestException('This request has no line to approve.');
+
+    const grantedRaw = data?.items?.[0]?.hours ?? line.hours;
+    const granted = Number(grantedRaw);
+    if (!Number.isFinite(granted) || granted <= 0) {
+      throw new BadRequestException('Enter how many hours to grant.');
+    }
+
+    const member = await this.prisma.preSalesTeamMember.findFirst({
+      where: { companyId, leadId: request.leadId, employeeId: line.employeeId, status: 'ACTIVE' },
+    });
+    if (!member) throw new BadRequestException('That person is no longer on this deal\'s pre-sales team.');
+
+    await this.prisma.$transaction([
+      this.prisma.preSalesTeamMember.update({
+        where: { id: member.id },
+        data: { hours: (member.hours ?? 0) + granted },
+      }),
+      this.prisma.preSalesRequestItem.update({
+        where: { id: line.id },
+        data: { status: 'APPROVED', hours: granted },
+      }),
+      this.prisma.preSalesRequest.update({
+        where: { id: request.id },
+        data: { status: 'APPROVED', approvedById: user.employeeId ?? null, approvedAt: new Date() },
+      }),
+    ]);
+
+    const who = `${line.employee.firstName} ${line.employee.lastName}`.trim();
+    const leadName = request.lead.companyName || request.lead.title || 'a deal';
+    await this.notificationsService.notifyEmployees([request.requestedById, line.employeeId], {
+      companyId, excludeEmployeeId: user.employeeId ?? null,
+      title: 'Additional hours approved',
+      message: `${granted} more hours approved for ${who} on ${leadName}.`,
+      type: 'SUCCESS', linkUrl: `/crm/leads/${request.leadId}`,
+    });
+
+    return this.prisma.preSalesRequest.findUnique({
+      where: { id: request.id },
+      include: { items: { include: { employee: { select: { id: true, firstName: true, lastName: true } } } } },
+    });
   }
 
   async rejectPreSalesRequest(
@@ -2242,12 +2598,21 @@ export class CrmService {
     const request = await this.loadPendingRequest(companyId, requestId, user);
     const adminRemark = (data?.adminRemark || '').trim() || null;
 
-    const updated = await this.prisma.preSalesRequest.update({
-      where: { id: requestId },
-      data: { status: 'REJECTED', approvedById: user.employeeId ?? null, approvedAt: new Date(), adminRemark },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Every line goes down with the request; none of these people join.
+      await tx.preSalesRequestItem.updateMany({
+        where: { requestId, status: 'REQUESTED' },
+        data: { status: 'REMOVED' },
+      });
+      return tx.preSalesRequest.update({
+        where: { id: requestId },
+        data: { status: 'REJECTED', approvedById: user.employeeId ?? null, approvedAt: new Date(), adminRemark },
+      });
     });
 
-    const who = `${request.employee.firstName} ${request.employee.lastName}`.trim();
+    const who = request.items
+      .map((i) => `${i.employee.firstName} ${i.employee.lastName}`.trim())
+      .join(', ');
     const leadName = request.lead.companyName || request.lead.title || 'a deal';
     await this.notificationsService.notifyEmployees([request.requestedById], {
       companyId, excludeEmployeeId: user.employeeId ?? null,
@@ -2271,8 +2636,8 @@ export class CrmService {
     const request = await this.prisma.preSalesRequest.findFirst({
       where: { id: requestId, companyId },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true } },
-        lead: { select: { id: true, title: true, companyName: true } },
+        items: { include: { employee: { select: { id: true, firstName: true, lastName: true } } } },
+        lead: { select: { id: true, title: true, companyName: true, addedById: true } },
       },
     });
     if (!request) throw new NotFoundException('Pre-sales request not found');
@@ -2320,6 +2685,22 @@ export class CrmService {
 
     const estimatedMinutes = this.parseDurationMinutes(data);
     const scheduledAt = this.parseScheduledAt(data);
+
+    // The member is engaged for a fixed number of hours; the tasks raised for
+    // them may not exceed it. Someone with no allocation is uncapped — those
+    // members predate the budget and refusing them would be a regression.
+    if (estimatedMinutes) {
+      const usage = await this.memberHoursUsage(companyId, leadId, assignedToId);
+      if (usage.capped && estimatedMinutes > (usage.remainingMinutes ?? 0)) {
+        throw new BadRequestException(
+          `That is more time than is left for this person. `
+          + `${CrmService.formatMinutes(usage.allocatedMinutes ?? 0)} allocated, `
+          + `${CrmService.formatMinutes(usage.usedMinutes)} already planned, `
+          + `${CrmService.formatMinutes(Math.max(0, usage.remainingMinutes ?? 0))} remaining. `
+          + `Request more hours if this task needs them.`,
+        );
+      }
+    }
 
     const task = await this.prisma.preSalesTask.create({
       data: {
@@ -2414,6 +2795,25 @@ export class CrmService {
     const employeeId = user.employeeId ?? null;
     if (!access.admin && task.assignedById !== employeeId) {
       throw new ForbiddenException('Only an administrator, or the person who created this task, can edit it.');
+    }
+
+    // Without this the cap is bypassed by creating a one-minute task and
+    // editing it to forty hours.
+    if (data?.estimatedMinutes !== undefined || data?.durationHours !== undefined) {
+      const minutes = this.parseDurationMinutes(data);
+      const assignee = data?.assignedToId !== undefined ? Number(data.assignedToId) : task.assignedToId;
+      if (minutes) {
+        const usage = await this.memberHoursUsage(companyId, leadId, assignee);
+        // This task's own current estimate is not competing with itself.
+        const otherUsed = usage.usedMinutes - (assignee === task.assignedToId ? (task.estimatedMinutes || 0) : 0);
+        const remaining = usage.allocatedMinutes === null ? null : usage.allocatedMinutes - otherUsed;
+        if (remaining !== null && minutes > remaining) {
+          throw new BadRequestException(
+            `That is more time than is left for this person — `
+            + `${CrmService.formatMinutes(Math.max(0, remaining))} remaining. Request more hours first.`,
+          );
+        }
+      }
     }
 
     return this.prisma.preSalesTask.update({

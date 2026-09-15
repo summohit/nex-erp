@@ -294,15 +294,30 @@ export class CrmController {
     return this.crmService.createPreSalesRequest(req.user.companyId, id, req.user, data);
   }
 
+  /** Ask for more of an existing member's time. An admin's own call applies it. */
+  @Post('leads/:id/pre-sales/hours-requests')
+  createPreSalesHoursRequest(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.crmService.createPreSalesHoursRequest(req.user.companyId, id, req.user, data);
+  }
+
   /** The administrator's queue, across every deal. */
   @Get('pre-sales/requests')
   listPreSalesRequests(@Request() req, @Query('status') status?: string) {
     return this.crmService.listPreSalesRequests(req.user.companyId, req.user, status);
   }
 
+  /**
+   * Approve — optionally with an edited set. The admin may drop people from the
+   * request and substitute others, so the body carries what they actually
+   * decided; omitting it approves the request as submitted.
+   */
   @Patch('pre-sales/requests/:requestId/approve')
-  approvePreSalesRequest(@Request() req, @Param('requestId', ParseIntPipe) requestId: number) {
-    return this.crmService.approvePreSalesRequest(req.user.companyId, requestId, req.user);
+  approvePreSalesRequest(
+    @Request() req,
+    @Param('requestId', ParseIntPipe) requestId: number,
+    @Body() data: any,
+  ) {
+    return this.crmService.approvePreSalesRequest(req.user.companyId, requestId, req.user, data);
   }
 
   @Patch('pre-sales/requests/:requestId/reject')

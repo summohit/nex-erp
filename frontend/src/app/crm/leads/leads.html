@@ -205,7 +205,7 @@
         <div class="adv-filter-item stage">
           <label><svg lucideLayers size="13"></svg> Stage</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedStages.length > 0" (click)="openFilterDropdown($event,'stage',['rep','category','source','contact','added'])">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedStages.length > 0" (click)="openFilterDropdown($event,'stage',['rep','psRep','psReq','psInv','category','source','contact','added'])">
               <span class="trigger-text">{{ selectedStages.length === 0 ? 'All Stages' : (selectedStages.length + ' selected') }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showStageDropdown"></svg>
             </button>
@@ -237,7 +237,7 @@
         <div class="adv-filter-item rep">
           <label><svg lucideUser size="13"></svg> Sales Representative</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedRepId !== 'ALL'" (click)="openFilterDropdown($event,'rep',['stage','category','source','contact','added'])">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedRepId !== 'ALL'" (click)="openFilterDropdown($event,'rep',['stage','psRep','psReq','psInv','category','source','contact','added'])">
               <span class="trigger-text">{{ getSelectedRepLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showRepDropdown"></svg>
             </button>
@@ -288,7 +288,7 @@
         <div class="adv-filter-item category">
           <label><svg lucideTag size="13"></svg> Lead Category</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedCategory !== 'ALL'" (click)="openFilterDropdown($event,'category',['stage','rep','source','contact','added'])">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedCategory !== 'ALL'" (click)="openFilterDropdown($event,'category',['stage','rep','psRep','psReq','psInv','source','contact','added'])">
               <span class="trigger-text">{{ getSelectedCategoryLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showCategoryDropdown"></svg>
             </button>
@@ -320,7 +320,7 @@
         <div class="adv-filter-item source">
           <label><svg lucideGlobe size="13"></svg> Lead Source</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedSource !== 'ALL'" (click)="openFilterDropdown($event,'source',['stage','rep','category','contact','added'])">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedSource !== 'ALL'" (click)="openFilterDropdown($event,'source',['stage','rep','psRep','psReq','psInv','category','contact','added'])">
               <span class="trigger-text">{{ getSelectedSourceLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showSourceDropdown"></svg>
             </button>
@@ -350,36 +350,35 @@
 
         <!-- 5. Lead Contact (searchable) -->
         <div class="adv-filter-item contact">
-          <label><svg lucideUserCheck size="13"></svg> Lead Contact</label>
+          <label><svg lucideUser size="13"></svg> Lead Contact</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedContactId !== 'ALL'" (click)="openFilterDropdown($event,'contact',['stage','rep','category','source','added'])">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedContactId !== 'ALL'" (click)="openFilterDropdown($event,'contact',['stage','rep','psRep','psReq','psInv','category','source','added'])">
               <span class="trigger-text">{{ getSelectedContactLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showContactDropdown"></svg>
             </button>
             <div class="filter-dropdown-popover" *ngIf="showContactDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
               <div class="popover-search-box">
                 <svg lucideSearch size="13" class="popover-search-icon"></svg>
-                <input type="text" placeholder="Search name, company, email..." [(ngModel)]="contactFilterSearchQuery" (click)="$event.stopPropagation()" />
+                <input type="text" placeholder="Search contacts..." [(ngModel)]="contactFilterSearchQuery" (click)="$event.stopPropagation()" />
                 <button type="button" class="popover-search-clear" *ngIf="contactFilterSearchQuery" (click)="contactFilterSearchQuery = ''"><svg lucideX size="11"></svg></button>
               </div>
               <div class="popover-options-scroll">
                 <div class="popover-option-item" (click)="selectContactFilter('ALL')" [class.selected]="selectedContactId === 'ALL'">
+                  <div class="option-avatar-circle neutral">ALL</div>
                   <div class="option-details">
                     <span class="option-primary">All Contacts</span>
                   </div>
                   <svg lucideCheck size="14" class="check-icon" *ngIf="selectedContactId === 'ALL'"></svg>
                 </div>
-                <div class="popover-option-item" *ngFor="let c of getFilteredContactsForFilter()" (click)="selectContactFilter(c.id)" [class.selected]="selectedContactId === c.id">
-                  <div class="option-avatar-circle" style="background: #e0e7ff; color: #4338ca;">
-                    {{ c.name ? c.name[0] : 'C' }}
+                <div class="popover-option-item" *ngFor="let contact of getFilteredContactsForFilter()" (click)="selectContactFilter(contact.id)" [class.selected]="selectedContactId === contact.id">
+                  <div class="option-avatar-circle">
+                    {{ (contact.name || 'C')[0].toUpperCase() }}
                   </div>
                   <div class="option-details">
-                    <span class="option-primary">{{ c.name }}</span>
-                    <span class="option-secondary" *ngIf="c.companyName || c.email">
-                      {{ c.companyName || c.email }}
-                    </span>
+                    <span class="option-primary">{{ contact.name }}</span>
+                    <span class="option-secondary" *ngIf="contact.companyName">{{ contact.companyName }}</span>
                   </div>
-                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedContactId === c.id"></svg>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedContactId === contact.id"></svg>
                 </div>
                 <div class="popover-empty" *ngIf="getFilteredContactsForFilter().length === 0">
                   No contacts match "{{ contactFilterSearchQuery }}"
@@ -392,9 +391,9 @@
 
         <!-- 6. Added By (searchable) -->
         <div class="adv-filter-item added">
-          <label><svg lucideUserCheck size="13"></svg> Added By</label>
+          <label><svg lucideUser size="13"></svg> Added By</label>
           <div class="searchable-filter-dropdown">
-            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedAddedById !== 'ALL'" (click)="openFilterDropdown($event,'added',['stage','rep','category','source','contact'])">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedAddedById !== 'ALL'" (click)="openFilterDropdown($event,'added',['stage','rep','psRep','psReq','psInv','category','source','contact'])">
               <span class="trigger-text">{{ getSelectedAddedByLabel() }}</span>
               <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showAddedByDropdown"></svg>
             </button>
@@ -408,7 +407,7 @@
                 <div class="popover-option-item" (click)="selectAddedByFilter('ALL')" [class.selected]="selectedAddedById === 'ALL'">
                   <div class="option-avatar-circle neutral">ALL</div>
                   <div class="option-details">
-                    <span class="option-primary">All team members</span>
+                    <span class="option-primary">All</span>
                   </div>
                   <svg lucideCheck size="14" class="check-icon" *ngIf="selectedAddedById === 'ALL'"></svg>
                 </div>
@@ -432,6 +431,128 @@
             </div>
             <div class="dropdown-backdrop-transparent" *ngIf="showAddedByDropdown" (click)="closeFilterDropdowns()"></div>
           </div>
+        </div>
+
+        <!-- Section Divider: Pre-Sales Filters -->
+        <div class="section-divider-label">
+          <svg lucideSparkles size="13"></svg>
+          <span>Pre-Sales Filters</span>
+        </div>
+
+        <!-- Pre-Sales Rep (searchable) -->
+        <div class="adv-filter-item ps-rep">
+          <label><svg lucideUserCheck size="13"></svg> Pre-Sales Representative</label>
+          <div class="searchable-filter-dropdown">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedPreSalesMemberId !== 'ALL'" (click)="openFilterDropdown($event,'psRep',['stage','rep','psReq','psInv','category','source','contact','added'])">
+              <span class="trigger-text">{{ getSelectedPreSalesMemberLabel() }}</span>
+              <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showPreSalesDropdown"></svg>
+            </button>
+            <div class="filter-dropdown-popover" *ngIf="showPreSalesDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
+              <div class="popover-search-box">
+                <svg lucideSearch size="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search pre-sales reps..." [(ngModel)]="preSalesSearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="preSalesSearchQuery" (click)="preSalesSearchQuery = ''"><svg lucideX size="11"></svg></button>
+              </div>
+              <div class="popover-options-scroll">
+                <div class="popover-option-item" (click)="selectPreSalesMemberFilter('ALL')" [class.selected]="selectedPreSalesMemberId === 'ALL'">
+                  <div class="option-avatar-circle neutral">ALL</div>
+                  <div class="option-details">
+                    <span class="option-primary">All Reps</span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedPreSalesMemberId === 'ALL'"></svg>
+                </div>
+                <div class="popover-option-item" *ngFor="let emp of getFilteredPreSalesEmployees()" (click)="selectPreSalesMemberFilter(emp.id)" [class.selected]="selectedPreSalesMemberId === emp.id">
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="option-avatar-img" />
+                  <div class="option-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{ emp.firstName ? emp.firstName[0] : '' }}{{ emp.lastName ? emp.lastName[0] : '' }}
+                  </div>
+                  <div class="option-details">
+                    <span class="option-primary">{{ emp.firstName }} {{ emp.lastName }}</span>
+                    <span class="option-secondary" *ngIf="emp.department?.name || emp.designation?.name">
+                      {{ emp.designation?.name || emp.department?.name }}
+                    </span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedPreSalesMemberId === emp.id"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredPreSalesEmployees().length === 0">
+                  No reps match "{{ preSalesSearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showPreSalesDropdown" (click)="closeFilterDropdowns()"></div>
+          </div>
+        </div>
+
+        <!-- Pre-Sales Requested By (searchable) -->
+        <div class="adv-filter-item ps-req">
+          <label><svg lucideUserPlus size="13"></svg> Pre-Sales Requested By</label>
+          <div class="searchable-filter-dropdown">
+            <button type="button" class="filter-dropdown-trigger" [class.has-selection]="selectedPreSalesRequestedById !== 'ALL'" (click)="openFilterDropdown($event,'psReq',['stage','rep','psRep','psInv','category','source','contact','added'])">
+              <span class="trigger-text">{{ getSelectedPreSalesRequestedByLabel() }}</span>
+              <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showPreSalesRequestedByDropdown"></svg>
+            </button>
+            <div class="filter-dropdown-popover" *ngIf="showPreSalesRequestedByDropdown" [ngStyle]="fDropdownPos ? {'left.px': fDropdownPos.left, 'top.px': fDropdownPos.top, 'max-height.px': fDropdownPos.maxHeight} : {}">
+              <div class="popover-search-box">
+                <svg lucideSearch size="13" class="popover-search-icon"></svg>
+                <input type="text" placeholder="Search requesters..." [(ngModel)]="preSalesRequestedBySearchQuery" (click)="$event.stopPropagation()" />
+                <button type="button" class="popover-search-clear" *ngIf="preSalesRequestedBySearchQuery" (click)="preSalesRequestedBySearchQuery = ''"><svg lucideX size="11"></svg></button>
+              </div>
+              <div class="popover-options-scroll">
+                <div class="popover-option-item" (click)="selectPreSalesRequestedByFilter('ALL')" [class.selected]="selectedPreSalesRequestedById === 'ALL'">
+                  <div class="option-avatar-circle neutral">ALL</div>
+                  <div class="option-details">
+                    <span class="option-primary">All Requesters</span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedPreSalesRequestedById === 'ALL'"></svg>
+                </div>
+                <div class="popover-option-item" *ngFor="let emp of getFilteredPreSalesRequestedByEmployees()" (click)="selectPreSalesRequestedByFilter(emp.id)" [class.selected]="selectedPreSalesRequestedById === emp.id">
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="option-avatar-img" />
+                  <div class="option-avatar-circle" *ngIf="!emp.avatarUrl">
+                    {{ emp.firstName ? emp.firstName[0] : '' }}{{ emp.lastName ? emp.lastName[0] : '' }}
+                  </div>
+                  <div class="option-details">
+                    <span class="option-primary">{{ emp.firstName }} {{ emp.lastName }}</span>
+                    <span class="option-secondary" *ngIf="emp.department?.name || emp.designation?.name">
+                      {{ emp.designation?.name || emp.department?.name }}
+                    </span>
+                  </div>
+                  <svg lucideCheck size="14" class="check-icon" *ngIf="selectedPreSalesRequestedById === emp.id"></svg>
+                </div>
+                <div class="popover-empty" *ngIf="getFilteredPreSalesRequestedByEmployees().length === 0">
+                  No requesters match "{{ preSalesRequestedBySearchQuery }}"
+                </div>
+              </div>
+            </div>
+            <div class="dropdown-backdrop-transparent" *ngIf="showPreSalesRequestedByDropdown" (click)="closeFilterDropdowns()"></div>
+          </div>
+        </div>
+
+        <!-- Pre-Sales Involvement (Segmented Control) -->
+        <div class="adv-filter-item ps-involve full-width">
+          <label><svg lucideClipboardList size="13"></svg> Pre-Sales Involvement</label>
+          <div class="ps-involve-pills">
+            <button type="button" class="ps-involve-pill" [class.active]="selectedPreSalesInvolvement === 'ALL'" (click)="selectedPreSalesInvolvement = 'ALL'; onFilterChange()">
+              All Leads
+            </button>
+            <button type="button" class="ps-involve-pill" [class.active]="selectedPreSalesInvolvement === 'HAS_PRESALES'" (click)="selectedPreSalesInvolvement = 'HAS_PRESALES'; onFilterChange()">
+              <svg lucideUserCheck size="12"></svg>
+              Has Pre-Sales
+            </button>
+            <button type="button" class="ps-involve-pill" [class.active]="selectedPreSalesInvolvement === 'NO_PRESALES'" (click)="selectedPreSalesInvolvement = 'NO_PRESALES'; onFilterChange()">
+              <svg lucideX size="12"></svg>
+              No Pre-Sales
+            </button>
+            <button type="button" class="ps-involve-pill" [class.active]="selectedPreSalesInvolvement === 'HAS_OPEN_TASKS'" (click)="selectedPreSalesInvolvement = 'HAS_OPEN_TASKS'; onFilterChange()">
+              <svg lucideClock size="12"></svg>
+              Open Tasks
+            </button>
+          </div>
+        </div>
+
+        <!-- Section Divider: Commercials & Timeline -->
+        <div class="section-divider-label">
+          <svg lucideSlidersHorizontal size="13"></svg>
+          <span>Commercials &amp; Timeline</span>
         </div>
 
         <!-- 7. Quotation Status -->
@@ -2731,60 +2852,236 @@
 <!-- ══════════════════════════ PRE-SALES REQUESTS (admin) ══════════════════════════ -->
 <div class="modal-backdrop" *ngIf="showPreSalesRequestsModal" (click)="closePreSalesRequestsModal()">
   <div class="modal-card ps-queue-modal" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <div>
-        <h2 style="margin:0;">Pre-Sales Requests</h2>
-        <p class="modal-subtitle">Approving adds the employee to that deal's pre-sales team straight away.</p>
+    <div class="modal-header ps-queue-header">
+      <div class="ps-header-left">
+        <div class="ps-header-icon-badge">
+          <svg lucideHourglass size="20"></svg>
+        </div>
+        <div>
+          <div class="ps-header-title-row">
+            <h2 style="margin:0;">Pre-Sales Requests</h2>
+            <span class="ps-header-pending-pill" *ngIf="pendingPreSalesRequests.length">
+              {{ pendingPreSalesRequests.length }} Pending
+            </span>
+          </div>
+          <p class="modal-subtitle">Approving adds the employee to that deal's pre-sales team straight away.</p>
+        </div>
       </div>
       <button type="button" class="btn-icon-close" (click)="closePreSalesRequestsModal()">
         <svg lucideX size="18"></svg>
       </button>
     </div>
 
-    <div class="modal-body enhanced-body">
-      <div class="ps-queue-loading" *ngIf="loadingPreSalesRequests">Loading requests…</div>
-
-      <div class="ps-queue-empty" *ngIf="!loadingPreSalesRequests && !preSalesRequests.length">
-        <svg lucideCheckCircle size="26"></svg>
-        <p>Nothing awaiting approval.</p>
+    <div class="modal-body enhanced-body ps-queue-body">
+      <div class="ps-queue-loading" *ngIf="loadingPreSalesRequests">
+        <svg lucideLoader2 size="24" class="spin-animation"></svg>
+        <span>Loading pre-sales requests…</span>
       </div>
 
-      <div class="ps-queue-row" *ngFor="let r of preSalesRequests" [class.is-decided]="r.status !== 'PENDING'">
-        <div class="ps-queue-main">
-          <div class="ps-queue-lead">
-            <svg lucideBriefcase size="13"></svg>
-            <span>{{ r.lead?.companyName || r.lead?.title || 'Deal' }}</span>
+      <div class="ps-queue-empty" *ngIf="!loadingPreSalesRequests && !preSalesRequests.length">
+        <div class="ps-empty-icon-circle">
+          <svg lucideCheckCircle size="28"></svg>
+        </div>
+        <h4>All Caught Up!</h4>
+        <p>There are no pre-sales requests awaiting approval.</p>
+      </div>
+
+      <div class="ps-queue-card" *ngFor="let r of preSalesRequests" [class.is-decided]="r.status !== 'PENDING'" [class.is-approved]="r.status === 'APPROVED'" [class.is-rejected]="r.status === 'REJECTED'">
+        
+        <!-- Top row: Lead/Company info & Status/Actions -->
+        <div class="ps-card-header">
+          <div class="ps-card-header-main">
+            <div class="ps-queue-lead-pill">
+              <svg lucideBuilding2 size="13"></svg>
+              <span>{{ r.lead?.companyName || r.lead?.title || 'Deal' }}</span>
+            </div>
+            <div class="ps-card-title-wrap">
+              <h3 class="ps-card-title">
+                {{ r.items?.length || 0 }} {{ (r.items?.length || 0) === 1 ? 'person' : 'people' }} requested
+              </h3>
+              <div class="ps-card-meta">
+                <span class="meta-item">
+                  <svg lucideUser size="12"></svg>
+                  <span>by <strong>{{ requestName(r.requestedBy) }}</strong></span>
+                </span>
+                <span class="meta-dot">•</span>
+                <span class="meta-item">
+                  <svg lucideCalendar size="12"></svg>
+                  <span>{{ r.createdAt | date:'dd MMM yyyy' }}</span>
+                </span>
+              </div>
+            </div>
           </div>
-          <div class="ps-queue-who">
-            <strong>{{ requestName(r) }}</strong>
-            <span>requested by {{ requestName(r.requestedBy) }} · {{ r.createdAt | date:'dd MMM yyyy' }}</span>
+
+          <!-- Top-right status or quick actions -->
+          <div class="ps-card-header-actions" *ngIf="r.status === 'PENDING' && rejectingRequest?.id !== r.id && editingRequest?.id !== r.id">
+            <button type="button" class="btn-reject-pill" [disabled]="decidingRequestId !== null" (click)="startReject(r)">
+              Reject
+            </button>
+            <button type="button" class="btn-approve-pill" [disabled]="decidingRequestId !== null" (click)="startApprove(r)">
+              Review &amp; Approve
+            </button>
           </div>
-          <p class="ps-queue-reason" *ngIf="r.reason">{{ r.reason }}</p>
-          <p class="ps-queue-remark" *ngIf="r.status === 'REJECTED' && r.adminRemark">
-            <strong>Admin remark:</strong> {{ r.adminRemark }}
-          </p>
+
+          <!-- Decided status badge -->
+          <div class="ps-card-status-badge-wrap" *ngIf="r.status !== 'PENDING'">
+            <span class="ps-status-pill-lg approved" *ngIf="r.status === 'APPROVED'">
+              <svg lucideCheckCircle size="13"></svg> Approved
+            </span>
+            <span class="ps-status-pill-lg rejected" *ngIf="r.status === 'REJECTED'">
+              <svg lucideXCircle size="13"></svg> Rejected
+            </span>
+          </div>
         </div>
 
-        <div class="ps-queue-actions" *ngIf="r.status === 'PENDING' && rejectingRequest?.id !== r.id">
-          <button type="button" class="btn-secondary" [disabled]="decidingRequestId !== null" (click)="startReject(r)">Reject</button>
-          <button type="button" class="btn-primary" [disabled]="decidingRequestId !== null" (click)="approvePreSalesRequest(r)">
-            {{ decidingRequestId === r.id ? 'Approving…' : 'Approve' }}
-          </button>
+        <!-- Requested items list (visible when not editing this request) -->
+        <div class="ps-card-items-list" *ngIf="editingRequest?.id !== r.id">
+          <div class="ps-card-item-row" *ngFor="let it of r.items"
+               [class.is-removed]="it.status === 'REMOVED'" [class.is-added]="it.status === 'ADDED'">
+            
+            <div class="ps-item-avatar-box">
+              <img *ngIf="it.employee?.avatarUrl" [src]="it.employee.avatarUrl" class="ps-item-avatar-img" alt="" />
+              <div *ngIf="!it.employee?.avatarUrl" class="ps-item-avatar-circle">
+                {{ requestInitials(it) }}
+              </div>
+            </div>
+
+            <div class="ps-item-content">
+              <div class="ps-item-name-row">
+                <span class="ps-item-name">{{ requestName(it) }}</span>
+                <span class="ps-item-tag-status added" *ngIf="it.status === 'ADDED'"><svg lucidePlus size="10"></svg> Added by admin</span>
+                <span class="ps-item-tag-status removed" *ngIf="it.status === 'REMOVED'"><svg lucideX size="10"></svg> Not granted</span>
+              </div>
+              
+              <div class="ps-item-badges-row">
+                <span class="ps-item-badge hours" *ngIf="it.hours">
+                  <svg lucideClock size="11"></svg> {{ it.hours }}h
+                </span>
+                <span class="ps-item-badge mode" *ngIf="it.engagementType" [class.onsite]="it.engagementType === 'ONSITE'" [class.virtual]="it.engagementType === 'VIRTUAL'">
+                  <svg lucideMapPin *ngIf="it.engagementType === 'ONSITE'" size="11"></svg>
+                  <svg lucideVideo *ngIf="it.engagementType === 'VIRTUAL'" size="11"></svg>
+                  {{ it.engagementType | titlecase }}
+                </span>
+                <span class="ps-item-badge tech" *ngIf="it.technology">
+                  <svg lucideTag size="11"></svg> {{ it.technology }}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- A rejection has to say why: the requester only sees this remark. -->
-        <div class="ps-queue-reject" *ngIf="rejectingRequest?.id === r.id">
-          <textarea [(ngModel)]="rejectRemark" rows="2"
-                    placeholder="e.g. This requirement can be handled by the existing pre-sales team."></textarea>
-          <div class="ps-queue-actions">
-            <button type="button" class="btn-secondary" (click)="cancelReject()">Cancel</button>
-            <button type="button" class="btn-primary" [disabled]="decidingRequestId !== null" (click)="confirmReject()">
-              {{ decidingRequestId === r.id ? 'Rejecting…' : 'Confirm Reject' }}
+        <!-- Requester reason / note -->
+        <div class="ps-card-reason-box" *ngIf="r.reason">
+          <div class="ps-reason-header">
+            <svg lucideMessageSquare size="12"></svg>
+            <span>Reason</span>
+          </div>
+          <p class="ps-reason-text">{{ r.reason }}</p>
+        </div>
+
+        <!-- Admin remark if rejected -->
+        <div class="ps-card-remark-box" *ngIf="r.status === 'REJECTED' && r.adminRemark">
+          <div class="ps-remark-header">
+            <svg lucideAlertCircle size="12"></svg>
+            <span>Admin Remark</span>
+          </div>
+          <p class="ps-remark-text">{{ r.adminRemark }}</p>
+        </div>
+
+        <!-- Review & Approve Inline Editing Mode -->
+        <div class="ps-queue-review-box" *ngIf="editingRequest?.id === r.id">
+          <div class="ps-review-box-header">
+            <h4>Review &amp; Edit Pre-Sales Allocation</h4>
+            <p>Fine-tune technology, engagement mode, or hours for each requested member, or add substitutions.</p>
+          </div>
+
+          <div class="ps-review-items-container">
+            <div class="ps-review-card-item" *ngFor="let item of editingItems; let i = index">
+              <div class="ps-review-item-head">
+                <div class="ps-review-avatar-wrap">
+                  <img *ngIf="item.avatarUrl" [src]="item.avatarUrl" class="ps-item-avatar-img" alt="" />
+                  <div *ngIf="!item.avatarUrl" class="ps-item-avatar-circle">
+                    {{ requestInitials(item) }}
+                  </div>
+                </div>
+                <strong class="ps-review-person-name">{{ item.name }}</strong>
+                <button type="button" class="btn-drop-item" (click)="dropFromRequest(i)" title="Remove this person from approval">
+                  <svg lucideX size="14"></svg>
+                </button>
+              </div>
+
+              <div class="ps-review-inputs-grid">
+                <div class="ps-input-group">
+                  <label>Technology / Scope</label>
+                  <input type="text" [(ngModel)]="item.technology" [name]="'rtech_' + r.id + '_' + i" placeholder="e.g. SDWAN, Cloud" />
+                </div>
+                <div class="ps-input-group sm">
+                  <label>Engagement</label>
+                  <select [(ngModel)]="item.engagementType" [name]="'rtype_' + r.id + '_' + i">
+                    <option value="ONSITE">Onsite</option>
+                    <option value="VIRTUAL">Virtual</option>
+                  </select>
+                </div>
+                <div class="ps-input-group xs">
+                  <label>Hours</label>
+                  <input type="number" min="0.5" step="0.5" [(ngModel)]="item.hours" [name]="'rhours_' + r.id + '_' + i" placeholder="Hours" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ps-review-empty-state" *ngIf="!editingItems.length">
+            <svg lucideAlertCircle size="18"></svg>
+            <span>Nobody left on this request. Add someone below, or cancel and reject the request.</span>
+          </div>
+
+          <!-- Add / Substitute someone -->
+          <div class="ps-review-substitute-section">
+            <label class="ps-substitute-label">
+              <svg lucideUserPlus size="13"></svg>
+              <span>Add / Substitute Team Member</span>
+            </label>
+            <div class="ps-substitute-input-wrap">
+              <svg lucideSearch size="14" class="ps-substitute-search-icon"></svg>
+              <input type="text" [(ngModel)]="addToRequestSearch" name="addToRequest"
+                     placeholder="Search employee name to substitute or add…" />
+            </div>
+            <div class="ps-substitute-suggestions" *ngIf="substitutionCandidates().length">
+              <button type="button" class="btn-candidate-chip" *ngFor="let e of substitutionCandidates()" (click)="addToRequest(e)">
+                <svg lucidePlus size="12"></svg>
+                <span>{{ e.firstName }} {{ e.lastName }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="ps-review-actions-bar">
+            <button type="button" class="btn-cancel-edit" (click)="cancelApprove()" [disabled]="decidingRequestId !== null">
+              Cancel
+            </button>
+            <button type="button" class="btn-confirm-approve" [disabled]="decidingRequestId !== null || !editingItems.length" (click)="confirmApprove()">
+              <svg lucideCheck size="14"></svg>
+              <span>{{ decidingRequestId === r.id ? 'Approving…' : 'Approve ' + editingItems.length + (editingItems.length === 1 ? ' Member' : ' Members') }}</span>
             </button>
           </div>
         </div>
 
-        <span class="ldm-status-badge" *ngIf="r.status !== 'PENDING'">{{ r.status | titlecase }}</span>
+        <!-- Reject Remark Input Mode -->
+        <div class="ps-queue-reject-box" *ngIf="rejectingRequest?.id === r.id">
+          <div class="ps-reject-box-header">
+            <h4>Provide Rejection Reason</h4>
+            <p>This remark will be visible to the requester explaining why this request cannot proceed.</p>
+          </div>
+          <textarea [(ngModel)]="rejectRemark" rows="3"
+                    placeholder="e.g. This requirement can be handled by the existing pre-sales team."></textarea>
+          <div class="ps-reject-actions-bar">
+            <button type="button" class="btn-cancel-edit" (click)="cancelReject()">Cancel</button>
+            <button type="button" class="btn-confirm-reject" [disabled]="decidingRequestId !== null" (click)="confirmReject()">
+              <svg lucideX size="14"></svg>
+              <span>{{ decidingRequestId === r.id ? 'Rejecting…' : 'Confirm Reject' }}</span>
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

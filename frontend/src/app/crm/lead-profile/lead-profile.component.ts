@@ -1553,8 +1553,24 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
     this.revokeSendPreviewUrl();
   }
 
+  /**
+   * The addresses typed into the send box, split the way people paste them.
+   * Mirrors parseRecipients on the server so the two agree on what counts.
+   */
+  get sendPreviewRecipients(): string[] {
+    return this.sendPreviewTo
+      .split(/[,;\n]/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+  }
+
+  /** Named individually, so a typo in the third address is findable. */
+  get sendPreviewInvalidRecipients(): string[] {
+    return this.sendPreviewRecipients.filter((e) => !isValidEmail(e));
+  }
+
   get sendPreviewToInvalid(): boolean {
-    return !isValidEmail(this.sendPreviewTo);
+    return !this.sendPreviewRecipients.length || this.sendPreviewInvalidRecipients.length > 0;
   }
 
   /** The irreversible step, and the only place that posts to /email. */
@@ -1562,7 +1578,7 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
     const q = this.sendPreviewQuote;
     if (!q || this.sendPreviewToInvalid) return;
 
-    const to = this.sendPreviewTo.trim();
+    const to = this.sendPreviewRecipients;
     this.sendingProposalId = q.id;
     this.http
       .post<any>(`${environment.apiUrl}/sales/quotations/${q.id}/email`, { to })
@@ -1570,7 +1586,12 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
         next: (res) => {
           this.sendingProposalId = null;
           this.closeSendPreview();
-          this.dialog.success(`Quotation ${q.quoteNumber} sent to ${res?.to || to}.`);
+          const sentTo = Array.isArray(res?.to) ? res.to : to;
+          this.dialog.success(
+            sentTo.length === 1
+              ? `Quotation ${q.quoteNumber} sent to ${sentTo[0]}.`
+              : `Quotation ${q.quoteNumber} sent to ${sentTo.length} recipients.`,
+          );
           this.loadLead(this.leadId!);
         },
         error: (err) => {
@@ -1879,12 +1900,12 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
   }
 
   presalesName(row: any): string {
-    const e = row?.employee || row?.assignedTo || row?.assignedBy || row?.requestedBy || row;
+    const e = row?.items?.[0]?.employee || row?.employee || row?.assignedTo || row?.assignedBy || row?.requestedBy || row;
     return `${e?.firstName || ''} ${e?.lastName || ''}`.trim() || '—';
   }
 
   presalesInitials(row: any): string {
-    const e = row?.employee || row?.assignedTo || row;
+    const e = row?.items?.[0]?.employee || row?.employee || row?.assignedTo || row;
     return `${e?.firstName?.[0] || ''}${e?.lastName?.[0] || ''}`.toUpperCase() || 'PS';
   }
 
@@ -1911,6 +1932,40 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
 
   get pendingRequests(): any[] {
     return (this.presalesRequests || []).filter((r) => r.status === 'PENDING');
+  }
+
+  async approveRequest(req: any) {
+    const name = this.presalesName(req);
+    const ok = await this.dialog.confirm(
+      `Approve request to add ${name} to the pre-sales team?`,
+      'Approve Pre-Sales Request', 'Approve', 'Cancel'
+    );
+    if (!ok) return;
+    this.http.patch<any>(`${environment.apiUrl}/crm/pre-sales/requests/${req.id}/approve`, {})
+      .subscribe({
+        next: () => {
+          this.loadPresalesInfo();
+          this.dialog.success('Pre-sales request approved.');
+        },
+        error: (err) => this.dialog.error(err?.error?.message || 'Could not approve request.')
+      });
+  }
+
+  async rejectRequest(req: any) {
+    const name = this.presalesName(req);
+    const ok = await this.dialog.confirm(
+      `Reject request to add ${name} to pre-sales?`,
+      'Reject Pre-Sales Request', 'Reject', 'Cancel'
+    );
+    if (!ok) return;
+    this.http.patch<any>(`${environment.apiUrl}/crm/pre-sales/requests/${req.id}/reject`, {})
+      .subscribe({
+        next: () => {
+          this.loadPresalesInfo();
+          this.dialog.success('Pre-sales request rejected.');
+        },
+        error: (err) => this.dialog.error(err?.error?.message || 'Could not reject request.')
+      });
   }
 
   // ── add members (admin) ────────────────────────────────────────────────────
@@ -2051,13 +2106,28 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
 
   showRequestPresalesModal = false;
   requestPresalesSearch = '';
-  requestPresalesForm: { employeeId: number | null; reason: string } = { employeeId: null, reason: '' };
+  requestPresalesReason = '';
   savingRequestPresales = false;
+
+  /**
+   * One line per person asked for, each with its own terms.
+   *
+   * A request is rarely for one specialist — it is "a network engineer on site
+   * and a cloud architect remotely" — so ticking someone adds a line here that
+   * the requester then fills in.
+   */
+  requestPresalesItems: Array<{
+    employeeId: number; name: string; technology: string;
+    engagementType: 'ONSITE' | 'VIRTUAL'; hours: number | null;
+  }> = [];
+
+  readonly engagementTypes: Array<'ONSITE' | 'VIRTUAL'> = ['ONSITE', 'VIRTUAL'];
 
   openRequestPresalesModal() {
     this.requestPresalesScope = 'core';
     this.requestPresalesSearch = '';
-    this.requestPresalesForm = { employeeId: null, reason: '' };
+    this.requestPresalesReason = '';
+    this.requestPresalesItems = [];
     this.showRequestPresalesModal = true;
     if (!this.presalesEmployees.length) this.loadPresalesEmployees();
   }
@@ -2067,27 +2137,135 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
     this.showRequestPresalesModal = false;
   }
 
+  isRequestCandidateSelected(employeeId: number): boolean {
+    return this.requestPresalesItems.some((i) => i.employeeId === employeeId);
+  }
+
+  toggleRequestCandidate(employee: any) {
+    const i = this.requestPresalesItems.findIndex((x) => x.employeeId === employee.id);
+    if (i >= 0) {
+      this.requestPresalesItems.splice(i, 1);
+      return;
+    }
+    this.requestPresalesItems.push({
+      employeeId: employee.id,
+      name: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
+      technology: '',
+      engagementType: 'VIRTUAL',
+      hours: null,
+    });
+  }
+
+  removeRequestItem(index: number) {
+    this.requestPresalesItems.splice(index, 1);
+  }
+
   saveRequestPresales() {
     if (this.leadId == null) return;
-    if (!this.requestPresalesForm.employeeId) { this.dialog.error('Select an employee.'); return; }
-    if (!this.requestPresalesForm.reason.trim()) {
+    if (!this.requestPresalesItems.length) { this.dialog.error('Add at least one person to the request.'); return; }
+    if (!this.requestPresalesReason.trim()) {
       this.dialog.error('Give a reason — an administrator has to approve this without knowing the deal.');
       return;
     }
+    // Both are required: hours become a budget the moment the person joins, so
+    // omitting them asks for an open-ended commitment.
+    const noTech = this.requestPresalesItems.find((i) => !i.technology.trim());
+    if (noTech) { this.dialog.error(`Say what technology ${noTech.name} is needed for.`); return; }
+    const badHours = this.requestPresalesItems.find((i) => !(Number(i.hours) > 0));
+    if (badHours) { this.dialog.error(`Enter the hours needed for ${badHours.name}.`); return; }
+
     this.savingRequestPresales = true;
-    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/requests`, this.requestPresalesForm)
-      .subscribe({
-        next: () => {
-          this.savingRequestPresales = false;
-          this.showRequestPresalesModal = false;
-          this.loadPresalesInfo();
-          this.dialog.success('Request sent to the administrator for approval.');
-        },
-        error: (err) => {
-          this.savingRequestPresales = false;
-          this.dialog.error(err?.error?.message || 'Could not send the request.');
-        },
-      });
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/requests`, {
+      reason: this.requestPresalesReason,
+      items: this.requestPresalesItems.map((i) => ({
+        employeeId: i.employeeId, technology: i.technology,
+        engagementType: i.engagementType, hours: i.hours,
+      })),
+    }).subscribe({
+      next: () => {
+        this.savingRequestPresales = false;
+        this.showRequestPresalesModal = false;
+        this.loadPresalesInfo();
+        this.dialog.success('Request sent to the administrator for approval.');
+      },
+      error: (err) => {
+        this.savingRequestPresales = false;
+        this.dialog.error(err?.error?.message || 'Could not send the request.');
+      },
+    });
+  }
+
+  // ── hours budget ───────────────────────────────────────────────────────────
+
+  /** "2h 30m" from minutes. Null allocation means uncapped, not zero. */
+  formatMinutes(minutes: number | null | undefined): string {
+    const n = Number(minutes);
+    if (!Number.isFinite(n) || n === 0) return '0m';
+    const h = Math.floor(Math.abs(n) / 60);
+    const m = Math.abs(n) % 60;
+    return [h ? `${h}h` : '', m ? `${m}m` : ''].filter(Boolean).join(' ');
+  }
+
+  /** How full a member's allocation is, for the meter on their card. */
+  usagePercent(member: any): number {
+    if (!member?.capped || !member.allocatedMinutes) return 0;
+    return Math.min(100, Math.round((member.usedMinutes / member.allocatedMinutes) * 100));
+  }
+
+  isOverBooked(member: any): boolean {
+    return !!member?.capped && (member.remainingMinutes ?? 0) <= 0;
+  }
+
+  showHoursRequestModal = false;
+  hoursRequestMember: any = null;
+  hoursRequestForm = { hours: null as number | null, reason: '' };
+  savingHoursRequest = false;
+
+  openHoursRequest(member: any) {
+    this.hoursRequestMember = member;
+    this.hoursRequestForm = { hours: null, reason: '' };
+    this.showHoursRequestModal = true;
+  }
+
+  closeHoursRequest() {
+    if (this.savingHoursRequest) return;
+    this.showHoursRequestModal = false;
+    this.hoursRequestMember = null;
+  }
+
+  saveHoursRequest() {
+    if (this.leadId == null || !this.hoursRequestMember) return;
+    if (!(Number(this.hoursRequestForm.hours) > 0)) { this.dialog.error('Enter how many additional hours are needed.'); return; }
+    if (!this.hoursRequestForm.reason.trim()) { this.dialog.error('Say why the extra time is needed.'); return; }
+
+    this.savingHoursRequest = true;
+    this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/hours-requests`, {
+      employeeId: this.hoursRequestMember.employeeId,
+      hours: this.hoursRequestForm.hours,
+      reason: this.hoursRequestForm.reason,
+    }).subscribe({
+      next: () => {
+        this.savingHoursRequest = false;
+        this.showHoursRequestModal = false;
+        this.hoursRequestMember = null;
+        this.loadPresalesInfo();
+        // An admin's own call applies immediately; anyone else is asking.
+        this.dialog.success(this.isAdminOrSuperAdmin ? 'Hours added.' : 'Request sent to the administrator.');
+      },
+      error: (err) => {
+        this.savingHoursRequest = false;
+        this.dialog.error(err?.error?.message || 'Could not submit the request.');
+      },
+    });
+  }
+
+  /** "16h onsite · Network security" for a member card or a request line. */
+  engagementSummary(row: any): string {
+    const bits: string[] = [];
+    if (row?.hours) bits.push(`${row.hours}h`);
+    if (row?.engagementType) bits.push(String(row.engagementType).toLowerCase());
+    if (row?.technology) bits.push(row.technology);
+    return bits.join(' · ');
   }
 
   // ── tasks ──────────────────────────────────────────────────────────────────
