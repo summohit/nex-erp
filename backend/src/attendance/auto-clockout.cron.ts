@@ -57,7 +57,9 @@ export class AutoClockoutCron implements OnModuleInit, OnModuleDestroy {
    *
    * Each session is closed at 23:00 IST *of its own day*, not "now" — otherwise
    * a session left open for three days would record a 72-hour shift. The
-   * clock-in coordinates are reused, since there is no live device to ask.
+   * clock-in coordinates are reused, since there is no live device to ask, and
+   * the row is stamped `autoClockedOut` so nothing downstream mistakes a cutoff
+   * for an observation.
    */
   async autoClockOutOpenSessions() {
     if (this.isProcessing) return;
@@ -129,6 +131,7 @@ export class AutoClockoutCron implements OnModuleInit, OnModuleDestroy {
               clockOut: logCutoff,
               clockOutLat: log.clockInLat ?? attendance.clockInLat ?? null,
               clockOutLng: log.clockInLng ?? attendance.clockInLng ?? null,
+              autoClockedOut: true,
             },
           });
         }
@@ -142,6 +145,11 @@ export class AutoClockoutCron implements OnModuleInit, OnModuleDestroy {
             isEarlyLeave,
             status,
             overtimeHours,
+            // Say so on the record. The time is a cutoff and the coordinates
+            // are the clock-in's, so without this the day reads as somebody
+            // who genuinely worked until 23:00 and left from where they came
+            // in — overtime and all.
+            autoClockedOut: true,
           },
         });
       }

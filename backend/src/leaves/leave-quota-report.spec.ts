@@ -17,11 +17,12 @@ describe('LeavesService.getQuotaReport', () => {
   let types: any[];
   let employees: any[];
   let balances: any[];
+  let encashments: any[];
 
   beforeEach(() => {
     types = [
-      { id: 1, name: 'Casual Leave', isPaid: true, carryForward: false, carryForwardLimit: 0 },
-      { id: 2, name: 'Privilege Leave', isPaid: true, carryForward: true, carryForwardLimit: 30 },
+      { id: 1, name: 'Casual Leave', isPaid: true, encashable: false, encashmentLimit: 0 },
+      { id: 2, name: 'Privilege Leave', isPaid: true, encashable: true, encashmentLimit: 30 },
     ];
     employees = [
       { id: 10, firstName: 'Akshara', lastName: 'Shukla', employeeCode: 'E10', avatarUrl: null,
@@ -30,9 +31,11 @@ describe('LeavesService.getQuotaReport', () => {
         designation: null, department: null, user: { status: 'SUSPENDED' } },
     ];
     balances = [
-      { employeeId: 10, leaveTypeId: 1, allocated: 10, used: 4, carriedOver: 0, carriedForwardFromYear: null },
-      { employeeId: 10, leaveTypeId: 2, allocated: 15, used: 2, carriedOver: 3, carriedForwardFromYear: 2025 },
+      { employeeId: 10, leaveTypeId: 1, allocated: 10, used: 4 },
+      { employeeId: 10, leaveTypeId: 2, allocated: 15, used: 2 },
     ];
+    // Privilege Leave closed out: 13 days were left and got paid.
+    encashments = [{ employeeId: 10, leaveTypeId: 2, days: 13 }];
 
     prisma = {
       leaveType: { findMany: jest.fn(async () => types) },
@@ -50,6 +53,14 @@ describe('LeavesService.getQuotaReport', () => {
           }),
         ),
       },
+      leaveEncashment: {
+        findMany: jest.fn(async ({ where }: any) =>
+          encashments.filter((e) => {
+            const scoped = where.employee?.id;
+            return (!scoped || e.employeeId === scoped) && where.year === YEAR;
+          }),
+        ),
+      },
     };
     service = new LeavesService(prisma, {} as any);
   });
@@ -57,19 +68,19 @@ describe('LeavesService.getQuotaReport', () => {
   const asAdmin = (employeeId?: number) =>
     service.getQuotaReport(COMPANY, { sub: 1, role: 'ADMIN' }, YEAR, employeeId);
 
-  it('totals allocated + carried − used per employee', async () => {
+  it('totals allocated − used per employee, with nothing inherited from last year', async () => {
     const res = await asAdmin();
     const row = res.rows.find((r) => r.employee.id === 10)!;
 
-    expect(row.totals).toEqual({ allocated: 25, used: 6, carriedOver: 3, remaining: 22 });
+    expect(row.totals).toEqual({ allocated: 25, used: 6, remaining: 19, encashed: 13 });
   });
 
   it('breaks the figures down per leave type', async () => {
     const res = await asAdmin();
     const row = res.rows.find((r) => r.employee.id === 10)!;
 
-    expect(row.byType[1]).toEqual({ allocated: 10, used: 4, carriedOver: 0, remaining: 6 });
-    expect(row.byType[2]).toEqual({ allocated: 15, used: 2, carriedOver: 3, remaining: 16 });
+    expect(row.byType[1]).toEqual({ allocated: 10, used: 4, remaining: 6, encashed: 0 });
+    expect(row.byType[2]).toEqual({ allocated: 15, used: 2, remaining: 13, encashed: 13 });
   });
 
   it('includes an employee with no balance rows, and flags it', async () => {
@@ -115,10 +126,21 @@ describe('LeavesService.getQuotaReport', () => {
     expect(res.rows[0].employee.id).toBe(10);
   });
 
-  it('reports whether carry-forward has actually been applied', async () => {
-    await expect(asAdmin()).resolves.toMatchObject({ carryForwardApplied: true });
+  // Encashed days are reported beside the remaining ones, never folded into
+  // `used` — an employee who took no leave and was paid for it must not read as
+  // having taken all of it.
+  it('keeps encashed days out of the used figure', async () => {
+    const res = await asAdmin();
+    const cell = res.rows.find((r) => r.employee.id === 10)!.byType[2];
 
-    balances = balances.map((b) => ({ ...b, carriedForwardFromYear: null }));
-    await expect(asAdmin()).resolves.toMatchObject({ carryForwardApplied: false });
+    expect(cell.used).toBe(2);
+    expect(cell.encashed).toBe(13);
+  });
+
+  it('reports whether the year has been settled yet', async () => {
+    await expect(asAdmin()).resolves.toMatchObject({ encashmentSettled: true });
+
+    encashments = [];
+    await expect(asAdmin()).resolves.toMatchObject({ encashmentSettled: false });
   });
 });

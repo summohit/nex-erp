@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, UPLOAD_TIMEOUT_MS } from './apiClient';
 
 export interface TicketEmployee {
   id: number;
@@ -149,6 +149,7 @@ export const ticketService = {
   uploadAttachment: async (formData: FormData): Promise<{ url: string }> => {
     const response = await apiClient.post('/upload/ticket-attachment', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT_MS,
     });
     return response.data;
   },

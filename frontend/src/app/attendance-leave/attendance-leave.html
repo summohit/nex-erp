@@ -336,17 +336,17 @@
               Half Day Allowed
             </div>
             <div class="balance-amount-wrapper">
-              <span class="balance-amount">{{ balance.allocated + balance.carriedOver - balance.used }}</span>
+              <span class="balance-amount">{{ balance.allocated - balance.used }}</span>
               <span class="days-label">days left</span>
             </div>
             
             <div class="balance-progress-container">
               <div class="balance-progress-bar">
-                <div class="balance-progress-fill" [style.width.%]="math.max(0, math.min(((balance.allocated + balance.carriedOver - balance.used) / (balance.allocated + balance.carriedOver)) * 100, 100))"></div>
+                <div class="balance-progress-fill" [style.width.%]="math.max(0, math.min(((balance.allocated - balance.used) / balance.allocated) * 100, 100))"></div>
               </div>
               <div class="balance-stats">
                 <span>{{ balance.used }} used</span>
-                <span>{{ balance.allocated + balance.carriedOver }} total</span>
+                <span>{{ balance.allocated }} total</span>
               </div>
             </div>
           </div>
@@ -415,7 +415,7 @@
         <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#E14B42' : ''" [disabled]="myBalances().length === 0">
           <option value="">{{ myBalances().length === 0 ? 'No Leave Types Available' : 'Select Leave Type...' }}</option>
           <option *ngFor="let balance of myBalances()" [value]="balance.leaveType.id">
-            {{ balance.leaveType.name }} ({{ balance.allocated + balance.carriedOver - balance.used }} days available)
+            {{ balance.leaveType.name }} ({{ balance.allocated - balance.used }} days available)
           </option>
         </select>
         <div *ngIf="showFormErrors() && !requestForm.leaveTypeId && myBalances().length > 0" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Leave Type is required</div>
@@ -641,10 +641,14 @@
 
       <div class="modal-body" style="padding: 16px 0;">
         <div style="display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid #E2E8F0;">
-          <div class="avatar-circle-sm">{{ leaveEmployeeName(leave).charAt(0) }}</div>
+          <img *ngIf="leave.employee?.avatarUrl" [src]="leave.employee.avatarUrl" class="leave-detail-avatar" alt="" />
+          <div class="avatar-circle-sm" *ngIf="!leave.employee?.avatarUrl">{{ leaveEmployeeInitials(leave) }}</div>
           <div>
             <div style="font-size: 15px; font-weight: 600; color: #0F172A;">{{ leaveEmployeeName(leave) }}</div>
-            <div style="font-size: 12px; color: #64748B;">{{ leave.employee?.department?.name || 'General' }}</div>
+            <div style="font-size: 12px; color: #64748B;">
+              {{ leaveEmployeeSubtitle(leave) }}
+              <span *ngIf="leave.employee?.employeeCode"> · {{ leave.employee.employeeCode }}</span>
+            </div>
           </div>
           <span class="status-badge" [ngClass]="leave.status.toLowerCase()" style="margin-left: auto;">{{ leave.status }}</span>
         </div>
@@ -1214,6 +1218,17 @@
           </span>
         </div>
 
+        <!-- Never clocked out: the 23:00 sweep closed this day -->
+        <div *ngIf="selectedDayDetails()?.log?.autoClockedOut"
+             style="display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; padding: 10px 12px; background: #FFFBEB; border: 1px solid #FDE68A; border-left: 3px solid #F59E0B; border-radius: 8px; font-size: 11.5px; line-height: 1.5; color: #78350F;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <span>
+            <strong style="font-weight: 700; color: #92400E;">Auto-closed at 11:00 PM.</strong>
+            No clock-out was recorded, so the system closed the day at its 11:00 PM cutoff and reused the
+            clock-in location. The time and coordinates below are not a recorded departure.
+          </span>
+        </div>
+
         <!-- Punch History Timeline -->
         <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; overflow-y: visible;">
           <ng-container *ngIf="selectedDayDetails()?.log?.logs?.length > 0; else noPunches">
@@ -1248,9 +1263,14 @@
                   </div>
                   <div style="font-size: 15px; font-weight: 700; color: #1E293B;">
                     {{ punch.clockOut ? (punch.clockOut | date:'shortTime') : 'Ongoing...' }}
+                    <span *ngIf="punch.autoClockedOut"
+                          title="Closed by the system at its 11:00 PM cutoff — not a recorded clock-out"
+                          style="display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 9999px; background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle; cursor: help;">auto</span>
                   </div>
-                  <div *ngIf="punch.clockOutLat" style="margin-top: 8px; font-size: 10px; color: #475569; display: flex; flex-direction: column; gap: 4px; background: #F8FAFC; padding: 6px; border-radius: 6px; border: 1px solid #E2E8F0;">
-                    <span style="color: #64748B;">Lat: {{ punch.clockOutLat | number:'1.4-4' }}<br>Lng: {{ punch.clockOutLng | number:'1.4-4' }}</span>
+                  <div *ngIf="punch.clockOutLat" [style.background]="punch.autoClockedOut ? '#FFFBEB' : '#F8FAFC'" [style.border-color]="punch.autoClockedOut ? '#FDE68A' : '#E2E8F0'" style="margin-top: 8px; font-size: 10px; color: #475569; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 6px; border: 1px solid #E2E8F0;">
+                    <span style="color: #64748B;">
+                      <em *ngIf="punch.autoClockedOut" style="display: block; margin-bottom: 3px; color: #92400E; font-weight: 700; font-style: normal; font-size: 9.5px;">clock-in location reused</em>
+                      Lat: {{ punch.clockOutLat | number:'1.4-4' }}<br>Lng: {{ punch.clockOutLng | number:'1.4-4' }}</span>
                     <a [href]="'https://www.google.com/maps?q=' + punch.clockOutLat + ',' + punch.clockOutLng" target="_blank" style="color: #2563EB; font-size: 10px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; margin-top: 2px;">
                       View on Map
                       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>

@@ -614,6 +614,17 @@
         </span>
       </div>
 
+      <!-- Never clocked out: the 23:00 sweep closed this day -->
+      <div class="auto-closed-note" *ngIf="selectedDayDetails()?.autoClockedOut">
+        <svg lucideAlertTriangle [size]="15"></svg>
+        <span>
+          <strong>Auto-closed at 11:00 PM.</strong>
+          Nobody clocked out, so the system closed the day at its 11:00 PM cutoff and reused the
+          clock-in location. The clock-out time and coordinates below are not a recorded departure,
+          and any overtime on this day follows from the cutoff rather than from hours actually worked.
+        </span>
+      </div>
+
       <!-- Punch History Timeline -->
       <div class="punch-sessions-container">
         <ng-container *ngIf="selectedDayDetails()?.logs && selectedDayDetails()!.logs.length > 0; else noPunches">
@@ -648,9 +659,15 @@
                 </div>
                 <div class="session-time-val">
                   {{ punch.clockOut ? (punch.clockOut | date:'shortTime') : (selectedDayDetails()?.isToday ? 'Ongoing...' : 'Did not clock out') }}
+                  <span class="auto-closed-chip" *ngIf="punch.autoClockedOut" title="Closed by the system at its 11:00 PM cutoff — not a recorded clock-out">
+                    auto
+                  </span>
                 </div>
-                <div *ngIf="punch.clockOutLat" class="session-geo-meta">
-                  <span class="geo-coords">Lat: {{ punch.clockOutLat | number:'1.4-4' }}<br>Lng: {{ punch.clockOutLng | number:'1.4-4' }}</span>
+                <div *ngIf="punch.clockOutLat" class="session-geo-meta" [class.is-inferred]="punch.autoClockedOut">
+                  <span class="geo-coords">
+                    <em *ngIf="punch.autoClockedOut">clock-in location reused</em>
+                    Lat: {{ punch.clockOutLat | number:'1.4-4' }}<br>Lng: {{ punch.clockOutLng | number:'1.4-4' }}
+                  </span>
                   <a [href]="'https://www.google.com/maps?q=' + punch.clockOutLat + ',' + punch.clockOutLng" target="_blank" class="geo-map-link">
                     View on Map
                     <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>

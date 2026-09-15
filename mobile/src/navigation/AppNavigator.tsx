@@ -68,6 +68,13 @@ function MainTabNavigator() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        // Tab screens stay mounted when you switch away, so without this a
+        // screen keeps re-rendering for the rest of the session — the Dashboard
+        // runs two one-second clocks, and they were repainting a 1,500-line
+        // component twice a second while the user sat in Projects. Freezing
+        // suspends rendering of a blurred screen; its timers and state still
+        // run, so nothing is lost, and it repaints on the way back.
+        freezeOnBlur: true,
       }}
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
@@ -131,7 +138,14 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          // Same reasoning as the tabs: a pushed screen leaves the one beneath
+          // it mounted, so the whole stack stays live behind whatever is on top.
+          freezeOnBlur: true,
+        }}
+      >
         {token == null ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (

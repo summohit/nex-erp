@@ -540,12 +540,12 @@ export class MasterDataComponent implements OnInit {
       }
     },
     { 
-      field: 'carryForward', 
-      headerName: 'Carry Forward', 
+      field: 'encashable', 
+      headerName: 'Encash at Year End', 
       cellRenderer: StatusToggleRendererComponent,
       cellRendererParams: {
         activeLabel: 'Yes', inactiveLabel: 'No',
-        onToggle: (data: any, isActive: boolean) => this.onLeaveTypeToggle(data, 'carryForward', isActive)
+        onToggle: (data: any, isActive: boolean) => this.onLeaveTypeToggle(data, 'encashable', isActive)
       }
     },
     { 
@@ -612,7 +612,7 @@ export class MasterDataComponent implements OnInit {
     address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0',
     geofenceRadius: 500, allowedIps: '',
     isActive: true,
-    defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
+    defaultDays: 0, isPaid: true, encashable: false, encashmentLimit: 0,
     accrualFrequency: 'NONE', accrualAmount: 0,
     allowHalfDay: true,
     date: ''
@@ -863,7 +863,7 @@ export class MasterDataComponent implements OnInit {
         address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0',
         geofenceRadius: 500, allowedIps: '',
         isActive: true,
-        defaultDays: 0, isPaid: true, carryForward: false, carryForwardLimit: 0,
+        defaultDays: 0, isPaid: true, encashable: false, encashmentLimit: 0,
         accrualFrequency: 'NONE', accrualAmount: 0,
         allowHalfDay: true,
         date: '',
@@ -915,7 +915,7 @@ export class MasterDataComponent implements OnInit {
     } else if (tab === 'leave-types') {
       // parse numeric
       this.formData.defaultDays = Number(this.formData.defaultDays);
-      this.formData.carryForwardLimit = Number(this.formData.carryForwardLimit);
+      this.formData.encashmentLimit = Number(this.formData.encashmentLimit);
       if (mode === 'create') this.masterDataService.createLeaveType(this.formData).subscribe({ next: () => onSuccess('Leave Type created'), error: onError });
       else this.masterDataService.updateLeaveType(id, this.formData).subscribe({ next: () => onSuccess('Leave Type updated'), error: onError });
     } else if (tab === 'holidays') {

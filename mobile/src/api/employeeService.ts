@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, UPLOAD_TIMEOUT_MS } from './apiClient';
 
 export interface EmployeeBasic {
   id: number;
@@ -91,6 +91,7 @@ export const employeeService = {
   uploadFile: async (formData: FormData) => {
     const response = await apiClient.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT_MS,
     });
     return response.data;
   },
@@ -98,6 +99,7 @@ export const employeeService = {
   uploadImage: async (formData: FormData) => {
     const response = await apiClient.post('/upload/image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT_MS,
     });
     return response.data;
   },
@@ -106,6 +108,7 @@ export const employeeService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: UPLOAD_TIMEOUT_MS,
     });
     return response.data;
   },

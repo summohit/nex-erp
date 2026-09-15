@@ -203,7 +203,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   myLeaveBalanceSeries = computed(() => {
     const balances = this.dashboard()?.common?.myLeaveBalance || [];
-    return [{ name: 'Remaining', data: balances.map((b: any) => Math.max(b.allocated + (b.carriedOver || 0) - b.used, 0)) }];
+    return [{ name: 'Remaining', data: balances.map((b: any) => Math.max(b.allocated - b.used, 0)) }];
   });
   myLeaveBalanceCategories = computed(() => (this.dashboard()?.common?.myLeaveBalance || []).map((b: any) => b.leaveType?.name || 'Leave'));
 

@@ -97,7 +97,7 @@ export class LeaveQuotaComponent implements OnInit {
    */
   private cellFor(row: QuotaRow) {
     const typeId = this.leaveTypeId();
-    return typeId === null ? row.totals : row.byType[typeId] ?? { allocated: 0, used: 0, carriedOver: 0, remaining: 0 };
+    return typeId === null ? row.totals : row.byType[typeId] ?? { allocated: 0, used: 0, remaining: 0, encashed: 0 };
   }
 
   rows = computed(() => {
@@ -109,13 +109,12 @@ export class LeaveQuotaComponent implements OnInit {
     return report.rows
       .map((r) => {
         const cell = this.cellFor(r);
-        const entitlement = cell.allocated + cell.carriedOver;
-        const utilisation = entitlement > 0 ? (cell.used / entitlement) * 100 : 0;
+        const utilisation = cell.allocated > 0 ? (cell.used / cell.allocated) * 100 : 0;
         return {
           ...r,
           allocated: cell.allocated,
           used: cell.used,
-          carriedOver: cell.carriedOver,
+          encashed: cell.encashed,
           remaining: cell.remaining,
           utilisation,
         };
@@ -158,8 +157,7 @@ export class LeaveQuotaComponent implements OnInit {
         unassigned++;
       } else {
         const cell = this.cellFor(r);
-        const entitlement = cell.allocated + cell.carriedOver;
-        const util = entitlement > 0 ? (cell.used / entitlement) * 100 : 0;
+        const util = cell.allocated > 0 ? (cell.used / cell.allocated) * 100 : 0;
         if (cell.remaining <= 2) lowRemaining++;
         if (util >= 75) highUsed++;
       }
@@ -180,7 +178,7 @@ export class LeaveQuotaComponent implements OnInit {
       return {
         ...r,
         allocated: cell.allocated,
-        carriedOver: cell.carriedOver,
+        encashed: cell.encashed,
         used: cell.used,
         remaining: cell.remaining,
       };
@@ -189,29 +187,38 @@ export class LeaveQuotaComponent implements OnInit {
     const totals = rows.reduce(
       (acc, r) => ({
         allocated: acc.allocated + r.allocated,
-        carriedOver: acc.carriedOver + r.carriedOver,
+        encashed: acc.encashed + r.encashed,
         used: acc.used + r.used,
         remaining: acc.remaining + r.remaining,
       }),
-      { allocated: 0, carriedOver: 0, used: 0, remaining: 0 },
+      { allocated: 0, encashed: 0, used: 0, remaining: 0 },
     );
-    const entitlement = totals.allocated + totals.carriedOver;
     return {
       ...totals,
       people: rows.length,
       filteredPeople: this.rows().length,
-      utilisation: entitlement > 0 ? (totals.used / entitlement) * 100 : 0,
+      utilisation: totals.allocated > 0 ? (totals.used / totals.allocated) * 100 : 0,
       missingBalances: rows.filter((r) => r.hasNoBalances).length,
     };
   });
 
-  /** Shown while carry-forward has not run — the remaining column understates. */
-  carryForwardPending = computed(() => {
+  /**
+   * Nothing carries into next year, so what is still unused at the end of this
+   * one either gets paid out or is gone. Worth saying while there is still time
+   * to take it — and not worth saying once the year has been settled.
+   */
+  expiryPending = computed(() => {
     const report = this.report();
     if (!report) return false;
-    const carriesForward = report.leaveTypes.some((t) => t.carryForward);
-    return carriesForward && !report.carryForwardApplied;
+    if (report.encashmentSettled) return false;
+    return this.summary().remaining > 0;
   });
+
+  /** True once the closing payslip has bought back the year's unused days. */
+  encashmentSettled = computed(() => this.report()?.encashmentSettled ?? false);
+
+  /** Whether any type pays out at all — the rest simply expire. */
+  hasEncashableTypes = computed(() => this.report()?.leaveTypes.some((t) => t.encashable) ?? false);
 
   selectedTypeName = computed(() => {
     const id = this.leaveTypeId();
@@ -271,19 +278,6 @@ export class LeaveQuotaComponent implements OnInit {
       cellRenderer: (p: any) => `<span class="cell-title-bold" style="font-variant-numeric: tabular-nums;">${this.days(p.value)}</span>`
     },
     {
-      field: 'carriedOver',
-      headerName: 'Carried In',
-      width: 125,
-      type: 'numericColumn',
-      valueFormatter: (p) => this.days(p.value),
-      cellRenderer: (p: any) => {
-        if (!p.value || p.value === 0) {
-          return '<span style="color: #94A3B8; font-weight: 500;">—</span>';
-        }
-        return `<span style="color: #7000FF; font-weight: 700; font-variant-numeric: tabular-nums;">+${this.days(p.value)}</span>`;
-      }
-    },
-    {
       field: 'used',
       headerName: 'Used',
       width: 115,
@@ -310,6 +304,19 @@ export class LeaveQuotaComponent implements OnInit {
         }
         return `<span class="status-round status-available"><span class="status-dot"></span>${this.days(val)} left</span>`;
       },
+    },
+    {
+      field: 'encashed',
+      headerName: 'Encashed',
+      width: 125,
+      type: 'numericColumn',
+      valueFormatter: (p) => this.days(p.value),
+      cellRenderer: (p: any) => {
+        if (!p.value || p.value === 0) {
+          return '<span style="color: #94A3B8; font-weight: 500;">—</span>';
+        }
+        return `<span style="color: #7000FF; font-weight: 700; font-variant-numeric: tabular-nums;" title="Paid out with the December salary">${this.days(p.value)}</span>`;
+      }
     },
     {
       field: 'utilisation',
@@ -368,7 +375,7 @@ export class LeaveQuotaComponent implements OnInit {
     if (!this.gridApi) return;
     this.gridApi.exportDataAsCsv({
       fileName: `leave-quota-${this.year()}${this.leaveTypeId() ? '-' + this.slug(this.selectedTypeName()) : ''}.csv`,
-      columnKeys: ['employee.name', 'allocated', 'carriedOver', 'used', 'remaining', 'utilisation'],
+      columnKeys: ['employee.name', 'allocated', 'used', 'remaining', 'encashed', 'utilisation'],
     });
   }
 
@@ -387,7 +394,7 @@ export class LeaveQuotaComponent implements OnInit {
     if (!row || !report) return [];
     return report.leaveTypes.map((t) => ({
       type: t,
-      ...(row.byType[t.id] ?? { allocated: 0, used: 0, carriedOver: 0, remaining: 0 }),
+      ...(row.byType[t.id] ?? { allocated: 0, used: 0, remaining: 0, encashed: 0 }),
     }));
   });
 

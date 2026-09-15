@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -48,6 +48,54 @@ const PulseSkeleton = ({ style }: { style: any }) => {
   }, [pulseAnim]);
   return <Animated.View style={[style, { opacity: pulseAnim, backgroundColor: '#E2E8F0' }]} />;
 };
+
+/**
+ * The wall clock, and the only thing in the app that re-renders every second.
+ *
+ * It owns its own state and interval on purpose. When this lived in
+ * DashboardScreen, each tick set state on a 1,500-line component and re-rendered
+ * the entire dashboard — chart maths, leave totals and all — once a second, for
+ * as long as the app was open. Here the tick repaints one <Text>.
+ *
+ * The same reasoning applies to any future "live" readout: give it its own
+ * component rather than a piece of the screen's state.
+ */
+const LiveClock = memo(function LiveClock({ style }: { style?: any }) {
+  const [now, setNow] = useState(() =>
+    new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+  );
+
+  useEffect(() => {
+    const tick = () =>
+      setNow(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return <Text style={style}>{now}</Text>;
+});
+
+/**
+ * Elapsed time on the active field visit. Same split, same reason — a second
+ * hand should never cost a full dashboard render.
+ *
+ * Keyed on the start time alone rather than the visit object, so an unrelated
+ * field changing on the visit does not restart the count.
+ */
+const VisitElapsed = memo(function VisitElapsed({ startTime, style }: { startTime: string; style?: any }) {
+  const [elapsed, setElapsed] = useState('00:00:00');
+
+  useEffect(() => {
+    const startMs = new Date(startTime).getTime();
+    const tick = () => setElapsed(formatElapsed(Math.max(0, Math.floor((Date.now() - startMs) / 1000))));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [startTime]);
+
+  return <Text style={style}>{elapsed}</Text>;
+});
 
 function formatRelativeTime(dateStr?: string | Date): string {
   if (!dateStr) return '';
@@ -106,11 +154,12 @@ export default function DashboardScreen() {
   } = useDashboardStore();
   const { activeVisit, fetchActiveVisit } = useFieldVisitStore();
 
-  const [currentTime, setCurrentTime] = useState('');
+  // currentTime and visitElapsed used to live here, each on a one-second
+  // interval. They are now LiveClock and VisitElapsed, which own their own
+  // state so a tick repaints one <Text> instead of this whole screen.
   const [liveWorkedTime, setLiveWorkedTime] = useState({ hours: 0, minutes: 0 });
   const [timeFilter, setTimeFilter] = useState<'7D' | '30D' | '3M'>('7D');
   const [refreshing, setRefreshing] = useState(false);
-  const [visitElapsed, setVisitElapsed] = useState('00:00:00');
   const [feedback, setFeedback] = useState<{
     visible: boolean;
     type: ModalType;
@@ -126,28 +175,9 @@ export default function DashboardScreen() {
     fetchActiveVisit().catch(() => {});
   }, [fetchDashboardData, fetchActiveVisit]);
 
-  // Field visit elapsed timer
-  useEffect(() => {
-    if (!activeVisit?.startTime) return;
-    const tick = () => {
-      const secs = Math.max(0, Math.floor((Date.now() - new Date(activeVisit.startTime).getTime()) / 1000));
-      setVisitElapsed(formatElapsed(secs));
-    };
-    tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
-  }, [activeVisit?.startTime]);
-
-  // Live Clock
-  useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
-    };
-    updateClock();
-    const timer = setInterval(updateClock, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // The per-second timers that used to sit here now live inside LiveClock and
+  // VisitElapsed. What remains ticks once a minute, which costs one render per
+  // minute rather than two per second.
 
   // Live Worked Time Tracker
   useEffect(() => {
@@ -236,21 +266,42 @@ export default function DashboardScreen() {
     }
   };
 
-  // Computed values
-  const totalLeaveAllocated = leaveBalances.reduce((sum, lb) => sum + lb.allocated, 0);
-  const totalLeaveUsed = leaveBalances.reduce((sum, lb) => sum + lb.used, 0);
-  const totalLeaveRemaining = Math.max(0, totalLeaveAllocated - totalLeaveUsed);
-  const leaveProgress = totalLeaveAllocated > 0 ? (totalLeaveUsed / totalLeaveAllocated) * 100 : 0;
+  // Computed values. Each block is keyed to the data it actually reads, so a
+  // re-render for an unrelated reason re-uses the last result instead of
+  // walking every balance, project and attendance record again.
+  const {
+    totalLeaveAllocated,
+    totalLeaveUsed,
+    totalLeaveRemaining,
+    leaveProgress,
+  } = useMemo(() => {
+    const allocated = leaveBalances.reduce((sum, lb) => sum + lb.allocated, 0);
+    const used = leaveBalances.reduce((sum, lb) => sum + lb.used, 0);
+    return {
+      totalLeaveAllocated: allocated,
+      totalLeaveUsed: used,
+      totalLeaveRemaining: Math.max(0, allocated - used),
+      leaveProgress: allocated > 0 ? (used / allocated) * 100 : 0,
+    };
+  }, [leaveBalances]);
 
-  const activeProjectsCount = projects.filter(p => p.status !== 'ARCHIVED').length;
-  const completedProjectsCount = projects.filter(p => p.status === 'COMPLETED').length;
+  const { activeProjectsCount, completedProjectsCount } = useMemo(() => ({
+    activeProjectsCount: projects.filter(p => p.status !== 'ARCHIVED').length,
+    completedProjectsCount: projects.filter(p => p.status === 'COMPLETED').length,
+  }), [projects]);
 
+  // Deliberately not memoised: it reads the clock, and the greeting has to be
+  // right when the screen repaints rather than frozen at whatever it said when
+  // the app was opened. Three comparisons is not worth a cache.
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening';
-  const cleanLastName = (profile?.lastName || '').trim() === '.' ? '' : (profile?.lastName || '').trim();
-  const displayName = profile
-    ? [profile.firstName?.trim(), cleanLastName].filter(Boolean).join(' ')
-    : (user?.email?.split('@')[0] || 'Employee');
+
+  const displayName = useMemo(() => {
+    const cleanLastName = (profile?.lastName || '').trim() === '.' ? '' : (profile?.lastName || '').trim();
+    return profile
+      ? [profile.firstName?.trim(), cleanLastName].filter(Boolean).join(' ')
+      : (user?.email?.split('@')[0] || 'Employee');
+  }, [profile, user?.email]);
 
   // Weekly attendance chart data (computed)
   const getChartData = () => {
@@ -293,10 +344,13 @@ export default function DashboardScreen() {
     return { data, avgHours: avg };
   };
 
-  const { data: chartData, avgHours } = getChartData();
+  // The heaviest thing on this screen: a full pass over attendanceHistory with
+  // a Date allocated per record. It only changes when that history does.
+  const { data: chartData, avgHours } = useMemo(getChartData, [attendanceHistory]);
+
   const todayDayIndex = (new Date().getDay() + 6) % 7; // Monday = 0
-  const workedTodayHours = todayAttendance?.totalHours || (liveWorkedTime.hours + liveWorkedTime.minutes / 60);
   const targetHours = 8.5;
+  const workedTodayHours = todayAttendance?.totalHours || (liveWorkedTime.hours + liveWorkedTime.minutes / 60);
   const progressRatio = Math.min(workedTodayHours / targetHours, 1);
   const trendVsAvg = avgHours > 0 ? ((workedTodayHours - avgHours) / avgHours) * 100 : 0;
   const trendColor = trendVsAvg >= 0 ? '#10B981' : '#EF4444';
@@ -369,7 +423,7 @@ export default function DashboardScreen() {
               {/* Clock & SVG Gauge Center */}
               <View style={styles.heroCenterRow}>
                 <View style={styles.heroTimeCol}>
-                  <Text style={styles.heroTimeClock}>{currentTime || '00:00:00'}</Text>
+                  <LiveClock style={styles.heroTimeClock} />
                   <Text style={styles.heroTargetSubtitle}>
                     {todayAttendance?.clockIn
                       ? `Clocked in at ${new Date(todayAttendance.clockIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
@@ -669,7 +723,7 @@ export default function DashboardScreen() {
                   <View style={styles.fieldLiveMetricsRow}>
                     <View style={styles.fieldLiveMetricItem}>
                       <Clock size={15} color="#E25E3E" strokeWidth={2.2} />
-                      <Text style={styles.fieldLiveValue}>{visitElapsed}</Text>
+                      <VisitElapsed startTime={activeVisit.startTime} style={styles.fieldLiveValue} />
                       <Text style={styles.fieldLiveLabel}>Duration</Text>
                     </View>
                     <View style={styles.fieldLiveDivider} />

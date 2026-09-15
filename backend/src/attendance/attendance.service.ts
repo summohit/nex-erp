@@ -74,6 +74,7 @@ export class AttendanceService {
     isLate: true,
     isEarlyLeave: true,
     overtimeHours: true,
+    autoClockedOut: true,
     logs: {
       select: {
         id: true,
@@ -83,6 +84,7 @@ export class AttendanceService {
         clockInLng: true,
         clockOutLat: true,
         clockOutLng: true,
+        autoClockedOut: true,
       },
     },
   } as const;
@@ -258,6 +260,7 @@ export class AttendanceService {
         status: existing.status === 'HALF_DAY' || isHalfDay ? 'HALF_DAY' : 'PRESENT',
         isLate: existing.isLate || isLate,
         clockOut: null, // Reset clockOut on parent since they are active
+        autoClockedOut: false, // reopened — the old cutoff no longer describes the day
         clockIn: existing.clockIn || now,
         clockInLat: existing.clockInLat || data.lat,
         clockInLng: existing.clockInLng || data.lng,
@@ -339,7 +342,11 @@ export class AttendanceService {
       data: {
         clockOut: now,
         clockOutLat: data.lat,
-        clockOutLng: data.lng
+        clockOutLng: data.lng,
+        // A person closed this one. Clearing rather than leaving the default
+        // matters for a day the sweep already closed and a later clock-in
+        // reopened.
+        autoClockedOut: false
       }
     });
 
@@ -351,7 +358,8 @@ export class AttendanceService {
         clockOutLng: data.lng,
         isEarlyLeave,
         status,
-        overtimeHours
+        overtimeHours,
+        autoClockedOut: false
       },
       include: { logs: true }
     }).then(r => this.withTotalHours(r));

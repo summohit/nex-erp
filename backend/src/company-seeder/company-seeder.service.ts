@@ -100,12 +100,15 @@ export class CompanySeederService implements OnModuleInit {
 
     // 4. Seed Default Leave Types
     const defaultLeaveTypes = [
-      { name: 'Casual Leave (CL)', description: 'For urgent personal matters', defaultDays: 12, isPaid: true, carryForward: false },
-      { name: 'Sick Leave (SL)', description: 'For medical issues and recovery', defaultDays: 10, isPaid: true, carryForward: false },
-      { name: 'Earned Leave (EL)', description: 'Annual paid vacation leave', defaultDays: 15, isPaid: true, carryForward: true, carryForwardLimit: 5 },
-      { name: 'Maternity Leave', description: 'Paid maternity leave for female employees', defaultDays: 180, isPaid: true, carryForward: false },
-      { name: 'Paternity Leave', description: 'Paid paternity leave for male employees', defaultDays: 15, isPaid: true, carryForward: false },
-      { name: 'Unpaid Leave (LOP)', description: 'Loss of pay leave', defaultDays: 0, isPaid: false, carryForward: false },
+      // encashable: leave that is an earned entitlement gets bought back if it
+      // is not taken by year end. Sick and Maternity are permission to be away
+      // when you need to be, not a balance the company owes money on.
+      { name: 'Casual Leave (CL)', description: 'For urgent personal matters', defaultDays: 12, isPaid: true, encashable: false },
+      { name: 'Sick Leave (SL)', description: 'For medical issues and recovery', defaultDays: 10, isPaid: true, encashable: false },
+      { name: 'Earned Leave (EL)', description: 'Annual paid vacation leave', defaultDays: 15, isPaid: true, encashable: true, encashmentLimit: 5 },
+      { name: 'Maternity Leave', description: 'Paid maternity leave for female employees', defaultDays: 180, isPaid: true, encashable: false },
+      { name: 'Paternity Leave', description: 'Paid paternity leave for male employees', defaultDays: 15, isPaid: true, encashable: false },
+      { name: 'Unpaid Leave (LOP)', description: 'Loss of pay leave', defaultDays: 0, isPaid: false, encashable: false },
     ];
 
     for (const lt of defaultLeaveTypes) {
@@ -119,8 +122,8 @@ export class CompanySeederService implements OnModuleInit {
             description: lt.description,
             defaultDays: lt.defaultDays,
             isPaid: lt.isPaid,
-            carryForward: lt.carryForward,
-            carryForwardLimit: lt.carryForwardLimit || 0,
+            encashable: lt.encashable,
+            encashmentLimit: lt.encashmentLimit || 0,
             companyId,
           },
         });
