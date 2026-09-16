@@ -1346,34 +1346,40 @@
     </div>
 
     <!-- Populated Grid -->
-    <div *ngIf="projectAttachments().length > 0" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; align-content: flex-start;">
-      <div *ngFor="let att of projectAttachments()" style="border: 1px solid #dfe1e6; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; background: white; transition: box-shadow 0.2s;" class="hover:shadow-md">
+    <div *ngIf="projectAttachments().length > 0" class="att-grid">
+      <div *ngFor="let att of projectAttachments()" class="att-card">
         <!-- Thumbnail -->
-        <div style="height: 140px; background: #f4f5f7; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid #dfe1e6; position: relative;" class="group">
-           <img *ngIf="isImageAttachment(att)" [src]="att.fileUrl" style="width: 100%; height: 100%; object-fit: cover;" (error)="onImageError(att)">
+        <div class="att-thumb-box group">
+           <img *ngIf="isImageAttachment(att)" [src]="att.fileUrl" class="att-thumb-img" (error)="onImageError(att)">
            
-           <ng-container *ngIf="!isImageAttachment(att)">
-             <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideFileText'" lucideFileText size="48" [style.color]="getAttachmentIconColor(att.fileName)"></svg>
-             <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideFile'" lucideFile size="48" [style.color]="getAttachmentIconColor(att.fileName)"></svg>
-             <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideLayoutGrid'" lucideLayoutGrid size="48" [style.color]="getAttachmentIconColor(att.fileName)"></svg>
-             <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideBarChart'" lucideBarChart size="48" [style.color]="getAttachmentIconColor(att.fileName)"></svg>
-             <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideVideo'" lucideVideo size="48" [style.color]="getAttachmentIconColor(att.fileName)"></svg>
-             <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideMusic'" lucideMusic size="48" [style.color]="getAttachmentIconColor(att.fileName)"></svg>
-             <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideImage'" lucideImage size="48" [style.color]="getAttachmentIconColor(att.fileName)"></svg>
-           </ng-container>
+           <div *ngIf="!isImageAttachment(att)" class="att-thumb-fallback" [style.background]="getAttachmentBadge(att.fileName).bg">
+             <div class="att-fallback-icon-box" [style.background]="getAttachmentBadge(att.fileName).iconBg" [style.color]="getAttachmentBadge(att.fileName).color">
+               <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideFileText'" lucideFileText size="28"></svg>
+               <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideFile'" lucideFile size="28"></svg>
+               <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideLayoutGrid'" lucideLayoutGrid size="28"></svg>
+               <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideBarChart'" lucideBarChart size="28"></svg>
+               <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideVideo'" lucideVideo size="28"></svg>
+               <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideMusic'" lucideMusic size="28"></svg>
+               <svg *ngIf="getAttachmentIcon(att.fileName) === 'lucideImage'" lucideImage size="28"></svg>
+             </div>
+             <span class="att-fallback-badge" [style.color]="getAttachmentBadge(att.fileName).color">
+               {{ getAttachmentBadge(att.fileName).label }}
+             </span>
+           </div>
 
            <!-- Hover Actions -->
-           <div style="position: absolute; inset: 0; background: rgba(9, 30, 66, 0.4); display: none; align-items: center; justify-content: center; gap: 12px; transition: all 0.2s;" class="group-hover:!flex">
-             <a [href]="att.fileUrl" target="_blank" style="width: 32px; height: 32px; border-radius: 50%; background: white; color: #172b4d; display: flex; align-items: center; justify-content: center; text-decoration: none; transition: transform 0.15s;" class="hover:scale-110">
-               <svg lucideExternalLink size="16"></svg>
+           <div class="att-thumb-hover-overlay">
+             <a [href]="att.fileUrl" target="_blank" class="att-hover-btn" title="Open preview">
+               <svg lucideExternalLink size="15"></svg>
              </a>
-             <a [href]="att.fileUrl" download target="_blank" style="width: 32px; height: 32px; border-radius: 50%; background: white; color: #172b4d; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: transform 0.15s;" class="hover:scale-110" title="Download">
-               <svg lucideDownload size="16"></svg>
+             <a [href]="att.fileUrl" download target="_blank" class="att-hover-btn" title="Download">
+               <svg lucideDownload size="15"></svg>
              </a>
            </div>
         </div>
+
         <!-- Meta -->
-        <div style="padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div class="att-meta-body">
            <!-- Renaming edits the NAME only: the extension is shown beside the
                 input, greyed, because the server keeps whatever the file was
                 uploaded with and letting it be typed would invite a change
@@ -1395,34 +1401,36 @@
              </button>
            </div>
            <ng-template #attNameLabel>
-             <span style="font-size: 13px; font-weight: 600; color: #172b4d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" [title]="att.fileName">{{ att.fileName }}</span>
+             <span class="att-file-name" [title]="att.fileName">{{ att.fileName }}</span>
            </ng-template>
-           <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: #5e6c84;">
+
+           <div class="att-meta-sub">
              <span>{{ att.createdAt | date:'MMM d, y' }}</span>
              <span *ngIf="att.fileSize">{{ (att.fileSize / 1024 / 1024) | number:'1.1-2' }} MB</span>
            </div>
            
            <!-- Task Heading -->
-           <div *ngIf="!att.isProjectDocument" (click)="openIssueDetailsById(att.issueId); $event.stopPropagation()" style="display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 4px 8px; background: #e0e7ff; border-radius: 4px; cursor: pointer; transition: background 0.15s;" class="hover:bg-indigo-200">
-             <svg lucideCheckSquare size="12" style="color: #3730a3; flex-shrink: 0;"></svg>
-             <span style="color: #3730a3; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" [title]="att.issueKey + ': ' + att.issueTitle">{{ att.issueKey }}: {{ att.issueTitle }}</span>
+           <div *ngIf="!att.isProjectDocument" (click)="openIssueDetailsById(att.issueId); $event.stopPropagation()" class="att-task-link">
+             <svg lucideCheckSquare size="12" style="flex-shrink: 0;"></svg>
+             <span [title]="att.issueKey + ': ' + att.issueTitle">{{ att.issueKey }}: {{ att.issueTitle }}</span>
            </div>
 
-           <!-- Project document: §6 wants who uploaded it, plus rename and
-                delete. Task attachments keep their existing behaviour. -->
+           <!-- Project document: who uploaded it, plus rename and delete -->
            <div *ngIf="att.isProjectDocument" class="att-doc-row">
-             <span class="att-doc-badge" title="Uploaded against the project, not a task">Project file</span>
-             <span class="att-doc-uploader" *ngIf="att.uploader">
-               {{ att.uploader.firstName }} {{ att.uploader.lastName }}
-             </span>
-             <span class="att-doc-actions">
-               <button type="button" (click)="startRenameDocument(att); $event.stopPropagation()" title="Rename">
-                 <svg lucidePencil size="13"></svg>
+             <div class="att-doc-left">
+               <span class="att-doc-badge" title="Uploaded against the project, not a task">Project file</span>
+               <span class="att-doc-uploader" *ngIf="att.uploader" [title]="att.uploader.firstName + ' ' + att.uploader.lastName">
+                 {{ att.uploader.firstName }} {{ att.uploader.lastName }}
+               </span>
+             </div>
+             <div class="att-doc-actions">
+               <button type="button" class="att-btn-edit" (click)="startRenameDocument(att); $event.stopPropagation()" title="Rename file">
+                 <svg lucideEdit2 size="13"></svg>
                </button>
-               <button type="button" class="att-doc-danger" (click)="deleteProjectDocument(att); $event.stopPropagation()" title="Delete">
+               <button type="button" class="att-btn-delete" (click)="deleteProjectDocument(att); $event.stopPropagation()" title="Delete file">
                  <svg lucideTrash2 size="13"></svg>
                </button>
-             </span>
+             </div>
            </div>
         </div>
       </div>

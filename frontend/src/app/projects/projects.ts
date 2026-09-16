@@ -961,6 +961,26 @@ export class ProjectsComponent implements OnInit {
     return dot > 0 ? fileName.slice(dot) : '';
   }
 
+  getFileTypeInfo(fileName: string): { bg: string; color: string; label: string } {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
+    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) {
+      return { bg: '#eff6ff', color: '#2563eb', label: ext.toUpperCase() };
+    }
+    if (ext === 'pdf') {
+      return { bg: '#fef2f2', color: '#dc2626', label: 'PDF' };
+    }
+    if (['csv', 'xls', 'xlsx'].includes(ext)) {
+      return { bg: '#ecfdf5', color: '#059669', label: ext.toUpperCase() };
+    }
+    if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) {
+      return { bg: '#f0f9ff', color: '#0284c7', label: ext.toUpperCase() };
+    }
+    if (['env', 'json', 'js', 'ts', 'html', 'css', 'xml'].includes(ext)) {
+      return { bg: '#faf5ff', color: '#7c3aed', label: ext.toUpperCase() };
+    }
+    return { bg: '#f1f5f9', color: '#475569', label: ext ? ext.toUpperCase() : 'FILE' };
+  }
+
   startRenameStaged(index: number) {
     this.renamingDocumentId.set(null);
     this.renamingStagedIndex.set(index);

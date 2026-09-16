@@ -82,6 +82,7 @@ export class MilestonesTabComponent {
       ALL: list.length,
       IN_PROGRESS: list.filter(m => m.status === 'IN_PROGRESS').length,
       PENDING: list.filter(m => m.status === 'PENDING').length,
+      ON_HOLD: list.filter(m => m.status === 'ON_HOLD').length,
       COMPLETED: list.filter(m => m.status === 'COMPLETED').length,
       CANCELLED: list.filter(m => m.status === 'CANCELLED').length,
     };
@@ -98,7 +99,7 @@ export class MilestonesTabComponent {
       list = list.filter(m =>
         m.name.toLowerCase().includes(q) ||
         (m.description && m.description.toLowerCase().includes(q)) ||
-        this.ownerName(m).toLowerCase().includes(q)
+        (m.owner && this.ownerName(m).toLowerCase().includes(q))
       );
     }
     return list;

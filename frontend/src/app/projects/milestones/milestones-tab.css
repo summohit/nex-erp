@@ -552,13 +552,18 @@
   background: #cbd5e1;
 }
 
-.ms-card-completed  .ms-card-stripe { background: #10b981; }
+.ms-card-completed   .ms-card-stripe { background: #10b981; }
 .ms-card-in-progress .ms-card-stripe { background: #3b82f6; }
-.ms-card-pending    .ms-card-stripe { background: #f59e0b; }
-.ms-card-cancelled  .ms-card-stripe { background: #ef4444; }
+.ms-card-pending     .ms-card-stripe { background: #f59e0b; }
+.ms-card-on-hold     .ms-card-stripe { background: #8b5cf6; }
+.ms-card-cancelled   .ms-card-stripe { background: #ef4444; }
 
 .ms-card-completed {
   background: #fafdfb;
+}
+
+.ms-card-on-hold {
+  background: #fdfcff;
 }
 
 /* Reorder Column */
@@ -639,6 +644,7 @@
 
 .ms-chip-pending     { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
 .ms-chip-in-progress { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.ms-chip-on-hold     { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }
 .ms-chip-completed   { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
 .ms-chip-cancelled   { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
 
@@ -721,80 +727,51 @@
   object-fit: cover;
 }
 
-/* Progress Column */
-.ms-card-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  width: 140px;
-  flex-shrink: 0;
-}
-
-.ms-progress-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.ms-progress-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: uppercase;
-}
-
-.ms-progress-val {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #334151;
-}
-
-.ms-progress-track {
-  width: 100%;
-  height: 7px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  overflow: hidden;
-}
-
-.ms-progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: #2563eb;
-  transition: width 0.3s ease;
-}
-
-.ms-progress-fill.ms-fill-done {
-  background: #10b981;
-}
 
 /* Amount Column */
 .ms-card-amount {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  width: 125px;
+  justify-content: center;
+  padding: 8px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  min-width: 135px;
   flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.ms-card:hover .ms-card-amount {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .ms-amount-val {
-  font-size: 14.5px;
-  font-weight: 750;
+  font-size: 15px;
+  font-weight: 700;
   color: #0f172a;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .ms-amount-share {
-  font-size: 11.5px;
-  color: #64748b;
-  font-weight: 500;
+  font-size: 11px;
+  color: #475569;
+  font-weight: 600;
+  background: #e2e8f0;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-top: 3px;
+  white-space: nowrap;
 }
 
 /* Actions Column */
 .ms-card-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -805,7 +782,7 @@
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 6px 9px;
+  padding: 6px 10px;
   outline: none;
   cursor: pointer;
   transition: all 0.15s;
@@ -814,6 +791,52 @@
 .ms-status-dropdown:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.ms-status-dropdown.status-completed   { color: #15803d; background: #f0fdf4; border-color: #bbf7d0; }
+.ms-status-dropdown.status-in-progress { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+.ms-status-dropdown.status-pending     { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+.ms-status-dropdown.status-on-hold     { color: #6d28d9; background: #f5f3ff; border-color: #ddd6fe; }
+.ms-status-dropdown.status-cancelled   { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+
+.ms-action-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.ms-action-icon-btn:hover {
+  transform: translateY(-1px);
+}
+
+.ms-action-icon-btn.ms-btn-edit:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+}
+
+.ms-action-icon-btn.ms-btn-danger:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.12);
+}
+
+.ms-action-icon-btn.ms-btn-hold:hover {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+  color: #7c3aed;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.12);
 }
 
 /* ── Empty & Loading States ───────────────────────────────────────────── */
@@ -890,12 +913,6 @@
 
   .ms-card-main {
     flex-basis: 100%;
-  }
-
-  .ms-card-progress {
-    width: auto;
-    flex: 1;
-    min-width: 140px;
   }
 
   .ms-card-amount {

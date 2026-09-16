@@ -19,7 +19,7 @@ import {
   LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive, LucideFlag,
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
-  LucideFileUp, LucideUpload,
+  LucideFileUp, LucideUpload, LucideUploadCloud,
   LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
   LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory
 } from '@lucide/angular';
@@ -50,7 +50,7 @@ declare var Quill: any;
     LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive, LucideFlag,
     LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
     LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
-    LucideFileUp, LucideUpload,
+    LucideFileUp, LucideUpload, LucideUploadCloud,
     LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
     LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory,
     AgGridAngular
@@ -392,6 +392,29 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return '#0284c7';
     if (['mp3', 'wav', 'ogg'].includes(ext)) return '#9333ea';
     return '#b3bac5';
+  }
+
+  getAttachmentBadge(filename: string): { bg: string; color: string; label: string; iconBg: string } {
+    const ext = filename?.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) {
+      return { bg: '#fdf2f8', color: '#db2777', label: ext.toUpperCase(), iconBg: '#fce7f3' };
+    }
+    if (ext === 'pdf') {
+      return { bg: '#fef2f2', color: '#dc2626', label: 'PDF', iconBg: '#fee2e2' };
+    }
+    if (['xls', 'xlsx', 'csv'].includes(ext)) {
+      return { bg: '#ecfdf5', color: '#059669', label: ext.toUpperCase(), iconBg: '#d1fae5' };
+    }
+    if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) {
+      return { bg: '#eff6ff', color: '#2563eb', label: ext.toUpperCase(), iconBg: '#dbeafe' };
+    }
+    if (['env', 'json', 'js', 'ts', 'html', 'css', 'xml', 'yml', 'yaml'].includes(ext)) {
+      return { bg: '#faf5ff', color: '#7c3aed', label: ext.toUpperCase(), iconBg: '#f3e8ff' };
+    }
+    if (['zip', 'rar', 'tar', 'gz', '7z'].includes(ext)) {
+      return { bg: '#fffbeb', color: '#d97706', label: ext.toUpperCase(), iconBg: '#fef3c7' };
+    }
+    return { bg: '#f8fafc', color: '#475569', label: (ext || 'FILE').toUpperCase(), iconBg: '#f1f5f9' };
   }
 
   openIssueDetailsById(issueId: number) {

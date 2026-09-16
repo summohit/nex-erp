@@ -6575,26 +6575,282 @@ input[type=text], input[type=email], input[type=password] {
 .att-upload-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 6px;
-  background: #2563eb;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #ffffff;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
-.att-upload-btn:hover { background: #1d4ed8; }
-.att-upload-btn:has(input:disabled) { opacity: 0.6; cursor: progress; }
+.att-upload-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
 
-/* Renaming edits the name only. The extension sits outside the input,
-   greyed, because the server keeps whatever the file was uploaded with. */
+.att-upload-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.att-upload-btn:has(input:disabled) {
+  opacity: 0.65;
+  cursor: progress;
+  transform: none;
+}
+
+.att-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  align-content: flex-start;
+}
+
+.att-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.att-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  transform: translateY(-2px);
+}
+
+.att-thumb-box {
+  height: 140px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid #f1f5f9;
+  position: relative;
+}
+
+.att-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.att-card:hover .att-thumb-img {
+  transform: scale(1.04);
+}
+
+.att-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+}
+
+.att-fallback-icon-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease;
+}
+
+.att-card:hover .att-fallback-icon-box {
+  transform: scale(1.08);
+}
+
+.att-fallback-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.att-thumb-hover-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.att-thumb-box:hover .att-thumb-hover-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.att-hover-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.15s ease;
+}
+
+.att-hover-btn:hover {
+  transform: scale(1.1);
+  color: #2563eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.att-meta-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.att-file-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.att-meta-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.att-task-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: #eff6ff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.att-task-link:hover {
+  background: #dbeafe;
+}
+
+.att-doc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.att-doc-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.att-doc-badge {
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.att-doc-uploader {
+  font-size: 11.5px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.att-doc-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.att-doc-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.att-doc-actions button:hover {
+  transform: translateY(-1px);
+}
+
+.att-doc-actions .att-btn-edit:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+}
+
+.att-doc-actions .att-btn-delete:hover {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.12);
+}
+
 .att-rename-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .att-rename-input {
@@ -6602,17 +6858,21 @@ input[type=text], input[type=email], input[type=password] {
   min-width: 0;
   font-size: 12.5px;
   font-weight: 600;
-  color: #172b4d;
-  border: 1px solid #2563eb;
-  border-radius: 4px;
-  padding: 4px 6px;
+  color: #1e293b;
+  border: 1.5px solid #3b82f6;
+  border-radius: 6px;
+  padding: 4px 8px;
   outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
 }
 
 .att-rename-ext {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: #94a3b8;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 3px 6px;
+  border-radius: 4px;
   flex-shrink: 0;
 }
 
@@ -6621,62 +6881,35 @@ input[type=text], input[type=email], input[type=password] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1px solid #dfe1e6;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
   cursor: pointer;
   flex-shrink: 0;
+  transition: all 0.15s ease;
 }
 
-.att-rename-ok { color: #15803d; }
-.att-rename-cancel { color: #b91c1c; }
-
-.att-doc-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.att-doc-badge {
+.att-rename-ok {
+  color: #059669;
   background: #ecfdf5;
-  color: #047857;
-  font-size: 10.5px;
-  font-weight: 700;
-  border-radius: 4px;
-  padding: 2px 6px;
-  white-space: nowrap;
+  border-color: #a7f3d0;
 }
 
-.att-doc-uploader {
-  font-size: 11px;
-  color: #5e6c84;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.att-rename-ok:hover {
+  background: #059669;
+  color: #ffffff;
+  border-color: #059669;
 }
 
-.att-doc-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
+.att-rename-cancel {
+  color: #64748b;
+  background: #f8fafc;
 }
 
-.att-doc-actions button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1px solid #dfe1e6;
-  background: #ffffff;
-  color: #5e6c84;
-  cursor: pointer;
+.att-rename-cancel:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
 }
-
-.att-doc-actions button:hover { border-color: #b3bac5; color: #172b4d; }
-.att-doc-actions .att-doc-danger:hover { border-color: #fca5a5; color: #b91c1c; }

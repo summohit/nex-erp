@@ -221,6 +221,14 @@
         <button
           type="button"
           class="ms-tab-pill"
+          [class.active]="statusFilter() === 'ON_HOLD'"
+          (click)="setStatusFilter('ON_HOLD')">
+          On Hold
+          <span class="ms-tab-badge">{{ statusCounts().ON_HOLD }}</span>
+        </button>
+        <button
+          type="button"
+          class="ms-tab-pill"
           [class.active]="statusFilter() === 'COMPLETED'"
           (click)="setStatusFilter('COMPLETED')">
           Completed
@@ -297,6 +305,7 @@
         [class.ms-card-completed]="m.status === 'COMPLETED'"
         [class.ms-card-in-progress]="m.status === 'IN_PROGRESS'"
         [class.ms-card-pending]="m.status === 'PENDING'"
+        [class.ms-card-on-hold]="m.status === 'ON_HOLD'"
         [class.ms-card-cancelled]="m.status === 'CANCELLED'">
 
         <!-- Left Accent Stripe -->
@@ -334,6 +343,7 @@
               <svg lucideCheckCircle2 size="11" *ngIf="m.status === 'COMPLETED'"></svg>
               <svg lucideClock size="11" *ngIf="m.status === 'IN_PROGRESS'"></svg>
               <svg lucideCircleDot size="11" *ngIf="m.status === 'PENDING'"></svg>
+              <svg lucidePause size="11" *ngIf="m.status === 'ON_HOLD'"></svg>
               <svg lucideX size="11" *ngIf="m.status === 'CANCELLED'"></svg>
               {{ m.status.replace('_', ' ') }}
             </span>
@@ -349,11 +359,17 @@
 
           <!-- Metadata Chips Row -->
           <div class="ms-meta-row">
-            <!-- Owner Avatar & Name -->
-            <div class="ms-meta-chip ms-owner-chip" [title]="'Assigned owner: ' + ownerName(m)">
+            <!-- Owner Avatar & Name (only displayed if an owner is assigned) -->
+            <div class="ms-meta-chip ms-owner-chip" *ngIf="m.owner && ownerName(m) !== 'Unassigned'" [title]="'Assigned owner: ' + ownerName(m)">
               <div class="ms-avatar-circle" *ngIf="!m.owner?.avatarUrl">{{ ownerInitials(m) }}</div>
               <img class="ms-avatar-img" *ngIf="m.owner?.avatarUrl" [src]="m.owner!.avatarUrl" [alt]="ownerName(m)" />
               <span class="ms-owner-text">{{ ownerName(m) }}</span>
+            </div>
+
+            <!-- Start Date -->
+            <div class="ms-meta-chip" *ngIf="m.startDate">
+              <svg lucideCalendar size="12" class="ms-meta-icon"></svg>
+              <span>Starts {{ m.startDate | date: 'mediumDate' }}</span>
             </div>
 
             <!-- Due Date / Completed Date -->
@@ -365,26 +381,6 @@
               <svg lucideCheckCircle2 size="12" class="ms-meta-icon"></svg>
               <span>Completed {{ (m.completedAt || m.dueDate) | date: 'mediumDate' }}</span>
             </div>
-
-            <!-- Task Counter -->
-            <div class="ms-meta-chip">
-              <svg lucideCheckSquare size="12" class="ms-meta-icon"></svg>
-              <span>{{ m.taskDone }} / {{ m.taskTotal }} tasks</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Progress Bar & Indicator -->
-        <div class="ms-card-progress">
-          <div class="ms-progress-header">
-            <span class="ms-progress-title">Progress</span>
-            <span class="ms-progress-val">{{ m.progress }}%</span>
-          </div>
-          <div class="ms-progress-track">
-            <div
-              class="ms-progress-fill"
-              [class.ms-fill-done]="m.status === 'COMPLETED' || m.progress === 100"
-              [style.width.%]="m.progress"></div>
           </div>
         </div>
 
@@ -398,13 +394,18 @@
         <div class="ms-card-actions" *ngIf="canManage()">
           <select
             class="ms-status-dropdown"
+            [class.status-completed]="m.status === 'COMPLETED'"
+            [class.status-in-progress]="m.status === 'IN_PROGRESS'"
+            [class.status-pending]="m.status === 'PENDING'"
+            [class.status-on-hold]="m.status === 'ON_HOLD'"
+            [class.status-cancelled]="m.status === 'CANCELLED'"
             [ngModel]="m.status"
             (ngModelChange)="setStatus(m, $event)"
             title="Update milestone status">
             <option *ngFor="let s of STATUSES" [value]="s">{{ s.replace('_', ' ') }}</option>
           </select>
 
-          <button type="button" class="ms-action-icon-btn" (click)="openEdit(m)" title="Edit milestone">
+          <button type="button" class="ms-action-icon-btn ms-btn-edit" (click)="openEdit(m)" title="Edit milestone">
             <svg lucidePencil size="14"></svg>
           </button>
           <!-- Deletable only while still pending. Once work has started the
@@ -422,7 +423,7 @@
           <ng-template #holdInstead>
             <button
               type="button"
-              class="ms-action-icon-btn"
+              class="ms-action-icon-btn ms-btn-hold"
               *ngIf="m.status !== 'ON_HOLD' && m.status !== 'CANCELLED'"
               (click)="setStatus(m, 'ON_HOLD')"
               title="Work has started on this milestone, so it can no longer be deleted. Put it on hold instead.">
