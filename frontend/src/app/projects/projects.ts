@@ -1,7 +1,9 @@
-import { Component, signal, inject, OnInit, computed } from '@angular/core';
+import { Component, signal, inject, OnInit, computed, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute, NavigationEnd } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs/operators';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef } from 'ag-grid-community';
 import {
@@ -26,7 +28,6 @@ import {
   TasksService, MyTask, TaskCapabilities, TaskType, LeadOption, TaskScope,
   PreSalesInfo, PreSalesTaskHistoryEntry,
 } from '../services/tasks.service';
-import { ActivatedRoute } from '@angular/router';
 
 /**
  * Project status, as of the Delivery module: DRAFT, ACTIVE, ON_HOLD, AT_RISK,
@@ -93,6 +94,7 @@ export class ProjectsComponent implements OnInit {
   private toast = inject(HotToastService);
   private route = inject(ActivatedRoute);
   private dialog = inject(DialogService);
+  private destroyRef = inject(DestroyRef);
 
   showArchiveWarningModal = false;
   pendingArchiveProjectId: number | null = null;
@@ -105,13 +107,30 @@ export class ProjectsComponent implements OnInit {
   clients = signal<any[]>([]);
   /** Active departments, for the project form and the Department filter. */
   departments = signal<any[]>([]);
+  /**
+   * §4: the project form's Client field lists LEAD CONTACTS, not clients —
+   * at the point a project is opened, the contact is who the business knows.
+   * Choosing one resolves server-side to the Client the project is saved
+   * against, creating it if there is not one already.
+   */
+  leadContacts = signal<any[]>([]);
   employees = signal<any[]>([]);
   searchQuery = signal<string>('');
   activeTab = signal<'all' | 'starred' | 'recent' | 'archived' | 'my-tasks'>(
     (() => {
       try {
-        const saved = localStorage.getItem('projects-active-tab') as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
-        return (saved && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(saved)) ? saved : 'all';
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/tasks')) {
+          return 'my-tasks';
+        }
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const tab = urlParams.get('tab') as any;
+          if (['all', 'starred', 'recent', 'archived'].includes(tab)) {
+            return tab;
+          }
+        }
+        const saved = (localStorage.getItem('projects-board-tab') || localStorage.getItem('projects-active-tab')) as any;
+        return (saved && ['all', 'starred', 'recent', 'archived'].includes(saved)) ? saved : 'all';
       } catch (e) {
         return 'all';
       }
@@ -794,6 +813,7 @@ export class ProjectsComponent implements OnInit {
       budgetAmount: null as number | null,
       hourlyRate: null as number | null,
       clientId: null as number | null,
+      leadContactId: null as number | null,
       pmIds: [] as number[],
       address: '',
       // ── Delivery (§4, §7, §9) ──
@@ -1006,49 +1026,28 @@ export class ProjectsComponent implements OnInit {
   });
 
   ngOnInit() {
-    // A pre-sales assignment notification links straight here now that the
-    // deal page no longer lists tasks — see CrmService.createPreSalesTask.
+    this.syncTabFromRoute();
+
+    // Listen to route changes because Angular reuses this component instance
+    // when navigating between /projects and /tasks (both point to ProjectsComponent).
+    this.router.events
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.syncTabFromRoute();
+      });
+
     const qp = this.route.snapshot.queryParamMap;
-    // Delivery > Tasks (/tasks) is this component opened on its task tab. The
-    // route pins the tab, so it wins over both ?tab= and the remembered tab —
-    // otherwise clicking Tasks in the sidebar could land on the board list.
-    const forcedTab = this.route.snapshot.data['forceTab'] as
-      | 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | undefined;
-    const qpTab = (forcedTab ?? qp.get('tab')) as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
-    if (qpTab && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(qpTab)) {
-      this.activeTab.set(qpTab);
-      // A route-pinned tab is not a choice the user made, so it is not
-      // remembered: visiting /tasks must not leave /projects showing tasks.
-      if (!forcedTab) {
-        try { localStorage.setItem('projects-active-tab', qpTab); } catch (e) {}
-      }
-    } else {
-      const savedTab = localStorage.getItem('projects-active-tab') as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
-      if (savedTab && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(savedTab)) {
-        this.activeTab.set(savedTab);
-      }
-    }
-
-    const psTask = Number(qp.get('psTask'));
-    if (psTask) {
-      this.activeTab.set('my-tasks');
-      try { localStorage.setItem('projects-active-tab', 'my-tasks'); } catch (e) {}
-      this.highlightedPreSalesTaskId = psTask;
-    }
-
-    // "Add Task" on a deal's pre-sales tab. The deal page does not keep its own
-    // composer any more; it sends the context here and this opens ours.
     const newTaskLeadId = Number(qp.get('newTaskLeadId'));
-    if (newTaskLeadId) {
-      this.activeTab.set('my-tasks');
-      try { localStorage.setItem('projects-active-tab', 'my-tasks'); } catch (e) {}
-    }
 
     this.loadStarredAndRecent();
     this.loadProjects();
     this.loadArchivedProjects();
     this.loadClients();
     this.loadDepartments();
+    this.loadLeadContacts();
     this.loadEmployees();
     // Cheap, and it decides whether the Add Task button exists at all. The
     // tasks themselves wait until somebody opens the tab.
@@ -1062,9 +1061,6 @@ export class ProjectsComponent implements OnInit {
       },
       error: () => {},
     });
-    // setActiveTab normally triggers this on first entry; landing on the tab
-    // from a query parameter or restored from localStorage skips it.
-    if (this.activeTab() === 'my-tasks') this.loadMyTasks();
 
     if (newTaskLeadId) {
       this.openComposerForLead(newTaskLeadId, Number(qp.get('newTaskAssigneeId')) || null);
@@ -1074,6 +1070,77 @@ export class ProjectsComponent implements OnInit {
         queryParams: { tab: 'my-tasks' },
         replaceUrl: true,
       });
+    }
+  }
+
+  private syncTabFromRoute() {
+    const currentUrl = this.router.url;
+    const path = currentUrl.split('?')[0];
+    const qp = this.route.snapshot.queryParamMap;
+    const forcedTab = this.route.snapshot.data['forceTab'] as
+      | 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | undefined;
+
+    // Delivery > Tasks (/tasks) or forcedTab: always show my-tasks
+    if (path.startsWith('/tasks') || forcedTab === 'my-tasks') {
+      this.activeTab.set('my-tasks');
+      if (this.isUserAdmin() && !this.userExplicitlyToggledScope && this.myTasksScope() !== 'all') {
+        this.myTasksScope.set('all');
+      }
+      if (!this.myTasksLoaded()) {
+        this.loadMyTasks();
+      }
+      return;
+    }
+
+    // Direct deep-link parameters that target a task
+    const psTask = Number(qp.get('psTask'));
+    if (psTask) {
+      this.activeTab.set('my-tasks');
+      this.highlightedPreSalesTaskId = psTask;
+      if (!this.myTasksLoaded()) {
+        this.loadMyTasks();
+      }
+      return;
+    }
+
+    const newTaskLeadId = Number(qp.get('newTaskLeadId'));
+    if (newTaskLeadId) {
+      this.activeTab.set('my-tasks');
+      if (!this.myTasksLoaded()) {
+        this.loadMyTasks();
+      }
+      return;
+    }
+
+    // Otherwise we are on /projects: check query param or last remembered board tab
+    const qpTab = qp.get('tab') as 'all' | 'starred' | 'recent' | 'archived' | null;
+    const validBoardTabs: Array<'all' | 'starred' | 'recent' | 'archived'> = ['all', 'starred', 'recent', 'archived'];
+
+    if (qpTab && validBoardTabs.includes(qpTab)) {
+      this.activeTab.set(qpTab);
+      try {
+        localStorage.setItem('projects-board-tab', qpTab);
+      } catch (e) {}
+      if (qpTab === 'archived') {
+        this.loadArchivedProjects();
+      }
+    } else {
+      let savedTab: 'all' | 'starred' | 'recent' | 'archived' = 'all';
+      try {
+        const saved = localStorage.getItem('projects-board-tab') as any;
+        if (saved && validBoardTabs.includes(saved)) {
+          savedTab = saved;
+        } else {
+          const legacy = localStorage.getItem('projects-active-tab') as any;
+          if (legacy && validBoardTabs.includes(legacy)) {
+            savedTab = legacy;
+          }
+        }
+      } catch (e) {}
+      this.activeTab.set(savedTab);
+      if (savedTab === 'archived') {
+        this.loadArchivedProjects();
+      }
     }
   }
 
@@ -1098,12 +1165,20 @@ export class ProjectsComponent implements OnInit {
       fill();
       return;
     }
+
     this.tasksService.getLeadOptions().subscribe({
-      next: (l) => {
-        this.leadOptions.set(l || []);
+      next: (opts) => {
+        this.leadOptions.set(opts);
         fill();
       },
-      error: () => this.toast.error('Could not load the deal this task is for.'),
+      error: () => fill(),
+    });
+  }
+
+  loadClients() {
+    this.clientsService.getClients().subscribe({
+      next: (res) => this.clients.set(res || []),
+      error: (err) => console.error('Error loading clients', err)
     });
   }
 
@@ -1114,11 +1189,16 @@ export class ProjectsComponent implements OnInit {
     });
   }
 
-  loadClients() {
-    this.clientsService.getClients().subscribe({
-      next: (res) => this.clients.set(res || []),
-      error: (err) => console.error('Error loading clients', err)
+  loadLeadContacts() {
+    this.projectsService.getLeadContactOptions().subscribe({
+      next: (res) => this.leadContacts.set(res || []),
+      error: (err) => console.error('Error loading lead contacts', err)
     });
+  }
+
+  /** "Acme Ltd — Priya Sharma", or just the name when there is no company. */
+  leadContactLabel(c: any): string {
+    return c?.companyName ? `${c.companyName} — ${c.name}` : (c?.name || 'Unnamed contact');
   }
 
   loadDepartments() {
@@ -1132,30 +1212,44 @@ export class ProjectsComponent implements OnInit {
 
   setActiveTab(tab: 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks') {
     this.activeTab.set(tab);
-    try {
-      localStorage.setItem('projects-active-tab', tab);
-    } catch (e) {}
 
-    // Update query params in URL without reload so refreshing retains the tab
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { tab: tab === 'all' ? null : tab },
-      queryParamsHandling: 'merge',
-      replaceUrl: true
-    });
+    const isCurrentRouteTasks = this.router.url.split('?')[0].startsWith('/tasks') ||
+      this.route.snapshot.data['forceTab'] === 'my-tasks';
 
-    if (tab === 'archived') {
-      this.loadArchivedProjects();
-    }
-    // Loaded on first entry rather than in ngOnInit: most visits to this screen
-    // are to open a board, and this is a two-source aggregation.
     if (tab === 'my-tasks') {
+      if (!isCurrentRouteTasks) {
+        this.router.navigate(['/tasks']);
+      }
       if (this.isUserAdmin() && !this.userExplicitlyToggledScope && this.myTasksScope() !== 'all') {
         this.myTasksScope.set('all');
       }
       if (!this.myTasksLoaded()) {
         this.loadMyTasks();
       }
+      return;
+    }
+
+    // A board tab was selected: 'all' | 'starred' | 'recent' | 'archived'
+    try {
+      localStorage.setItem('projects-board-tab', tab);
+    } catch (e) {}
+
+    if (isCurrentRouteTasks) {
+      this.router.navigate(['/projects'], {
+        queryParams: tab === 'all' ? {} : { tab }
+      });
+    } else {
+      // Update query params in URL without reload so refreshing retains the tab
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { tab: tab === 'all' ? null : tab },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
+
+    if (tab === 'archived') {
+      this.loadArchivedProjects();
     }
   }
 
@@ -2327,6 +2421,7 @@ export class ProjectsComponent implements OnInit {
       budgetAmount: project.budgetAmount,
       hourlyRate: project.hourlyRate,
       clientId: project.clientId,
+      leadContactId: project.leadContactId ?? project.leadContact?.id ?? null,
       pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || [],
       address: project.address || '',
       category: project.category || '',
@@ -2374,7 +2469,10 @@ export class ProjectsComponent implements OnInit {
       billingType: this.projectForm.billingType,
       budgetAmount: this.projectForm.budgetAmount || null,
       hourlyRate: this.projectForm.hourlyRate || null,
-      clientId: this.projectForm.clientId || null,
+      // The server turns this into clientId, reusing an existing client of the
+      // same name. clientId is deliberately not sent: two sources for one
+      // field is how they drift apart.
+      leadContactId: this.projectForm.leadContactId || null,
       pmIds: this.projectForm.pmIds,
       address: this.projectForm.address || null,
       category: this.projectForm.category || null,

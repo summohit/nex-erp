@@ -7,12 +7,12 @@ import { ShiftsService } from '../../services/shifts.service';
 import { AuthService } from '../../services/auth.service';
 import { Shift } from '../../services/attendance';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideX } from '@lucide/angular';
+import { LucideX, LucideIndianRupee, LucideLock, LucideInfo } from '@lucide/angular';
 
 @Component({
   selector: 'app-employee-drawer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, LucideX],
+  imports: [CommonModule, ReactiveFormsModule, LucideX, LucideIndianRupee, LucideLock, LucideInfo],
   templateUrl: './employee-drawer.html',
   styleUrls: ['./employee-drawer.css']
 })
@@ -108,6 +108,11 @@ export class EmployeeDrawerComponent implements OnInit {
     this.employeeService.setCostRate(employeeId, next).subscribe({
       error: (err) => this.toast.error(err?.error?.message || 'Employee saved, but the cost rate did not'),
     });
+  }
+
+  setQuickRate(rate: number | null) {
+    this.form.patchValue({ hourlyCostRate: rate });
+    this.form.get('hourlyCostRate')?.markAsDirty();
   }
 
   isProjectManagerDesignation(designationId: number | null): boolean {

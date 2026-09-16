@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { applyFinancialVisibilityAll } from './project-visibility';
+import { CrmService } from '../crm/crm.service';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import axios from 'axios';
@@ -12,7 +13,36 @@ import * as xlsx from 'xlsx';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private crm: CrmService,
+  ) {}
+
+  /**
+   * The Client id a project should be saved against (§4).
+   *
+   * The form picks a LEAD CONTACT, not a client — that is who the business
+   * actually knows at the point a project is created. Project.clientId still
+   * points at Client, so every client filter, column and future invoice is
+   * unaffected; this is the step that turns the chosen contact into that row,
+   * reusing an existing client of the same name rather than duplicating it.
+   *
+   * `clientId` is still honoured when sent directly, so anything already
+   * passing a client (imports, the AI onboarding flow) keeps working.
+   */
+  private async resolveClientId(companyId: number, data: any): Promise<number | null | undefined> {
+    if (data.leadContactId) {
+      const client = await this.crm.findOrCreateClientFromLeadContact(
+        companyId,
+        parseInt(data.leadContactId, 10),
+      );
+      return client.id;
+    }
+    // Explicitly cleared, versus simply not mentioned in the payload.
+    if (data.leadContactId === null && data.clientId === undefined) return null;
+    if (data.clientId !== undefined) return data.clientId ? parseInt(data.clientId, 10) : null;
+    return undefined;
+  }
 
   async createProject(companyId: number, leadId: number, data: any) {
     // Ensure unique project name per company (case-insensitive)
@@ -52,6 +82,9 @@ export class ProjectsService {
     const nextSeq = String(maxSeq + 1).padStart(2, '0');
     const finalKey = `${baseKey}${nextSeq}`;
 
+    // The form sends a lead contact; this is the Client it resolves to.
+    const resolvedClientId = await this.resolveClientId(companyId, data);
+
     // Create project, member, and default board
     const project = await this.prisma.project.create({
       data: {
@@ -66,7 +99,9 @@ export class ProjectsService {
         billingType: data.billingType || 'NON_BILLABLE',
         budgetAmount: data.budgetAmount ? parseFloat(data.budgetAmount) : null,
         hourlyRate: data.hourlyRate ? parseFloat(data.hourlyRate) : null,
-        clientId: data.clientId ? parseInt(data.clientId, 10) : null,
+        clientId: resolvedClientId ?? null,
+        // What was actually chosen, so an edit can show it again.
+        leadContactId: data.leadContactId ? parseInt(data.leadContactId, 10) : null,
         // Delivery module fields (§4, §7, §9). A project created without a
         // status is ACTIVE rather than DRAFT: somebody filling in this form is
         // starting work, and DRAFT would hide it behind the default filter.
@@ -431,6 +466,9 @@ export class ProjectsService {
         // come down with it rather than costing a lookup per row.
         client: {
           select: { id: true, name: true }
+        },
+        leadContact: {
+          select: { id: true, name: true, companyName: true }
         },
         department: {
           select: { id: true, name: true }
@@ -918,7 +956,13 @@ export class ProjectsService {
     if (data.billingType !== undefined) updateData.billingType = data.billingType;
     if (data.budgetAmount !== undefined) updateData.budgetAmount = data.budgetAmount ? parseFloat(data.budgetAmount) : null;
     if (data.hourlyRate !== undefined) updateData.hourlyRate = data.hourlyRate ? parseFloat(data.hourlyRate) : null;
-    if (data.clientId !== undefined) updateData.clientId = data.clientId ? parseInt(data.clientId, 10) : null;
+    // Resolves a chosen lead contact to its Client, or takes clientId directly.
+    // Left alone entirely when the payload mentions neither.
+    const resolvedClientId = await this.resolveClientId(companyId, data);
+    if (resolvedClientId !== undefined) updateData.clientId = resolvedClientId;
+    if (data.leadContactId !== undefined) {
+      updateData.leadContactId = data.leadContactId ? parseInt(data.leadContactId, 10) : null;
+    }
     if (data.status !== undefined) updateData.status = data.status;
     if (data.workStatus !== undefined) updateData.workStatus = data.workStatus;
     // Delivery module fields (§4, §7, §9, §37).

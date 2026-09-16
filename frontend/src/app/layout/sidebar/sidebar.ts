@@ -83,18 +83,25 @@ export class SidebarComponent implements OnInit {
 
   isMainItemActive(item: any): boolean {
     const currentUrl = this.router.url;
+    const currentPath = currentUrl.split('?')[0];
     if (item.route && item.route !== '/') {
       if (item.route === '/dashboard' && (currentUrl === '/dashboard' || currentUrl === '/')) {
         return true;
       }
-      if (item.route !== '/dashboard' && currentUrl.startsWith(item.route)) {
+      if (item.route !== '/dashboard' && currentPath.startsWith(item.route)) {
         return true;
       }
     }
     if (item.subItems) {
-      return item.subItems.some((sub: any) => currentUrl.includes(sub.route));
+      return item.subItems.some((sub: any) => currentPath.startsWith(sub.route) || currentUrl.includes(sub.route));
     }
     return false;
+  }
+
+  isSubItemActive(sub: any): boolean {
+    if (!sub?.route) return false;
+    const currentPath = this.router.url.split('?')[0];
+    return currentPath === sub.route;
   }
 
   ngOnInit() {

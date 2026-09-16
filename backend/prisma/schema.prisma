@@ -1428,14 +1428,22 @@ model Project {
 
   // Client & Billing
   clientId               Int?
-  client                 Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client                 Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  /// The lead contact the project was opened against (§4). The form picks one
+  /// of these, not a client; choosing one resolves to `clientId` above.
+  ///
+  /// Kept because the resolution is not reversible — several contacts at one
+  /// company map to a single Client — so without it an edit could not show
+  /// what was chosen, and would clear the field on save.
+  leadContactId          Int?
+  leadContact            LeadContact? @relation("ProjectLeadContact", fields: [leadContactId], references: [id], onDelete: SetNull)
   startDate              DateTime?
   endDate                DateTime?
-  billingType            String    @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
+  billingType            String       @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
   budgetAmount           Float?
   hourlyRate             Float?
-  currency               String    @default("INR")
-  budgetNotes            String?   @db.Text
+  currency               String       @default("INR")
+  budgetNotes            String?      @db.Text
   /// The hours the project was sold/planned for, set against logged time to
   /// give estimated → logged → remaining.
   estimatedHours         Float?
@@ -1443,7 +1451,7 @@ model Project {
   /// must use the timer. Defaults to true — every project predating this
   /// column already allowed manual entry, and flipping that silently would
   /// strand timesheets mid-week.
-  allowManualTimeLogging Boolean   @default(true)
+  allowManualTimeLogging Boolean      @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2764,6 +2772,7 @@ model LeadContact {
   updatedAt         DateTime          @updatedAt
   leadsBrought      Lead[]
   notes             LeadContactNote[]
+  projects          Project[]         @relation("ProjectLeadContact")
 }
 
 // A follow-up is a single logged/scheduled interaction on a lead — a running

@@ -138,29 +138,73 @@
         <!-- §23. Only Admin, Superadmin and Finance; the server refuses everyone
              else regardless. Shown on edit only — a rate needs an employee to
              belong to, and the create call has no id to attach it to yet. -->
-        <div
-          class="form-group full-width"
-          *ngIf="canSetCostRate && employeeData?.id"
-          style="margin-top: 12px; background: #F8FAFC; padding: 12px 16px; border-radius: 8px; border: 1px solid #E2E8F0;">
-          <label style="margin-bottom: 2px; font-weight: 600; color: #1E293B;">Internal Cost Rate (₹ / hour)</label>
-          <div style="font-size: 12px; color: #64748B; margin-bottom: 8px;">
-            What an hour of this person's time costs a project internally. Used to
-            calculate project cost against budget. Not their salary, and never shown
-            to employees or HR. Leave blank if there is no rate — their hours are
-            then reported as unpriced rather than free.
+        <div class="form-group full-width cost-rate-card" *ngIf="canSetCostRate && employeeData?.id">
+          <div class="cost-rate-header">
+            <div class="cost-rate-title-wrap">
+              <div class="cost-rate-icon-badge">
+                <svg lucideIndianRupee size="16"></svg>
+              </div>
+              <div>
+                <div class="cost-rate-title">Internal Cost Rate</div>
+                <div class="cost-rate-subtitle">Project billing & costing rate</div>
+              </div>
+            </div>
+            <span class="cost-rate-confidential-pill" title="Visible only to Admins and Finance">
+              <svg lucideLock size="11"></svg> Confidential
+            </span>
           </div>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            formControlName="hourlyCostRate"
-            placeholder="e.g. 500" />
+
+          <div class="cost-rate-body">
+            <!-- Modern Currency Input Group -->
+            <div class="cost-rate-input-group">
+              <span class="currency-prefix">₹</span>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                class="cost-rate-input"
+                formControlName="hourlyCostRate"
+                placeholder="e.g. 500" />
+              <span class="unit-suffix">/ hour</span>
+            </div>
+
+            <!-- Quick preset buttons for common rates -->
+            <div class="cost-rate-presets">
+              <span class="presets-label">Quick select:</span>
+              <button type="button" class="preset-btn" (click)="setQuickRate(300)">₹300</button>
+              <button type="button" class="preset-btn" (click)="setQuickRate(500)">₹500</button>
+              <button type="button" class="preset-btn" (click)="setQuickRate(800)">₹800</button>
+              <button type="button" class="preset-btn" (click)="setQuickRate(1200)">₹1,200</button>
+              <button type="button" class="preset-clear" *ngIf="form.get('hourlyCostRate')?.value" (click)="setQuickRate(null)">Clear</button>
+            </div>
+
+            <!-- Live Cost Projection / Context Banner (if rate entered) -->
+            <div class="cost-projection" *ngIf="form.get('hourlyCostRate')?.value as rate">
+              <div class="projection-item">
+                <span class="projection-label">Daily (8h):</span>
+                <span class="projection-value">₹{{ (rate * 8) | number:'1.0-0' }}</span>
+              </div>
+              <div class="projection-dot">•</div>
+              <div class="projection-item">
+                <span class="projection-label">Monthly (~160h):</span>
+                <span class="projection-value">₹{{ (rate * 160) | number:'1.0-0' }}</span>
+              </div>
+            </div>
+
+            <!-- Clean helper text callout -->
+            <div class="cost-rate-info-box">
+              <svg lucideInfo size="14" class="info-icon"></svg>
+              <p>
+                Calculates internal project cost against budget. <strong>Never shown to employees or HR.</strong> Leave blank to report hours as unpriced.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div class="form-group full-width" style="margin-top: 12px; display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; padding: 12px 16px; border-radius: 8px; border: 1px solid #E2E8F0;">
-          <div>
-            <label style="margin-bottom: 2px; font-weight: 600; color: #1E293B;">Project Manager Authority</label>
-            <div style="font-size: 12px; color: #64748B;">Allow this employee to be assigned as a PM in projects and approve completed tasks.</div>
+        <div class="form-group full-width pm-authority-card">
+          <div class="pm-authority-text">
+            <div class="pm-authority-title">Project Manager Authority</div>
+            <div class="pm-authority-desc">Allow this employee to be assigned as a PM in projects and approve completed tasks.</div>
           </div>
           <label class="switch" style="margin: 0;">
             <input type="checkbox" formControlName="isProjectManager">

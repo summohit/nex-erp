@@ -1494,12 +1494,17 @@
     <!-- §4: logical sections rather than one undifferentiated column of
          inputs. Basic information first, then schedule, then the commercial
          terms — which most roles never fill in at all. -->
+    <!-- §4: lead contacts, not clients. Picking one creates or reuses the
+         client the project is billed to, server-side. -->
     <div class="form-section">
       <label class="section-label">Client</label>
-      <select class="trello-select" [(ngModel)]="projectForm.clientId">
+      <select class="trello-select" [(ngModel)]="projectForm.leadContactId">
         <option [ngValue]="null">No Client</option>
-        <option *ngFor="let c of clients()" [ngValue]="c.id">{{ c.name }}</option>
+        <option *ngFor="let c of leadContacts()" [ngValue]="c.id">{{ leadContactLabel(c) }}</option>
       </select>
+      <small style="color: #6b7280; font-size: 12px; margin-top: 6px; display: block;">
+        Pick the contact this project is for. They are added as a client automatically.
+      </small>
     </div>
 
     <div class="form-section row">

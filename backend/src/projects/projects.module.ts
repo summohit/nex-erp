@@ -15,9 +15,11 @@ import { IssueRemindersCron } from './issues/issue-reminders.cron';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EventsModule } from '../events/events.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+// For resolving a chosen lead contact to the Client a project is saved against.
+import { CrmModule } from '../crm/crm.module';
 
 @Module({
-  imports: [PrismaModule, EventsModule, NotificationsModule],
+  imports: [PrismaModule, EventsModule, NotificationsModule, CrmModule],
   controllers: [ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController],
   providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron]
 })

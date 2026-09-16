@@ -4,7 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucidePlus, LucideTrash2, LucideChevronUp, LucideChevronDown,
-  LucideFlag, LucideX, LucidePencil, LucideCheck
+  LucideFlag, LucideX, LucidePencil, LucideCheck,
+  LucideCalendar, LucideClock, LucideCheckCircle2, LucideAlertTriangle,
+  LucideSearch, LucideCheckSquare, LucideCoins, LucidePieChart,
+  LucideCircleDot, LucideTrendingUp
 } from '@lucide/angular';
 import { ProjectsService, Milestone, MilestoneList } from '../../services/projects';
 import { EmployeeService } from '../../services/employee.service';
@@ -25,7 +28,10 @@ import { EmployeeService } from '../../services/employee.service';
   imports: [
     CommonModule, FormsModule,
     LucidePlus, LucideTrash2, LucideChevronUp, LucideChevronDown,
-    LucideFlag, LucideX, LucidePencil, LucideCheck
+    LucideFlag, LucideX, LucidePencil, LucideCheck,
+    LucideCalendar, LucideClock, LucideCheckCircle2, LucideAlertTriangle,
+    LucideSearch, LucideCheckSquare, LucideCoins, LucidePieChart,
+    LucideCircleDot, LucideTrendingUp
   ],
   templateUrl: './milestones-tab.html',
   styleUrls: ['./milestones-tab.css']
@@ -41,6 +47,10 @@ export class MilestonesTabComponent {
   data = signal<MilestoneList | null>(null);
   loading = signal(true);
   employees = signal<any[]>([]);
+
+  /** Search query and filter tab */
+  searchQuery = signal('');
+  statusFilter = signal<string>('ALL');
 
   /** The milestone being edited, or 'new', or null when the form is closed. */
   editing = signal<number | 'new' | null>(null);
@@ -58,6 +68,43 @@ export class MilestonesTabComponent {
 
   /** Completed against total — the §41 "Milestones 3 / 5" card. */
   completedCount = computed(() => this.milestones().filter(m => m.status === 'COMPLETED').length);
+
+  completionRate = computed(() => {
+    const total = this.milestones().length;
+    if (!total) return 0;
+    return Math.round((this.completedCount() / total) * 100);
+  });
+
+  statusCounts = computed(() => {
+    const list = this.milestones();
+    return {
+      ALL: list.length,
+      IN_PROGRESS: list.filter(m => m.status === 'IN_PROGRESS').length,
+      PENDING: list.filter(m => m.status === 'PENDING').length,
+      COMPLETED: list.filter(m => m.status === 'COMPLETED').length,
+      CANCELLED: list.filter(m => m.status === 'CANCELLED').length,
+    };
+  });
+
+  filteredMilestones = computed(() => {
+    let list = this.milestones();
+    const filter = this.statusFilter();
+    if (filter !== 'ALL') {
+      list = list.filter(m => m.status === filter);
+    }
+    const q = this.searchQuery().trim().toLowerCase();
+    if (q) {
+      list = list.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.description && m.description.toLowerCase().includes(q)) ||
+        this.ownerName(m).toLowerCase().includes(q)
+      );
+    }
+    return list;
+  });
+
+  totalTasksDone = computed(() => this.milestones().reduce((sum, m) => sum + (m.taskDone || 0), 0));
+  totalTasksTotal = computed(() => this.milestones().reduce((sum, m) => sum + (m.taskTotal || 0), 0));
 
   constructor() {
     // Re-fetch if the tab is ever pointed at a different project.
@@ -116,6 +163,17 @@ export class MilestonesTabComponent {
   ownerName(m: Milestone): string {
     if (!m.owner) return 'Unassigned';
     return `${m.owner.firstName || ''} ${m.owner.lastName || ''}`.trim();
+  }
+
+  ownerInitials(m: Milestone): string {
+    if (!m.owner) return '?';
+    const first = m.owner.firstName?.[0] || '';
+    const last = m.owner.lastName?.[0] || '';
+    return (first + last).toUpperCase() || '?';
+  }
+
+  setStatusFilter(filter: string) {
+    this.statusFilter.set(filter);
   }
 
   isOverdue(m: Milestone): boolean {

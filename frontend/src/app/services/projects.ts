@@ -241,6 +241,21 @@ export class ProjectsService {
     return this.http.put<any>(`${this.apiUrl}/${projectId}/boards/columns/reorder`, { columnIds });
   }
 
+  /**
+   * Lead contacts for the project form's Client field (§4).
+   *
+   * A CRM endpoint reached from here because the project form is its only
+   * caller and there is no CRM service to hang it on — the CRM screens talk to
+   * HttpClient directly. The dedicated /options route returns identity only
+   * and is not scoped to contacts the viewer personally added, which the CRM
+   * board's own list is.
+   */
+  getLeadContactOptions() {
+    return this.http.get<LeadContactOption[]>(
+      `${environment.apiUrl}/crm/lead-contacts/options`
+    );
+  }
+
   // ── Milestones (§13) ──────────────────────────────────────────────────
   // The list response carries `canViewFinancials` and `canManage` alongside
   // the rows: the server decides both, and the UI reads its answer rather than
@@ -265,6 +280,14 @@ export class ProjectsService {
   reorderMilestones(projectId: number, orderedIds: number[]) {
     return this.http.put<{ success: boolean }>(`${this.apiUrl}/${projectId}/milestones/reorder`, { orderedIds });
   }
+}
+
+export interface LeadContactOption {
+  id: number;
+  name: string;
+  companyName?: string | null;
+  email?: string | null;
+  contactCode?: string | null;
 }
 
 export interface Milestone {

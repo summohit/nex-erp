@@ -494,35 +494,84 @@
 
   <!-- Summary Dashboard Container -->
   <div class="summary-dashboard" *ngIf="activeProjectTab() === 'summary'">
-    <ng-container *ngIf="projectSummary(); else loadingSummary">
-      <!-- Metric Cards -->
+    <div class="summary-container" *ngIf="projectSummary(); else loadingSummary">
+      <!-- Header Banner -->
+      <div class="summary-header-banner">
+        <div class="summary-header-left">
+          <div class="summary-project-avatar" [style.background]="getBoardBackground()">
+            {{ (project()?.name || 'P')[0] | uppercase }}
+          </div>
+          <div class="summary-project-meta">
+            <div class="summary-title-row">
+              <h2 class="summary-project-title">{{ project()?.name || 'Project Overview' }}</h2>
+              <span class="summary-key-badge" *ngIf="project()?.key">{{ project()?.key }}</span>
+              <span class="summary-status-badge" [class]="(project()?.status || 'ACTIVE').toLowerCase()">
+                {{ project()?.status || 'ACTIVE' }}
+              </span>
+            </div>
+            <p class="summary-project-desc" *ngIf="project()?.description">{{ project()?.description }}</p>
+            <div class="summary-meta-pills">
+              <span class="meta-pill" *ngIf="project()?.client">
+                <svg lucideBuilding size="13"></svg> {{ project()?.client?.name }}
+              </span>
+              <span class="meta-pill" *ngIf="project()?.department">
+                <svg lucideFolder size="13"></svg> {{ project()?.department?.name }}
+              </span>
+              <span class="meta-pill" *ngIf="projectOwner()">
+                <svg lucideUser size="13"></svg> Owner: {{ projectOwner()?.firstName }} {{ projectOwner()?.lastName }}
+              </span>
+              <span class="meta-pill" *ngIf="project()?.billingType">
+                <svg lucideBanknote size="13"></svg> {{ project()?.billingType }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="summary-header-actions">
+          <button type="button" class="btn-summary-action primary" (click)="setProjectTab('board')">
+            <svg lucideKanban size="15"></svg> Open Board
+          </button>
+          <button type="button" class="btn-summary-action" (click)="setProjectTab('list')">
+            <svg lucideList size="15"></svg> View List
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Metric Cards -->
       <div class="summary-metrics-grid">
         <div class="summary-metric-card">
-          <div class="metric-icon-box"><svg lucideCheck size="16"></svg></div>
+          <div class="metric-icon-box emerald">
+            <svg lucideCheckCircle2 size="22"></svg>
+          </div>
           <div class="metric-details">
-            <span class="metric-val">{{ projectSummary()?.metrics?.completedLast7Days }} completed</span>
-            <span class="metric-sub">in the last 7 days</span>
+            <span class="metric-val">{{ projectSummary()?.metrics?.completedLast7Days || 0 }}</span>
+            <span class="metric-sub">Completed in last 7 days</span>
           </div>
         </div>
         <div class="summary-metric-card">
-          <div class="metric-icon-box"><svg lucidePencil size="16"></svg></div>
+          <div class="metric-icon-box blue">
+            <svg lucideActivity size="22"></svg>
+          </div>
           <div class="metric-details">
-            <span class="metric-val">{{ projectSummary()?.metrics?.updatedLast7Days }} updated</span>
-            <span class="metric-sub">in the last 7 days</span>
+            <span class="metric-val">{{ projectSummary()?.metrics?.updatedLast7Days || 0 }}</span>
+            <span class="metric-sub">Updated in last 7 days</span>
           </div>
         </div>
         <div class="summary-metric-card">
-          <div class="metric-icon-box"><svg lucideCheckSquare size="16"></svg></div>
+          <div class="metric-icon-box purple">
+            <svg lucideSparkles size="22"></svg>
+          </div>
           <div class="metric-details">
-            <span class="metric-val">{{ projectSummary()?.metrics?.createdLast7Days }} created</span>
-            <span class="metric-sub">in the last 7 days</span>
+            <span class="metric-val">{{ projectSummary()?.metrics?.createdLast7Days || 0 }}</span>
+            <span class="metric-sub">Created in last 7 days</span>
           </div>
         </div>
         <div class="summary-metric-card">
-          <div class="metric-icon-box"><svg lucideCalendar size="16"></svg></div>
+          <div class="metric-icon-box amber">
+            <svg lucideCalendar size="22"></svg>
+          </div>
           <div class="metric-details">
-            <span class="metric-val">{{ projectSummary()?.metrics?.dueSoonNext7Days }} due soon</span>
-            <span class="metric-sub">in the next 7 days</span>
+            <span class="metric-val">{{ projectSummary()?.metrics?.dueSoonNext7Days || 0 }}</span>
+            <span class="metric-sub">Due in next 7 days</span>
           </div>
         </div>
       </div>
@@ -534,37 +583,37 @@
         <div class="summary-col-left">
           
           <!-- Budget & Billing -->
-          <div class="summary-panel" *ngIf="project()?.billingType !== 'NON_BILLABLE'">
+          <div class="summary-panel" *ngIf="project()?.billingType && project()?.billingType !== 'NON_BILLABLE'">
             <div class="summary-panel-header">
-              <h3>Budget & Billing</h3>
-              <p>Track project financials and tracked time.</p>
+              <div>
+                <h3><svg lucideBanknote size="18" class="text-primary"></svg> Budget & Billing</h3>
+                <p>Track project financials, consumption, and tracked time.</p>
+              </div>
             </div>
-            <div class="summary-status-body" style="padding: 16px;">
+            <div class="budget-billing-body">
               
-              <div *ngIf="project()?.billingType === 'FIXED'" style="margin-bottom: 16px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <span style="font-weight: 500;">Fixed Budget</span>
-                  <span class="font-mono text-primary" style="font-weight: 600;">{{ project()?.budgetAmount | currency }}</span>
+              <div *ngIf="project()?.billingType === 'FIXED'">
+                <div class="budget-metric-row">
+                  <span class="budget-metric-label">Allocated Project Budget</span>
+                  <span class="budget-metric-value text-primary">{{ project()?.budgetAmount | currency:'INR':'symbol':'1.0-0' }}</span>
                 </div>
-                <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
-                  <!-- Mock progress for now -->
-                  <div style="height: 100%; background: #10b981; width: 45%;"></div>
+                <div class="budget-progress-track">
+                  <div class="budget-progress-bar" style="width: 45%;"></div>
                 </div>
-                <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: var(--text-muted);">
+                <div class="budget-sub-stats">
                   <span>45% consumed</span>
-                  <span>{{ (project()?.budgetAmount * 0.55) | currency }} remaining</span>
+                  <span>{{ (project()?.budgetAmount * 0.55) | currency:'INR':'symbol':'1.0-0' }} remaining</span>
                 </div>
               </div>
 
-              <div *ngIf="project()?.billingType === 'HOURLY'" style="display: flex; justify-content: space-between; align-items: center;">
+              <div *ngIf="project()?.billingType === 'HOURLY'" class="budget-hourly-row">
                 <div>
-                  <div style="font-size: 12px; color: var(--text-muted);">Hourly Rate</div>
-                  <div style="font-weight: 600; font-size: 16px;" class="font-mono">{{ project()?.hourlyRate | currency }}/hr</div>
+                  <div style="font-size: 12px; color: #64748b; font-weight: 500;">Hourly Rate</div>
+                  <div style="font-weight: 700; font-size: 18px; color: #0f172a; font-family: ui-monospace, monospace;">{{ project()?.hourlyRate | currency:'INR':'symbol':'1.0-0' }}/hr</div>
                 </div>
-                <!-- This will be populated dynamically once time logs are pulled in summary -->
                 <div style="text-align: right;">
-                  <div style="font-size: 12px; color: var(--text-muted);">Billable Time Logged</div>
-                  <div style="font-weight: 600; font-size: 16px;" class="text-primary font-mono">12.5 hrs</div>
+                  <div style="font-size: 12px; color: #64748b; font-weight: 500;">Billable Time Logged</div>
+                  <div style="font-weight: 700; font-size: 18px; color: #2563eb; font-family: ui-monospace, monospace;">{{ projectSummary()?.timeTracking?.loggedHours || 0 }} hrs</div>
                 </div>
               </div>
 
@@ -574,21 +623,31 @@
           <!-- Status overview -->
           <div class="summary-panel">
             <div class="summary-panel-header">
-              <h3>Status overview</h3>
-              <p>Get a snapshot of the status of your work items. <a href="javascript:void(0)" (click)="setProjectTab('board')">View all work items</a></p>
+              <div>
+                <h3><svg lucideKanban size="18" class="text-primary"></svg> Status Overview</h3>
+                <p>Snapshot of work items across stages.</p>
+              </div>
+              <a href="javascript:void(0)" (click)="setProjectTab('board')">View board &rarr;</a>
             </div>
             <div class="summary-status-body">
               <div class="donut-chart-wrapper">
                 <div class="donut-chart" [style.background]="donutGradient">
                   <div class="donut-hole">
                     <span class="donut-total">{{ summaryTotalItems }}</span>
-                    <span class="donut-label">Total items</span>
+                    <span class="donut-label">Work Items</span>
                   </div>
                 </div>
               </div>
               <div class="donut-legend">
                 <div class="legend-item" *ngFor="let stat of projectSummary()?.statusOverview">
-                  <span class="legend-color" [style.background-color]="getStatusColor(stat.status)"></span> {{ stat.status }}: {{ stat.count }}
+                  <div class="legend-item-left">
+                    <span class="legend-color" [style.background-color]="getStatusColor(stat.status)"></span>
+                    <span class="legend-status-name">{{ formatStatusName(stat.status) }}</span>
+                  </div>
+                  <div class="legend-item-right">
+                    <span class="legend-count">{{ stat.count }}</span>
+                    <span class="legend-pct">{{ getStatusPercentage(stat.count) }}%</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -597,32 +656,40 @@
           <!-- Team workload -->
           <div class="summary-panel">
             <div class="summary-panel-header">
-              <h3>Team workload</h3>
-              <p>Monitor the capacity of your team. <a href="javascript:void(0)" (click)="setProjectTab('board')">Reassign work items to get the right balance</a></p>
+              <div>
+                <h3><svg lucideUsers size="18" class="text-primary"></svg> Team Workload</h3>
+                <p>Task capacity and workload balance among assignees.</p>
+              </div>
+              <a href="javascript:void(0)" (click)="setProjectTab('board')">Rebalance work &rarr;</a>
             </div>
             <div class="workload-list">
               <div class="workload-header-row">
                 <span>Assignee</span>
-                <span>Work distribution</span>
+                <span>Work Distribution</span>
               </div>
-              <div class="workload-row cursor-pointer hover:bg-gray-50 transition-colors" *ngFor="let item of projectSummary()?.teamWorkload; let i = index" (click)="openWorkloadModal(item.assigneeId, item.name)">
+              <div class="workload-row cursor-pointer" *ngFor="let item of projectSummary()?.teamWorkload; let i = index" (click)="openWorkloadModal(item.assigneeId, item.name)">
                 <div class="workload-assignee">
-                  <img *ngIf="item.avatarUrl" [src]="item.avatarUrl" class="assignee-avatar" alt="Avatar" style="align-self: flex-start; margin-top: 2px;">
-                  <div *ngIf="!item.avatarUrl" class="assignee-fallback" style="align-self: flex-start; margin-top: 2px;"><svg lucideUsers size="14"></svg></div>
-                  <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <span>{{ item.name }}</span>
-                    <span style="font-size: 11px; background: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; font-weight: 600; width: fit-content;">
+                  <img *ngIf="item.avatarUrl" [src]="item.avatarUrl" class="assignee-avatar" alt="Avatar">
+                  <div *ngIf="!item.avatarUrl" class="assignee-fallback">
+                    {{ (item.name || 'U')[0] | uppercase }}
+                  </div>
+                  <div class="workload-assignee-info">
+                    <span class="workload-assignee-name" [title]="item.name">{{ item.name }}</span>
+                    <span class="workload-task-pill">
                       {{ item.count }} task{{ item.count !== 1 ? 's' : '' }}
                     </span>
                   </div>
                 </div>
                 <div class="workload-bar-wrapper">
                   <div class="workload-bar">
-                    <!-- Basic calculation for demo: (item.count / total) * 100 -->
                     <div class="workload-bar-fill" [style.width.%]="(item.count / (summaryTotalItems || 1)) * 100" [style.background-color]="getAssigneeColor(i)"></div>
                   </div>
                   <span class="workload-pct">{{ ((item.count / (summaryTotalItems || 1)) * 100).toFixed(0) }}%</span>
                 </div>
+              </div>
+              <div class="summary-empty-state" *ngIf="!projectSummary()?.teamWorkload?.length">
+                <svg lucideUsers size="28" style="color: #94a3b8;"></svg>
+                <span>No active assignees on this project.</span>
               </div>
             </div>
           </div>
@@ -630,16 +697,29 @@
           <!-- Priority breakdown -->
           <div class="summary-panel">
             <div class="summary-panel-header">
-              <h3>Priority breakdown</h3>
-              <p>Get a holistic view of how work is being prioritized.</p>
+              <div>
+                <h3><svg lucideTrendingUp size="18" class="text-primary"></svg> Priority Breakdown</h3>
+                <p>Workload categorization by urgency and impact.</p>
+              </div>
             </div>
-            <div class="priority-chart-container">
-              <!-- Placeholder for Bar Chart using CSS flex -->
-              <div class="priority-bars">
-                <div class="priority-bar-col" *ngFor="let p of projectSummary()?.priorityBreakdown">
-                  <div class="priority-bar-fill" [style.height.%]="(p.count / (summaryTotalItems || 1)) * 100" [style.background-color]="getPriorityColor(p.priority)"></div>
-                  <div class="priority-label">{{ p.priority }}</div>
+            <div class="priority-list">
+              <div class="priority-row" *ngFor="let p of projectSummary()?.priorityBreakdown">
+                <div class="priority-meta-row">
+                  <span class="priority-badge-label">
+                    <span class="priority-dot" [style.background-color]="getPriorityColor(p.priority)"></span>
+                    {{ p.priority }}
+                  </span>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="priority-count-badge">{{ p.count }} task{{ p.count !== 1 ? 's' : '' }}</span>
+                    <span style="font-size: 12px; font-weight: 600; color: #64748b;">{{ getPriorityPercentage(p.count) }}%</span>
+                  </div>
                 </div>
+                <div class="priority-bar-track">
+                  <div class="priority-bar-fill" [style.width.%]="(p.count / (summaryTotalItems || 1)) * 100" [style.background-color]="getPriorityColor(p.priority)"></div>
+                </div>
+              </div>
+              <div class="summary-empty-state" *ngIf="!projectSummary()?.priorityBreakdown?.length">
+                <span>No priority breakdown data available.</span>
               </div>
             </div>
           </div>
@@ -648,38 +728,78 @@
 
         <!-- Right Column -->
         <div class="summary-col-right">
-          <!-- Recent activity -->
+          
+          <!-- Project Health & Quick Stats -->
           <div class="summary-panel">
-            <div class="summary-panel-header flex justify-between items-center">
+            <div class="summary-panel-header">
               <div>
-                <h3>Recent activity</h3>
-                <p>Stay up to date with what's happening across the space.</p>
+                <h3><svg lucideActivity size="18" class="text-primary"></svg> Project Health</h3>
+                <p>Overall completion progress and delivery velocity.</p>
               </div>
-              <button class="btn-icon-tiny"><svg lucideExternalLink size="14"></svg></button>
             </div>
-            <div class="activity-feed">
-              <div class="activity-item" *ngFor="let act of projectSummary()?.recentActivity">
-                <div class="activity-avatar">
-                  <img *ngIf="act.actor?.avatarUrl" [src]="act.actor?.avatarUrl">
-                  <span *ngIf="!act.actor?.avatarUrl">{{ getMemberInitials(act.actor) }}</span>
+            <div class="health-card-body">
+              <div class="health-completion-gauge">
+                <div class="gauge-info">
+                  <span class="gauge-title">Completion Rate</span>
+                  <span class="gauge-subtitle">{{ summaryCompletionRate }}% of deliverables finished</span>
                 </div>
-                <div class="activity-content">
-                  <p>
-                    <strong>{{ act.actor?.firstName }} {{ act.actor?.lastName }}</strong> 
-                    {{ act.action === 'CREATED' ? 'created' : act.action === 'STATUS_CHANGED' ? 'updated status of' : 'updated' }} 
-                    <span class="activity-issue-key cursor-pointer hover:underline" (click)="openIssueDetails(act.issue)"><svg lucideCheckSquare size="12" class="inline"></svg> {{ act.issue?.key }}: {{ act.issue?.title }}</span>
-                  </p>
-                  <span class="activity-time">{{ act.createdAt | date:'short' }}</span>
+                <span class="gauge-pct">{{ summaryCompletionRate }}%</span>
+              </div>
+              <div class="health-stat-pill-grid">
+                <div class="health-stat-pill">
+                  <span class="health-stat-title">Total Tasks</span>
+                  <span class="health-stat-number">{{ summaryTotalItems }}</span>
+                </div>
+                <div class="health-stat-pill">
+                  <span class="health-stat-title">Team Members</span>
+                  <span class="health-stat-number">{{ (project()?.members?.length || 0) + (projectOwner() ? 1 : 0) }}</span>
                 </div>
               </div>
             </div>
           </div>
+
+          <!-- Recent activity -->
+          <div class="summary-panel">
+            <div class="summary-panel-header">
+              <div>
+                <h3><svg lucideClock size="18" class="text-primary"></svg> Recent Activity</h3>
+                <p>Real-time audit log of team actions.</p>
+              </div>
+            </div>
+            <div class="activity-feed">
+              <div class="activity-item" *ngFor="let act of projectSummary()?.recentActivity">
+                <div class="activity-avatar">
+                  <img *ngIf="act.actor?.avatarUrl" [src]="act.actor?.avatarUrl" alt="Avatar">
+                  <span *ngIf="!act.actor?.avatarUrl">{{ getMemberInitials(act.actor) }}</span>
+                </div>
+                <div class="activity-content">
+                  <p class="activity-text">
+                    <span class="activity-actor">{{ act.actor?.firstName }} {{ act.actor?.lastName }}</span> 
+                    {{ act.action === 'CREATED' ? 'created' : act.action === 'STATUS_CHANGED' ? 'updated status of' : 'updated' }} 
+                    <span class="activity-issue-key cursor-pointer" (click)="openIssueDetails(act.issue)">
+                      <svg lucideCheckSquare size="12" class="inline"></svg>
+                      {{ act.issue?.key }}: {{ act.issue?.title }}
+                    </span>
+                  </p>
+                  <span class="activity-time">{{ act.createdAt | date:'mediumDate' }} • {{ act.createdAt | date:'shortTime' }}</span>
+                </div>
+              </div>
+              <div class="summary-empty-state" *ngIf="!projectSummary()?.recentActivity?.length">
+                <svg lucideClock size="24" style="color: #94a3b8;"></svg>
+                <span>No recent activity logged for this project.</span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>
-    </ng-container>
+    </div>
     <ng-template #loadingSummary>
-      <div class="p-8 text-center text-gray-500">Loading summary...</div>
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 360px; gap: 12px; color: #64748b;">
+        <svg lucideClock size="32" class="animate-spin text-primary"></svg>
+        <span style="font-size: 14px; font-weight: 500;">Loading project summary...</span>
+      </div>
     </ng-template>
   </div>
 
@@ -840,7 +960,7 @@
        of "may this person see money". -->
   <!-- projectId is set from the route, so the guard keeps the required input
        from ever being bound undefined on a direct load of this tab. -->
-  <div class="milestones-panel" *ngIf="activeProjectTab() === 'milestones' && projectId" style="padding: 20px 24px;">
+  <div class="milestones-panel" *ngIf="activeProjectTab() === 'milestones' && projectId">
     <app-milestones-tab [projectId]="projectId" />
   </div>
 
@@ -2387,96 +2507,261 @@
 
       <!-- Time Tracking Section -->
       <div class="modal-time-tracking-section mb-6">
-        <div class="section-header">
-          <svg lucideClock size="18" class="header-icon"></svg>
-          <h3>Time Tracking</h3>
-        </div>
-
-        <div class="time-tracking-card">
-          <div class="time-tracking-stats-row">
-            <!-- Estimated -->
-            <div class="time-stat-box">
-              <span class="stat-label">Estimated</span>
-              <div class="stat-input-wrapper">
-                <input type="number" 
-                       class="time-est-input" 
-                       [ngModel]="issueForm.estimatedHours" 
-                       (ngModelChange)="issueForm.estimatedHours = $event; updateIssueDetails({ estimatedHours: $event })"
-                       placeholder="0"
-                       min="0"
-                       step="0.5">
-                <span class="stat-unit">h</span>
-              </div>
+        <div class="section-header time-tracking-header">
+          <div class="tt-header-left">
+            <div class="tt-header-icon-badge">
+              <svg lucideClock size="16"></svg>
             </div>
-
-            <div class="time-stat-divider"></div>
-
-            <!-- Logged -->
-            <div class="time-stat-box">
-              <span class="stat-label">Logged</span>
-              <div class="stat-value" [innerHTML]="getSafeHtml(selectedIssueTimeLogged().text)"></div>
-            </div>
-
-            <div class="time-stat-divider"></div>
-
-            <!-- Progress Bar -->
-            <div class="time-stat-box time-progress-box">
-              <div class="time-progress-header">
-                <span class="stat-label">Progress</span>
-                <span class="stat-percent">{{ Math.round(timeTrackingProgressPercent()) }}%</span>
-              </div>
-              <div class="time-progress-bar-bg">
-                <div class="time-progress-bar-fill" 
-                     [style.width.%]="timeTrackingProgressPercent()"
-                     [class.over-budget]="timeTrackingProgressPercent() >= 100">
-                </div>
-              </div>
+            <div class="tt-header-title-group">
+              <h3 class="tt-header-title">Time Tracking</h3>
+              <span class="tt-header-subtitle">Estimates & spent time</span>
             </div>
           </div>
 
-          <!-- Action Buttons Row -->
-          <div class="time-tracking-actions-row">
-            <button class="btn-timer-toggle" 
-                    [class.timer-running]="isTimerRunning()" 
-                    (click)="toggleTimeTimer()" 
-                    [disabled]="isTimerLoading()" 
-                    type="button">
-              <svg *ngIf="!isTimerRunning()" lucidePlay size="14"></svg>
-              <svg *ngIf="isTimerRunning()" lucideSquare size="14"></svg>
-              <span *ngIf="!isTimerRunning()">{{ isTimerLoading() ? 'Starting...' : 'Start Timer' }}</span>
-              <span *ngIf="isTimerRunning()">{{ isTimerLoading() ? 'Stopping...' : 'Stop Timer (' + activeTimerString() + ')' }}</span>
-            </button>
+          <div class="tt-header-right">
+            <!-- Active Timer Live Badge -->
+            <div *ngIf="isTimerRunning()" class="tt-live-ticker-badge">
+              <span class="tt-pulsing-dot"></span>
+              <span class="tt-ticker-text">Live: {{ activeTimerString() || '00:00:00' }}</span>
+            </div>
+            <!-- Status Badge when stopped -->
+            <div *ngIf="!isTimerRunning() && selectedIssueTimeEstimated().totalMin > 0" 
+                 class="tt-status-pill"
+                 [class.over-budget]="timeTrackingProgressPercent() >= 100"
+                 [class.near-budget]="timeTrackingProgressPercent() >= 80 && timeTrackingProgressPercent() < 100"
+                 [class.on-track]="timeTrackingProgressPercent() < 80">
+              <span *ngIf="timeTrackingProgressPercent() >= 100">Over Budget</span>
+              <span *ngIf="timeTrackingProgressPercent() >= 80 && timeTrackingProgressPercent() < 100">Near Budget</span>
+              <span *ngIf="timeTrackingProgressPercent() < 80">On Track</span>
+            </div>
+          </div>
+        </div>
 
-            <div class="relative">
-              <button class="btn-log-work-trigger" (click)="isTimeLogModalOpen.set(!isTimeLogModalOpen())" type="button">
-                <svg lucideClock size="14"></svg>
-                <span>Log Work</span>
-              </button>
-
-              <!-- Manual Log Work Popover -->
-              <div *ngIf="isTimeLogModalOpen()" class="trello-popover time-log-popover" (click)="$event.stopPropagation()">
-                <div class="popover-header">
-                  <span>Log Time</span>
-                  <button class="btn-icon-tiny" (click)="isTimeLogModalOpen.set(false)"><svg lucideX size="16"></svg></button>
+        <div class="time-tracking-body">
+          <div class="tt-premium-card">
+            <!-- 3 Stat Metrics Grid -->
+            <div class="tt-metrics-grid">
+              
+              <!-- Metric 1: Estimated -->
+              <div class="tt-metric-col">
+                <div class="tt-metric-header">
+                  <span class="tt-metric-label">Estimated</span>
+                  <span class="tt-metric-sub">Budget</span>
                 </div>
-                <div class="popover-body p-3">
-                  <div class="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                      <label class="checklist-popover-label">Hours</label>
-                      <input type="number" class="checklist-popover-input" [ngModel]="timeLogHours()" (ngModelChange)="timeLogHours.set($event)" placeholder="0" min="0">
-                    </div>
-                    <div>
-                      <label class="checklist-popover-label">Minutes</label>
-                      <input type="number" class="checklist-popover-input" [ngModel]="timeLogMinutes()" (ngModelChange)="timeLogMinutes.set($event)" placeholder="0" min="0" max="59">
-                    </div>
-                  </div>
-                  
-                  <button class="btn-trello-create-compact w-full" (click)="submitManualTimeLog()" [disabled]="isTimerLoading()" type="button">
-                    {{ isTimerLoading() ? 'Saving...' : 'Save Log' }}
-                  </button>
+                <div class="tt-input-group">
+                  <input type="number" 
+                         class="tt-hour-input" 
+                         [(ngModel)]="issueForm.estimatedHours" 
+                         (change)="updateEstimatedHours()"
+                         (blur)="updateEstimatedHours()"
+                         placeholder="0"
+                         min="0"
+                         step="0.5">
+                  <span class="tt-input-unit">hrs</span>
+                </div>
+                <!-- Quick Estimate Presets -->
+                <div class="tt-quick-chips">
+                  <button type="button" class="tt-chip" (click)="setEstimatePreset(1)" [class.active]="issueForm.estimatedHours === 1">1h</button>
+                  <button type="button" class="tt-chip" (click)="setEstimatePreset(2)" [class.active]="issueForm.estimatedHours === 2">2h</button>
+                  <button type="button" class="tt-chip" (click)="setEstimatePreset(4)" [class.active]="issueForm.estimatedHours === 4">4h</button>
+                  <button type="button" class="tt-chip" (click)="setEstimatePreset(8)" [class.active]="issueForm.estimatedHours === 8">8h</button>
+                </div>
+              </div>
+
+              <div class="tt-col-divider"></div>
+
+              <!-- Metric 2: Logged -->
+              <div class="tt-metric-col">
+                <div class="tt-metric-header">
+                  <span class="tt-metric-label">Logged</span>
+                  <span class="tt-metric-sub">{{ (selectedIssue()?.timeLogs?.length || 0) }} log(s)</span>
+                </div>
+                <div class="tt-metric-value-display">
+                  <span class="tt-val-big" [innerHTML]="getSafeHtml(selectedIssueTimeLogged().text)"></span>
+                </div>
+                <div class="tt-metric-subtext">
+                  <span *ngIf="selectedIssueTimeLogged().totalMin === 0" class="text-slate-400">No time logged yet</span>
+                  <span *ngIf="selectedIssueTimeLogged().totalMin > 0" class="text-slate-500 font-medium">
+                    {{ selectedIssueTimeLogged().totalMin }} mins total
+                  </span>
+                </div>
+              </div>
+
+              <div class="tt-col-divider"></div>
+
+              <!-- Metric 3: Remaining / Balance -->
+              <div class="tt-metric-col">
+                <div class="tt-metric-header">
+                  <span class="tt-metric-label">Remaining</span>
+                  <span class="tt-metric-sub">Balance</span>
+                </div>
+                <div class="tt-metric-value-display">
+                  <span class="tt-val-big" 
+                        [class.text-emerald-600]="!remainingTimeFormatted().isOver && selectedIssueTimeEstimated().totalMin > 0"
+                        [class.text-rose-600]="remainingTimeFormatted().isOver"
+                        [class.text-slate-400]="selectedIssueTimeEstimated().totalMin === 0">
+                    {{ remainingTimeFormatted().text }}
+                  </span>
+                </div>
+                <div class="tt-metric-subtext">
+                  <span [class.text-emerald-600]="!remainingTimeFormatted().isOver && selectedIssueTimeEstimated().totalMin > 0"
+                        [class.text-rose-600]="remainingTimeFormatted().isOver"
+                        [class.text-slate-400]="selectedIssueTimeEstimated().totalMin === 0">
+                    {{ remainingTimeFormatted().subtext }}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Progress Bar Section -->
+            <div class="tt-progress-section" *ngIf="selectedIssueTimeEstimated().totalMin > 0 || selectedIssueTimeLogged().totalMin > 0">
+              <div class="tt-progress-header">
+                <span class="tt-progress-label">
+                  <strong>{{ Math.round(timeTrackingProgressPercent()) }}%</strong> logged of {{ selectedIssueTimeEstimated().rawText }} estimate
+                </span>
+                <span class="tt-progress-ratio">
+                  {{ selectedIssueTimeLogged().rawText }} / {{ selectedIssueTimeEstimated().rawText }}
+                </span>
+              </div>
+              <div class="tt-progress-bar-bg">
+                <div class="tt-progress-bar-fill" 
+                     [style.width.%]="timeTrackingProgressPercent()"
+                     [class.over-budget]="timeTrackingProgressPercent() >= 100"
+                     [class.near-budget]="timeTrackingProgressPercent() >= 80 && timeTrackingProgressPercent() < 100">
                 </div>
               </div>
             </div>
+
+            <!-- Action Buttons Footer -->
+            <div class="tt-action-footer">
+              <div class="tt-action-left">
+                <!-- Live Timer Toggle Button -->
+                <button class="tt-btn-timer" 
+                        [class.timer-running]="isTimerRunning()" 
+                        (click)="toggleTimeTimer()" 
+                        [disabled]="isTimerLoading()" 
+                        type="button">
+                  <ng-container *ngIf="!isTimerRunning()">
+                    <svg lucidePlay size="14" class="fill-current"></svg>
+                    <span>{{ isTimerLoading() ? 'Starting...' : 'Start Timer' }}</span>
+                  </ng-container>
+                  <ng-container *ngIf="isTimerRunning()">
+                    <span class="tt-btn-pulse-dot"></span>
+                    <svg lucideSquare size="14" class="fill-current"></svg>
+                    <span>{{ isTimerLoading() ? 'Stopping...' : 'Stop Timer' }}</span>
+                    <span class="tt-btn-timer-time">({{ activeTimerString() }})</span>
+                  </ng-container>
+                </button>
+
+                <!-- Log Work Trigger Button with Popover -->
+                <div class="relative">
+                  <button class="tt-btn-log-work" 
+                          (click)="isTimeLogModalOpen.set(!isTimeLogModalOpen())" 
+                          type="button">
+                    <svg lucidePlus size="14"></svg>
+                    <span>Log Work</span>
+                  </button>
+
+                  <!-- Modern Log Work Popover -->
+                  <div *ngIf="isTimeLogModalOpen()" class="tt-popover-dropdown" (click)="$event.stopPropagation()">
+                    <div class="tt-popover-header">
+                      <div class="flex items-center gap-2">
+                        <svg lucideClock size="15" class="text-blue-600"></svg>
+                        <span class="font-semibold text-slate-800 text-xs">Log Spent Time</span>
+                      </div>
+                      <button class="tt-btn-icon-close" (click)="isTimeLogModalOpen.set(false)" type="button">
+                        <svg lucideX size="14"></svg>
+                      </button>
+                    </div>
+
+                    <div class="tt-popover-body">
+                      <!-- Quick Presets -->
+                      <div class="mb-3">
+                        <div class="tt-popover-sublabel mb-1.5">Quick Duration</div>
+                        <div class="tt-popover-presets">
+                          <button type="button" class="tt-preset-pill" (click)="setTimeLogPreset(0, 15)">15m</button>
+                          <button type="button" class="tt-preset-pill" (click)="setTimeLogPreset(0, 30)">30m</button>
+                          <button type="button" class="tt-preset-pill" (click)="setTimeLogPreset(1, 0)">1h</button>
+                          <button type="button" class="tt-preset-pill" (click)="setTimeLogPreset(2, 0)">2h</button>
+                          <button type="button" class="tt-preset-pill" (click)="setTimeLogPreset(4, 0)">4h</button>
+                          <button type="button" class="tt-preset-pill" (click)="setTimeLogPreset(8, 0)">8h</button>
+                        </div>
+                      </div>
+
+                      <!-- Inputs Grid -->
+                      <div class="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                          <label class="tt-popover-label">Hours</label>
+                          <div class="tt-popover-input-wrapper">
+                            <input type="number" 
+                                   class="tt-popover-input" 
+                                   [ngModel]="timeLogHours()" 
+                                   (ngModelChange)="timeLogHours.set($event)" 
+                                   placeholder="0" 
+                                   min="0">
+                            <span class="tt-popover-unit">hr</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label class="tt-popover-label">Minutes</label>
+                          <div class="tt-popover-input-wrapper">
+                            <input type="number" 
+                                   class="tt-popover-input" 
+                                   [ngModel]="timeLogMinutes()" 
+                                   (ngModelChange)="timeLogMinutes.set($event)" 
+                                   placeholder="0" 
+                                   min="0" 
+                                   max="59">
+                            <span class="tt-popover-unit">min</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Save Button -->
+                      <button class="tt-btn-save-log" 
+                              (click)="submitManualTimeLog()" 
+                              [disabled]="isTimerLoading() || ((timeLogHours() || 0) <= 0 && (timeLogMinutes() || 0) <= 0)" 
+                              type="button">
+                        <svg lucideCheck size="14"></svg>
+                        <span>{{ isTimerLoading() ? 'Saving...' : 'Save Time Log' }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- History Toggle -->
+              <div class="tt-action-right" *ngIf="(selectedIssue()?.timeLogs?.length || 0) > 0">
+                <button type="button" 
+                        class="tt-btn-history-toggle" 
+                        (click)="showTimeLogsHistory.set(!showTimeLogsHistory())">
+                  <svg lucideHistory size="13"></svg>
+                  <span>{{ showTimeLogsHistory() ? 'Hide Logs' : 'View Logs (' + selectedIssue().timeLogs.length + ')' }}</span>
+                  <svg lucideChevronDown size="12" class="transition-transform duration-200" [class.rotate-180]="showTimeLogsHistory()"></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Time Log History Drawer (Collapsible) -->
+            <div *ngIf="showTimeLogsHistory() && (selectedIssue()?.timeLogs?.length || 0) > 0" class="tt-history-drawer">
+              <div class="tt-history-title">
+                <svg lucideHistory size="13"></svg>
+                <span>Logged Sessions History</span>
+              </div>
+              <div class="tt-history-list">
+                <div *ngFor="let log of selectedIssue().timeLogs" class="tt-history-item">
+                  <div class="tt-history-duration">
+                    <svg lucideClock size="12" class="text-blue-500"></svg>
+                    <span>{{ formatDurationMin(log.durationMin) }}</span>
+                  </div>
+                  <div class="tt-history-date">
+                    <span>{{ formatTimeLogDate(log.startedAt || log.createdAt) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

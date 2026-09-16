@@ -20,7 +20,8 @@ import {
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
   LucideFileUp, LucideUpload,
-  LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle
+  LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
+  LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { SocketService } from '../../services/socket.service';
@@ -51,6 +52,7 @@ declare var Quill: any;
     LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
     LucideFileUp, LucideUpload,
     LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
+    LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory,
     AgGridAngular
   ],
   templateUrl: './project-detail.html',
@@ -560,6 +562,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   timeLogHours = signal<number | null>(null);
   timeLogMinutes = signal<number | null>(null);
   isTimerLoading = signal<boolean>(false);
+  showTimeLogsHistory = signal<boolean>(false);
 
   // Moving / Updating Issue Loader State
   updatingIssueIds = signal<Set<number>>(new Set());
@@ -610,6 +613,33 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const est = this.selectedIssueTimeEstimated().totalMin;
     if (est === 0) return 0;
     return Math.min(100, (logged / est) * 100);
+  });
+
+  remainingTimeFormatted = computed(() => {
+    const est = this.selectedIssueTimeEstimated().totalMin;
+    const logged = this.selectedIssueTimeLogged().totalMin;
+    if (est === 0) {
+      return { text: '—', subtext: 'No estimate set', isOver: false, remainingMin: 0 };
+    }
+    const diff = est - logged;
+    if (diff > 0) {
+      const h = Math.floor(diff / 60);
+      const m = diff % 60;
+      let text = '';
+      if (h > 0) text += `${h}h `;
+      if (m > 0 || h === 0) text += `${m}m`;
+      return { text: text.trim() + ' left', subtext: 'Within budget', isOver: false, remainingMin: diff };
+    } else if (diff < 0) {
+      const overMin = Math.abs(diff);
+      const h = Math.floor(overMin / 60);
+      const m = overMin % 60;
+      let text = '+';
+      if (h > 0) text += `${h}h `;
+      if (m > 0 || h === 0) text += `${m}m`;
+      return { text: text.trim() + ' over', subtext: 'Over budget', isOver: true, remainingMin: diff };
+    } else {
+      return { text: '0m left', subtext: 'Exact budget met', isOver: false, remainingMin: 0 };
+    }
   });
 
   isTimerRunning = computed(() => {
@@ -822,6 +852,45 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       
     }).catch(() => this.toast.error('Failed to log time'))
     .finally(() => this.isTimerLoading.set(false));
+  }
+
+  updateEstimatedHours() {
+    const val = this.issueForm.estimatedHours !== null && this.issueForm.estimatedHours !== undefined 
+      ? Number(this.issueForm.estimatedHours) 
+      : 0;
+    this.updateIssueDetails({ estimatedHours: val });
+  }
+
+  setEstimatePreset(hours: number) {
+    this.issueForm.estimatedHours = hours;
+    this.updateIssueDetails({ estimatedHours: hours });
+  }
+
+  setTimeLogPreset(hours: number, minutes: number) {
+    this.timeLogHours.set(hours);
+    this.timeLogMinutes.set(minutes);
+  }
+
+  formatDurationMin(durationMin: number): string {
+    if (!durationMin) return '0m';
+    const h = Math.floor(durationMin / 60);
+    const m = durationMin % 60;
+    let s = '';
+    if (h > 0) s += `${h}h `;
+    if (m > 0 || h === 0) s += `${m}m`;
+    return s.trim();
+  }
+
+  formatTimeLogDate(dateStr: any): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   }
 
   onRoadmapBarDragEnd(event: CdkDragEnd, issue: any) {
@@ -1346,6 +1415,39 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
 
     return `conic-gradient(${gradientParts.join(', ')})`;
+  }
+
+  get summaryCompletionRate(): number {
+    const summary = this.projectSummary();
+    if (!summary || !summary.statusOverview || summary.statusOverview.length === 0) return 0;
+    const total = this.summaryTotalItems;
+    if (!total) return 0;
+    const done = summary.statusOverview.find(s => s.status === 'DONE')?.count || 0;
+    return Math.round((done / total) * 100);
+  }
+
+  formatStatusName(status: string): string {
+    const names: Record<string, string> = {
+      'TODO': 'To Do',
+      'IN_PROGRESS': 'In Progress',
+      'IN_REVIEW': 'In Review',
+      'DONE': 'Done',
+      'CANCELLED': 'Cancelled',
+      'ON_HOLD': 'On Hold'
+    };
+    return names[status] || status.replace(/_/g, ' ');
+  }
+
+  getStatusPercentage(count: number): number {
+    const total = this.summaryTotalItems;
+    if (!total) return 0;
+    return Math.round((count / total) * 100);
+  }
+
+  getPriorityPercentage(count: number): number {
+    const total = this.summaryTotalItems;
+    if (!total) return 0;
+    return Math.round((count / total) * 100);
   }
 
   loadProjectDetails() {
