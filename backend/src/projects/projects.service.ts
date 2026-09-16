@@ -503,6 +503,9 @@ export class ProjectsService {
           include: {
             employee: { select: { firstName: true, lastName: true, avatarUrl: true } }
           }
+        },
+        client: {
+          select: { id: true, name: true }
         }
       }
     });

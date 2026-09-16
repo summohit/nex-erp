@@ -24,6 +24,7 @@ import {
 import { AuthService } from '../../services/auth.service';
 import { SocketService } from '../../services/socket.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { MasterDataService } from '../../services/master-data.service';
 
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -66,6 +67,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private socketService = inject(SocketService);
   private fieldVisitsService = inject(FieldVisitsService);
   private http = inject(HttpClient);
+  private masterDataService = inject(MasterDataService);
 
   Math = Math;
   paginationPageSizeSelector = [10, 25, 50, 100];
@@ -516,6 +518,132 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       issues = issues.filter(i => this.listFilterPriorities().includes(i.priority));
     }
 
+    // ── Filter Pipeline filters ──
+    // Date filter (start date range)
+    if (this.fdDateOn() && this.fdStartDate()) {
+      const from = new Date(this.fdStartDate()!).getTime();
+      issues = issues.filter(i => {
+        if (!i.startDate) return false;
+        const d = new Date(i.startDate).getTime();
+        return !isNaN(d) && d >= from;
+      });
+    }
+
+    // Type
+    if (this.fdType()) {
+      issues = issues.filter(i => i.type === this.fdType());
+    }
+
+    // Project
+    if (this.fdProjectId()) {
+      issues = issues.filter(i => i.projectId === this.fdProjectId());
+    }
+
+    // Client — issues have no direct client; map through issues' project
+    if (this.fdClientId()) {
+      const proj = this.fdAllProjects();
+      const projClient = new Map<number, number>();
+      proj.forEach((p: any) => { if (p.clientId) projClient.set(p.id, p.clientId); });
+      issues = issues.filter(i => projClient.get(i.projectId) === this.fdClientId());
+    }
+
+    // Assigned To
+    if (this.fdAssignToIds().length > 0) {
+      const sel = this.fdAssignToIds();
+      issues = issues.filter(i =>
+        (i.assigneeId && sel.includes(i.assigneeId)) ||
+        (i.members && i.members.some((m: any) => sel.includes(m.employeeId)))
+      );
+    }
+
+    // Assigned By (reporter)
+    if (this.fdAssignByIds().length > 0) {
+      const sel = this.fdAssignByIds();
+      issues = issues.filter(i => i.reporterId && sel.includes(i.reporterId));
+    }
+
+    // Labels
+    if (this.fdLabelIds().length > 0) {
+      const sel = this.fdLabelIds();
+      issues = issues.filter(i =>
+        i.labels && i.labels.some((il: any) => sel.includes(il.labelId || il.label?.id))
+      );
+    }
+
+    // Priority (pipeline single-select)
+    if (this.fdPriority()) {
+      issues = issues.filter(i => i.priority === this.fdPriority());
+    }
+
+    // Task Category
+    if (this.fdTaskCategoryId()) {
+      issues = issues.filter(i => i.taskTypeId === this.fdTaskCategoryId());
+    }
+
+    // ── Column-aligned pipeline filters ──
+    // ID (matches grid "ID" column → issue key)
+    if (this.fdIssueKey().trim()) {
+      const q = this.fdIssueKey().trim().toLowerCase();
+      issues = issues.filter(i => i.key && i.key.toLowerCase().includes(q));
+    }
+
+    // Task name (matches grid "Task" column → title)
+    if (this.fdTaskName().trim()) {
+      const q = this.fdTaskName().trim().toLowerCase();
+      issues = issues.filter(i => i.title && i.title.toLowerCase().includes(q));
+    }
+
+    // List (matches grid "List" column → board columnId)
+    if (this.fdColumnIds().length > 0) {
+      issues = issues.filter(i => this.fdColumnIds().includes(i.columnId));
+    }
+
+    // Status (matches grid "Status" column)
+    if (this.fdStatuses().length > 0) {
+      issues = issues.filter(i => this.fdStatuses().includes(i.status));
+    }
+
+    // Due Date (matches grid "Due Date" column — dueDate, falls back to startDate)
+    if (this.fdDueFrom() || this.fdDueTo()) {
+      const from = this.fdDueFrom() ? new Date(this.fdDueFrom()!).getTime() : null;
+      const to = this.fdDueTo() ? new Date(this.fdDueTo()!).getTime() : null;
+      issues = issues.filter(i => {
+        const due = i.dueDate ? new Date(i.dueDate).getTime() : (i.startDate ? new Date(i.startDate).getTime() : null);
+        if (!due || isNaN(due)) return false;
+        if (from !== null && due < from) return false;
+        if (to !== null && due > to + 86399999) return false;
+        return true;
+      });
+    }
+
+    // Created At (matches grid "Created At" column)
+    if (this.fdCreatedFrom() || this.fdCreatedTo()) {
+      const from = this.fdCreatedFrom() ? new Date(this.fdCreatedFrom()!).getTime() : null;
+      const to = this.fdCreatedTo() ? new Date(this.fdCreatedTo()!).getTime() : null;
+      issues = issues.filter(i => {
+        if (!i.createdAt) return false;
+        const d = new Date(i.createdAt).getTime();
+        if (isNaN(d)) return false;
+        if (from !== null && d < from) return false;
+        if (to !== null && d > to + 86399999) return false;
+        return true;
+      });
+    }
+
+    // Updated At (matches grid "Updated At" column)
+    if (this.fdUpdatedFrom() || this.fdUpdatedTo()) {
+      const from = this.fdUpdatedFrom() ? new Date(this.fdUpdatedFrom()!).getTime() : null;
+      const to = this.fdUpdatedTo() ? new Date(this.fdUpdatedTo()!).getTime() : null;
+      issues = issues.filter(i => {
+        if (!i.updatedAt) return false;
+        const d = new Date(i.updatedAt).getTime();
+        if (isNaN(d)) return false;
+        if (from !== null && d < from) return false;
+        if (to !== null && d > to + 86399999) return false;
+        return true;
+      });
+    }
+
     return issues;
   });
 
@@ -552,6 +680,145 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.listFilterColumnIds.set([]);
     this.listFilterPriorities.set([]);
     this.listFilterMyIssues.set(false);
+    this.fdDateOn.set(false);
+    this.fdStartDate.set(null);
+    this.fdType.set(null);
+    this.fdProjectId.set(null);
+    this.fdClientId.set(null);
+    this.fdAssignToIds.set([]);
+    this.fdAssignByIds.set([]);
+    this.fdLabelIds.set([]);
+    this.fdPriority.set(null);
+    this.fdTaskCategoryId.set(null);
+    this.fdIssueKey.set('');
+    this.fdTaskName.set('');
+    this.fdColumnIds.set([]);
+    this.fdStatuses.set([]);
+    this.fdDueFrom.set(null);
+    this.fdDueTo.set(null);
+    this.fdCreatedFrom.set(null);
+    this.fdCreatedTo.set(null);
+    this.fdUpdatedFrom.set(null);
+    this.fdUpdatedTo.set(null);
+  }
+
+  // ── Filter Pipeline Drawer ──────────────────────────────────────────────
+  showFilterDrawer = signal<boolean>(false);
+  fdDropdownOpen = signal<string | null>(null);
+
+  // Filter values
+  fdDateOn = signal<boolean>(false);
+  fdStartDate = signal<string | null>(null);
+  fdType = signal<string | null>(null);
+  fdProjectId = signal<number | null>(null);
+  fdClientId = signal<number | null>(null);
+  fdAssignToIds = signal<number[]>([]);
+  fdAssignByIds = signal<number[]>([]);
+  fdLabelIds = signal<number[]>([]);
+  fdPriority = signal<string | null>(null);
+  fdTaskCategoryId = signal<number | null>(null);
+
+  // Column-aligned pipeline filters (mirror the tasks grid columns)
+  fdIssueKey = signal<string>('');
+  fdTaskName = signal<string>('');
+  fdColumnIds = signal<number[]>([]);
+  fdStatuses = signal<string[]>([]);
+  fdDueFrom = signal<string | null>(null);
+  fdDueTo = signal<string | null>(null);
+  fdCreatedFrom = signal<string | null>(null);
+  fdCreatedTo = signal<string | null>(null);
+  fdUpdatedFrom = signal<string | null>(null);
+  fdUpdatedTo = signal<string | null>(null);
+
+  // Available options (loaded on drawer open)
+  fdAllProjects = signal<any[]>([]);
+  fdAllClients = signal<any[]>([]);
+  fdAllLabels = signal<any[]>([]);
+  fdAllTaskCategories = signal<any[]>([]);
+
+  fdActiveFilterCount = computed(() => {
+    let n = 0;
+    if (this.fdDateOn() && this.fdStartDate()) n++;
+    if (this.fdType()) n++;
+    if (this.fdProjectId()) n++;
+    if (this.fdClientId()) n++;
+    if (this.fdAssignToIds().length > 0) n++;
+    if (this.fdAssignByIds().length > 0) n++;
+    if (this.fdLabelIds().length > 0) n++;
+    if (this.fdPriority()) n++;
+    if (this.fdTaskCategoryId()) n++;
+    if (this.fdIssueKey().trim()) n++;
+    if (this.fdTaskName().trim()) n++;
+    if (this.fdColumnIds().length > 0) n++;
+    if (this.fdStatuses().length > 0) n++;
+    if (this.fdDueFrom() || this.fdDueTo()) n++;
+    if (this.fdCreatedFrom() || this.fdCreatedTo()) n++;
+    if (this.fdUpdatedFrom() || this.fdUpdatedTo()) n++;
+    return n;
+  });
+
+  loadFilterDrawerData() {
+    this.projectsService.getProjects().subscribe({ next: (p) => this.fdAllProjects.set(p || []) });
+    const projClient = this.project()?.client;
+    this.fdAllClients.set(projClient ? [projClient] : []);
+    if (!this.companyMembers().length) this.loadCompanyMembers();
+    const usedTaskTypes = new Set(
+      this.allIssues().map((i: any) => i.taskTypeId).filter((x: any) => !!x)
+    );
+    this.masterDataService.getTaskTypes().subscribe({ next: (t) => {
+      this.fdAllTaskCategories.set((t || []).filter((tc: any) => usedTaskTypes.has(tc.id)));
+    }});
+    this.projectsService.getLabels(this.projectId).subscribe({ next: (l) => this.fdAllLabels.set(l || []) });
+  }
+
+  toggleFilterDrawer() {
+    if (this.showFilterDrawer()) {
+      this.showFilterDrawer.set(false);
+      this.fdDropdownOpen.set(null);
+    } else {
+      if (!this.fdProjectId() && this.projectId) {
+        this.fdProjectId.set(this.projectId);
+      }
+      this.loadFilterDrawerData();
+      this.showFilterDrawer.set(true);
+      this.fdDropdownOpen.set(null);
+    }
+  }
+
+  toggleFdDropdown(name: string, event: MouseEvent) {
+    event.stopPropagation();
+    this.fdDropdownOpen.set(this.fdDropdownOpen() === name ? null : name);
+  }
+
+  fdSetSingle(signalRef: any, value: any) {
+    signalRef.set(signalRef() === value ? null : value);
+  }
+
+  fdToggleArray(signalRef: any, value: any) {
+    const cur = signalRef() as any[];
+    signalRef.set(cur.includes(value) ? cur.filter((x: any) => x !== value) : [...cur, value]);
+  }
+
+  closeFdDropdowns() {
+    this.fdDropdownOpen.set(null);
+  }
+
+  fdProjectName(id: number | null): string {
+    if (!id) return 'All';
+    const p = this.fdAllProjects().find(x => x.id === id);
+    return p ? p.name : '—';
+  }
+
+  fdClientName(id: number | null): string {
+    if (!id) return 'All';
+    const c = this.fdAllClients().find(x => x.id === id);
+    return c ? c.name : '—';
+  }
+
+  fdTaskCategoryName(id: number | null): string {
+    if (!id) return 'All';
+    const t = this.fdAllTaskCategories().find(x => x.id === id);
+    return t ? t.name : '—';
   }
 
   // Time Tracking State
