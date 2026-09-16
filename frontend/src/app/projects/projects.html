@@ -1502,7 +1502,7 @@
 
         <!-- Board Title -->
         <div class="cbm-field-group">
-          <label class="cbm-field-label">Board Title <span class="cbm-required">*</span></label>
+          <label class="cbm-field-label" data-field="name">Board Title <span class="cbm-required">*</span></label>
           <div class="cbm-input-wrapper">
             <input 
               type="text" 
@@ -1638,7 +1638,7 @@
           <!-- Category (Searchable Select Box) -->
           <div class="cbm-field-group">
             <div class="cbm-field-label-row">
-              <label class="cbm-field-label">Category <span class="cbm-required">*</span></label>
+              <label class="cbm-field-label" data-field="category">Category <span class="cbm-required">*</span></label>
             <span class="cbm-error-text" *ngIf="isRequiredMissing('category')">Category is required</span>
               <span class="cbm-field-hint-badge">Searchable</span>
             </div>
@@ -1707,7 +1707,7 @@
 
           <!-- Department (Searchable Select Box) -->
           <div class="cbm-field-group">
-            <label class="cbm-field-label">Department <span class="cbm-required">*</span></label>
+            <label class="cbm-field-label" data-field="departmentId">Department <span class="cbm-required">*</span></label>
             <span class="cbm-error-text" *ngIf="isRequiredMissing('departmentId')">Department is required</span>
             <div class="cbm-searchable-select" (click)="$event.stopPropagation()">
               <button 
@@ -1787,7 +1787,7 @@
 
         <div class="cbm-fields-grid-3">
           <div class="cbm-field-group">
-            <label class="cbm-field-label">Start Date <span class="cbm-required">*</span></label>
+            <label class="cbm-field-label" data-field="startDate">Start Date <span class="cbm-required">*</span></label>
             <span class="cbm-error-text" *ngIf="isRequiredMissing('startDate')">Start Date is required</span>
             <input 
               type="date" 
@@ -1797,7 +1797,7 @@
           </div>
 
           <div class="cbm-field-group">
-            <label class="cbm-field-label">Deadline <span class="cbm-required">*</span></label>
+            <label class="cbm-field-label" data-field="endDate">Deadline <span class="cbm-required">*</span></label>
             <span class="cbm-error-text" *ngIf="isRequiredMissing('endDate')">Deadline is required</span>
             <input 
               type="date" 
@@ -1828,7 +1828,7 @@
         </div>
 
         <div class="cbm-field-group">
-          <label class="cbm-field-label">Project Managers <span class="cbm-required">*</span></label>
+          <label class="cbm-field-label" data-field="pmIds">Project Managers <span class="cbm-required">*</span></label>
           <div class="cbm-searchable-select" (click)="$event.stopPropagation()">
             <!-- Multi-select trigger -->
             <div 
@@ -1911,7 +1911,7 @@
              managers who own it. Stored as ProjectMember MEMBER rows; anyone
              picked in both lists keeps the higher role. -->
         <div class="cbm-field-group">
-          <label class="cbm-field-label">Assigned Users <span class="cbm-required">*</span></label>
+          <label class="cbm-field-label" data-field="memberIds">Assigned Users <span class="cbm-required">*</span></label>
           <div class="cbm-searchable-select" (click)="$event.stopPropagation()">
             <div
               class="cbm-select-trigger cbm-multi-trigger"
@@ -2000,10 +2000,11 @@
 
         <div class="cbm-field-group">
           <label class="cbm-field-label">Attachments</label>
-          <label class="cbm-file-drop">
-            <svg lucideUploadCloud size="18"></svg>
-            <span>Choose scope documents, proposals, agreements…</span>
-            <input type="file" multiple hidden (change)="onStagedFilesPicked($event)" />
+          <label class="cbm-file-drop" [class.is-busy]="stagedUploading()">
+            <svg *ngIf="!stagedUploading()" lucideUploadCloud size="18"></svg>
+            <svg *ngIf="stagedUploading()" lucideLoader2 size="18" class="cbm-upload-spinner"></svg>
+            <span>{{ stagedUploading() ? 'Uploading…' : 'Choose scope documents, proposals, agreements…' }}</span>
+            <input type="file" multiple hidden [disabled]="stagedUploading()" (change)="onStagedFilesPicked($event)" />
           </label>
 
           <!-- Already uploaded. Renaming and deleting take effect immediately;
@@ -2168,16 +2169,28 @@
 
     </div>
 
+    <!-- Blocks the form while files go up. The project row is already saved
+         at this point, so closing mid-upload would leave attachments half
+         written with nothing on screen saying so. -->
+    <div class="cbm-upload-overlay" *ngIf="stagedUploading()">
+      <div class="cbm-upload-card">
+        <svg lucideLoader2 size="26" class="cbm-upload-spinner"></svg>
+        <strong>Uploading {{ stagedFiles().length }} file{{ stagedFiles().length === 1 ? '' : 's' }}…</strong>
+        <span>Please keep this window open until it finishes.</span>
+      </div>
+    </div>
+
     <!-- Modal Sticky Footer -->
     <div class="cbm-footer">
-      <button type="button" class="cbm-btn-cancel" (click)="closeCreateModal()">Cancel</button>
+      <button type="button" class="cbm-btn-cancel" [disabled]="stagedUploading()" (click)="closeCreateModal()">Cancel</button>
       <button 
         type="button" 
         class="cbm-btn-submit" 
-        [disabled]="!projectForm.name.trim() || isDateRangeInvalid()"
+        [disabled]="stagedUploading() || !projectForm.name.trim() || isDateRangeInvalid()"
         (click)="saveProject()">
-        <svg lucideCheck size="16"></svg>
-        <span>{{ editingProjectId() ? 'Save Changes' : 'Create Board' }}</span>
+        <svg *ngIf="!stagedUploading()" lucideCheck size="16"></svg>
+        <svg *ngIf="stagedUploading()" lucideLoader2 size="16" class="cbm-upload-spinner"></svg>
+        <span>{{ stagedUploading() ? 'Uploading…' : (editingProjectId() ? 'Save Changes' : 'Create Board') }}</span>
       </button>
     </div>
 

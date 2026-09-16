@@ -606,6 +606,9 @@
 }
 
 .cbm-card {
+  /* Anchors .cbm-upload-overlay, which covers the whole modal while files
+     are being uploaded. */
+  position: relative;
   width: 720px;
   max-width: 95vw;
   max-height: 90vh;
@@ -4864,4 +4867,55 @@
 .cbm-staged-remove.cbm-ok:hover {
   border-color: #86efac;
   color: #166534;
+}
+
+/* ── Upload in progress ───────────────────────────────────────────────── */
+
+/* The project row is saved before its files go up, so the modal has to stay
+   put until they finish — closing mid-upload loses attachments silently. */
+.cbm-upload-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(2px);
+}
+
+.cbm-upload-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 34px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  text-align: center;
+}
+
+.cbm-upload-card strong { font-size: 14.5px; color: #0f172a; }
+.cbm-upload-card span   { font-size: 12.5px; color: #64748b; }
+
+.cbm-upload-spinner {
+  color: #2563eb;
+  animation: cbm-spin 0.9s linear infinite;
+}
+
+@keyframes cbm-spin {
+  to { transform: rotate(360deg); }
+}
+
+.cbm-file-drop.is-busy {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.cbm-btn-submit:disabled,
+.cbm-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

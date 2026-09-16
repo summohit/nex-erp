@@ -13,7 +13,7 @@ import {
   LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
   LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
   LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
-  LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity
+  LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
@@ -78,7 +78,7 @@ function getStatusColors(status: string): { bg: string; color: string } {
     LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
     LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
     LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
-    LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity,
+    LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity,
     AgGridModule
   ],
   templateUrl: './projects.html',
@@ -1237,21 +1237,50 @@ export class ProjectsComponent implements OnInit {
    * Names all of them at once: sending someone round the form one error at a
    * time is worse than one message listing what is left.
    */
+  /**
+   * Required fields in the order they appear on the form, so "the first one
+   * missing" is also the first one the user would scroll past.
+   */
+  private readonly REQUIRED_FIELDS: { anchor: string; label: string; isMissing: () => boolean }[] = [
+    { anchor: 'name',         label: 'Board title',     isMissing: () => !this.projectForm.name.trim() },
+    { anchor: 'category',     label: 'Category',        isMissing: () => !this.projectForm.category?.trim() },
+    { anchor: 'departmentId', label: 'Department',      isMissing: () => !this.projectForm.departmentId },
+    { anchor: 'startDate',    label: 'Start date',      isMissing: () => !this.projectForm.startDate },
+    { anchor: 'endDate',      label: 'Deadline',        isMissing: () => !this.projectForm.endDate },
+    { anchor: 'pmIds',        label: 'Project manager', isMissing: () => this.projectForm.pmIds.length === 0 },
+    { anchor: 'memberIds',    label: 'Assigned user',   isMissing: () => this.projectForm.memberIds.length === 0 },
+  ];
+
   missingRequiredFields(): string[] {
-    const missing: string[] = [];
-    if (!this.projectForm.name.trim()) missing.push('Board title');
-    if (!this.projectForm.startDate) missing.push('Start date');
-    if (!this.projectForm.endDate) missing.push('Deadline');
-    if (!this.projectForm.departmentId) missing.push('Department');
-    if (!this.projectForm.category?.trim()) missing.push('Category');
-    if (this.projectForm.pmIds.length === 0) missing.push('Project manager');
-    if (this.projectForm.memberIds.length === 0) missing.push('Assigned user');
-    return missing;
+    return this.REQUIRED_FIELDS.filter(f => f.isMissing()).map(f => f.label);
+  }
+
+  /**
+   * Scroll the first missing field into view.
+   *
+   * The form is long enough that a toast alone leaves people hunting — and on
+   * an existing project the missing field is usually one they never filled in
+   * and would not think to look for.
+   */
+  private focusFirstInvalidField() {
+    const first = this.REQUIRED_FIELDS.find(f => f.isMissing());
+    if (!first) return;
+
+    // After the toast, so the browser has painted the error states.
+    setTimeout(() => {
+      const label = document.querySelector(`[data-field="${first.anchor}"]`) as HTMLElement | null;
+      if (!label) return;
+      label.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // The anchor sits on the label; the control is its sibling, so focus has
+      // to come from the surrounding group rather than from inside the label.
+      const group = label.closest('.cbm-field-group') || label.parentElement;
+      (group?.querySelector('input, select, textarea') as HTMLElement | null)?.focus({ preventScroll: true });
+    }, 0);
   }
 
   /** Only a new project is held to the rules — see saveProject. */
   isRequiredMissing(field: 'startDate' | 'endDate' | 'departmentId' | 'category' | 'pmIds' | 'memberIds'): boolean {
-    if (this.editingProjectId() || !this.isSubmitted()) return false;
+    if (!this.isSubmitted()) return false;
     if (field === 'pmIds') return this.projectForm.pmIds.length === 0;
     if (field === 'memberIds') return this.projectForm.memberIds.length === 0;
     if (field === 'category') return !this.projectForm.category?.trim();
@@ -2820,16 +2849,15 @@ export class ProjectsComponent implements OnInit {
       return;
     }
 
-    // Required only when creating. The server enforces the same rule, and
-    // deliberately only on create: 82 of 83 existing projects have no
-    // department, so requiring one to save an edit would make nearly every
-    // project in the system unsaveable until somebody invented one.
-    if (!this.editingProjectId()) {
-      const missing = this.missingRequiredFields();
-      if (missing.length) {
-        this.toast.error(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`);
-        return;
-      }
+    // Applies to edits as well as new projects. The server still only
+    // enforces this on create, so an import or API caller is not blocked by
+    // a rule that arrived after the data did — but a person going through
+    // this form is expected to complete it.
+    const missing = this.missingRequiredFields();
+    if (missing.length) {
+      this.toast.error(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`);
+      this.focusFirstInvalidField();
+      return;
     }
 
     const bgValue = this.selectedBg().startsWith('http') 
