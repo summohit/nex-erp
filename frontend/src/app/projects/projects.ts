@@ -2076,6 +2076,106 @@ export class ProjectsComponent implements OnInit {
   myTasksPreSalesCount = computed(() => this.myTasks().filter((t) => t.source === 'PRE_SALES').length);
   myTasksGeneralCount = computed(() => this.myTasks().filter((t) => t.source === 'GENERAL').length);
 
+  // ── §17 Task filters ───────────────────────────────────────────────────
+  // Sit alongside the quick chips rather than replacing them: the chips answer
+  // "what needs me today", these answer "find the thing I am thinking of".
+  taskFiltersOpen = signal<boolean>(false);
+  tfProject = signal<string>('ALL');
+  tfProjectCode = signal<string>('ALL');
+  tfAssignee = signal<string>('ALL');
+  tfStatus = signal<string>('ALL');
+  tfPriority = signal<string>('ALL');
+  tfType = signal<string>('ALL');
+  tfMilestone = signal<string>('ALL');
+  tfDueFrom = signal<string>('');
+  tfDueTo = signal<string>('');
+
+  readonly taskStatusOptions = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'DONE', 'CANCELLED'] as const;
+
+  /**
+   * Options come from the tasks on screen, not from master data: offering a
+   * project or a person with nothing in the list produces a choice that can
+   * only ever return an empty table.
+   */
+  private taskOptionsFrom(pick: (t: MyTask) => string | null | undefined): string[] {
+    const seen = new Set<string>();
+    for (const t of this.myTasks()) {
+      const v = pick(t);
+      if (v) seen.add(String(v));
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }
+
+  taskProjectOptions = computed(() => this.taskOptionsFrom(t => t.parent?.name));
+  taskCodeOptions = computed(() => this.taskOptionsFrom(t => t.projectCode));
+  taskTypeOptions = computed(() => this.taskOptionsFrom(t => t.taskType));
+  taskMilestoneOptions = computed(() => this.taskOptionsFrom(t => t.milestone?.name));
+  taskPriorityOptions = computed(() => this.taskOptionsFrom(t => t.priority));
+
+  taskAssigneeOptions = computed(() => {
+    const byId = new Map<number, string>();
+    for (const t of this.myTasks()) {
+      for (const a of t.assignees || []) {
+        byId.set(a.id, `${a.firstName || ''} ${a.lastName || ''}`.trim());
+      }
+    }
+    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  activeTaskFilterCount = computed(() =>
+    [
+      this.tfProject(), this.tfProjectCode(), this.tfAssignee(),
+      this.tfStatus(), this.tfPriority(), this.tfType(), this.tfMilestone(),
+    ].filter(v => v !== 'ALL').length
+    + (this.tfDueFrom() ? 1 : 0)
+    + (this.tfDueTo() ? 1 : 0)
+  );
+
+  clearTaskFilters() {
+    this.tfProject.set('ALL');
+    this.tfProjectCode.set('ALL');
+    this.tfAssignee.set('ALL');
+    this.tfStatus.set('ALL');
+    this.tfPriority.set('ALL');
+    this.tfType.set('ALL');
+    this.tfMilestone.set('ALL');
+    this.tfDueFrom.set('');
+    this.tfDueTo.set('');
+  }
+
+  private applyTaskFilters(list: MyTask[]): MyTask[] {
+    const project = this.tfProject();
+    const code = this.tfProjectCode();
+    const assignee = this.tfAssignee();
+    const status = this.tfStatus();
+    const priority = this.tfPriority();
+    const type = this.tfType();
+    const milestone = this.tfMilestone();
+    const dueFrom = this.tfDueFrom();
+    const dueTo = this.tfDueTo();
+
+    return list.filter(t => {
+      if (project !== 'ALL' && (t.parent?.name || '') !== project) return false;
+      if (code !== 'ALL' && (t.projectCode || '') !== code) return false;
+      if (status !== 'ALL' && t.status !== status) return false;
+      if (priority !== 'ALL' && (t.priority || '') !== priority) return false;
+      if (type !== 'ALL' && (t.taskType || '') !== type) return false;
+      if (milestone !== 'ALL' && (t.milestone?.name || '') !== milestone) return false;
+
+      if (assignee !== 'ALL') {
+        const has = (t.assignees || []).some((a: any) => String(a.id) === assignee);
+        if (!has) return false;
+      }
+
+      // A task with no due date is not "due before X", so it drops out of a
+      // date-bounded search rather than quietly passing it.
+      if (dueFrom && (!t.dueDate || new Date(t.dueDate) < new Date(dueFrom))) return false;
+      if (dueTo && (!t.dueDate || new Date(t.dueDate) > new Date(dueTo))) return false;
+
+      return true;
+    });
+  }
+
   filteredMyTasks = computed(() => {
     let list = this.myTasks();
     const filter = this.myTasksFilter();
@@ -2105,7 +2205,7 @@ export class ProjectsComponent implements OnInit {
         )
       );
     }
-    return list;
+    return this.applyTaskFilters(list);
   });
 
   /**

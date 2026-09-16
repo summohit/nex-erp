@@ -595,9 +595,95 @@
         </div>
 
         <div class="my-tasks-toolbar-right">
+          <button
+            type="button"
+            class="toggle-done-pill"
+            (click)="taskFiltersOpen.set(!taskFiltersOpen())"
+            [class.active]="taskFiltersOpen() || activeTaskFilterCount() > 0">
+            <svg lucideFilter size="14"></svg>
+            <span>Filters</span>
+            <span class="quick-filter-count" *ngIf="activeTaskFilterCount() > 0">{{ activeTaskFilterCount() }}</span>
+          </button>
           <button type="button" class="toggle-done-pill" (click)="toggleMyTasksDone()" [class.active]="myTasksShowDone()" title="Toggle completed tasks visibility">
             <svg lucideCheckCircle2 size="14"></svg>
             <span>{{ myTasksShowDone() ? 'Hide completed' : 'Show completed' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- §17 Task filters. The chips above answer "what needs me today";
+           these answer "find the one I am thinking of". Collapsed by default so
+           the list stays the point of the screen. -->
+      <div class="task-filters-panel" *ngIf="taskFiltersOpen()">
+        <label class="project-filter-field">
+          <span>Project</span>
+          <select [ngModel]="tfProject()" (ngModelChange)="tfProject.set($event)">
+            <option value="ALL">All projects</option>
+            <option *ngFor="let p of taskProjectOptions()" [value]="p">{{ p }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Project code</span>
+          <select [ngModel]="tfProjectCode()" (ngModelChange)="tfProjectCode.set($event)">
+            <option value="ALL">All codes</option>
+            <option *ngFor="let c of taskCodeOptions()" [value]="c">{{ c }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Assignee</span>
+          <select [ngModel]="tfAssignee()" (ngModelChange)="tfAssignee.set($event)">
+            <option value="ALL">Anyone</option>
+            <option *ngFor="let a of taskAssigneeOptions()" [value]="a.id">{{ a.name }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Status</span>
+          <select [ngModel]="tfStatus()" (ngModelChange)="tfStatus.set($event)">
+            <option value="ALL">Any status</option>
+            <option *ngFor="let st of taskStatusOptions" [value]="st">{{ st.replace('_', ' ') }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Priority</span>
+          <select [ngModel]="tfPriority()" (ngModelChange)="tfPriority.set($event)">
+            <option value="ALL">Any priority</option>
+            <option *ngFor="let pr of taskPriorityOptions()" [value]="pr">{{ pr }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Category</span>
+          <select [ngModel]="tfType()" (ngModelChange)="tfType.set($event)">
+            <option value="ALL">All categories</option>
+            <option *ngFor="let t of taskTypeOptions()" [value]="t">{{ t }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field" *ngIf="taskMilestoneOptions().length > 0">
+          <span>Milestone</span>
+          <select [ngModel]="tfMilestone()" (ngModelChange)="tfMilestone.set($event)">
+            <option value="ALL">All milestones</option>
+            <option *ngFor="let m of taskMilestoneOptions()" [value]="m">{{ m }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Due on or after</span>
+          <input type="date" [ngModel]="tfDueFrom()" (ngModelChange)="tfDueFrom.set($event)" />
+        </label>
+
+        <label class="project-filter-field">
+          <span>Due on or before</span>
+          <input type="date" [ngModel]="tfDueTo()" (ngModelChange)="tfDueTo.set($event)" />
+        </label>
+
+        <div class="task-filters-actions" *ngIf="activeTaskFilterCount() > 0">
+          <button type="button" class="project-filters-clear" (click)="clearTaskFilters()">
+            <svg lucideX size="13"></svg> Clear all
           </button>
         </div>
       </div>

@@ -453,7 +453,10 @@ export class TasksService {
       select: {
         id: true, key: true, title: true, status: true, priority: true,
         startDate: true, dueDate: true, estimatedHours: true,
-        project: { select: { id: true, name: true, isSystem: true } },
+        project: { select: { id: true, name: true, key: true, isSystem: true } },
+        // §17: the task list filters by project code and by milestone, and
+        // both are cheap joins the row already half-carries.
+        milestone: { select: { id: true, name: true } },
         lead: { select: { id: true, title: true, leadCode: true, companyName: true, contactName: true, flow: true } },
         taskType: { select: { name: true } },
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -501,6 +504,9 @@ export class TasksService {
         rawStatus: i.status,
         priority: i.priority,
         taskType: i.taskType?.name ?? null,
+        // Null on a general or deal task, which has no project to code.
+        projectCode: general ? null : (i.project?.key ?? null),
+        milestone: i.milestone ? { id: i.milestone.id, name: i.milestone.name } : null,
         startDate: i.startDate,
         dueDate: i.dueDate,
         estimatedHours: i.estimatedHours,

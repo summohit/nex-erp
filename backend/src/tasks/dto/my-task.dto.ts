@@ -34,6 +34,10 @@ export interface MyTaskDto {
    *  because inventing a priority is worse than admitting there isn't one. */
   priority: string | null;
   taskType: string | null;
+  /** Project key, e.g. CES/0925/07. Null on a general or deal task. */
+  projectCode?: string | null;
+  /** The milestone this task delivers, when it has one (§15). */
+  milestone?: { id: number; name: string } | null;
   startDate: Date | null;
   dueDate: Date | null;
   estimatedHours: number | null;

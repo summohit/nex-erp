@@ -5054,3 +5054,27 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* §17 My Tasks filters. Reuses .project-filter-field from the board list so
+   both filter surfaces look and behave the same. */
+.task-filters-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 14px 0 4px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.task-filters-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
+@media (max-width: 640px) {
+  .task-filters-panel { grid-template-columns: 1fr; }
+}
