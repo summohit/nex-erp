@@ -913,6 +913,18 @@
         <svg lucideX size="13"></svg> Clear filters
       </button>
 
+      <!-- Filter Pipeline Drawer Toggle -->
+      <button (click)="toggleFilterDrawer()" 
+              style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; font-size: 13px; font-weight: 600; color: #334155; cursor: pointer;"
+              [style.background-color]="fdActiveFilterCount() > 0 ? '#fffbeb' : 'white'"
+              [style.border-color]="fdActiveFilterCount() > 0 ? '#fde68a' : '#e2e8f0'"
+              class="hover:bg-gray-50 transition-colors"
+              title="Open advanced filter pipeline">
+        <svg lucideFilter size="14" style="width: 14px; height: 14px; flex-shrink: 0;" [style.color]="fdActiveFilterCount() > 0 ? '#d97706' : '#64748b'"></svg>
+        <span>Filter pipeline</span>
+        <span *ngIf="fdActiveFilterCount() > 0" style="background: #d97706; color: white; border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: 700;">{{ fdActiveFilterCount() }}</span>
+      </button>
+
       <!-- Export Dropdown -->
       <div style="position: relative; margin-left: auto;">
         <button (click)="togglePopover('list-export')" 
@@ -951,6 +963,353 @@
         [paginationPageSizeSelector]="paginationPageSizeSelector"
         [defaultColDef]="{ resizable: true, sortable: true }">
       </ag-grid-angular>
+    </div>
+
+    <!-- Filter Pipeline Drawer (slides in from the left) -->
+    <div class="fd-overlay" *ngIf="showFilterDrawer()" (click)="closeFdDropdowns()">
+      <div class="fd-panel" (click)="$event.stopPropagation()">
+        <!-- Drawer header -->
+        <div class="fd-header">
+          <div class="fd-title">
+            <svg lucideFilter size="15" style="margin-right: 8px; color: #2563eb;"></svg>
+            <span>Filters</span>
+          </div>
+          <button class="fd-close-btn" (click)="toggleFilterDrawer()" title="Close filters">
+            <svg lucideX size="17"></svg>
+          </button>
+        </div>
+
+        <!-- Drawer body -->
+        <div class="fd-body">
+
+          <!-- ID (matches grid "ID" column) -->
+          <div class="fd-section">
+            <div class="fd-section-label">ID</div>
+            <input type="text" class="fd-text-input" placeholder="e.g. PROJ-12" [ngModel]="fdIssueKey()" (ngModelChange)="fdIssueKey.set($event)" title="Filter by task ID (key)">
+          </div>
+
+          <!-- Task name (matches grid "Task" column) -->
+          <div class="fd-section">
+            <div class="fd-section-label">Task name</div>
+            <input type="text" class="fd-text-input" placeholder="Search by task name" [ngModel]="fdTaskName()" (ngModelChange)="fdTaskName.set($event)" title="Filter by task title">
+          </div>
+
+          <!-- List (matches grid "List" column) -->
+          <div class="fd-section">
+            <div class="fd-section-label">List</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('list', $event)">
+                <span [style.color]="fdColumnIds().length ? '#0f172a' : '#94a3b8'">
+                  {{ fdColumnIds().length ? (fdColumnIds().length + ' selected') : 'All' }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'list'">
+                <button class="fd-select-option multi" [class.selected]="fdColumnIds().length === 0" (click)="fdColumnIds.set([])">
+                  <span class="fd-check" [style.background]="fdColumnIds().length === 0 ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdColumnIds().length === 0" size="11"></svg></span>
+                  <span>All</span>
+                </button>
+                <button *ngFor="let col of columns()" class="fd-select-option multi" [class.selected]="fdColumnIds().includes(col.id)" (click)="fdToggleArray(fdColumnIds, col.id)">
+                  <span class="fd-check" [style.background]="fdColumnIds().includes(col.id) ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdColumnIds().includes(col.id)" size="11"></svg></span>
+                  <span class="fd-label-dot" [style.background-color]="col.color || '#6b7280'"></span>
+                  <span>{{ col.name }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status (matches grid "Status" column) -->
+          <div class="fd-section">
+            <div class="fd-section-label">Status</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('status', $event)">
+                <span [style.color]="fdStatuses().length ? '#0f172a' : '#94a3b8'">
+                  {{ fdStatuses().length ? (fdStatuses().length + ' selected') : 'All' }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'status'">
+                <button class="fd-select-option multi" [class.selected]="fdStatuses().length === 0" (click)="fdStatuses.set([])">
+                  <span class="fd-check" [style.background]="fdStatuses().length === 0 ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdStatuses().length === 0" size="11"></svg></span>
+                  <span>All</span>
+                </button>
+                <button *ngFor="let st of ['TODO','IN_PROGRESS','IN_REVIEW','DONE']" class="fd-select-option multi" [class.selected]="fdStatuses().includes(st)" (click)="fdToggleArray(fdStatuses, st)">
+                  <span class="fd-check" [style.background]="fdStatuses().includes(st) ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdStatuses().includes(st)" size="11"></svg></span>
+                  <span>{{ st.replace('_', ' ') }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Due Date (matches grid "Due Date" column) -->
+          <div class="fd-section">
+            <div class="fd-section-label">Due Date</div>
+            <div class="fd-range-row">
+              <input type="date" class="fd-date-input" [ngModel]="fdDueFrom()" (ngModelChange)="fdDueFrom.set($event || null)" title="Tasks due on or after this date">
+              <span class="fd-range-sep">to</span>
+              <input type="date" class="fd-date-input" [ngModel]="fdDueTo()" (ngModelChange)="fdDueTo.set($event || null)" title="Tasks due on or before this date">
+            </div>
+          </div>
+
+          <!-- Created At (matches grid "Created At" column) -->
+          <div class="fd-section">
+            <div class="fd-section-label">Created At</div>
+            <div class="fd-range-row">
+              <input type="date" class="fd-date-input" [ngModel]="fdCreatedFrom()" (ngModelChange)="fdCreatedFrom.set($event || null)" title="Tasks created on or after this date">
+              <span class="fd-range-sep">to</span>
+              <input type="date" class="fd-date-input" [ngModel]="fdCreatedTo()" (ngModelChange)="fdCreatedTo.set($event || null)" title="Tasks created on or before this date">
+            </div>
+          </div>
+
+          <!-- Updated At (matches grid "Updated At" column) -->
+          <div class="fd-section">
+            <div class="fd-section-label">Updated At</div>
+            <div class="fd-range-row">
+              <input type="date" class="fd-date-input" [ngModel]="fdUpdatedFrom()" (ngModelChange)="fdUpdatedFrom.set($event || null)" title="Tasks updated on or after this date">
+              <span class="fd-range-sep">to</span>
+              <input type="date" class="fd-date-input" [ngModel]="fdUpdatedTo()" (ngModelChange)="fdUpdatedTo.set($event || null)" title="Tasks updated on or before this date">
+            </div>
+          </div>
+
+          <!-- Date Filter On -->
+          <div class="fd-section">
+            <div class="fd-section-label">Date Filter On</div>
+            <div class="fd-toggle-row">
+              <span class="fd-toggle-hint">Only show tasks within a date range</span>
+              <label class="fd-switch">
+                <input type="checkbox" [ngModel]="fdDateOn()" (ngModelChange)="fdDateOn.set($event)" />
+                <span class="fd-slider" [class.active]="fdDateOn()"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Start Date -->
+          <div class="fd-section">
+            <div class="fd-section-label">Start Date</div>
+            <div class="fd-date-wrap">
+              <input
+                type="date"
+                class="fd-date-input"
+                [disabled]="!fdDateOn()"
+                [ngModel]="fdStartDate()"
+                (ngModelChange)="fdStartDate.set($event || null)"
+                title="Only show tasks that start on or after this date" />
+            </div>
+          </div>
+
+          <!-- Type -->
+          <div class="fd-section">
+            <div class="fd-section-label">Type</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('type', $event)">
+                <span [style.color]="fdType() ? '#0f172a' : '#94a3b8'">{{ fdType() || 'All' }}</span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'type'">
+                <button class="fd-select-option" [class.selected]="!fdType()" (click)="fdSetSingle(fdType, null); fdDropdownOpen.set(null)">
+                  <span>All</span>
+                  <svg lucideCheck *ngIf="!fdType()" size="14"></svg>
+                </button>
+                <button *ngFor="let t of ['EPIC','STORY','TASK','BUG','SUBTASK']" class="fd-select-option" [class.selected]="fdType() === t" (click)="fdSetSingle(fdType, t); fdDropdownOpen.set(null)">
+                  <span>{{ t }}</span>
+                  <svg lucideCheck *ngIf="fdType() === t" size="14"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Project -->
+          <div class="fd-section">
+            <div class="fd-section-label">Project</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('project', $event)">
+                <span [style.color]="fdProjectId() ? '#0f172a' : '#94a3b8'">
+                  {{ fdProjectName(fdProjectId()) }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'project'">
+                <button class="fd-select-option" [class.selected]="!fdProjectId()" (click)="fdSetSingle(fdProjectId, null); fdDropdownOpen.set(null)">
+                  <span>All</span>
+                  <svg lucideCheck *ngIf="!fdProjectId()" size="14"></svg>
+                </button>
+                <button *ngFor="let p of fdAllProjects()" class="fd-select-option" [class.selected]="fdProjectId() === p.id" (click)="fdSetSingle(fdProjectId, p.id); fdDropdownOpen.set(null)">
+                  <span>{{ p.name }}</span>
+                  <svg lucideCheck *ngIf="fdProjectId() === p.id" size="14"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Client -->
+          <div class="fd-section">
+            <div class="fd-section-label">Client</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('client', $event)">
+                <span [style.color]="fdClientId() ? '#0f172a' : '#94a3b8'">
+                  {{ fdClientName(fdClientId()) }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'client'">
+                <button class="fd-select-option" [class.selected]="!fdClientId()" (click)="fdSetSingle(fdClientId, null); fdDropdownOpen.set(null)">
+                  <span>All</span>
+                  <svg lucideCheck *ngIf="!fdClientId()" size="14"></svg>
+                </button>
+                <button *ngFor="let c of fdAllClients()" class="fd-select-option" [class.selected]="fdClientId() === c.id" (click)="fdSetSingle(fdClientId, c.id); fdDropdownOpen.set(null)">
+                  <span>{{ c.name }}</span>
+                  <svg lucideCheck *ngIf="fdClientId() === c.id" size="14"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Assigned To -->
+          <div class="fd-section">
+            <div class="fd-section-label">Assigned To</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('assignedTo', $event)">
+                <span [style.color]="fdAssignToIds().length ? '#0f172a' : '#94a3b8'">
+                  {{ fdAssignToIds().length ? (fdAssignToIds().length + ' assigned') : 'All' }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'assignedTo'">
+                <button class="fd-select-option multi" [class.selected]="fdAssignToIds().length === 0" (click)="fdAssignToIds.set([])">
+                  <span class="fd-check" [style.background]="fdAssignToIds().length === 0 ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdAssignToIds().length === 0" size="11"></svg></span>
+                  <span>All</span>
+                </button>
+                <button *ngFor="let m of (project()?.members || [])" class="fd-select-option multi" [class.selected]="fdAssignToIds().includes(m.employeeId)" (click)="fdToggleArray(fdAssignToIds, m.employeeId)">
+                  <span class="fd-check" [style.background]="fdAssignToIds().includes(m.employeeId) ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdAssignToIds().includes(m.employeeId)" size="11"></svg></span>
+                  <span>{{ m.employee?.firstName }} {{ m.employee?.lastName }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Assigned By -->
+          <div class="fd-section">
+            <div class="fd-section-label">Assigned By</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('assignedBy', $event)">
+                <span [style.color]="fdAssignByIds().length ? '#0f172a' : '#94a3b8'">
+                  {{ fdAssignByIds().length ? (fdAssignByIds().length + ' assigned') : 'All' }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'assignedBy'">
+                <button class="fd-select-option multi" [class.selected]="fdAssignByIds().length === 0" (click)="fdAssignByIds.set([])">
+                  <span class="fd-check" [style.background]="fdAssignByIds().length === 0 ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdAssignByIds().length === 0" size="11"></svg></span>
+                  <span>All</span>
+                </button>
+                <button *ngFor="let m of (project()?.members || [])" class="fd-select-option multi" [class.selected]="fdAssignByIds().includes(m.employeeId)" (click)="fdToggleArray(fdAssignByIds, m.employeeId)">
+                  <span class="fd-check" [style.background]="fdAssignByIds().includes(m.employeeId) ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdAssignByIds().includes(m.employeeId)" size="11"></svg></span>
+                  <span>{{ m.employee?.firstName }} {{ m.employee?.lastName }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Label -->
+          <div class="fd-section">
+            <div class="fd-section-label">Label</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('label', $event)">
+                <span [style.color]="fdLabelIds().length ? '#0f172a' : '#94a3b8'">
+                  {{ fdLabelIds().length ? (fdLabelIds().length + ' selected') : 'All' }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'label'">
+                <button class="fd-select-option multi" [class.selected]="fdLabelIds().length === 0" (click)="fdLabelIds.set([])">
+                  <span class="fd-check" [style.background]="fdLabelIds().length === 0 ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdLabelIds().length === 0" size="11"></svg></span>
+                  <span>All</span>
+                </button>
+                <button *ngFor="let l of fdAllLabels()" class="fd-select-option multi" [class.selected]="fdLabelIds().includes(l.id)" (click)="fdToggleArray(fdLabelIds, l.id)">
+                  <span class="fd-check" [style.background]="fdLabelIds().includes(l.id) ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdLabelIds().includes(l.id)" size="11"></svg></span>
+                  <span class="fd-label-dot" [style.background-color]="l.color || '#6b7280'"></span>
+                  <span>{{ l.name }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Priority -->
+          <div class="fd-section">
+            <div class="fd-section-label">Priority</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('priority', $event)">
+                <span [style.color]="fdPriority() ? '#0f172a' : '#94a3b8'">{{ fdPriority() || 'All' }}</span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'priority'">
+                <button class="fd-select-option" [class.selected]="!fdPriority()" (click)="fdSetSingle(fdPriority, null); fdDropdownOpen.set(null)">
+                  <span>All</span>
+                  <svg lucideCheck *ngIf="!fdPriority()" size="14"></svg>
+                </button>
+                <button *ngFor="let pri of ['CRITICAL','HIGH','MEDIUM','LOW']" class="fd-select-option" [class.selected]="fdPriority() === pri" (click)="fdSetSingle(fdPriority, pri); fdDropdownOpen.set(null)">
+                  <span class="fd-priority-dot" [style.background-color]="pri === 'CRITICAL' ? '#dc2626' : pri === 'HIGH' ? '#ea580c' : pri === 'MEDIUM' ? '#ca8a04' : '#16a34a'"></span>
+                  <span>{{ pri }}</span>
+                  <svg lucideCheck *ngIf="fdPriority() === pri" size="14"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Task Category -->
+          <div class="fd-section">
+            <div class="fd-section-label">Task Category</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('taskCategory', $event)">
+                <span [style.color]="fdTaskCategoryId() ? '#0f172a' : '#94a3b8'">
+                  {{ fdTaskCategoryName(fdTaskCategoryId()) }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'taskCategory'">
+                <button class="fd-select-option" [class.selected]="!fdTaskCategoryId()" (click)="fdSetSingle(fdTaskCategoryId, null); fdDropdownOpen.set(null)">
+                  <span>All</span>
+                  <svg lucideCheck *ngIf="!fdTaskCategoryId()" size="14"></svg>
+                </button>
+                <button *ngFor="let tc of fdAllTaskCategories()" class="fd-select-option" [class.selected]="fdTaskCategoryId() === tc.id" (click)="fdSetSingle(fdTaskCategoryId, tc.id); fdDropdownOpen.set(null)">
+                  <span>{{ tc.name }}</span>
+                  <svg lucideCheck *ngIf="fdTaskCategoryId() === tc.id" size="14"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Billable Task (disabled — no data yet) -->
+          <div class="fd-section fd-disabled">
+            <div class="fd-section-label">Billable Task</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" disabled>
+                <span style="color: #94a3b8;">All</span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Milestones (disabled — no data yet) -->
+          <div class="fd-section fd-disabled">
+            <div class="fd-section-label">Milestones</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" disabled>
+                <span style="color: #94a3b8;">All</span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drawer footer -->
+        <div class="fd-footer">
+          <button class="fd-clear-btn" (click)="clearListFilters()">
+            <svg lucideX size="14"></svg>
+            Clear all
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
