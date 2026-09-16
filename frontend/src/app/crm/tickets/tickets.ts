@@ -17,6 +17,7 @@ import {
 import { QuillModule } from 'ngx-quill';
 import { TicketService, Ticket, TicketStats, NewTicketAttachment, TicketPermissions } from '../../services/ticket.service';
 import { MasterDataService, Department } from '../../services/master-data.service';
+import { EmployeeService, Employee } from '../../services/employee.service';
 import { AuthService } from '../../services/auth.service';
 import { TicketDetailComponent } from './ticket-detail/ticket-detail';
 import { ChartCardComponent } from '../../shared/components/chart-card/chart-card.component';
@@ -45,6 +46,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 export class TicketsComponent implements OnInit {
   private ticketService = inject(TicketService);
   private masterDataService = inject(MasterDataService);
+  private employeeService = inject(EmployeeService);
   private authService = inject(AuthService);
   private toast = inject(HotToastService);
   private route = inject(ActivatedRoute);
@@ -53,6 +55,7 @@ export class TicketsComponent implements OnInit {
   tickets: Ticket[] = [];
   stats: TicketStats | null = null;
   departments: Department[] = [];
+  employees: Employee[] = [];
   isLoading = false;
   showCreateModal = false;
   selectedTicket: Ticket | null = null;
@@ -62,6 +65,7 @@ export class TicketsComponent implements OnInit {
 
   // Filters
   filterDept = '';
+  filterEmployee = '';
   filterStatus = '';
   filterPriority = '';
   filterPlatform = '';
@@ -84,6 +88,9 @@ export class TicketsComponent implements OnInit {
   // Filter Searchable Dropdown States
   showDeptDropdown = false;
   deptSearchQuery = '';
+
+  showEmployeeDropdown = false;
+  employeeSearchQuery = '';
 
   showStatusDropdown = false;
   statusSearchQuery = '';
@@ -428,6 +435,21 @@ export class TicketsComponent implements OnInit {
     this.loadTickets();
     this.loadStats();
     this.masterDataService.getDepartments().subscribe({ next: (d) => (this.departments = d) });
+    this.employeeService.getEmployeesBasicList().subscribe({
+      next: (e) => {
+        const currentUser = this.authService.currentUser();
+        const role = currentUser?.role;
+        const myEmpId = currentUser?.employeeId;
+        const isAdmin = role === 'ADMIN' || role === 'SUPERADMIN';
+        
+        let list = e || [];
+        if (!isAdmin && myEmpId) {
+          list = list.filter(emp => String(emp.id) === String(myEmpId) || String(emp.managerId) === String(myEmpId));
+        }
+        this.employees = list;
+      },
+      error: () => {},
+    });
     this.ticketService.getMyPermissions().subscribe({
       next: (p) => (this.permissions = p),
     });
@@ -437,6 +459,7 @@ export class TicketsComponent implements OnInit {
     this.isLoading = true;
     const filters: Record<string, any> = {};
     if (this.filterDept) filters['departmentId'] = this.filterDept;
+    if (this.filterEmployee) filters['employeeId'] = this.filterEmployee;
     if (this.filterStatus) filters['status'] = this.filterStatus;
     if (this.filterPriority) filters['priority'] = this.filterPriority;
     if (this.filterPlatform) filters['platform'] = this.filterPlatform;
@@ -688,11 +711,12 @@ export class TicketsComponent implements OnInit {
   }
 
   hasActiveFilters(): boolean {
-    return !!(this.searchTerm || this.filterDept || this.filterStatus || this.filterPriority || this.filterPlatform);
+    return !!(this.searchTerm || this.filterEmployee || this.filterDept || this.filterStatus || this.filterPriority || this.filterPlatform || (this.filterMonth && this.filterMonth !== 'all') || (this.filterDeadline && this.filterDeadline !== 'all'));
   }
 
   closeAllDropdowns() {
     this.showDeptDropdown = false;
+    this.showEmployeeDropdown = false;
     this.showStatusDropdown = false;
     this.showPriorityDropdown = false;
     this.showPlatformDropdown = false;
@@ -703,6 +727,18 @@ export class TicketsComponent implements OnInit {
   }
 
   // Filter Dropdown Handlers
+  getFilteredEmployees(query: string): Employee[] {
+    const q = (query || '').toLowerCase().trim();
+    if (!q) return this.employees;
+    return this.employees.filter(e => {
+      const name = `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase();
+      const dept = (e.department?.name || '').toLowerCase();
+      const desig = (e.designation?.name || '').toLowerCase();
+      const email = (e.email || e.user?.email || '').toLowerCase();
+      return name.includes(q) || dept.includes(q) || desig.includes(q) || email.includes(q);
+    });
+  }
+
   getFilteredDepartments(query: string): Department[] {
     const q = (query || '').toLowerCase().trim();
     if (!q) return this.departments;
@@ -734,6 +770,18 @@ export class TicketsComponent implements OnInit {
   }
 
   // Label Getters for Filters
+  isCurrentUser(empId?: number | string): boolean {
+    if (!empId) return false;
+    return String(empId) === String(this.authService.currentUser()?.employeeId);
+  }
+
+  getSelectedEmployeeLabel(): string {
+    if (!this.filterEmployee) return 'All Employees';
+    const emp = this.employees.find(e => String(e.id) === String(this.filterEmployee));
+    if (!emp) return 'All Employees';
+    return `${emp.firstName} ${emp.lastName}${this.isCurrentUser(emp.id) ? ' (you)' : ''}`;
+  }
+
   /** Filters on the department that raised the ticket, not the team working it. */
   getSelectedDeptLabel(): string {
     if (!this.filterDept) return 'All Departments';
@@ -757,6 +805,19 @@ export class TicketsComponent implements OnInit {
   }
 
   // Select Action Handlers for Filters
+  selectEmployeeFilter(id: string | number) {
+    this.filterEmployee = id ? String(id) : '';
+    this.showEmployeeDropdown = false;
+    this.employeeSearchQuery = '';
+    this.loadTickets();
+  }
+
+  getEmployeeInitials(emp: Employee): string {
+    const f = (emp.firstName || '')[0] || '';
+    const l = (emp.lastName || '')[0] || '';
+    return (f + l).toUpperCase() || '?';
+  }
+
   selectDeptFilter(id: string | number) {
     this.filterDept = id ? String(id) : '';
     this.showDeptDropdown = false;
@@ -863,6 +924,15 @@ export class TicketsComponent implements OnInit {
       });
     }
 
+    if (this.filterEmployee) {
+      const emp = this.employees.find(e => String(e.id) === String(this.filterEmployee));
+      chips.push({
+        key: 'employee',
+        label: `Employee: ${emp ? emp.firstName + ' ' + emp.lastName : this.filterEmployee}`,
+        clear: () => { this.filterEmployee = ''; this.loadTickets(); },
+      });
+    }
+
     if (this.filterStatus) {
       chips.push({
         key: 'status',
@@ -892,6 +962,8 @@ export class TicketsComponent implements OnInit {
 
   clearFilters() {
     this.filterDept = '';
+    this.filterEmployee = '';
+    this.employeeSearchQuery = '';
     this.filterStatus = '';
     this.filterPriority = '';
     this.filterPlatform = '';

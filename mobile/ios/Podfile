@@ -17,6 +17,17 @@ end
 target 'NexMobileApp' do
   config = use_native_modules!
 
+  # Firebase as a static framework.
+  #
+  # Only takes effect when frameworks are actually in use, which this Podfile
+  # already drives from USE_FRAMEWORKS above. Deliberately NOT forcing
+  # use_frameworks! here: this app links react-native-maps and
+  # react-native-geolocation-service, and switching the whole Pod graph to
+  # frameworks is a good way to break both. If the iOS build hits duplicate
+  # symbols after adding Firebase, run `USE_FRAMEWORKS=static pod install`
+  # rather than hard-coding it — that is what the mechanism above is for.
+  $RNFirebaseAsStaticFramework = true
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

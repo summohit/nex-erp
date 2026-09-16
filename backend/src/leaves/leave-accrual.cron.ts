@@ -32,7 +32,7 @@ export class LeaveAccrualCron implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     // setInterval rather than @nestjs/schedule, which is not installed —
-    // matching AutoClockoutCron and TicketTimerSweepCron.
+    // matching MissedClockOutCron and TicketTimerSweepCron.
     this.timer = setInterval(() => this.tick(), 60 * 1000);
     // Sweep on boot too. Unlike the attendance sweep this is safe to repeat:
     // every write is guarded by a period stamp, so a boot on the 1st credits

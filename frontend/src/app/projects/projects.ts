@@ -8,15 +8,24 @@ import {
   LucidePlus, LucideKanban,
   LucideX, LucideUser, LucideChevronLeft, LucideCheck, LucideMoreHorizontal,
   LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw, LucideBrainCircuit,
-  LucideLayoutGrid, LucideList, LucideChevronDown, LucideAlertTriangle, LucideUsers
+  LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
+  LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
+  LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
+import { UploadService } from '../services/upload.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { DialogService } from '../shared/services/dialog.service';
 import { ProjectStarCellRendererComponent } from '../shared/components/project-star-cell-renderer.component';
 import { ProjectActionCellRendererComponent } from '../shared/components/project-action-cell-renderer.component';
+import {
+  TasksService, MyTask, TaskCapabilities, TaskType, LeadOption, TaskScope,
+  PreSalesInfo, PreSalesTaskHistoryEntry,
+} from '../services/tasks.service';
+import { ActivatedRoute } from '@angular/router';
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   FINISHED: { bg: '#dcfce7', color: '#15803d' },
@@ -40,7 +49,10 @@ function getStatusColors(status: string): { bg: string; color: string } {
     CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban,
     LucideX, LucideUser, LucideChevronLeft, LucideBrainCircuit,
     LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw,
-    LucideLayoutGrid, LucideList, LucideChevronDown, LucideAlertTriangle, LucideUsers, AgGridModule
+    LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
+    LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
+    LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
+    AgGridModule
   ],
   templateUrl: './projects.html',
   styleUrls: ['./projects.css']
@@ -51,7 +63,11 @@ export class ProjectsComponent implements OnInit {
   private employeeService = inject(EmployeeService);
   private router = inject(Router);
   private authService = inject(AuthService);
+  private tasksService = inject(TasksService);
+  private uploadService = inject(UploadService);
   private toast = inject(HotToastService);
+  private route = inject(ActivatedRoute);
+  private dialog = inject(DialogService);
 
   showArchiveWarningModal = false;
   pendingArchiveProjectId: number | null = null;
@@ -64,9 +80,76 @@ export class ProjectsComponent implements OnInit {
   clients = signal<any[]>([]);
   employees = signal<any[]>([]);
   searchQuery = signal<string>('');
-  activeTab = signal<'all' | 'starred' | 'recent' | 'archived'>('all');
+  activeTab = signal<'all' | 'starred' | 'recent' | 'archived' | 'my-tasks'>(
+    (() => {
+      try {
+        const saved = localStorage.getItem('projects-active-tab') as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
+        return (saved && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(saved)) ? saved : 'all';
+      } catch (e) {
+        return 'all';
+      }
+    })()
+  );
   viewMode = signal<'card' | 'table'>((localStorage.getItem('projects-view-mode') as 'card' | 'table') || 'card');
   quickFilter = signal<'none' | 'overdue' | 'due-week' | 'led-by-me'>('none');
+
+  // ── My Tasks ───────────────────────────────────────────────────────────
+  myTasks = signal<MyTask[]>([]);
+  myTasksLoading = signal<boolean>(false);
+  myTasksLoaded = signal<boolean>(false);
+  myTasksTruncated = signal<boolean>(false);
+  myTasksShowDone = signal<boolean>(false);
+  /** Tracks if user explicitly clicked the Assigned to me / Everyone toggle */
+  userExplicitlyToggledScope = false;
+
+  private isUserAdmin(): boolean {
+    if (this.taskCapabilities().isAdmin) {
+      return true;
+    }
+    const role = this.currentUser()?.role || this.authService.currentUser()?.role;
+    if (role === 'ADMIN' || role === 'SUPERADMIN') {
+      return true;
+    }
+    try {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length > 1) {
+          const payload = JSON.parse(atob(parts[1]));
+          if (payload?.role === 'ADMIN' || payload?.role === 'SUPERADMIN') {
+            return true;
+          }
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  /**
+   * Whose tasks the list is showing.
+   *
+   * Only administrators are offered 'all'; for administrators, it defaults to 'all'
+   * ("Everyone") so they see company work without having to toggle manually.
+   */
+  myTasksScope = signal<TaskScope>(
+    (() => {
+      try {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          const parts = token.split('.');
+          if (parts.length > 1) {
+            const payload = JSON.parse(atob(parts[1]));
+            if (payload?.role === 'ADMIN' || payload?.role === 'SUPERADMIN') {
+              return 'all';
+            }
+          }
+        }
+      } catch (e) {}
+      return 'mine';
+    })()
+  );
+  /** Answered by the server so the department rule has one authority. */
+  taskCapabilities = signal<TaskCapabilities>({ canCreateTask: false, canCreateGeneral: false, isAdmin: false });
   pmDropdownOpen = signal(false);
   pmSearchQuery = '';
 
@@ -591,11 +674,95 @@ export class ProjectsComponent implements OnInit {
   });
 
   ngOnInit() {
+    // A pre-sales assignment notification links straight here now that the
+    // deal page no longer lists tasks — see CrmService.createPreSalesTask.
+    const qp = this.route.snapshot.queryParamMap;
+    const qpTab = qp.get('tab') as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
+    if (qpTab && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(qpTab)) {
+      this.activeTab.set(qpTab);
+      try { localStorage.setItem('projects-active-tab', qpTab); } catch (e) {}
+    } else {
+      const savedTab = localStorage.getItem('projects-active-tab') as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
+      if (savedTab && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(savedTab)) {
+        this.activeTab.set(savedTab);
+      }
+    }
+
+    const psTask = Number(qp.get('psTask'));
+    if (psTask) {
+      this.activeTab.set('my-tasks');
+      try { localStorage.setItem('projects-active-tab', 'my-tasks'); } catch (e) {}
+      this.highlightedPreSalesTaskId = psTask;
+    }
+
+    // "Add Task" on a deal's pre-sales tab. The deal page does not keep its own
+    // composer any more; it sends the context here and this opens ours.
+    const newTaskLeadId = Number(qp.get('newTaskLeadId'));
+    if (newTaskLeadId) {
+      this.activeTab.set('my-tasks');
+      try { localStorage.setItem('projects-active-tab', 'my-tasks'); } catch (e) {}
+    }
+
     this.loadStarredAndRecent();
     this.loadProjects();
     this.loadArchivedProjects();
     this.loadClients();
     this.loadEmployees();
+    // Cheap, and it decides whether the Add Task button exists at all. The
+    // tasks themselves wait until somebody opens the tab.
+    this.tasksService.getCapabilities().subscribe({
+      next: (c) => {
+        this.taskCapabilities.set(c);
+        if (c.isAdmin && this.myTasksScope() === 'mine' && !this.userExplicitlyToggledScope) {
+          this.myTasksScope.set('all');
+          if (this.activeTab() === 'my-tasks') this.loadMyTasks();
+        }
+      },
+      error: () => {},
+    });
+    // setActiveTab normally triggers this on first entry; landing on the tab
+    // from a query parameter or restored from localStorage skips it.
+    if (this.activeTab() === 'my-tasks') this.loadMyTasks();
+
+    if (newTaskLeadId) {
+      this.openComposerForLead(newTaskLeadId, Number(qp.get('newTaskAssigneeId')) || null);
+      // One-shot parameters: a reload should show the list, not reopen the form.
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { tab: 'my-tasks' },
+        replaceUrl: true,
+      });
+    }
+  }
+
+  /**
+   * Open the composer already pointed at a deal.
+   *
+   * The deal options have to be in hand before the modal appears: isPreSalesTarget
+   * reads the chosen deal's `flow`, so opening first would render the form in its
+   * ordinary shape — a priority, a start date, everyone in the company as an
+   * assignee — and then reshape it under the user a moment later.
+   */
+  private openComposerForLead(leadId: number, assigneeId: number | null) {
+    const fill = () => {
+      this.openCreateTask();
+      this.taskForm.parentKind = 'LEAD';
+      this.taskForm.leadId = leadId;
+      if (assigneeId) this.taskForm.assigneeIds = [assigneeId];
+      this.loadPreSalesInfoFor(leadId, assigneeId);
+    };
+
+    if (this.leadOptions().length) {
+      fill();
+      return;
+    }
+    this.tasksService.getLeadOptions().subscribe({
+      next: (l) => {
+        this.leadOptions.set(l || []);
+        fill();
+      },
+      error: () => this.toast.error('Could not load the deal this task is for.'),
+    });
   }
 
   loadEmployees() {
@@ -612,12 +779,1118 @@ export class ProjectsComponent implements OnInit {
     });
   }
 
-  setActiveTab(tab: 'all' | 'starred' | 'recent' | 'archived') {
+  setActiveTab(tab: 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks') {
     this.activeTab.set(tab);
+    try {
+      localStorage.setItem('projects-active-tab', tab);
+    } catch (e) {}
+
+    // Update query params in URL without reload so refreshing retains the tab
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: tab === 'all' ? null : tab },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
+
     if (tab === 'archived') {
       this.loadArchivedProjects();
     }
+    // Loaded on first entry rather than in ngOnInit: most visits to this screen
+    // are to open a board, and this is a two-source aggregation.
+    if (tab === 'my-tasks') {
+      if (this.isUserAdmin() && !this.userExplicitlyToggledScope && this.myTasksScope() !== 'all') {
+        this.myTasksScope.set('all');
+      }
+      if (!this.myTasksLoaded()) {
+        this.loadMyTasks();
+      }
+    }
   }
+
+  // ── Creating a task ──────────────────────────────────────────────────────
+
+  isCreateTaskOpen = signal(false);
+  isSavingTask = signal(false);
+  taskTypes = signal<TaskType[]>([]);
+  leadOptions = signal<LeadOption[]>([]);
+  assigneeSearch = signal('');
+
+  // Dropdown open states and search signals for Add Task modal
+  taskProjectDropdownOpen = signal(false);
+  taskProjectSearch = signal('');
+
+  taskLeadDropdownOpen = signal(false);
+  taskLeadSearch = signal('');
+
+  taskTypeDropdownOpen = signal(false);
+  taskTypeSearch = signal('');
+
+  taskPriorityDropdownOpen = signal(false);
+  taskAssigneeDropdownOpen = signal(false);
+
+  // Attachment upload states
+  isUploadingAttachment = signal(false);
+  uploadingFileName = signal('');
+  isAttachmentDragOver = signal(false);
+
+  presalesDeals = computed(() => this.leadOptions().filter((l) => l.flow === 'PRE_SALES'));
+  salesLeads = computed(() => this.leadOptions().filter((l) => l.flow !== 'PRE_SALES'));
+
+  filteredModalProjects = computed(() => {
+    const q = this.taskProjectSearch().toLowerCase().trim();
+    if (!q) return this.projects();
+    return this.projects().filter((p) =>
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.key || '').toLowerCase().includes(q)
+    );
+  });
+
+  filteredModalPresalesDeals = computed(() => {
+    const q = this.taskLeadSearch().toLowerCase().trim();
+    const deals = this.presalesDeals();
+    if (!q) return deals;
+    return deals.filter((l) =>
+      (l.title || '').toLowerCase().includes(q) ||
+      (l.companyName || '').toLowerCase().includes(q) ||
+      (l.leadCode || '').toLowerCase().includes(q) ||
+      (l.contactName || '').toLowerCase().includes(q)
+    );
+  });
+
+  filteredModalSalesLeads = computed(() => {
+    const q = this.taskLeadSearch().toLowerCase().trim();
+    const leads = this.salesLeads();
+    if (!q) return leads;
+    return leads.filter((l) =>
+      (l.title || '').toLowerCase().includes(q) ||
+      (l.companyName || '').toLowerCase().includes(q) ||
+      (l.leadCode || '').toLowerCase().includes(q) ||
+      (l.contactName || '').toLowerCase().includes(q)
+    );
+  });
+
+  filteredModalTaskTypes = computed(() => {
+    const q = this.taskTypeSearch().toLowerCase().trim();
+    if (!q) return this.taskTypes();
+    return this.taskTypes().filter((t) => (t.name || '').toLowerCase().includes(q));
+  });
+
+  taskForm: any = this.blankTaskForm();
+
+  private blankTaskForm() {
+    return {
+      title: '',
+      description: '',
+      parentKind: 'GENERAL' as 'PROJECT' | 'LEAD' | 'GENERAL',
+      projectId: null as number | null,
+      leadId: null as number | null,
+      taskTypeId: null as number | null,
+      priority: 'MEDIUM',
+      startDate: '',
+      dueDate: '',
+      // Pre-sales work is scheduled to an instant, not a day — "6:24 PM on the
+      // 14th" is the whole point of a site visit or a call.
+      dueTime: '',
+      estimatedHours: null as number | null,
+      assigneeIds: [] as number[],
+      attachments: [] as { fileName: string; fileUrl: string; fileSize?: number }[],
+    };
+  }
+
+  closeAllTaskDropdowns() {
+    this.taskProjectDropdownOpen.set(false);
+    this.taskLeadDropdownOpen.set(false);
+    this.taskTypeDropdownOpen.set(false);
+    this.taskPriorityDropdownOpen.set(false);
+    this.taskAssigneeDropdownOpen.set(false);
+  }
+
+  openCreateTask() {
+    this.taskForm = this.blankTaskForm();
+    this.assigneeSearch.set('');
+    this.taskProjectSearch.set('');
+    this.taskLeadSearch.set('');
+    this.taskTypeSearch.set('');
+    this.closeAllTaskDropdowns();
+    this.isAttachmentDragOver.set(false);
+    this.editingPreSalesTaskId.set(null);
+    this.preSalesInfo.set(null);
+    this.isCreateTaskOpen.set(true);
+    this.ensureTaskPickerData();
+  }
+
+  /** Task types and deals, fetched once and reused by every open of the modal. */
+  private ensureTaskPickerData() {
+    if (!this.taskTypes().length) {
+      this.tasksService.getTaskTypes().subscribe({
+        next: (t) => this.taskTypes.set(t || []),
+        error: () => {},
+      });
+    }
+    if (!this.leadOptions().length) {
+      this.tasksService.getLeadOptions().subscribe({
+        next: (l) => this.leadOptions.set(l || []),
+        error: () => {},
+      });
+    }
+  }
+
+  closeCreateTask() {
+    this.closeAllTaskDropdowns();
+    this.isCreateTaskOpen.set(false);
+    this.editingPreSalesTaskId.set(null);
+  }
+
+  toggleTaskAssignee(employeeId: number) {
+    const current = this.taskForm.assigneeIds as number[];
+    // A pre-sales task has exactly one assignee: it is their hours budget it
+    // spends, and only they can move its status.
+    if (this.isPreSalesTarget) {
+      this.taskForm.assigneeIds = current.includes(employeeId) ? [] : [employeeId];
+      this.taskAssigneeDropdownOpen.set(false);
+      return;
+    }
+    this.taskForm.assigneeIds = current.includes(employeeId)
+      ? current.filter((id) => id !== employeeId)
+      : [...current, employeeId];
+  }
+
+  removeTaskAssignee(employeeId: number, event?: Event) {
+    if (event) event.stopPropagation();
+    const current = this.taskForm.assigneeIds as number[];
+    this.taskForm.assigneeIds = current.filter((id) => id !== employeeId);
+  }
+
+  isTaskAssignee(employeeId: number): boolean {
+    return (this.taskForm.assigneeIds as number[]).includes(employeeId);
+  }
+
+  getEmployeeById(id: number): any {
+    return this.employees().find((e: any) => e.id === id);
+  }
+
+  getEmployeeAvatar(emp: any): string | null {
+    return emp?.avatarUrl || emp?.user?.avatarUrl || emp?.profilePicture || emp?.avatar || null;
+  }
+
+  leadLabel(lead: any): string {
+    if (!lead) return '';
+    const code = lead.leadCode ? `[${lead.leadCode}] ` : '';
+    const title = (lead.title || '').trim();
+    const company = (lead.companyName || '').trim();
+    if (title && company) return `${code}${title} — ${company}`;
+    if (title) return `${code}${title}`;
+    if (company) return `${code}${company}`;
+    if (lead.contactName) return `${code}${lead.contactName}`;
+    return `${code}Deal #${lead.id}`;
+  }
+
+  getSelectedProject(): any {
+    return this.projects().find((p) => p.id === this.taskForm.projectId);
+  }
+
+  getSelectedLead(): any {
+    return this.leadOptions().find((l) => l.id === this.taskForm.leadId);
+  }
+
+  getSelectedTaskType(): any {
+    return this.taskTypes().find((t) => t.id === this.taskForm.taskTypeId);
+  }
+
+  getPriorityDetails(priority: string): { label: string; dotClass: string } {
+    switch ((priority || '').toUpperCase()) {
+      case 'CRITICAL':
+        return { label: 'Critical', dotClass: 'dot-critical' };
+      case 'HIGH':
+        return { label: 'High', dotClass: 'dot-high' };
+      case 'MEDIUM':
+        return { label: 'Medium', dotClass: 'dot-medium' };
+      case 'LOW':
+        return { label: 'Low', dotClass: 'dot-low' };
+      default:
+        return { label: priority || 'Medium', dotClass: 'dot-medium' };
+    }
+  }
+
+  selectTaskProject(id: number) {
+    this.taskForm.projectId = id;
+    this.taskProjectDropdownOpen.set(false);
+  }
+
+  selectTaskLead(id: number) {
+    const changed = this.taskForm.leadId !== id;
+    this.taskForm.leadId = id;
+    this.taskLeadDropdownOpen.set(false);
+    if (!changed) return;
+
+    // A pre-sales task may only go to someone on that deal's team, so the
+    // assignee picker has to be repopulated from the deal — and anyone picked
+    // from the previous list is no longer a valid choice.
+    this.taskForm.assigneeIds = [];
+    this.preSalesInfo.set(null);
+    if (this.leadOptions().find((l) => l.id === id)?.flow === 'PRE_SALES') {
+      this.loadPreSalesInfoFor(id);
+    }
+  }
+
+  selectTaskType(id: number | null) {
+    this.taskForm.taskTypeId = id;
+    this.taskTypeDropdownOpen.set(false);
+  }
+
+  selectTaskPriority(p: string) {
+    this.taskForm.priority = p;
+    this.taskPriorityDropdownOpen.set(false);
+  }
+
+  // ── Attachment handling ───────────────────────────────────────────────────
+
+  onAttachmentFilesSelected(event: any) {
+    const files = event.target?.files;
+    if (files && files.length) {
+      this.uploadFiles(Array.from(files));
+    }
+    event.target.value = '';
+  }
+
+  onAttachmentDrop(event: DragEvent) {
+    event.preventDefault();
+    this.isAttachmentDragOver.set(false);
+    if (event.dataTransfer?.files?.length) {
+      this.uploadFiles(Array.from(event.dataTransfer.files));
+    }
+  }
+
+  onAttachmentDragOver(event: DragEvent) {
+    event.preventDefault();
+    this.isAttachmentDragOver.set(true);
+  }
+
+  onAttachmentDragLeave(event: DragEvent) {
+    event.preventDefault();
+    this.isAttachmentDragOver.set(false);
+  }
+
+  uploadFiles(files: File[]) {
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) {
+        this.toast.error(`"${file.name}" exceeds maximum size of 20MB`);
+        continue;
+      }
+      this.isUploadingAttachment.set(true);
+      this.uploadingFileName.set(file.name);
+      this.uploadService.uploadFile(file).subscribe({
+        next: (res: any) => {
+          this.isUploadingAttachment.set(false);
+          this.uploadingFileName.set('');
+          const url = res?.url || res?.fileUrl;
+          if (url) {
+            this.taskForm.attachments.push({
+              fileName: file.name,
+              fileUrl: url,
+              fileSize: file.size,
+            });
+            this.toast.success(`Attached ${file.name}`);
+          }
+        },
+        error: (err: any) => {
+          this.isUploadingAttachment.set(false);
+          this.uploadingFileName.set('');
+          this.toast.error(err?.error?.message || `Failed to upload "${file.name}"`);
+        },
+      });
+    }
+  }
+
+  removeAttachment(index: number, event?: Event) {
+    if (event) event.stopPropagation();
+    this.taskForm.attachments.splice(index, 1);
+  }
+
+  formatFileSize(bytes?: number): string {
+    if (!bytes || isNaN(bytes)) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  getFileExtension(fileName: string): string {
+    if (!fileName) return 'FILE';
+    const parts = fileName.split('.');
+    return (parts.length > 1 ? parts.pop()! : 'FILE').toUpperCase();
+  }
+
+  saveTask() {
+    if (!this.taskForm.title?.trim()) {
+      this.toast.error('Give the task a title.');
+      return;
+    }
+    if (this.taskForm.parentKind === 'PROJECT' && !this.taskForm.projectId) {
+      this.toast.error('Choose a project.');
+      return;
+    }
+    if (this.taskForm.parentKind === 'LEAD' && !this.taskForm.leadId) {
+      this.toast.error('Choose a pre-sales deal or lead.');
+      return;
+    }
+
+    // A pre-sales deal gets a pre-sales task — a different model, different
+    // endpoint, and an hours budget the CRM enforces.
+    if (this.isPreSalesTarget) {
+      this.savePreSalesTask();
+      return;
+    }
+
+    this.isSavingTask.set(true);
+    this.tasksService.createTask({
+      title: this.taskForm.title.trim(),
+      description: this.taskForm.description || null,
+      parentKind: this.taskForm.parentKind,
+      projectId: this.taskForm.parentKind === 'PROJECT' ? Number(this.taskForm.projectId) : undefined,
+      leadId: this.taskForm.parentKind === 'LEAD' ? Number(this.taskForm.leadId) : undefined,
+      taskTypeId: this.taskForm.taskTypeId ? Number(this.taskForm.taskTypeId) : undefined,
+      priority: this.taskForm.priority,
+      startDate: this.taskForm.startDate || undefined,
+      dueDate: this.taskForm.dueDate || undefined,
+      estimatedHours: this.taskForm.estimatedHours != null && this.taskForm.estimatedHours !== ''
+        ? Number(this.taskForm.estimatedHours) : undefined,
+      assigneeIds: this.taskForm.assigneeIds,
+      attachments: this.taskForm.attachments?.length ? this.taskForm.attachments : undefined,
+    }).subscribe({
+      next: (created: any) => {
+        this.isSavingTask.set(false);
+        this.isCreateTaskOpen.set(false);
+        this.toast.success(`${created?.key || 'Task'} created`);
+        this.loadMyTasks();
+      },
+      error: (err) => {
+        this.isSavingTask.set(false);
+        this.toast.error(err?.error?.message || 'Could not create the task.');
+      },
+    });
+  }
+
+  // ── My Tasks ─────────────────────────────────────────────────────────────
+
+  myTasksFilter = signal<'all' | 'overdue' | 'due-week' | 'PROJECT' | 'PRE_SALES' | 'GENERAL'>('all');
+
+  setMyTasksFilter(filter: 'all' | 'overdue' | 'due-week' | 'PROJECT' | 'PRE_SALES' | 'GENERAL') {
+    this.myTasksFilter.set(filter);
+  }
+
+  /**
+   * The administrator's company-wide view.
+   *
+   * Without it an admin with nothing assigned to them opened this screen onto
+   * "No tasks assigned to you" while the company had open work everywhere.
+   */
+  setMyTasksScope(scope: TaskScope) {
+    if (this.myTasksScope() === scope) return;
+    this.userExplicitlyToggledScope = true;
+    this.myTasksScope.set(scope);
+    this.loadMyTasks();
+  }
+
+  loadMyTasks() {
+    this.myTasksLoading.set(true);
+    this.tasksService.getMyTasks({
+      includeDone: this.myTasksShowDone(),
+      scope: this.myTasksScope(),
+    }).subscribe({
+      next: (res) => {
+        this.myTasks.set(res.items || []);
+        this.myTasksTruncated.set(!!res.truncated);
+        // What the server gave us, not what we asked for.
+        if (res.scope) this.myTasksScope.set(res.scope);
+        this.myTasksLoading.set(false);
+        this.myTasksLoaded.set(true);
+      },
+      error: () => {
+        this.myTasks.set([]);
+        this.myTasksLoading.set(false);
+        this.myTasksLoaded.set(true);
+      },
+    });
+  }
+
+  toggleMyTasksDone() {
+    this.myTasksShowDone.set(!this.myTasksShowDone());
+    this.loadMyTasks();
+  }
+
+  myTasksCount = computed(() => this.myTasks().length);
+  myTasksOverdueCount = computed(() => this.myTasks().filter((t) => t.isOverdue).length);
+  myTasksBlockedCount = computed(() => this.myTasks().filter((t) => t.blockedBy?.length).length);
+  myTasksDueWeekCount = computed(() => {
+    const now = new Date();
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return this.myTasks().filter((t) => {
+      if (!t.dueDate) return false;
+      const d = new Date(t.dueDate);
+      return d >= now && d <= nextWeek;
+    }).length;
+  });
+  myTasksProjectCount = computed(() => this.myTasks().filter((t) => t.source === 'PROJECT').length);
+  myTasksPreSalesCount = computed(() => this.myTasks().filter((t) => t.source === 'PRE_SALES').length);
+  myTasksGeneralCount = computed(() => this.myTasks().filter((t) => t.source === 'GENERAL').length);
+
+  filteredMyTasks = computed(() => {
+    let list = this.myTasks();
+    const filter = this.myTasksFilter();
+    if (filter === 'overdue') {
+      list = list.filter((t) => t.isOverdue);
+    } else if (filter === 'due-week') {
+      const now = new Date();
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      list = list.filter((t) => {
+        if (!t.dueDate) return false;
+        const d = new Date(t.dueDate);
+        return d >= now && d <= nextWeek;
+      });
+    } else if (filter === 'PROJECT' || filter === 'PRE_SALES' || filter === 'GENERAL') {
+      list = list.filter((t) => t.source === filter);
+    }
+
+    const q = this.searchQuery().toLowerCase().trim();
+    if (q) {
+      list = list.filter((t) =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.refKey || '').toLowerCase().includes(q) ||
+        (t.parent?.name || '').toLowerCase().includes(q) ||
+        (t.taskType || '').toLowerCase().includes(q) ||
+        (t.assignees || []).some((a: any) =>
+          `${a.firstName || ''} ${a.lastName || ''}`.toLowerCase().includes(q)
+        )
+      );
+    }
+    return list;
+  });
+
+  /**
+   * Where a row goes depends on what it actually is, and the server already
+   * decided — see MyTaskDto.link. Routing rules per source in one place.
+   */
+  onMyTaskRowClicked(event: any) {
+    const task: MyTask = event?.data;
+    if (!task) return;
+
+    // The action buttons are rendered inside the row, so a click on one of
+    // them arrives here as a row click too. Whichever was hit wins; only a
+    // click on the row itself falls through to navigation.
+    const hit = (event.event?.target as HTMLElement | undefined)?.closest?.('[data-act]') as HTMLElement | null;
+    const act = hit?.getAttribute('data-act');
+    if (act) {
+      if (act === 'status') this.openPreSalesStatus(task, hit!.getAttribute('data-status') || 'WORKING');
+      else if (act === 'history') this.openPreSalesHistory(task);
+      else if (act === 'edit') this.openEditPreSalesTask(task);
+      else if (act === 'delete') this.deletePreSalesTask(task);
+      return;
+    }
+
+    // A pre-sales task is worked from this screen now, so its row opens its
+    // trail rather than navigating to a page that no longer lists it.
+    if (task.source === 'PRE_SALES') {
+      this.openPreSalesHistory(task);
+      return;
+    }
+    if (!task.link) return;
+    this.router.navigate([task.link.route], { queryParams: task.link.queryParams });
+  }
+
+  // ── Pre-sales tasks ──────────────────────────────────────────────────────
+  //
+  // A pre-sales task used to be created and driven from the deal page. That
+  // table has moved here, so everything it could do has to live here too:
+  // raising one, editing it, walking it through NEW → WORKING → ON HOLD →
+  // COMPLETED, reading its history, and deleting it.
+  //
+  // It is NOT an Issue. It is assigned within a deal's pre-sales team and it
+  // spends that person's hours budget, both enforced by the CRM — so it keeps
+  // its own model and its own endpoints, and the composer changes shape when
+  // the chosen deal turns out to be a pre-sales engagement.
+
+  /**
+   * Ringed when a notification links straight to one row.
+   *
+   * A plain field, not a signal: it is read from inside an ag-Grid row-class
+   * callback, which runs during the grid's own render pass, and a signal read
+   * there ties grid rendering to Angular's reactive graph for no benefit — the
+   * value is set once, before any rows exist.
+   */
+  highlightedPreSalesTaskId: number | null = null;
+
+  /** The chosen deal's team and permissions, loaded when a deal is picked. */
+  preSalesInfo = signal<PreSalesInfo | null>(null);
+  preSalesInfoLoading = signal<boolean>(false);
+  editingPreSalesTaskId = signal<number | null>(null);
+
+  /**
+   * True when what is being raised is a pre-sales task rather than an issue.
+   *
+   * Decided by the deal, not by a fourth tab in the picker: the dropdown
+   * already separates "Pre-Sales Deals" from "Sales Opportunities", and asking
+   * someone to state twice which kind of thing they just chose is a question
+   * with only one right answer. A plain getter rather than a computed because
+   * taskForm is an object, not a signal.
+   */
+  get isPreSalesTarget(): boolean {
+    if (this.taskForm.parentKind !== 'LEAD' || !this.taskForm.leadId) return false;
+    return this.getSelectedLead()?.flow === 'PRE_SALES';
+  }
+
+  /** Only ACTIVE members may be given a task — the server refuses the rest. */
+  activePreSalesMembers(): any[] {
+    return (this.preSalesInfo()?.members || []).filter((m: any) => m.status === 'ACTIVE');
+  }
+
+  /** Server-decided, never inferred from the role here. */
+  get canCreatePreSalesTask(): boolean {
+    return this.preSalesInfo()?.permissions?.canCreateTasks === true;
+  }
+
+  /**
+   * Who this task may go to. For a pre-sales deal that is the deal's own team;
+   * for anything else it is everybody.
+   */
+  taskAssigneeCandidates(): any[] {
+    if (!this.isPreSalesTarget) return this.employees();
+    return this.activePreSalesMembers().map((m: any) => ({
+      ...(m.employee || {}),
+      id: m.employeeId,
+    }));
+  }
+
+  filteredTaskAssignees(): any[] {
+    const q = this.assigneeSearch().toLowerCase().trim();
+    const list = this.taskAssigneeCandidates();
+    if (!q) return list;
+    return list.filter((e: any) =>
+      `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(q) ||
+      (e.designation?.name || '').toLowerCase().includes(q) ||
+      (e.department?.name || '').toLowerCase().includes(q) ||
+      (e.user?.email || '').toLowerCase().includes(q)
+    );
+  }
+
+  /** Reopen the composer on an existing pre-sales task. */
+  openEditPreSalesTask(task: MyTask) {
+    if (!task.preSales) return;
+    this.taskForm = this.blankTaskForm();
+    this.taskForm.parentKind = 'LEAD';
+    this.taskForm.leadId = task.preSales.leadId;
+    this.taskForm.title = task.title || '';
+    this.taskForm.description = task.preSales.description || '';
+    this.taskForm.assigneeIds = task.preSales.assignedToId ? [task.preSales.assignedToId] : [];
+    if (task.preSales.scheduledAt) {
+      const when = new Date(task.preSales.scheduledAt);
+      this.taskForm.dueDate = this.toDateInput(when);
+      this.taskForm.dueTime = when.toTimeString().slice(0, 5);
+    }
+    if (task.preSales.estimatedMinutes != null) {
+      this.taskForm.estimatedHours = Math.round((task.preSales.estimatedMinutes / 60) * 100) / 100;
+    }
+    const matchedType = this.taskTypes().find((t) => t.name === task.taskType);
+    this.taskForm.taskTypeId = matchedType?.id ?? null;
+
+    this.editingPreSalesTaskId.set(task.id);
+    this.assigneeSearch.set('');
+    this.closeAllTaskDropdowns();
+    this.isCreateTaskOpen.set(true);
+    this.ensureTaskPickerData();
+    this.loadPreSalesInfoFor(task.preSales.leadId);
+  }
+
+  /** A date input wants local YYYY-MM-DD; toISOString would shift the day. */
+  private toDateInput(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  /**
+   * `expectAssigneeId` is the person a deal page pre-selected. It is checked
+   * against the team once the team is known — someone taken off the deal since
+   * that page was last loaded would otherwise sit in the form as a chip and come
+   * back as a 400 on save.
+   */
+  private loadPreSalesInfoFor(leadId: number, expectAssigneeId: number | null = null) {
+    this.preSalesInfo.set(null);
+    this.preSalesInfoLoading.set(true);
+    this.tasksService.getPreSalesInfo(leadId).subscribe({
+      next: (info) => {
+        this.preSalesInfo.set(info);
+        this.preSalesInfoLoading.set(false);
+        if (expectAssigneeId && !this.activePreSalesMembers().some((m: any) => m.employeeId === expectAssigneeId)) {
+          this.taskForm.assigneeIds = [];
+          this.toast.error('That person is no longer on this deal\u2019s pre-sales team. Choose someone else.');
+        }
+      },
+      error: () => {
+        this.preSalesInfo.set(null);
+        this.preSalesInfoLoading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Save the composer as a pre-sales task.
+   *
+   * Duration goes over as minutes: the CRM stores minutes and the budget is
+   * checked in minutes, so rounding here once beats rounding in two places.
+   */
+  private savePreSalesTask() {
+    const leadId = Number(this.taskForm.leadId);
+    const assignedToId = (this.taskForm.assigneeIds as number[])[0];
+    if (!assignedToId) {
+      this.toast.error('Choose the pre-sales specialist this task is for.');
+      return;
+    }
+    if (this.isUploadingAttachment()) {
+      this.toast.error('Wait for the attachments to finish uploading.');
+      return;
+    }
+
+    const hours = this.taskForm.estimatedHours;
+    const payload: any = {
+      title: this.taskForm.title.trim(),
+      description: this.taskForm.description || '',
+      taskType: this.getSelectedTaskType()?.name || '',
+      assignedToId,
+      scheduledDate: this.taskForm.dueDate || '',
+      scheduledTime: this.taskForm.dueTime || '',
+      estimatedMinutes: hours != null && hours !== '' ? Math.round(Number(hours) * 60) : null,
+    };
+    const editingId = this.editingPreSalesTaskId();
+    // The CRM only takes attachments when the task is raised; on an edit they
+    // are attached through a status change instead.
+    if (!editingId && this.taskForm.attachments?.length) {
+      payload.attachments = this.taskForm.attachments;
+    }
+
+    this.isSavingTask.set(true);
+    const request = editingId
+      ? this.tasksService.updatePreSalesTask(leadId, editingId, payload)
+      : this.tasksService.createPreSalesTask(leadId, payload);
+
+    request.subscribe({
+      next: () => {
+        this.isSavingTask.set(false);
+        this.isCreateTaskOpen.set(false);
+        this.editingPreSalesTaskId.set(null);
+        this.toast.success(editingId ? 'Pre-sales task updated' : 'Pre-sales task created');
+        this.loadMyTasks();
+      },
+      error: (err) => {
+        this.isSavingTask.set(false);
+        this.toast.error(err?.error?.message || 'Could not save the pre-sales task.');
+      },
+    });
+  }
+
+  // ── pre-sales status ─────────────────────────────────────────────────────
+
+  isPreSalesStatusOpen = signal<boolean>(false);
+  preSalesStatusTask = signal<MyTask | null>(null);
+  preSalesStatusForm: { status: string; remark: string; attachments: any[] } =
+    { status: 'WORKING', remark: '', attachments: [] };
+  isSavingPreSalesStatus = signal<boolean>(false);
+  uploadingPreSalesFiles = signal<number>(0);
+
+  /** Which moves this task can make next. COMPLETED is terminal. */
+  nextPreSalesStatuses(task: MyTask | null): string[] {
+    switch (String(task?.rawStatus || 'NEW')) {
+      case 'NEW': return ['WORKING'];
+      case 'WORKING': return ['ON_HOLD', 'COMPLETED'];
+      case 'ON_HOLD': return ['WORKING', 'COMPLETED'];
+      default: return [];
+    }
+  }
+
+  preSalesStatusLabel(status: string): string {
+    return status === 'WORKING' ? 'Start' : status === 'ON_HOLD' ? 'Hold' : 'Complete';
+  }
+
+  preSalesStatusHeading(status: string): string {
+    return status === 'WORKING' ? 'Start working on this task'
+      : status === 'ON_HOLD' ? 'Put this task on hold'
+      : 'Mark this task as completed';
+  }
+
+  /** Required for ON_HOLD and COMPLETED — the server insists too. */
+  get preSalesRemarkRequired(): boolean {
+    return this.preSalesStatusForm.status === 'ON_HOLD' || this.preSalesStatusForm.status === 'COMPLETED';
+  }
+
+  openPreSalesStatus(task: MyTask, status: string) {
+    this.preSalesStatusTask.set(task);
+    this.preSalesStatusForm = { status, remark: '', attachments: [] };
+    this.uploadingPreSalesFiles.set(0);
+    this.isPreSalesStatusOpen.set(true);
+  }
+
+  closePreSalesStatus() {
+    if (this.isSavingPreSalesStatus()) return;
+    this.isPreSalesStatusOpen.set(false);
+    this.preSalesStatusTask.set(null);
+  }
+
+  onPreSalesStatusFilesSelected(event: any) {
+    const files: File[] = Array.from(event.target?.files || []);
+    event.target.value = '';
+    for (const file of files) {
+      this.uploadingPreSalesFiles.update((n) => n + 1);
+      this.uploadService.uploadFile(file).subscribe({
+        next: (res: any) => {
+          const url = res?.url || res?.fileUrl;
+          if (url) {
+            this.preSalesStatusForm.attachments = [
+              ...this.preSalesStatusForm.attachments,
+              { fileName: file.name, fileUrl: url, fileSize: file.size },
+            ];
+          }
+          this.uploadingPreSalesFiles.update((n) => n - 1);
+        },
+        error: () => {
+          this.uploadingPreSalesFiles.update((n) => n - 1);
+          this.toast.error(`Failed to upload "${file.name}"`);
+        },
+      });
+    }
+  }
+
+  savePreSalesStatus() {
+    const task = this.preSalesStatusTask();
+    if (!task?.preSales) return;
+    if (this.preSalesRemarkRequired && !this.preSalesStatusForm.remark.trim()) {
+      this.toast.error(this.preSalesStatusForm.status === 'ON_HOLD'
+        ? 'Say why the task is on hold.'
+        : 'Add a completion remark before marking the task complete.');
+      return;
+    }
+    if (this.uploadingPreSalesFiles() > 0) {
+      this.toast.error('Wait for the attachments to finish uploading.');
+      return;
+    }
+
+    this.isSavingPreSalesStatus.set(true);
+    this.tasksService.changePreSalesTaskStatus(task.preSales.leadId, task.id, this.preSalesStatusForm)
+      .subscribe({
+        next: () => {
+          this.isSavingPreSalesStatus.set(false);
+          this.isPreSalesStatusOpen.set(false);
+          this.preSalesStatusTask.set(null);
+          this.toast.success('Task updated');
+          this.loadMyTasks();
+        },
+        error: (err) => {
+          this.isSavingPreSalesStatus.set(false);
+          this.toast.error(err?.error?.message || 'Could not update the task.');
+        },
+      });
+  }
+
+  // ── pre-sales history ────────────────────────────────────────────────────
+
+  isPreSalesHistoryOpen = signal<boolean>(false);
+  preSalesHistoryTask = signal<MyTask | null>(null);
+  preSalesHistory = signal<PreSalesTaskHistoryEntry[]>([]);
+  preSalesHistoryLoading = signal<boolean>(false);
+
+  openPreSalesHistory(task: MyTask) {
+    if (!task.preSales) return;
+    this.preSalesHistoryTask.set(task);
+    this.preSalesHistory.set([]);
+    this.preSalesHistoryLoading.set(true);
+    this.isPreSalesHistoryOpen.set(true);
+    this.tasksService.getPreSalesTaskHistory(task.preSales.leadId, task.id).subscribe({
+      next: (rows) => {
+        this.preSalesHistory.set(rows || []);
+        this.preSalesHistoryLoading.set(false);
+      },
+      error: () => {
+        this.preSalesHistoryLoading.set(false);
+        this.toast.error('Could not load the task history.');
+      },
+    });
+  }
+
+  closePreSalesHistory() {
+    this.isPreSalesHistoryOpen.set(false);
+    this.preSalesHistoryTask.set(null);
+  }
+
+  preSalesStatusClass(status: string): string {
+    return 'ps-status-' + String(status || 'NEW').toLowerCase().replace('_', '-');
+  }
+
+  preSalesStatusWord(status: string): string {
+    return String(status || 'NEW').replace('_', ' ');
+  }
+
+  personName(p: any): string {
+    return `${p?.firstName || ''} ${p?.lastName || ''}`.trim() || '—';
+  }
+
+  // ── deleting ─────────────────────────────────────────────────────────────
+
+  /** Deleting removes the task and its history; completing keeps the record. */
+  async deletePreSalesTask(task: MyTask) {
+    if (!task.preSales) return;
+    const ok = await this.dialog.confirm(
+      `Delete "${task.title}"? Its status history and attachments go with it.`,
+      'Delete task', 'Delete', 'Cancel',
+    );
+    if (!ok) return;
+    this.tasksService.deletePreSalesTask(task.preSales.leadId, task.id).subscribe({
+      next: () => {
+        this.toast.success('Task deleted');
+        this.loadMyTasks();
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not delete the task.'),
+    });
+  }
+
+  /** Escapes text bound for a raw-HTML ag-Grid cell. */
+  private esc(v: any): string {
+    return String(v ?? '').replace(/[&<>"]/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
+  }
+
+  /**
+   * Whether the grid can size itself to its rows.
+   *
+   * ag-Grid's 'normal' layout fills its container, and this wrapper has no
+   * height of its own — so a list long enough to leave 'autoHeight' collapsed
+   * to nothing but a pagination bar. Ten rows was never enough to notice; the
+   * administrator's company-wide view, at two hundred, is.
+   */
+  myTasksGridAutoHeight = computed(() => this.filteredMyTasks().length <= 10);
+
+  myTasksGridApi: any = null;
+
+  onMyTasksGridReady(params: any) {
+    this.myTasksGridApi = params.api;
+    setTimeout(() => {
+      params.api.sizeColumnsToFit();
+      const scrollContainer = document.querySelector('.my-tasks-grid .ag-body-horizontal-scroll-viewport');
+      if (scrollContainer) (scrollContainer as HTMLElement).scrollLeft = 0;
+    }, 50);
+  }
+
+  myTasksDefaultColDef: ColDef = {
+    sortable: true,
+    filter: false,
+    resizable: true,
+  };
+
+  /** Tints each row by status so the queue is scannable at a glance, exactly like CRM tickets. */
+  myTasksRowClassRules = {
+    // The row a pre-sales assignment notification pointed at.
+    'row-linked': (p: any) =>
+      p.data?.source === 'PRE_SALES' && p.data?.id === this.highlightedPreSalesTaskId,
+    'row-status-open':        (p: any) => p.data?.status === 'TODO' || p.data?.status === 'OPEN',
+    'row-status-in-progress': (p: any) => p.data?.status === 'IN_PROGRESS' || p.data?.status === 'IN_REVIEW',
+    'row-status-resolved':    (p: any) => p.data?.status === 'DONE' || p.data?.status === 'RESOLVED',
+    'row-status-closed':      (p: any) => p.data?.status === 'CANCELLED' || p.data?.status === 'CLOSED',
+    'row-status-rejected':    (p: any) => p.data?.status === 'BLOCKED' || (p.data?.isOverdue && p.data?.status !== 'DONE' && p.data?.status !== 'CANCELLED'),
+  };
+
+  myTasksColDefs: ColDef[] = [
+    {
+      field: 'refKey',
+      headerName: 'REF',
+      width: 120,
+      minWidth: 110,
+      maxWidth: 140,
+      pinned: 'left',
+      cellRenderer: (p: any) => `<span class="ticket-num-badge" title="${this.esc(p.value)}">${this.esc(p.value || '—')}</span>`,
+    },
+    {
+      field: 'title',
+      headerName: 'TITLE & TYPE',
+      flex: 1,
+      minWidth: 220,
+      maxWidth: 380,
+      cellRenderer: (p: any) => {
+        const typeKey = (p.data?.taskType || 'TASK').toUpperCase();
+        const typeLabel = this.esc(p.data?.taskType || 'Task');
+        let typeBadgeClass = 'type-improvement';
+        if (typeKey.includes('BUG')) typeBadgeClass = 'type-bug';
+        else if (typeKey.includes('FEATURE')) typeBadgeClass = 'type-feature';
+        else if (typeKey.includes('QUESTION') || typeKey.includes('CALL')) typeBadgeClass = 'type-question';
+        else if (typeKey.includes('ATTENDANCE')) typeBadgeClass = 'type-attendance';
+
+        const blockers = p.data?.blockedBy?.length
+          ? `<span class="type-pill type-bug" style="margin-left:4px;" title="Blocked by ${this.esc(p.data.blockedBy.map((b: any) => b.refKey).join(', '))}">BLOCKED BY ${p.data.blockedBy.length}</span>`
+          : '';
+
+        return `
+          <div class="cell-ticket-title-wrapper">
+            <div class="cell-title-text" title="${this.esc(p.value || '')}">${this.esc(p.value || '')}</div>
+            <div class="cell-meta-row">
+              <span class="type-pill ${typeBadgeClass}">${typeLabel}</span>
+              ${blockers}
+            </div>
+          </div>
+        `;
+      },
+    },
+    {
+      field: 'source',
+      headerName: 'SOURCE',
+      width: 100,
+      minWidth: 95,
+      maxWidth: 115,
+      cellRenderer: (p: any) => {
+        const val = (p.value || 'GENERAL').toUpperCase();
+        let cls = 'platform-web';
+        let label = 'GENERAL';
+        if (val === 'PROJECT') { cls = 'platform-web'; label = 'PROJECT'; }
+        else if (val === 'PRE_SALES') { cls = 'platform-mobile'; label = 'PRE-SALES'; }
+        else if (val === 'GENERAL') { cls = 'platform-both'; label = 'GENERAL'; }
+        return `<span class="platform-tag ${cls}">${label}</span>`;
+      },
+    },
+    {
+      colId: 'belongsTo',
+      headerName: 'BELONGS TO',
+      width: 170,
+      minWidth: 150,
+      valueGetter: (p: any) => p.data?.parent?.name ?? '—',
+      cellRenderer: (p: any) => `<span class="dept-cell" title="${this.esc(p.value)}">${this.esc(p.value || '—')}</span>`,
+    },
+    {
+      field: 'priority',
+      headerName: 'PRIORITY',
+      width: 110,
+      minWidth: 110,
+      cellRenderer: (p: any) => {
+        const raw = String(p.value || 'LOW').toUpperCase();
+        const dotColors: Record<string, string> = {
+          CRITICAL: '#dc2626',
+          HIGH: '#ea580c',
+          MEDIUM: '#d97706',
+          LOW: '#94a3b8',
+        };
+        const dotColor = dotColors[raw] || '#94a3b8';
+        const cls = `priority-${raw.toLowerCase()}`;
+        return `<span class="priority-pill ${cls}"><span class="priority-dot" style="background-color: ${dotColor};"></span>${raw}</span>`;
+      },
+    },
+    {
+      field: 'status',
+      headerName: 'STATUS',
+      width: 125,
+      minWidth: 125,
+      cellRenderer: (p: any) => {
+        const raw = String(p.value || 'TODO').toUpperCase();
+        const statusMap: Record<string, { cls: string; label: string }> = {
+          TODO:        { cls: 'status-open', label: 'OPEN' },
+          OPEN:        { cls: 'status-open', label: 'OPEN' },
+          IN_PROGRESS: { cls: 'status-in-progress', label: 'IN PROGRESS' },
+          IN_REVIEW:   { cls: 'status-in-progress', label: 'IN REVIEW' },
+          DONE:        { cls: 'status-resolved', label: 'RESOLVED' },
+          RESOLVED:    { cls: 'status-resolved', label: 'RESOLVED' },
+          CLOSED:      { cls: 'status-closed', label: 'CLOSED' },
+          CANCELLED:   { cls: 'status-closed', label: 'CLOSED' },
+          BLOCKED:     { cls: 'status-rejected', label: 'BLOCKED' },
+          REJECTED:    { cls: 'status-rejected', label: 'REJECTED' },
+        };
+        const s = statusMap[raw] || { cls: 'status-open', label: raw.replace(/_/g, ' ') };
+        return `<span class="status-pill ${s.cls}"><span class="status-indicator-dot"></span>${s.label}</span>`;
+      },
+    },
+    {
+      field: 'dueDate',
+      headerName: 'DEADLINE',
+      width: 120,
+      minWidth: 115,
+      cellRenderer: (p: any) => {
+        if (!p.value) return '<span style="color:#94a3b8;">—</span>';
+        const d = new Date(p.value);
+        const str = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        if (p.data?.isOverdue && p.data?.status !== 'DONE' && p.data?.status !== 'CANCELLED') {
+          return `<span style="color: #dc2626; font-weight: 700; font-size: 12px;">${str}</span>`;
+        }
+        return `<span style="color: #475569; font-size: 12.5px; font-weight: 500;">${str}</span>`;
+      },
+    },
+    {
+      field: 'assignee',
+      headerName: 'ASSIGNEE',
+      width: 155,
+      minWidth: 155,
+      sortable: false,
+      cellRenderer: (p: any) => {
+        const assignees: any[] = p.data?.assignees || [];
+        if (!assignees.length) {
+          return `<div class="user-cell unassigned"><span class="avatar-circle neutral">?</span><span class="user-name-text">Unassigned</span></div>`;
+        }
+        if (assignees.length === 1) {
+          const a = assignees[0];
+          const name = `${a.firstName || ''} ${a.lastName || ''}`.trim();
+          const initials = ((a.firstName?.[0] || '') + (a.lastName?.[0] || '')).toUpperCase() || '?';
+          const avatarHtml = a.avatarUrl
+            ? `<img class="avatar-img" src="${this.esc(a.avatarUrl)}" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span class="avatar-circle" style="display:none;">${initials}</span>`
+            : `<span class="avatar-circle">${initials}</span>`;
+          return `
+            <div class="user-cell" title="${this.esc(name)}">
+              ${avatarHtml}
+              <div class="user-info">
+                <span class="user-name-text">${this.esc(name)}</span>
+              </div>
+            </div>
+          `;
+        }
+        const visible = assignees.slice(0, 3);
+        const extra = assignees.length - 3;
+        const stack = visible.map((a, i) => {
+          const ml = i === 0 ? '0' : '-8px';
+          const initials = ((a.firstName?.[0] || '') + (a.lastName?.[0] || '')).toUpperCase() || '?';
+          return a.avatarUrl
+            ? `<img class="avatar-img" src="${this.esc(a.avatarUrl)}" style="margin-left:${ml};z-index:${3-i};" alt="" />`
+            : `<span class="avatar-circle" style="margin-left:${ml};z-index:${3-i};">${initials}</span>`;
+        }).join('');
+        const extraTag = extra > 0 ? `<span class="avatar-circle neutral" style="margin-left:-6px;font-size:9px;">+${extra}</span>` : '';
+        return `<div class="user-cell"><div style="display:flex;align-items:center;">${stack}${extraTag}</div></div>`;
+      }
+    },
+    {
+      headerName: 'ACTIONS',
+      // Wide enough for a pre-sales row, which carries its status moves as
+      // well as its trail — everything the deal page used to offer.
+      width: 210,
+      minWidth: 190,
+      sortable: false,
+      filter: false,
+      pinned: 'right',
+      cellRenderer: (p: any) => {
+        const task: MyTask = p.data;
+        if (task?.source !== 'PRE_SALES') {
+          return `<button class="btn-grid-action" title="View details"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> <span>Details</span></button>`;
+        }
+
+        // Flags come from the server — see MyTaskDto.preSales. Rendering a
+        // button the caller may not use only produces a 403 they cannot act on.
+        const ps = task.preSales;
+        const moves = ps?.canChangeStatus ? this.nextPreSalesStatuses(task) : [];
+        const statusBtns = moves.map((st) =>
+          `<button class="btn-grid-action ps-move ps-move-${st.toLowerCase().replace('_', '-')}" data-act="status" data-status="${st}" title="${this.esc(this.preSalesStatusHeading(st))}">${this.esc(this.preSalesStatusLabel(st))}</button>`,
+        ).join('');
+
+        const icon = (act: string, title: string, path: string, cls = '') =>
+          `<button class="btn-grid-icon ${cls}" data-act="${act}" title="${this.esc(title)}"><svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg></button>`;
+
+        const history = icon('history', 'Status history', '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>');
+        const manage = ps?.canManage
+          ? icon('edit', 'Edit task', '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>')
+            + icon('delete', 'Delete task', '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>', 'danger')
+          : '';
+
+        return `<div class="ps-row-actions">${statusBtns}${history}${manage}</div>`;
+      },
+    }
+  ];
 
   loadStarredAndRecent() {
     try {

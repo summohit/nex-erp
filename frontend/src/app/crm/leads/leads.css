@@ -206,14 +206,18 @@
   transform: translateY(-1px);
 }
 
-/* Filter Bar Card */
 .filter-bar-card {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: 14px;
   border: 1px solid #e2e8f0;
   padding: 12px 18px;
   margin-bottom: 20px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  position: sticky;
+  top: 64px;
+  z-index: 35;
 }
 
 .filter-bar-card-wrap {
@@ -1410,7 +1414,8 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
-  max-height: 100%;
+  max-height: calc(100vh - 230px);
+  min-height: 480px;
 }
 
 .column-header {
@@ -1419,6 +1424,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  flex-shrink: 0;
 }
 
 .column-header-left {
@@ -3529,7 +3543,9 @@ textarea:focus {
 }
 .leads-table-scroll {
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: auto;
+  max-height: calc(100vh - 220px);
+  min-height: 420px;
   -webkit-overflow-scrolling: touch;
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3564,9 +3580,10 @@ textarea:focus {
   color: #115e59;
 }
 
-/* Custom styled bottom scrollbar for the deals table */
+/* Custom styled bottom and vertical scrollbars for the deals table */
 .leads-table-scroll::-webkit-scrollbar {
-  height: 12px;
+  height: 10px;
+  width: 8px;
 }
 .leads-table-scroll::-webkit-scrollbar-track {
   background: #f1f5f9;
@@ -3575,7 +3592,7 @@ textarea:focus {
 .leads-table-scroll::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 10px;
-  border: 3px solid #f1f5f9;
+  border: 2px solid #f1f5f9;
 }
 .leads-table-scroll::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
@@ -3601,7 +3618,7 @@ textarea:focus {
   text-transform: uppercase;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 20;
 }
 /* Sticky Actions column so action buttons stay visible while scrolling */
 .leads-table .col-actions-sticky {
@@ -3609,8 +3626,12 @@ textarea:focus {
   right: 0;
   background: #f8fafc;
   box-shadow: -4px 0 8px rgba(16, 24, 40, 0.06);
-  z-index: 2;
+  z-index: 21;
   text-align: right;
+}
+.leads-table th.col-actions-sticky {
+  z-index: 25;
+  top: 0;
 }
 .leads-table td.col-actions-sticky {
   background: #ffffff;

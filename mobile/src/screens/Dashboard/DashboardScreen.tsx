@@ -19,6 +19,8 @@ import { useFieldVisitStore } from '../../store/fieldVisitStore';
 import { formatElapsed } from '../../utils/haversine';
 import { navigateTo } from '../../navigation/navigationUtils';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
+import LateClockOutModal from '../../components/LateClockOutModal';
+import { CLOCK_ERROR, clockRefusal } from '../../api/attendanceService';
 import {
   Clock,
   Play,
@@ -216,6 +218,14 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
+  /**
+   * The previous day the server says is still open, if any.
+   *
+   * Two refusals drive everything below, and both are recognised by a stable
+   * `code` rather than by their message text — see CLOCK_ERROR.
+   */
+  const [lateClockOut, setLateClockOut] = useState<{ visible: boolean; day?: string }>({ visible: false });
+
   const handleAttendanceToggle = async () => {
     try {
       if (todayAttendance?.clockIn && !todayAttendance?.clockOut) {
@@ -226,7 +236,46 @@ export default function DashboardScreen() {
         setFeedback({ visible: true, type: 'success', title: 'Shift Started', message: 'You have clocked in successfully.' });
       }
     } catch (err: any) {
-      setFeedback({ visible: true, type: 'error', title: 'Action Failed', message: err?.message || 'Failed to update attendance' });
+      const refusal = clockRefusal(err);
+
+      // "That is a previous day — why now?" Ask, then retry with the answer.
+      if (refusal.code === CLOCK_ERROR.LATE_REASON_REQUIRED) {
+        setLateClockOut({ visible: true, day: refusal.openSessionDate });
+        return;
+      }
+
+      // "You still have an earlier day open." Closing it is the only way
+      // forward, so try that rather than leaving a dead end — the server will
+      // then ask for a reason if it decides one is needed, which keeps
+      // "after midnight" defined in exactly one place.
+      if (refusal.code === CLOCK_ERROR.OPEN_PREVIOUS_SESSION) {
+        try {
+          await clockOut();
+          setFeedback({ visible: true, type: 'success', title: 'Previous Shift Closed', message: 'Your earlier session has been clocked out. You can start your shift now.' });
+        } catch (inner: any) {
+          const innerRefusal = clockRefusal(inner);
+          if (innerRefusal.code === CLOCK_ERROR.LATE_REASON_REQUIRED) {
+            setLateClockOut({ visible: true, day: innerRefusal.openSessionDate });
+            return;
+          }
+          setFeedback({ visible: true, type: 'error', title: 'Action Failed', message: innerRefusal.message || refusal.message || 'Failed to update attendance' });
+        }
+        return;
+      }
+
+      setFeedback({ visible: true, type: 'error', title: 'Action Failed', message: refusal.message || err?.message || 'Failed to update attendance' });
+    }
+  };
+
+  /** Retry the clock-out with the explanation the server insisted on. */
+  const submitLateClockOut = async (reason: string) => {
+    try {
+      await clockOut(undefined, undefined, reason);
+      setLateClockOut({ visible: false });
+      setFeedback({ visible: true, type: 'success', title: 'Shift Ended', message: 'Your previous session has been closed.' });
+    } catch (err: any) {
+      setLateClockOut({ visible: false });
+      setFeedback({ visible: true, type: 'error', title: 'Action Failed', message: clockRefusal(err).message || err?.message || 'Failed to clock out' });
     }
   };
 
@@ -822,6 +871,14 @@ export default function DashboardScreen() {
         title={feedback.title}
         message={feedback.message}
         onClose={() => setFeedback(prev => ({ ...prev, visible: false }))}
+      />
+
+      <LateClockOutModal
+        visible={lateClockOut.visible}
+        day={lateClockOut.day}
+        submitting={isClockingIn}
+        onCancel={() => setLateClockOut({ visible: false })}
+        onSubmit={submitLateClockOut}
       />
     </AppScreen>
   );

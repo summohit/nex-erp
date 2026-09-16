@@ -14,6 +14,7 @@ export interface Employee {
   designationId?: number;
   role: string;
   isProjectManager?: boolean;
+  managerId?: number;
   department?: { id?: number; name: string };
   designation?: { id?: number; name: string };
   user?: { email: string, role: string, avatarUrl?: string, status?: string };

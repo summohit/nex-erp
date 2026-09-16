@@ -30,7 +30,7 @@
       <input 
         type="text" 
         class="search-input" 
-        placeholder="Search boards..." 
+        [placeholder]="activeTab() === 'my-tasks' ? 'Search tasks...' : 'Search boards...'" 
         [ngModel]="searchQuery()" 
         (ngModelChange)="searchQuery.set($event)">
     </div>
@@ -62,6 +62,13 @@
         (click)="setActiveTab('archived')">
         <svg lucideArchive size="14" class="tab-icon"></svg>
         Archived
+      </button>
+      <button 
+        class="tab-pill" 
+        [class.active]="activeTab() === 'my-tasks'" 
+        (click)="setActiveTab('my-tasks')">
+        <svg lucideListChecks size="14" class="tab-icon"></svg>
+        My Tasks<ng-container *ngIf="myTasksLoaded()"> ({{ myTasks().length }})</ng-container>
       </button>
     </div>
   </div>
@@ -356,6 +363,7 @@
             [pagination]="true"
             [paginationPageSize]="paginationPageSize"
             [paginationPageSizeSelector]="paginationPageSizeOptions"
+            [suppressPaginationPanel]="filteredProjects().length <= paginationPageSize"
             [quickFilterText]="searchQuery()"
             [rowHeight]="52"
             (gridReady)="onBoardsGridReady($event)"
@@ -364,6 +372,244 @@
           </ag-grid-angular>
         </div>
       </ng-template>
+    </div>
+  </div>
+
+  <!-- ✅ My Tasks — project, general and pre-sales work in one list -->
+  <div class="section-container my-tasks-section" *ngIf="activeTab() === 'my-tasks'">
+    <div class="my-tasks-header-card">
+      <!-- Top Row: Title, Subtitle, Scope Switch & Add Task -->
+      <div class="my-tasks-card-top">
+        <div class="my-tasks-title-group">
+          <div class="my-tasks-icon-badge">
+            <svg lucideListChecks size="22"></svg>
+          </div>
+          <div class="my-tasks-title-text">
+            <div class="my-tasks-title-row">
+              <h2 class="my-tasks-title">{{ myTasksScope() === 'all' ? 'All Tasks' : 'My Tasks' }}</h2>
+              <span class="my-tasks-count-pill" *ngIf="myTasksCount() > 0">
+                {{ myTasksCount() }} Task{{ myTasksCount() === 1 ? '' : 's' }}
+              </span>
+            </div>
+            <p class="my-tasks-subtitle">
+              <ng-container *ngIf="myTasksScope() === 'all'">
+                Every task in the company — project work, general tasks and pre-sales deals.
+              </ng-container>
+              <ng-container *ngIf="myTasksScope() !== 'all'">
+                Everything assigned to you — project work, general tasks and pre-sales deals.
+              </ng-container>
+            </p>
+          </div>
+        </div>
+
+        <div class="my-tasks-card-actions">
+          <!-- Administrators only. Without this an admin with nothing assigned
+               to them saw an empty screen while the company had open work. -->
+          <div class="scope-switch" *ngIf="taskCapabilities().isAdmin">
+            <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'mine'"
+                    (click)="setMyTasksScope('mine')">
+              <svg lucideUser size="13"></svg>
+              <span>Assigned to me</span>
+            </button>
+            <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'all'"
+                    (click)="setMyTasksScope('all')">
+              <svg lucideUsers size="13"></svg>
+              <span>Everyone</span>
+            </button>
+          </div>
+
+          <button type="button" class="btn-create-task-main" *ngIf="taskCapabilities().canCreateTask" (click)="openCreateTask()">
+            <svg lucidePlus size="16"></svg>
+            <span>Add Task</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Card Inner Divider -->
+      <div class="my-tasks-card-divider"></div>
+
+      <!-- Bottom Toolbar: Quick Filter Chips on Left, Show Completed on Right -->
+      <div class="my-tasks-toolbar-row">
+        <div class="my-tasks-chips-scroll">
+          <button
+            type="button"
+            class="quick-filter-chip"
+            [class.active]="myTasksFilter() === 'all'"
+            (click)="setMyTasksFilter('all')">
+            <svg lucideListChecks size="13"></svg>
+            <span>All Tasks</span>
+            <span class="quick-filter-count" *ngIf="myTasksCount() > 0">{{ myTasksCount() }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="quick-filter-chip chip-warn"
+            [class.active]="myTasksFilter() === 'overdue'"
+            (click)="setMyTasksFilter('overdue')"
+            *ngIf="myTasksOverdueCount() > 0">
+            <svg lucideAlertTriangle size="13"></svg>
+            <span>Overdue</span>
+            <span class="quick-filter-count count-warn">{{ myTasksOverdueCount() }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="quick-filter-chip chip-due"
+            [class.active]="myTasksFilter() === 'due-week'"
+            (click)="setMyTasksFilter('due-week')"
+            *ngIf="myTasksDueWeekCount() > 0">
+            <svg lucideClock size="13"></svg>
+            <span>Due this week</span>
+            <span class="quick-filter-count">{{ myTasksDueWeekCount() }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="quick-filter-chip"
+            [class.active]="myTasksFilter() === 'PROJECT'"
+            (click)="setMyTasksFilter('PROJECT')"
+            *ngIf="myTasksProjectCount() > 0">
+            <svg lucideFolder size="13"></svg>
+            <span>Projects</span>
+            <span class="quick-filter-count">{{ myTasksProjectCount() }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="quick-filter-chip"
+            [class.active]="myTasksFilter() === 'PRE_SALES'"
+            (click)="setMyTasksFilter('PRE_SALES')"
+            *ngIf="myTasksPreSalesCount() > 0">
+            <svg lucideBriefcase size="13"></svg>
+            <span>Pre-sales</span>
+            <span class="quick-filter-count">{{ myTasksPreSalesCount() }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="quick-filter-chip"
+            [class.active]="myTasksFilter() === 'GENERAL'"
+            (click)="setMyTasksFilter('GENERAL')"
+            *ngIf="myTasksGeneralCount() > 0">
+            <svg lucideLayers size="13"></svg>
+            <span>General</span>
+            <span class="quick-filter-count">{{ myTasksGeneralCount() }}</span>
+          </button>
+        </div>
+
+        <div class="my-tasks-toolbar-right">
+          <button type="button" class="toggle-done-pill" (click)="toggleMyTasksDone()" [class.active]="myTasksShowDone()" title="Toggle completed tasks visibility">
+            <svg lucideCheckCircle2 size="14"></svg>
+            <span>{{ myTasksShowDone() ? 'Hide completed' : 'Show completed' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notices Container (Overdue, Blocked, Truncated) -->
+    <div class="notices-container" *ngIf="myTasksOverdueCount() || myTasksBlockedCount() || myTasksTruncated()">
+      <div class="quota-notice-card warn" *ngIf="myTasksOverdueCount() && myTasksFilter() !== 'overdue'">
+        <div class="notice-icon-badge">
+          <svg lucideAlertTriangle size="15"></svg>
+        </div>
+        <div class="notice-text-wrap">
+          <span class="notice-text">
+            <strong>{{ myTasksOverdueCount() }} {{ myTasksOverdueCount() === 1 ? 'task is' : 'tasks are' }}</strong> past due date. Action needed to keep work on schedule.
+          </span>
+        </div>
+        <button type="button" class="notice-filter-link" (click)="setMyTasksFilter('overdue')">
+          <span>View overdue</span>
+          <svg lucideChevronLeft size="13" style="transform: rotate(180deg);"></svg>
+        </button>
+      </div>
+
+      <div class="quota-notice-card info" *ngIf="myTasksBlockedCount()">
+        <div class="notice-icon-badge blue">
+          <svg lucideClock size="15"></svg>
+        </div>
+        <div class="notice-text-wrap">
+          <span class="notice-text">
+            <strong>{{ myTasksBlockedCount() }} {{ myTasksBlockedCount() === 1 ? 'task is' : 'tasks are' }}</strong> waiting on another task. (You can still proceed — this is a note).
+          </span>
+        </div>
+      </div>
+
+      <div class="quota-notice-card warn" *ngIf="myTasksTruncated()">
+        <div class="notice-icon-badge">
+          <svg lucideAlertTriangle size="15"></svg>
+        </div>
+        <div class="notice-text-wrap">
+          <span class="notice-text">Showing the first 200 per source. Narrow the list to see the rest.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skeleton Loaders -->
+    <div class="boards-table-wrapper" *ngIf="myTasksLoading()">
+      <div style="display: flex; flex-direction: column; gap: 12px; padding: 12px 0;">
+        <div class="skeleton-line shimmer" style="width: 100%; height: 42px; border-radius: 6px;"></div>
+        <div class="skeleton-line shimmer" style="width: 100%; height: 50px; border-radius: 6px;" *ngFor="let s of [1, 2, 3, 4]"></div>
+      </div>
+    </div>
+
+    <!-- Global Empty State -->
+    <div class="boards-table-wrapper empty-wrap" *ngIf="!myTasksLoading() && myTasks().length === 0">
+      <div class="my-tasks-empty-card">
+        <div class="empty-icon-badge">
+          <svg lucideListChecks size="32"></svg>
+        </div>
+        <h3>{{ myTasksScope() === 'all' ? 'No open tasks in the company' : 'No tasks assigned to you' }}</h3>
+        <p *ngIf="myTasksScope() !== 'all'">
+          All tasks assigned to you across projects, pre-sales deals, and general company operations will appear here.
+          <ng-container *ngIf="taskCapabilities().isAdmin"> Switch to <strong>Everyone</strong> to see the whole company's.</ng-container>
+        </p>
+        <p *ngIf="myTasksScope() === 'all'">
+          Nothing is open across projects, pre-sales deals or general company operations. Completed work is hidden — turn on <strong>Show completed</strong> to include it.
+        </p>
+        <button type="button" class="btn-create-task-main" (click)="openCreateTask()">
+          <svg lucidePlus size="16"></svg>
+          <span>Create a task</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filtered Empty State -->
+    <div class="boards-table-wrapper empty-wrap" *ngIf="!myTasksLoading() && myTasks().length > 0 && filteredMyTasks().length === 0">
+      <div class="my-tasks-empty-card">
+        <div class="empty-icon-badge search">
+          <svg lucideSearch size="30"></svg>
+        </div>
+        <h3>No tasks match your filter</h3>
+        <p>No tasks match the currently selected filter or search query.</p>
+        <button type="button" class="btn-clear-task-filters" (click)="setMyTasksFilter('all'); searchQuery.set('')">
+          Reset filters
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Table View -->
+    <div class="table-container my-tasks-table-wrapper" *ngIf="!myTasksLoading() && filteredMyTasks().length > 0">
+      <ag-grid-angular
+        class="ag-theme-quartz"
+        [theme]="'legacy'"
+        style="width: 100%;"
+        [rowData]="filteredMyTasks()"
+        [columnDefs]="myTasksColDefs"
+        [defaultColDef]="myTasksDefaultColDef"
+        [rowClassRules]="myTasksRowClassRules"
+        [rowHeight]="48"
+        [headerHeight]="38"
+        [pagination]="true"
+        [paginationPageSize]="paginationPageSize"
+        [paginationPageSizeSelector]="paginationPageSizeOptions"
+        [suppressPaginationPanel]="filteredMyTasks().length <= paginationPageSize"
+        [quickFilterText]="searchQuery()"
+        [animateRows]="true"
+        [domLayout]="myTasksGridAutoHeight() ? 'autoHeight' : 'normal'"
+        [style.height]="myTasksGridAutoHeight() ? null : 'clamp(420px, calc(100vh - 430px), 760px)'"
+        (gridReady)="onMyTasksGridReady($event)"
+        (rowClicked)="onMyTaskRowClicked($event)">
+      </ag-grid-angular>
     </div>
   </div>
 
@@ -442,10 +688,646 @@
   </div>
 </div>
 
-<!-- Modal Backdrop -->
-<div class="modal-overlay" *ngIf="isCreateModalOpen()" (click)="closeCreateModal()"></div>
+<!-- Modal Backdrop for Add Task -->
+<div class="modal-overlay" *ngIf="isCreateTaskOpen()" (click)="closeCreateTask()"></div>
 
-<!-- Trello-Style Create Board Popover Modal -->
+<!-- ✅ Enhanced Add Task Modal -->
+<div class="modal-content enhanced-modal task-modal-card" *ngIf="isCreateTaskOpen()" (click)="closeAllTaskDropdowns(); $event.stopPropagation()">
+  <!-- Header -->
+  <div class="modal-header">
+    <div class="modal-header-left">
+      <div class="modal-icon-badge orange">
+        <svg lucideCheckSquare size="20"></svg>
+      </div>
+      <div>
+        <h3 class="modal-title">{{ editingPreSalesTaskId() ? 'Edit Pre-Sales Task' : 'Create New Task' }}</h3>
+        <p class="modal-subtitle">Assign work across projects, pre-sales deals, or general company tasks.</p>
+      </div>
+    </div>
+    <button type="button" class="btn-icon-tiny" (click)="closeCreateTask()" title="Close">
+      <svg lucideX size="18"></svg>
+    </button>
+  </div>
+
+  <div class="modal-body enhanced-modal-body">
+    <!-- Task Title -->
+    <div class="form-group">
+      <label class="form-label">Task Title <span class="req">*</span></label>
+      <input type="text" class="enhanced-input" [(ngModel)]="taskForm.title" placeholder="What needs doing? (e.g. Prepare client architecture presentation)" />
+    </div>
+
+    <!-- Description -->
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea rows="3" class="enhanced-textarea" [(ngModel)]="taskForm.description" placeholder="Any context, specifications, or links that help whoever works on this..."></textarea>
+    </div>
+
+    <!-- Belongs To (Segmented Tab Bar) -->
+    <div class="form-group">
+      <label class="form-label">Belongs to</label>
+      <div class="task-parent-segmented-bar" [class.locked]="editingPreSalesTaskId()">
+        <button type="button" class="segmented-pill-btn" [class.active]="taskForm.parentKind === 'GENERAL'"
+                (click)="taskForm.parentKind = 'GENERAL'; closeAllTaskDropdowns()">
+          <svg lucideLayers size="14"></svg>
+          <span>General</span>
+        </button>
+        <button type="button" class="segmented-pill-btn" [class.active]="taskForm.parentKind === 'PROJECT'"
+                (click)="taskForm.parentKind = 'PROJECT'; closeAllTaskDropdowns()">
+          <svg lucideFolder size="14"></svg>
+          <span>Project Board</span>
+        </button>
+        <button type="button" class="segmented-pill-btn" [class.active]="taskForm.parentKind === 'LEAD'"
+                (click)="taskForm.parentKind = 'LEAD'; closeAllTaskDropdowns()">
+          <svg lucideBriefcase size="14"></svg>
+          <span>Pre-sales Deal</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Searchable Project Board Picker -->
+    <div class="context-selection-box" *ngIf="taskForm.parentKind === 'PROJECT'">
+      <div class="form-group mb-0">
+        <label class="form-label">Choose Project Board <span class="req">*</span></label>
+        <div class="searchable-select-container">
+          <button type="button" class="custom-select-trigger"
+                  [class.active]="taskProjectDropdownOpen()"
+                  (click)="taskProjectDropdownOpen.set(!taskProjectDropdownOpen()); taskLeadDropdownOpen.set(false); taskTypeDropdownOpen.set(false); taskPriorityDropdownOpen.set(false); taskAssigneeDropdownOpen.set(false); $event.stopPropagation()">
+            <div class="custom-select-value" *ngIf="getSelectedProject() as p">
+              <svg lucideFolder size="15" class="select-val-icon text-orange"></svg>
+              <span class="select-val-text font-medium">{{ p.name }}</span>
+              <span class="badge-project-key" *ngIf="p.key">{{ p.key }}</span>
+            </div>
+            <div class="custom-select-placeholder" *ngIf="!getSelectedProject()">
+              <svg lucideFolder size="15" class="select-val-icon text-muted"></svg>
+              <span>Select a project board…</span>
+            </div>
+            <svg lucideChevronDown size="15" class="custom-select-chevron" [class.open]="taskProjectDropdownOpen()"></svg>
+          </button>
+
+          <!-- Searchable Projects Dropdown -->
+          <div class="custom-dropdown-panel" *ngIf="taskProjectDropdownOpen()" (click)="$event.stopPropagation()">
+            <div class="custom-dropdown-search">
+              <svg lucideSearch size="14" class="search-icon"></svg>
+              <input type="text" class="custom-search-input" [(ngModel)]="taskProjectSearch" placeholder="Search projects by name or key…" />
+            </div>
+            <div class="custom-dropdown-list">
+              <div class="custom-dropdown-item" *ngFor="let p of filteredModalProjects()"
+                   [class.selected]="taskForm.projectId === p.id"
+                   (click)="selectTaskProject(p.id)">
+                <svg lucideFolder size="15" class="item-icon text-orange"></svg>
+                <div class="item-text-wrap">
+                  <span class="item-title">{{ p.name }}</span>
+                  <span class="badge-project-key" *ngIf="p.key">{{ p.key }}</span>
+                </div>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.projectId === p.id"></svg>
+              </div>
+              <div class="custom-dropdown-empty" *ngIf="filteredModalProjects().length === 0">
+                No projects found matching "{{ taskProjectSearch() }}"
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Searchable Pre-Sales Deal / Lead Picker -->
+    <div class="context-selection-box" *ngIf="taskForm.parentKind === 'LEAD'">
+      <div class="form-group mb-0">
+        <label class="form-label">Select Pre-Sales Deal / Lead <span class="req">*</span></label>
+        <div class="searchable-select-container">
+          <button type="button" class="custom-select-trigger"
+                  [class.active]="taskLeadDropdownOpen()"
+                  (click)="taskLeadDropdownOpen.set(!taskLeadDropdownOpen()); taskProjectDropdownOpen.set(false); taskTypeDropdownOpen.set(false); taskPriorityDropdownOpen.set(false); taskAssigneeDropdownOpen.set(false); $event.stopPropagation()">
+            <div class="custom-select-value" *ngIf="getSelectedLead() as l">
+              <svg lucideBriefcase size="15" class="select-val-icon text-orange"></svg>
+              <span class="badge-lead-code" *ngIf="l.leadCode">{{ l.leadCode }}</span>
+              <span class="select-val-text font-medium">{{ l.title || l.companyName || l.contactName || ('Deal #' + l.id) }}</span>
+              <span class="select-val-company" *ngIf="l.title && l.companyName">({{ l.companyName }})</span>
+            </div>
+            <div class="custom-select-placeholder" *ngIf="!getSelectedLead()">
+              <svg lucideBriefcase size="15" class="select-val-icon text-muted"></svg>
+              <span>Choose a pre-sales deal or lead opportunity…</span>
+            </div>
+            <svg lucideChevronDown size="15" class="custom-select-chevron" [class.open]="taskLeadDropdownOpen()"></svg>
+          </button>
+
+          <!-- Searchable Deals/Leads Dropdown -->
+          <div class="custom-dropdown-panel" *ngIf="taskLeadDropdownOpen()" (click)="$event.stopPropagation()">
+            <div class="custom-dropdown-search">
+              <svg lucideSearch size="14" class="search-icon"></svg>
+              <input type="text" class="custom-search-input" [(ngModel)]="taskLeadSearch" placeholder="Search deals by title, company, code…" />
+            </div>
+            <div class="custom-dropdown-list">
+              <!-- Pre-Sales Deals Group -->
+              <div class="custom-dropdown-group-label" *ngIf="filteredModalPresalesDeals().length > 0">
+                <svg lucideBriefcase size="12"></svg>
+                <span>Pre-Sales Deals</span>
+              </div>
+              <div class="custom-dropdown-item" *ngFor="let l of filteredModalPresalesDeals()"
+                   [class.selected]="taskForm.leadId === l.id"
+                   (click)="selectTaskLead(l.id)">
+                <div class="item-text-wrap">
+                  <span class="badge-lead-code" *ngIf="l.leadCode">{{ l.leadCode }}</span>
+                  <span class="item-title">{{ l.title || l.companyName || 'Deal #' + l.id }}</span>
+                  <span class="item-subtitle" *ngIf="l.title && l.companyName">— {{ l.companyName }}</span>
+                </div>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.leadId === l.id"></svg>
+              </div>
+
+              <!-- Sales Opportunities Group -->
+              <div class="custom-dropdown-group-label" *ngIf="filteredModalSalesLeads().length > 0">
+                <svg lucideLayers size="12"></svg>
+                <span>Sales Opportunities / Leads</span>
+              </div>
+              <div class="custom-dropdown-item" *ngFor="let l of filteredModalSalesLeads()"
+                   [class.selected]="taskForm.leadId === l.id"
+                   (click)="selectTaskLead(l.id)">
+                <div class="item-text-wrap">
+                  <span class="badge-lead-code" *ngIf="l.leadCode">{{ l.leadCode }}</span>
+                  <span class="item-title">{{ l.title || l.companyName || 'Lead #' + l.id }}</span>
+                  <span class="item-subtitle" *ngIf="l.title && l.companyName">— {{ l.companyName }}</span>
+                </div>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.leadId === l.id"></svg>
+              </div>
+
+              <div class="custom-dropdown-empty" *ngIf="filteredModalPresalesDeals().length === 0 && filteredModalSalesLeads().length === 0">
+                No pre-sales deals or leads match "{{ taskLeadSearch() }}"
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="context-hint" *ngIf="!isPreSalesTarget">
+          <svg lucideCheckCircle2 size="12" style="color: #ea580c; flex-shrink: 0;"></svg>
+          <span>Links this task directly to the deal's tracking records in Pre-Sales.</span>
+        </div>
+
+        <!-- A pre-sales deal changes what is being raised: the task goes to
+             that deal's own team and spends their hours allocation. Saying so
+             beats a 403 after the form has been filled in. -->
+        <div class="presales-context-note" *ngIf="isPreSalesTarget">
+          <div class="loading-inline" *ngIf="preSalesInfoLoading()">
+            <svg lucideLoader2 size="13" class="spinner-icon"></svg>
+            <span>Loading this deal's pre-sales team…</span>
+          </div>
+
+          <ng-container *ngIf="!preSalesInfoLoading()">
+            <div class="presales-note-row ok" *ngIf="canCreatePreSalesTask && activePreSalesMembers().length">
+              <svg lucideUsers size="13"></svg>
+              <span>
+                This is a <strong>pre-sales deal</strong>. The task goes to one of its
+                {{ activePreSalesMembers().length }} team member{{ activePreSalesMembers().length === 1 ? '' : 's' }}
+                and counts against their hours allocation.
+              </span>
+            </div>
+            <div class="presales-note-row warn" *ngIf="!activePreSalesMembers().length">
+              <svg lucideAlertTriangle size="13"></svg>
+              <span>This deal has no active pre-sales team yet. Add people to it from the deal page first.</span>
+            </div>
+            <div class="presales-note-row warn" *ngIf="activePreSalesMembers().length && !canCreatePreSalesTask">
+              <svg lucideAlertTriangle size="13"></svg>
+              <span>Only an administrator, or whoever put these people on the deal, can raise tasks for them.</span>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+
+    <!-- General workspace info -->
+    <div class="context-selection-box general-box" *ngIf="taskForm.parentKind === 'GENERAL'">
+      <div class="general-box-hint">
+        <svg lucideLayers size="16" style="color: #64748b; flex-shrink: 0;"></svg>
+        <span>This task will be stored in your company's shared General Workspace.</span>
+      </div>
+    </div>
+
+    <!-- Attributes: Task Type & Priority (Searchable Selects) -->
+    <div class="task-form-grid-2">
+      <div class="form-group">
+        <label class="form-label">Task Type</label>
+        <div class="searchable-select-container">
+          <button type="button" class="custom-select-trigger"
+                  [class.active]="taskTypeDropdownOpen()"
+                  (click)="taskTypeDropdownOpen.set(!taskTypeDropdownOpen()); taskProjectDropdownOpen.set(false); taskLeadDropdownOpen.set(false); taskPriorityDropdownOpen.set(false); taskAssigneeDropdownOpen.set(false); $event.stopPropagation()">
+            <span class="custom-select-value font-medium" *ngIf="getSelectedTaskType() as t">{{ t.name }}</span>
+            <span class="custom-select-placeholder" *ngIf="!getSelectedTaskType()">None (General)</span>
+            <svg lucideChevronDown size="15" class="custom-select-chevron" [class.open]="taskTypeDropdownOpen()"></svg>
+          </button>
+          <div class="custom-dropdown-panel" *ngIf="taskTypeDropdownOpen()" (click)="$event.stopPropagation()">
+            <div class="custom-dropdown-search">
+              <svg lucideSearch size="14" class="search-icon"></svg>
+              <input type="text" class="custom-search-input" [(ngModel)]="taskTypeSearch" placeholder="Search task types…" />
+            </div>
+            <div class="custom-dropdown-list">
+              <div class="custom-dropdown-item" [class.selected]="taskForm.taskTypeId === null" (click)="selectTaskType(null)">
+                <span class="item-title">None (General)</span>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.taskTypeId === null"></svg>
+              </div>
+              <div class="custom-dropdown-item" *ngFor="let t of filteredModalTaskTypes()"
+                   [class.selected]="taskForm.taskTypeId === t.id"
+                   (click)="selectTaskType(t.id)">
+                <span class="item-title">{{ t.name }}</span>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.taskTypeId === t.id"></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- A pre-sales task genuinely has no priority; showing the control
+           would collect a value the CRM discards. -->
+      <div class="form-group" *ngIf="!isPreSalesTarget">
+        <label class="form-label">Priority</label>
+        <div class="searchable-select-container">
+          <button type="button" class="custom-select-trigger"
+                  [class.active]="taskPriorityDropdownOpen()"
+                  (click)="taskPriorityDropdownOpen.set(!taskPriorityDropdownOpen()); taskProjectDropdownOpen.set(false); taskLeadDropdownOpen.set(false); taskTypeDropdownOpen.set(false); taskAssigneeDropdownOpen.set(false); $event.stopPropagation()">
+            <div class="custom-select-value">
+              <span class="priority-dot" [ngClass]="getPriorityDetails(taskForm.priority).dotClass"></span>
+              <span class="font-medium">{{ getPriorityDetails(taskForm.priority).label }}</span>
+            </div>
+            <svg lucideChevronDown size="15" class="custom-select-chevron" [class.open]="taskPriorityDropdownOpen()"></svg>
+          </button>
+          <div class="custom-dropdown-panel" *ngIf="taskPriorityDropdownOpen()" (click)="$event.stopPropagation()">
+            <div class="custom-dropdown-list">
+              <div class="custom-dropdown-item" [class.selected]="taskForm.priority === 'CRITICAL'" (click)="selectTaskPriority('CRITICAL')">
+                <span class="priority-dot dot-critical"></span>
+                <span class="item-title">Critical</span>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.priority === 'CRITICAL'"></svg>
+              </div>
+              <div class="custom-dropdown-item" [class.selected]="taskForm.priority === 'HIGH'" (click)="selectTaskPriority('HIGH')">
+                <span class="priority-dot dot-high"></span>
+                <span class="item-title">High</span>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.priority === 'HIGH'"></svg>
+              </div>
+              <div class="custom-dropdown-item" [class.selected]="taskForm.priority === 'MEDIUM'" (click)="selectTaskPriority('MEDIUM')">
+                <span class="priority-dot dot-medium"></span>
+                <span class="item-title">Medium</span>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.priority === 'MEDIUM'"></svg>
+              </div>
+              <div class="custom-dropdown-item" [class.selected]="taskForm.priority === 'LOW'" (click)="selectTaskPriority('LOW')">
+                <span class="priority-dot dot-low"></span>
+                <span class="item-title">Low</span>
+                <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.priority === 'LOW'"></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline & Hours (3 cols) -->
+    <div class="task-form-grid-3">
+      <div class="form-group" *ngIf="!isPreSalesTarget">
+        <label class="form-label">Start Date</label>
+        <input type="date" class="enhanced-input" [(ngModel)]="taskForm.startDate" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">{{ isPreSalesTarget ? 'Scheduled Date' : 'Due Date' }}</label>
+        <input type="date" class="enhanced-input" [(ngModel)]="taskForm.dueDate" />
+      </div>
+      <!-- A call or a site visit happens at a time, not on a day. -->
+      <div class="form-group" *ngIf="isPreSalesTarget">
+        <label class="form-label">Scheduled Time</label>
+        <input type="time" class="enhanced-input" [(ngModel)]="taskForm.dueTime" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estimated Hours</label>
+        <input type="number" min="0" step="0.5" class="enhanced-input" [(ngModel)]="taskForm.estimatedHours" placeholder="e.g. 8" />
+        <small class="form-hint" *ngIf="isPreSalesTarget">Counts against this person's hours allocation on the deal.</small>
+      </div>
+    </div>
+
+    <!-- Assignees Section (Search, Name, and Image) -->
+    <div class="form-group">
+      <div class="assignee-header-row">
+        <label class="form-label mb-0">
+          {{ isPreSalesTarget ? 'Assigned Specialist' : 'Assign to' }}
+          <span class="req" *ngIf="isPreSalesTarget">*</span>
+          <span class="optional" *ngIf="!isPreSalesTarget">(optional)</span>
+        </label>
+        <span class="assignee-count-badge" *ngIf="taskForm.assigneeIds.length > 0 && !isPreSalesTarget">
+          {{ taskForm.assigneeIds.length }} assigned
+        </span>
+      </div>
+
+      <!-- Selected assignees chips with avatar image, name, lead tag and remove button -->
+      <div class="selected-assignees-row" *ngIf="taskForm.assigneeIds.length > 0">
+        <div class="selected-assignee-pill" *ngFor="let id of taskForm.assigneeIds; let i = index">
+          <img *ngIf="getEmployeeAvatar(getEmployeeById(id)) as av" [src]="av" class="assignee-pill-avatar assignee-pill-avatar-img" />
+          <div *ngIf="!getEmployeeAvatar(getEmployeeById(id))" class="assignee-pill-avatar" [style.background]="getPmColor(id)">
+            {{ (getEmployeeById(id)?.firstName || '?')[0] | uppercase }}
+          </div>
+          <span class="assignee-pill-name">{{ getEmployeeById(id)?.firstName }} {{ getEmployeeById(id)?.lastName }}</span>
+          <span class="assignee-lead-tag" *ngIf="i === 0 && !isPreSalesTarget">Lead</span>
+          <button type="button" class="btn-remove-assignee" (click)="removeTaskAssignee(id, $event)" title="Remove assignee">
+            <svg lucideX size="11"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Assignee Searchable Dropdown Trigger -->
+      <div class="searchable-select-container">
+        <button type="button" class="custom-select-trigger assignee-trigger"
+                [class.active]="taskAssigneeDropdownOpen()"
+                (click)="taskAssigneeDropdownOpen.set(!taskAssigneeDropdownOpen()); taskProjectDropdownOpen.set(false); taskLeadDropdownOpen.set(false); taskTypeDropdownOpen.set(false); taskPriorityDropdownOpen.set(false); $event.stopPropagation()">
+          <div class="assignee-trigger-left">
+            <svg lucideUsers size="16" class="select-val-icon text-muted"></svg>
+            <span *ngIf="taskForm.assigneeIds.length === 0" class="custom-select-placeholder">
+              {{ isPreSalesTarget ? 'Choose a pre-sales specialist on this deal…' : 'Search and select team members…' }}
+            </span>
+            <span *ngIf="taskForm.assigneeIds.length > 0" class="custom-select-value font-medium">
+              {{ isPreSalesTarget ? 'Change the assigned specialist' : 'Add or remove team members (' + taskForm.assigneeIds.length + ' selected)' }}
+            </span>
+          </div>
+          <svg lucideChevronDown size="15" class="custom-select-chevron" [class.open]="taskAssigneeDropdownOpen()"></svg>
+        </button>
+
+        <!-- Searchable Assignee Dropdown Panel with Search, Name, and Image -->
+        <div class="custom-dropdown-panel assignee-dropdown-panel" *ngIf="taskAssigneeDropdownOpen()" (click)="$event.stopPropagation()">
+          <div class="custom-dropdown-search">
+            <svg lucideSearch size="14" class="search-icon"></svg>
+            <input type="text" class="custom-search-input" [(ngModel)]="assigneeSearch"
+                   placeholder="Search team members by name, designation, email…" autofocus />
+          </div>
+
+          <div class="custom-dropdown-list assignee-dropdown-list">
+            <div class="assignee-dropdown-item" *ngFor="let emp of filteredTaskAssignees()"
+                 (click)="toggleTaskAssignee(emp.id)">
+              <!-- Checkbox -->
+              <div class="pm-item-check" [class.checked]="isTaskAssignee(emp.id)">
+                <svg lucideCheck size="12" *ngIf="isTaskAssignee(emp.id)"></svg>
+              </div>
+
+              <!-- Avatar Image or Initials -->
+              <img *ngIf="getEmployeeAvatar(emp) as av" [src]="av" class="assignee-item-avatar assignee-item-avatar-img" />
+              <div *ngIf="!getEmployeeAvatar(emp)" class="assignee-item-avatar" [style.background]="getPmColor(emp.id)">
+                {{ (emp.firstName || '?')[0] | uppercase }}
+              </div>
+
+              <!-- Name & Role / Email -->
+              <div class="assignee-item-info">
+                <div class="assignee-item-name">{{ emp.firstName }} {{ emp.lastName }}</div>
+                <div class="assignee-item-sub">
+                  <span *ngIf="emp.designation?.name">{{ emp.designation.name }}</span>
+                  <span *ngIf="emp.designation?.name && (emp.user?.email || emp.department?.name)"> • </span>
+                  <span *ngIf="emp.department?.name">{{ emp.department.name }}</span>
+                  <span *ngIf="!emp.department?.name && emp.user?.email">{{ emp.user.email }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="custom-dropdown-empty" *ngIf="filteredTaskAssignees().length === 0">
+              {{ isPreSalesTarget
+                  ? (activePreSalesMembers().length ? 'No one on this deal matches "' + assigneeSearch() + '"' : 'This deal has no active pre-sales team.')
+                  : 'No team members match "' + assigneeSearch() + '"' }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <small class="form-hint" *ngIf="taskForm.assigneeIds.length > 1 && !isPreSalesTarget">
+        The first person selected owns the task; others are assigned alongside them.
+      </small>
+      <small class="form-hint" *ngIf="isPreSalesTarget">
+        A pre-sales task has one owner — it is their hours it spends, and only they can move its status.
+      </small>
+    </div>
+
+    <!-- Attachments Section — on an edit the CRM takes files through a
+         status change instead, so the dropzone would silently discard them. -->
+    <div class="form-group task-attachments-section" *ngIf="!editingPreSalesTaskId()">
+      <div class="assignee-header-row">
+        <label class="form-label mb-0">
+          <svg lucidePaperclip size="14" style="color: #ea580c; display: inline-block; vertical-align: -2px; margin-right: 4px;"></svg>
+          Attachments <span class="optional">(optional)</span>
+        </label>
+        <span class="assignee-count-badge" *ngIf="taskForm.attachments.length > 0">
+          {{ taskForm.attachments.length }} file{{ taskForm.attachments.length > 1 ? 's' : '' }}
+        </span>
+      </div>
+
+      <!-- Drag & Drop Upload Zone -->
+      <div class="attachment-dropzone" [class.drag-over]="isAttachmentDragOver()"
+           (dragover)="onAttachmentDragOver($event)"
+           (dragleave)="onAttachmentDragLeave($event)"
+           (drop)="onAttachmentDrop($event)"
+           (click)="taskFileInput.click()">
+        <input type="file" #taskFileInput multiple class="hidden" (change)="onAttachmentFilesSelected($event)"
+               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar" style="display: none;" />
+
+        <div class="attachment-dropzone-content" *ngIf="!isUploadingAttachment()">
+          <div class="attachment-upload-icon-wrap">
+            <svg lucideUploadCloud size="24" class="upload-icon"></svg>
+          </div>
+          <div class="attachment-dropzone-text">
+            <p class="dropzone-title"><span>Click to browse</span> or drag and drop files here</p>
+            <p class="dropzone-subtitle">PDF, PNG, JPG, DOCX, XLSX, TXT, ZIP up to 20MB</p>
+          </div>
+        </div>
+
+        <!-- Uploading indicator -->
+        <div class="attachment-uploading-bar" *ngIf="isUploadingAttachment()">
+          <svg lucideLoader2 size="20" class="spinner-icon"></svg>
+          <span class="uploading-text">Uploading {{ uploadingFileName() }}…</span>
+        </div>
+      </div>
+
+      <!-- Attached Files List -->
+      <div class="attached-files-list" *ngIf="taskForm.attachments.length > 0">
+        <div class="attached-file-item" *ngFor="let att of taskForm.attachments; let idx = index">
+          <div class="attached-file-left">
+            <div class="attached-file-badge">
+              <svg lucideFileText size="16" class="file-badge-icon"></svg>
+              <span class="file-ext-tag">{{ getFileExtension(att.fileName) }}</span>
+            </div>
+            <div class="attached-file-meta">
+              <span class="attached-file-name" [title]="att.fileName">{{ att.fileName }}</span>
+              <span class="attached-file-size" *ngIf="att.fileSize">{{ formatFileSize(att.fileSize) }}</span>
+            </div>
+          </div>
+          <div class="attached-file-actions">
+            <a [href]="att.fileUrl" target="_blank" rel="noopener noreferrer" class="btn-attachment-action" title="Preview file" (click)="$event.stopPropagation()">
+              <svg lucideExternalLink size="14"></svg>
+            </a>
+            <button type="button" class="btn-attachment-action delete" (click)="removeAttachment(idx, $event)" title="Remove file">
+              <svg lucideTrash2 size="14"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="modal-footer task-modal-footer">
+    <button class="btn btn-secondary task-modal-btn-cancel" (click)="closeCreateTask()" [disabled]="isSavingTask()">Cancel</button>
+    <button class="btn btn-primary task-modal-btn-submit" (click)="saveTask()"
+            [disabled]="isSavingTask() || isUploadingAttachment()
+                        || (isPreSalesTarget && (preSalesInfoLoading() || !canCreatePreSalesTask || !activePreSalesMembers().length))">
+      <svg lucideLoader2 size="16" class="spinner-icon" *ngIf="isSavingTask()"></svg>
+      <svg lucidePlus size="16" *ngIf="!isSavingTask() && !editingPreSalesTaskId()"></svg>
+      <svg lucideCheck size="16" *ngIf="!isSavingTask() && editingPreSalesTaskId()"></svg>
+      <span>{{ isSavingTask() ? 'Saving…' : (editingPreSalesTaskId() ? 'Update task' : 'Create task') }}</span>
+    </button>
+  </div>
+</div>
+
+
+<!-- ══════════════════ PRE-SALES: STATUS CHANGE ══════════════════
+     The task's status is the only thing the assignee can move, and every move
+     writes a dated remark. Both modals below moved here from the deal page
+     along with the table they belonged to. -->
+<div class="modal-overlay" *ngIf="isPreSalesStatusOpen()" (click)="closePreSalesStatus()"></div>
+
+<div class="modal-content enhanced-modal task-modal-card ps-dialog" *ngIf="isPreSalesStatusOpen()" (click)="$event.stopPropagation()">
+  <div class="modal-header">
+    <div class="modal-header-left">
+      <div class="modal-icon-badge"
+           [ngClass]="{
+             'blue': preSalesStatusForm.status === 'WORKING',
+             'amber': preSalesStatusForm.status === 'ON_HOLD',
+             'green': preSalesStatusForm.status === 'COMPLETED'
+           }">
+        <svg lucideClock size="20"></svg>
+      </div>
+      <div>
+        <h3 class="modal-title">{{ preSalesStatusHeading(preSalesStatusForm.status) }}</h3>
+        <p class="modal-subtitle">{{ preSalesStatusTask()?.title }}</p>
+      </div>
+    </div>
+    <button type="button" class="btn-icon-tiny" (click)="closePreSalesStatus()" title="Close">
+      <svg lucideX size="18"></svg>
+    </button>
+  </div>
+
+  <div class="modal-body enhanced-modal-body">
+    <div class="form-group">
+      <label class="form-label">
+        {{ preSalesStatusForm.status === 'ON_HOLD' ? 'Reason for hold' : 'Progress / completion remarks' }}
+        <span class="req" *ngIf="preSalesRemarkRequired">*</span>
+      </label>
+      <textarea rows="4" class="enhanced-textarea" [(ngModel)]="preSalesStatusForm.remark"
+                [placeholder]="preSalesStatusForm.status === 'ON_HOLD'
+                  ? 'e.g. Waiting for the client to confirm their network architecture.'
+                  : (preSalesStatusForm.status === 'COMPLETED'
+                      ? 'e.g. Technical discussion concluded; architecture diagram and preliminary BOM prepared.'
+                      : 'e.g. Started requirements gathering with the client.')"></textarea>
+      <small class="form-hint" *ngIf="preSalesRemarkRequired">
+        Required — this is the record of what happened, read by everyone on the deal.
+      </small>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">
+        <svg lucidePaperclip size="14" style="color:#ea580c;display:inline-block;vertical-align:-2px;margin-right:4px;"></svg>
+        Documents &amp; attachments <span class="optional">(optional)</span>
+      </label>
+      <input type="file" multiple hidden #psStatusFileInput (change)="onPreSalesStatusFilesSelected($event)" />
+      <button type="button" class="btn-outline-upload" (click)="psStatusFileInput.click()">
+        <svg lucideUploadCloud size="15"></svg>
+        <span>Attach files</span>
+      </button>
+
+      <div class="attached-files-list" *ngIf="preSalesStatusForm.attachments.length">
+        <div class="attached-file-item" *ngFor="let att of preSalesStatusForm.attachments">
+          <div class="attached-file-left">
+            <div class="attached-file-badge">
+              <svg lucideFileText size="16" class="file-badge-icon"></svg>
+              <span class="file-ext-tag">{{ getFileExtension(att.fileName) }}</span>
+            </div>
+            <div class="attached-file-meta">
+              <span class="attached-file-name" [title]="att.fileName">{{ att.fileName }}</span>
+              <span class="attached-file-size" *ngIf="att.fileSize">{{ formatFileSize(att.fileSize) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="loading-inline" *ngIf="uploadingPreSalesFiles() > 0">
+        <svg lucideLoader2 size="13" class="spinner-icon"></svg>
+        <span>Uploading {{ uploadingPreSalesFiles() }} file(s)…</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer task-modal-footer">
+    <button class="btn btn-secondary task-modal-btn-cancel" (click)="closePreSalesStatus()" [disabled]="isSavingPreSalesStatus()">Cancel</button>
+    <button class="btn btn-primary task-modal-btn-submit" (click)="savePreSalesStatus()"
+            [disabled]="isSavingPreSalesStatus() || uploadingPreSalesFiles() > 0">
+      <svg lucideLoader2 size="16" class="spinner-icon" *ngIf="isSavingPreSalesStatus()"></svg>
+      <svg lucideCheckCircle2 size="16" *ngIf="!isSavingPreSalesStatus()"></svg>
+      <span>{{ isSavingPreSalesStatus()
+        ? 'Saving…'
+        : (preSalesStatusForm.status === 'COMPLETED' ? 'Complete task' : 'Update status') }}</span>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════ PRE-SALES: STATUS HISTORY ══════════════════ -->
+<div class="modal-overlay" *ngIf="isPreSalesHistoryOpen()" (click)="closePreSalesHistory()"></div>
+
+<div class="modal-content enhanced-modal task-modal-card ps-dialog" *ngIf="isPreSalesHistoryOpen()" (click)="$event.stopPropagation()">
+  <div class="modal-header">
+    <div class="modal-header-left">
+      <div class="modal-icon-badge orange">
+        <svg lucideClock size="20"></svg>
+      </div>
+      <div>
+        <h3 class="modal-title">Status history</h3>
+        <p class="modal-subtitle">{{ preSalesHistoryTask()?.title }}</p>
+      </div>
+    </div>
+    <button type="button" class="btn-icon-tiny" (click)="closePreSalesHistory()" title="Close">
+      <svg lucideX size="18"></svg>
+    </button>
+  </div>
+
+  <div class="modal-body enhanced-modal-body">
+    <!-- The deal this belongs to, since this screen mixes every deal together. -->
+    <div class="ps-history-deal" *ngIf="preSalesHistoryTask() as t">
+      <svg lucideBriefcase size="13"></svg>
+      <span>{{ t.parent?.name }}</span>
+      <span class="ps-history-ref">{{ t.refKey }}</span>
+    </div>
+
+    <div class="loading-inline" *ngIf="preSalesHistoryLoading()">
+      <svg lucideLoader2 size="14" class="spinner-icon"></svg>
+      <span>Loading the timeline…</span>
+    </div>
+
+    <div class="ps-timeline" *ngIf="!preSalesHistoryLoading() && preSalesHistory().length">
+      <div class="ps-timeline-item" *ngFor="let h of preSalesHistory()">
+        <div class="ps-timeline-marker" [ngClass]="preSalesStatusClass(h.newStatus)"></div>
+        <div class="ps-timeline-body">
+          <div class="ps-timeline-head">
+            <span class="ps-timeline-status" [ngClass]="preSalesStatusClass(h.newStatus)">
+              {{ preSalesStatusWord(h.newStatus) }}
+            </span>
+            <span class="ps-timeline-from" *ngIf="h.previousStatus">from {{ preSalesStatusWord(h.previousStatus) }}</span>
+            <span class="ps-timeline-when">{{ h.createdAt | date:'dd MMM yyyy, h:mm a' }}</span>
+          </div>
+          <div class="ps-timeline-who" *ngIf="h.changedBy">{{ personName(h.changedBy) }}</div>
+          <p class="ps-timeline-remark" *ngIf="h.remark">{{ h.remark }}</p>
+          <div class="ps-timeline-files" *ngIf="h.attachments?.length">
+            <a class="ps-timeline-file" *ngFor="let a of h.attachments" [href]="a.fileUrl" target="_blank" rel="noopener noreferrer">
+              <svg lucidePaperclip size="12"></svg>
+              <span>{{ a.fileName }}</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="custom-dropdown-empty" *ngIf="!preSalesHistoryLoading() && !preSalesHistory().length">
+      Nothing has happened to this task yet.
+    </div>
+  </div>
+
+  <div class="modal-footer task-modal-footer">
+    <button class="btn btn-secondary task-modal-btn-cancel" (click)="closePreSalesHistory()">Close</button>
+  </div>
+</div>
+
 <div class="create-board-modal" *ngIf="isCreateModalOpen()">
   <!-- Modal Header -->
   <div class="modal-header">

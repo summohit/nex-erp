@@ -68,8 +68,13 @@ export class AttendanceService {
     return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-in`, { lat, lng });
   }
 
-  clockOut(lat?: number, lng?: number) {
-    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out`, { lat, lng });
+  /**
+   * `reason` is required — and only accepted — when the session being closed
+   * belongs to a previous IST day. The server decides; the client sends it in
+   * response to a LATE_CLOCK_OUT_REASON_REQUIRED refusal.
+   */
+  clockOut(lat?: number, lng?: number, reason?: string) {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out`, { lat, lng, reason });
   }
 
   getMyRegularizations(): Observable<any[]> {

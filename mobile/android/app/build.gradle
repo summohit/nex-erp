@@ -2,6 +2,24 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+/*
+ * Firebase, only if this checkout has been given its credentials.
+ *
+ * The google-services plugin FAILS THE BUILD when google-services.json is
+ * missing, and that file is per-project configuration that does not belong in
+ * the repository. Applying it unconditionally would mean nobody could build the
+ * Android app until they had obtained it — including people working on parts of
+ * the app that have nothing to do with notifications.
+ *
+ * Guarded, push simply does not work until the file is dropped in beside this
+ * one (android/app/google-services.json); everything else builds and runs.
+ */
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+} else {
+    logger.lifecycle("[firebase] android/app/google-services.json not found — push notifications disabled in this build.")
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.

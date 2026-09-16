@@ -12,6 +12,8 @@ describe('clockIn / clockOut on an on-site day', () => {
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
   /** A real instant for the given IST wall-clock time on 2026-09-10. */
   const ist = (hh: number, mm = 0) => new Date(Date.UTC(2026, 8, 10, hh, mm) - IST_OFFSET_MS);
+  /** The IST calendar day those instants fall on — what Attendance.date holds. */
+  const DAY_KEY = new Date(Date.UTC(2026, 8, 10));
 
   const OFFICE_SHIFT = {
     id: 1, name: 'General Shift', startTime: '09:30', endTime: '18:30',
@@ -37,6 +39,9 @@ describe('clockIn / clockOut on an on-site day', () => {
       },
       attendance: {
         findUnique: jest.fn().mockResolvedValue(null),
+        // Clock-in refuses to start while an earlier day is still open, and
+        // clock-out falls back to one. No abandoned session in these cases.
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(async ({ data }: any) => ({ id: 5, ...data, logs: [] })),
         update: jest.fn(async ({ data }: any) => ({ id: 5, ...data, logs: [] })),
       },
@@ -126,7 +131,7 @@ describe('clockIn / clockOut on an on-site day', () => {
     onsiteDay('07:00', '14:00');
     jest.useFakeTimers().setSystemTime(ist(14, 5));
     prisma.attendance.findUnique.mockResolvedValue({
-      id: 5, clockIn: ist(7, 0), status: 'PRESENT',
+      id: 5, date: DAY_KEY, clockIn: ist(7, 0), status: 'PRESENT', isEarlyLeave: false,
       logs: [{ id: 100, clockIn: ist(7, 0), clockOut: null }],
     });
 
@@ -142,7 +147,7 @@ describe('clockIn / clockOut on an on-site day', () => {
     officeDay();
     jest.useFakeTimers().setSystemTime(ist(14, 5));
     prisma.attendance.findUnique.mockResolvedValue({
-      id: 5, clockIn: ist(7, 0), status: 'PRESENT',
+      id: 5, date: DAY_KEY, clockIn: ist(7, 0), status: 'PRESENT', isEarlyLeave: false,
       logs: [{ id: 100, clockIn: ist(7, 0), clockOut: null }],
     });
 

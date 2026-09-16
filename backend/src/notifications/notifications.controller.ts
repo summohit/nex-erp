@@ -1,11 +1,60 @@
-import { Controller, Get, Put, Body, Param, Query, Req, UseGuards, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Put, Post, Delete, Body, Param, Query, Req, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
+import { DeviceTokensService } from './push/device-tokens.service';
+import { PushService } from './push/push.service';
 import { AuthGuard } from '../auth/auth.guard';
 
 @UseGuards(AuthGuard)
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private notificationsService: NotificationsService) {}
+  constructor(
+    private notificationsService: NotificationsService,
+    private deviceTokens: DeviceTokensService,
+    private push: PushService,
+  ) {}
+
+  /**
+   * The browser's Firebase config, served rather than compiled in.
+   *
+   * Keeps the whole setup to one file on the server: changing Firebase project,
+   * or configuring one for the first time, needs no Angular rebuild and no .env
+   * edit. Returns only the public web values — see PushService.getWebConfig,
+   * which lists them field by field precisely so the service account's private
+   * key in the same file can never be spread into this response.
+   */
+  @Get('push-config')
+  async pushConfig() {
+    return this.push.getWebConfig();
+  }
+
+  // ── push devices ─────────────────────────────────────────────────────────
+  //
+  // Registered before ':id/read' for the same reason 'preferences' is: a path
+  // segment that is not a number must be matched before the :id route claims it.
+
+  /**
+   * Called on every app launch, not just the first — FCM rotates registration
+   * tokens on its own schedule, and a client that registers once quietly stops
+   * receiving anything.
+   */
+  @Post('devices')
+  async registerDevice(
+    @Req() req: any,
+    @Body() body: { token: string; platform: string; deviceName?: string },
+  ) {
+    return this.deviceTokens.register(this.extractUserId(req), req.user.companyId, body);
+  }
+
+  /** On sign-out, so the next person on this device does not get these pushes. */
+  @Delete('devices')
+  async unregisterDevice(@Req() req: any, @Body() body: { token: string }) {
+    return this.deviceTokens.unregister(this.extractUserId(req), body?.token);
+  }
+
+  @Get('devices')
+  async listDevices(@Req() req: any) {
+    return this.deviceTokens.list(this.extractUserId(req));
+  }
 
   @Get()
   async getMyNotifications(

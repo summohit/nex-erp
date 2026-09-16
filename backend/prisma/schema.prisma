@@ -72,6 +72,7 @@ model Company {
   projects              Project[]
   issues                Issue[]
   notifications         Notification[]
+  deviceTokens          DeviceToken[]
   appRoles              AppRole[]
   featureFlags          FeatureFlag[]
   approvalWorkflows     ApprovalWorkflow[]
@@ -110,6 +111,7 @@ model Company {
   preSalesTaskFiles     PreSalesTaskAttachment[]
   preSalesRequestItems  PreSalesRequestItem[]
   tickets               Ticket[]
+  taskTypes             TaskType[]
 }
 
 // Authentication & RBAC
@@ -140,6 +142,58 @@ model User {
   approvedQuotations       Quotation[]                @relation("QuotationApprover")
   twoFactor                UserTwoFactor?
   twoFactorBackupCodes     TwoFactorBackupCode[]
+  deviceTokens             DeviceToken[]
+}
+
+/// One push destination: a browser, or an installation of the mobile app.
+///
+/// A user has several — a laptop, a phone, a tablet — and a notification goes
+/// to all of them. Keyed on the FCM registration token because that is what
+/// Firebase actually addresses, and because the same token can be reassigned
+/// to a different user when someone else signs in on a shared device: the
+/// upsert on `token` moves it rather than leaving a ghost that pushes one
+/// person's shift reminders to another's phone.
+///
+/// Tokens expire and are revoked without warning. `lastSeenAt` is refreshed on
+/// every registration so stale rows are identifiable, and a send that comes
+/// back `messaging/registration-token-not-registered` deletes the row.
+model DeviceToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId  Int
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// WEB | ANDROID | IOS
+  platform   String
+  /// Free-text, for a person looking at their own sessions ("Chrome on Mac").
+  deviceName String?
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([companyId])
+}
+
+/// One reminder that has already gone out, so it goes out once.
+///
+/// The sweep runs every minute and asks "is this employee within the minute
+/// that is 10 minutes before their shift start". A restart, a slow tick, a
+/// clock adjustment or a second backend instance would each re-answer yes for
+/// the same minute. The unique key is the idempotency: the insert fails the
+/// second time and the send is skipped.
+model ShiftReminderLog {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// The IST calendar day the shift belongs to.
+  date       DateTime @db.Date
+  /// CLOCK_IN_T10 | CLOCK_IN_T5 | CLOCK_IN_T1 | CLOCK_OUT_T10 | CLOCK_OUT_T5 | CLOCK_OUT_OVERDUE
+  kind       String
+  sentAt     DateTime @default(now())
+
+  @@unique([employeeId, date, kind])
+  @@index([date])
 }
 
 model VerificationToken {
@@ -228,20 +282,28 @@ model RolePermission {
 
 // Master Data
 model Department {
-  id            Int            @id @default(autoincrement())
-  name          String
-  companyId     Int
-  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  isActive      Boolean        @default(true)
-  defaultRole   String         @default("EMPLOYEE")
-  designations  Designation[]
-  employees     Employee[]
-  jobs          Job[]
-  blackoutDates BlackoutDate[]
-  tickets       Ticket[]       @relation("TicketOwningTeam")
-  raisedTickets Ticket[]       @relation("TicketRaisedByDept")
+  id             Int            @id @default(autoincrement())
+  name           String
+  companyId      Int
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  isActive       Boolean        @default(true)
+  defaultRole    String         @default("EMPLOYEE")
+  /// Whether this department's employees may raise tasks, on top of SUPERADMIN
+  /// and ADMIN who always may.
+  ///
+  /// A flag rather than a name match on "Sales": this company has Sales, Field
+  /// Sales and Sales & Marketing as separate departments, the seeder creates a
+  /// fourth spelling, and a rename would silently revoke access for everyone in
+  /// it. Who may raise work is configuration, not a string comparison.
+  canCreateTasks Boolean        @default(false)
+  designations   Designation[]
+  employees      Employee[]
+  jobs           Job[]
+  blackoutDates  BlackoutDate[]
+  tickets        Ticket[]       @relation("TicketOwningTeam")
+  raisedTickets  Ticket[]       @relation("TicketRaisedByDept")
 }
 
 model Designation {
@@ -363,6 +425,7 @@ model Employee {
   appreciations     Appreciation[]
   leaveRequests     LeaveRequest[]
   attendances       Attendance[]
+  shiftReminders    ShiftReminderLog[]
   salaryStructures  SalaryStructure[]
   payslips          Payslip[]
   expenseClaims     ExpenseClaim[]
@@ -653,11 +716,25 @@ model Attendance {
   projectId      Int?
   project        Project?        @relation("ProjectAttendance", fields: [projectId], references: [id], onDelete: SetNull)
   isOnsite       Boolean         @default(false)
+  /// Why this day was closed late. Collected only when someone clocks out of a
+  /// PREVIOUS day's session after IST midnight — at that point the clock-out
+  /// time bears no relation to when they actually stopped working, and the
+  /// record is worthless without an explanation.
+  clockOutReason String?
+  /// The shift ended and nobody clocked out, so the sweep said so.
+  ///
+  /// This is the replacement for closing the session automatically. The day
+  /// stays open and honest; this flag is what the reminder is sent from and
+  /// what a manager's screen can filter on. Cleared when the session is
+  /// finally closed.
+  missedClockOut Boolean         @default(false)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   logs           AttendanceLog[]
 
   @@unique([employeeId, date])
+  /// "Whose session is still open?" runs every minute in the reminder sweep.
+  @@index([clockOut, date])
 }
 
 model AttendanceLog {
@@ -1288,6 +1365,21 @@ model Project {
   id          Int       @id @default(autoincrement())
   name        String
   key         String // Auto-generated, unique per company (e.g., "NEX")
+  /// The company's single "General" project: where tasks that belong to no real
+  /// project live. Hidden from every project list, picker and board view — it
+  /// exists so a general task still gets a key, a board column, labels and a
+  /// detail screen, rather than making `projectId` nullable and teaching every
+  /// board code path to cope with its absence.
+  ///
+  /// Anything that lists projects to a human MUST filter `isSystem: false`.
+  isSystem    Boolean   @default(false)
+  /// Next issue number for this project. `${key}-${count + 1}` read the row
+  /// count and then wrote, which hands two people creating a task in the same
+  /// second the same number — and @@unique([key, companyId]) turns that into a
+  /// 500. Incrementing this column inside the create transaction row-locks it,
+  /// so concurrent callers get distinct keys. It also never reuses a key after
+  /// a deletion, which a count does.
+  issueSeq    Int       @default(0)
   description String?
   color       String    @default("#2563eb") // Project accent color
   icon        String    @default("folder") // Lucide icon name
@@ -1777,6 +1869,18 @@ model Issue {
   // Relationships
   projectId  Int
   project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// The deal this task was raised against, when it was. Distinct from
+  /// PreSalesTask, which keeps its own hours budget and approval flow — this is
+  /// only for tasks raised through the unified task form, so a task can carry a
+  /// lead badge without that model being touched.
+  leadId     Int?
+  lead       Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  /// The business meaning of the task — Call, Site Visit, Documentation —
+  /// managed as master data. Deliberately separate from `type` above, which is
+  /// EPIC/STORY/TASK/BUG: a developer's vocabulary, not the company's, and one
+  /// that already drives board icons, subtask semantics and the AI checklist.
+  taskTypeId Int?
+  taskType   TaskType?    @relation(fields: [taskTypeId], references: [id], onDelete: SetNull)
   columnId   Int?
   column     BoardColumn? @relation(fields: [columnId], references: [id], onDelete: SetNull)
   assigneeId Int?
@@ -1796,16 +1900,69 @@ model Issue {
   activities  IssueActivity[]
   timeLogs    IssueTimeLog[] // Detailed time entries if multiple sessions
   checklists  Checklist[]
-  reminders   IssueReminder[] // Sent due-date reminder markers (dedupe)
+  reminders   IssueReminder[]
+  /// Tasks that must finish before this one, and the ones waiting on it.
+  blockedBy   IssueDependency[] @relation("IssueBlockedBy")
+  blocking    IssueDependency[] @relation("IssueBlocks")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([key, companyId])
+  /// "What is assigned to me, soonest first" — the My Tasks query.
+  @@index([companyId, assigneeId, isArchived])
+  @@index([companyId, dueDate])
 }
 
 // Support multiple work sessions if a user stops and starts
 // Tracks which due-date reminders have already been sent for an issue (prevents duplicates)
+/// The business meaning of a task — "Client Call", "Site Visit",
+/// "Documentation" — managed by admins under Master Data rather than hardcoded,
+/// so the vocabulary can change without a deploy. Mirrors how LeaveType works.
+model TaskType {
+  id        Int      @id @default(autoincrement())
+  name      String
+  /// Soft-disable rather than delete: a type that has been used is still the
+  /// truth about the tasks that carry it, so it is hidden from new tasks
+  /// instead of being removed from old ones.
+  isActive  Boolean  @default(true)
+  position  Int      @default(0)
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  issues    Issue[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+}
+
+/// One task waiting on another.
+///
+/// A join table rather than a single `blockedById`, because "previous task" is
+/// genuinely many in practice — a deployment waits on three tickets — and a
+/// single column forces a migration the first time somebody needs two.
+///
+/// Advisory by default: the blocked task shows a chip and a warning, and work
+/// is never prevented, because a stale blocker nobody closed must not be able
+/// to stop real work. The one exception is the move into a REVIEW or DONE
+/// column, where an open blocker means the task demonstrably is not finished.
+model IssueDependency {
+  id               Int      @id @default(autoincrement())
+  /// The task that is waiting.
+  issueId          Int
+  issue            Issue    @relation("IssueBlockedBy", fields: [issueId], references: [id], onDelete: Cascade)
+  /// The task that must finish first.
+  dependsOnIssueId Int
+  dependsOnIssue   Issue    @relation("IssueBlocks", fields: [dependsOnIssueId], references: [id], onDelete: Cascade)
+  type             String   @default("BLOCKS") // BLOCKS, RELATES
+  companyId        Int
+  createdById      Int?
+  createdAt        DateTime @default(now())
+
+  @@unique([issueId, dependsOnIssueId])
+  @@index([dependsOnIssueId])
+}
+
 model IssueReminder {
   id        Int      @id @default(autoincrement())
   issueId   Int
@@ -1920,6 +2077,9 @@ model IssueMember {
   assignedAt DateTime @default(now())
 
   @@id([issueId, employeeId])
+  /// The primary key leads with issueId, so "every issue this person is on" —
+  /// exactly what My Tasks asks — could not use it and scanned the table.
+  @@index([employeeId])
 }
 
 model Notification {
@@ -2466,6 +2626,7 @@ model Lead {
   preSalesRequests    PreSalesRequest[]
   preSalesTasks       PreSalesTask[]
   preSalesMom         PreSalesMoM[]
+  tasks               Issue[]
 }
 
 // External contact (broker/partner/referrer) who can be selected as the source
@@ -2607,6 +2768,7 @@ model PreSalesTeamMember {
   /// worse than showing nothing.
   technology     String?
   engagementType String? // ONSITE, VIRTUAL
+  location       String?
   hours          Float?
   status         String    @default("ACTIVE") // ACTIVE, REMOVED
   removedAt      DateTime?
@@ -2675,6 +2837,7 @@ model PreSalesRequestItem {
   /// ONSITE or VIRTUAL. Drives nothing automatically; it is what the requester
   /// is committing the person's time to, and the admin is approving.
   engagementType String          @default("VIRTUAL")
+  location       String?
   /// Hours of their time being asked for.
   hours          Float?
   /// REQUESTED until the admin decides, then APPROVED or REMOVED. ADDED marks

@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
+import { PushService } from './push/push.service';
 
 @Injectable()
 export class NotificationsService {
@@ -8,7 +9,8 @@ export class NotificationsService {
 
   constructor(
     private prisma: PrismaService,
-    private notificationsGateway: NotificationsGateway
+    private notificationsGateway: NotificationsGateway,
+    private push: PushService,
   ) {}
 
   /**
@@ -108,6 +110,24 @@ export class NotificationsService {
 
       // Emit real-time WebSocket packet to user room
       this.notificationsGateway.sendToUser(userId, notification);
+
+      // And push, for the recipient who does not have the app open — which is
+      // the whole point of a "your shift starts in 10 minutes" reminder.
+      //
+      // Deliberately here rather than at each call site: every notification in
+      // the product now reaches a closed app, and there is one mute check, one
+      // audit row and one delivery rule instead of two systems drifting apart.
+      // Not awaited — a slow FCM round trip must not hold up the request that
+      // caused the notification, and the row is already committed.
+      void this.push
+        .sendToUser(userId, {
+          title,
+          message,
+          type,
+          linkUrl,
+          data: { notificationId: String(notification.id) },
+        })
+        .catch((err) => this.logger.warn(`Push failed for user ${userId}: ${err.message}`));
 
       return notification;
     } catch (error) {

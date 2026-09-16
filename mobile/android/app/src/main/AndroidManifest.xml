@@ -26,6 +26,20 @@
     android:theme="@style/AppTheme"
     android:usesCleartextTraffic="${usesCleartextTraffic}"
     android:supportsRtl="true">
+
+    <!-- Shift reminders arrive on their own channel so a person can silence
+         task chatter in Android's settings without silencing the thing that
+         tells them their shift is starting. The id must match the channelId
+         PushService sends against. Android 8+ drops a notification whose
+         channel does not exist, so the channel itself is created in
+         MainApplication at startup — this only names the default. -->
+    <meta-data
+      android:name="com.google.firebase.messaging.default_notification_channel_id"
+      android:value="shift-reminders" />
+    <meta-data
+      android:name="com.google.firebase.messaging.default_notification_icon"
+      android:resource="@mipmap/ic_launcher" />
+
     <activity
       android:name=".MainActivity"
       android:label="@string/app_name"

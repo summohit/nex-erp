@@ -23,7 +23,7 @@ interface DashboardState {
 
   fetchDashboardData: () => Promise<void>;
   clockIn: (lat?: number, lng?: number) => Promise<void>;
-  clockOut: (lat?: number, lng?: number) => Promise<void>;
+  clockOut: (lat?: number, lng?: number, reason?: string) => Promise<void>;
   markNotificationRead: (id: number) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
 }
@@ -131,22 +131,31 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       set({ todayAttendance: record, isClockingIn: false });
       useTimesheetStore.getState().fetchData();
     } catch (error: any) {
-      set({ error: error.message || 'Clock in failed', isClockingIn: false });
+      const fromServer = error?.response?.data?.message;
+      set({ error: fromServer || error.message || 'Clock in failed', isClockingIn: false });
       throw error;
     }
   },
 
-  clockOut: async () => {
+  /**
+   * `reason` is passed straight through. The server asks for it — by refusing
+   * with LATE_CLOCK_OUT_REASON_REQUIRED — when the session being closed belongs
+   * to a previous day; the screen prompts and calls this again with the answer.
+   */
+  clockOut: async (lat?: number, lng?: number, reason?: string) => {
     set({ isClockingIn: true, error: null });
     try {
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) throw new Error('Location permission is required.');
       const coords = await getCurrentLocation();
-      const record = await attendanceService.clockOut(coords.lat, coords.lng);
+      const record = await attendanceService.clockOut(coords.lat, coords.lng, reason);
       set({ todayAttendance: record, isClockingIn: false });
       useTimesheetStore.getState().fetchData();
     } catch (error: any) {
-      set({ error: error.message || 'Clock out failed', isClockingIn: false });
+      // The server's sentence, not axios's "Request failed with status code
+      // 400" — these refusals exist to be read.
+      const fromServer = error?.response?.data?.message;
+      set({ error: fromServer || error.message || 'Clock out failed', isClockingIn: false });
       throw error;
     }
   },

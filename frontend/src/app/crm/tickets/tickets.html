@@ -432,9 +432,46 @@
           </select>
         </div>
 
+        <!-- Employee Filter (Searchable) -->
+        <div class="searchable-filter-dropdown">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterEmployee" (click)="showEmployeeDropdown = !showEmployeeDropdown; showDeptDropdown=false; showStatusDropdown=false; showPriorityDropdown=false; showPlatformDropdown=false">
+            <svg lucideUser [size]="14" class="trigger-prefix-icon"></svg>
+            <span class="trigger-text">{{ getSelectedEmployeeLabel() }}</span>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showEmployeeDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover popover-emp-dropdown" *ngIf="showEmployeeDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search employees..." [(ngModel)]="employeeSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="employeeSearchQuery" (click)="employeeSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
+            </div>
+            <div class="popover-options-scroll">
+              <div class="popover-option-item" (click)="selectEmployeeFilter('')" [class.selected]="!filterEmployee">
+                <span class="option-primary">All Employees</span>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="!filterEmployee"></svg>
+              </div>
+              <div class="popover-option-item popover-option-emp" *ngFor="let emp of getFilteredEmployees(employeeSearchQuery)" (click)="selectEmployeeFilter(emp.id)" [class.selected]="filterEmployee === '' + emp.id">
+                <div class="popover-emp-info">
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="popover-emp-avatar" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+                  <span class="popover-emp-initials" [style.display]="emp.avatarUrl ? 'none' : 'flex'">{{ getEmployeeInitials(emp) }}</span>
+                  <div class="popover-emp-text">
+                    <span class="popover-emp-name">{{ emp.firstName }} {{ emp.lastName }}<span class="text-muted" *ngIf="isCurrentUser(emp.id)"> (you)</span></span>
+                    <span class="popover-emp-dept" *ngIf="emp.department?.name || emp.designation?.name">{{ emp.designation?.name || emp.department?.name }}</span>
+                  </div>
+                </div>
+                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterEmployee === '' + emp.id"></svg>
+              </div>
+              <div class="popover-empty" *ngIf="getFilteredEmployees(employeeSearchQuery).length === 0">
+                No employees match "{{ employeeSearchQuery }}"
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showEmployeeDropdown" (click)="showEmployeeDropdown = false"></div>
+        </div>
+
         <!-- 1. Department Filter (Searchable) -->
         <div class="searchable-filter-dropdown">
-          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterDept" (click)="showDeptDropdown = !showDeptDropdown; showStatusDropdown=false; showPriorityDropdown=false; showPlatformDropdown=false">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterDept" (click)="showDeptDropdown = !showDeptDropdown; showEmployeeDropdown=false; showStatusDropdown=false; showPriorityDropdown=false; showPlatformDropdown=false">
             <svg lucideBuilding [size]="14" class="trigger-prefix-icon"></svg>
             <span class="trigger-text">{{ getSelectedDeptLabel() }}</span>
             <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showDeptDropdown"></svg>
@@ -464,7 +501,7 @@
 
         <!-- 2. Status Filter (Searchable) -->
         <div class="searchable-filter-dropdown">
-          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterStatus" (click)="showStatusDropdown = !showStatusDropdown; showDeptDropdown=false; showPriorityDropdown=false; showPlatformDropdown=false">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterStatus" (click)="showStatusDropdown = !showStatusDropdown; showEmployeeDropdown=false; showDeptDropdown=false; showPriorityDropdown=false; showPlatformDropdown=false">
             <svg lucideClock [size]="14" class="trigger-prefix-icon"></svg>
             <span class="trigger-text">{{ getSelectedStatusLabel() }}</span>
             <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showStatusDropdown"></svg>
@@ -494,7 +531,7 @@
 
         <!-- 3. Priority Filter (Searchable) -->
         <div class="searchable-filter-dropdown">
-          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterPriority" (click)="showPriorityDropdown = !showPriorityDropdown; showDeptDropdown=false; showStatusDropdown=false; showPlatformDropdown=false">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterPriority" (click)="showPriorityDropdown = !showPriorityDropdown; showEmployeeDropdown=false; showDeptDropdown=false; showStatusDropdown=false; showPlatformDropdown=false">
             <svg lucideFlame [size]="14" class="trigger-prefix-icon"></svg>
             <span class="trigger-text">{{ getSelectedPriorityLabel() }}</span>
             <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showPriorityDropdown"></svg>
@@ -524,7 +561,7 @@
 
         <!-- 4. Platform Filter (Searchable) -->
         <div class="searchable-filter-dropdown">
-          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterPlatform" (click)="showPlatformDropdown = !showPlatformDropdown; showDeptDropdown=false; showStatusDropdown=false; showPriorityDropdown=false">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterPlatform" (click)="showPlatformDropdown = !showPlatformDropdown; showEmployeeDropdown=false; showDeptDropdown=false; showStatusDropdown=false; showPriorityDropdown=false">
             <svg lucideLayers [size]="14" class="trigger-prefix-icon"></svg>
             <span class="trigger-text">{{ getSelectedPlatformLabel() }}</span>
             <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showPlatformDropdown"></svg>

@@ -2090,3 +2090,13 @@
   background: #FEE2E2;
   border-color: #FCA5A5;
 }
+
+/* Real photo where there is one; the initials circle is the fallback. */
+.leave-detail-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #E2E8F0;
+  flex-shrink: 0;
+}

@@ -125,11 +125,6 @@
           <div class="info-tile"><div class="tile-icon"><svg lucidePhone size="16"></svg></div><div class="tile-content"><span class="tile-label">Mobile</span><span class="tile-value"><a *ngIf="lead.phone" [href]="'tel:' + lead.phone" class="meta-link">{{ lead.phone }}</a><span *ngIf="!lead.phone">—</span></span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideBuilding size="16"></svg></div><div class="tile-content"><span class="tile-label">Company Name</span><span class="tile-value">{{ lead.companyName || '—' }}</span></div></div>
         </div>
-        <div class="contact-action-row">
-          <button class="btn-primary-pill contact-email-btn" (click)="openEmail()" [disabled]="!lead.email">
-            <svg lucideMail size="16"></svg> Send Email
-          </button>
-        </div>
       </div>
     </div>
 
@@ -614,7 +609,9 @@
               <button class="btn-outline-pill" *ngIf="presalesPermissions.canRequestMembers" (click)="openRequestPresalesModal()">
                 <svg lucidePlusCircle size="16"></svg> Request Pre-Sales
               </button>
-              <button class="btn-outline-pill" *ngIf="presalesPermissions.canCreateTasks && activeMembers.length" (click)="openTaskModal()">
+              <!-- The form itself lives in My Tasks; this hands it the deal. -->
+              <button class="btn-outline-pill" *ngIf="presalesPermissions.canCreateTasks && activeMembers.length"
+                      (click)="addPreSalesTask()">
                 <svg lucideClipboardList size="16"></svg> Add Task
               </button>
             </div>
@@ -637,6 +634,13 @@
                     <span>{{ m.employee?.designation?.name || 'Pre-Sales Specialist' }}</span>
                   </span>
                 </div>
+                <!-- Opens the composer with this deal AND this person already
+                     chosen, which is the whole reason to start from here
+                     rather than from the task list. -->
+                <button type="button" class="btn-icon-task ps-member-task" *ngIf="canAssignTaskTo(m)"
+                        (click)="addPreSalesTask(m)" [title]="'Assign a task to ' + presalesName(m)">
+                  <svg lucideClipboardList [size]="14"></svg>
+                </button>
                 <button type="button" class="btn-icon-del ps-member-del" *ngIf="presalesPermissions.canAddMembers"
                         (click)="removePresalesMember(m)" title="Remove from pre-sales">
                   <svg lucideTrash2 [size]="14"></svg>
@@ -690,118 +694,16 @@
             <svg lucideUsers size="28" style="margin-bottom:8px;opacity:.4"></svg>
             <div>No pre-sales team on this deal yet.</div>
           </div>
-        </div>
 
-        <!-- Tasks -->
-        <div class="content-card">
-          <div class="card-header-styled">
-            <div class="header-title-box">
-              <span class="header-icon bg-emerald-light text-emerald"><svg lucideClipboardList size="16"></svg></span>
-              <h3>Pre-Sales Tasks</h3>
-            </div>
-            <button class="btn-primary-pill" *ngIf="presalesPermissions.canCreateTasks && activeMembers.length" (click)="openTaskModal()">
-              <svg lucidePlus size="16"></svg> Add Task
-            </button>
-          </div>
+        <!-- The pre-sales task table used to sit here. It now lives in
+             Projects → My Tasks, which is the one screen that shows a
+             person every task they have, whichever system raised it —
+             see ProjectsComponent and CrmService.getMyPreSalesTasks.
+             Creating, editing, status changes and the history timeline
+             all moved with it; this page keeps the team. -->
 
-          <div class="table-scroll" *ngIf="!loadingPresales && presalesTasks.length">
-            <table class="leads-table ps-table-modern">
-              <thead>
-                <tr>
-                  <th>Task Title</th>
-                  <th>Assigned Specialist</th>
-                  <th>Scheduled Date & Time</th>
-                  <th>Est. Duration</th>
-                  <th>Status</th>
-                  <th style="text-align: right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let t of presalesTasks" class="ps-task-row">
-                  <td data-label="Task Title">
-                    <div class="ps-task-title-group">
-                      <div class="ps-task-name">{{ t.title }}</div>
-                      <div class="ps-task-type-pill" *ngIf="t.taskType">
-                        <svg lucideTag size="11"></svg>
-                        <span>{{ t.taskType }}</span>
-                      </div>
-                    </div>
-                    <div class="ps-task-attachments" *ngIf="t.attachments?.length">
-                      <a class="ps-file-chip-card ps-task-file-chip" *ngFor="let a of t.attachments.slice(0, 3)"
-                         [href]="a.fileUrl" target="_blank" rel="noopener" title="{{ a.fileName }}">
-                        <svg lucidePaperclip size="11"></svg>
-                        <span class="ps-file-title">{{ a.fileName }}</span>
-                      </a>
-                      <span class="ps-task-file-more" *ngIf="t.attachments.length > 3" title="and {{ t.attachments.length - 3 }} more">
-                        +{{ t.attachments.length - 3 }} more
-                      </span>
-                    </div>
-                  </td>
-                  <td data-label="Assigned Specialist">
-                    <div class="ps-assigned-profile">
-                      <img *ngIf="t.assignedTo?.avatarUrl" [src]="t.assignedTo.avatarUrl" class="ps-avatar-img-xs" alt="" />
-                      <div *ngIf="!t.assignedTo?.avatarUrl" class="ps-avatar-small">{{ presalesInitials(t.assignedTo) }}</div>
-                      <span class="ps-assigned-label">{{ presalesName(t.assignedTo) }}</span>
-                    </div>
-                  </td>
-                  <td data-label="Scheduled">
-                    <div class="ps-schedule-pill" *ngIf="t.scheduledAt">
-                      <svg lucideCalendarClock size="13"></svg>
-                      <span>{{ t.scheduledAt | date:'dd MMM yyyy, h:mm a' }}</span>
-                    </div>
-                    <span class="text-muted" *ngIf="!t.scheduledAt">—</span>
-                  </td>
-                  <td data-label="Est. Duration">
-                    <div class="ps-duration-chip" *ngIf="t.estimatedMinutes">
-                      <svg lucideClock size="12"></svg>
-                      <span>{{ formatDuration(t.estimatedMinutes) }}</span>
-                    </div>
-                    <span class="text-muted" *ngIf="!t.estimatedMinutes">—</span>
-                  </td>
-                  <td data-label="Status">
-                    <span class="ps-status-pill {{ taskStatusClass(t.status) }}">
-                      <span class="ps-status-dot"></span>
-                      {{ taskStatusLabel(t.status) }}
-                    </span>
-                  </td>
-                  <td data-label="Actions" style="text-align: right;">
-                    <div class="ps-task-actions">
-                      <!-- Only the assignee moves the status; the server decides. -->
-                      <button type="button" class="btn-action-status {{ s | lowercase }}"
-                              *ngFor="let s of (t.canChangeStatus ? nextStatuses(t) : [])"
-                              (click)="openStatusModal(t, s)">
-                        <svg lucidePlay size="12" *ngIf="s === 'WORKING'"></svg>
-                        <svg lucidePause size="12" *ngIf="s === 'ON_HOLD'"></svg>
-                        <svg lucideCheckCircle2 size="12" *ngIf="s === 'COMPLETED'"></svg>
-                        <span>{{ s === 'WORKING' ? 'Start' : s === 'ON_HOLD' ? 'Hold' : 'Complete' }}</span>
-                      </button>
-                      <button type="button" class="btn-icon-ghost ps-action-btn" (click)="openTaskHistory(t)" title="View Status History Timeline">
-                        <svg lucideHistory [size]="14"></svg>
-                      </button>
-                      <button type="button" class="btn-icon-ghost ps-action-btn" *ngIf="presalesPermissions.canCreateTasks"
-                              (click)="openTaskModal(t)" title="Edit task">
-                        <svg lucideEdit2 [size]="14"></svg>
-                      </button>
-                      <!-- Deleting is for a task that should not exist; completing
-                           is the record of one that did. Different actions. -->
-                      <button type="button" class="btn-icon-ghost ps-action-btn ps-action-danger"
-                              *ngIf="presalesPermissions.canCreateTasks"
-                              (click)="deleteTask(t)" title="Delete task">
-                        <svg lucideTrash2 [size]="14"></svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="empty-state-box" *ngIf="!loadingPresales && !presalesTasks.length">
-            <svg lucideClipboardList size="28" style="opacity:.4; margin-bottom:8px;"></svg>
-            <div>No pre-sales tasks created yet.</div>
-          </div>
-        </div>
       </div>
+    </div>
     </div>
 
 
@@ -848,17 +750,45 @@
           </div>
 
           <div class="ps-pick-list">
-            <label class="ps-pick-row" *ngFor="let e of presalesCandidates(addPresalesSearch, addPresalesScope)">
-              <input type="checkbox" class="ps-checkbox" [checked]="isPresalesCandidateSelected(e.id)" (change)="togglePresalesCandidate(e.id)" />
-              <div class="ps-avatar-wrapper">
-                <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" class="ps-avatar-img-sm" alt="" />
-                <div *ngIf="!e.avatarUrl" class="ps-avatar-small">{{ (e.firstName?.[0] || '') + (e.lastName?.[0] || '') }}</div>
+            <ng-container *ngFor="let e of presalesCandidates(addPresalesSearch, addPresalesScope)">
+              <label class="ps-pick-row">
+                <input type="checkbox" class="ps-checkbox" [checked]="isPresalesCandidateSelected(e.id)" (change)="togglePresalesCandidate(e.id)" />
+                <div class="ps-avatar-wrapper">
+                  <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" class="ps-avatar-img-sm" alt="" />
+                  <div *ngIf="!e.avatarUrl" class="ps-avatar-small">{{ (e.firstName?.[0] || '') + (e.lastName?.[0] || '') }}</div>
+                </div>
+                <div class="ps-pick-id">
+                  <span class="ps-member-name">{{ e.firstName }} {{ e.lastName }}</span>
+                  <span class="ps-member-role">{{ e.designation?.name || 'No designation' }} · {{ e.department?.name || 'No department' }}</span>
+                </div>
+              </label>
+              
+              <!-- Per-user options block -->
+              <div class="ps-member-options" *ngIf="isPresalesCandidateSelected(e.id)">
+                <div class="ps-options-grid">
+                  <div class="form-group">
+                    <label class="form-label">Technology</label>
+                    <input type="text" class="modern-form-control" [(ngModel)]="addPresalesOptions[e.id].technology" placeholder="e.g. Network Security">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select class="modern-form-control" [(ngModel)]="addPresalesOptions[e.id].engagementType">
+                      <option value="VIRTUAL">Virtual</option>
+                      <option value="ONSITE">On-Site</option>
+                    </select>
+                  </div>
+                  <div class="form-group" *ngIf="addPresalesOptions[e.id].engagementType === 'ONSITE'">
+                    <label class="form-label">Location</label>
+                    <input type="text" class="modern-form-control" [(ngModel)]="addPresalesOptions[e.id].location" placeholder="e.g. Client Office">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Hours</label>
+                    <input type="number" class="modern-form-control" [(ngModel)]="addPresalesOptions[e.id].hours" placeholder="0">
+                  </div>
+                </div>
               </div>
-              <div class="ps-pick-id">
-                <span class="ps-member-name">{{ e.firstName }} {{ e.lastName }}</span>
-                <span class="ps-member-role">{{ e.designation?.name || 'No designation' }} · {{ e.department?.name || 'No department' }}</span>
-              </div>
-            </label>
+            </ng-container>
+
             <div class="ps-pick-empty" *ngIf="!presalesCandidates(addPresalesSearch, addPresalesScope).length">
               <svg lucideUsers size="20" style="opacity:.4; margin-bottom:4px;"></svg>
               <div>No matching employees found to add.</div>
@@ -950,6 +880,11 @@
                     <option *ngFor="let t of engagementTypes" [ngValue]="t">{{ t === 'ONSITE' ? 'Onsite' : 'Virtual' }}</option>
                   </select>
                 </div>
+                <div class="ps-rq-field" *ngIf="item.engagementType === 'ONSITE'">
+                  <label>Location</label>
+                  <input type="text" class="modern-form-control" [(ngModel)]="item.location"
+                         [name]="'loc_' + i" placeholder="e.g. Client Office" />
+                </div>
                 <div class="ps-rq-field ps-rq-narrow">
                   <label>Hours</label>
                   <input type="number" min="1" step="0.5" class="modern-form-control" [(ngModel)]="item.hours"
@@ -1010,267 +945,6 @@
       </div>
     </div>
 
-    <!-- ══════════════════════════ PRE-SALES TASK ══════════════════════════ -->
-    <div class="modal-overlay" *ngIf="showTaskModal" (click)="closeTaskModal()">
-      <div class="modal-card modal-card-md ps-modal-styled" (click)="$event.stopPropagation()">
-        <div class="modal-header-styled ps-modal-header-modern">
-          <div class="modal-header-text">
-            <div class="ps-modal-header-flex">
-              <div class="ps-header-icon-circle bg-emerald-light text-emerald">
-                <svg lucideClipboardList size="18"></svg>
-              </div>
-              <div>
-                <h3>{{ editingTaskId ? 'Edit Pre-Sales Task' : 'Add Pre-Sales Task' }}</h3>
-                <p>Assign technical objectives to a pre-sales specialist on this deal.</p>
-              </div>
-            </div>
-          </div>
-          <button class="close-btn" (click)="closeTaskModal()"><svg lucideX size="18"></svg></button>
-        </div>
-
-        <div class="modal-body-styled ps-modal-body-scroll">
-          <div class="ps-form-grid">
-            <div class="ps-field ps-field-full">
-              <label class="form-label">Task Title <span class="required">*</span></label>
-              <input type="text" class="modern-form-control" [class.input-error]="taskSubmitted && taskErrors.title"
-                     [(ngModel)]="taskForm.title" (input)="taskErrors.title = ''"
-                     placeholder="e.g. Technical Requirement Review & Architecture Diagram" />
-              <span class="field-error-text" *ngIf="taskSubmitted && taskErrors.title">
-                <svg lucideAlertCircle size="12"></svg> {{ taskErrors.title }}
-              </span>
-            </div>
-            <div class="ps-field">
-              <label class="form-label">Task Type</label>
-              <select class="modern-form-control" [(ngModel)]="taskTypeSelection" (change)="onTaskTypeSelect()">
-                <option value="">Select Task Type (optional)</option>
-                <option *ngFor="let type of preSalesTaskTypes" [value]="type">{{ type }}</option>
-                <option value="Custom">Custom / Other…</option>
-              </select>
-              <input *ngIf="taskTypeSelection === 'Custom'" type="text" class="modern-form-control"
-                     style="margin-top: 6px;"
-                     [(ngModel)]="customTaskType" (input)="onCustomTaskTypeInput()"
-                     placeholder="Enter custom task type…" />
-            </div>
-            <div class="ps-field">
-              <label class="form-label">Assigned Specialist <span class="required">*</span></label>
-              <select class="modern-form-control" [class.input-error]="taskSubmitted && taskErrors.assignedToId"
-                      [(ngModel)]="taskForm.assignedToId" (change)="taskErrors.assignedToId = ''">
-                <option [ngValue]="null">Select a pre-sales specialist</option>
-                <option *ngFor="let m of activeMembers" [ngValue]="m.employeeId">{{ presalesName(m) }} ({{ m.employee?.designation?.name || 'Pre-Sales' }})</option>
-              </select>
-              <span class="field-error-text" *ngIf="taskSubmitted && taskErrors.assignedToId">
-                <svg lucideAlertCircle size="12"></svg> {{ taskErrors.assignedToId }}
-              </span>
-            </div>
-            <div class="ps-field">
-              <label class="form-label">Scheduled Date</label>
-              <input type="date" class="modern-form-control" [(ngModel)]="taskForm.scheduledDate" />
-            </div>
-            <div class="ps-field">
-              <label class="form-label">Scheduled Time</label>
-              <input type="time" class="modern-form-control" [(ngModel)]="taskForm.scheduledTime" />
-            </div>
-            <div class="ps-field ps-field-full">
-              <label class="form-label">Estimated Duration</label>
-              <div class="ps-duration-row">
-                <div class="ps-duration-input-wrap">
-                  <input type="number" min="0" class="modern-form-control" [(ngModel)]="taskForm.durationHours" placeholder="0" />
-                  <span class="ps-duration-unit">Hours</span>
-                </div>
-                <div class="ps-duration-input-wrap">
-                  <input type="number" min="0" max="59" class="modern-form-control" [(ngModel)]="taskForm.durationMinutes" placeholder="0" />
-                  <span class="ps-duration-unit">Mins</span>
-                </div>
-              </div>
-            </div>
-            <div class="ps-field ps-field-full">
-              <label class="form-label">Task Instructions / Scope</label>
-              <textarea class="modern-form-control" rows="3" [(ngModel)]="taskForm.description"
-                        placeholder="e.g. Discuss technical requirements, understand existing infrastructure, and prepare solution proposal."></textarea>
-            </div>
-            <div class="ps-field ps-field-full" *ngIf="!editingTaskId">
-              <label class="form-label">Supporting Documents</label>
-              <div class="ps-file-picker">
-                <button type="button" class="btn-outline-pill ps-upload-btn">
-                  <svg lucideUpload size="14"></svg> Attach Files
-                </button>
-                <input type="file" multiple class="ps-file-input-cover" (change)="onTaskFilesSelected($event)" />
-              </div>
-              <div class="ps-files-chips-wrap" *ngIf="taskForm.attachments?.length">
-                <div class="ps-file-chip-card" *ngFor="let a of taskForm.attachments; let i = index">
-                  <svg lucidePaperclip size="13"></svg>
-                  <span class="ps-file-title">{{ a.fileName }}</span>
-                  <button type="button" class="ps-chip-remove" (click)="removeTaskAttachment(i)"><svg lucideX size="12"></svg></button>
-                </div>
-              </div>
-              <span class="ps-uploading" *ngIf="uploadingTaskFiles > 0">
-                <svg lucideLoader2 size="12" class="spin-icon"></svg> Uploading {{ uploadingTaskFiles }} file(s)…
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer-styled">
-          <button class="btn-outline-pill" (click)="closeTaskModal()" [disabled]="savingTask">Cancel</button>
-          <button class="btn-primary-pill" (click)="saveTask()" [disabled]="savingTask">
-            <svg lucideLoader2 size="16" class="spin-icon" *ngIf="savingTask"></svg>
-            {{ savingTask ? 'Saving…' : (editingTaskId ? 'Update Task' : 'Create Task') }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════════════════ TASK STATUS ══════════════════════════ -->
-    <div class="modal-overlay" *ngIf="showStatusModal" (click)="closeStatusModal()">
-      <div class="modal-card modal-card-md ps-modal-styled" (click)="$event.stopPropagation()">
-        <div class="modal-header-styled ps-modal-header-modern">
-          <div class="modal-header-text">
-            <div class="ps-modal-header-flex">
-              <div class="ps-header-icon-circle" [ngClass]="{
-                'bg-blue-light text-blue': statusForm.status === 'WORKING',
-                'bg-amber-light text-amber': statusForm.status === 'ON_HOLD',
-                'bg-emerald-light text-emerald': statusForm.status === 'COMPLETED'
-              }">
-                <svg lucidePlay size="18" *ngIf="statusForm.status === 'WORKING'"></svg>
-                <svg lucidePause size="18" *ngIf="statusForm.status === 'ON_HOLD'"></svg>
-                <svg lucideCheckCircle2 size="18" *ngIf="statusForm.status === 'COMPLETED'"></svg>
-              </div>
-              <div>
-                <h3>{{ statusForm.status === 'WORKING' ? 'Start Working on Task' : statusForm.status === 'ON_HOLD' ? 'Put Task On Hold' : 'Mark Task as Completed' }}</h3>
-                <p class="ps-task-subhead">{{ statusTask?.title }}</p>
-              </div>
-            </div>
-          </div>
-          <button class="close-btn" (click)="closeStatusModal()"><svg lucideX size="18"></svg></button>
-        </div>
-
-        <div class="modal-body-styled ps-modal-body-scroll">
-          <label class="form-label">
-            {{ statusForm.status === 'ON_HOLD' ? 'Reason for Hold' : 'Progress / Completion Remarks' }}
-            <span class="required" *ngIf="statusRemarkRequired">*</span>
-          </label>
-          <textarea class="modern-form-control" rows="3" [(ngModel)]="statusForm.remark"
-                    [placeholder]="statusForm.status === 'ON_HOLD'
-                      ? 'e.g. Waiting for client network architecture confirmation before proceeding.'
-                      : (statusForm.status === 'COMPLETED'
-                          ? 'e.g. Technical discussion concluded. Prepared architecture diagram and preliminary BOM.'
-                          : 'e.g. Started technical analysis and requirements gathering with client.')"></textarea>
-
-          <label class="form-label" style="margin-top: 14px;">Documents & Attachments</label>
-          <div class="ps-file-picker">
-            <button type="button" class="btn-outline-pill ps-upload-btn">
-              <svg lucideUpload size="14"></svg> Attach Files
-            </button>
-            <input type="file" multiple class="ps-file-input-cover" (change)="onStatusFilesSelected($event)" />
-          </div>
-          <div class="ps-files-chips-wrap" *ngIf="statusForm.attachments?.length">
-            <div class="ps-file-chip-card" *ngFor="let a of statusForm.attachments">
-              <svg lucidePaperclip size="13"></svg>
-              <span class="ps-file-title">{{ a.fileName }}</span>
-            </div>
-          </div>
-          <span class="ps-uploading" *ngIf="uploadingStatusFiles > 0">
-            <svg lucideLoader2 size="12" class="spin-icon"></svg> Uploading {{ uploadingStatusFiles }} file(s)…
-          </span>
-        </div>
-
-        <div class="modal-footer-styled">
-          <button class="btn-outline-pill" (click)="closeStatusModal()" [disabled]="savingStatus">Cancel</button>
-          <button class="btn-primary-pill" (click)="saveStatus()" [disabled]="savingStatus">
-            <svg lucideLoader2 size="16" class="spin-icon" *ngIf="savingStatus"></svg>
-            {{ savingStatus ? 'Saving…' : (statusForm.status === 'COMPLETED' ? 'Complete Task' : 'Update Status') }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════════════════ TASK HISTORY ══════════════════════════ -->
-    <div class="modal-overlay" *ngIf="showHistoryModal" (click)="closeHistoryModal()">
-      <div class="modal-card modal-card-md ps-history-modal" (click)="$event.stopPropagation()">
-        <div class="modal-header-styled ps-history-header">
-          <div class="modal-header-text">
-            <div class="ps-modal-header-flex">
-              <div class="ps-header-icon-circle bg-indigo-light text-indigo">
-                <svg lucideHistory size="18"></svg>
-              </div>
-              <div>
-                <h3 class="ps-history-title">Status History Timeline</h3>
-                <p class="ps-history-task-subtitle">{{ historyTask?.title }}</p>
-              </div>
-            </div>
-          </div>
-          <button class="close-btn" (click)="closeHistoryModal()"><svg lucideX size="18"></svg></button>
-        </div>
-
-        <div class="modal-body-styled ps-history-body-wrap ps-modal-body-scroll">
-          <div class="loading-box" *ngIf="loadingTaskHistory"><div class="spinner small"></div><span>Loading history timeline…</span></div>
-
-          <div class="ps-timeline" *ngIf="!loadingTaskHistory && taskHistory.length">
-            <div class="ps-timeline-item" *ngFor="let h of taskHistory">
-              <div class="ps-timeline-marker-wrap">
-                <div class="ps-timeline-marker {{ taskStatusClass(h.newStatus) }}">
-                  <svg lucideCheck size="11" *ngIf="h.newStatus === 'COMPLETED'"></svg>
-                  <svg lucidePlay size="10" *ngIf="h.newStatus === 'WORKING'"></svg>
-                  <svg lucidePause size="10" *ngIf="h.newStatus === 'ON_HOLD'"></svg>
-                  <svg lucidePlus size="11" *ngIf="h.newStatus === 'NEW'"></svg>
-                </div>
-              </div>
-              <div class="ps-timeline-card">
-                <div class="ps-timeline-head">
-                  <div class="ps-timeline-badge-group">
-                    <span class="ps-status-pill {{ taskStatusClass(h.newStatus) }}">
-                      <span class="ps-status-dot"></span>
-                      {{ taskStatusLabel(h.newStatus) }}
-                    </span>
-                    <span class="ps-prev-badge" *ngIf="h.previousStatus && h.previousStatus !== h.newStatus">
-                      was {{ taskStatusLabel(h.previousStatus) }}
-                    </span>
-                  </div>
-                  <div class="ps-timeline-time">
-                    <svg lucideClock size="12"></svg>
-                    <span>{{ h.changedAt | date:'dd MMM yyyy, h:mm a' }}</span>
-                  </div>
-                </div>
-
-                <div class="ps-timeline-author-row">
-                  <img *ngIf="h.changedBy?.avatarUrl" [src]="h.changedBy.avatarUrl" class="ps-avatar-img-xs" alt="" />
-                  <div *ngIf="!h.changedBy?.avatarUrl" class="ps-avatar-xs">{{ presalesInitials(h.changedBy) }}</div>
-                  <span class="ps-author-name">{{ presalesName(h.changedBy) }}</span>
-                </div>
-
-                <div class="ps-timeline-remark-box" *ngIf="h.remark">
-                  <svg lucideMessageSquare size="12" class="ps-bubble-quote"></svg>
-                  <p class="ps-remark-text">{{ h.remark }}</p>
-                </div>
-
-                <div class="ps-timeline-files" *ngIf="h.attachments?.length">
-                  <div class="ps-files-label">
-                    <svg lucidePaperclip size="11"></svg>
-                    <span>Attached Documents ({{ h.attachments.length }})</span>
-                  </div>
-                  <div class="ps-files-grid">
-                    <a class="ps-file-chip-card" *ngFor="let a of h.attachments" [href]="a.fileUrl" target="_blank" rel="noopener">
-                      <svg lucideFileText size="13"></svg>
-                      <span class="ps-file-title">{{ a.fileName }}</span>
-                      <svg lucideExternalLink size="11" class="ps-ext-arrow"></svg>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="empty-state-box" *ngIf="!loadingTaskHistory && !taskHistory.length">
-            <svg lucideHistory size="28" style="opacity:.3; margin-bottom: 8px;"></svg>
-            <div>No status history recorded yet.</div>
-          </div>
-        </div>
-
-        <div class="modal-footer-styled">
-          <button class="btn-outline-pill" (click)="closeHistoryModal()">Close</button>
-        </div>
-      </div>
-    </div>
 
     <!-- ══════════════════════════ FOLLOW-UP MODAL ══════════════════════════ -->
     <div class="modal-overlay" *ngIf="showFollowUpModal" (click)="closeFollowUpModal()">

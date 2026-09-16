@@ -32,6 +32,13 @@ export interface Branch {
   isActive?: boolean;
 }
 
+export interface TaskType {
+  id: number;
+  name: string;
+  isActive: boolean;
+  position: number;
+}
+
 export interface LeaveType {
   id: number;
   name: string;
@@ -128,6 +135,25 @@ export class MasterDataService {
   }
 
   // --- Leave Types ---
+  // Task types — the business meaning of a task (Call, Site Visit,
+  // Documentation), kept as master data so the vocabulary can change without a
+  // deploy. Distinct from Issue.type, which drives board behaviour.
+  getTaskTypes(): Observable<TaskType[]> {
+    return this.http.get<TaskType[]>(`${this.apiUrl}/task-types`);
+  }
+
+  createTaskType(data: Partial<TaskType>): Observable<TaskType> {
+    return this.http.post<TaskType>(`${this.apiUrl}/task-types`, data);
+  }
+
+  updateTaskType(id: number, data: Partial<TaskType>): Observable<TaskType> {
+    return this.http.put<TaskType>(`${this.apiUrl}/task-types/${id}`, data);
+  }
+
+  deleteTaskType(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/task-types/${id}`);
+  }
+
   getLeaveTypes(): Observable<LeaveType[]> {
     return this.http.get<LeaveType[]>(`${this.apiUrl}/leave-types`);
   }

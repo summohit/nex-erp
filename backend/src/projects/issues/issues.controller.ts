@@ -44,7 +44,7 @@ export class IssuesController {
     @Param('id', ParseIntPipe) id: number
   ) {
     const actorEmployeeId = req.user.employeeId ?? req.user.sub;
-    return this.issuesService.toggleArchive(req.user.companyId, actorEmployeeId, projectId, id);
+    return this.issuesService.toggleArchive(req.user.companyId, actorEmployeeId, projectId, id, req.user.role);
   }
 
   @Post(':id/review')

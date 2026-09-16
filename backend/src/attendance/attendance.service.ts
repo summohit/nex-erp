@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
+import { LateClockOutError, OpenSessionError } from './open-session.error';
 import { haversineKm } from '../common/geo.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShiftRosterService, EffectiveShift } from './shift-roster.service';
@@ -189,6 +190,16 @@ export class AttendanceService {
       }
     }
 
+    // Nothing may start while something earlier is still running.
+    //
+    // The sweep no longer closes an abandoned session, so Monday's stays open
+    // until a human closes it. Allowing Tuesday's clock-in on top would leave
+    // two open sessions for one person and no way to tell which of them the
+    // next clock-out belongs to — and Monday would silently accrue hours for as
+    // long as it stayed open. Refusing is what forces the correction.
+    const openEarlier = await this.findOpenSessionBefore(employee.id, todayKey);
+    if (openEarlier) throw OpenSessionError.forDate(openEarlier.date);
+
     let existing = await this.prisma.attendance.findUnique({
       where: { employeeId_date: { employeeId: employee.id, date: todayKey } },
       include: { logs: true }
@@ -274,21 +285,90 @@ export class AttendanceService {
     }).then(r => this.withTotalHours(r));
   }
 
-  async clockOut(userId: number, data: { lat?: number, lng?: number }) {
+  /**
+   * The most recent session before `beforeDate` that was never clocked out.
+   *
+   * Shared by clock-in (which refuses while one exists) and clock-out (which
+   * closes it), so the two can never disagree about what "still open" means.
+   */
+  private async findOpenSessionBefore(employeeId: number, beforeDate: Date) {
+    return this.prisma.attendance.findFirst({
+      where: { employeeId, date: { lt: beforeDate }, clockIn: { not: null }, clockOut: null },
+      orderBy: { date: 'desc' },
+      include: { logs: true },
+    });
+  }
+
+  /**
+   * Close the open session — today's, or an earlier one left hanging.
+   *
+   * Two things changed here when the automatic 23:00 clock-out was removed.
+   *
+   * First, this can no longer assume the session belongs to today. A shift
+   * abandoned on Monday is still open on Tuesday morning, and the old lookup —
+   * today's attendance row or nothing — answered "You must clock in first",
+   * which was both wrong and unfixable from the UI.
+   *
+   * Second, when the session being closed belongs to an earlier IST day, the
+   * clock-out time is not an observation of anything. The person is not at
+   * work; they are closing a record. So it asks why, and it does not pay
+   * overtime on the seventeen hours between the shift ending and someone
+   * remembering. The real hours go through regularization, which is the path
+   * that already exists for correcting a day.
+   */
+  async clockOut(userId: number, data: { lat?: number, lng?: number, reason?: string }) {
     const employee = await this.prisma.employee.findUnique({
       where: { userId },
       include: { shift: true, branch: true }
     });
     if (!employee) throw new BadRequestException('Employee profile not found');
 
-    const nowForDay = new Date();
-    const todayKey = istDateKey(nowForDay);
-    const effective = await this.roster.getEffectiveShift(employee.id, todayKey, employee.shift);
+    const now = new Date();
+    const todayKey = istDateKey(now);
+
+    let existing = await this.prisma.attendance.findUnique({
+      where: { employeeId_date: { employeeId: employee.id, date: todayKey } },
+      include: { logs: true }
+    });
+    let activeLog = existing?.logs.find(l => !l.clockOut) ?? null;
+
+    // Nothing open today — fall back to the abandoned session, if there is one.
+    if (!activeLog) {
+      const earlier = await this.findOpenSessionBefore(employee.id, todayKey);
+      if (earlier) {
+        existing = earlier;
+        activeLog = earlier.logs.find(l => !l.clockOut) ?? null;
+      }
+    }
+
+    if (!existing || !existing.clockIn) {
+      throw new BadRequestException('You must clock in first');
+    }
+    if (!activeLog) {
+      throw new BadRequestException('Already clocked out');
+    }
+
+    // Is this a previous day being closed after IST midnight? Comparing date
+    // KEYS rather than elapsed hours is what makes "after midnight" exact: a
+    // 23:50 clock-out of the same day is normal, 00:10 of the next is not,
+    // and those are eleven times closer together than a fixed-hours rule
+    // would treat them.
+    const isPreviousDay = existing.date.getTime() < todayKey.getTime();
+
+    const reason = (data?.reason ?? '').trim();
+    if (isPreviousDay && !reason) {
+      throw new LateClockOutError(existing.date);
+    }
+
+    const effective = await this.roster.getEffectiveShift(employee.id, existing.date, employee.shift);
 
     const branch = employee.branch;
-    // Same on-site exemption as clock-in — otherwise someone could clock in at
-    // a client site and then be unable to clock out.
-    if (!effective.onsite && branch && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
+    // Geofence, on the same on-site exemption as clock-in — and skipped
+    // entirely for a previous day. Someone closing Monday's session at one in
+    // the morning is at home, and enforcing the office radius would leave the
+    // session permanently unclosable, which is the one outcome worse than an
+    // imprecise location.
+    if (!isPreviousDay && !effective.onsite && branch && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
       if (data.lat == null || data.lng == null) {
         throw new BadRequestException('Location is required to clock out at this branch.');
       }
@@ -301,28 +381,16 @@ export class AttendanceService {
       }
     }
 
-    const existing = await this.prisma.attendance.findUnique({
-      where: { employeeId_date: { employeeId: employee.id, date: todayKey } },
-      include: { logs: true }
-    });
-
-    if (!existing || !existing.clockIn) {
-      throw new BadRequestException('You must clock in first');
-    }
-
-    const activeLog = existing.logs.find(l => !l.clockOut);
-    if (!activeLog) {
-      throw new BadRequestException('Already clocked out');
-    }
-
-    const now = new Date();
     let isEarlyLeave = false;
     let status = 'PRESENT';
     let overtimeHours = 0;
 
-    // The roster's window again, so leaving a 14:00-finish on-site day at 14:05
-    // is not recorded as a half day against the 18:00 office shift.
-    if (effective.endTime) {
+    // Scored only for a session closed on its own day. For a previous day the
+    // gap between the shift ending and someone remembering is not work, and
+    // paying overtime on it would reward forgetting; leaving the day at PRESENT
+    // with a reason attached is the honest record, and regularization is how
+    // the real hours get corrected.
+    if (!isPreviousDay && effective.endTime) {
       // Same IST-fixed resolution as clockIn — see the comment there.
       const expectedEnd = istTimeInstant(now, effective.endTime);
 
@@ -335,6 +403,9 @@ export class AttendanceService {
           overtimeHours = parseFloat((diffMs / 3600000).toFixed(2));
         }
       }
+    } else if (isPreviousDay) {
+      status = existing.status ?? 'PRESENT';
+      isEarlyLeave = existing.isEarlyLeave;
     }
 
     await this.prisma.attendanceLog.update({
@@ -344,8 +415,7 @@ export class AttendanceService {
         clockOutLat: data.lat,
         clockOutLng: data.lng,
         // A person closed this one. Clearing rather than leaving the default
-        // matters for a day the sweep already closed and a later clock-in
-        // reopened.
+        // matters for a day the old sweep closed and a later clock-in reopened.
         autoClockedOut: false
       }
     });
@@ -359,7 +429,12 @@ export class AttendanceService {
         isEarlyLeave,
         status,
         overtimeHours,
-        autoClockedOut: false
+        autoClockedOut: false,
+        // The reason is the permanent record that this day's clock-out time is
+        // a closure rather than an observation. `missedClockOut` is the live
+        // "still open and overdue" state and is spent the moment it closes.
+        ...(isPreviousDay ? { clockOutReason: reason } : {}),
+        missedClockOut: false,
       },
       include: { logs: true }
     }).then(r => this.withTotalHours(r));

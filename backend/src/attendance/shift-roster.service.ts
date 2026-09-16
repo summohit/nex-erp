@@ -32,6 +32,28 @@ export interface RosterAssignment {
  * its say. `startTime`/`endTime` are already merged: a roster entry's own
  * window wins over the shift's, and the shift's is the fallback.
  */
+/** An employee's standing shift, as much of it as the resolution rule reads. */
+export interface StandingShift {
+  id: number;
+  name: string;
+  startTime: string | null;
+  endTime: string | null;
+  bufferTimeMinutes: number;
+  workingDays: string | null;
+  halfDayTime?: string | null;
+}
+
+/** One roster row, as much of it as the resolution rule reads. */
+export interface RosterEntryForResolution {
+  isDayOff: boolean;
+  onsiteApprovalStatus?: string | null;
+  projectId: number | null;
+  address: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  shift: StandingShift | null;
+}
+
 export interface EffectiveShift {
   source: 'ROSTER' | 'STANDING' | 'NONE';
   shift: {
@@ -219,7 +241,7 @@ export class ShiftRosterService {
   async getEffectiveShift(
     employeeId: number,
     date: Date,
-    standingShift?: { id: number; name: string; startTime: string | null; endTime: string | null; bufferTimeMinutes: number; workingDays: string | null; halfDayTime?: string | null } | null,
+    standingShift?: StandingShift | null,
   ): Promise<EffectiveShift> {
     const standing =
       standingShift !== undefined
@@ -233,6 +255,64 @@ export class ShiftRosterService {
       include: { shift: true },
     });
 
+    return ShiftRosterService.resolveEffectiveShift(entry, standing, date);
+  }
+
+  /**
+   * The same answer for many people at once, in two queries instead of 2N.
+   *
+   * The reminder sweep runs every minute and has to know the window for every
+   * employee in the company. Calling getEffectiveShift in a loop is two queries
+   * per person per minute — for a five-hundred-person company that is a
+   * thousand queries a minute for a job that usually sends nothing. This does
+   * the two reads in bulk and hands both to the same resolution, so the batch
+   * path cannot drift from the single path.
+   */
+  async getEffectiveShiftsForDate(
+    employeeIds: number[],
+    date: Date,
+  ): Promise<Map<number, EffectiveShift>> {
+    const out = new Map<number, EffectiveShift>();
+    if (!employeeIds.length) return out;
+
+    const [employees, entries] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: { id: { in: employeeIds } },
+        select: { id: true, shift: true },
+      }),
+      this.prisma.shiftRosterEntry.findMany({
+        where: { employeeId: { in: employeeIds }, date },
+        include: { shift: true },
+      }),
+    ]);
+
+    const standingByEmployee = new Map(employees.map(e => [e.id, e.shift ?? null]));
+    const entryByEmployee = new Map(entries.map(e => [e.employeeId, e]));
+
+    for (const employeeId of employeeIds) {
+      out.set(
+        employeeId,
+        ShiftRosterService.resolveEffectiveShift(
+          entryByEmployee.get(employeeId) ?? null,
+          standingByEmployee.get(employeeId) ?? null,
+          date,
+        ),
+      );
+    }
+    return out;
+  }
+
+  /**
+   * The decision itself, with the reads already done.
+   *
+   * Pure and static so the single-employee and batch paths share one rule
+   * rather than two implementations that agree until someone edits one.
+   */
+  static resolveEffectiveShift(
+    entry: RosterEntryForResolution | null,
+    standing: StandingShift | null,
+    date: Date,
+  ): EffectiveShift {
     const fromStanding = (): EffectiveShift => {
       if (!standing) return { source: 'NONE', shift: null, startTime: null, endTime: null, isDayOff: false, onsite: null };
       const dayName = DAY_NAMES[date.getUTCDay()];
@@ -272,11 +352,11 @@ export class ShiftRosterService {
     return {
       source: 'ROSTER',
       shift: {
-          id: shift.id,
-          name: shift.name,
-          bufferTimeMinutes: shift.bufferTimeMinutes,
-          halfDayTime: shift.halfDayTime ?? null,
-        },
+        id: shift.id,
+        name: shift.name,
+        bufferTimeMinutes: shift.bufferTimeMinutes,
+        halfDayTime: shift.halfDayTime ?? null,
+      },
       // The entry's own window wins; the shift's is the fallback.
       startTime: entry.startTime ?? shift.startTime,
       endTime: entry.endTime ?? shift.endTime,

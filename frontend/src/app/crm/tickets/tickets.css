@@ -263,18 +263,20 @@
   background: #f0fdf4;
 }
 
-/* --------------------------------------------------------------------------
-   Filter Bar Card
-   -------------------------------------------------------------------------- */
 .filter-bar-card {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: 14px;
   border: 1px solid #e2e8f0;
   padding: 14px 18px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: sticky;
+  top: 64px;
+  z-index: 35;
 }
 
 .filter-bar-main-row {
@@ -521,6 +523,72 @@
   font-size: 12px;
   color: #94a3b8;
   text-align: center;
+}
+
+/* Employee Dropdown Spec */
+.popover-emp-dropdown {
+  min-width: 260px;
+  max-width: 340px;
+}
+
+.popover-option-emp {
+  padding: 6px 8px;
+}
+
+.popover-emp-info {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.popover-emp-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.popover-emp-initials {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+}
+
+.popover-emp-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+
+.popover-emp-name {
+  font-size: 12.5px;
+  color: #1e293b;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popover-emp-dept {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dropdown-backdrop-transparent {
@@ -2138,17 +2206,23 @@ label {
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  overflow: hidden;
+  overflow: visible;
   margin-top: 16px;
 }
 
 .unified-table-card .filter-bar-card {
   border: none;
-  box-shadow: none;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   border-bottom: 1px solid #e2e8f0;
-  border-radius: 0;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
   padding: 16px 20px;
-  background: #fafaf9; /* very light warm gray */
+  background: rgba(250, 250, 249, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: sticky;
+  top: 64px;
+  z-index: 35;
 }
 
 .unified-table-card .table-container {

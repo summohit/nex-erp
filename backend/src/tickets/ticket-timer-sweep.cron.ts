@@ -29,7 +29,7 @@ const AUTO_CLOSED_NOTE =
  * Ticket time tracking had no equivalent of the attendance auto-clock-out, so a
  * forgotten timer ran forever: it blocked the owner from starting a new one on
  * that ticket, and would eventually write an absurd duration. This mirrors
- * AutoClockoutCron deliberately — same hour, same once-per-day guard, same
+ * MissedClockOutCron deliberately — same hour, same once-per-day guard, same
  * setInterval approach, since @nestjs/schedule is not installed.
  */
 @Injectable()
@@ -43,7 +43,7 @@ export class TicketTimerSweepCron implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     this.timer = setInterval(() => this.checkAndRun(), 60 * 1000);
-    // No startup sweep. AutoClockoutCron has one and it cost a day of
+    // No startup sweep. The old auto-clock-out job had one and it cost a day of
     // attendance when `nest start --watch` restarted on every file save; the
     // cutoff logic here is time-based anyway, so a boot adds nothing.
   }

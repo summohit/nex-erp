@@ -40,6 +40,34 @@ export function istHour(date: Date): number {
   return toISTFields(date).hours;
 }
 
+/** Minutes since IST midnight (0-1439) for `date`, server timezone irrelevant. */
+export function istMinutesOfDay(date: Date): number {
+  const { hours, minutes } = toISTFields(date);
+  return hours * 60 + minutes;
+}
+
+/** `"HH:mm"` as minutes since midnight, or null if it is not a time. */
+export function hhmmToMinutes(hhmm: string | null | undefined): number | null {
+  if (!hhmm) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  const hours = Number(m[1]);
+  const minutes = Number(m[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+/**
+ * The IST calendar day `days` before or after the one containing `date`.
+ *
+ * Built from the date key rather than by subtracting 24 hours, so it stays a
+ * clean UTC-midnight value of the kind `Attendance.date` requires.
+ */
+export function istDateKeyShift(date: Date, days: number): Date {
+  const key = istDateKey(date);
+  return new Date(key.getTime() + days * 86_400_000);
+}
+
 /**
  * The real UTC instant corresponding to `"HH:mm"` IST on the same IST
  * calendar day as `reference`. Use this to build a shift's expected

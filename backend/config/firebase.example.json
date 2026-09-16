@@ -1,0 +1,40 @@
+{
+  "_comment": [
+    "Copy to firebase.json (same directory) and fill in. That file is gitignored.",
+    "This one file configures BOTH the server and the browser, so deploying is",
+    "one scp and a restart: no .env edit, no Angular rebuild.",
+    "",
+    "serviceAccount: Firebase console -> Project settings -> Service accounts ->",
+    "  Generate new private key. Paste the WHOLE downloaded object here. SECRET.",
+    "",
+    "web: Project settings -> General -> Your apps -> Web app -> Config,",
+    "  plus vapidKey from Project settings -> Cloud Messaging -> Web Push",
+    "  certificates -> Key pair. These six-plus-one are public by design.",
+    "",
+    "Remove this _comment key if you prefer; it is ignored either way."
+  ],
+
+  "serviceAccount": {
+    "type": "service_account",
+    "project_id": "",
+    "private_key_id": "",
+    "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+    "client_email": "",
+    "client_id": "",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "",
+    "universe_domain": "googleapis.com"
+  },
+
+  "web": {
+    "apiKey": "",
+    "authDomain": "",
+    "projectId": "",
+    "storageBucket": "",
+    "messagingSenderId": "",
+    "appId": "",
+    "vapidKey": ""
+  }
+}

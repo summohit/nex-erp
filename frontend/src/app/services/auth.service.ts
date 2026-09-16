@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { signal } from '@angular/core';
 import { environment } from '../../environments/environment';
 import { PermissionsService } from './permissions.service';
+import { PushNotificationsService } from './push-notifications.service';
 
 @Injectable({
   providedIn: 'root'
@@ -13,6 +14,7 @@ export class AuthService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/auth`;
   private permissionsService = inject(PermissionsService);
+  private push = inject(PushNotificationsService);
 
   currentUser = signal<any>(null);
 
@@ -158,6 +160,13 @@ export class AuthService {
   }
 
   logout() {
+    // Release this browser's push token FIRST, while the access token is still
+    // in storage for the request to authenticate with. Without it the next
+    // person to sign in on this machine inherits the previous user's shift
+    // reminders until the token happens to rotate. Deliberately not awaited:
+    // signing out must never hang on, or fail because of, a cleanup call.
+    void this.push.disable();
+
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     this.currentUser.set(null);

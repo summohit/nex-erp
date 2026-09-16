@@ -390,7 +390,10 @@ export class ProjectsService {
 
   async getProjects(companyId: number, userId: number, role: string) {
     const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN';
-    const whereClause: any = { companyId, status: 'ACTIVE' };
+    // isSystem excludes the hidden "General" project, which exists only to give
+    // projectless tasks a key, a board column and a detail screen. It is not a
+    // project anybody works on and must never appear in a board list.
+    const whereClause: any = { companyId, status: 'ACTIVE', isSystem: false };
     
     const emp = await this.prisma.employee.findUnique({ where: { userId } });
     const empId = emp ? emp.id : userId;
@@ -440,7 +443,7 @@ export class ProjectsService {
 
   async getArchivedProjects(companyId: number, userId: number, role: string) {
     const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN';
-    const whereClause: any = { companyId, status: 'ARCHIVED' };
+    const whereClause: any = { companyId, status: 'ARCHIVED', isSystem: false };
     
     const emp = await this.prisma.employee.findUnique({ where: { userId } });
     const empId = emp ? emp.id : userId;
@@ -861,6 +864,9 @@ export class ProjectsService {
   async archiveProject(companyId: number, projectId: number, force: boolean) {
     const project = await this.prisma.project.findUnique({ where: { id: projectId, companyId } });
     if (!project) throw new NotFoundException('Project not found');
+    // The General project is where projectless tasks live. Archiving it would
+    // strand every one of them.
+    if (project.isSystem) throw new BadRequestException('The General project cannot be archived.');
 
     if (!force) {
       const activeTasksCount = await this.prisma.issue.count({

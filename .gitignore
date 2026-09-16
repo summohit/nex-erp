@@ -28,3 +28,8 @@ scraper/out/
 scraper/auth/
 scraper/__pycache__/
 *.partial.jsonl
+
+# Firebase credentials. The service account's private key can push to every
+# device in the project, so the real file never enters the repository —
+# backend/config/firebase.example.json documents its shape.
+backend/config/firebase.json

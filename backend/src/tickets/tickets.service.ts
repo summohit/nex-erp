@@ -392,6 +392,22 @@ export class TicketsService {
     if (filters.type) where.type = filters.type;
     if (filters.assigneeId) where.assigneeId = Number(filters.assigneeId);
     if (filters.reporterId) where.reporterId = Number(filters.reporterId);
+    if (filters.employeeId) {
+      const empId = Number(filters.employeeId);
+      if (!isNaN(empId)) {
+        if (!where.AND) {
+          where.AND = [];
+        } else if (!Array.isArray(where.AND)) {
+          where.AND = [where.AND];
+        }
+        where.AND.push({
+          OR: [
+            { assigneeId: empId },
+            { reporterId: empId },
+          ],
+        });
+      }
+    }
 
     if (filters.fromDate || filters.toDate) {
       where.createdAt = {};

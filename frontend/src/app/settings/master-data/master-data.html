@@ -6,7 +6,7 @@
     </div>
     <button class="btn-primary" (click)="openModal('create')">
       <svg lucidePlus size="18"></svg>
-      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
+      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
     </button>
   </div>
 
@@ -26,6 +26,7 @@
     <button class="tab-btn" [class.active]="activeTab() === 'branches'" (click)="switchTab('branches')">Branches</button>
     <button class="tab-btn" [class.active]="activeTab() === 'shifts'" (click)="switchTab('shifts')">Shifts</button>
     <button class="tab-btn" [class.active]="activeTab() === 'leave-types'" (click)="switchTab('leave-types')">Leave Types</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'task-types'" (click)="switchTab('task-types')">Task Types</button>
     <button class="tab-btn" [class.active]="activeTab() === 'holidays'" (click)="switchTab('holidays')">Holidays</button>
     <button class="tab-btn" [class.active]="activeTab() === 'blackout-dates'" (click)="switchTab('blackout-dates')">Blackout Dates</button>
   </div>
@@ -140,6 +141,17 @@
       [gridOptions]="gridOptions">
     </ag-grid-angular>
 
+    <ag-grid-angular
+      *ngIf="activeTab() === 'task-types'"
+      class="ag-theme-quartz"
+      [theme]="'legacy'"
+      style="width: 100%; height: 500px;"
+      [rowData]="taskTypes()"
+      [columnDefs]="taskTypeColDefs"
+      [defaultColDef]="defaultColDef"
+      [gridOptions]="gridOptions">
+    </ag-grid-angular>
+
     <!-- Holidays -->
     <div *ngIf="activeTab() === 'holidays'" class="tab-content">
       <div class="header-actions">
@@ -227,7 +239,7 @@
           <div class="modal-header-icon-badge" *ngIf="activeTab() === 'shifts'">
             <svg lucideClock size="20"></svg>
           </div>
-          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
+          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
         </div>
         <p class="subtitle">{{ activeTab() === 'shifts' ? 'Configure shift timings, punch policies, and weekly working schedule' : 'Enter the details to keep your master data organized' }}</p>
       </div>
@@ -571,6 +583,26 @@
         </div>
 
         <!-- Leave Types -->
+        <div class="form-group" *ngIf="activeTab() === 'task-types'">
+          <label>Display order</label>
+          <input type="number" class="form-control" [(ngModel)]="formData.position" min="0">
+          <small class="form-hint">Lower numbers appear first in the task form.</small>
+        </div>
+        <div class="form-group full-width toggle-group" *ngIf="activeTab() === 'departments'">
+          <div class="toggle-info">
+            <label>Can create tasks</label>
+            <p class="help-text">
+              Let this department raise tasks and assign them to people.
+              Administrators can always do this; use it to extend the same to
+              Sales or any other team. A department's name has no effect — only
+              this switch does.
+            </p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" [(ngModel)]="formData.canCreateTasks">
+            <span class="slider"></span>
+          </label>
+        </div>
         <div class="form-group" *ngIf="activeTab() === 'leave-types'">
           <label>Default Days</label>
           <input type="number" class="form-control" [(ngModel)]="formData.defaultDays" min="0">

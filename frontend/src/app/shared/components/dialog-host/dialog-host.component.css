@@ -104,3 +104,37 @@
   box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
 }
 .dlg-btn-error:hover { box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35); }
+
+/* Prompt variant — a reason the server will not accept the action without. */
+.dlg-textarea {
+  width: 100%;
+  margin: 4px 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #1e293b;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.dlg-textarea:focus {
+  outline: none;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+}
+
+.dlg-textarea::placeholder { color: #94a3b8; }
+
+.dlg-icon.prompt {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+/* Submit stays out of reach until the required text is there. */
+.dlg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

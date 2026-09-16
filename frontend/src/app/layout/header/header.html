@@ -92,6 +92,18 @@
         <span>Notifications</span>
         <button class="mark-read-btn" (click)="markAllAsRead()" *ngIf="notificationsService.unreadCount() > 0">Mark all read</button>
       </div>
+
+      <!-- Shown only while the browser has not been asked. Once the answer is
+           known — granted or denied — the prompt is gone: a denied permission
+           is sticky and the button could do nothing but lie. -->
+      <div class="push-optin" *ngIf="canOfferPush">
+        <div class="push-optin-text">
+          <strong>Turn on shift reminders</strong>
+          <span>Get told to clock in and out even when this tab is closed.</span>
+        </div>
+        <button type="button" class="push-optin-btn" (click)="enablePush()">Enable</button>
+      </div>
+
       <div class="notifications-list">
         <div *ngIf="notificationsService.notifications().length === 0" class="no-notifications">
           <svg lucideBell size="28" class="text-slate-300 mb-2"></svg>

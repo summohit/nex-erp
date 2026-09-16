@@ -1973,6 +1973,7 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
   showAddPresalesModal = false;
   addPresalesSearch = '';
   addPresalesSelected: number[] = [];
+  addPresalesOptions: { [employeeId: number]: { technology: string, engagementType: string, location: string, hours: number | null } } = {};
   addPresalesRemark = '';
   savingAddPresales = false;
 
@@ -2048,8 +2049,13 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
 
   togglePresalesCandidate(employeeId: number) {
     const i = this.addPresalesSelected.indexOf(employeeId);
-    if (i >= 0) this.addPresalesSelected.splice(i, 1);
-    else this.addPresalesSelected.push(employeeId);
+    if (i >= 0) {
+      this.addPresalesSelected.splice(i, 1);
+      delete this.addPresalesOptions[employeeId];
+    } else {
+      this.addPresalesSelected.push(employeeId);
+      this.addPresalesOptions[employeeId] = { technology: '', engagementType: 'VIRTUAL', location: '', hours: null };
+    }
   }
 
   isPresalesCandidateSelected(employeeId: number): boolean {
@@ -2061,9 +2067,23 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
       this.dialog.error('Select at least one employee.');
       return;
     }
+    const members = this.addPresalesSelected.map(id => ({
+      employeeId: id,
+      ...this.addPresalesOptions[id]
+    }));
+
+    const noTech = members.find(m => !m.technology?.trim());
+    if (noTech) { this.dialog.error('Say what technology each person is needed for.'); return; }
+    
+    const noLocation = members.find(m => m.engagementType === 'ONSITE' && !m.location?.trim());
+    if (noLocation) { this.dialog.error('Enter a location for onsite engagements.'); return; }
+
+    const badHours = members.find(m => m.hours === null || m.hours <= 0);
+    if (badHours) { this.dialog.error('Enter the hours needed for each person.'); return; }
+
     this.savingAddPresales = true;
     this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/members`, {
-      employeeIds: this.addPresalesSelected,
+      members,
       remark: this.addPresalesRemark,
     }).subscribe({
       next: (info) => {
@@ -2118,7 +2138,7 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
    */
   requestPresalesItems: Array<{
     employeeId: number; name: string; technology: string;
-    engagementType: 'ONSITE' | 'VIRTUAL'; hours: number | null;
+    engagementType: 'ONSITE' | 'VIRTUAL'; location?: string; hours: number | null;
   }> = [];
 
   readonly engagementTypes: Array<'ONSITE' | 'VIRTUAL'> = ['ONSITE', 'VIRTUAL'];
@@ -2152,6 +2172,7 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
       name: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
       technology: '',
       engagementType: 'VIRTUAL',
+      location: '',
       hours: null,
     });
   }
@@ -2173,13 +2194,15 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
     if (noTech) { this.dialog.error(`Say what technology ${noTech.name} is needed for.`); return; }
     const badHours = this.requestPresalesItems.find((i) => !(Number(i.hours) > 0));
     if (badHours) { this.dialog.error(`Enter the hours needed for ${badHours.name}.`); return; }
+    const noLocation = this.requestPresalesItems.find((i) => i.engagementType === 'ONSITE' && !i.location?.trim());
+    if (noLocation) { this.dialog.error(`Enter the location for ${noLocation.name}'s onsite engagement.`); return; }
 
     this.savingRequestPresales = true;
     this.http.post<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/requests`, {
       reason: this.requestPresalesReason,
       items: this.requestPresalesItems.map((i) => ({
         employeeId: i.employeeId, technology: i.technology,
-        engagementType: i.engagementType, hours: i.hours,
+        engagementType: i.engagementType, location: i.location, hours: i.hours,
       })),
     }).subscribe({
       next: () => {
@@ -2264,299 +2287,55 @@ export class LeadProfileComponent implements OnInit, OnDestroy {
     const bits: string[] = [];
     if (row?.hours) bits.push(`${row.hours}h`);
     if (row?.engagementType) bits.push(String(row.engagementType).toLowerCase());
+    if (row?.location) bits.push(`at ${row.location}`);
     if (row?.technology) bits.push(row.technology);
     return bits.join(' · ');
   }
 
   // ── tasks ──────────────────────────────────────────────────────────────────
 
-  readonly preSalesTaskTypes: string[] = [
-    'Client Meeting',
-    'Product Demo',
-    'Technical Requirement Gathering',
-    'Solution Architecture & Design',
-    'Proof of Concept (POC)',
-    'RFP / Tender Response',
-    'BOM (Bill of Materials) Preparation',
-    'Security & Compliance Review',
-    'Infrastructure Assessment',
-    'Client Follow-up'
-  ];
-
-  taskTypeSelection: string = '';
-  customTaskType: string = '';
-  taskErrors: { title?: string; assignedToId?: string } = {};
-  taskSubmitted = false;
-
-  showTaskModal = false;
-  editingTaskId: number | null = null;
-  taskForm: any = this.freshTaskForm();
-  savingTask = false;
-  uploadingTaskFiles = 0;
-
-  private freshTaskForm() {
-    return {
-      title: '', taskType: '', assignedToId: null as number | null,
-      scheduledDate: '', scheduledTime: '',
-      durationHours: 0, durationMinutes: 0,
-      description: '', attachments: [] as any[],
-    };
-  }
-
-  openTaskModal(task?: any) {
-    this.editingTaskId = task?.id ?? null;
-    this.taskErrors = {};
-    this.taskSubmitted = false;
-    if (task) {
-      const type = task.taskType || '';
-      const isPredefined = this.preSalesTaskTypes.includes(type);
-      this.taskTypeSelection = isPredefined ? type : (type ? 'Custom' : '');
-      this.customTaskType = isPredefined ? '' : type;
-      this.taskForm = {
-        title: task.title || '',
-        taskType: type,
-        assignedToId: task.assignedToId ?? null,
-        scheduledDate: task.scheduledAt ? new Date(task.scheduledAt).toISOString().slice(0, 10) : '',
-        scheduledTime: task.scheduledAt ? new Date(task.scheduledAt).toTimeString().slice(0, 5) : '',
-        durationHours: Math.floor((task.estimatedMinutes || 0) / 60),
-        durationMinutes: (task.estimatedMinutes || 0) % 60,
-        description: task.description || '',
-        attachments: [],
-      };
-    } else {
-      this.taskTypeSelection = '';
-      this.customTaskType = '';
-      this.taskForm = this.freshTaskForm();
-    }
-    this.showTaskModal = true;
-  }
-
-  onTaskTypeSelect() {
-    if (this.taskTypeSelection === 'Custom') {
-      this.taskForm.taskType = this.customTaskType;
-    } else {
-      this.taskForm.taskType = this.taskTypeSelection;
-    }
-  }
-
-  onCustomTaskTypeInput() {
-    this.taskForm.taskType = this.customTaskType;
-  }
-
-  closeTaskModal() {
-    if (this.savingTask) return;
-    this.showTaskModal = false;
-    this.editingTaskId = null;
-    this.taskErrors = {};
-    this.taskSubmitted = false;
-  }
-
-  onTaskFilesSelected(event: any) {
-    const files: File[] = Array.from(event.target?.files || []);
-    event.target.value = '';
-    for (const file of files) {
-      this.uploadingTaskFiles++;
-      const form = new FormData();
-      form.append('file', file);
-      // The CRM's existing upload endpoint — no second storage system.
-      this.http.post<{ url: string }>(`${environment.apiUrl}/upload`, form).subscribe({
-        next: (res) => {
-          this.taskForm.attachments = [
-            ...this.taskForm.attachments,
-            { fileName: file.name, fileUrl: res.url, fileSize: file.size },
-          ];
-          this.uploadingTaskFiles--;
-        },
-        error: () => {
-          this.uploadingTaskFiles--;
-          this.dialog.error(`Failed to upload "${file.name}".`);
-        },
-      });
-    }
-  }
-
-  removeTaskAttachment(index: number) {
-    this.taskForm.attachments.splice(index, 1);
-  }
-
-  saveTask() {
+  /**
+   * Raise a task for this deal, from this deal.
+   *
+   * The composer lives in My Tasks — one form, one set of validation rules, one
+   * place the hours budget is explained — so this hands it the context instead
+   * of keeping a second copy here. Passing the member as well is the point of
+   * starting from a person's card: the deal and the specialist are both filled
+   * in before the form opens.
+   */
+  addPreSalesTask(member?: any) {
     if (this.leadId == null) return;
-    this.taskSubmitted = true;
-    this.taskErrors = {};
-
-    let hasError = false;
-    if (!this.taskForm.title || !this.taskForm.title.trim()) {
-      this.taskErrors.title = 'Task title is required.';
-      hasError = true;
-    }
-    if (!this.taskForm.assignedToId) {
-      this.taskErrors.assignedToId = 'Please select a pre-sales specialist.';
-      hasError = true;
-    }
-
-    if (hasError) {
-      return;
-    }
-
-    if (this.uploadingTaskFiles > 0) {
-      this.dialog.error('Wait for the attachments to finish uploading.');
-      return;
-    }
-
-    if (this.taskTypeSelection === 'Custom') {
-      this.taskForm.taskType = (this.customTaskType || '').trim();
-    } else {
-      this.taskForm.taskType = this.taskTypeSelection;
-    }
-
-    this.savingTask = true;
-    const base = `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks`;
-    const request = this.editingTaskId
-      ? this.http.put<any>(`${base}/${this.editingTaskId}`, this.taskForm)
-      : this.http.post<any>(base, this.taskForm);
-
-    request.subscribe({
-      next: () => {
-        this.savingTask = false;
-        this.showTaskModal = false;
-        this.editingTaskId = null;
-        this.taskSubmitted = false;
-        this.taskErrors = {};
-        this.loadPresalesInfo();
-        this.dialog.success('Task saved.');
-      },
-      error: (err) => {
-        this.savingTask = false;
-        this.dialog.error(err?.error?.message || 'Could not save the task.');
+    this.router.navigate(['/projects'], {
+      queryParams: {
+        tab: 'my-tasks',
+        newTaskLeadId: this.leadId,
+        ...(member?.employeeId ? { newTaskAssigneeId: member.employeeId } : {}),
       },
     });
   }
 
-  /** Deleting removes the task and its history; completing keeps the record. */
-  async deleteTask(task: any) {
-    if (this.leadId == null) return;
-    const ok = await this.dialog.confirm(
-      `Delete "${task.title}"? Its status history and attachments go with it.`,
-      'Delete task', 'Delete', 'Cancel',
-    );
-    if (!ok) return;
-
-    this.http.delete<any>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${task.id}`)
-      .subscribe({
-        next: () => { this.loadPresalesInfo(); this.dialog.success('Task deleted.'); },
-        error: (err) => this.dialog.error(err?.error?.message || 'Could not delete the task.'),
-      });
+  /**
+   * May this caller raise a task for this particular member?
+   *
+   * `permissions.canCreateTasks` is a coarse "for somebody on this deal" — it
+   * is true as soon as one member qualifies. Per person the server's rule is
+   * narrower: an administrator, or whoever put that person on the deal. Mirrored
+   * here so a button only appears where it will work. See canCreateTaskFor.
+   */
+  canAssignTaskTo(member: any): boolean {
+    if (!this.presalesPermissions.canCreateTasks) return false;
+    if (this.isAdminOrSuperAdmin) return true;
+    return !!member?.assignedById && member.assignedById === this.auth.currentUser()?.employeeId;
   }
 
-  // ── task status ────────────────────────────────────────────────────────────
-
-  showStatusModal = false;
-  statusTask: any = null;
-  statusForm: any = { status: 'WORKING', remark: '', attachments: [] as any[] };
-  savingStatus = false;
-  uploadingStatusFiles = 0;
-
-  /** Which moves this task can make next. COMPLETED is terminal. */
-  nextStatuses(task: any): string[] {
-    switch (String(task?.status || 'NEW')) {
-      case 'NEW': return ['WORKING'];
-      case 'WORKING': return ['ON_HOLD', 'COMPLETED'];
-      case 'ON_HOLD': return ['WORKING', 'COMPLETED'];
-      default: return [];
-    }
-  }
-
-  openStatusModal(task: any, status: string) {
-    this.statusTask = task;
-    this.statusForm = { status, remark: '', attachments: [] };
-    this.showStatusModal = true;
-  }
-
-  closeStatusModal() {
-    if (this.savingStatus) return;
-    this.showStatusModal = false;
-    this.statusTask = null;
-  }
-
-  onStatusFilesSelected(event: any) {
-    const files: File[] = Array.from(event.target?.files || []);
-    event.target.value = '';
-    for (const file of files) {
-      this.uploadingStatusFiles++;
-      const form = new FormData();
-      form.append('file', file);
-      this.http.post<{ url: string }>(`${environment.apiUrl}/upload`, form).subscribe({
-        next: (res) => {
-          this.statusForm.attachments = [
-            ...this.statusForm.attachments,
-            { fileName: file.name, fileUrl: res.url, fileSize: file.size },
-          ];
-          this.uploadingStatusFiles--;
-        },
-        error: () => {
-          this.uploadingStatusFiles--;
-          this.dialog.error(`Failed to upload "${file.name}".`);
-        },
-      });
-    }
-  }
-
-  /** Required for ON_HOLD and COMPLETED — the server insists too. */
-  get statusRemarkRequired(): boolean {
-    return this.statusForm.status === 'ON_HOLD' || this.statusForm.status === 'COMPLETED';
-  }
-
-  saveStatus() {
-    if (this.leadId == null || !this.statusTask) return;
-    if (this.statusRemarkRequired && !this.statusForm.remark.trim()) {
-      this.dialog.error(this.statusForm.status === 'ON_HOLD'
-        ? 'Say why the task is on hold.'
-        : 'Add a completion remark before marking the task complete.');
-      return;
-    }
-    if (this.uploadingStatusFiles > 0) { this.dialog.error('Wait for the attachments to finish uploading.'); return; }
-
-    this.savingStatus = true;
-    this.http.post<any>(
-      `${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${this.statusTask.id}/status`,
-      this.statusForm,
-    ).subscribe({
-      next: () => {
-        this.savingStatus = false;
-        this.showStatusModal = false;
-        this.statusTask = null;
-        this.loadPresalesInfo();
-        this.dialog.success('Task updated.');
-      },
-      error: (err) => {
-        this.savingStatus = false;
-        this.dialog.error(err?.error?.message || 'Could not update the task.');
-      },
-    });
-  }
-
-  // ── history ────────────────────────────────────────────────────────────────
-
-  showHistoryModal = false;
-  historyTask: any = null;
-  taskHistory: any[] = [];
-  loadingTaskHistory = false;
-
-  openTaskHistory(task: any) {
-    if (this.leadId == null) return;
-    this.historyTask = task;
-    this.taskHistory = [];
-    this.loadingTaskHistory = true;
-    this.showHistoryModal = true;
-    this.http.get<any[]>(`${environment.apiUrl}/crm/leads/${this.leadId}/pre-sales/tasks/${task.id}/history`)
-      .subscribe({
-        next: (rows) => { this.taskHistory = rows || []; this.loadingTaskHistory = false; },
-        error: () => { this.loadingTaskHistory = false; this.dialog.error('Could not load the task history.'); },
-      });
-  }
-
-  closeHistoryModal() {
-    this.showHistoryModal = false;
-    this.historyTask = null;
-  }
+  // The table is gone from this page. Raising a pre-sales task, editing it, walking it
+  // through NEW → WORKING → ON HOLD → COMPLETED and reading its history all
+  // happen in Projects → My Tasks now, so that one screen shows a person
+  // every task they have rather than only the ones a deal page was open on.
+  // The endpoints are unchanged — see TasksService in the frontend, and
+  // CrmService.createPreSalesTask / changePreSalesTaskStatus on the server.
+  //
+  // What stays here is the team: who is on the deal, and the hours they are
+  // engaged for. `presalesTasks` is still loaded by loadPresalesInfo because
+  // the same endpoint returns it, and it is what those hours are spent on.
 }

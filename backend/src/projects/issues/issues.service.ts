@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import FormData from 'form-data';
 import { TasksGateway } from '../../events/tasks/tasks.gateway';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { canCreateTask } from '../../tasks/task-permissions';
 
 @Injectable()
 export class IssuesService {
@@ -19,8 +20,13 @@ export class IssuesService {
     const project = await this.prisma.project.findUnique({ where: { id: projectId, companyId } });
     if (!project) throw new NotFoundException('Project not found');
 
-    if (!(role === 'SUPERADMIN' || role === 'ADMIN') && project.leadId !== reporterId) {
-      throw new ForbiddenException('Only the project owner can create tasks');
+    // Admins, the project owner, and any department flagged as able to raise
+    // tasks. Shared with TasksService so the rule has one definition — see
+    // tasks/task-permissions.ts for why it is a flag and not a name match.
+    if (!(await canCreateTask(this.prisma as any, companyId, reporterId, role, project))) {
+      throw new ForbiddenException(
+        'You do not have permission to create tasks in this project.',
+      );
     }
 
     const count = await this.prisma.issue.count({ where: { projectId, companyId } });
@@ -40,7 +46,9 @@ export class IssuesService {
     if (columnId) {
       const targetCol = await this.prisma.boardColumn.findUnique({ where: { id: Number(columnId) } });
       if (targetCol && this.isRestrictedColumn(targetCol)) {
-        await this.assertCanCompleteOrArchive(companyId, reporterId, { projectId, assigneeId: data.assigneeId ? Number(data.assigneeId) : null });
+        await this.assertCanCompleteOrArchive(
+          companyId, reporterId, { projectId, assigneeId: data.assigneeId ? Number(data.assigneeId) : null }, role,
+        );
       }
     }
 
@@ -168,9 +176,22 @@ export class IssuesService {
     return n.includes('done') || n.includes('complete') || n.includes('archive');
   }
 
-  private async assertCanCompleteOrArchive(companyId: number, actorEmployeeId: number, issue: any) {
+  private async assertCanCompleteOrArchive(
+    companyId: number,
+    actorEmployeeId: number,
+    issue: any,
+    role?: string,
+  ) {
+    // Administrators, as everywhere else in this service. Without this an admin
+    // could not close a task unless they happened to own the project, be a PM
+    // on it, or sit above the assignee — and for a task in the General project,
+    // which has no owner and no project managers by construction, the only gate
+    // left was the assignee's manager chain. An administrator with nobody
+    // reporting to them could not close a general task at all.
+    if (role === 'SUPERADMIN' || role === 'ADMIN') return;
+
     const project = issue.projectId
-      ? await this.prisma.project.findUnique({ where: { id: issue.projectId }, select: { leadId: true } })
+      ? await this.prisma.project.findUnique({ where: { id: issue.projectId }, select: { leadId: true, isSystem: true, name: true } })
       : null;
 
     // The project Owner can always move a task to Done/Archive.
@@ -183,7 +204,9 @@ export class IssuesService {
         where: { projectId: issue.projectId, employeeId: issue.assigneeId, role: 'PROJECT_MANAGER' }
       });
       if (assigneeIsPM) {
-        throw new ForbiddenException('Only the project owner can move a task assigned to a Project Manager into this stage.');
+        throw new ForbiddenException(
+          'This task is assigned to a Project Manager, so only the project owner (or an administrator) can move it to Review, Done or Archived.',
+        );
       }
     }
 
@@ -199,18 +222,31 @@ export class IssuesService {
         where: { companyId, managerId: actorEmployeeId }
       });
       if (subordinateCount === 0) {
-        throw new ForbiddenException('Only managers (or the assignee\'s upper hierarchy) can move a task to Done or archive it.');
+        throw new ForbiddenException(
+          'This task is unassigned, and only someone who manages people — or the project owner, a project manager, or an administrator — can move it to Done or archive it. Assign it to someone first.',
+        );
       }
       return;
     }
 
     if (actorEmployeeId === issue.assigneeId) {
-      throw new ForbiddenException('The assignee cannot move this task to Done. Only their manager (or above) can.');
+      throw new ForbiddenException(
+        'You cannot sign off your own task. Ask your manager, the project owner or an administrator to move it to Done.',
+      );
     }
 
     const hierarchy = await this.getAssigneeUpperHierarchy(companyId, issue.assigneeId);
     if (!hierarchy.includes(actorEmployeeId)) {
-      throw new ForbiddenException('Only the assignee\'s manager (or above) can move this task to Done or archive it.');
+      // Name the person. "The assignee's manager" sends someone hunting through
+      // the org chart for who that is; the task says who it belongs to.
+      const assignee = await this.prisma.employee.findUnique({
+        where: { id: issue.assigneeId },
+        select: { firstName: true, lastName: true },
+      });
+      const who = `${assignee?.firstName ?? ''} ${assignee?.lastName ?? ''}`.trim();
+      throw new ForbiddenException(
+        `This task belongs to ${who || 'someone else'}. Only their manager, the project owner${project?.isSystem ? '' : ' or a project manager on this board'}, or an administrator can move it to Done or archive it.`,
+      );
     }
   }
 
@@ -256,7 +292,10 @@ export class IssuesService {
           const fromIdx = columns.findIndex(c => c.id === oldIssue.columnId);
           const toIdx = columns.findIndex(c => c.id === updateData.columnId);
           if (fromIdx !== -1 && toIdx !== -1 && Math.abs(toIdx - fromIdx) !== 1) {
-            throw new ForbiddenException('Cannot skip columns. Move one column at a time.');
+            const next = columns[fromIdx + (toIdx > fromIdx ? 1 : -1)];
+            throw new ForbiddenException(
+              `A task moves one column at a time${next ? `, so "${columns[fromIdx].name}" goes to "${next.name}" next` : ''}.`,
+            );
           }
         }
         if (data.status === undefined) {
@@ -270,7 +309,30 @@ export class IssuesService {
     }
 
     if (isRestrictedTarget) {
-      await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue);
+      await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue, role);
+      // The one place a dependency is enforced rather than advised.
+      //
+      // Everywhere else an open blocker is a chip and a note, because a stale
+      // blocker nobody closed must not be able to stop real work. Moving into
+      // Review or Done is different: it is a claim that the task is finished,
+      // and it demonstrably is not while something it waits on is still open.
+      const openBlockers = await this.prisma.issueDependency.findMany({
+        where: {
+          issueId,
+          companyId,
+          type: 'BLOCKS',
+          dependsOnIssue: { status: { notIn: ['DONE', 'CANCELLED'] } },
+        },
+        select: { dependsOnIssue: { select: { key: true, title: true } } },
+      });
+      if (openBlockers.length) {
+        const list = openBlockers.map((b) => b.dependsOnIssue.key).join(', ');
+        throw new BadRequestException(
+          openBlockers.length === 1
+            ? `This task is waiting on ${list}, which is not finished yet.`
+            : `This task is waiting on ${list}, which are not finished yet.`,
+        );
+      }
     }
     if (data.assigneeId !== undefined) updateData.assigneeId = data.assigneeId ? Number(data.assigneeId) : null;
     if (data.parentId !== undefined) updateData.parentId = data.parentId ? Number(data.parentId) : null;
@@ -387,12 +449,12 @@ export class IssuesService {
     return issue;
   }
 
-  async toggleArchive(companyId: number, employeeId: number, projectId: number, issueId: number) {
+  async toggleArchive(companyId: number, employeeId: number, projectId: number, issueId: number, role?: string) {
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
 
     if (!oldIssue.isArchived) {
-      await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue);
+      await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue, role);
     }
 
     const issue = await this.prisma.issue.update({
@@ -884,8 +946,15 @@ export class IssuesService {
 
     if (actorEmployeeId !== undefined && !(actorRole === 'SUPERADMIN' || actorRole === 'ADMIN')) {
       const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { leadId: true } });
-      if (project && project.leadId !== actorEmployeeId) {
-        throw new ForbiddenException('Only the project owner can assign members to a task');
+      // Whoever raised the task can staff it. Without this a Sales user could
+      // create a task and then be unable to assign anyone to it: the General
+      // project has no leadId, so the owner check below can never pass there.
+      const isReporter = issue.reporterId === actorEmployeeId;
+      const allowed =
+        isReporter ||
+        (await canCreateTask(this.prisma as any, companyId, actorEmployeeId, actorRole, project));
+      if (!allowed) {
+        throw new ForbiddenException('You do not have permission to assign members to this task');
       }
     }
 

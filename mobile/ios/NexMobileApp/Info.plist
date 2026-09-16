@@ -48,6 +48,10 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<!-- Lets a push wake the app in the background. Required for FCM to
+		     deliver anything while the app is not in the foreground, which is
+		     every shift reminder. -->
+		<string>remote-notification</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>BootSplash</string>

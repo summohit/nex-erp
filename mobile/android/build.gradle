@@ -25,6 +25,10 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        // Firebase Cloud Messaging. Only ever APPLIED when google-services.json
+        // is present — see app/build.gradle — so a checkout without the file
+        // still builds. Having the classpath here is harmless either way.
+        classpath("com.google.gms:google-services:4.4.2")
     }
 }
 

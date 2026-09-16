@@ -1,4 +1,5 @@
-<div class="dlg-backdrop" *ngIf="dialog.state() as s" (click)="s.variant === 'confirm' ? null : respond(true)">
+<div class="dlg-backdrop" *ngIf="dialog.state() as s"
+     (click)="s.variant === 'confirm' || s.variant === 'prompt' ? null : respond(true)">
   <div class="dlg-card" (click)="$event.stopPropagation()">
     <div class="dlg-icon" [ngClass]="s.variant">
       <svg *ngIf="s.variant === 'success'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -14,18 +15,33 @@
         <line x1="12" y1="16" x2="12" y2="12"></line>
         <line x1="12" y1="8" x2="12.01" y2="8"></line>
       </svg>
+      <svg *ngIf="s.variant === 'prompt'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
     </div>
 
     <h3 class="dlg-title">{{s.title}}</h3>
     <p class="dlg-message">{{s.message}}</p>
 
+    <!-- ngModel binds the service's plain field, not the state signal: writing
+         to the signal on every keystroke rebuilds the dialog and loses the caret. -->
+    <textarea *ngIf="s.variant === 'prompt'"
+              class="dlg-textarea"
+              rows="3"
+              [placeholder]="s.placeholder || ''"
+              [(ngModel)]="dialog.promptValue"
+              autofocus></textarea>
+
     <div class="dlg-actions">
-      <button *ngIf="s.variant === 'confirm'" class="dlg-btn dlg-btn-secondary" (click)="respond(false)">{{s.cancelLabel}}</button>
+      <button *ngIf="s.variant === 'confirm' || s.variant === 'prompt'"
+              class="dlg-btn dlg-btn-secondary" (click)="respond(false)">{{s.cancelLabel}}</button>
       <button class="dlg-btn" [ngClass]="{
-        'dlg-btn-primary': s.variant === 'confirm',
+        'dlg-btn-primary': s.variant === 'confirm' || s.variant === 'prompt',
         'dlg-btn-success': s.variant === 'success',
         'dlg-btn-error': s.variant === 'error'
-      }" (click)="respond(true)">{{s.confirmLabel}}</button>
+      }"
+      [disabled]="!canSubmitPrompt"
+      (click)="respond(true)">{{s.confirmLabel}}</button>
     </div>
   </div>
 </div>

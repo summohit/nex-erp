@@ -4,7 +4,8 @@ import { AttendanceController } from './attendance.controller';
 import { ShiftsService } from './shifts.service';
 import { ShiftRosterService } from './shift-roster.service';
 import { ShiftsController } from './shifts.controller';
-import { AutoClockoutCron } from './auto-clockout.cron';
+import { MissedClockOutCron } from './missed-clockout.cron';
+import { ShiftRemindersCron } from './shift-reminders.cron';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -12,7 +13,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [PrismaModule, PermissionsModule, NotificationsModule],
   controllers: [AttendanceController, ShiftsController],
-  providers: [AttendanceService, ShiftsService, ShiftRosterService, AutoClockoutCron],
+  providers: [
+    AttendanceService, ShiftsService, ShiftRosterService,
+    MissedClockOutCron, ShiftRemindersCron,
+  ],
   exports: [AttendanceService, ShiftsService, ShiftRosterService]
 })
 export class AttendanceModule {}

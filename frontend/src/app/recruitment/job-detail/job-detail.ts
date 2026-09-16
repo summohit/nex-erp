@@ -10,7 +10,7 @@ import {
   LucideClock, LucideTrash2, LucideInbox, LucideStar, LucideAward,
   LucideLayoutGrid, LucideTable, LucideExternalLink, LucideDownload,
   LucideCopy, LucideCheck, LucideShare2, LucideChevronRight, LucideInfo,
-  LucideMoreVertical, LucideCalendar, LucideDollarSign, LucideUserCheck, LucideUserX
+  LucideMoreVertical, LucideCalendar, LucideDollarSign, LucideIndianRupee, LucideUserCheck, LucideUserX
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { JobsService, Job } from '../../services/jobs.service';
@@ -23,11 +23,12 @@ import { CandidatesService, JobApplication } from '../../services/candidates.ser
     CommonModule, FormsModule, DatePipe,
     LucideArrowLeft, LucideSearch, LucideUsers, LucideCalendarClock,
     LucideBriefcase, LucideMapPin, LucideBuilding, LucideEye,
-    LucideX, LucideSparkles, LucideXCircle,
+    LucidePlus, LucideX, LucideSparkles, LucideCheckCircle, LucideXCircle,
     LucideFileText, LucideMail, LucidePhone, LucideLink, LucideGlobe,
-    LucideClock, LucideAward,
+    LucideClock, LucideTrash2, LucideInbox, LucideStar, LucideAward,
     LucideLayoutGrid, LucideTable, LucideExternalLink, LucideDownload,
-    LucideCopy, LucideCheck, LucideShare2, LucideChevronRight, LucideInfo
+    LucideCopy, LucideCheck, LucideShare2, LucideChevronRight, LucideInfo,
+    LucideMoreVertical, LucideCalendar, LucideDollarSign, LucideIndianRupee, LucideUserCheck, LucideUserX
   ],
   templateUrl: './job-detail.html',
   styleUrls: ['./job-detail.css']

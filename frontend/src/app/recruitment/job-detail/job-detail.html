@@ -64,7 +64,7 @@
             <span>{{ j.experienceYears }} Experience</span>
           </div>
           <div class="hero-meta-item" *ngIf="j.minSalary || j.maxSalary">
-            <svg lucideDollarSign size="14"></svg>
+            <svg lucideIndianRupee size="14"></svg>
             <span>₹{{ (j.minSalary || 0) | number }} - ₹{{ (j.maxSalary || 0) | number }}</span>
           </div>
           <div class="hero-meta-item" *ngIf="j.createdAt">

@@ -361,6 +361,117 @@ export class CrmService {
    * A caller who reaches the lead another way — they created it, they own it,
    * they have VIEW_ALL, they are an admin — keeps the full row.
    */
+  /**
+   * Pre-sales tasks shaped for the My Tasks list — one person's by default,
+   * or the whole company's when `everyone` is set for an administrator.
+   *
+   * This lives here rather than in TasksService because the CRM module owns what
+   * a pre-sales viewer may see. Crucially the lead `select` below is minimal —
+   * id and names only — so `value`, `currency`, `expectedClosure` and every
+   * other commercial field are physically absent from the result rather than
+   * stripped afterwards. maskLeadsForPreSales is subtractive: it removes fields
+   * from a lead that was already fully loaded. Calling it here would work today
+   * and quietly stop working the first time somebody widened the select.
+   *
+   * ⚠️ If this select ever grows beyond identity fields, route the result
+   * through maskLeadsForPreSales — or better, do not grow it.
+   */
+  async getMyPreSalesTasks(
+    companyId: number,
+    employeeId: number,
+    opts: { includeDone?: boolean; take?: number; everyone?: boolean; isAdmin?: boolean } = {},
+  ): Promise<any[]> {
+    const tasks = await this.prisma.preSalesTask.findMany({
+      where: {
+        companyId,
+        // `everyone` is the administrator's company-wide view. The caller is
+        // responsible for having checked the role — this method is not a
+        // permission boundary, it is the CRM's shaping of the rows.
+        ...(opts.everyone ? {} : { assignedToId: employeeId }),
+        ...(opts.includeDone ? {} : { status: { not: 'COMPLETED' } }),
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        taskType: true,
+        status: true,
+        scheduledAt: true,
+        estimatedMinutes: true,
+        assignedToId: true,
+        assignedById: true,
+        lead: { select: { id: true, title: true, leadCode: true, companyName: true, contactName: true, flow: true } },
+        assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+      orderBy: [{ scheduledAt: 'asc' }, { id: 'desc' }],
+      take: opts.take ?? 200,
+    });
+
+    // NEW/WORKING/ON_HOLD/COMPLETED is this module's ladder; the task list uses
+    // a shared one. rawStatus is carried through so the badge still reads
+    // "On Hold" rather than the normalised "Blocked".
+    const LADDER: Record<string, string> = {
+      NEW: 'TODO',
+      WORKING: 'IN_PROGRESS',
+      ON_HOLD: 'BLOCKED',
+      COMPLETED: 'DONE',
+    };
+    const now = new Date();
+    const isAdmin = opts.isAdmin === true;
+
+    return tasks.map((t) => {
+      const dealName = t.lead?.title
+        ? (t.lead.companyName ? `${t.lead.title} (${t.lead.companyName})` : t.lead.title)
+        : (t.lead?.companyName || t.lead?.contactName || (t.lead?.leadCode ? `Deal ${t.lead.leadCode}` : 'Deal'));
+
+      return {
+        source: 'PRE_SALES' as const,
+        id: t.id,
+        refKey: `PS-${t.id}`,
+        title: t.title,
+        status: (LADDER[t.status] ?? 'TODO') as any,
+        rawStatus: t.status,
+        // A pre-sales task has no priority. Left null rather than defaulted,
+        // because inventing one would sort real priorities against a guess.
+        priority: null,
+        taskType: t.taskType ?? null,
+        startDate: null,
+        dueDate: t.scheduledAt,
+        estimatedHours: t.estimatedMinutes != null ? t.estimatedMinutes / 60 : null,
+        assignees: t.assignedTo ? [t.assignedTo] : [],
+        parent: {
+          kind: 'LEAD' as const,
+          id: t.lead.id,
+          name: dealName,
+        },
+        blockedBy: [],
+        isOverdue: !!t.scheduledAt && t.scheduledAt < now,
+        // My Tasks is where a pre-sales task is worked now that the deal page
+        // no longer carries the table, so a row links back to this list rather
+        // than to the lead.
+        link: {
+          route: '/projects',
+          queryParams: { tab: 'my-tasks', psTask: String(t.id) },
+        },
+        // Everything the My Tasks row needs to act on the task without a second
+        // request. The flags mirror what changePreSalesTaskStatus,
+        // updatePreSalesTask and deletePreSalesTask will actually allow — the
+        // server still re-checks, so tampering with them changes nothing.
+        preSales: {
+          leadId: t.lead.id,
+          assignedToId: t.assignedToId,
+          assignedById: t.assignedById,
+          description: t.description ?? null,
+          scheduledAt: t.scheduledAt,
+          estimatedMinutes: t.estimatedMinutes,
+          canChangeStatus:
+            isAdmin || t.assignedToId === employeeId || t.assignedById === employeeId,
+          canManage: isAdmin || t.assignedById === employeeId,
+        },
+      };
+    });
+  }
+
   private async maskLeadsForPreSales<T extends { id: number; addedById: number | null; assignedToId: number | null }>(
     leads: T[],
     user: { role?: string; employeeId?: number | null },
@@ -2055,16 +2166,16 @@ export class CrmService {
     companyId: number,
     leadId: number,
     user: { role?: string; employeeId?: number | null },
-    data: { employeeIds?: any; remark?: string },
+    data: { employeeIds?: any; members?: any[]; remark?: string },
   ) {
     const access = await this.resolvePreSalesAccess(companyId, leadId, user);
     if (!access.canManageMembers) {
       throw new ForbiddenException('Only an administrator can add pre-sales members directly. Raise a request instead.');
     }
 
-    const ids = Array.isArray(data?.employeeIds)
-      ? [...new Set(data.employeeIds.map((v: any) => Number(v)).filter((v: number) => Number.isFinite(v)))]
-      : [];
+    const membersData = data.members || (Array.isArray(data.employeeIds) ? data.employeeIds.map(id => ({ employeeId: id })) : []);
+    const ids = [...new Set(membersData.map((m: any) => Number(m.employeeId)).filter((v: number) => Number.isFinite(v)))];
+    
     if (!ids.length) throw new BadRequestException('Select at least one employee.');
 
     const employees = await this.prisma.employee.findMany({
@@ -2077,11 +2188,19 @@ export class CrmService {
 
     const remark = (data?.remark || '').trim() || null;
     const added: number[] = [];
-    for (const id of ids) {
+    for (const m of membersData) {
+      const id = Number(m.employeeId);
+      if (!ids.includes(id)) continue;
+      
+      const technology = (m.technology || '').trim() || null;
+      const engagementType = m.engagementType === 'ONSITE' ? 'ONSITE' : 'VIRTUAL';
+      const location = (m.location || '').trim() || null;
+      const hours = m.hours ? Number(m.hours) : null;
+
       const row = await this.prisma.preSalesTeamMember.upsert({
         where: { leadId_employeeId: { leadId, employeeId: id } },
-        create: { companyId, leadId, employeeId: id, assignedById: user.employeeId ?? null, remark, status: 'ACTIVE' },
-        update: { status: 'ACTIVE', removedAt: null, assignedById: user.employeeId ?? null, remark },
+        create: { companyId, leadId, employeeId: id, assignedById: user.employeeId ?? null, remark, status: 'ACTIVE', technology, engagementType, location, hours },
+        update: { status: 'ACTIVE', removedAt: null, assignedById: user.employeeId ?? null, remark, technology, engagementType, location, hours },
       });
       added.push(row.employeeId);
     }
@@ -2171,6 +2290,7 @@ export class CrmService {
     }
 
     const technology = String(raw?.technology || '').trim() || null;
+    const location = String(raw?.location || '').trim() || null;
 
     // Hours are a budget once the person is on the deal — tasks are measured
     // against them — so a request that omits them is asking for an open-ended
@@ -2178,9 +2298,10 @@ export class CrmService {
     if (opts.requireDetails) {
       if (!technology) throw new BadRequestException('Say what technology each person is needed for.');
       if (hours === null) throw new BadRequestException('Give the hours needed for each person.');
+      if (engagementType === 'ONSITE' && !location) throw new BadRequestException('Give a location for onsite engagement.');
     }
 
-    return { employeeId, technology, engagementType, hours };
+    return { employeeId, technology, engagementType, location, hours };
   }
 
   // ── hours budget ───────────────────────────────────────────────────────────
@@ -2763,7 +2884,9 @@ export class CrmService {
       companyId, excludeEmployeeId: employeeId,
       title: 'New pre-sales task',
       message: `New task assigned: ${title} (${leadName}).`,
-      type: 'ACTION_REQUIRED', linkUrl: `/crm/leads/${leadId}`,
+      // My Tasks, not the deal page: the deal page no longer lists tasks, and
+      // the assignee may not be allowed to see the deal's commercials anyway.
+      type: 'ACTION_REQUIRED', linkUrl: `/projects?tab=my-tasks&psTask=${task.id}`,
     });
 
     return task;

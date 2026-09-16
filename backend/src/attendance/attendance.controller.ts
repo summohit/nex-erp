@@ -38,7 +38,7 @@ export class AttendanceController {
   }
 
   @Post('clock-out')
-  clockOut(@Request() req, @Body() data: { lat?: number, lng?: number }) {
+  clockOut(@Request() req, @Body() data: { lat?: number, lng?: number, reason?: string }) {
     return this.attendanceService.clockOut(req.user.sub, data);
   }
 

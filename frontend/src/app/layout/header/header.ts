@@ -17,6 +17,8 @@ import {
   LucideArrowRight, LucideMenu
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
+import { DialogService } from '../../shared/services/dialog.service';
+import { PushNotificationsService } from '../../services/push-notifications.service';
 
 @Component({
   selector: 'app-header',
@@ -44,6 +46,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private employeeService = inject(EmployeeService);
   private ticketService = inject(TicketService);
   private toast = inject(HotToastService);
+  private dialog = inject(DialogService);
+  private push = inject(PushNotificationsService);
   notificationsService = inject(NotificationsService);
 
   // Change Password Modal
@@ -100,6 +104,34 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
     this.checkTodayAttendance();
     this.initTicketAlerts();
+
+    // Silent: only re-registers a browser that has already said yes. Not
+    // redundant — FCM rotates registration tokens on its own schedule, so a
+    // browser that registered once and never again quietly stops receiving
+    // anything. Never prompts; that is pushPrompt() below, behind a click.
+    void this.push.resumeIfAlreadyGranted();
+  }
+
+  // ── push notifications ───────────────────────────────────────────────────
+
+  /**
+   * Offer to turn on push, but only where the offer is still live.
+   *
+   * Hidden once the answer is known either way. `denied` is sticky — the
+   * browser will not re-prompt and only the site settings panel can undo it —
+   * so a button that silently does nothing is worse than no button.
+   */
+  get canOfferPush(): boolean {
+    return this.push.permission === 'default';
+  }
+
+  async enablePush() {
+    const ok = await this.push.enable();
+    this.toast[ok ? 'success' : 'error'](
+      ok
+        ? 'Shift reminders will now reach you even with this tab closed.'
+        : 'Notifications were not enabled. You can turn them on in your browser’s site settings.',
+    );
   }
 
   ngOnDestroy() {
@@ -181,11 +213,21 @@ export class HeaderComponent implements OnInit, OnDestroy {
     }
   }
 
-  private executeClock(action: 'clockIn' | 'clockOut') {
+  /**
+   * Two refusals the server sends that are instructions, not errors.
+   *
+   * Both arrive as a 400 carrying a stable `code`, because matching on the
+   * message text would break the first time somebody rewords it. See
+   * OpenSessionError / LateClockOutError on the server.
+   */
+  private static readonly OPEN_PREVIOUS_SESSION = 'OPEN_PREVIOUS_SESSION';
+  private static readonly LATE_REASON_REQUIRED = 'LATE_CLOCK_OUT_REASON_REQUIRED';
+
+  private executeClock(action: 'clockIn' | 'clockOut', reason?: string) {
     const proceed = (lat?: number, lng?: number) => {
       const sub = action === 'clockIn'
         ? this.attendanceService.clockIn(lat, lng)
-        : this.attendanceService.clockOut(lat, lng);
+        : this.attendanceService.clockOut(lat, lng, reason);
 
       sub.subscribe({
         next: () => {
@@ -194,7 +236,26 @@ export class HeaderComponent implements OnInit, OnDestroy {
           this.isClocking.set(false);
         },
         error: (err) => {
-          this.toast.error(err.error?.message || `Failed to ${action === 'clockIn' ? 'clock in' : 'clock out'}`);
+          const body = err?.error ?? {};
+
+          // "You still have yesterday open." Offer to close it rather than
+          // showing a dead end — it is the only way forward, and the user
+          // cannot reach that day from this button otherwise.
+          if (body.code === HeaderComponent.OPEN_PREVIOUS_SESSION) {
+            this.isClocking.set(false);
+            void this.offerToCloseOpenSession(body.openSessionDate, body.message);
+            return;
+          }
+
+          // "That is a previous day — why are you closing it now?" Ask, then
+          // retry the same clock-out with the answer attached.
+          if (body.code === HeaderComponent.LATE_REASON_REQUIRED) {
+            this.isClocking.set(false);
+            void this.askLateClockOutReason(body.openSessionDate);
+            return;
+          }
+
+          this.toast.error(body.message || `Failed to ${action === 'clockIn' ? 'clock in' : 'clock out'}`);
           this.isClocking.set(false);
         }
       });
@@ -212,6 +273,54 @@ export class HeaderComponent implements OnInit, OnDestroy {
       this.toast.error('Location access is required to clock in/out. Your browser does not support location access.');
       this.isClocking.set(false);
     }
+  }
+
+  /**
+   * A clock-in was refused because an earlier day is still open.
+   *
+   * Closing that day is the only thing that unblocks them, and this button is
+   * the only clock control on the screen, so the offer is made here rather than
+   * leaving them to work out that "clock out" now means something else.
+   */
+  private async offerToCloseOpenSession(openDate: string | undefined, message: string) {
+    const ok = await this.dialog.confirm(
+      message,
+      openDate ? `Session still open from ${this.formatDay(openDate)}` : 'Session still open',
+      'Clock out from that shift',
+      'Not now',
+    );
+    if (!ok) return;
+
+    this.isClocking.set(true);
+    // No reason yet: the server decides whether this counts as a previous day,
+    // and answers with LATE_CLOCK_OUT_REASON_REQUIRED if it does. Guessing here
+    // would mean two implementations of "after midnight".
+    this.executeClock('clockOut');
+  }
+
+  /** Ask why a previous day is being closed now, then retry with the answer. */
+  private async askLateClockOutReason(openDate: string | undefined) {
+    const day = openDate ? this.formatDay(openDate) : 'a previous day';
+    const reason = await this.dialog.prompt(
+      `You are clocking out for ${day}. Please provide a reason — it is saved against that day's record.`,
+      'Reason for late clock-out',
+      {
+        placeholder: 'e.g. Left the site in a hurry and forgot to clock out',
+        confirmLabel: 'Clock out',
+        required: true,
+      },
+    );
+    if (!reason) return;
+
+    this.isClocking.set(true);
+    this.executeClock('clockOut', reason);
+  }
+
+  /** "2026-09-14" → "14 Sep 2026". */
+  private formatDay(iso: string): string {
+    const d = new Date(`${iso}T00:00:00`);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   openSpotlight() {

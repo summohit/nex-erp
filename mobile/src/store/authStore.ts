@@ -60,6 +60,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
     }
     set({ user, token, refreshToken: refreshToken ?? null, isLoading: false });
+
+    // Claim this handset for the new user's push notifications. After the token
+    // is in storage, because the registration call has to authenticate as them.
+    // Not awaited: a device that cannot register must still be able to sign in.
+    const { registerDeviceToken } = await import('../native/pushNotifications');
+    void registerDeviceToken();
   },
   setTokens: async (token, refreshToken) => {
     await AsyncStorage.setItem(TOKEN_KEY, token);
@@ -73,6 +79,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
   logout: async () => {
+    // Release the push token FIRST, while the access token is still in storage
+    // for the request to authenticate with. Without it the next person to sign
+    // in on this handset keeps receiving the previous user's shift reminders
+    // until FCM happens to rotate the token.
+    try {
+      const { unregisterDeviceToken } = await import('../native/pushNotifications');
+      await unregisterDeviceToken();
+    } catch {
+      // Signing out must never be blocked by a cleanup call.
+    }
+
     await AsyncStorage.removeItem(TOKEN_KEY);
     await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
     await AsyncStorage.removeItem('userData');
@@ -91,6 +108,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userData = await AsyncStorage.getItem('userData');
       const companyData = await AsyncStorage.getItem('companyData');
       if (token && userData) {
+        // Re-register on every launch, not only at sign-in: FCM rotates
+        // registration tokens on its own schedule, and a device that
+        // registered once quietly stops receiving anything weeks later.
+        import('../native/pushNotifications')
+          .then(({ registerDeviceToken }) => registerDeviceToken())
+          .catch(() => {});
         // An access token that expired while the app was closed is fine — the
         // first request 401s and the interceptor refreshes it in place.
         set({

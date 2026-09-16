@@ -363,6 +363,30 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (issue) this.openIssueDetails(issue);
   }
 
+  /** Set from ?task=, cleared the moment it is used. */
+  private pendingTaskDeepLink: number | null = null;
+
+  /**
+   * Open the task named in the URL, then take it back out of the URL.
+   *
+   * Without the rewrite, refreshing the page or coming back to it would reopen
+   * the modal every time — the same clean-up the lead profile does after its
+   * own deep link. If the id is not on this board (archived, or the user cannot
+   * see it) we land on the board silently rather than explaining a task they
+   * were not going to be shown anyway.
+   */
+  private consumePendingTaskDeepLink() {
+    const id = this.pendingTaskDeepLink;
+    if (!id) return;
+    this.pendingTaskDeepLink = null;
+    this.openIssueDetailsById(id);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {},
+      replaceUrl: true,
+    });
+  }
+
   activeTab = signal<'board'|'backlog'|'analytics'|'settings'>('board');
   activeProjectTab = signal<string>('board');
   projectSummary = signal<ProjectSummary | null>(null);
@@ -1220,6 +1244,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   projectSocketSubscriptions: any[] = [];
 
   ngOnInit() {
+    this.route.queryParamMap.subscribe(q => {
+      const task = q.get('task');
+      if (task && !isNaN(Number(task))) this.pendingTaskDeepLink = Number(task);
+    });
+
     this.route.paramMap.subscribe(params => {
       const id = params.get('id');
       if (id) {
@@ -1355,6 +1384,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
             });
             this.issuesByColumn.set(map);
             this.isLoading.set(false);
+            // A task opened from My Tasks arrives as ?task=<id>. The id is
+            // captured in ngOnInit but can only be acted on here, once
+            // allIssues() is populated.
+            this.consumePendingTaskDeepLink();
           },
           error: () => {
             this.isLoading.set(false);
@@ -1780,6 +1813,20 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return false;
   }
 
+  /**
+   * Report why a move was refused.
+   *
+   * The server knows exactly — "this task belongs to Mohit Singh, only their
+   * manager can close it", "a task moves one column at a time", "waiting on
+   * NEX-12". Every one of those arrived as a 403 or 400 with a message and was
+   * thrown away in favour of "Please try again", which is advice that never
+   * works: trying again does the same thing. The fallback is only for a network
+   * failure, where there genuinely is no reason to report.
+   */
+  private reportMoveFailure(err: any, fallback: string) {
+    this.toast.error(err?.error?.message || fallback);
+  }
+
   drop(event: CdkDragDrop<any[]>, targetColumnId: number) {
     const issue = event.previousContainer.data[event.previousIndex];
     if (!issue) return;
@@ -1818,9 +1865,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.setIssueUpdating(issue.id, false);
         this.loadBoardAndIssues();
       },
-      error: () => {
+      error: (err) => {
         this.setIssueUpdating(issue.id, false);
-        this.toast.error('Failed to move issue');
+        this.reportMoveFailure(err, 'Could not move the task — the server did not respond.');
         this.loadBoardAndIssues();
       }
     });
@@ -1873,7 +1920,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.setIssueUpdating(issueId, false);
-          this.toast.error('Failed to update status');
+          this.reportMoveFailure(err, 'Could not update the status — the server did not respond.');
           this.loadBoardAndIssues();
         }
       });
@@ -2808,9 +2855,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.toast.success('Task moved.');
         this.loadBoardAndIssues();
       },
-      error: () => {
+      error: (err) => {
         this.setIssueUpdating(issue.id, false);
-        this.toast.error('Failed to move task. Please try again.');
+        this.reportMoveFailure(err, 'Could not move the task — the server did not respond.');
         this.loadBoardAndIssues();
       }
     });
@@ -2853,9 +2900,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
             this.toast.success('Task moved and proof uploaded successfully.');
             this.loadBoardAndIssues();
           },
-          error: () => {
+          error: (err) => {
             this.setIssueUpdating(issue.id, false);
-            this.toast.error('Proof uploaded but failed to move task. Please try again.');
+            // The files are already attached; only the move was refused.
+            this.reportMoveFailure(
+              err, 'The proof was uploaded, but the task could not be moved — the server did not respond.',
+            );
             this.loadBoardAndIssues();
           }
         });

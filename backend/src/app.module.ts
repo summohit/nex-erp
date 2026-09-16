@@ -38,6 +38,7 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { LeadFormsModule } from './lead-forms/lead-forms.module';
 import { AppDownloadModule } from './app-download/app-download.module';
 import { TicketsModule } from './tickets/tickets.module';
+import { TasksModule } from './tasks/tasks.module';
 import { CommonModule } from './common/common.module';
 
 @Module({
@@ -49,7 +50,7 @@ import { CommonModule } from './common/common.module';
     ThrottlerModule.forRoot({
       throttlers: [{ name: 'default', ttl: seconds(60), limit: 60 }],
     }),
-    CommonModule, AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule],
+    CommonModule, AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule, TasksModule],
   controllers: [AppController],
   providers: [AppService],
 })

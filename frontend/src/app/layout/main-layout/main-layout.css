@@ -13,6 +13,13 @@
   flex-direction: column;
 }
 
+app-header {
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
 .content-area {
   padding: var(--space-xl);
   flex: 1;

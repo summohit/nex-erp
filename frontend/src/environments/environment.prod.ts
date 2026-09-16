@@ -6,5 +6,5 @@ export const environment = {
   // committed to the repo — drop the signed build at
   // backend/uploads/app/nex-workspace.apk and it goes live immediately.
   // Leave empty to force the "Coming Soon" state on the landing page.
-  androidApkUrl: 'https://nex.ces-pl.com/api/app-download/android'
+  androidApkUrl: 'https://nex.ces-pl.com/api/app-download/android',
 };

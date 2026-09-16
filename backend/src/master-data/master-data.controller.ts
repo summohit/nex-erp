@@ -32,7 +32,7 @@ export class MasterDataController {
 
   // --- Department CRUD ---
   @Post('departments')
-  async createDepartment(@Request() req, @Body() data: { name: string, defaultRole?: string }) {
+  async createDepartment(@Request() req, @Body() data: { name: string, defaultRole?: string, canCreateTasks?: boolean }) {
     const existing = await this.prisma.department.findFirst({
       where: {
         name: { equals: data.name, mode: 'insensitive' },
@@ -48,17 +48,21 @@ export class MasterDataController {
       data: {
         name: data.name,
         companyId: req.user.companyId,
-        defaultRole: data.defaultRole || 'EMPLOYEE'
+        defaultRole: data.defaultRole || 'EMPLOYEE',
+        canCreateTasks: data.canCreateTasks === true
       }
     });
   }
 
   @Put('departments/:id')
-  async updateDepartment(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { name?: string, isActive?: boolean, defaultRole?: string }) {
+  async updateDepartment(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { name?: string, isActive?: boolean, defaultRole?: string, canCreateTasks?: boolean }) {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.defaultRole !== undefined) updateData.defaultRole = data.defaultRole;
+    // Who may raise tasks, set here rather than inferred from the department's
+    // name — see tasks/task-permissions.ts.
+    if (data.canCreateTasks !== undefined) updateData.canCreateTasks = data.canCreateTasks;
 
     const result = await this.prisma.department.update({
       where: { id, companyId: req.user.companyId },
@@ -255,6 +259,71 @@ export class MasterDataController {
     return this.prisma.leaveType.delete({
       where: { id, companyId: req.user.companyId }
     });
+  }
+
+  // --- Task Type CRUD ---
+  // The business meaning of a task (Call, Site Visit, Documentation), kept as
+  // master data so the vocabulary can change without a deploy. Distinct from
+  // Issue.type, which is EPIC/STORY/TASK/BUG and drives board behaviour.
+  @Get('task-types')
+  async getTaskTypes(@Request() req, @Query('activeOnly') activeOnly?: string) {
+    return this.prisma.taskType.findMany({
+      where: {
+        companyId: req.user.companyId,
+        ...(activeOnly === 'true' ? { isActive: true } : {}),
+      },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  @Post('task-types')
+  async createTaskType(@Request() req, @Body() data: { name: string; position?: number }) {
+    if (!data?.name?.trim()) throw new BadRequestException('A task type needs a name');
+    const existing = await this.prisma.taskType.findFirst({
+      where: { name: { equals: data.name.trim(), mode: 'insensitive' }, companyId: req.user.companyId },
+    });
+    if (existing) throw new BadRequestException('That task type already exists');
+
+    return this.prisma.taskType.create({
+      data: {
+        name: data.name.trim(),
+        position: Number(data.position) || 0,
+        companyId: req.user.companyId,
+      },
+    });
+  }
+
+  @Put('task-types/:id')
+  async updateTaskType(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { name?: string; isActive?: boolean; position?: number },
+  ) {
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.position !== undefined) updateData.position = Number(data.position) || 0;
+
+    return this.prisma.taskType.update({
+      where: { id, companyId: req.user.companyId },
+      data: updateData,
+    });
+  }
+
+  @Delete('task-types/:id')
+  async deleteTaskType(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    // A type that tasks already carry is the truth about those tasks. Hide it
+    // from new ones rather than rewriting history by deleting it.
+    const inUse = await this.prisma.issue.count({
+      where: { taskTypeId: id, companyId: req.user.companyId },
+    });
+    if (inUse > 0) {
+      return this.prisma.taskType.update({
+        where: { id, companyId: req.user.companyId },
+        data: { isActive: false },
+      });
+    }
+    return this.prisma.taskType.delete({ where: { id, companyId: req.user.companyId } });
   }
 
   // --- Holiday CRUD ---
