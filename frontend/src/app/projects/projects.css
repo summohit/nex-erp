@@ -3574,3 +3574,187 @@
   flex-direction: column !important;
   gap: 10px !important;
 }
+
+/* ── Delivery list cells ──────────────────────────────────────────────── */
+
+/* Project code, Rule 10: its own column, read as an identifier rather than
+   as part of the project name it used to be appended to. */
+.boards-grid-table .project-code-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+/* "Not set" and "not yours to see" both render as a dash. The difference is
+   carried by whether the column is present at all, which the server decides. */
+.boards-grid-table .cell-muted {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.boards-grid-table .progress-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.boards-grid-table .progress-track {
+  flex: 1;
+  min-width: 48px;
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.boards-grid-table .progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.boards-grid-table .progress-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ── §3 Project filters ───────────────────────────────────────────────── */
+
+.project-filters {
+  margin: 0 0 16px;
+}
+
+.project-filters-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.project-filters-toggle,
+.project-filters-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.project-filters-toggle:hover,
+.project-filters-clear:hover {
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+.project-filters-toggle svg.rotated {
+  transform: rotate(180deg);
+}
+
+.project-filters-count {
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.project-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.project-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.project-filter-field > span {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.project-filter-field select,
+.project-filter-field input {
+  width: 100%;
+  font-size: 13px;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+.project-filter-field select:focus,
+.project-filter-field input:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .project-filters-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── §4 Project form sections ─────────────────────────────────────────── */
+
+/* A quiet divider between groups of fields. The create form runs to a dozen
+   inputs; without these it reads as one undifferentiated column. */
+.form-section-heading {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin: 22px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
+  margin: 0;
+}

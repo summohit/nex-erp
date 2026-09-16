@@ -66,10 +66,21 @@ const menuSections: MenuSection[] = [
         ]
       },
       {
-        id: 'projects',
-        title: 'Projects',
+        // Delivery is a section, not a link. Its children all ride on the
+        // single 'projects' permission (see menus.service.ts) — renaming the
+        // entry must not silently revoke anyone's access.
+        //
+        // Project Tickets and Project Reports join this list when the screens
+        // behind them ship; a row that leads nowhere is worse than none.
+        id: 'delivery',
+        title: 'Delivery',
         icon: 'lucideKanban',
-        route: '/projects'
+        subItems: [
+          { id: 'projects', title: 'Projects', route: '/projects' },
+          { id: 'tasks', title: 'Tasks', route: '/tasks' },
+          { id: 'timesheets', title: 'Timesheet', route: '/timesheets' },
+          { id: 'field-visits', title: 'Field Visits', route: '/field-visits' }
+        ]
       },
       {
         id: 'attendance',

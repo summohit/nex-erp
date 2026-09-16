@@ -304,6 +304,7 @@ model Department {
   blackoutDates  BlackoutDate[]
   tickets        Ticket[]       @relation("TicketOwningTeam")
   raisedTickets  Ticket[]       @relation("TicketRaisedByDept")
+  projects       Project[]      @relation("DepartmentProjects")
 }
 
 model Designation {
@@ -1362,9 +1363,9 @@ model Interview {
 // ═══════════════════════════════════════════
 
 model Project {
-  id          Int       @id @default(autoincrement())
-  name        String
-  key         String // Auto-generated, unique per company (e.g., "NEX")
+  id            Int         @id @default(autoincrement())
+  name          String
+  key           String // Auto-generated, unique per company (e.g., "NEX")
   /// The company's single "General" project: where tasks that belong to no real
   /// project live. Hidden from every project list, picker and board view — it
   /// exists so a general task still gets a key, a board column, labels and a
@@ -1372,35 +1373,63 @@ model Project {
   /// board code path to cope with its absence.
   ///
   /// Anything that lists projects to a human MUST filter `isSystem: false`.
-  isSystem    Boolean   @default(false)
+  isSystem      Boolean     @default(false)
   /// Next issue number for this project. `${key}-${count + 1}` read the row
   /// count and then wrote, which hands two people creating a task in the same
   /// second the same number — and @@unique([key, companyId]) turns that into a
   /// 500. Incrementing this column inside the create transaction row-locks it,
   /// so concurrent callers get distinct keys. It also never reuses a key after
   /// a deletion, which a count does.
-  issueSeq    Int       @default(0)
-  description String?
-  color       String    @default("#2563eb") // Project accent color
-  icon        String    @default("folder") // Lucide icon name
-  status      String    @default("ACTIVE") // ACTIVE, ARCHIVED (lifecycle status — unrelated to workStatus)
-  category    String? // free-text project category (e.g. "Implementation and Deployment")
-  progress    Int? // 0-100 completion percentage
-  address     String?   @db.Text // On-site work location for this project, set at creation
-  workStatus  String? // NOT_STARTED, IN_PROGRESS, FINISHED (work status — distinct from ACTIVE/ARCHIVED)
-  leadId      Int? // Project lead (Employee)
-  lead        Employee? @relation("ProjectLead", fields: [leadId], references: [id])
-  companyId   Int
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  issueSeq      Int         @default(0)
+  description   String?
+  color         String      @default("#2563eb") // Project accent color
+  icon          String      @default("folder") // Lucide icon name
+  status        String      @default("ACTIVE") // ACTIVE, ARCHIVED (archive lifecycle only — unrelated to workStatus)
+  category      String? // free-text project category (e.g. "Implementation and Deployment")
+  progress      Int? // 0-100 completion percentage
+  address       String?     @db.Text // On-site work location for this project, set at creation
+  /// THE project status: DRAFT, ACTIVE, ON_HOLD, AT_RISK, COMPLETED, CLOSED,
+  /// CANCELLED. Named `workStatus` for history — it held
+  /// NOT_STARTED/IN_PROGRESS/FINISHED before the Delivery module widened it.
+  /// Distinct from `status`, which only records whether the row is archived.
+  workStatus    String?
+  /// Where the project sits in the closure process: WORK_PENDING,
+  /// SIGNOFF_PENDING, FINANCE_PENDING, PAYMENT_PENDING, FULLY_CLOSED.
+  ///
+  /// Deliberately not a finer grain of `workStatus`. Delivery and collection
+  /// run independently, and the case this module exists to make visible is
+  /// exactly the one where they disagree — work COMPLETED, money still
+  /// PAYMENT_PENDING.
+  closureStatus String      @default("WORK_PENDING")
+  priority      String      @default("MEDIUM") // CRITICAL, HIGH, MEDIUM, LOW
+  projectType   String? // free-text, e.g. "Implementation", "AMC", "T&M"
+  /// The delivery team accountable for the project, so the list can be filtered
+  /// by department without inferring it from whoever happens to be a member.
+  departmentId  Int?
+  department    Department? @relation("DepartmentProjects", fields: [departmentId], references: [id], onDelete: SetNull)
+  leadId        Int? // Project lead (Employee)
+  lead          Employee?   @relation("ProjectLead", fields: [leadId], references: [id])
+  companyId     Int
+  company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // Client & Billing
-  clientId     Int?
-  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  startDate    DateTime?
-  endDate      DateTime?
-  billingType  String    @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
-  budgetAmount Float?
-  hourlyRate   Float?
+  clientId               Int?
+  client                 Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  startDate              DateTime?
+  endDate                DateTime?
+  billingType            String    @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
+  budgetAmount           Float?
+  hourlyRate             Float?
+  currency               String    @default("INR")
+  budgetNotes            String?   @db.Text
+  /// The hours the project was sold/planned for, set against logged time to
+  /// give estimated → logged → remaining.
+  estimatedHours         Float?
+  /// §9: whether an employee may type hours in directly on this project, or
+  /// must use the timer. Defaults to true — every project predating this
+  /// column already allowed manual entry, and flipping that silently would
+  /// strand timesheets mid-week.
+  allowManualTimeLogging Boolean   @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1421,6 +1450,8 @@ model Project {
   attendances   Attendance[]         @relation("ProjectAttendance")
 
   @@unique([key, companyId])
+  @@index([companyId, workStatus])
+  @@index([departmentId])
 }
 
 model ProjectDocument {

@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { applyFinancialVisibilityAll } from './project-visibility';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import axios from 'axios';
@@ -65,6 +67,18 @@ export class ProjectsService {
         budgetAmount: data.budgetAmount ? parseFloat(data.budgetAmount) : null,
         hourlyRate: data.hourlyRate ? parseFloat(data.hourlyRate) : null,
         clientId: data.clientId ? parseInt(data.clientId, 10) : null,
+        // Delivery module fields (§4, §7, §9). A project created without a
+        // status is ACTIVE rather than DRAFT: somebody filling in this form is
+        // starting work, and DRAFT would hide it behind the default filter.
+        category: data.category || null,
+        projectType: data.projectType || null,
+        priority: data.priority || 'MEDIUM',
+        departmentId: data.departmentId ? parseInt(data.departmentId, 10) : null,
+        workStatus: data.workStatus || 'ACTIVE',
+        currency: data.currency || 'INR',
+        budgetNotes: data.budgetNotes || null,
+        estimatedHours: data.estimatedHours ? parseFloat(data.estimatedHours) : null,
+        allowManualTimeLogging: data.allowManualTimeLogging === undefined ? true : !!data.allowManualTimeLogging,
         companyId,
         leadId,
         members: {
@@ -413,6 +427,14 @@ export class ProjectsService {
         lead: {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true }
         },
+        // Client and department are columns and filters on the list, so they
+        // come down with it rather than costing a lookup per row.
+        client: {
+          select: { id: true, name: true }
+        },
+        department: {
+          select: { id: true, name: true }
+        },
         members: {
           orderBy: { joinedAt: 'asc' },
           select: {
@@ -428,17 +450,67 @@ export class ProjectsService {
           select: { status: true }
         },
         expenseClaims: {
-          where: { status: 'PAID' },
-          select: { amount: true }
+          where: { status: { in: ['APPROVED', 'PAID'] } },
+          select: { amount: true, status: true }
         }
       }
     });
 
-    return projects.map(({ issues, expenseClaims, ...p }) => ({
-      ...p,
-      remainingIssues: issues.filter((i) => i.status !== 'DONE' && i.status !== 'CANCELLED').length,
-      paidExpenseTotal: expenseClaims.reduce((sum, c) => sum + c.amount, 0)
-    }));
+    const loggedHoursByProject = await this.getLoggedHoursByProject(projects.map((p) => p.id));
+
+    const rows = projects.map(({ issues, expenseClaims, ...p }) => {
+      const totalIssues = issues.length;
+      const doneIssues = issues.filter((i) => i.status === 'DONE').length;
+      const loggedHours = loggedHoursByProject.get(p.id) ?? 0;
+      const expenseTotal = expenseClaims.reduce((sum, c) => sum + c.amount, 0);
+
+      return {
+        ...p,
+        remainingIssues: issues.filter((i) => i.status !== 'DONE' && i.status !== 'CANCELLED').length,
+        totalIssues,
+        doneIssues,
+        // §11: progress from task completion, unless a PM has set it by hand.
+        progress: p.progress ?? (totalIssues ? Math.round((doneIssues / totalIssues) * 100) : 0),
+        loggedHours,
+        remainingHours: p.estimatedHours == null ? null : p.estimatedHours - loggedHours,
+        expenseTotal,
+        paidExpenseTotal: expenseClaims
+          .filter((c) => c.status === 'PAID')
+          .reduce((sum, c) => sum + c.amount, 0),
+        // Employee cost lands in phase 2, when employees have a cost rate.
+        // Until then budget used is expenses alone, and saying so is better
+        // than publishing a number that will silently change meaning.
+        budgetUsed: expenseTotal,
+        budgetRemaining: p.budgetAmount == null ? null : p.budgetAmount - expenseTotal,
+        budgetUtilization:
+          p.budgetAmount ? Math.round((expenseTotal / p.budgetAmount) * 100) : null,
+      };
+    });
+
+    return applyFinancialVisibilityAll(rows, { role, employeeId: emp ? emp.id : null });
+  }
+
+  /**
+   * Logged minutes per project, rolled up to hours.
+   *
+   * One grouped query rather than including `timeLogs` on every issue: a
+   * project with a thousand tasks and years of timer sessions would otherwise
+   * pull every row across the wire to add them up.
+   */
+  private async getLoggedHoursByProject(projectIds: number[]): Promise<Map<number, number>> {
+    if (!projectIds.length) return new Map();
+
+    const rows = await this.prisma.$queryRaw<{ projectId: number; minutes: bigint | null }[]>`
+      SELECT i."projectId" AS "projectId", SUM(COALESCE(t."durationMin", 0)) AS minutes
+        FROM "IssueTimeLog" t
+        JOIN "Issue" i ON i.id = t."issueId"
+       WHERE i."projectId" IN (${Prisma.join(projectIds)})
+       GROUP BY i."projectId"
+    `;
+
+    return new Map(
+      rows.map((r) => [r.projectId, Math.round((Number(r.minutes ?? 0) / 60) * 100) / 100]),
+    );
   }
 
   async getArchivedProjects(companyId: number, userId: number, role: string) {
@@ -815,6 +887,22 @@ export class ProjectsService {
     if (data.clientId !== undefined) updateData.clientId = data.clientId ? parseInt(data.clientId, 10) : null;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.workStatus !== undefined) updateData.workStatus = data.workStatus;
+    // Delivery module fields (§4, §7, §9, §37).
+    if (data.category !== undefined) updateData.category = data.category || null;
+    if (data.projectType !== undefined) updateData.projectType = data.projectType || null;
+    if (data.priority !== undefined) updateData.priority = data.priority;
+    if (data.departmentId !== undefined) updateData.departmentId = data.departmentId ? parseInt(data.departmentId, 10) : null;
+    if (data.currency !== undefined) updateData.currency = data.currency;
+    if (data.budgetNotes !== undefined) updateData.budgetNotes = data.budgetNotes || null;
+    if (data.estimatedHours !== undefined) updateData.estimatedHours = data.estimatedHours ? parseFloat(data.estimatedHours) : null;
+    if (data.allowManualTimeLogging !== undefined) updateData.allowManualTimeLogging = !!data.allowManualTimeLogging;
+    if (data.closureStatus !== undefined) updateData.closureStatus = data.closureStatus;
+    if (data.progress !== undefined) {
+      // Null clears a hand-set percentage and hands progress back to the
+      // task-completion calculation in getProjects — without this there is no
+      // way to undo a manual override.
+      updateData.progress = data.progress === null || data.progress === '' ? null : parseInt(data.progress, 10);
+    }
 
     const updated = await this.prisma.project.update({
       where: { id },

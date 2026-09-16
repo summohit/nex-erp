@@ -245,6 +245,96 @@
       </button>
     </div>
 
+    <!-- §3 Project filters. Collapsed by default: nine dropdowns above a list
+         most people open to click one project is a wall, not a tool. The
+         summary row says how many are on so a filtered-empty list is never a
+         mystery. -->
+    <div class="project-filters">
+      <div class="project-filters-head">
+        <button type="button" class="project-filters-toggle" (click)="filtersOpen.set(!filtersOpen())">
+          <svg lucideFilter size="14"></svg>
+          Filters
+          <span class="project-filters-count" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
+          <svg lucideChevronDown size="14" [class.rotated]="filtersOpen()"></svg>
+        </button>
+        <button
+          type="button"
+          class="project-filters-clear"
+          *ngIf="activeFilterCount() > 0"
+          (click)="clearProjectFilters()">
+          <svg lucideX size="13"></svg> Clear all
+        </button>
+      </div>
+
+      <div class="project-filters-grid" *ngIf="filtersOpen()">
+        <label class="project-filter-field">
+          <span>Client</span>
+          <select [ngModel]="filterClientId()" (ngModelChange)="filterClientId.set($event)">
+            <option value="ALL">All clients</option>
+            <option *ngFor="let c of clientOptions()" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Project manager</span>
+          <select [ngModel]="filterPmId()" (ngModelChange)="filterPmId.set($event)">
+            <option value="ALL">All managers</option>
+            <option *ngFor="let m of pmOptions()" [value]="m.id">{{ m.name }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Department</span>
+          <select [ngModel]="filterDepartmentId()" (ngModelChange)="filterDepartmentId.set($event)">
+            <option value="ALL">All departments</option>
+            <option *ngFor="let d of departmentOptions()" [value]="d.id">{{ d.name }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Category</span>
+          <select [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event)">
+            <option value="ALL">All categories</option>
+            <option *ngFor="let c of categoryOptions()" [value]="c">{{ c }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Status</span>
+          <select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)">
+            <option value="ALL">All statuses</option>
+            <option *ngFor="let st of projectStatusOptions" [value]="st">{{ st.replace('_', ' ') }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Priority</span>
+          <select [ngModel]="filterPriority()" (ngModelChange)="filterPriority.set($event)">
+            <option value="ALL">All priorities</option>
+            <option *ngFor="let pr of projectPriorityOptions" [value]="pr">{{ pr }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Project type</span>
+          <select [ngModel]="filterProjectType()" (ngModelChange)="filterProjectType.set($event)">
+            <option value="ALL">All types</option>
+            <option *ngFor="let t of projectTypeOptions()" [value]="t">{{ t }}</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
+          <span>Started on or after</span>
+          <input type="date" [ngModel]="filterStartFrom()" (ngModelChange)="filterStartFrom.set($event)" />
+        </label>
+
+        <label class="project-filter-field">
+          <span>Deadline on or before</span>
+          <input type="date" [ngModel]="filterDeadlineTo()" (ngModelChange)="filterDeadlineTo.set($event)" />
+        </label>
+      </div>
+    </div>
+
     <!-- Boards Grid / Table -->
     <div class="boards-container">
       <!-- Skeleton Loaders -->
@@ -357,7 +447,7 @@
             class="ag-theme-quartz boards-grid-table"
             [theme]="'legacy'"
             [rowData]="filteredProjects()"
-            [columnDefs]="boardsColDefs"
+            [columnDefs]="boardsColumnDefs()"
             [defaultColDef]="defaultColDef"
             [gridOptions]="gridOptions"
             [pagination]="true"
@@ -1401,17 +1491,67 @@
       </div>
     </div>
 
-    <!-- Billing & Schedule Fields -->
+    <!-- §4: logical sections rather than one undifferentiated column of
+         inputs. Basic information first, then schedule, then the commercial
+         terms — which most roles never fill in at all. -->
+    <div class="form-section">
+      <label class="section-label">Client</label>
+      <select class="trello-select" [(ngModel)]="projectForm.clientId">
+        <option [ngValue]="null">No Client</option>
+        <option *ngFor="let c of clients()" [ngValue]="c.id">{{ c.name }}</option>
+      </select>
+    </div>
+
+    <div class="form-section row">
+      <div class="col">
+        <label class="section-label">Department</label>
+        <select class="trello-select" [(ngModel)]="projectForm.departmentId">
+          <option [ngValue]="null">No department</option>
+          <option *ngFor="let d of departments()" [ngValue]="d.id">{{ d.name }}</option>
+        </select>
+      </div>
+      <div class="col" style="margin-left: 10px;">
+        <label class="section-label">Category</label>
+        <input type="text" class="trello-input" [(ngModel)]="projectForm.category" placeholder="e.g. Implementation and Deployment">
+      </div>
+    </div>
+
+    <div class="form-section row">
+      <div class="col">
+        <label class="section-label">Project Type</label>
+        <input type="text" class="trello-input" [(ngModel)]="projectForm.projectType" placeholder="e.g. Implementation, AMC, T&amp;M">
+      </div>
+      <div class="col" style="margin-left: 10px;">
+        <label class="section-label">Priority</label>
+        <select class="trello-select" [(ngModel)]="projectForm.priority">
+          <option *ngFor="let pr of projectPriorityOptions" [value]="pr">{{ pr }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ── Schedule & status ──────────────────────────────────────────── -->
+    <div class="form-section-heading">Schedule &amp; status</div>
+
     <div class="form-section row">
       <div class="col">
         <label class="section-label">Start Date</label>
         <input type="date" class="trello-input" [(ngModel)]="projectForm.startDate">
       </div>
       <div class="col" style="margin-left: 10px;">
-        <label class="section-label">End Date</label>
+        <label class="section-label">Deadline</label>
         <input type="date" class="trello-input" [(ngModel)]="projectForm.endDate">
       </div>
     </div>
+
+    <div class="form-section">
+      <label class="section-label">Status</label>
+      <select class="trello-select" [(ngModel)]="projectForm.workStatus">
+        <option *ngFor="let st of projectStatusOptions" [value]="st">{{ st.replace('_', ' ') }}</option>
+      </select>
+    </div>
+
+    <!-- ── Budget & effort (§7, §8) ───────────────────────────────────── -->
+    <div class="form-section-heading">Budget &amp; effort</div>
 
     <div class="form-section">
       <label class="section-label">Billing Type</label>
@@ -1422,27 +1562,54 @@
       </select>
     </div>
 
-    <div class="form-section row" *ngIf="projectForm.billingType === 'FIXED'">
+    <div class="form-section row">
       <div class="col">
-        <label class="section-label">Budget Amount</label>
-        <input type="number" class="trello-input" [(ngModel)]="projectForm.budgetAmount" placeholder="e.g. 10000">
+        <!-- §7: the budget is what the project is measured against, so it is
+             asked for on every project rather than only fixed-price ones —
+             a time-and-materials project still has a cap somebody tracks. -->
+        <label class="section-label">Project Budget</label>
+        <input type="number" class="trello-input" [(ngModel)]="projectForm.budgetAmount" placeholder="e.g. 1000000">
+      </div>
+      <div class="col" style="margin-left: 10px;">
+        <label class="section-label">Currency</label>
+        <select class="trello-select" [(ngModel)]="projectForm.currency">
+          <option value="INR">INR (₹)</option>
+          <option value="USD">USD ($)</option>
+          <option value="EUR">EUR (€)</option>
+        </select>
       </div>
     </div>
 
-    <div class="form-section row" *ngIf="projectForm.billingType === 'HOURLY'">
+    <div class="form-section row">
       <div class="col">
+        <label class="section-label">Estimated Hours</label>
+        <input type="number" class="trello-input" [(ngModel)]="projectForm.estimatedHours" placeholder="e.g. 2000">
+      </div>
+      <div class="col" style="margin-left: 10px;" *ngIf="projectForm.billingType === 'HOURLY'">
         <label class="section-label">Hourly Rate</label>
         <input type="number" class="trello-input" [(ngModel)]="projectForm.hourlyRate" placeholder="e.g. 150">
       </div>
     </div>
 
-    <!-- Client Selection -->
     <div class="form-section">
-      <label class="section-label">Client</label>
-      <select class="trello-select" [(ngModel)]="projectForm.clientId">
-        <option [ngValue]="null">No Client</option>
-        <option *ngFor="let c of clients()" [ngValue]="c.id">{{ c.name }}</option>
-      </select>
+      <label class="section-label">Budget Notes</label>
+      <textarea
+        class="trello-input" rows="2"
+        [(ngModel)]="projectForm.budgetNotes"
+        placeholder="What the budget covers, and anything excluded from it">
+      </textarea>
+    </div>
+
+    <!-- ── Time logging (§9) ──────────────────────────────────────────── -->
+    <div class="form-section">
+      <label class="checkbox-row">
+        <input type="checkbox" [(ngModel)]="projectForm.allowManualTimeLogging">
+        <span>Allow manual time logging</span>
+      </label>
+      <small style="color: #6b7280; font-size: 12px; margin-top: 6px; display: block;">
+        When off, hours on this project can only come from the timer. Existing
+        entries are left alone either way.
+      </small>
     </div>
 
     <!-- On-site Address (used by the Shift Roster's on-site flow) -->

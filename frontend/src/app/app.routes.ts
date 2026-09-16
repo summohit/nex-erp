@@ -48,9 +48,13 @@ export const routes: Routes = [
     children: [
       { path: 'dashboard', component: DashboardComponent },
       { 
+        // Delivery > Timesheet. Shares the projects permission, as Field Visits
+        // and Tasks do: menus.service grants all three off 'projects', and a
+        // sidebar row that leads to an Access Denied toast is worse than none.
+        // The screen is the viewer's own time either way.
         path: 'timesheets',
         canActivate: [permissionGuard],
-        data: { module: 'timesheets' },
+        data: { module: 'projects' },
         loadComponent: () => import('./timesheets/timesheets.component').then(m => m.TimesheetsComponent)
       },
       { 
@@ -244,6 +248,16 @@ export const routes: Routes = [
         path: 'projects',
         canActivate: [permissionGuard],
         data: { module: 'projects' },
+        loadComponent: () => import('./projects/projects').then(m => m.ProjectsComponent)
+      },
+      {
+        // Delivery > Tasks. The task list is a tab of the projects screen
+        // rather than a second copy of two thousand lines of grid, filter and
+        // composer code; `forceTab` opens the component straight onto it.
+        // Shares the projects permission — see menus.service.ts.
+        path: 'tasks',
+        canActivate: [permissionGuard],
+        data: { module: 'projects', forceTab: 'my-tasks' },
         loadComponent: () => import('./projects/projects').then(m => m.ProjectsComponent)
       },
       {

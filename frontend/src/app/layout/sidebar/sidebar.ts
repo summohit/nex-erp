@@ -73,10 +73,9 @@ export class SidebarComponent implements OnInit {
    */
   getModuleStatus(title: string): 'DONE' | 'WIP' | null {
     const doneModules = [
-      'Dashboard', 'Employees', 'Recruitment', 'Projects', 'Attendance & Leave',
+      'Dashboard', 'Employees', 'Recruitment', 'Delivery', 'Attendance & Leave',
       'Performance', 'CRM', 'Sales', 'Settings',
       'Appreciation', 'Offboarding', 'Payroll & Expenses', 'Clients', 'Assets & IT',
-      'Field Visits',
     ];
     if (doneModules.includes(title)) return 'DONE';
     return 'WIP';

@@ -92,19 +92,63 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Sales menu auto-seeded successfully.');
         }
         
-        const fieldVisitsMenu = await this.prisma.menu.findFirst({ where: { title: 'Field Visits', parentId: parent.id } });
-        if (!fieldVisitsMenu) {
-          await this.prisma.menu.create({
-            data: {
-              title: 'Field Visits',
-              icon: 'map-pin',
-              route: '/field-visits',
-              displayOrder: 9,
-              parentId: parent.id,
-              isActive: true,
-            },
+        // ── Delivery ───────────────────────────────────────────────────
+        // Projects is a section, not a link: Projects, Tasks, Timesheet and
+        // Field Visits live under it. Reconciled on every boot rather than
+        // seeded once, so an install that predates the Delivery module and one
+        // created from prisma/seed-menus.ts converge on the same sidebar.
+        //
+        // Project Tickets and Project Reports are deliberately absent until
+        // the screens behind them exist — a menu row that leads nowhere is
+        // worse than a missing one.
+        const deliveryMenu = await this.prisma.menu.findFirst({
+          where: { parentId: parent.id, OR: [{ title: 'Delivery' }, { route: '/projects' }] },
+        });
+
+        if (deliveryMenu) {
+          if (deliveryMenu.title !== 'Delivery' || deliveryMenu.route !== null) {
+            await this.prisma.menu.update({
+              where: { id: deliveryMenu.id },
+              // Route cleared: a parent that is both a link and a section
+              // renders as a dead click target once it has children, which is
+              // why CRM was given the same treatment.
+              data: { title: 'Delivery', route: null, icon: deliveryMenu.icon || 'kanban' },
+            });
+            this.logger.log('Projects menu promoted to the Delivery section.');
+          }
+
+          const deliveryChildren = [
+            { title: 'Projects', route: '/projects', displayOrder: 1 },
+            { title: 'Tasks', route: '/tasks', displayOrder: 2 },
+            { title: 'Timesheet', route: '/timesheets', displayOrder: 3 },
+            { title: 'Field Visits', route: '/field-visits', displayOrder: 4 },
+          ];
+
+          for (const child of deliveryChildren) {
+            const existing = await this.prisma.menu.findFirst({
+              where: { parentId: deliveryMenu.id, route: child.route },
+            });
+            if (existing) {
+              if (!existing.isActive) {
+                await this.prisma.menu.update({ where: { id: existing.id }, data: { isActive: true } });
+              }
+              continue;
+            }
+            await this.prisma.menu.create({
+              data: { ...child, parentId: deliveryMenu.id, isActive: true },
+            });
+            this.logger.log(`Delivery > ${child.title} menu auto-seeded successfully.`);
+          }
+
+          // Field Visits used to sit beside Projects at the top level. Retire
+          // the old row rather than leaving it in two places.
+          const { count: movedFieldVisits } = await this.prisma.menu.updateMany({
+            where: { route: '/field-visits', parentId: parent.id, isActive: true },
+            data: { isActive: false },
           });
-          this.logger.log('Field Visits menu auto-seeded successfully.');
+          if (movedFieldVisits > 0) {
+            this.logger.log('Field Visits moved under Delivery.');
+          }
         }
 
         // Tickets is reached from the header (next to Create), not the sidebar.
@@ -269,9 +313,17 @@ export class MenusService implements OnModuleInit {
     // own, so it is granted alongside the profile rather than via RolePermission.
     allowedModules.add('settings/security');
 
-    // Field Visits rides on the projects permission — a visit is always logged
-    // against a project, so there is no separate module for an admin to grant.
-    if (allowedModules.has('projects')) allowedModules.add('field-visits');
+    // The Delivery section's children all ride on the single 'projects'
+    // permission. Renaming the sidebar entry must not quietly revoke access:
+    // every role that could reach Projects before can reach all of Delivery
+    // now, and there is nothing new for an administrator to grant.
+    //
+    // Field Visits was already doing this — a visit is always logged against a
+    // project — and Tasks and Timesheet are the same work seen from a
+    // different angle, not a separate permission surface.
+    if (allowedModules.has('projects')) {
+      ['field-visits', 'tasks', 'timesheets'].forEach((m) => allowedModules.add(m));
+    }
 
     // The leave quota report is a read-only view of balances that the
     // attendance permission already covers, and the endpoint scopes anyone who
