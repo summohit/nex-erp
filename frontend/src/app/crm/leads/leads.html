@@ -180,6 +180,36 @@
       </button>
     </div>
 
+
+    <!-- Active Filter Chips -->
+    <div class="active-filter-chips" *ngIf="hasActiveFilters()">
+      <div class="chips-title">
+        <svg lucideFilter size="12"></svg>
+        <span>Active Filters:</span>
+      </div>
+      <div class="filter-chips-list">
+        <span class="filter-chip" *ngFor="let chip of getActiveFilterChips()">
+          <span class="chip-text">{{ chip.label }}</span>
+          <button type="button" class="chip-remove-btn" (click)="chip.clear()" title="Remove filter">
+            <svg lucideX size="11"></svg>
+          </button>
+        </span>
+      </div>
+      <button type="button" class="btn-clear-all-chips" (click)="clearFilters()">Reset All</button>
+    </div>
+
+    <!-- Filtered Summary Bar -->
+    <div class="filter-summary-bar" *ngIf="hasActiveFilters()">
+      <div class="filter-summary-item">
+        <span class="filter-summary-label">Filtered Deals</span>
+        <span class="filter-summary-value">{{ getFilteredCount() }}</span>
+      </div>
+      <div class="filter-summary-item">
+        <span class="filter-summary-label">Filtered Value</span>
+        <span class="filter-summary-value">{{ getFilteredValue() | currency:'INR' }}</span>
+      </div>
+    </div>
+  </div>
     <!-- Advanced Filters Modal (slide-in from right) -->
     <div class="filters-modal-backdrop" *ngIf="showAdvancedFilters" (click)="showAdvancedFilters = false; closeFilterDropdowns()"></div>
     <div class="advanced-filters-panel" [class.open]="showAdvancedFilters">
@@ -643,35 +673,6 @@
       </div>
     </div>
 
-    <!-- Active Filter Chips -->
-    <div class="active-filter-chips" *ngIf="hasActiveFilters()">
-      <div class="chips-title">
-        <svg lucideFilter size="12"></svg>
-        <span>Active Filters:</span>
-      </div>
-      <div class="filter-chips-list">
-        <span class="filter-chip" *ngFor="let chip of getActiveFilterChips()">
-          <span class="chip-text">{{ chip.label }}</span>
-          <button type="button" class="chip-remove-btn" (click)="chip.clear()" title="Remove filter">
-            <svg lucideX size="11"></svg>
-          </button>
-        </span>
-      </div>
-      <button type="button" class="btn-clear-all-chips" (click)="clearFilters()">Reset All</button>
-    </div>
-
-    <!-- Filtered Summary Bar -->
-    <div class="filter-summary-bar" *ngIf="hasActiveFilters()">
-      <div class="filter-summary-item">
-        <span class="filter-summary-label">Filtered Deals</span>
-        <span class="filter-summary-value">{{ getFilteredCount() }}</span>
-      </div>
-      <div class="filter-summary-item">
-        <span class="filter-summary-label">Filtered Value</span>
-        <span class="filter-summary-value">{{ getFilteredValue() | currency:'INR' }}</span>
-      </div>
-    </div>
-  </div>
 
   <!-- Skeleton Card Template -->
   <ng-template #skeletonLoader>
@@ -1109,7 +1110,7 @@
         <svg lucideSearch size="16" class="contacts-search-icon"></svg>
         <input 
           type="text" 
-          placeholder="Search contacts by name, company, email, phone, source, or category..." 
+          placeholder="Search Lead contacts by Details.." 
           [(ngModel)]="contactSearchQuery"
         />
         <button *ngIf="contactSearchQuery" class="btn-clear-search" (click)="contactSearchQuery = ''">

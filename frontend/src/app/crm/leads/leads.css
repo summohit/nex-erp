@@ -208,8 +208,6 @@
 
 .filter-bar-card {
   background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border-radius: 14px;
   border: 1px solid #e2e8f0;
   padding: 12px 18px;
