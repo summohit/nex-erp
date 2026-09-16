@@ -726,6 +726,16 @@
                         <span>{{ t.taskType }}</span>
                       </div>
                     </div>
+                    <div class="ps-task-attachments" *ngIf="t.attachments?.length">
+                      <a class="ps-file-chip-card ps-task-file-chip" *ngFor="let a of t.attachments.slice(0, 3)"
+                         [href]="a.fileUrl" target="_blank" rel="noopener" title="{{ a.fileName }}">
+                        <svg lucidePaperclip size="11"></svg>
+                        <span class="ps-file-title">{{ a.fileName }}</span>
+                      </a>
+                      <span class="ps-task-file-more" *ngIf="t.attachments.length > 3" title="and {{ t.attachments.length - 3 }} more">
+                        +{{ t.attachments.length - 3 }} more
+                      </span>
+                    </div>
                   </td>
                   <td data-label="Assigned Specialist">
                     <div class="ps-assigned-profile">
@@ -1080,10 +1090,12 @@
             </div>
             <div class="ps-field ps-field-full" *ngIf="!editingTaskId">
               <label class="form-label">Supporting Documents</label>
-              <input type="file" multiple hidden #taskFileInput (change)="onTaskFilesSelected($event)" />
-              <button type="button" class="btn-outline-pill ps-upload-btn" (click)="taskFileInput.click()">
-                <svg lucideUpload size="14"></svg> Attach Files
-              </button>
+              <div class="ps-file-picker">
+                <button type="button" class="btn-outline-pill ps-upload-btn">
+                  <svg lucideUpload size="14"></svg> Attach Files
+                </button>
+                <input type="file" multiple class="ps-file-input-cover" (change)="onTaskFilesSelected($event)" />
+              </div>
               <div class="ps-files-chips-wrap" *ngIf="taskForm.attachments?.length">
                 <div class="ps-file-chip-card" *ngFor="let a of taskForm.attachments; let i = index">
                   <svg lucidePaperclip size="13"></svg>
@@ -1145,10 +1157,12 @@
                           : 'e.g. Started technical analysis and requirements gathering with client.')"></textarea>
 
           <label class="form-label" style="margin-top: 14px;">Documents & Attachments</label>
-          <input type="file" multiple hidden #statusFileInput (change)="onStatusFilesSelected($event)" />
-          <button type="button" class="btn-outline-pill ps-upload-btn" (click)="statusFileInput.click()">
-            <svg lucideUpload size="14"></svg> Attach Files
-          </button>
+          <div class="ps-file-picker">
+            <button type="button" class="btn-outline-pill ps-upload-btn">
+              <svg lucideUpload size="14"></svg> Attach Files
+            </button>
+            <input type="file" multiple class="ps-file-input-cover" (change)="onStatusFilesSelected($event)" />
+          </div>
           <div class="ps-files-chips-wrap" *ngIf="statusForm.attachments?.length">
             <div class="ps-file-chip-card" *ngFor="let a of statusForm.attachments">
               <svg lucidePaperclip size="13"></svg>

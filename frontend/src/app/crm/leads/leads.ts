@@ -393,6 +393,21 @@ isSubmitted = false;
   contactAddedBySearchQuery = '';
   showContactAddedByDropdown = false;
 
+  // Lead Contacts filter bar (below the search bar). The options are derived
+  // from values that are valid for leads: standard LEAD_SOURCES, DEAL_CATEGORIES
+  // and the actual country/employee values present on the contacts.
+  contactSourceFilter: string = 'ALL';
+  contactCategoryFilter: string = 'ALL';
+  contactCountryFilter: string = 'ALL';
+  contactAddedByFilter: number | 'ALL' = 'ALL';
+  contactLeadsFilter: 'ALL' | 'HAS_LEADS' | 'NO_LEADS' = 'ALL';
+  contactSourceFilterSearchQuery = '';
+  contactCategoryFilterSearchQuery = '';
+  contactFilterAddedBySearchQuery = '';
+  showContactSourceFilterDropdown = false;
+  showContactCategoryFilterDropdown = false;
+  showContactAddedByFilterDropdown = false;
+
   /** Flips on the first save attempt so errors appear only after one. */
   leadContactSubmitted = false;
 
@@ -1091,19 +1106,186 @@ csvImporting = false;
     return s;
   }
 
+  private getLeadsForContact(contactId: number): any[] {
+    return this.leads.filter(l => (l as any).broughtByContact?.id === contactId);
+  }
+
   getFilteredLeadContacts(): any[] {
-    if (!this.contactSearchQuery.trim()) return this.leadContacts;
-    const q = this.contactSearchQuery.toLowerCase();
-    return this.leadContacts.filter(c =>
-      c.name?.toLowerCase().includes(q) ||
-      c.companyName?.toLowerCase().includes(q) ||
-      c.email?.toLowerCase().includes(q) ||
-      c.phone?.toLowerCase().includes(q) ||
-      c.mobile?.toLowerCase().includes(q) ||
-      c.leadSource?.toLowerCase().includes(q) ||
-      (c.addedBy && `${c.addedBy.firstName} ${c.addedBy.lastName}`.toLowerCase().includes(q)) ||
-      (c.leadsBrought && c.leadsBrought.some((l: any) => l.dealCategory?.toLowerCase().includes(q)))
+    let list = this.leadContacts;
+    if (this.contactSearchQuery.trim()) {
+      const q = this.contactSearchQuery.toLowerCase();
+      list = list.filter(c =>
+        c.name?.toLowerCase().includes(q) ||
+        c.companyName?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.phone?.toLowerCase().includes(q) ||
+        c.mobile?.toLowerCase().includes(q) ||
+        c.leadSource?.toLowerCase().includes(q) ||
+        (c.addedBy && `${c.addedBy.firstName} ${c.addedBy.lastName}`.toLowerCase().includes(q)) ||
+        (c.leadsBrought && c.leadsBrought.some((l: any) => l.dealCategory?.toLowerCase().includes(q)))
+      );
+    }
+    if (this.contactSourceFilter !== 'ALL') {
+      list = list.filter(c => c.leadSource === this.contactSourceFilter);
+    }
+    if (this.contactCategoryFilter !== 'ALL') {
+      list = list.filter(c => this.getLeadsForContact(c.id).some((l: any) => l.dealCategory === this.contactCategoryFilter));
+    }
+    if (this.contactCountryFilter !== 'ALL') {
+      list = list.filter(c => (c.country || '').toLowerCase() === this.contactCountryFilter.toLowerCase());
+    }
+    if (this.contactAddedByFilter !== 'ALL') {
+      list = list.filter(c => (c.addedBy?.id ?? c.addedById) === this.contactAddedByFilter);
+    }
+    if (this.contactLeadsFilter === 'HAS_LEADS') {
+      list = list.filter(c => this.getLeadsForContact(c.id).length > 0);
+    }
+    if (this.contactLeadsFilter === 'NO_LEADS') {
+      list = list.filter(c => this.getLeadsForContact(c.id).length === 0);
+    }
+    return list;
+  }
+
+  // ── Lead Contacts filter bar options ──────────────────────────────────────
+  // Only sources/categories that are valid for leads are offered, plus any
+  // legacy values still sitting on real rows so nothing becomes unfilterable.
+
+  getContactSourceFilterOptions(): string[] {
+    const legacy = this.leadContacts
+      .map(c => c.leadSource)
+      .filter((s): s is string => !!s && !this.LEAD_SOURCES.includes(s))
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .sort((a, b) => a.localeCompare(b));
+    const used = this.LEAD_SOURCES.filter(s => this.leadContacts.some(c => c.leadSource === s));
+    return [...used, ...legacy];
+  }
+
+  getFilteredContactSourceFilterOptions(): string[] {
+    const all = this.getContactSourceFilterOptions();
+    if (!this.contactSourceFilterSearchQuery.trim()) return all;
+    const q = this.contactSourceFilterSearchQuery.toLowerCase();
+    return all.filter(s => s.toLowerCase().includes(q));
+  }
+
+  getContactCategoryFilterOptions(): { id: string; name: string }[] {
+    const legacy = this.leads
+      .filter(l => (l as any).broughtByContact)
+      .map(l => l.dealCategory)
+      .filter((c): c is string => !!c && !this.DEAL_CATEGORIES.some(d => d.id === c))
+      .filter((v, i, a) => a.indexOf(v) === i);
+    const used = this.DEAL_CATEGORIES.filter(d => this.leads.some(l => (l as any).broughtByContact && l.dealCategory === d.id));
+    return [...used, ...legacy.map(c => ({ id: c, name: c }))];
+  }
+
+  getFilteredContactCategoryFilterOptions(): { id: string; name: string }[] {
+    const all = this.getContactCategoryFilterOptions();
+    if (!this.contactCategoryFilterSearchQuery.trim()) return all;
+    const q = this.contactCategoryFilterSearchQuery.toLowerCase();
+    return all.filter(c => c.name.toLowerCase().includes(q));
+  }
+
+  getContactCountryFilterOptions(): string[] {
+    return this.leadContacts
+      .map(c => c.country)
+      .filter((c): c is string => !!c?.trim())
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  getFilteredContactAddedByFilterOptions(): any[] {
+    if (!this.contactFilterAddedBySearchQuery.trim()) return this.employees;
+    const q = this.contactFilterAddedBySearchQuery.toLowerCase();
+    return this.employees.filter(e =>
+      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+      e.designation?.name?.toLowerCase().includes(q) ||
+      e.department?.name?.toLowerCase().includes(q)
     );
+  }
+
+  getSelectedContactSourceFilterLabel(): string {
+    return this.contactSourceFilter === 'ALL' ? 'All Sources' : this.contactSourceFilter;
+  }
+
+  getSelectedContactCategoryFilterLabel(): string {
+    if (this.contactCategoryFilter === 'ALL') return 'All Categories';
+    const cat = this.DEAL_CATEGORIES.find(d => d.id === this.contactCategoryFilter);
+    return cat?.name || this.contactCategoryFilter;
+  }
+
+  getSelectedContactAddedByFilterLabel(): string {
+    if (this.contactAddedByFilter === 'ALL') return 'All Added By';
+    const emp = this.employees.find(e => e.id === this.contactAddedByFilter);
+    return emp ? `${emp.firstName} ${emp.lastName}` : 'Selected';
+  }
+
+  selectContactSourceFilter(source: string) {
+    this.contactSourceFilter = source;
+    this.showContactSourceFilterDropdown = false;
+    this.contactSourceFilterSearchQuery = '';
+  }
+
+  selectContactCategoryFilter(category: string) {
+    this.contactCategoryFilter = category;
+    this.showContactCategoryFilterDropdown = false;
+    this.contactCategoryFilterSearchQuery = '';
+  }
+
+  selectContactCountryFilter(country: string) {
+    this.contactCountryFilter = country;
+  }
+
+  selectContactAddedByFilter(empId: number | 'ALL') {
+    this.contactAddedByFilter = empId;
+    this.showContactAddedByFilterDropdown = false;
+    this.contactFilterAddedBySearchQuery = '';
+  }
+
+  selectContactLeadsFilter(value: 'ALL' | 'HAS_LEADS' | 'NO_LEADS') {
+    this.contactLeadsFilter = value;
+  }
+
+  closeContactFilterDropdowns() {
+    this.showContactSourceFilterDropdown = false;
+    this.showContactCategoryFilterDropdown = false;
+    this.showContactAddedByFilterDropdown = false;
+  }
+
+  hasContactFilters(): boolean {
+    return this.contactSourceFilter !== 'ALL' ||
+      this.contactCategoryFilter !== 'ALL' ||
+      this.contactCountryFilter !== 'ALL' ||
+      this.contactAddedByFilter !== 'ALL' ||
+      this.contactLeadsFilter !== 'ALL';
+  }
+
+  getContactFilterChips(): { key: string; label: string; clear: () => void }[] {
+    const chips: { key: string; label: string; clear: () => void }[] = [];
+    if (this.contactSourceFilter !== 'ALL') {
+      chips.push({ key: 'source', label: `Source: ${this.contactSourceFilter}`, clear: () => { this.contactSourceFilter = 'ALL'; } });
+    }
+    if (this.contactCategoryFilter !== 'ALL') {
+      chips.push({ key: 'category', label: `Category: ${this.getSelectedContactCategoryFilterLabel()}`, clear: () => { this.contactCategoryFilter = 'ALL'; } });
+    }
+    if (this.contactCountryFilter !== 'ALL') {
+      chips.push({ key: 'country', label: `Country: ${this.contactCountryFilter}`, clear: () => { this.contactCountryFilter = 'ALL'; } });
+    }
+    if (this.contactAddedByFilter !== 'ALL') {
+      chips.push({ key: 'addedBy', label: `Added By: ${this.getSelectedContactAddedByFilterLabel()}`, clear: () => { this.contactAddedByFilter = 'ALL'; } });
+    }
+    if (this.contactLeadsFilter !== 'ALL') {
+      const label = this.contactLeadsFilter === 'HAS_LEADS' ? 'Has Brought Leads' : 'No Leads Brought';
+      chips.push({ key: 'leads', label, clear: () => { this.contactLeadsFilter = 'ALL'; } });
+    }
+    return chips;
+  }
+
+  clearContactFilters() {
+    this.contactSourceFilter = 'ALL';
+    this.contactCategoryFilter = 'ALL';
+    this.contactCountryFilter = 'ALL';
+    this.contactAddedByFilter = 'ALL';
+    this.contactLeadsFilter = 'ALL';
+    this.closeContactFilterDropdowns();
   }
 
   getFilteredContactAddedByEmployees(): any[] {

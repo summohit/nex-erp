@@ -5552,7 +5552,21 @@ input:checked + .toggle-slider:before {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+.ps-file-picker {
   margin-top: 4px;
+  position: relative;
+  display: inline-block;
+}
+.ps-file-input-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+  z-index: 1;
 }
 .ps-files-chips-wrap {
   display: flex;
@@ -5597,6 +5611,37 @@ input:checked + .toggle-slider:before {
 }
 .ps-ext-arrow {
   color: #94a3b8 !important;
+}
+
+/* Attachments shown directly on the pre-sales task row — everyone with access
+   to the lead should see what was handed over, not just the person who
+   uploaded it after opening a modal. */
+.ps-task-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.ps-task-file-chip {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  max-width: 220px;
+}
+.ps-task-file-chip .ps-file-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-task-file-more {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 4px 9px;
+  white-space: nowrap;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

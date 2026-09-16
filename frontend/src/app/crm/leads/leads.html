@@ -1147,6 +1147,139 @@
       </div>
     </div>
 
+    <!-- Lead Contacts Filter Bar (below the search bar) -->
+    <div class="contacts-filter-bar">
+      <div class="contacts-filter-label">
+        <svg lucideFilter size="13"></svg>
+        <span>Filter</span>
+      </div>
+
+      <div class="contacts-filter-controls">
+        <!-- Source (valid lead sources) -->
+        <div class="searchable-filter-dropdown contacts-filter-control">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="contactSourceFilter !== 'ALL'" (click)="showContactSourceFilterDropdown = !showContactSourceFilterDropdown; showContactCategoryFilterDropdown = false; showContactAddedByFilterDropdown = false">
+            <span class="trigger-text">{{ getSelectedContactSourceFilterLabel() }}</span>
+            <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showContactSourceFilterDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showContactSourceFilterDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch size="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search sources..." [(ngModel)]="contactSourceFilterSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="contactSourceFilterSearchQuery" (click)="contactSourceFilterSearchQuery = ''"><svg lucideX size="11"></svg></button>
+            </div>
+            <div class="popover-header-actions">
+              <span>{{ getContactSourceFilterOptions().length }} Sources</span>
+              <button type="button" class="popover-clear-btn" *ngIf="contactSourceFilter !== 'ALL'" (click)="contactSourceFilter = 'ALL'">Clear</button>
+            </div>
+            <div class="popover-options-scroll">
+              <button type="button" class="popover-option-item" [class.selected]="contactSourceFilter === 'ALL'" (click)="selectContactSourceFilter('ALL')">
+                <span class="option-label">All Sources</span>
+                <svg lucideCheck size="13" class="check-icon" *ngIf="contactSourceFilter === 'ALL'"></svg>
+              </button>
+              <button type="button" class="popover-option-item" [class.selected]="contactSourceFilter === s" *ngFor="let s of getFilteredContactSourceFilterOptions()" (click)="selectContactSourceFilter(s)">
+                <span class="option-label">{{ s }}</span>
+                <svg lucideCheck size="13" class="check-icon" *ngIf="contactSourceFilter === s"></svg>
+              </button>
+              <div class="popover-empty" *ngIf="getFilteredContactSourceFilterOptions().length === 0">No sources match "{{ contactSourceFilterSearchQuery }}"</div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showContactSourceFilterDropdown" (click)="closeContactFilterDropdowns()"></div>
+        </div>
+
+        <!-- Category (deal category of brought leads) -->
+        <div class="searchable-filter-dropdown contacts-filter-control">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="contactCategoryFilter !== 'ALL'" (click)="showContactCategoryFilterDropdown = !showContactCategoryFilterDropdown; showContactSourceFilterDropdown = false; showContactAddedByFilterDropdown = false">
+            <span class="trigger-text">{{ getSelectedContactCategoryFilterLabel() }}</span>
+            <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showContactCategoryFilterDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showContactCategoryFilterDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch size="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search categories..." [(ngModel)]="contactCategoryFilterSearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="contactCategoryFilterSearchQuery" (click)="contactCategoryFilterSearchQuery = ''"><svg lucideX size="11"></svg></button>
+            </div>
+            <div class="popover-header-actions">
+              <span>{{ getContactCategoryFilterOptions().length }} Categories</span>
+              <button type="button" class="popover-clear-btn" *ngIf="contactCategoryFilter !== 'ALL'" (click)="contactCategoryFilter = 'ALL'">Clear</button>
+            </div>
+            <div class="popover-options-scroll">
+              <button type="button" class="popover-option-item" [class.selected]="contactCategoryFilter === 'ALL'" (click)="selectContactCategoryFilter('ALL')">
+                <span class="option-label">All Categories</span>
+                <svg lucideCheck size="13" class="check-icon" *ngIf="contactCategoryFilter === 'ALL'"></svg>
+              </button>
+              <button type="button" class="popover-option-item" [class.selected]="contactCategoryFilter === c.id" *ngFor="let c of getFilteredContactCategoryFilterOptions()" (click)="selectContactCategoryFilter(c.id)">
+                <span class="option-label">{{ c.name }}</span>
+                <svg lucideCheck size="13" class="check-icon" *ngIf="contactCategoryFilter === c.id"></svg>
+              </button>
+              <div class="popover-empty" *ngIf="getFilteredContactCategoryFilterOptions().length === 0">No categories match "{{ contactCategoryFilterSearchQuery }}"</div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showContactCategoryFilterDropdown" (click)="closeContactFilterDropdowns()"></div>
+        </div>
+
+        <!-- Country -->
+        <div class="custom-select-wrapper contacts-filter-control">
+          <svg lucideMapPin size="13" class="select-prefix-icon"></svg>
+          <select [(ngModel)]="contactCountryFilter" [class.has-selection]="contactCountryFilter !== 'ALL'" title="Filter by country">
+            <option value="ALL">All Countries</option>
+            <option *ngFor="let cnt of getContactCountryFilterOptions()" [value]="cnt">{{ cnt }}</option>
+          </select>
+          <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+        </div>
+
+        <!-- Added By (employee) -->
+        <div class="searchable-filter-dropdown contacts-filter-control">
+          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="contactAddedByFilter !== 'ALL'" (click)="showContactAddedByFilterDropdown = !showContactAddedByFilterDropdown; showContactSourceFilterDropdown = false; showContactCategoryFilterDropdown = false">
+            <span class="trigger-text">{{ getSelectedContactAddedByFilterLabel() }}</span>
+            <svg lucideChevronDown size="13" class="chevron" [class.rotated]="showContactAddedByFilterDropdown"></svg>
+          </button>
+          <div class="filter-dropdown-popover" *ngIf="showContactAddedByFilterDropdown">
+            <div class="popover-search-box">
+              <svg lucideSearch size="13" class="popover-search-icon"></svg>
+              <input type="text" placeholder="Search employees..." [(ngModel)]="contactFilterAddedBySearchQuery" (click)="$event.stopPropagation()" />
+              <button type="button" class="popover-search-clear" *ngIf="contactFilterAddedBySearchQuery" (click)="contactFilterAddedBySearchQuery = ''"><svg lucideX size="11"></svg></button>
+            </div>
+            <div class="popover-header-actions">
+              <span>{{ getFilteredContactAddedByFilterOptions().length }} Employees</span>
+              <button type="button" class="popover-clear-btn" *ngIf="contactAddedByFilter !== 'ALL'" (click)="contactAddedByFilter = 'ALL'">Clear</button>
+            </div>
+            <div class="popover-options-scroll">
+              <button type="button" class="popover-option-item" [class.selected]="contactAddedByFilter === 'ALL'" (click)="selectContactAddedByFilter('ALL')">
+                <span class="option-label">All Added By</span>
+                <svg lucideCheck size="13" class="check-icon" *ngIf="contactAddedByFilter === 'ALL'"></svg>
+              </button>
+              <button type="button" class="popover-option-item" [class.selected]="contactAddedByFilter === emp.id" *ngFor="let emp of getFilteredContactAddedByFilterOptions()" (click)="selectContactAddedByFilter(emp.id)">
+                <span class="option-avatar-circle">{{ emp.firstName ? emp.firstName[0] : '' }}{{ emp.lastName ? emp.lastName[0] : '' }}</span>
+                <span class="option-label">{{ emp.firstName }} {{ emp.lastName }}</span>
+                <svg lucideCheck size="13" class="check-icon" *ngIf="contactAddedByFilter === emp.id"></svg>
+              </button>
+              <div class="popover-empty" *ngIf="getFilteredContactAddedByFilterOptions().length === 0">No employees match "{{ contactFilterAddedBySearchQuery }}"</div>
+            </div>
+          </div>
+          <div class="dropdown-backdrop-transparent" *ngIf="showContactAddedByFilterDropdown" (click)="closeContactFilterDropdowns()"></div>
+        </div>
+
+        <!-- Leads brought -->
+        <div class="custom-select-wrapper contacts-filter-control">
+          <svg lucideAward size="13" class="select-prefix-icon"></svg>
+          <select [(ngModel)]="contactLeadsFilter" [class.has-selection]="contactLeadsFilter !== 'ALL'" title="Filter by leads brought">
+            <option value="ALL">All Contacts</option>
+            <option value="HAS_LEADS">Has Brought Leads</option>
+            <option value="NO_LEADS">No Leads Brought</option>
+          </select>
+          <svg lucideChevronDown size="13" class="select-chevron-icon"></svg>
+        </div>
+      </div>
+
+      <div class="contacts-filter-right">
+        <span class="contacts-filter-count" *ngIf="getContactFilterChips().length > 0">{{ getContactFilterChips().length }} active</span>
+        <button type="button" class="contacts-filter-reset" *ngIf="hasContactFilters()" (click)="clearContactFilters()" title="Reset all contact filters">
+          <svg lucideRotateCcw size="13"></svg>
+          <span>Reset</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Contacts Table Card -->
     <div class="contacts-table-card" *ngIf="getFilteredLeadContacts().length > 0; else noFilteredContacts">
       <table class="contacts-table">

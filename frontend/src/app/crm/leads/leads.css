@@ -5640,6 +5640,118 @@ textarea:focus {
   }
 }
 
+/* === Lead Contacts filter bar (below the search bar) === */
+.contacts-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 16px;
+  flex-wrap: wrap;
+}
+
+.contacts-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+.contacts-filter-label svg {
+  color: #ea580c;
+}
+
+.contacts-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.contacts-filter-control {
+  min-width: 150px;
+  max-width: 210px;
+}
+
+.contacts-filter-control .filter-dropdown-trigger {
+  height: 34px;
+}
+
+.contacts-filter-control select {
+  height: 34px;
+  padding-left: 32px;
+}
+
+.contacts-filter-control .select-prefix-icon {
+  left: 10px;
+}
+
+.contacts-filter-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.contacts-filter-count {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #c2410c;
+  background: #fff7ed;
+  border: 1px solid #ffedd5;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.contacts-filter-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.contacts-filter-reset:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+@media (max-width: 820px) {
+  .contacts-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .contacts-filter-controls {
+    justify-content: flex-start;
+  }
+  .contacts-filter-right {
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+}
+
 /* Skeleton loading rows */
 .sk-lead-row td {
   padding: 14px 16px;
