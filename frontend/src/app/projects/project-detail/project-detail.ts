@@ -1366,6 +1366,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         // Needed by the task modal's Milestone picker, which can be opened
         // before the Milestones tab is ever visited.
         this.loadProjectMilestones();
+        // And by the Attachments tab, which otherwise shows only task
+        // attachments and reports a project full of documents as empty.
+        this.loadProjectDocuments();
         
         // Socket integration for the whole project
         this.socketService.joinProject(this.projectId);
