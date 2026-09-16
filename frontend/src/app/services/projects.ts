@@ -297,7 +297,7 @@ export interface Milestone {
   description?: string | null;
   startDate?: string | null;
   dueDate?: string | null;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  status: 'PENDING' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
   completedAt?: string | null;
   ownerId?: number | null;
   owner?: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;

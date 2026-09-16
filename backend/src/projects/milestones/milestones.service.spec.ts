@@ -173,6 +173,78 @@ describe('MilestonesService.update', () => {
   });
 });
 
+describe('deleting a milestone', () => {
+  // Only while it is still pending. Once work is booked against a milestone,
+  // deleting it would unlink that work and erase the amount an invoice is
+  // owed for — so it is put on hold or cancelled instead.
+  it('allows deleting a pending milestone', async () => {
+    const { service, prisma } = makeService();
+    prisma.projectMilestone.findFirst.mockResolvedValue({ id: 9, projectId: 1, status: 'PENDING' });
+
+    await expect(service.remove(1, 60, 'EMPLOYEE', 9)).resolves.toEqual({ success: true });
+    expect(prisma.projectMilestone.delete).toHaveBeenCalled();
+  });
+
+  it.each(['IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED'])(
+    'refuses to delete a %s milestone',
+    async (status) => {
+      const { service, prisma } = makeService();
+      prisma.projectMilestone.findFirst.mockResolvedValue({ id: 9, projectId: 1, status });
+
+      await expect(service.remove(1, 60, 'EMPLOYEE', 9)).rejects.toThrow(BadRequestException);
+      expect(prisma.projectMilestone.delete).not.toHaveBeenCalled();
+    },
+  );
+
+  it('points the user at on hold instead of just refusing', async () => {
+    const { service, prisma } = makeService();
+    prisma.projectMilestone.findFirst.mockResolvedValue({ id: 9, projectId: 1, status: 'IN_PROGRESS' });
+
+    await expect(service.remove(1, 60, 'EMPLOYEE', 9)).rejects.toThrow(/on hold/);
+  });
+
+  // Authorisation is still checked first, whatever the status.
+  it('refuses an ordinary member before it considers the status', async () => {
+    const { service } = makeService();
+    await expect(service.remove(1, 70, 'EMPLOYEE', 9)).rejects.toThrow(ForbiddenException);
+  });
+});
+
+describe('ON_HOLD is a real status', () => {
+  it('is accepted on create', async () => {
+    const { service, prisma } = makeService();
+    await service.create(1, 60, 'EMPLOYEE', 1, { name: 'Phase 1', status: 'ON_HOLD' });
+
+    expect(prisma.projectMilestone.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'ON_HOLD' }) }),
+    );
+  });
+
+  it('is accepted on update', async () => {
+    const { service, prisma } = makeService();
+    await service.update(1, 60, 'EMPLOYEE', 9, { status: 'ON_HOLD' });
+
+    expect(prisma.projectMilestone.update.mock.calls[0][0].data.status).toBe('ON_HOLD');
+  });
+});
+
+describe('the owner is no longer set from the form', () => {
+  // Removed from add/edit; milestones that already have one keep it.
+  it('ignores an ownerId sent on create', async () => {
+    const { service, prisma } = makeService();
+    await service.create(1, 60, 'EMPLOYEE', 1, { name: 'Phase 1', ownerId: 99 });
+
+    expect(prisma.projectMilestone.create.mock.calls[0][0].data).not.toHaveProperty('ownerId');
+  });
+
+  it('ignores an ownerId sent on update', async () => {
+    const { service, prisma } = makeService();
+    await service.update(1, 60, 'EMPLOYEE', 9, { ownerId: 99 });
+
+    expect(prisma.projectMilestone.update.mock.calls[0][0].data).not.toHaveProperty('ownerId');
+  });
+});
+
 describe('MilestonesService.reorder', () => {
   // Otherwise a crafted id list is a way to renumber another project's rows.
   it('refuses ids that belong to a different project', async () => {

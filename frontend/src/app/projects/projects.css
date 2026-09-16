@@ -4737,3 +4737,24 @@
   margin-left: 2px;
   cursor: help;
 }
+
+/* Required-field marking on the create form. Only a NEW project is held to
+   these rules — see saveProject for why edits are exempt. */
+.cbm-required {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.cbm-error-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.cbm-select-trigger.has-error,
+.cbm-input.has-error {
+  border-color: #dc2626;
+  background: #fef2f2;
+}

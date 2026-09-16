@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
+  LucidePause,
   LucidePlus, LucideTrash2, LucideChevronUp, LucideChevronDown,
   LucideFlag, LucideX, LucidePencil, LucideCheck,
   LucideCalendar, LucideClock, LucideCheckCircle2, LucideAlertTriangle,
@@ -31,7 +32,7 @@ import { EmployeeService } from '../../services/employee.service';
     LucideFlag, LucideX, LucidePencil, LucideCheck,
     LucideCalendar, LucideClock, LucideCheckCircle2, LucideAlertTriangle,
     LucideSearch, LucideCheckSquare, LucideCoins, LucidePieChart,
-    LucideCircleDot, LucideTrendingUp
+    LucideCircleDot, LucideTrendingUp, LucidePause
   ],
   templateUrl: './milestones-tab.html',
   styleUrls: ['./milestones-tab.css']
@@ -56,7 +57,7 @@ export class MilestonesTabComponent {
   editing = signal<number | 'new' | null>(null);
   saving = signal(false);
 
-  readonly STATUSES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
+  readonly STATUSES = ['PENDING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED'] as const;
 
   form = this.blankForm();
 
@@ -126,7 +127,6 @@ export class MilestonesTabComponent {
       startDate: '',
       dueDate: '',
       status: 'PENDING' as string,
-      ownerId: null as number | null,
       amount: null as number | null,
       percentage: null as number | null,
     };
@@ -193,7 +193,6 @@ export class MilestonesTabComponent {
       startDate: m.startDate ? m.startDate.split('T')[0] : '',
       dueDate: m.dueDate ? m.dueDate.split('T')[0] : '',
       status: m.status,
-      ownerId: m.ownerId ?? null,
       // Absent rather than null when the viewer may not see money, so these
       // stay untouched and the server keeps whatever is stored.
       amount: m.amount ?? null,
@@ -219,7 +218,6 @@ export class MilestonesTabComponent {
       startDate: this.form.startDate || null,
       dueDate: this.form.dueDate || null,
       status: this.form.status,
-      ownerId: this.form.ownerId || null,
     };
     // Only send money if this viewer is allowed to set it — the server ignores
     // it otherwise, and sending it anyway invites confusion when it is dropped.
@@ -255,6 +253,17 @@ export class MilestonesTabComponent {
       next: () => this.load(this.projectId()),
       error: (err) => this.toast.error(err?.error?.message || 'Could not update the milestone'),
     });
+  }
+
+  /**
+   * Whether this milestone may still be deleted.
+   *
+   * Mirrors the server rule rather than replacing it: only a PENDING
+   * milestone can go, because once work is booked against one, deleting it
+   * would unlink that work and erase the amount an invoice is owed for.
+   */
+  canDelete(m: Milestone): boolean {
+    return m.status === 'PENDING';
   }
 
   remove(m: Milestone) {

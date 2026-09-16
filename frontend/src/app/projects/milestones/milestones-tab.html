@@ -157,14 +157,6 @@
           </select>
         </label>
 
-        <label class="ms-field">
-          <span class="ms-field-label">Owner</span>
-          <select [(ngModel)]="form.ownerId">
-            <option [ngValue]="null">Unassigned</option>
-            <option *ngFor="let e of employees()" [ngValue]="e.id">{{ e.firstName }} {{ e.lastName }}</option>
-          </select>
-        </label>
-
         <!-- Money fields (only if user may view financials) -->
         <ng-container *ngIf="canViewFinancials()">
           <label class="ms-field">
@@ -415,9 +407,28 @@
           <button type="button" class="ms-action-icon-btn" (click)="openEdit(m)" title="Edit milestone">
             <svg lucidePencil size="14"></svg>
           </button>
-          <button type="button" class="ms-action-icon-btn ms-btn-danger" (click)="remove(m)" title="Delete milestone">
+          <!-- Deletable only while still pending. Once work has started the
+               milestone is a fact — tasks are booked to it and its amount is
+               what an invoice will be written for — so it is put on hold or
+               cancelled instead, which keeps both. -->
+          <button
+            type="button"
+            class="ms-action-icon-btn ms-btn-danger"
+            *ngIf="canDelete(m); else holdInstead"
+            (click)="remove(m)"
+            title="Delete milestone">
             <svg lucideTrash2 size="14"></svg>
           </button>
+          <ng-template #holdInstead>
+            <button
+              type="button"
+              class="ms-action-icon-btn"
+              *ngIf="m.status !== 'ON_HOLD' && m.status !== 'CANCELLED'"
+              (click)="setStatus(m, 'ON_HOLD')"
+              title="Work has started on this milestone, so it can no longer be deleted. Put it on hold instead.">
+              <svg lucidePause size="14"></svg>
+            </button>
+          </ng-template>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { applyFinancialVisibilityAll } from './project-visibility';
+import { buildInitialMembers } from './project-members';
 import { CrmService } from '../crm/crm.service';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -44,7 +45,48 @@ export class ProjectsService {
     return undefined;
   }
 
+  /**
+   * Fields a NEW project cannot be created without.
+   *
+   * Enforced on create only, deliberately. When this rule was introduced 82 of
+   * 83 existing projects had no department — it had been added a phase earlier
+   * and never backfilled — so applying it to updates would have made almost
+   * every project in the system unsaveable until somebody guessed a department
+   * for it. New projects start complete; old ones are fixed deliberately
+   * rather than by being held hostage to an unrelated edit.
+   *
+   * Server-side because the form is not the only caller, and a required field
+   * that only the UI knows about is a suggestion rather than a rule.
+   */
+  private assertRequiredForCreate(data: any) {
+    const missing: string[] = [];
+
+    if (!data.name?.trim()) missing.push('Board title');
+    if (!data.startDate) missing.push('Start date');
+    if (!data.endDate) missing.push('Deadline');
+    if (!data.departmentId) missing.push('Department');
+    if (!data.category?.trim()) missing.push('Category');
+    if (!Array.isArray(data.pmIds) || data.pmIds.length === 0) {
+      missing.push('At least one project manager');
+    }
+    if (!Array.isArray(data.memberIds) || data.memberIds.length === 0) {
+      missing.push('At least one assigned user');
+    }
+
+    if (missing.length) {
+      throw new BadRequestException(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`);
+    }
+
+    // A deadline before the start is not a missing field but it is not a
+    // project either, and the two are worth reporting separately.
+    if (new Date(data.endDate) < new Date(data.startDate)) {
+      throw new BadRequestException('Deadline must be on or after the start date');
+    }
+  }
+
   async createProject(companyId: number, leadId: number, data: any) {
+    this.assertRequiredForCreate(data);
+
     // Ensure unique project name per company (case-insensitive)
     const existingProject = await this.prisma.project.findFirst({
       where: { companyId, name: { equals: data.name.trim(), mode: 'insensitive' } }
@@ -116,14 +158,12 @@ export class ProjectsService {
         companyId,
         leadId,
         members: {
-          create: [
-            { employeeId: leadId, role: 'ADMIN' },
-            ...(data.pmIds
-              ? data.pmIds
-                  .filter((id: number) => id !== leadId)
-                  .map((id: number) => ({ employeeId: id, role: 'PROJECT_MANAGER' }))
-              : [])
-          ]
+          // One row per person, highest role wins. The owner is ADMIN, the
+          // chosen managers are PROJECT_MANAGER, and everyone else assigned to
+          // the project is MEMBER — de-duplicated, because ProjectMember is
+          // unique on (projectId, employeeId) and somebody picked as both a
+          // manager and a user would otherwise fail the insert.
+          create: buildInitialMembers(leadId, data.pmIds, data.memberIds)
         },
         boards: {
           create: {
@@ -988,6 +1028,9 @@ export class ProjectsService {
     if (data.pmIds !== undefined) {
       await this.syncProjectManagers(id, data.pmIds || []);
     }
+    if (data.memberIds !== undefined) {
+      await this.syncProjectMembers(id, data.memberIds || []);
+    }
 
     return updated;
   }
@@ -1020,6 +1063,41 @@ export class ProjectsService {
       ...(toAdd.length
         ? [this.prisma.projectMember.createMany({
             data: toAdd.map(employeeId => ({ projectId, employeeId, role: 'PROJECT_MANAGER' }))
+          })]
+        : [])
+    ]);
+  }
+
+  /**
+   * Reconcile the plain members of a project with the chosen list.
+   *
+   * Only ever touches MEMBER rows. The owner (ADMIN) and the project managers
+   * are governed by their own fields, and a manager who also appears in the
+   * assigned-users list keeps the higher role rather than being demoted by
+   * this running second — which is what a blanket "set everyone in this list
+   * to MEMBER" would do.
+   */
+  private async syncProjectMembers(projectId: number, memberIds: number[]) {
+    const existing = await this.prisma.projectMember.findMany({ where: { projectId } });
+
+    const privileged = new Set(
+      existing.filter(m => m.role === 'ADMIN' || m.role === 'PROJECT_MANAGER').map(m => m.employeeId),
+    );
+    const wanted = memberIds.filter(id => !privileged.has(id));
+
+    const currentMemberIds = existing.filter(m => m.role === 'MEMBER').map(m => m.employeeId);
+    const toRemove = currentMemberIds.filter(id => !wanted.includes(id));
+    const toAdd = wanted.filter(id => !existing.some(m => m.employeeId === id));
+
+    await this.prisma.$transaction([
+      ...(toRemove.length
+        ? [this.prisma.projectMember.deleteMany({
+            where: { projectId, employeeId: { in: toRemove }, role: 'MEMBER' }
+          })]
+        : []),
+      ...(toAdd.length
+        ? [this.prisma.projectMember.createMany({
+            data: toAdd.map(employeeId => ({ projectId, employeeId, role: 'MEMBER' }))
           })]
         : [])
     ]);

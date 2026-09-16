@@ -14,7 +14,18 @@ import { canViewProjectFinancials, FinancialViewer } from '../project-visibility
 export class MilestonesService {
   constructor(private prisma: PrismaService) {}
 
-  private readonly STATUSES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+  private readonly STATUSES = ['PENDING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED'];
+
+  /**
+   * A milestone may only be deleted while it is still PENDING.
+   *
+   * Once work has started against it, the milestone is a fact: tasks are
+   * booked to it, and its amount is what an invoice will be written for.
+   * Deleting it would silently unlink that work and erase the commitment.
+   * Anything past PENDING is put ON_HOLD or CANCELLED instead, which keeps
+   * the record and the tasks attached to it.
+   */
+  private readonly DELETABLE_STATUSES = ['PENDING'];
 
   /**
    * The viewer's standing on one project — resolved once per request rather
@@ -138,7 +149,6 @@ export class MilestonesService {
         startDate: data.startDate ? new Date(data.startDate) : null,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         status: this.STATUSES.includes(data.status) ? data.status : 'PENDING',
-        ownerId: data.ownerId ? parseInt(data.ownerId, 10) : null,
         position: (last?.position ?? -1) + 1,
         ...money,
       },
@@ -163,7 +173,6 @@ export class MilestonesService {
     if (data.description !== undefined) patch.description = data.description || null;
     if (data.startDate !== undefined) patch.startDate = data.startDate ? new Date(data.startDate) : null;
     if (data.dueDate !== undefined) patch.dueDate = data.dueDate ? new Date(data.dueDate) : null;
-    if (data.ownerId !== undefined) patch.ownerId = data.ownerId ? parseInt(data.ownerId, 10) : null;
 
     if (data.status !== undefined) {
       if (!this.STATUSES.includes(data.status)) throw new BadRequestException('Unknown milestone status');
@@ -192,12 +201,19 @@ export class MilestonesService {
   async remove(companyId: number, employeeId: number | null, role: string, milestoneId: number) {
     const existing = await this.prisma.projectMilestone.findFirst({
       where: { id: milestoneId, companyId },
-      select: { id: true, projectId: true },
+      select: { id: true, projectId: true, status: true },
     });
     if (!existing) throw new NotFoundException('Milestone not found');
 
     const { canManage } = await this.viewerFor(employeeId, role, existing.projectId, companyId);
     if (!canManage) throw new ForbiddenException('Only a project manager or administrator can delete milestones');
+
+    if (!this.DELETABLE_STATUSES.includes(existing.status)) {
+      throw new BadRequestException(
+        `A milestone that is ${existing.status.replace('_', ' ').toLowerCase()} cannot be deleted. ` +
+        `Put it on hold or cancel it instead — that keeps the record and the tasks booked against it.`,
+      );
+    }
 
     // Tasks survive: Issue.milestoneId is SetNull, so deleting a milestone
     // unlinks the work rather than destroying it.

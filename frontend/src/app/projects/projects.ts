@@ -331,6 +331,39 @@ export class ProjectsComponent implements OnInit {
     return `<div style="display:flex;align-items:center;height:100%;">${circles}${overflowCircle}${countBtn}</div>`;
   }
 
+  // ── Assigned users ─────────────────────────────────────────────────────
+  // Separate from project managers: a manager owns the delivery, a user works
+  // on it. They are stored as ProjectMember MEMBER rows, and somebody picked
+  // in both lists keeps the higher role — the server collapses the duplicate.
+  memberDropdownOpen = signal<boolean>(false);
+  memberSearchQuery = signal<string>('');
+
+  filteredMemberEmployees = computed(() => {
+    const q = this.memberSearchQuery().toLowerCase().trim();
+    const all = this.employees() || [];
+    if (!q) return all;
+    return all.filter((e: any) =>
+      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+      (e.user?.email || '').toLowerCase().includes(q) ||
+      (e.designation?.name || '').toLowerCase().includes(q) ||
+      (e.department?.name || '').toLowerCase().includes(q)
+    );
+  });
+
+  toggleMember(id: number) {
+    const idx = this.projectForm.memberIds.indexOf(id);
+    if (idx >= 0) {
+      this.projectForm.memberIds.splice(idx, 1);
+    } else {
+      this.projectForm.memberIds.push(id);
+    }
+  }
+
+  removeMember(id: number) {
+    const idx = this.projectForm.memberIds.indexOf(id);
+    if (idx >= 0) this.projectForm.memberIds.splice(idx, 1);
+  }
+
   togglePm(id: number) {
     const idx = this.projectForm.pmIds.indexOf(id);
     if (idx >= 0) {
@@ -825,6 +858,7 @@ export class ProjectsComponent implements OnInit {
       clientId: null as number | null,
       leadContactId: null as number | null,
       pmIds: [] as number[],
+      memberIds: [] as number[],
       address: '',
       // ── Delivery (§4, §7, §9) ──
       category: '',
@@ -1038,6 +1072,7 @@ export class ProjectsComponent implements OnInit {
 
   closeAllModalDropdowns() {
     this.pmDropdownOpen.set(false);
+    this.memberDropdownOpen.set(false);
     this.clientDropdownOpen.set(false);
     this.categoryDropdownOpen.set(false);
     this.departmentDropdownOpen.set(false);
@@ -1045,6 +1080,33 @@ export class ProjectsComponent implements OnInit {
 
   // Deadline cannot precede the start date. Checked on both fields and again
   // on save, so a value typed straight into the date input cannot slip past.
+  /**
+   * Which required fields a NEW project is still missing.
+   *
+   * Names all of them at once: sending someone round the form one error at a
+   * time is worse than one message listing what is left.
+   */
+  missingRequiredFields(): string[] {
+    const missing: string[] = [];
+    if (!this.projectForm.name.trim()) missing.push('Board title');
+    if (!this.projectForm.startDate) missing.push('Start date');
+    if (!this.projectForm.endDate) missing.push('Deadline');
+    if (!this.projectForm.departmentId) missing.push('Department');
+    if (!this.projectForm.category?.trim()) missing.push('Category');
+    if (this.projectForm.pmIds.length === 0) missing.push('Project manager');
+    if (this.projectForm.memberIds.length === 0) missing.push('Assigned user');
+    return missing;
+  }
+
+  /** Only a new project is held to the rules — see saveProject. */
+  isRequiredMissing(field: 'startDate' | 'endDate' | 'departmentId' | 'category' | 'pmIds' | 'memberIds'): boolean {
+    if (this.editingProjectId() || !this.isSubmitted()) return false;
+    if (field === 'pmIds') return this.projectForm.pmIds.length === 0;
+    if (field === 'memberIds') return this.projectForm.memberIds.length === 0;
+    if (field === 'category') return !this.projectForm.category?.trim();
+    return !this.projectForm[field];
+  }
+
   isDateRangeInvalid(): boolean {
     if (!this.projectForm.startDate || !this.projectForm.endDate) return false;
     return this.projectForm.endDate < this.projectForm.startDate;
@@ -2550,6 +2612,7 @@ export class ProjectsComponent implements OnInit {
       clientId: project.clientId,
       leadContactId: project.leadContactId ?? project.leadContact?.id ?? null,
       pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || [],
+      memberIds: project.members?.filter((m: any) => m.role === 'MEMBER').map((m: any) => m.employeeId) || [],
       address: project.address || '',
       category: project.category || '',
       priority: project.priority || 'MEDIUM',
@@ -2590,6 +2653,18 @@ export class ProjectsComponent implements OnInit {
       return;
     }
 
+    // Required only when creating. The server enforces the same rule, and
+    // deliberately only on create: 82 of 83 existing projects have no
+    // department, so requiring one to save an edit would make nearly every
+    // project in the system unsaveable until somebody invented one.
+    if (!this.editingProjectId()) {
+      const missing = this.missingRequiredFields();
+      if (missing.length) {
+        this.toast.error(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`);
+        return;
+      }
+    }
+
     const bgValue = this.selectedBg().startsWith('http') 
       ? `url(${this.selectedBg()})` 
       : this.selectedBg();
@@ -2608,6 +2683,7 @@ export class ProjectsComponent implements OnInit {
       // field is how they drift apart.
       leadContactId: this.projectForm.leadContactId || null,
       pmIds: this.projectForm.pmIds,
+      memberIds: this.projectForm.memberIds,
       address: this.projectForm.address || null,
       category: this.projectForm.category || null,
       priority: this.projectForm.priority,
