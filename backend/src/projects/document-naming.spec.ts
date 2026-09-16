@@ -69,6 +69,14 @@ describe('renameKeepingExtension', () => {
     });
   });
 
+  // The same rule serves the upload path, where the user renamed a file
+  // before it was stored. Keeping one authority means the browser cannot
+  // disagree with the server about what a document is called.
+  it('is the rule applied to a renamed upload as well as a later rename', () => {
+    expect(renameKeepingExtension('IMG_4821.png', 'Site photo')).toBe('Site photo.png');
+    expect(renameKeepingExtension('IMG_4821.png', 'Site photo.jpg')).toBe('Site photo.jpg.png');
+  });
+
   it('truncates a very long name but keeps the extension', () => {
     const result = renameKeepingExtension('scope.pdf', 'a'.repeat(500));
 

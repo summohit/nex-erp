@@ -49,9 +49,14 @@ export class ProjectsService {
     return this.http.post<any>(`${this.apiUrl}/ai-onboarding`, data);
   }
 
-  uploadProjectDocument(projectId: number, file: File) {
+  /**
+   * @param name optional name to store it under. The server keeps the real
+   *   extension whatever this says, so the rule lives in exactly one place.
+   */
+  uploadProjectDocument(projectId: number, file: File, name?: string) {
     const formData = new FormData();
     formData.append('file', file);
+    if (name?.trim()) formData.append('name', name.trim());
     return this.http.post<any>(`${this.apiUrl}/${projectId}/documents`, formData);
   }
 

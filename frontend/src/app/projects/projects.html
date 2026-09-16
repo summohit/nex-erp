@@ -2006,19 +2006,79 @@
             <input type="file" multiple hidden (change)="onStagedFilesPicked($event)" />
           </label>
 
-          <div class="cbm-staged-list" *ngIf="stagedFiles().length > 0">
-            <div class="cbm-staged-file" *ngFor="let f of stagedFiles(); let i = index">
+          <!-- Already uploaded. Renaming and deleting take effect immediately;
+               there is nothing to defer because the file is already stored. -->
+          <div class="cbm-staged-list" *ngIf="existingDocuments().length > 0">
+            <div class="cbm-staged-file" *ngFor="let doc of existingDocuments()">
               <svg lucideFileText size="14" class="cbm-staged-icon"></svg>
-              <span class="cbm-staged-name" [title]="f.name">{{ f.name }}</span>
-              <span class="cbm-staged-size">{{ formatFileSize(f.size) }}</span>
-              <button type="button" class="cbm-staged-remove" (click)="removeStagedFile(i)" title="Remove">
-                <svg lucideX size="12"></svg>
-              </button>
+
+              <ng-container *ngIf="renamingDocumentId() === doc.id; else docLabel">
+                <input
+                  type="text"
+                  class="cbm-rename-input"
+                  [(ngModel)]="documentNameDraft"
+                  [ngModelOptions]="{ standalone: true }"
+                  (keyup.enter)="confirmRenameDocument(doc)"
+                  (keyup.escape)="cancelRename()" />
+                <span class="cbm-rename-ext">{{ fileExtension(doc.name) }}</span>
+                <button type="button" class="cbm-staged-remove cbm-ok" (click)="confirmRenameDocument(doc)" title="Save name">
+                  <svg lucideCheck size="12"></svg>
+                </button>
+                <button type="button" class="cbm-staged-remove" (click)="cancelRename()" title="Cancel">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </ng-container>
+
+              <ng-template #docLabel>
+                <span class="cbm-staged-name" [title]="doc.name">{{ doc.name }}</span>
+                <span class="cbm-staged-size">Uploaded</span>
+                <button type="button" class="cbm-staged-remove" (click)="startRenameDocument(doc)" title="Rename">
+                  <svg lucidePencil size="12"></svg>
+                </button>
+                <button type="button" class="cbm-staged-remove" (click)="deleteExistingDocument(doc)" title="Delete">
+                  <svg lucideTrash2 size="12"></svg>
+                </button>
+              </ng-template>
+            </div>
+          </div>
+
+          <!-- Picked but not yet uploaded. Renaming here is local until save. -->
+          <div class="cbm-staged-list" *ngIf="stagedFiles().length > 0">
+            <div class="cbm-staged-file" *ngFor="let entry of stagedFiles(); let i = index">
+              <svg lucideFileText size="14" class="cbm-staged-icon"></svg>
+
+              <ng-container *ngIf="renamingStagedIndex() === i; else stagedLabel">
+                <input
+                  type="text"
+                  class="cbm-rename-input"
+                  [(ngModel)]="documentNameDraft"
+                  [ngModelOptions]="{ standalone: true }"
+                  (keyup.enter)="confirmRenameStaged(i)"
+                  (keyup.escape)="cancelRename()" />
+                <span class="cbm-rename-ext">{{ fileExtension(entry.name) }}</span>
+                <button type="button" class="cbm-staged-remove cbm-ok" (click)="confirmRenameStaged(i)" title="Save name">
+                  <svg lucideCheck size="12"></svg>
+                </button>
+                <button type="button" class="cbm-staged-remove" (click)="cancelRename()" title="Cancel">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </ng-container>
+
+              <ng-template #stagedLabel>
+                <span class="cbm-staged-name" [title]="entry.name">{{ entry.name }}</span>
+                <span class="cbm-staged-size">{{ formatFileSize(entry.file.size) }}</span>
+                <button type="button" class="cbm-staged-remove" (click)="startRenameStaged(i)" title="Rename">
+                  <svg lucidePencil size="12"></svg>
+                </button>
+                <button type="button" class="cbm-staged-remove" (click)="removeStagedFile(i)" title="Remove">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </ng-template>
             </div>
           </div>
           <span class="cbm-field-helper">
-            Uploaded once the board is created. You can add, rename and remove files
-            any time from the project's Attachments tab.
+            Click the pencil to rename a file — the extension stays as it is.
+            Newly picked files upload when you save.
           </span>
         </div>
       </div>

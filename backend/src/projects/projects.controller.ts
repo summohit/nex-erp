@@ -27,13 +27,16 @@ export class ProjectsController {
   uploadProjectDocument(
     @Req() req,
     @Param('id', ParseIntPipe) id: number,
-    @UploadedFile() file: Express.Multer.File
+    @UploadedFile() file: Express.Multer.File,
+    // Optional: the name to store it under, when the user renamed the file
+    // before it was uploaded. The extension is preserved either way.
+    @Body('name') name?: string,
   ) {
     // employeeId, not sub. ProjectDocument.uploadedBy is a foreign key to
     // Employee, and this was passing the User id — so "uploaded by" resolved
     // to whichever employee happened to share that number, or to nobody.
     return this.projectsService.uploadProjectDocument(
-      req.user.companyId, id, req.user.employeeId ?? req.user.sub, file,
+      req.user.companyId, id, req.user.employeeId ?? req.user.sub, file, name,
     );
   }
 

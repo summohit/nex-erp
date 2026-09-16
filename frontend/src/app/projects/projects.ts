@@ -921,19 +921,111 @@ export class ProjectsComponent implements OnInit {
    * /projects/:id/documents, and there is no id to upload against until the
    * create call returns. They go up immediately afterwards.
    */
-  stagedFiles = signal<File[]>([]);
+  stagedFiles = signal<{ file: File; name: string }[]>([]);
   stagedUploading = signal(false);
+  /** Index of the staged file being renamed, or null. */
+  renamingStagedIndex = signal<number | null>(null);
+  /** Documents already uploaded — shown when editing an existing project. */
+  existingDocuments = signal<any[]>([]);
+  renamingDocumentId = signal<number | null>(null);
+  documentNameDraft = '';
 
   onStagedFilesPicked(event: Event) {
     const input = event.target as HTMLInputElement;
     const picked = Array.from(input.files || []);
-    if (picked.length) this.stagedFiles.update(list => [...list, ...picked]);
+    if (picked.length) {
+      // The name is carried beside the File rather than on it: File.name is
+      // read-only, so a rename has to live somewhere else until upload.
+      this.stagedFiles.update(list => [...list, ...picked.map(file => ({ file, name: file.name }))]);
+    }
     // Clearing it means picking the same file twice in a row still fires.
     input.value = '';
   }
 
   removeStagedFile(index: number) {
     this.stagedFiles.update(list => list.filter((_, i) => i !== index));
+    this.renamingStagedIndex.set(null);
+  }
+
+  // ── Renaming, before and after upload ──────────────────────────────────
+  // Both edit the NAME only. The extension is shown beside the input rather
+  // than in it, and the server re-applies the rule on save either way.
+
+  fileBaseName(fileName: string): string {
+    const dot = (fileName || '').lastIndexOf('.');
+    return dot > 0 ? fileName.slice(0, dot) : (fileName || '');
+  }
+
+  fileExtension(fileName: string): string {
+    const dot = (fileName || '').lastIndexOf('.');
+    return dot > 0 ? fileName.slice(dot) : '';
+  }
+
+  startRenameStaged(index: number) {
+    this.renamingDocumentId.set(null);
+    this.renamingStagedIndex.set(index);
+    this.documentNameDraft = this.fileBaseName(this.stagedFiles()[index]?.name || '');
+  }
+
+  confirmRenameStaged(index: number) {
+    const base = this.documentNameDraft.trim();
+    if (!base) {
+      this.toast.error('A file name is required');
+      return;
+    }
+    this.stagedFiles.update(list => list.map((entry, i) =>
+      i === index ? { ...entry, name: `${base}${this.fileExtension(entry.name)}` } : entry
+    ));
+    this.cancelRename();
+  }
+
+  startRenameDocument(doc: any) {
+    this.renamingStagedIndex.set(null);
+    this.renamingDocumentId.set(doc.id);
+    this.documentNameDraft = this.fileBaseName(doc.name);
+  }
+
+  confirmRenameDocument(doc: any) {
+    const base = this.documentNameDraft.trim();
+    if (!base) {
+      this.toast.error('A file name is required');
+      return;
+    }
+    if (base === this.fileBaseName(doc.name)) {
+      this.cancelRename();
+      return;
+    }
+
+    const projectId = this.editingProjectId();
+    if (!projectId) return;
+
+    this.projectsService.renameProjectDocument(projectId, doc.id, base).subscribe({
+      next: (updated) => {
+        this.existingDocuments.update(list => list.map(d => d.id === doc.id ? { ...d, name: updated.name } : d));
+        this.cancelRename();
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not rename the file'),
+    });
+  }
+
+  cancelRename() {
+    this.renamingStagedIndex.set(null);
+    this.renamingDocumentId.set(null);
+    this.documentNameDraft = '';
+  }
+
+  deleteExistingDocument(doc: any) {
+    const projectId = this.editingProjectId();
+    if (!projectId) return;
+    if (!confirm(`Delete "${doc.name}"? This cannot be undone.`)) return;
+
+    this.projectsService.deleteProjectDocument(projectId, doc.id).subscribe({
+      next: () => {
+        this.existingDocuments.update(list => list.filter(d => d.id !== doc.id));
+        this.toast.success('File deleted');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not delete the file'),
+    });
   }
 
   /**
@@ -965,8 +1057,8 @@ export class ProjectsComponent implements OnInit {
       done();
     };
 
-    for (const file of files) {
-      this.projectsService.uploadProjectDocument(projectId, file).subscribe({
+    for (const entry of files) {
+      this.projectsService.uploadProjectDocument(projectId, entry.file, entry.name).subscribe({
         next: () => finish(),
         error: () => { failed++; finish(); },
       });
@@ -1434,6 +1526,13 @@ export class ProjectsComponent implements OnInit {
     this.employeeService.getEmployees().subscribe({
       next: (res) => this.employees.set(res || []),
       error: (err) => console.error('Error loading employees', err)
+    });
+  }
+
+  loadExistingDocuments(projectId: number) {
+    this.projectsService.getProjectDocuments(projectId).subscribe({
+      next: (docs) => this.existingDocuments.set(docs || []),
+      error: () => this.existingDocuments.set([]),
     });
   }
 
@@ -2652,6 +2751,8 @@ export class ProjectsComponent implements OnInit {
     this.editingProjectId.set(null);
     this.projectForm = this.emptyProjectForm();
     this.stagedFiles.set([]);
+    this.existingDocuments.set([]);
+    this.cancelRename();
     this.selectedBg.set(this.colorBackgrounds[1]);
     this.isSubmitted.set(false);
     this.isCreateModalOpen.set(true);
@@ -2660,6 +2761,12 @@ export class ProjectsComponent implements OnInit {
   openEditModal(project: any, event: Event) {
     if (event) event.stopPropagation();
     this.editingProjectId.set(project.id);
+    // Files staged during an earlier Create must not follow the user into an
+    // Edit of a different project — they would look attached and then upload
+    // themselves to the wrong board.
+    this.stagedFiles.set([]);
+    this.cancelRename();
+    this.loadExistingDocuments(project.id);
     this.projectForm = {
       ...this.emptyProjectForm(),
       name: project.name,
@@ -2757,9 +2864,13 @@ export class ProjectsComponent implements OnInit {
 
     if (this.editingProjectId()) {
       this.projectsService.updateProject(this.editingProjectId()!, payload).subscribe({
-        next: (res) => {
-          this.loadProjects();
-          this.closeCreateModal();
+        next: () => {
+          // Files staged while editing were previously dropped on the floor —
+          // only the create path uploaded them.
+          this.uploadStagedFiles(this.editingProjectId()!, () => {
+            this.loadProjects();
+            this.closeCreateModal();
+          });
         },
         error: (err) => this.toast.error(err?.error?.message || 'Error updating project')
       });

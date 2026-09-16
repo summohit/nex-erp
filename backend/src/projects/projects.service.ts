@@ -416,8 +416,30 @@ export class ProjectsService {
     return { success: true };
   }
 
-  async uploadProjectDocument(companyId: number, projectId: number, uploadedBy: number, file: Express.Multer.File) {
+  /**
+   * @param requestedName optional name to store the file under. Run through
+   *   the same extension-preserving rule as a later rename, so there is one
+   *   authority for what a document may be called rather than a second copy
+   *   of the rule living in the browser.
+   */
+  async uploadProjectDocument(
+    companyId: number,
+    projectId: number,
+    uploadedBy: number,
+    file: Express.Multer.File,
+    requestedName?: string,
+  ) {
     if (!file) throw new BadRequestException('No file provided');
+
+    let documentName = file.originalname;
+    if (requestedName?.trim()) {
+      try {
+        documentName = renameKeepingExtension(file.originalname, requestedName);
+      } catch (e) {
+        if (e instanceof InvalidDocumentName) throw new BadRequestException(e.message);
+        throw e;
+      }
+    }
 
     // Verify project access
     const project = await this.prisma.project.findFirst({
@@ -493,7 +515,7 @@ export class ProjectsService {
 
       // 3. Save or Update in database (Handle re-upload of same file name)
       const existingDoc = await this.prisma.projectDocument.findFirst({
-        where: { projectId, name: file.originalname }
+        where: { projectId, name: documentName }
       });
 
       let doc;
@@ -514,7 +536,7 @@ export class ProjectsService {
         doc = await this.prisma.projectDocument.create({
           data: {
             projectId,
-            name: file.originalname,
+            name: documentName,
             url,
             fileId,
             type: ext.toLowerCase().replace('.', ''),

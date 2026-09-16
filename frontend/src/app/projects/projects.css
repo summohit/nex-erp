@@ -4833,3 +4833,35 @@
 }
 
 .cbm-staged-remove:hover { border-color: #fca5a5; color: #b91c1c; }
+
+/* Renaming a file in the project form. The extension sits outside the input,
+   greyed: the stored bytes do not change on a rename, so neither may the
+   thing that says how to read them. The server re-applies that rule anyway. */
+.cbm-rename-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e293b;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  padding: 4px 7px;
+  outline: none;
+}
+
+.cbm-rename-ext {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.cbm-staged-remove.cbm-ok {
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+.cbm-staged-remove.cbm-ok:hover {
+  border-color: #86efac;
+  color: #166534;
+}
