@@ -6,6 +6,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ProjectsService, ProjectSummary } from '../../services/projects';
+import { MilestonesTabComponent } from '../milestones/milestones-tab';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
 import { 
   LucideLayoutDashboard, LucideKanban,
@@ -15,11 +16,12 @@ import {
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
   LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
   LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
-  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
+  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive, LucideFlag,
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
-  LucideFileUp, LucideUpload,
-  LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle
+  LucideFileUp, LucideUpload, LucideUploadCloud,
+  LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
+  LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { SocketService } from '../../services/socket.service';
@@ -38,7 +40,7 @@ declare var Quill: any;
   selector: 'app-project-detail',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, DragDropModule,
+    CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     LucideLayoutDashboard, LucideKanban,
     LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
     LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
@@ -46,11 +48,12 @@ declare var Quill: any;
     LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
     LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
     LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
-    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive,
+    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive, LucideFlag,
     LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
     LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
-    LucideFileUp, LucideUpload,
+    LucideFileUp, LucideUpload, LucideUploadCloud,
     LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
+    LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory,
     AgGridAngular
   ],
   templateUrl: './project-detail.html',
@@ -247,11 +250,44 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Project-level documents (§6) — scope, proposal, agreement.
+   *
+   * Separate from task attachments: these belong to the project, not to a
+   * work item. The Attachments tab used to show only the latter, so a file
+   * uploaded against the project itself had nowhere to appear.
+   */
+  projectDocuments = signal<any[]>([]);
+  documentsUploading = signal(false);
+  renamingDocumentId = signal<number | null>(null);
+  renameDraft = '';
+
+  loadProjectDocuments() {
+    this.projectsService.getProjectDocuments(this.projectId).subscribe({
+      next: (docs) => this.projectDocuments.set(docs || []),
+      error: () => this.projectDocuments.set([]),
+    });
+  }
+
   // Compute all attachments across the project
   projectAttachments = computed(() => {
     const issues = this.activeIssues();
     let allAtts: any[] = [];
-    
+
+    // Project documents first: they are the contract-level files, and they
+    // are shown in the same list so there is one place to look rather than
+    // two competing ideas of "the project's files".
+    for (const doc of this.projectDocuments()) {
+      allAtts.push({
+        id: doc.id,
+        fileName: doc.name,
+        fileUrl: doc.url,
+        createdAt: doc.createdAt,
+        uploader: doc.employee,
+        isProjectDocument: true,
+      });
+    }
+
     for (const issue of issues) {
       if (issue.attachments && issue.attachments.length > 0) {
         issue.attachments.forEach((a: any) => {
@@ -358,6 +394,29 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return '#0284c7';
     if (['mp3', 'wav', 'ogg'].includes(ext)) return '#9333ea';
     return '#b3bac5';
+  }
+
+  getAttachmentBadge(filename: string): { bg: string; color: string; label: string; iconBg: string } {
+    const ext = filename?.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) {
+      return { bg: '#fdf2f8', color: '#db2777', label: ext.toUpperCase(), iconBg: '#fce7f3' };
+    }
+    if (ext === 'pdf') {
+      return { bg: '#fef2f2', color: '#dc2626', label: 'PDF', iconBg: '#fee2e2' };
+    }
+    if (['xls', 'xlsx', 'csv'].includes(ext)) {
+      return { bg: '#ecfdf5', color: '#059669', label: ext.toUpperCase(), iconBg: '#d1fae5' };
+    }
+    if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) {
+      return { bg: '#eff6ff', color: '#2563eb', label: ext.toUpperCase(), iconBg: '#dbeafe' };
+    }
+    if (['env', 'json', 'js', 'ts', 'html', 'css', 'xml', 'yml', 'yaml'].includes(ext)) {
+      return { bg: '#faf5ff', color: '#7c3aed', label: ext.toUpperCase(), iconBg: '#f3e8ff' };
+    }
+    if (['zip', 'rar', 'tar', 'gz', '7z'].includes(ext)) {
+      return { bg: '#fffbeb', color: '#d97706', label: ext.toUpperCase(), iconBg: '#fef3c7' };
+    }
+    return { bg: '#f8fafc', color: '#475569', label: (ext || 'FILE').toUpperCase(), iconBg: '#f1f5f9' };
   }
 
   openIssueDetailsById(issueId: number) {
@@ -826,6 +885,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   timeLogHours = signal<number | null>(null);
   timeLogMinutes = signal<number | null>(null);
   isTimerLoading = signal<boolean>(false);
+  showTimeLogsHistory = signal<boolean>(false);
 
   // Moving / Updating Issue Loader State
   updatingIssueIds = signal<Set<number>>(new Set());
@@ -876,6 +936,33 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const est = this.selectedIssueTimeEstimated().totalMin;
     if (est === 0) return 0;
     return Math.min(100, (logged / est) * 100);
+  });
+
+  remainingTimeFormatted = computed(() => {
+    const est = this.selectedIssueTimeEstimated().totalMin;
+    const logged = this.selectedIssueTimeLogged().totalMin;
+    if (est === 0) {
+      return { text: '—', subtext: 'No estimate set', isOver: false, remainingMin: 0 };
+    }
+    const diff = est - logged;
+    if (diff > 0) {
+      const h = Math.floor(diff / 60);
+      const m = diff % 60;
+      let text = '';
+      if (h > 0) text += `${h}h `;
+      if (m > 0 || h === 0) text += `${m}m`;
+      return { text: text.trim() + ' left', subtext: 'Within budget', isOver: false, remainingMin: diff };
+    } else if (diff < 0) {
+      const overMin = Math.abs(diff);
+      const h = Math.floor(overMin / 60);
+      const m = overMin % 60;
+      let text = '+';
+      if (h > 0) text += `${h}h `;
+      if (m > 0 || h === 0) text += `${m}m`;
+      return { text: text.trim() + ' over', subtext: 'Over budget', isOver: true, remainingMin: diff };
+    } else {
+      return { text: '0m left', subtext: 'Exact budget met', isOver: false, remainingMin: 0 };
+    }
   });
 
   isTimerRunning = computed(() => {
@@ -1012,6 +1099,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       next: () => {
         // We will reload everything to keep UI completely in sync, including time tracking
         this.loadBoardAndIssues();
+        // Task counts on the Milestones tab move when a task's milestone does.
+        this.loadProjectMilestones();
+        this.loadProjectDocuments();
         
         // Also manually update the selected issue right away for fast UI response
         const current = this.selectedIssue();
@@ -1088,6 +1178,45 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       
     }).catch(() => this.toast.error('Failed to log time'))
     .finally(() => this.isTimerLoading.set(false));
+  }
+
+  updateEstimatedHours() {
+    const val = this.issueForm.estimatedHours !== null && this.issueForm.estimatedHours !== undefined 
+      ? Number(this.issueForm.estimatedHours) 
+      : 0;
+    this.updateIssueDetails({ estimatedHours: val });
+  }
+
+  setEstimatePreset(hours: number) {
+    this.issueForm.estimatedHours = hours;
+    this.updateIssueDetails({ estimatedHours: hours });
+  }
+
+  setTimeLogPreset(hours: number, minutes: number) {
+    this.timeLogHours.set(hours);
+    this.timeLogMinutes.set(minutes);
+  }
+
+  formatDurationMin(durationMin: number): string {
+    if (!durationMin) return '0m';
+    const h = Math.floor(durationMin / 60);
+    const m = durationMin % 60;
+    let s = '';
+    if (h > 0) s += `${h}h `;
+    if (m > 0 || h === 0) s += `${m}m`;
+    return s.trim();
+  }
+
+  formatTimeLogDate(dateStr: any): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   }
 
   onRoadmapBarDragEnd(event: CdkDragEnd, issue: any) {
@@ -1524,6 +1653,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.loadProjectDetails();
         this.loadBoardAndIssues();
         this.loadActivity();
+        // Needed by the task modal's Milestone picker, which can be opened
+        // before the Milestones tab is ever visited.
+        this.loadProjectMilestones();
+        // And by the Attachments tab, which otherwise shows only task
+        // attachments and reports a project full of documents as empty.
+        this.loadProjectDocuments();
         
         // Socket integration for the whole project
         this.socketService.joinProject(this.projectId);
@@ -1614,6 +1749,39 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return `conic-gradient(${gradientParts.join(', ')})`;
   }
 
+  get summaryCompletionRate(): number {
+    const summary = this.projectSummary();
+    if (!summary || !summary.statusOverview || summary.statusOverview.length === 0) return 0;
+    const total = this.summaryTotalItems;
+    if (!total) return 0;
+    const done = summary.statusOverview.find(s => s.status === 'DONE')?.count || 0;
+    return Math.round((done / total) * 100);
+  }
+
+  formatStatusName(status: string): string {
+    const names: Record<string, string> = {
+      'TODO': 'To Do',
+      'IN_PROGRESS': 'In Progress',
+      'IN_REVIEW': 'In Review',
+      'DONE': 'Done',
+      'CANCELLED': 'Cancelled',
+      'ON_HOLD': 'On Hold'
+    };
+    return names[status] || status.replace(/_/g, ' ');
+  }
+
+  getStatusPercentage(count: number): number {
+    const total = this.summaryTotalItems;
+    if (!total) return 0;
+    return Math.round((count / total) * 100);
+  }
+
+  getPriorityPercentage(count: number): number {
+    const total = this.summaryTotalItems;
+    if (!total) return 0;
+    return Math.round((count / total) * 100);
+  }
+
   loadProjectDetails() {
     this.projectsService.getProject(this.projectId).subscribe({
       next: (res) => {
@@ -1628,6 +1796,31 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         }
       }
     });
+  }
+
+  /**
+   * §15: milestones offered on the task modal's Milestone picker.
+   *
+   * Loaded once with the project rather than per card. The endpoint answers
+   * permissions too, but only the identity is needed here — amounts never
+   * appear on a task.
+   */
+  projectMilestones = signal<any[]>([]);
+
+  loadProjectMilestones() {
+    this.projectsService.getMilestones(this.projectId).subscribe({
+      next: (res) => this.projectMilestones.set(res?.milestones || []),
+      error: () => this.projectMilestones.set([]),
+    });
+  }
+
+  setIssueMilestone(milestoneId: number | null) {
+    const issue = this.selectedIssue();
+    if (!issue) return;
+    // Optimistic, so the select does not snap back while the save is in
+    // flight; loadBoardAndIssues reconciles it either way.
+    this.selectedIssue.set({ ...issue, milestoneId });
+    this.updateIssueDetails({ milestoneId });
   }
 
   loadBoardAndIssues() {
@@ -1650,6 +1843,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
               }
             });
             this.issuesByColumn.set(map);
+            // Re-point the open task modal at its refreshed row. Without this
+            // the modal keeps rendering the copy it was opened with, so time
+            // logged from inside it appears to do nothing until you close and
+            // reopen the card.
+            const open = this.selectedIssue();
+            if (open) {
+              const fresh = issues.find((i: any) => i.id === open.id);
+              if (fresh) this.selectedIssue.set(fresh);
+            }
             this.isLoading.set(false);
             // A task opened from My Tasks arrives as ?task=<id>. The id is
             // captured in ngOnInit but can only be acted on here, once
@@ -1664,6 +1866,93 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       error: () => {
         this.isLoading.set(false);
       }
+    });
+  }
+
+  // ── Project document actions (§6) ──────────────────────────────────────
+
+  onProjectDocumentPicked(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+
+    this.documentsUploading.set(true);
+    let remaining = files.length;
+
+    for (const file of files) {
+      this.projectsService.uploadProjectDocument(this.projectId, file).subscribe({
+        next: () => {
+          if (--remaining === 0) {
+            this.documentsUploading.set(false);
+            this.loadProjectDocuments();
+            this.toast.success(files.length === 1 ? 'File uploaded' : `${files.length} files uploaded`);
+          }
+        },
+        error: (err) => {
+          if (--remaining === 0) this.documentsUploading.set(false);
+          this.toast.error(err?.error?.message || `Could not upload ${file.name}`);
+        },
+      });
+    }
+    // Clearing it means picking the same file twice in a row still fires.
+    input.value = '';
+  }
+
+  /**
+   * Start renaming. The extension is shown but not edited — the server keeps
+   * whatever the file was uploaded with, so offering it here would only invite
+   * a change that is then silently undone.
+   */
+  startRenameDocument(doc: any) {
+    this.renamingDocumentId.set(doc.id);
+    this.renameDraft = this.documentBaseName(doc.fileName);
+  }
+
+  documentBaseName(fileName: string): string {
+    const dot = (fileName || '').lastIndexOf('.');
+    return dot > 0 ? fileName.slice(0, dot) : (fileName || '');
+  }
+
+  documentExtension(fileName: string): string {
+    const dot = (fileName || '').lastIndexOf('.');
+    return dot > 0 ? fileName.slice(dot) : '';
+  }
+
+  cancelRenameDocument() {
+    this.renamingDocumentId.set(null);
+    this.renameDraft = '';
+  }
+
+  confirmRenameDocument(doc: any) {
+    const name = this.renameDraft.trim();
+    if (!name) {
+      this.toast.error('A file name is required');
+      return;
+    }
+    if (name === this.documentBaseName(doc.fileName)) {
+      this.cancelRenameDocument();
+      return;
+    }
+
+    this.projectsService.renameProjectDocument(this.projectId, doc.id, name).subscribe({
+      next: () => {
+        this.cancelRenameDocument();
+        this.loadProjectDocuments();
+        this.toast.success('File renamed');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not rename the file'),
+    });
+  }
+
+  deleteProjectDocument(doc: any) {
+    if (!confirm(`Delete "${doc.fileName}"? This cannot be undone.`)) return;
+
+    this.projectsService.deleteProjectDocument(this.projectId, doc.id).subscribe({
+      next: () => {
+        this.loadProjectDocuments();
+        this.toast.success('File deleted');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not delete the file'),
     });
   }
 

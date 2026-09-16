@@ -391,6 +391,15 @@ export class CrmController {
     });
   }
 
+  /**
+   * Identity-only list for pickers, such as the project form's Client field.
+   * Declared before 'lead-contacts/:id' so "options" is not read as an id.
+   */
+  @Get('lead-contacts/options')
+  getLeadContactOptions(@Request() req) {
+    return this.crmService.getLeadContactOptions(req.user.companyId);
+  }
+
   @Get('lead-contacts/:id')
   getLeadContactById(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.crmService.getLeadContactById(req.user.companyId, id);

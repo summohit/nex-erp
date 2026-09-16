@@ -1,7 +1,9 @@
-import { Component, signal, inject, OnInit, computed } from '@angular/core';
+import { Component, signal, inject, OnInit, computed, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute, NavigationEnd } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs/operators';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef } from 'ag-grid-community';
 import {
@@ -10,10 +12,12 @@ import {
   LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw, LucideBrainCircuit,
   LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
   LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
-  LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2
+  LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
+  LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
+import { MasterDataService } from '../services/master-data.service';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
 import { UploadService } from '../services/upload.service';
@@ -25,17 +29,39 @@ import {
   TasksService, MyTask, TaskCapabilities, TaskType, LeadOption, TaskScope,
   PreSalesInfo, PreSalesTaskHistoryEntry,
 } from '../services/tasks.service';
-import { ActivatedRoute } from '@angular/router';
 
+/**
+ * Project status, as of the Delivery module: DRAFT, ACTIVE, ON_HOLD, AT_RISK,
+ * COMPLETED, CLOSED, CANCELLED. The three legacy values are kept because a
+ * cached response or an un-migrated row would otherwise render colourless.
+ */
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  FINISHED: { bg: '#dcfce7', color: '#15803d' },
+  DRAFT: { bg: '#f1f2f4', color: '#6b7280' },
+  ACTIVE: { bg: '#dbeafe', color: '#1d4ed8' },
+  ON_HOLD: { bg: '#fef3c7', color: '#b45309' },
+  AT_RISK: { bg: '#ffedd5', color: '#c2410c' },
   COMPLETED: { bg: '#dcfce7', color: '#15803d' },
+  CLOSED: { bg: '#e0e7ff', color: '#4338ca' },
+  CANCELLED: { bg: '#fee2e2', color: '#b91c1c' },
+  // Retired vocabulary, still possible on unmigrated rows.
+  FINISHED: { bg: '#dcfce7', color: '#15803d' },
   IN_PROGRESS: { bg: '#dbeafe', color: '#1d4ed8' },
   NOT_STARTED: { bg: '#f1f2f4', color: '#6b7280' },
-  ACTIVE: { bg: '#dbeafe', color: '#1d4ed8' },
   ARCHIVED: { bg: '#fee2e2', color: '#b91c1c' },
-  ON_HOLD: { bg: '#fef3c7', color: '#b45309' },
   BLOCKED: { bg: '#fee2e2', color: '#b91c1c' }
+};
+
+export const PROJECT_STATUSES = [
+  'DRAFT', 'ACTIVE', 'ON_HOLD', 'AT_RISK', 'COMPLETED', 'CLOSED', 'CANCELLED'
+] as const;
+
+export const PROJECT_PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const;
+
+const PRIORITY_COLORS: Record<string, { bg: string; color: string }> = {
+  CRITICAL: { bg: '#fee2e2', color: '#b91c1c' },
+  HIGH: { bg: '#ffedd5', color: '#c2410c' },
+  MEDIUM: { bg: '#fef3c7', color: '#b45309' },
+  LOW: { bg: '#f1f5f9', color: '#475569' }
 };
 
 function getStatusColors(status: string): { bg: string; color: string } {
@@ -52,6 +78,7 @@ function getStatusColors(status: string): { bg: string; color: string } {
     LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
     LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
     LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
+    LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity,
     AgGridModule
   ],
   templateUrl: './projects.html',
@@ -60,6 +87,7 @@ function getStatusColors(status: string): { bg: string; color: string } {
 export class ProjectsComponent implements OnInit {
   private projectsService = inject(ProjectsService);
   private clientsService = inject(ClientsService);
+  private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
   private router = inject(Router);
   private authService = inject(AuthService);
@@ -68,6 +96,7 @@ export class ProjectsComponent implements OnInit {
   private toast = inject(HotToastService);
   private route = inject(ActivatedRoute);
   private dialog = inject(DialogService);
+  private destroyRef = inject(DestroyRef);
 
   showArchiveWarningModal = false;
   pendingArchiveProjectId: number | null = null;
@@ -78,13 +107,32 @@ export class ProjectsComponent implements OnInit {
   projects = signal<any[]>([]);
   archivedProjects = signal<any[]>([]);
   clients = signal<any[]>([]);
+  /** Active departments, for the project form and the Department filter. */
+  departments = signal<any[]>([]);
+  /**
+   * §4: the project form's Client field lists LEAD CONTACTS, not clients —
+   * at the point a project is opened, the contact is who the business knows.
+   * Choosing one resolves server-side to the Client the project is saved
+   * against, creating it if there is not one already.
+   */
+  leadContacts = signal<any[]>([]);
   employees = signal<any[]>([]);
   searchQuery = signal<string>('');
   activeTab = signal<'all' | 'starred' | 'recent' | 'archived' | 'my-tasks'>(
     (() => {
       try {
-        const saved = localStorage.getItem('projects-active-tab') as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
-        return (saved && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(saved)) ? saved : 'all';
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/tasks')) {
+          return 'my-tasks';
+        }
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const tab = urlParams.get('tab') as any;
+          if (['all', 'starred', 'recent', 'archived'].includes(tab)) {
+            return tab;
+          }
+        }
+        const saved = (localStorage.getItem('projects-board-tab') || localStorage.getItem('projects-active-tab')) as any;
+        return (saved && ['all', 'starred', 'recent', 'archived'].includes(saved)) ? saved : 'all';
       } catch (e) {
         return 'all';
       }
@@ -151,7 +199,7 @@ export class ProjectsComponent implements OnInit {
   /** Answered by the server so the department rule has one authority. */
   taskCapabilities = signal<TaskCapabilities>({ canCreateTask: false, canCreateGeneral: false, isAdmin: false });
   pmDropdownOpen = signal(false);
-  pmSearchQuery = '';
+  pmSearchQuery = signal<string>('');
 
   projectManagerEmployees = computed(() => {
     return this.employees().filter((e: any) =>
@@ -160,12 +208,20 @@ export class ProjectsComponent implements OnInit {
   });
 
   filteredPmEmployees = computed(() => {
-    const q = this.pmSearchQuery.toLowerCase().trim();
-    const list = this.projectManagerEmployees();
-    if (!q) return list;
-    return list.filter((e: any) =>
+    const q = this.pmSearchQuery().toLowerCase().trim();
+    const all = this.employees() || [];
+    if (!q) {
+      const pms = all.filter((e: any) =>
+        e.isProjectManager === true || /project.*manager|manager.*project/i.test(e.designation?.name || '')
+      );
+      const others = all.filter((e: any) => !pms.includes(e));
+      return [...pms, ...others];
+    }
+    return all.filter((e: any) =>
       `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(q) ||
-      (e.user?.email || '').toLowerCase().includes(q)
+      (e.user?.email || '').toLowerCase().includes(q) ||
+      (e.designation?.name || '').toLowerCase().includes(q) ||
+      (e.department?.name || '').toLowerCase().includes(q)
     );
   });
 
@@ -273,6 +329,39 @@ export class ProjectsComponent implements OnInit {
       </button>`;
 
     return `<div style="display:flex;align-items:center;height:100%;">${circles}${overflowCircle}${countBtn}</div>`;
+  }
+
+  // ── Assigned users ─────────────────────────────────────────────────────
+  // Separate from project managers: a manager owns the delivery, a user works
+  // on it. They are stored as ProjectMember MEMBER rows, and somebody picked
+  // in both lists keeps the higher role — the server collapses the duplicate.
+  memberDropdownOpen = signal<boolean>(false);
+  memberSearchQuery = signal<string>('');
+
+  filteredMemberEmployees = computed(() => {
+    const q = this.memberSearchQuery().toLowerCase().trim();
+    const all = this.employees() || [];
+    if (!q) return all;
+    return all.filter((e: any) =>
+      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q) ||
+      (e.user?.email || '').toLowerCase().includes(q) ||
+      (e.designation?.name || '').toLowerCase().includes(q) ||
+      (e.department?.name || '').toLowerCase().includes(q)
+    );
+  });
+
+  toggleMember(id: number) {
+    const idx = this.projectForm.memberIds.indexOf(id);
+    if (idx >= 0) {
+      this.projectForm.memberIds.splice(idx, 1);
+    } else {
+      this.projectForm.memberIds.push(id);
+    }
+  }
+
+  removeMember(id: number) {
+    const idx = this.projectForm.memberIds.indexOf(id);
+    if (idx >= 0) this.projectForm.memberIds.splice(idx, 1);
   }
 
   togglePm(id: number) {
@@ -420,152 +509,308 @@ export class ProjectsComponent implements OnInit {
     });
   }
 
-  boardsColDefs: ColDef[] = [
-    {
-      headerName: '',
-      field: 'star',
-      width: 56,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      cellRenderer: ProjectStarCellRendererComponent,
-      cellRendererParams: {
-        isStarred: (data: any) => this.isStarred(data.id),
-        onToggle: (data: any) => this.toggleStar(data.id)
-      }
-    },
-    {
-      headerName: 'Name',
-      field: 'name',
-      flex: 2.2,
-      minWidth: 260,
-      cellRenderer: (params: any) => {
-        if (!params.data) return '';
-        const color = this.getGradient(params.data.color, params.node?.rowIndex || 0);
-        const key = params.data.key ? `<span style="margin-left:8px;font-weight:700;">${params.data.key}</span>` : '';
-        return `
-          <div class="table-name-cell">
-            <span class="table-color-dot" style="background:${color}"></span>
-            <span class="board-title">${params.data.name}</span>
-            ${key}
-          </div>
-        `;
-      }
-    },
-    {
-      headerName: 'Lead',
-      field: 'lead',
-      flex: 1.2,
-      minWidth: 160,
-      valueGetter: (params: any) => {
-        const lead = params.data?.lead;
-        return lead ? `${lead.firstName || ''} ${lead.lastName || ''}`.trim() : '—';
+  /**
+   * Whether money is on screen at all.
+   *
+   * The server decides per project and stamps each row with
+   * `canViewFinancials` — a project manager sees the budget of the projects
+   * they run and nobody else's, so this is not a single answer about the
+   * viewer. The columns appear if any row grants them, and each cell falls
+   * back to a dash for the rows that do not.
+   */
+  canSeeAnyFinancials = computed(() =>
+    this.filteredProjects().some((p: any) => p.canViewFinancials)
+  );
+
+  private money(value: number | null | undefined, row: any): string {
+    if (!row?.canViewFinancials) return '<span class="cell-muted">—</span>';
+    if (value == null) return '<span class="cell-muted">—</span>';
+    const symbol = row.currency === 'USD' ? '$' : row.currency === 'EUR' ? '€' : '₹';
+    return `${symbol}${Number(value).toLocaleString('en-IN')}`;
+  }
+
+  private hours(value: number | null | undefined): string {
+    if (value == null) return '<span class="cell-muted">—</span>';
+    const rounded = Math.round(Number(value) * 10) / 10;
+    return `${rounded.toLocaleString('en-IN')}h`;
+  }
+
+  /**
+   * §2.1 list columns. A computed rather than a fixed array because the money
+   * columns come and go with the rows the viewer is allowed to see.
+   */
+  boardsColumnDefs = computed<ColDef[]>(() => {
+    const cols: ColDef[] = [
+      {
+        headerName: '',
+        field: 'star',
+        width: 56,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        cellRenderer: ProjectStarCellRendererComponent,
+        cellRendererParams: {
+          isStarred: (data: any) => this.isStarred(data.id),
+          onToggle: (data: any) => this.toggleStar(data.id)
+        }
       },
-      cellRenderer: (params: any) => this.buildPersonHtml(params.data?.lead)
-    },
-    {
-      headerName: 'PM',
-      field: 'pm',
-      flex: 1.2,
-      minWidth: 160,
-      sortable: false,
-      valueGetter: (params: any) => {
-        const pms = (params.data?.members || []).filter((m: any) => m.role === 'PROJECT_MANAGER');
-        if (!pms.length) return '—';
-        return pms.map((m: any) => `${m.employee?.firstName || ''} ${m.employee?.lastName || ''}`.trim()).join(', ');
+      {
+        // Rule 10: the project code is a column of its own, searchable and
+        // sortable. It used to be tacked onto the end of the name cell, where
+        // it could not be sorted on and read as part of the title.
+        headerName: 'Code',
+        field: 'key',
+        width: 140,
+        minWidth: 120,
+        cellRenderer: (params: any) =>
+          params.value ? `<span class="project-code-chip">${params.value}</span>` : '<span class="cell-muted">—</span>'
       },
-      cellRenderer: (params: any) => {
-        const pms = (params.data?.members || [])
-          .filter((m: any) => m.role === 'PROJECT_MANAGER')
-          .map((m: any) => m.employee);
-        return this.buildPeopleHtml(pms);
+      {
+        headerName: 'Project',
+        field: 'name',
+        flex: 2,
+        minWidth: 240,
+        cellRenderer: (params: any) => {
+          if (!params.data) return '';
+          const color = this.getGradient(params.data.color, params.node?.rowIndex || 0);
+          return `
+            <div class="table-name-cell">
+              <span class="table-color-dot" style="background:${color}"></span>
+              <span class="board-title">${params.data.name}</span>
+            </div>
+          `;
+        }
+      },
+      {
+        headerName: 'Client',
+        field: 'client.name',
+        width: 170,
+        valueGetter: (params: any) => params.data?.client?.name || '—'
+      },
+      {
+        headerName: 'PM',
+        field: 'pm',
+        width: 170,
+        sortable: false,
+        valueGetter: (params: any) => {
+          const pms = (params.data?.members || []).filter((m: any) => m.role === 'PROJECT_MANAGER');
+          if (!pms.length) return '—';
+          return pms.map((m: any) => `${m.employee?.firstName || ''} ${m.employee?.lastName || ''}`.trim()).join(', ');
+        },
+        cellRenderer: (params: any) => {
+          const pms = (params.data?.members || [])
+            .filter((m: any) => m.role === 'PROJECT_MANAGER')
+            .map((m: any) => m.employee);
+          return this.buildPeopleHtml(pms);
+        }
+      },
+      {
+        headerName: 'Lead',
+        field: 'lead',
+        width: 170,
+        valueGetter: (params: any) => {
+          const lead = params.data?.lead;
+          return lead ? `${lead.firstName || ''} ${lead.lastName || ''}`.trim() : '—';
+        },
+        cellRenderer: (params: any) => this.buildPersonHtml(params.data?.lead)
+      },
+      {
+        headerName: 'Department',
+        field: 'department.name',
+        width: 150,
+        valueGetter: (params: any) => params.data?.department?.name || '—'
+      },
+      {
+        headerName: 'Category',
+        field: 'category',
+        width: 160,
+        valueGetter: (params: any) => params.data?.category || '—'
+      },
+      {
+        headerName: 'Status',
+        field: 'workStatus',
+        width: 130,
+        cellRenderer: (params: any) => {
+          const s = params.data?.workStatus || '';
+          if (!s) return '<span class="cell-muted">—</span>';
+          const { bg, color } = getStatusColors(s);
+          return `<span class="pstatus-pill" style="background:${bg};color:${color}">${s.replace(/_/g, ' ')}</span>`;
+        }
+      },
+      {
+        headerName: 'Priority',
+        field: 'priority',
+        width: 120,
+        cellRenderer: (params: any) => {
+          const v = (params.value || 'MEDIUM').toUpperCase();
+          const { bg, color } = PRIORITY_COLORS[v] || PRIORITY_COLORS['MEDIUM'];
+          return `<span class="pstatus-pill" style="background:${bg};color:${color}">${v}</span>`;
+        }
+      },
+      {
+        headerName: 'Progress',
+        field: 'progress',
+        width: 140,
+        valueGetter: (params: any) => params.data?.progress ?? 0,
+        cellRenderer: (params: any) => {
+          const pct = Math.max(0, Math.min(100, Number(params.value ?? 0)));
+          const color = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
+          return `
+            <div class="progress-cell">
+              <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+              <span class="progress-label">${pct}%</span>
+            </div>
+          `;
+        }
+      },
+      {
+        headerName: 'Team',
+        field: 'members',
+        width: 150,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: any) => this.buildTeamStackHtml(params.data),
+        onCellClicked: (params: any) => {
+          const btn = (params.event?.target as HTMLElement)?.closest('[data-team-project-id]');
+          if (btn) this.openTeamModal(params.data);
+        }
+      },
+      {
+        headerName: 'Tasks',
+        field: '_count.issues',
+        width: 150,
+        valueGetter: (params: any) => params.data?._count?.issues ?? 0,
+        cellRenderer: (params: any) => {
+          const total = params.data?.totalIssues ?? params.data?._count?.issues ?? 0;
+          const remaining = params.data?.remainingIssues ?? 0;
+          const done = total - remaining;
+          if (total === 0) return '<span class="cell-muted">—</span>';
+          const pct = Math.round((done / total) * 100);
+          const color = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
+          const bg = pct === 100 ? '#dcfce7' : pct >= 50 ? '#fef3c7' : '#fee2e2';
+          return `
+            <div style="display:flex;align-items:center;gap:6px;height:100%;">
+              <span style="background:${bg};color:${color};font-weight:700;font-size:11.5px;padding:3px 8px;border-radius:10px;white-space:nowrap;">${remaining} left</span>
+              <span style="background:#eef2ff;color:#4338ca;font-weight:700;font-size:11.5px;padding:3px 8px;border-radius:10px;white-space:nowrap;">${total} total</span>
+            </div>
+          `;
+        }
+      },
+      // §8: estimated → logged → remaining, the module's core metric. Hours
+      // are work, not money, so every role sees them.
+      {
+        headerName: 'Est. hrs',
+        field: 'estimatedHours',
+        width: 110,
+        type: 'numericColumn',
+        cellRenderer: (params: any) => this.hours(params.value)
+      },
+      {
+        headerName: 'Logged hrs',
+        field: 'loggedHours',
+        width: 120,
+        type: 'numericColumn',
+        cellRenderer: (params: any) => this.hours(params.value)
+      },
+      {
+        headerName: 'Remaining hrs',
+        field: 'remainingHours',
+        width: 140,
+        type: 'numericColumn',
+        cellRenderer: (params: any) => {
+          if (params.value == null) return '<span class="cell-muted">—</span>';
+          const over = Number(params.value) < 0;
+          return `<span style="color:${over ? '#b91c1c' : 'inherit'};font-weight:${over ? 700 : 400}">${this.hours(params.value)}</span>`;
+        }
       }
-    },
-    {
-      headerName: 'Status',
-      field: 'workStatus',
-      flex: 1,
-      minWidth: 130,
-      cellRenderer: (params: any) => {
-        const s = params.data?.workStatus || params.data?.status || '';
-        if (!s) return '—';
-        const { bg, color } = getStatusColors(s);
-        return `<span class="pstatus-pill" style="background:${bg};color:${color}">${s.replace(/_/g, ' ')}</span>`;
-      }
-    },
-    {
-      headerName: 'Team',
-      field: 'members',
-      flex: 1,
-      minWidth: 160,
-      sortable: false,
-      filter: false,
-      cellRenderer: (params: any) => this.buildTeamStackHtml(params.data),
-      onCellClicked: (params: any) => {
-        const btn = (params.event?.target as HTMLElement)?.closest('[data-team-project-id]');
-        if (btn) this.openTeamModal(params.data);
-      }
-    },
-    {
-      headerName: 'Tasks',
-      field: '_count.issues',
-      flex: 1,
-      minWidth: 150,
-      valueGetter: (params: any) => params.data?._count?.issues ?? 0,
-      cellRenderer: (params: any) => {
-        const total = params.data?._count?.issues ?? 0;
-        const remaining = params.data?.remainingIssues ?? 0;
-        const done = total - remaining;
-        if (total === 0) return '<span style="color:#94a3b8;font-size:12px;">—</span>';
-        const pct = Math.round((done / total) * 100);
-        const color = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
-        const bg = pct === 100 ? '#dcfce7' : pct >= 50 ? '#fef3c7' : '#fee2e2';
-        return `
-          <div style="display:flex;align-items:center;gap:6px;height:100%;">
-            <span style="background:${bg};color:${color};font-weight:700;font-size:11.5px;padding:3px 8px;border-radius:10px;white-space:nowrap;">${remaining} left</span>
-            <span style="background:#eef2ff;color:#4338ca;font-weight:700;font-size:11.5px;padding:3px 8px;border-radius:10px;white-space:nowrap;">${total} total</span>
-          </div>
-        `;
-      }
-    },
-    {
-      headerName: 'Paid Expense',
-      field: 'paidExpenseTotal',
-      flex: 0.9,
-      minWidth: 130,
-      valueGetter: (params: any) => params.data?.paidExpenseTotal ?? 0,
-      valueFormatter: (params: any) => `₹${(params.value ?? 0).toLocaleString('en-IN')}`
-    },
-    {
-      headerName: 'Start date',
-      field: 'startDate',
-      flex: 1,
-      minWidth: 120,
-      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
-    },
-    {
-      headerName: 'End date',
-      field: 'endDate',
-      flex: 1,
-      minWidth: 120,
-      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
-    },
-    {
-      headerName: '',
-      field: 'actions',
-      width: 70,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right',
-      cellRenderer: ProjectActionCellRendererComponent,
-      cellRendererParams: {
-        showActions: () => this.isManagementAdmin,
-        onEdit: (data: any) => this.openEditModal(data, new Event('click')),
-        onArchive: (data: any) => this.archiveBoard(data, false, new Event('click'))
-      }
+    ];
+
+    // Rule 1: budget, cost and utilisation are for Admin, Finance and the
+    // project's own PM. The server has already removed the values; this keeps
+    // the empty columns off everyone else's screen too.
+    if (this.canSeeAnyFinancials()) {
+      cols.push(
+        {
+          headerName: 'Budget',
+          field: 'budgetAmount',
+          width: 140,
+          type: 'numericColumn',
+          cellRenderer: (params: any) => this.money(params.value, params.data)
+        },
+        {
+          // §23: logged hours × each person's internal cost rate.
+          headerName: 'Employee cost',
+          field: 'employeeCost',
+          width: 150,
+          type: 'numericColumn',
+          cellRenderer: (params: any) => {
+            const base = this.money(params.value, params.data);
+            const unpriced = params.data?.unratedHours ?? 0;
+            if (!params.data?.canViewFinancials || unpriced <= 0) return base;
+            // The figure is an understatement whenever somebody logged hours
+            // without a cost rate. Saying so beats a number that looks whole.
+            return `<span title="Excludes ${unpriced}h logged by people with no cost rate set">${base}<span class="cost-partial">*</span></span>`;
+          }
+        },
+        {
+          // Employee cost + approved expenses. This is what the project has
+          // actually consumed, and what budget remaining is measured against.
+          headerName: 'Actual cost',
+          field: 'actualCost',
+          width: 140,
+          type: 'numericColumn',
+          cellRenderer: (params: any) => this.money(params.value, params.data)
+        },
+        {
+          headerName: 'Budget left',
+          field: 'budgetRemaining',
+          width: 140,
+          type: 'numericColumn',
+          cellRenderer: (params: any) => {
+            if (!params.data?.canViewFinancials || params.value == null) {
+              return '<span class="cell-muted">—</span>';
+            }
+            const over = Number(params.value) < 0;
+            return `<span style="color:${over ? '#b91c1c' : 'inherit'};font-weight:${over ? 700 : 400}">${this.money(params.value, params.data)}</span>`;
+          }
+        }
+      );
     }
-  ];
+
+    cols.push(
+      {
+        headerName: 'Start date',
+        field: 'startDate',
+        width: 130,
+        valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+      },
+      {
+        // Labelled Deadline per §2.1; `endDate` is the column that has always
+        // held it, and adding a second date field would leave two answers.
+        headerName: 'Deadline',
+        field: 'endDate',
+        width: 130,
+        valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+      },
+      {
+        headerName: '',
+        field: 'actions',
+        width: 70,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        pinned: 'right',
+        cellRenderer: ProjectActionCellRendererComponent,
+        cellRendererParams: {
+          showActions: () => this.isManagementAdmin,
+          onEdit: (data: any) => this.openEditModal(data, new Event('click')),
+          onArchive: (data: any) => this.archiveBoard(data, false, new Event('click'))
+        }
+      }
+    );
+
+    return cols;
+  });
 
   onBoardRowClicked(event: any) {
     const target = event.event?.target as HTMLElement | null;
@@ -593,19 +838,41 @@ export class ProjectsComponent implements OnInit {
 
   selectedBg = signal<string>(this.colorBackgrounds[1]);
 
-  projectForm = {
-    name: '',
-    visibility: 'Workspace',
-    description: '',
-    startDate: '',
-    endDate: '',
-    billingType: 'NON_BILLABLE',
-    budgetAmount: null as number | null,
-    hourlyRate: null as number | null,
-    clientId: null as number | null,
-    pmIds: [] as number[],
-    address: ''
-  };
+  /**
+   * A blank project.
+   *
+   * The same object literal used to be written out three times — here, in
+   * openCreateModal and in openEditModal — so every new field had to be added
+   * in three places or the form silently kept the previous project's value.
+   */
+  private emptyProjectForm() {
+    return {
+      name: '',
+      visibility: 'Workspace',
+      description: '',
+      startDate: '',
+      endDate: '',
+      billingType: 'NON_BILLABLE',
+      budgetAmount: null as number | null,
+      hourlyRate: null as number | null,
+      clientId: null as number | null,
+      leadContactId: null as number | null,
+      pmIds: [] as number[],
+      memberIds: [] as number[],
+      address: '',
+      // ── Delivery (§4, §7, §9) ──
+      category: '',
+      priority: 'MEDIUM',
+      departmentId: null as number | null,
+      workStatus: 'ACTIVE',
+      currency: 'INR',
+      budgetNotes: '',
+      estimatedHours: null as number | null,
+      allowManualTimeLogging: true
+    };
+  }
+
+  projectForm = this.emptyProjectForm();
 
   gradients = [
     'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
@@ -643,11 +910,479 @@ export class ProjectsComponent implements OnInit {
   });
 
   // Filtered lists
+  // ── §3 Project filters ─────────────────────────────────────────────────
+  // Each is 'ALL' or an exact value; dates are ISO yyyy-mm-dd or ''. Held as
+  // separate signals rather than one object so a change to any of them
+  // recomputes the list without a manual trigger.
+  /**
+   * Files chosen in the create form (§6).
+   *
+   * Held in memory until the project exists: the upload endpoint is
+   * /projects/:id/documents, and there is no id to upload against until the
+   * create call returns. They go up immediately afterwards.
+   */
+  stagedFiles = signal<{ file: File; name: string }[]>([]);
+  stagedUploading = signal(false);
+  /** Index of the staged file being renamed, or null. */
+  renamingStagedIndex = signal<number | null>(null);
+  /** Documents already uploaded — shown when editing an existing project. */
+  existingDocuments = signal<any[]>([]);
+  renamingDocumentId = signal<number | null>(null);
+  documentNameDraft = '';
+
+  onStagedFilesPicked(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const picked = Array.from(input.files || []);
+    if (picked.length) {
+      // The name is carried beside the File rather than on it: File.name is
+      // read-only, so a rename has to live somewhere else until upload.
+      this.stagedFiles.update(list => [...list, ...picked.map(file => ({ file, name: file.name }))]);
+    }
+    // Clearing it means picking the same file twice in a row still fires.
+    input.value = '';
+  }
+
+  removeStagedFile(index: number) {
+    this.stagedFiles.update(list => list.filter((_, i) => i !== index));
+    this.renamingStagedIndex.set(null);
+  }
+
+  // ── Renaming, before and after upload ──────────────────────────────────
+  // Both edit the NAME only. The extension is shown beside the input rather
+  // than in it, and the server re-applies the rule on save either way.
+
+  fileBaseName(fileName: string): string {
+    const dot = (fileName || '').lastIndexOf('.');
+    return dot > 0 ? fileName.slice(0, dot) : (fileName || '');
+  }
+
+  fileExtension(fileName: string): string {
+    const dot = (fileName || '').lastIndexOf('.');
+    return dot > 0 ? fileName.slice(dot) : '';
+  }
+
+  getFileTypeInfo(fileName: string): { bg: string; color: string; label: string } {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
+    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) {
+      return { bg: '#eff6ff', color: '#2563eb', label: ext.toUpperCase() };
+    }
+    if (ext === 'pdf') {
+      return { bg: '#fef2f2', color: '#dc2626', label: 'PDF' };
+    }
+    if (['csv', 'xls', 'xlsx'].includes(ext)) {
+      return { bg: '#ecfdf5', color: '#059669', label: ext.toUpperCase() };
+    }
+    if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) {
+      return { bg: '#f0f9ff', color: '#0284c7', label: ext.toUpperCase() };
+    }
+    if (['env', 'json', 'js', 'ts', 'html', 'css', 'xml'].includes(ext)) {
+      return { bg: '#faf5ff', color: '#7c3aed', label: ext.toUpperCase() };
+    }
+    return { bg: '#f1f5f9', color: '#475569', label: ext ? ext.toUpperCase() : 'FILE' };
+  }
+
+  startRenameStaged(index: number) {
+    this.renamingDocumentId.set(null);
+    this.renamingStagedIndex.set(index);
+    this.documentNameDraft = this.fileBaseName(this.stagedFiles()[index]?.name || '');
+  }
+
+  confirmRenameStaged(index: number) {
+    const base = this.documentNameDraft.trim();
+    if (!base) {
+      this.toast.error('A file name is required');
+      return;
+    }
+    this.stagedFiles.update(list => list.map((entry, i) =>
+      i === index ? { ...entry, name: `${base}${this.fileExtension(entry.name)}` } : entry
+    ));
+    this.cancelRename();
+  }
+
+  startRenameDocument(doc: any) {
+    this.renamingStagedIndex.set(null);
+    this.renamingDocumentId.set(doc.id);
+    this.documentNameDraft = this.fileBaseName(doc.name);
+  }
+
+  confirmRenameDocument(doc: any) {
+    const base = this.documentNameDraft.trim();
+    if (!base) {
+      this.toast.error('A file name is required');
+      return;
+    }
+    if (base === this.fileBaseName(doc.name)) {
+      this.cancelRename();
+      return;
+    }
+
+    const projectId = this.editingProjectId();
+    if (!projectId) return;
+
+    this.projectsService.renameProjectDocument(projectId, doc.id, base).subscribe({
+      next: (updated) => {
+        this.existingDocuments.update(list => list.map(d => d.id === doc.id ? { ...d, name: updated.name } : d));
+        this.cancelRename();
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not rename the file'),
+    });
+  }
+
+  cancelRename() {
+    this.renamingStagedIndex.set(null);
+    this.renamingDocumentId.set(null);
+    this.documentNameDraft = '';
+  }
+
+  deleteExistingDocument(doc: any) {
+    const projectId = this.editingProjectId();
+    if (!projectId) return;
+    if (!confirm(`Delete "${doc.name}"? This cannot be undone.`)) return;
+
+    this.projectsService.deleteProjectDocument(projectId, doc.id).subscribe({
+      next: () => {
+        this.existingDocuments.update(list => list.filter(d => d.id !== doc.id));
+        this.toast.success('File deleted');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not delete the file'),
+    });
+  }
+
+  /**
+   * Upload the staged files against a project that now exists.
+   *
+   * Failures are reported but never block: the project has already been
+   * created by this point, and refusing to navigate would strand the user on
+   * a form for a project that is already saved. They can re-upload from the
+   * Attachments tab.
+   */
+  private uploadStagedFiles(projectId: number, done: () => void) {
+    const files = this.stagedFiles();
+    if (!files.length) {
+      done();
+      return;
+    }
+
+    this.stagedUploading.set(true);
+    let remaining = files.length;
+    let failed = 0;
+
+    const finish = () => {
+      if (--remaining > 0) return;
+      this.stagedUploading.set(false);
+      this.stagedFiles.set([]);
+      if (failed) {
+        this.toast.error(`${failed} of ${files.length} file(s) did not upload. Add them from the Attachments tab.`);
+      }
+      done();
+    };
+
+    for (const entry of files) {
+      this.projectsService.uploadProjectDocument(projectId, entry.file, entry.name).subscribe({
+        next: () => finish(),
+        error: () => { failed++; finish(); },
+      });
+    }
+  }
+
+  /** Collapsed by default — see the note in projects.html. */
+  filtersOpen = signal<boolean>(false);
+  filterClientId = signal<string>('ALL');
+  filterPmId = signal<string>('ALL');
+  filterDepartmentId = signal<string>('ALL');
+  filterCategory = signal<string>('ALL');
+  filterStatus = signal<string>('ALL');
+  filterPriority = signal<string>('ALL');
+  filterStartFrom = signal<string>('');
+  filterDeadlineTo = signal<string>('');
+
+  readonly projectStatusOptions = PROJECT_STATUSES;
+  readonly projectPriorityOptions = PROJECT_PRIORITIES;
+
+  /**
+   * Filter dropdowns are built from the projects on screen, not from master
+   * data: offering a department that no project uses produces an option that
+   * can only ever return nothing.
+   */
+  private distinctFrom(pick: (p: any) => string | null | undefined): string[] {
+    const seen = new Set<string>();
+    for (const p of this.myProjects()) {
+      const v = pick(p);
+      if (v) seen.add(String(v));
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }
+
+  clientOptions = computed(() => {
+    const byId = new Map<number, string>();
+    for (const p of this.myProjects()) {
+      if (p.client?.id) byId.set(p.client.id, p.client.name);
+    }
+    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  departmentOptions = computed(() => {
+    const byId = new Map<number, string>();
+    for (const p of this.myProjects()) {
+      if (p.department?.id) byId.set(p.department.id, p.department.name);
+    }
+    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  pmOptions = computed(() => {
+    const byId = new Map<number, string>();
+    for (const p of this.myProjects()) {
+      for (const m of p.members || []) {
+        if (m.role === 'PROJECT_MANAGER' && m.employee) {
+          byId.set(m.employeeId, `${m.employee.firstName || ''} ${m.employee.lastName || ''}`.trim());
+        }
+      }
+    }
+    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  projectCategories: string[] = [
+    'Implementation & Deployment',
+    'Implementation & Migration',
+    'Products',
+    'AMC (Annual Maintenance Contract)',
+    'FMS (Resource Contract)',
+    'Rental',
+    'Corporate Training',
+    'POC',
+    'Other',
+    'Inbound',
+    'Implementation',
+    'Software',
+    'Enterprise'
+  ];
+
+  categoryOptions = computed(() => {
+    const fromProjects = this.distinctFrom(p => p.category);
+    const combined = new Set([...this.projectCategories, ...fromProjects]);
+    return Array.from(combined);
+  });
+
+  allBoardsForSelect = computed(() => {
+    const list = this.myProjects();
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  });
+
+  allTasksForSelect = computed(() => {
+    const list = this.myTasks();
+    return [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  });
+
+  // Create / Edit Modal Searchable Selects
+  clientDropdownOpen = signal<boolean>(false);
+  clientSearchQuery = signal<string>('');
+
+  categoryDropdownOpen = signal<boolean>(false);
+  categorySearchQuery = signal<string>('');
+
+  filteredLeadContacts = computed(() => {
+    const list = this.leadContacts() || [];
+    const q = this.clientSearchQuery().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(c => 
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.companyName && c.companyName.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.toLowerCase().includes(q))
+    );
+  });
+
+  getSelectedLeadContact(): any | null {
+    if (!this.projectForm.leadContactId) return null;
+    return (this.leadContacts() || []).find(c => c.id === this.projectForm.leadContactId) || null;
+  }
+
+  getContactInitial(c: any): string {
+    const n = c?.name || c?.companyName || '?';
+    return n.charAt(0).toUpperCase();
+  }
+
+  selectLeadContact(c: any | null) {
+    this.projectForm.leadContactId = c ? c.id : null;
+    this.clientDropdownOpen.set(false);
+    this.clientSearchQuery.set('');
+  }
+
+  filteredCategories = computed(() => {
+    const q = this.categorySearchQuery().toLowerCase().trim();
+    if (!q) return this.projectCategories;
+    return this.projectCategories.filter(c => c.toLowerCase().includes(q));
+  });
+
+  selectCategory(cat: string) {
+    this.projectForm.category = cat;
+    this.categoryDropdownOpen.set(false);
+    this.categorySearchQuery.set('');
+  }
+
+  departmentDropdownOpen = signal<boolean>(false);
+  departmentSearchQuery = signal<string>('');
+
+  filteredDepartments = computed(() => {
+    const list = this.departments() || [];
+    const q = this.departmentSearchQuery().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter((d: any) => (d.name && d.name.toLowerCase().includes(q)));
+  });
+
+  getSelectedDepartment(): any | null {
+    if (!this.projectForm.departmentId) return null;
+    return (this.departments() || []).find((d: any) => d.id === this.projectForm.departmentId) || null;
+  }
+
+  selectDepartment(d: any | null) {
+    this.projectForm.departmentId = d ? d.id : null;
+    this.departmentDropdownOpen.set(false);
+    this.departmentSearchQuery.set('');
+  }
+
+  closeAllModalDropdowns() {
+    this.pmDropdownOpen.set(false);
+    this.memberDropdownOpen.set(false);
+    this.clientDropdownOpen.set(false);
+    this.categoryDropdownOpen.set(false);
+    this.departmentDropdownOpen.set(false);
+  }
+
+  // Deadline cannot precede the start date. Checked on both fields and again
+  // on save, so a value typed straight into the date input cannot slip past.
+  /**
+   * Which required fields a NEW project is still missing.
+   *
+   * Names all of them at once: sending someone round the form one error at a
+   * time is worse than one message listing what is left.
+   */
+  /**
+   * Required fields in the order they appear on the form, so "the first one
+   * missing" is also the first one the user would scroll past.
+   */
+  private readonly REQUIRED_FIELDS: { anchor: string; label: string; isMissing: () => boolean }[] = [
+    { anchor: 'name',         label: 'Board title',     isMissing: () => !this.projectForm.name.trim() },
+    { anchor: 'category',     label: 'Category',        isMissing: () => !this.projectForm.category?.trim() },
+    { anchor: 'departmentId', label: 'Department',      isMissing: () => !this.projectForm.departmentId },
+    { anchor: 'startDate',    label: 'Start date',      isMissing: () => !this.projectForm.startDate },
+    { anchor: 'endDate',      label: 'Deadline',        isMissing: () => !this.projectForm.endDate },
+    { anchor: 'pmIds',        label: 'Project manager', isMissing: () => this.projectForm.pmIds.length === 0 },
+    { anchor: 'memberIds',    label: 'Assigned user',   isMissing: () => this.projectForm.memberIds.length === 0 },
+  ];
+
+  missingRequiredFields(): string[] {
+    return this.REQUIRED_FIELDS.filter(f => f.isMissing()).map(f => f.label);
+  }
+
+  /**
+   * Scroll the first missing field into view.
+   *
+   * The form is long enough that a toast alone leaves people hunting — and on
+   * an existing project the missing field is usually one they never filled in
+   * and would not think to look for.
+   */
+  private focusFirstInvalidField() {
+    const first = this.REQUIRED_FIELDS.find(f => f.isMissing());
+    if (!first) return;
+
+    // After the toast, so the browser has painted the error states.
+    setTimeout(() => {
+      const label = document.querySelector(`[data-field="${first.anchor}"]`) as HTMLElement | null;
+      if (!label) return;
+      label.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // The anchor sits on the label; the control is its sibling, so focus has
+      // to come from the surrounding group rather than from inside the label.
+      const group = label.closest('.cbm-field-group') || label.parentElement;
+      (group?.querySelector('input, select, textarea') as HTMLElement | null)?.focus({ preventScroll: true });
+    }, 0);
+  }
+
+  /** Only a new project is held to the rules — see saveProject. */
+  isRequiredMissing(field: 'startDate' | 'endDate' | 'departmentId' | 'category' | 'pmIds' | 'memberIds'): boolean {
+    if (!this.isSubmitted()) return false;
+    if (field === 'pmIds') return this.projectForm.pmIds.length === 0;
+    if (field === 'memberIds') return this.projectForm.memberIds.length === 0;
+    if (field === 'category') return !this.projectForm.category?.trim();
+    return !this.projectForm[field];
+  }
+
+  isDateRangeInvalid(): boolean {
+    if (!this.projectForm.startDate || !this.projectForm.endDate) return false;
+    return this.projectForm.endDate < this.projectForm.startDate;
+  }
+
+  onStartDateChange() {
+    if (this.projectForm.startDate && this.projectForm.endDate && this.projectForm.endDate < this.projectForm.startDate) {
+      this.projectForm.endDate = this.projectForm.startDate;
+    }
+  }
+
+  onEndDateChange() {
+    if (this.projectForm.startDate && this.projectForm.endDate && this.projectForm.endDate < this.projectForm.startDate) {
+      this.toast.warning('Deadline must be equal to or after Start Date');
+    }
+  }
+
+  activeFilterCount = computed(() =>
+    [
+      this.filterClientId(), this.filterPmId(), this.filterDepartmentId(),
+      this.filterCategory(), this.filterStatus(), this.filterPriority()
+    ].filter(v => v !== 'ALL').length
+    + (this.filterStartFrom() ? 1 : 0)
+    + (this.filterDeadlineTo() ? 1 : 0)
+  );
+
+  clearProjectFilters() {
+    this.filterClientId.set('ALL');
+    this.filterPmId.set('ALL');
+    this.filterDepartmentId.set('ALL');
+    this.filterCategory.set('ALL');
+    this.filterStatus.set('ALL');
+    this.filterPriority.set('ALL');
+    this.filterStartFrom.set('');
+    this.filterDeadlineTo.set('');
+  }
+
+  private applyProjectFilters(list: any[]): any[] {
+    const client = this.filterClientId();
+    const pm = this.filterPmId();
+    const dept = this.filterDepartmentId();
+    const category = this.filterCategory();
+    const status = this.filterStatus();
+    const priority = this.filterPriority();
+    const startFrom = this.filterStartFrom();
+    const deadlineTo = this.filterDeadlineTo();
+
+    return list.filter(p => {
+      if (client !== 'ALL' && String(p.client?.id ?? '') !== client) return false;
+      if (dept !== 'ALL' && String(p.department?.id ?? '') !== dept) return false;
+      if (category !== 'ALL' && (p.category || '') !== category) return false;
+      if (status !== 'ALL' && (p.workStatus || '') !== status) return false;
+      if (priority !== 'ALL' && (p.priority || 'MEDIUM') !== priority) return false;
+
+      if (pm !== 'ALL') {
+        const isPm = (p.members || []).some(
+          (m: any) => m.role === 'PROJECT_MANAGER' && String(m.employeeId) === pm
+        );
+        if (!isPm) return false;
+      }
+
+      // "Started on or after" and "due on or before" — the two halves people
+      // actually ask for. A full range on both dates was four inputs for a
+      // question nobody was asking.
+      if (startFrom && (!p.startDate || new Date(p.startDate) < new Date(startFrom))) return false;
+      if (deadlineTo && (!p.endDate || new Date(p.endDate) > new Date(deadlineTo))) return false;
+
+      return true;
+    });
+  }
+
   filteredProjects = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
 
     if (this.activeTab() === 'archived') {
-      return this.archivedProjects();
+      return this.applyProjectFilters(this.archivedProjects());
     }
 
     let list = this.myProjects();
@@ -659,9 +1394,15 @@ export class ProjectsComponent implements OnInit {
     }
 
     list = this.applyQuickFilter(list);
+    list = this.applyProjectFilters(list);
 
     if (!q) return list;
-    return list.filter(p => p.name.toLowerCase().includes(q) || p.key?.toLowerCase().includes(q));
+    // §3: name, code and client are all searchable from the one box.
+    return list.filter(p =>
+      p.name.toLowerCase().includes(q)
+      || p.key?.toLowerCase().includes(q)
+      || p.client?.name?.toLowerCase().includes(q)
+    );
   });
 
   starredProjects = computed(() => {
@@ -674,39 +1415,28 @@ export class ProjectsComponent implements OnInit {
   });
 
   ngOnInit() {
-    // A pre-sales assignment notification links straight here now that the
-    // deal page no longer lists tasks — see CrmService.createPreSalesTask.
+    this.syncTabFromRoute();
+
+    // Listen to route changes because Angular reuses this component instance
+    // when navigating between /projects and /tasks (both point to ProjectsComponent).
+    this.router.events
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.syncTabFromRoute();
+      });
+
     const qp = this.route.snapshot.queryParamMap;
-    const qpTab = qp.get('tab') as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
-    if (qpTab && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(qpTab)) {
-      this.activeTab.set(qpTab);
-      try { localStorage.setItem('projects-active-tab', qpTab); } catch (e) {}
-    } else {
-      const savedTab = localStorage.getItem('projects-active-tab') as 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | null;
-      if (savedTab && ['all', 'starred', 'recent', 'archived', 'my-tasks'].includes(savedTab)) {
-        this.activeTab.set(savedTab);
-      }
-    }
-
-    const psTask = Number(qp.get('psTask'));
-    if (psTask) {
-      this.activeTab.set('my-tasks');
-      try { localStorage.setItem('projects-active-tab', 'my-tasks'); } catch (e) {}
-      this.highlightedPreSalesTaskId = psTask;
-    }
-
-    // "Add Task" on a deal's pre-sales tab. The deal page does not keep its own
-    // composer any more; it sends the context here and this opens ours.
     const newTaskLeadId = Number(qp.get('newTaskLeadId'));
-    if (newTaskLeadId) {
-      this.activeTab.set('my-tasks');
-      try { localStorage.setItem('projects-active-tab', 'my-tasks'); } catch (e) {}
-    }
 
     this.loadStarredAndRecent();
     this.loadProjects();
     this.loadArchivedProjects();
     this.loadClients();
+    this.loadDepartments();
+    this.loadLeadContacts();
     this.loadEmployees();
     // Cheap, and it decides whether the Add Task button exists at all. The
     // tasks themselves wait until somebody opens the tab.
@@ -720,9 +1450,6 @@ export class ProjectsComponent implements OnInit {
       },
       error: () => {},
     });
-    // setActiveTab normally triggers this on first entry; landing on the tab
-    // from a query parameter or restored from localStorage skips it.
-    if (this.activeTab() === 'my-tasks') this.loadMyTasks();
 
     if (newTaskLeadId) {
       this.openComposerForLead(newTaskLeadId, Number(qp.get('newTaskAssigneeId')) || null);
@@ -732,6 +1459,77 @@ export class ProjectsComponent implements OnInit {
         queryParams: { tab: 'my-tasks' },
         replaceUrl: true,
       });
+    }
+  }
+
+  private syncTabFromRoute() {
+    const currentUrl = this.router.url;
+    const path = currentUrl.split('?')[0];
+    const qp = this.route.snapshot.queryParamMap;
+    const forcedTab = this.route.snapshot.data['forceTab'] as
+      | 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | undefined;
+
+    // Delivery > Tasks (/tasks) or forcedTab: always show my-tasks
+    if (path.startsWith('/tasks') || forcedTab === 'my-tasks') {
+      this.activeTab.set('my-tasks');
+      if (this.isUserAdmin() && !this.userExplicitlyToggledScope && this.myTasksScope() !== 'all') {
+        this.myTasksScope.set('all');
+      }
+      if (!this.myTasksLoaded()) {
+        this.loadMyTasks();
+      }
+      return;
+    }
+
+    // Direct deep-link parameters that target a task
+    const psTask = Number(qp.get('psTask'));
+    if (psTask) {
+      this.activeTab.set('my-tasks');
+      this.highlightedPreSalesTaskId = psTask;
+      if (!this.myTasksLoaded()) {
+        this.loadMyTasks();
+      }
+      return;
+    }
+
+    const newTaskLeadId = Number(qp.get('newTaskLeadId'));
+    if (newTaskLeadId) {
+      this.activeTab.set('my-tasks');
+      if (!this.myTasksLoaded()) {
+        this.loadMyTasks();
+      }
+      return;
+    }
+
+    // Otherwise we are on /projects: check query param or last remembered board tab
+    const qpTab = qp.get('tab') as 'all' | 'starred' | 'recent' | 'archived' | null;
+    const validBoardTabs: Array<'all' | 'starred' | 'recent' | 'archived'> = ['all', 'starred', 'recent', 'archived'];
+
+    if (qpTab && validBoardTabs.includes(qpTab)) {
+      this.activeTab.set(qpTab);
+      try {
+        localStorage.setItem('projects-board-tab', qpTab);
+      } catch (e) {}
+      if (qpTab === 'archived') {
+        this.loadArchivedProjects();
+      }
+    } else {
+      let savedTab: 'all' | 'starred' | 'recent' | 'archived' = 'all';
+      try {
+        const saved = localStorage.getItem('projects-board-tab') as any;
+        if (saved && validBoardTabs.includes(saved)) {
+          savedTab = saved;
+        } else {
+          const legacy = localStorage.getItem('projects-active-tab') as any;
+          if (legacy && validBoardTabs.includes(legacy)) {
+            savedTab = legacy;
+          }
+        }
+      } catch (e) {}
+      this.activeTab.set(savedTab);
+      if (savedTab === 'archived') {
+        this.loadArchivedProjects();
+      }
     }
   }
 
@@ -756,19 +1554,13 @@ export class ProjectsComponent implements OnInit {
       fill();
       return;
     }
+
     this.tasksService.getLeadOptions().subscribe({
-      next: (l) => {
-        this.leadOptions.set(l || []);
+      next: (opts) => {
+        this.leadOptions.set(opts);
         fill();
       },
-      error: () => this.toast.error('Could not load the deal this task is for.'),
-    });
-  }
-
-  loadEmployees() {
-    this.employeeService.getEmployees().subscribe({
-      next: (res) => this.employees.set(res || []),
-      error: (err) => console.error('Error loading employees', err)
+      error: () => fill(),
     });
   }
 
@@ -779,32 +1571,81 @@ export class ProjectsComponent implements OnInit {
     });
   }
 
+  loadEmployees() {
+    this.employeeService.getEmployees().subscribe({
+      next: (res) => this.employees.set(res || []),
+      error: (err) => console.error('Error loading employees', err)
+    });
+  }
+
+  loadExistingDocuments(projectId: number) {
+    this.projectsService.getProjectDocuments(projectId).subscribe({
+      next: (docs) => this.existingDocuments.set(docs || []),
+      error: () => this.existingDocuments.set([]),
+    });
+  }
+
+  loadLeadContacts() {
+    this.projectsService.getLeadContactOptions().subscribe({
+      next: (res) => this.leadContacts.set(res || []),
+      error: (err) => console.error('Error loading lead contacts', err)
+    });
+  }
+
+  /** "Acme Ltd — Priya Sharma", or just the name when there is no company. */
+  leadContactLabel(c: any): string {
+    return c?.companyName ? `${c.companyName} — ${c.name}` : (c?.name || 'Unnamed contact');
+  }
+
+  loadDepartments() {
+    // Active only: a retired department should not be offered on a new
+    // project, though existing projects keep the one they were given.
+    this.masterDataService.getDepartments(true).subscribe({
+      next: (res) => this.departments.set(res || []),
+      error: (err) => console.error('Error loading departments', err)
+    });
+  }
+
   setActiveTab(tab: 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks') {
     this.activeTab.set(tab);
-    try {
-      localStorage.setItem('projects-active-tab', tab);
-    } catch (e) {}
 
-    // Update query params in URL without reload so refreshing retains the tab
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { tab: tab === 'all' ? null : tab },
-      queryParamsHandling: 'merge',
-      replaceUrl: true
-    });
+    const isCurrentRouteTasks = this.router.url.split('?')[0].startsWith('/tasks') ||
+      this.route.snapshot.data['forceTab'] === 'my-tasks';
 
-    if (tab === 'archived') {
-      this.loadArchivedProjects();
-    }
-    // Loaded on first entry rather than in ngOnInit: most visits to this screen
-    // are to open a board, and this is a two-source aggregation.
     if (tab === 'my-tasks') {
+      if (!isCurrentRouteTasks) {
+        this.router.navigate(['/tasks']);
+      }
       if (this.isUserAdmin() && !this.userExplicitlyToggledScope && this.myTasksScope() !== 'all') {
         this.myTasksScope.set('all');
       }
       if (!this.myTasksLoaded()) {
         this.loadMyTasks();
       }
+      return;
+    }
+
+    // A board tab was selected: 'all' | 'starred' | 'recent' | 'archived'
+    try {
+      localStorage.setItem('projects-board-tab', tab);
+    } catch (e) {}
+
+    if (isCurrentRouteTasks) {
+      this.router.navigate(['/projects'], {
+        queryParams: tab === 'all' ? {} : { tab }
+      });
+    } else {
+      // Update query params in URL without reload so refreshing retains the tab
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { tab: tab === 'all' ? null : tab },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
+
+    if (tab === 'archived') {
+      this.loadArchivedProjects();
     }
   }
 
@@ -1957,19 +2798,10 @@ export class ProjectsComponent implements OnInit {
 
   openCreateModal() {
     this.editingProjectId.set(null);
-    this.projectForm = { 
-      name: '', 
-      visibility: 'Workspace', 
-      description: '',
-      startDate: '',
-      endDate: '',
-      billingType: 'NON_BILLABLE',
-      budgetAmount: null as number | null,
-      hourlyRate: null as number | null,
-      clientId: null as number | null,
-      pmIds: [] as number[],
-      address: ''
-    };
+    this.projectForm = this.emptyProjectForm();
+    this.stagedFiles.set([]);
+    this.existingDocuments.set([]);
+    this.cancelRename();
     this.selectedBg.set(this.colorBackgrounds[1]);
     this.isSubmitted.set(false);
     this.isCreateModalOpen.set(true);
@@ -1978,9 +2810,15 @@ export class ProjectsComponent implements OnInit {
   openEditModal(project: any, event: Event) {
     if (event) event.stopPropagation();
     this.editingProjectId.set(project.id);
-    this.projectForm = { 
-      name: project.name, 
-      visibility: 'Workspace', 
+    // Files staged during an earlier Create must not follow the user into an
+    // Edit of a different project — they would look attached and then upload
+    // themselves to the wrong board.
+    this.stagedFiles.set([]);
+    this.cancelRename();
+    this.loadExistingDocuments(project.id);
+    this.projectForm = {
+      ...this.emptyProjectForm(),
+      name: project.name,
       description: project.description || '',
       startDate: project.startDate ? project.startDate.split('T')[0] : '',
       endDate: project.endDate ? project.endDate.split('T')[0] : '',
@@ -1988,8 +2826,18 @@ export class ProjectsComponent implements OnInit {
       budgetAmount: project.budgetAmount,
       hourlyRate: project.hourlyRate,
       clientId: project.clientId,
+      leadContactId: project.leadContactId ?? project.leadContact?.id ?? null,
       pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || [],
-      address: project.address || ''
+      memberIds: project.members?.filter((m: any) => m.role === 'MEMBER').map((m: any) => m.employeeId) || [],
+      address: project.address || '',
+      category: project.category || '',
+      priority: project.priority || 'MEDIUM',
+      departmentId: project.department?.id ?? project.departmentId ?? null,
+      workStatus: project.workStatus || 'ACTIVE',
+      currency: project.currency || 'INR',
+      budgetNotes: project.budgetNotes || '',
+      estimatedHours: project.estimatedHours ?? null,
+      allowManualTimeLogging: project.allowManualTimeLogging !== false
     };
     
     // Set the selected background (match it or use gradient as fallback)
@@ -2005,13 +2853,32 @@ export class ProjectsComponent implements OnInit {
 
   closeCreateModal() {
     this.isCreateModalOpen.set(false);
-    this.pmDropdownOpen.set(false);
-    this.pmSearchQuery = '';
+    this.closeAllModalDropdowns();
+    this.pmSearchQuery.set('');
+    this.clientSearchQuery.set('');
+    this.categorySearchQuery.set('');
+    this.departmentSearchQuery.set('');
   }
 
   saveProject() {
     this.isSubmitted.set(true);
     if (!this.projectForm.name.trim()) return;
+
+    if (this.isDateRangeInvalid()) {
+      this.toast.error('Deadline must be equal to or after Start Date');
+      return;
+    }
+
+    // Applies to edits as well as new projects. The server still only
+    // enforces this on create, so an import or API caller is not blocked by
+    // a rule that arrived after the data did — but a person going through
+    // this form is expected to complete it.
+    const missing = this.missingRequiredFields();
+    if (missing.length) {
+      this.toast.error(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`);
+      this.focusFirstInvalidField();
+      return;
+    }
 
     const bgValue = this.selectedBg().startsWith('http') 
       ? `url(${this.selectedBg()})` 
@@ -2026,16 +2893,32 @@ export class ProjectsComponent implements OnInit {
       billingType: this.projectForm.billingType,
       budgetAmount: this.projectForm.budgetAmount || null,
       hourlyRate: this.projectForm.hourlyRate || null,
-      clientId: this.projectForm.clientId || null,
+      // The server turns this into clientId, reusing an existing client of the
+      // same name. clientId is deliberately not sent: two sources for one
+      // field is how they drift apart.
+      leadContactId: this.projectForm.leadContactId || null,
       pmIds: this.projectForm.pmIds,
-      address: this.projectForm.address || null
+      memberIds: this.projectForm.memberIds,
+      address: this.projectForm.address || null,
+      category: this.projectForm.category || null,
+      priority: this.projectForm.priority,
+      departmentId: this.projectForm.departmentId || null,
+      workStatus: this.projectForm.workStatus,
+      currency: this.projectForm.currency,
+      budgetNotes: this.projectForm.budgetNotes || null,
+      estimatedHours: this.projectForm.estimatedHours || null,
+      allowManualTimeLogging: this.projectForm.allowManualTimeLogging
     };
 
     if (this.editingProjectId()) {
       this.projectsService.updateProject(this.editingProjectId()!, payload).subscribe({
-        next: (res) => {
-          this.loadProjects();
-          this.closeCreateModal();
+        next: () => {
+          // Files staged while editing were previously dropped on the floor —
+          // only the create path uploaded them.
+          this.uploadStagedFiles(this.editingProjectId()!, () => {
+            this.loadProjects();
+            this.closeCreateModal();
+          });
         },
         error: (err) => this.toast.error(err?.error?.message || 'Error updating project')
       });
@@ -2043,8 +2926,13 @@ export class ProjectsComponent implements OnInit {
       this.projectsService.createProject(payload).subscribe({
         next: (res) => {
           this.loadProjects();
-          this.closeCreateModal();
-          this.goToProject(res.id);
+          // Files first, then navigate — landing on the board while uploads
+          // are still in flight would show an Attachments tab that is missing
+          // what the user just added.
+          this.uploadStagedFiles(res.id, () => {
+            this.closeCreateModal();
+            this.goToProject(res.id);
+          });
         },
         error: (err) => this.toast.error(err?.error?.message || 'Error creating project')
       });

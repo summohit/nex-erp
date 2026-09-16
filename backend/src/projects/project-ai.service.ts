@@ -377,7 +377,10 @@ JSON SCHEMA:
         }
 
         if (ai.milestones?.length) {
-          await tx.projectMilestone.createMany({
+          // AnalysisMilestone, not ProjectMilestone: these are the AI's
+          // suggestions for this run. A PM promotes the ones they accept into
+          // real, costed milestones by hand.
+          await tx.analysisMilestone.createMany({
             data: ai.milestones.map((m: any) => ({
               analysisId: aId,
               name: m.name || 'Untitled Milestone',

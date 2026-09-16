@@ -112,6 +112,7 @@ model Company {
   preSalesRequestItems  PreSalesRequestItem[]
   tickets               Ticket[]
   taskTypes             TaskType[]
+  projectMilestones     ProjectMilestone[]
 }
 
 // Authentication & RBAC
@@ -304,6 +305,7 @@ model Department {
   blackoutDates  BlackoutDate[]
   tickets        Ticket[]       @relation("TicketOwningTeam")
   raisedTickets  Ticket[]       @relation("TicketRaisedByDept")
+  projects       Project[]      @relation("DepartmentProjects")
 }
 
 model Designation {
@@ -344,6 +346,18 @@ model Employee {
   shift            Shift?       @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   isProjectManager Boolean      @default(false)
 
+  /// What an hour of this person's time costs the company internally (§23).
+  ///
+  /// Not their salary and not what a client is billed: it is the loaded rate
+  /// the project is charged, and it is the only input that turns logged hours
+  /// into project cost. Null means "no rate set" — those hours contribute
+  /// nothing to cost, and the project dashboard says so rather than quietly
+  /// reporting a cheaper project than it is.
+  ///
+  /// Commercial: never exposed to an employee who is not Admin, Finance, or a
+  /// manager of the project the hours were logged against.
+  hourlyCostRate Float?
+
   employmentType String?
   joiningDate    DateTime?
 
@@ -354,6 +368,7 @@ model Employee {
   onboardingTasks  EmployeeOnboardingTask[]
   kioskPin         String? // 4-digit PIN for Kiosk Mode
   recruitedJobs    Job[]                    @relation("JobRecruiter")
+  ownedMilestones  ProjectMilestone[]       @relation("MilestoneOwner")
 
   // Profile details
   salutation    String?
@@ -1362,9 +1377,9 @@ model Interview {
 // ═══════════════════════════════════════════
 
 model Project {
-  id          Int       @id @default(autoincrement())
-  name        String
-  key         String // Auto-generated, unique per company (e.g., "NEX")
+  id            Int         @id @default(autoincrement())
+  name          String
+  key           String // Auto-generated, unique per company (e.g., "NEX")
   /// The company's single "General" project: where tasks that belong to no real
   /// project live. Hidden from every project list, picker and board view — it
   /// exists so a general task still gets a key, a board column, labels and a
@@ -1372,35 +1387,70 @@ model Project {
   /// board code path to cope with its absence.
   ///
   /// Anything that lists projects to a human MUST filter `isSystem: false`.
-  isSystem    Boolean   @default(false)
+  isSystem      Boolean     @default(false)
   /// Next issue number for this project. `${key}-${count + 1}` read the row
   /// count and then wrote, which hands two people creating a task in the same
   /// second the same number — and @@unique([key, companyId]) turns that into a
   /// 500. Incrementing this column inside the create transaction row-locks it,
   /// so concurrent callers get distinct keys. It also never reuses a key after
   /// a deletion, which a count does.
-  issueSeq    Int       @default(0)
-  description String?
-  color       String    @default("#2563eb") // Project accent color
-  icon        String    @default("folder") // Lucide icon name
-  status      String    @default("ACTIVE") // ACTIVE, ARCHIVED (lifecycle status — unrelated to workStatus)
-  category    String? // free-text project category (e.g. "Implementation and Deployment")
-  progress    Int? // 0-100 completion percentage
-  address     String?   @db.Text // On-site work location for this project, set at creation
-  workStatus  String? // NOT_STARTED, IN_PROGRESS, FINISHED (work status — distinct from ACTIVE/ARCHIVED)
-  leadId      Int? // Project lead (Employee)
-  lead        Employee? @relation("ProjectLead", fields: [leadId], references: [id])
-  companyId   Int
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  issueSeq      Int         @default(0)
+  description   String?
+  color         String      @default("#2563eb") // Project accent color
+  icon          String      @default("folder") // Lucide icon name
+  status        String      @default("ACTIVE") // ACTIVE, ARCHIVED (archive lifecycle only — unrelated to workStatus)
+  category      String? // free-text project category (e.g. "Implementation and Deployment")
+  progress      Int? // 0-100 completion percentage
+  address       String?     @db.Text // On-site work location for this project, set at creation
+  /// THE project status: DRAFT, ACTIVE, ON_HOLD, AT_RISK, COMPLETED, CLOSED,
+  /// CANCELLED. Named `workStatus` for history — it held
+  /// NOT_STARTED/IN_PROGRESS/FINISHED before the Delivery module widened it.
+  /// Distinct from `status`, which only records whether the row is archived.
+  workStatus    String?
+  /// Where the project sits in the closure process: WORK_PENDING,
+  /// SIGNOFF_PENDING, FINANCE_PENDING, PAYMENT_PENDING, FULLY_CLOSED.
+  ///
+  /// Deliberately not a finer grain of `workStatus`. Delivery and collection
+  /// run independently, and the case this module exists to make visible is
+  /// exactly the one where they disagree — work COMPLETED, money still
+  /// PAYMENT_PENDING.
+  closureStatus String      @default("WORK_PENDING")
+  priority      String      @default("MEDIUM") // CRITICAL, HIGH, MEDIUM, LOW
+  /// The delivery team accountable for the project, so the list can be filtered
+  /// by department without inferring it from whoever happens to be a member.
+  departmentId  Int?
+  department    Department? @relation("DepartmentProjects", fields: [departmentId], references: [id], onDelete: SetNull)
+  leadId        Int? // Project lead (Employee)
+  lead          Employee?   @relation("ProjectLead", fields: [leadId], references: [id])
+  companyId     Int
+  company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // Client & Billing
-  clientId     Int?
-  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  startDate    DateTime?
-  endDate      DateTime?
-  billingType  String    @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
-  budgetAmount Float?
-  hourlyRate   Float?
+  clientId               Int?
+  client                 Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  /// The lead contact the project was opened against (§4). The form picks one
+  /// of these, not a client; choosing one resolves to `clientId` above.
+  ///
+  /// Kept because the resolution is not reversible — several contacts at one
+  /// company map to a single Client — so without it an edit could not show
+  /// what was chosen, and would clear the field on save.
+  leadContactId          Int?
+  leadContact            LeadContact? @relation("ProjectLeadContact", fields: [leadContactId], references: [id], onDelete: SetNull)
+  startDate              DateTime?
+  endDate                DateTime?
+  billingType            String       @default("NON_BILLABLE") // NON_BILLABLE, HOURLY, FIXED_PRICE
+  budgetAmount           Float?
+  hourlyRate             Float?
+  currency               String       @default("INR")
+  budgetNotes            String?      @db.Text
+  /// The hours the project was sold/planned for, set against logged time to
+  /// give estimated → logged → remaining.
+  estimatedHours         Float?
+  /// §9: whether an employee may type hours in directly on this project, or
+  /// must use the timer. Defaults to true — every project predating this
+  /// column already allowed manual entry, and flipping that silently would
+  /// strand timesheets mid-week.
+  allowManualTimeLogging Boolean      @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1414,6 +1464,7 @@ model Project {
   onboardingStatus String @default("DRAFT") // DRAFT, DOCUMENTS_UPLOADED, ANALYZING, ANALYZED, UNDER_REVIEW, CHANGES_REQUIRED, APPROVED, READY_FOR_KICKOFF, IN_PROGRESS, COMPLETED, ERROR
 
   documents     ProjectDocument[]
+  milestones    ProjectMilestone[]
   analysisRuns  ProjectAnalysisRun[]
   fieldVisits   FieldVisit[]         @relation("ProjectFieldVisits")
   expenseClaims ExpenseClaim[]
@@ -1421,6 +1472,8 @@ model Project {
   attendances   Attendance[]         @relation("ProjectAttendance")
 
   @@unique([key, companyId])
+  @@index([companyId, workStatus])
+  @@index([departmentId])
 }
 
 model ProjectDocument {
@@ -1484,7 +1537,7 @@ model ProjectAnalysisRun {
   resourcePlans    ProjectResourcePlan[]
   costEstimate     ProjectCostEstimate?
   roadmap          ProjectRoadmap?
-  milestones       ProjectMilestone[]
+  milestones       AnalysisMilestone[]
   risks            ProjectRisk[]
   dependencies     ProjectDependency[]
   assumptions      ProjectAssumption[]
@@ -1625,7 +1678,13 @@ model ProjectRoadmap {
   scheduleConfidence Float?
 }
 
-model ProjectMilestone {
+/// A milestone the AI proposed while reading the project's documents.
+///
+/// Renamed from ProjectMilestone when the Delivery module gave that name to
+/// the real thing. These are a suggestion attached to one analysis run — they
+/// carry no money, no owner and no consequences, and a project can have
+/// several runs' worth. A PM promotes them into ProjectMilestone by hand.
+model AnalysisMilestone {
   id         Int                @id @default(autoincrement())
   analysisId Int
   analysis   ProjectAnalysisRun @relation(fields: [analysisId], references: [id], onDelete: Cascade)
@@ -1638,6 +1697,57 @@ model ProjectMilestone {
   responsibleRole String?
   approvalReq     String?
   status          String    @default("AI_GENERATED")
+
+  @@map("AnalysisMilestone")
+}
+
+/// A real project milestone: a dated chunk of the contract with money against
+/// it (§13).
+///
+/// `amount` is the share of the project budget this milestone releases, which
+/// is what makes it the join between delivery and finance — completing one is
+/// what makes an invoice eligible (§14). It is commercial, so it travels
+/// through the same visibility rule as the project budget.
+///
+/// `percentage` is stored rather than derived from amount/budget: milestones
+/// are often negotiated as percentages first, and a later budget revision must
+/// not silently rewrite what was agreed.
+model ProjectMilestone {
+  id        Int     @id @default(autoincrement())
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?   @db.Text
+  startDate   DateTime?
+  dueDate     DateTime?
+  /// Share of the project this milestone represents, 0-100.
+  percentage  Float?
+  /// Value released on completion, in the project's currency.
+  amount      Float?
+  /// PENDING, IN_PROGRESS, COMPLETED, CANCELLED. Invoicing and payment are
+  /// tracked separately — a completed milestone is not a paid one, which is
+  /// the distinction the whole closure flow rests on.
+  status      String    @default("PENDING")
+  completedAt DateTime?
+
+  ownerId Int?
+  owner   Employee? @relation("MilestoneOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  /// Display order, so milestones read in delivery sequence rather than by id.
+  position Int @default(0)
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  /// Tasks delivering this milestone (§13 "Related Tasks").
+  issues Issue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, position])
+  @@index([companyId, status])
 }
 
 model ProjectRisk {
@@ -1867,31 +1977,35 @@ model Issue {
   rejectionReason String? @db.Text
 
   // Relationships
-  projectId  Int
-  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   Int
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// The deal this task was raised against, when it was. Distinct from
   /// PreSalesTask, which keeps its own hours budget and approval flow — this is
   /// only for tasks raised through the unified task form, so a task can carry a
   /// lead badge without that model being touched.
-  leadId     Int?
-  lead       Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  leadId      Int?
+  lead        Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
   /// The business meaning of the task — Call, Site Visit, Documentation —
   /// managed as master data. Deliberately separate from `type` above, which is
   /// EPIC/STORY/TASK/BUG: a developer's vocabulary, not the company's, and one
   /// that already drives board icons, subtask semantics and the AI checklist.
-  taskTypeId Int?
-  taskType   TaskType?    @relation(fields: [taskTypeId], references: [id], onDelete: SetNull)
-  columnId   Int?
-  column     BoardColumn? @relation(fields: [columnId], references: [id], onDelete: SetNull)
-  assigneeId Int?
-  assignee   Employee?    @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  reporterId Int?
-  reporter   Employee?    @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
-  parentId   Int? // For sub-tasks and Epic→Story linking
-  parent     Issue?       @relation("IssueHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children   Issue[]      @relation("IssueHierarchy")
-  companyId  Int
-  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  taskTypeId  Int?
+  taskType    TaskType?         @relation(fields: [taskTypeId], references: [id], onDelete: SetNull)
+  /// The milestone this task delivers (§15). SetNull rather than Cascade: a
+  /// milestone being dropped must not delete the work already done for it.
+  milestoneId Int?
+  milestone   ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  columnId    Int?
+  column      BoardColumn?      @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  assigneeId  Int?
+  assignee    Employee?         @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporterId  Int?
+  reporter    Employee?         @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  parentId    Int? // For sub-tasks and Epic→Story linking
+  parent      Issue?            @relation("IssueHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Issue[]           @relation("IssueHierarchy")
+  companyId   Int
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   comments    IssueComment[]
   attachments IssueAttachment[]
@@ -2657,6 +2771,7 @@ model LeadContact {
   updatedAt         DateTime          @updatedAt
   leadsBrought      Lead[]
   notes             LeadContactNote[]
+  projects          Project[]         @relation("ProjectLeadContact")
 }
 
 // A follow-up is a single logged/scheduled interaction on a lead — a running

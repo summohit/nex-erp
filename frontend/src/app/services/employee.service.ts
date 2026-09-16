@@ -41,6 +41,21 @@ export class EmployeeService {
     });
   }
 
+  /**
+   * Set an employee's internal charge-out rate (§23). Null clears it.
+   *
+   * Its own endpoint rather than a field on updateEmployee: the server refuses
+   * the rate to every role but Admin, Superadmin and Finance, and keeping it
+   * off the ordinary profile payload means an unauthorised save cannot
+   * silently drop it either.
+   */
+  setCostRate(employeeId: number, hourlyCostRate: number | null) {
+    return this.http.put<{ id: number; hourlyCostRate: number | null }>(
+      `${this.apiUrl}/${employeeId}/cost-rate`,
+      { hourlyCostRate }
+    );
+  }
+
   // Minimal name/avatar list — usable by any authenticated employee, unlike
   // getEmployees() which requires employee-directory view permission.
   getEmployeesBasicList(): Observable<Employee[]> {

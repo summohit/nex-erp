@@ -1826,6 +1826,83 @@ export class CrmService {
     };
   }
 
+  /**
+   * Minimal lead-contact list for pickers (the project form's Client field).
+   *
+   * Separate from getLeadContacts because that one scopes a non-admin without
+   * VIEW_ALL to contacts they personally added — right for the CRM board,
+   * wrong for a dropdown, where it would show a project manager an empty list
+   * and no way to say who the work is for. This returns identity only: no
+   * owner, no note counts, nothing a CRM permission is protecting. It mirrors
+   * employees/basic-list, which exists for the same reason.
+   */
+  async getLeadContactOptions(companyId: number) {
+    return this.prisma.leadContact.findMany({
+      where: { companyId },
+      select: { id: true, name: true, companyName: true, email: true, contactCode: true },
+      orderBy: [{ companyName: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  /**
+   * The Client a lead contact corresponds to, creating one if there isn't one.
+   *
+   * Used when a project is saved against a lead contact (§4, "lead contacts —
+   * add as clients"). Project.clientId still points at Client, so every client
+   * filter, column and future invoice keeps working; this is what turns the
+   * chosen contact into that row.
+   *
+   * Unlike convertLeadContactToClient, an existing client of the same name is
+   * returned rather than rejected. Picking the same contact for a second
+   * project is an ordinary thing to do, and it must attach to the client that
+   * already exists instead of failing or creating a duplicate.
+   */
+  async findOrCreateClientFromLeadContact(companyId: number, id: number) {
+    const contact = await this.prisma.leadContact.findFirst({ where: { id, companyId } });
+    if (!contact) throw new NotFoundException('Lead Contact not found');
+
+    const clientName = (contact.companyName || contact.name || '').trim();
+    if (!clientName) {
+      throw new BadRequestException('That contact has no company or name to use as a client.');
+    }
+
+    const existing = await this.prisma.client.findFirst({ where: { companyId, name: clientName } });
+    if (existing) return existing;
+
+    return this.prisma.client.create({ data: this.clientDataFromLeadContact(companyId, contact) });
+  }
+
+  /**
+   * The lead-contact → client field mapping, in one place so the CRM's
+   * explicit Convert button and the project form's implicit one cannot drift
+   * into producing different clients from the same contact.
+   */
+  private clientDataFromLeadContact(companyId: number, contact: any) {
+    const clientName = (contact.companyName || contact.name || '').trim();
+    return {
+      companyId,
+      name: clientName,
+      website: contact.website || null,
+      status: 'LEAD',
+      currency: 'INR',
+      billingAddressLine1: contact.address || null,
+      billingCity: contact.city || null,
+      billingState: contact.state || null,
+      billingZipCode: contact.postalCode || null,
+      billingCountry: contact.country || null,
+      contacts: contact.email ? {
+        create: [{
+          firstName: (contact.name || '').split(' ')[0] || 'Unknown',
+          lastName: (contact.name || '').split(' ').slice(1).join(' ') || null,
+          email: contact.email,
+          phone: contact.phone || null,
+          mobile: contact.mobile || null,
+          isPrimary: true,
+        }],
+      } : undefined,
+    };
+  }
+
   async convertLeadContactToClient(companyId: number, id: number) {
     const contact = await this.prisma.leadContact.findFirst({ where: { id, companyId } });
     if (!contact) throw new NotFoundException('Lead Contact not found');
@@ -1836,6 +1913,9 @@ export class CrmService {
     const existing = await this.prisma.client.findFirst({
       where: { companyId, name: clientName },
     });
+    // Still a conflict here, deliberately: the CRM's Convert button is an
+    // explicit "make this a client", and silently handing back one that
+    // already exists would look like it had done nothing.
     if (existing) {
       throw new ConflictException(
         `A client named "${clientName}" already exists.`,

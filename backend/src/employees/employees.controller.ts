@@ -74,6 +74,20 @@ export class EmployeesController {
     return this.employeesService.update(+id, req.user.companyId, data);
   }
 
+  /**
+   * §23. Separate from PUT :id so a commercial rate cannot ride in alongside
+   * an ordinary profile edit; the service re-checks the role regardless.
+   */
+  @Put(':id/cost-rate')
+  setCostRate(@Request() req, @Param('id') id: string, @Body('hourlyCostRate') rate: number | null) {
+    return this.employeesService.setCostRate(
+      +id,
+      req.user.companyId,
+      req.user.role,
+      rate === null || rate === undefined || (rate as any) === '' ? null : Number(rate),
+    );
+  }
+
   @Delete(':id')
   delete(@Request() req, @Param('id') id: string) {
     return this.employeesService.delete(+id, req.user.companyId);

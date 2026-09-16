@@ -96,7 +96,7 @@
                 <ng-container *ngFor="let sub of item.subItems; let last = last">
                   <div class="sub-nav-item-wrapper">
                     <div class="tree-line" [class.last]="last"></div>
-                    <a href="#" class="sub-nav-item" [class.active]="router.url === sub.route" (click)="handleSubMenuClick(sub, $event)">
+                    <a href="#" class="sub-nav-item" [class.active]="isSubItemActive(sub)" (click)="handleSubMenuClick(sub, $event)">
                       {{ sub.title }}
                     </a>
                   </div>

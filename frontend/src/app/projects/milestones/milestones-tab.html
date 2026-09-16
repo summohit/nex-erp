@@ -1,0 +1,437 @@
+<div class="ms-tab">
+  <div class="ms-container">
+    <!-- Header Banner -->
+    <div class="ms-header-banner">
+      <div class="ms-header-title-group">
+        <div class="ms-header-badge">
+          <svg lucideFlag size="18"></svg>
+        </div>
+        <div>
+          <h2 class="ms-main-title">Project Milestones</h2>
+          <p class="ms-subtitle">Track deliverable stages, completion timelines, budgets, and billing milestones.</p>
+        </div>
+      </div>
+
+      <button type="button" class="ms-btn-primary" *ngIf="canManage()" (click)="openCreate()">
+        <svg lucidePlus size="15"></svg> Add milestone
+      </button>
+    </div>
+
+    <!-- KPI Metric Cards Grid -->
+    <div class="ms-kpis">
+      <!-- 1. Completed Milestones KPI -->
+      <div class="ms-kpi-card">
+        <div class="ms-kpi-icon-box ms-kpi-emerald">
+          <svg lucideCheckCircle2 size="20"></svg>
+        </div>
+        <div class="ms-kpi-content">
+          <span class="ms-kpi-label">Milestones Complete</span>
+          <div class="ms-kpi-value-row">
+            <span class="ms-kpi-value">{{ completedCount() }}<span class="ms-kpi-total"> / {{ milestones().length }}</span></span>
+            <span class="ms-kpi-pill ms-pill-emerald">{{ completionRate() }}%</span>
+          </div>
+          <div class="ms-kpi-bar-track">
+            <div class="ms-kpi-bar-fill ms-fill-emerald" [style.width.%]="completionRate()"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Financial KPIs (Admin / Finance / Allowed users) -->
+      <ng-container *ngIf="totals() as t">
+        <!-- 2. Milestone Total Value -->
+        <div class="ms-kpi-card">
+          <div class="ms-kpi-icon-box ms-kpi-blue">
+            <svg lucideCoins size="20"></svg>
+          </div>
+          <div class="ms-kpi-content">
+            <span class="ms-kpi-label">Milestone Value</span>
+            <span class="ms-kpi-value">{{ money(t.milestoneValue) }}</span>
+            <span class="ms-kpi-subtext">Committed billing value</span>
+          </div>
+        </div>
+
+        <!-- 3. Project Budget -->
+        <div class="ms-kpi-card" *ngIf="t.budgetAmount != null">
+          <div class="ms-kpi-icon-box ms-kpi-indigo">
+            <svg lucidePieChart size="20"></svg>
+          </div>
+          <div class="ms-kpi-content">
+            <span class="ms-kpi-label">Project Budget</span>
+            <span class="ms-kpi-value">{{ money(t.budgetAmount) }}</span>
+            <span class="ms-kpi-subtext">Total allocated budget</span>
+          </div>
+        </div>
+
+        <!-- 4. Budget Allocation Status -->
+        <div class="ms-kpi-card" *ngIf="t.unallocated != null">
+          <!-- Perfectly Allocated -->
+          <ng-container *ngIf="t.unallocated === 0">
+            <div class="ms-kpi-icon-box ms-kpi-emerald">
+              <svg lucideTrendingUp size="20"></svg>
+            </div>
+            <div class="ms-kpi-content">
+              <span class="ms-kpi-label">Allocation Status</span>
+              <span class="ms-kpi-value ms-text-emerald">100% Matched</span>
+              <span class="ms-kpi-subtext">Fully allocated to milestones</span>
+            </div>
+          </ng-container>
+
+          <!-- Over-allocated -->
+          <ng-container *ngIf="t.unallocated < 0">
+            <div class="ms-kpi-icon-box ms-kpi-rose">
+              <svg lucideAlertTriangle size="20"></svg>
+            </div>
+            <div class="ms-kpi-content">
+              <span class="ms-kpi-label">Over-allocated</span>
+              <span class="ms-kpi-value ms-text-rose">{{ money(-t.unallocated) }}</span>
+              <span class="ms-kpi-subtext ms-text-rose">Exceeds total project budget</span>
+            </div>
+          </ng-container>
+
+          <!-- Unallocated remaining -->
+          <ng-container *ngIf="t.unallocated > 0">
+            <div class="ms-kpi-icon-box ms-kpi-amber">
+              <svg lucideTrendingUp size="20"></svg>
+            </div>
+            <div class="ms-kpi-content">
+              <span class="ms-kpi-label">Unallocated Budget</span>
+              <span class="ms-kpi-value ms-text-amber">{{ money(t.unallocated) }}</span>
+              <span class="ms-kpi-subtext">Remaining to be staged</span>
+            </div>
+          </ng-container>
+        </div>
+      </ng-container>
+
+      <!-- If financial totals are absent, show Tasks KPI -->
+      <div class="ms-kpi-card" *ngIf="!totals()">
+        <div class="ms-kpi-icon-box ms-kpi-purple">
+          <svg lucideCheckSquare size="20"></svg>
+        </div>
+        <div class="ms-kpi-content">
+          <span class="ms-kpi-label">Linked Tasks</span>
+          <span class="ms-kpi-value">{{ totalTasksDone() }}<span class="ms-kpi-total"> / {{ totalTasksTotal() }}</span></span>
+          <span class="ms-kpi-subtext">Across all active milestones</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create / Edit Form Card -->
+    <div class="ms-form-card" *ngIf="editing() !== null">
+      <div class="ms-form-head">
+        <div class="ms-form-head-title">
+          <div class="ms-form-icon-pill">
+            <svg lucideFlag size="16"></svg>
+          </div>
+          <div>
+            <h3>{{ editing() === 'new' ? 'New Milestone' : 'Edit Milestone' }}</h3>
+            <span class="ms-form-desc">Define deliverable goals, timeline, assigned owner, and billing targets.</span>
+          </div>
+        </div>
+        <button type="button" class="ms-icon-btn" (click)="cancelEdit()" title="Close">
+          <svg lucideX size="15"></svg>
+        </button>
+      </div>
+
+      <div class="ms-form-grid">
+        <!-- Milestone Name -->
+        <label class="ms-field ms-field-wide">
+          <span class="ms-field-label">Milestone Name <span class="ms-req">*</span></span>
+          <input type="text" [(ngModel)]="form.name" placeholder="e.g. Phase 1: MVP Architecture & Core Setup" />
+        </label>
+
+        <!-- Timeline & Assignee Row -->
+        <label class="ms-field">
+          <span class="ms-field-label">Start Date</span>
+          <input type="date" [(ngModel)]="form.startDate" />
+        </label>
+
+        <label class="ms-field">
+          <span class="ms-field-label">Due Date</span>
+          <input type="date" [(ngModel)]="form.dueDate" />
+        </label>
+
+        <label class="ms-field">
+          <span class="ms-field-label">Status</span>
+          <select [(ngModel)]="form.status">
+            <option *ngFor="let s of STATUSES" [value]="s">{{ s.replace('_', ' ') }}</option>
+          </select>
+        </label>
+
+        <!-- Money fields (only if user may view financials) -->
+        <ng-container *ngIf="canViewFinancials()">
+          <label class="ms-field">
+            <span class="ms-field-label">Amount ({{ symbol() }})</span>
+            <div class="ms-input-addon-wrap">
+              <span class="ms-input-prefix">{{ symbol() }}</span>
+              <input type="number" [(ngModel)]="form.amount" placeholder="e.g. 200000" />
+            </div>
+          </label>
+          <label class="ms-field">
+            <span class="ms-field-label">Share of Project (%)</span>
+            <div class="ms-input-addon-wrap">
+              <input type="number" [(ngModel)]="form.percentage" placeholder="e.g. 20" />
+              <span class="ms-input-suffix">%</span>
+            </div>
+          </label>
+        </ng-container>
+
+        <!-- Description -->
+        <label class="ms-field ms-field-wide">
+          <span class="ms-field-label">Description</span>
+          <textarea rows="2" [(ngModel)]="form.description" placeholder="Summarize deliverables and scope included in this milestone"></textarea>
+        </label>
+      </div>
+
+      <div class="ms-form-actions">
+        <button type="button" class="ms-btn-ghost" (click)="cancelEdit()">Cancel</button>
+        <button type="button" class="ms-btn-primary" [disabled]="saving()" (click)="save()">
+          <svg lucideCheck size="14"></svg> {{ saving() ? 'Saving…' : 'Save milestone' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="ms-toolbar" *ngIf="milestones().length > 0">
+      <!-- Status Tabs -->
+      <div class="ms-filter-tabs">
+        <button
+          type="button"
+          class="ms-tab-pill"
+          [class.active]="statusFilter() === 'ALL'"
+          (click)="setStatusFilter('ALL')">
+          All
+          <span class="ms-tab-badge">{{ statusCounts().ALL }}</span>
+        </button>
+        <button
+          type="button"
+          class="ms-tab-pill"
+          [class.active]="statusFilter() === 'IN_PROGRESS'"
+          (click)="setStatusFilter('IN_PROGRESS')">
+          In Progress
+          <span class="ms-tab-badge">{{ statusCounts().IN_PROGRESS }}</span>
+        </button>
+        <button
+          type="button"
+          class="ms-tab-pill"
+          [class.active]="statusFilter() === 'PENDING'"
+          (click)="setStatusFilter('PENDING')">
+          Pending
+          <span class="ms-tab-badge">{{ statusCounts().PENDING }}</span>
+        </button>
+        <button
+          type="button"
+          class="ms-tab-pill"
+          [class.active]="statusFilter() === 'ON_HOLD'"
+          (click)="setStatusFilter('ON_HOLD')">
+          On Hold
+          <span class="ms-tab-badge">{{ statusCounts().ON_HOLD }}</span>
+        </button>
+        <button
+          type="button"
+          class="ms-tab-pill"
+          [class.active]="statusFilter() === 'COMPLETED'"
+          (click)="setStatusFilter('COMPLETED')">
+          Completed
+          <span class="ms-tab-badge">{{ statusCounts().COMPLETED }}</span>
+        </button>
+        <button
+          type="button"
+          class="ms-tab-pill"
+          *ngIf="statusCounts().CANCELLED > 0"
+          [class.active]="statusFilter() === 'CANCELLED'"
+          (click)="setStatusFilter('CANCELLED')">
+          Cancelled
+          <span class="ms-tab-badge">{{ statusCounts().CANCELLED }}</span>
+        </button>
+      </div>
+
+      <!-- Search Input -->
+      <div class="ms-search-box">
+        <svg lucideSearch size="14" class="ms-search-icon"></svg>
+        <input
+          type="text"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+          placeholder="Search milestones or owners…" />
+        <button
+          type="button"
+          class="ms-search-clear"
+          *ngIf="searchQuery()"
+          (click)="searchQuery.set('')"
+          title="Clear search">
+          <svg lucideX size="12"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="ms-loading" *ngIf="loading()">
+      <div class="ms-loading-spinner"></div>
+      <span>Loading milestones…</span>
+    </div>
+
+    <!-- Empty State (No milestones at all) -->
+    <div class="ms-empty-card" *ngIf="!loading() && milestones().length === 0 && editing() === null">
+      <div class="ms-empty-icon-circle">
+        <svg lucideFlag size="32"></svg>
+      </div>
+      <h3>No milestones defined yet</h3>
+      <p>
+        Milestones divide the project into dated, costed deliverables. Completing a milestone
+        signals progress and makes stages ready for invoice billing.
+      </p>
+      <button type="button" class="ms-btn-primary" *ngIf="canManage()" (click)="openCreate()">
+        <svg lucidePlus size="15"></svg> Add the first milestone
+      </button>
+    </div>
+
+    <!-- Empty Search Results -->
+    <div class="ms-empty-card" *ngIf="!loading() && milestones().length > 0 && filteredMilestones().length === 0">
+      <div class="ms-empty-icon-circle">
+        <svg lucideSearch size="28"></svg>
+      </div>
+      <h3>No matching milestones found</h3>
+      <p>Try adjusting your search query or switching the status filter tab.</p>
+      <button type="button" class="ms-btn-ghost" (click)="searchQuery.set(''); setStatusFilter('ALL')">
+        Reset filters
+      </button>
+    </div>
+
+    <!-- Milestone Cards List -->
+    <div class="ms-card-list" *ngIf="!loading() && filteredMilestones().length > 0">
+      <div
+        class="ms-card"
+        *ngFor="let m of filteredMilestones(); let i = index"
+        [class.ms-card-completed]="m.status === 'COMPLETED'"
+        [class.ms-card-in-progress]="m.status === 'IN_PROGRESS'"
+        [class.ms-card-pending]="m.status === 'PENDING'"
+        [class.ms-card-on-hold]="m.status === 'ON_HOLD'"
+        [class.ms-card-cancelled]="m.status === 'CANCELLED'">
+
+        <!-- Left Accent Stripe -->
+        <div class="ms-card-stripe"></div>
+
+        <!-- Reorder Controls -->
+        <div class="ms-order-wrap" *ngIf="canManage()">
+          <button
+            type="button"
+            class="ms-reorder-btn"
+            [disabled]="i === 0"
+            (click)="move(m, -1)"
+            title="Move up">
+            <svg lucideChevronUp size="13"></svg>
+          </button>
+          <span class="ms-order-num">#{{ i + 1 }}</span>
+          <button
+            type="button"
+            class="ms-reorder-btn"
+            [disabled]="i === filteredMilestones().length - 1"
+            (click)="move(m, 1)"
+            title="Move down">
+            <svg lucideChevronDown size="13"></svg>
+          </button>
+        </div>
+
+        <!-- Main Milestone Content -->
+        <div class="ms-card-main">
+          <!-- Title & Badges Row -->
+          <div class="ms-title-row">
+            <h4 class="ms-card-name">{{ m.name }}</h4>
+
+            <!-- Status Badge -->
+            <span class="ms-status-chip" [class]="'ms-chip-' + m.status.toLowerCase().replace('_', '-')">
+              <svg lucideCheckCircle2 size="11" *ngIf="m.status === 'COMPLETED'"></svg>
+              <svg lucideClock size="11" *ngIf="m.status === 'IN_PROGRESS'"></svg>
+              <svg lucideCircleDot size="11" *ngIf="m.status === 'PENDING'"></svg>
+              <svg lucidePause size="11" *ngIf="m.status === 'ON_HOLD'"></svg>
+              <svg lucideX size="11" *ngIf="m.status === 'CANCELLED'"></svg>
+              {{ m.status.replace('_', ' ') }}
+            </span>
+
+            <!-- Overdue Tag -->
+            <span class="ms-overdue-tag" *ngIf="isOverdue(m)">
+              <svg lucideAlertTriangle size="11"></svg> Overdue
+            </span>
+          </div>
+
+          <!-- Description (if provided) -->
+          <p class="ms-card-desc" *ngIf="m.description">{{ m.description }}</p>
+
+          <!-- Metadata Chips Row -->
+          <div class="ms-meta-row">
+            <!-- Owner Avatar & Name (only displayed if an owner is assigned) -->
+            <div class="ms-meta-chip ms-owner-chip" *ngIf="m.owner && ownerName(m) !== 'Unassigned'" [title]="'Assigned owner: ' + ownerName(m)">
+              <div class="ms-avatar-circle" *ngIf="!m.owner?.avatarUrl">{{ ownerInitials(m) }}</div>
+              <img class="ms-avatar-img" *ngIf="m.owner?.avatarUrl" [src]="m.owner!.avatarUrl" [alt]="ownerName(m)" />
+              <span class="ms-owner-text">{{ ownerName(m) }}</span>
+            </div>
+
+            <!-- Start Date -->
+            <div class="ms-meta-chip" *ngIf="m.startDate">
+              <svg lucideCalendar size="12" class="ms-meta-icon"></svg>
+              <span>Starts {{ m.startDate | date: 'mediumDate' }}</span>
+            </div>
+
+            <!-- Due Date / Completed Date -->
+            <div class="ms-meta-chip" *ngIf="m.dueDate && m.status !== 'COMPLETED'">
+              <svg lucideCalendar size="12" class="ms-meta-icon"></svg>
+              <span>Due {{ m.dueDate | date: 'mediumDate' }}</span>
+            </div>
+            <div class="ms-meta-chip ms-meta-done" *ngIf="m.completedAt || (m.status === 'COMPLETED' && m.dueDate)">
+              <svg lucideCheckCircle2 size="12" class="ms-meta-icon"></svg>
+              <span>Completed {{ (m.completedAt || m.dueDate) | date: 'mediumDate' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Financial Value & Budget Share -->
+        <div class="ms-card-amount" *ngIf="canViewFinancials()">
+          <span class="ms-amount-val">{{ money(m.amount) }}</span>
+          <span class="ms-amount-share" *ngIf="m.percentage != null">{{ m.percentage }}% of project</span>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="ms-card-actions" *ngIf="canManage()">
+          <select
+            class="ms-status-dropdown"
+            [class.status-completed]="m.status === 'COMPLETED'"
+            [class.status-in-progress]="m.status === 'IN_PROGRESS'"
+            [class.status-pending]="m.status === 'PENDING'"
+            [class.status-on-hold]="m.status === 'ON_HOLD'"
+            [class.status-cancelled]="m.status === 'CANCELLED'"
+            [ngModel]="m.status"
+            (ngModelChange)="setStatus(m, $event)"
+            title="Update milestone status">
+            <option *ngFor="let s of STATUSES" [value]="s">{{ s.replace('_', ' ') }}</option>
+          </select>
+
+          <button type="button" class="ms-action-icon-btn ms-btn-edit" (click)="openEdit(m)" title="Edit milestone">
+            <svg lucidePencil size="14"></svg>
+          </button>
+          <!-- Deletable only while still pending. Once work has started the
+               milestone is a fact — tasks are booked to it and its amount is
+               what an invoice will be written for — so it is put on hold or
+               cancelled instead, which keeps both. -->
+          <button
+            type="button"
+            class="ms-action-icon-btn ms-btn-danger"
+            *ngIf="canDelete(m); else holdInstead"
+            (click)="remove(m)"
+            title="Delete milestone">
+            <svg lucideTrash2 size="14"></svg>
+          </button>
+          <ng-template #holdInstead>
+            <button
+              type="button"
+              class="ms-action-icon-btn ms-btn-hold"
+              *ngIf="m.status !== 'ON_HOLD' && m.status !== 'CANCELLED'"
+              (click)="setStatus(m, 'ON_HOLD')"
+              title="Work has started on this milestone, so it can no longer be deleted. Put it on hold instead.">
+              <svg lucidePause size="14"></svg>
+            </button>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
