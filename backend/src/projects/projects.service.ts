@@ -106,7 +106,6 @@ export class ProjectsService {
         // status is ACTIVE rather than DRAFT: somebody filling in this form is
         // starting work, and DRAFT would hide it behind the default filter.
         category: data.category || null,
-        projectType: data.projectType || null,
         priority: data.priority || 'MEDIUM',
         departmentId: data.departmentId ? parseInt(data.departmentId, 10) : null,
         workStatus: data.workStatus || 'ACTIVE',
@@ -967,7 +966,6 @@ export class ProjectsService {
     if (data.workStatus !== undefined) updateData.workStatus = data.workStatus;
     // Delivery module fields (§4, §7, §9, §37).
     if (data.category !== undefined) updateData.category = data.category || null;
-    if (data.projectType !== undefined) updateData.projectType = data.projectType || null;
     if (data.priority !== undefined) updateData.priority = data.priority;
     if (data.departmentId !== undefined) updateData.departmentId = data.departmentId ? parseInt(data.departmentId, 10) : null;
     if (data.currency !== undefined) updateData.currency = data.currency;

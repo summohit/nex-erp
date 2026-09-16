@@ -12,7 +12,8 @@ import {
   LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw, LucideBrainCircuit,
   LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
   LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
-  LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2
+  LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
+  LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
@@ -77,6 +78,7 @@ function getStatusColors(status: string): { bg: string; color: string } {
     LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
     LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
     LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
+    LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity,
     AgGridModule
   ],
   templateUrl: './projects.html',
@@ -197,7 +199,7 @@ export class ProjectsComponent implements OnInit {
   /** Answered by the server so the department rule has one authority. */
   taskCapabilities = signal<TaskCapabilities>({ canCreateTask: false, canCreateGeneral: false, isAdmin: false });
   pmDropdownOpen = signal(false);
-  pmSearchQuery = '';
+  pmSearchQuery = signal<string>('');
 
   projectManagerEmployees = computed(() => {
     return this.employees().filter((e: any) =>
@@ -206,12 +208,20 @@ export class ProjectsComponent implements OnInit {
   });
 
   filteredPmEmployees = computed(() => {
-    const q = this.pmSearchQuery.toLowerCase().trim();
-    const list = this.projectManagerEmployees();
-    if (!q) return list;
-    return list.filter((e: any) =>
+    const q = this.pmSearchQuery().toLowerCase().trim();
+    const all = this.employees() || [];
+    if (!q) {
+      const pms = all.filter((e: any) =>
+        e.isProjectManager === true || /project.*manager|manager.*project/i.test(e.designation?.name || '')
+      );
+      const others = all.filter((e: any) => !pms.includes(e));
+      return [...pms, ...others];
+    }
+    return all.filter((e: any) =>
       `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(q) ||
-      (e.user?.email || '').toLowerCase().includes(q)
+      (e.user?.email || '').toLowerCase().includes(q) ||
+      (e.designation?.name || '').toLowerCase().includes(q) ||
+      (e.department?.name || '').toLowerCase().includes(q)
     );
   });
 
@@ -818,7 +828,6 @@ export class ProjectsComponent implements OnInit {
       address: '',
       // ── Delivery (§4, §7, §9) ──
       category: '',
-      projectType: '',
       priority: 'MEDIUM',
       departmentId: null as number | null,
       workStatus: 'ACTIVE',
@@ -879,7 +888,6 @@ export class ProjectsComponent implements OnInit {
   filterCategory = signal<string>('ALL');
   filterStatus = signal<string>('ALL');
   filterPriority = signal<string>('ALL');
-  filterProjectType = signal<string>('ALL');
   filterStartFrom = signal<string>('');
   filterDeadlineTo = signal<string>('');
 
@@ -928,14 +936,136 @@ export class ProjectsComponent implements OnInit {
     return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  categoryOptions = computed(() => this.distinctFrom(p => p.category));
-  projectTypeOptions = computed(() => this.distinctFrom(p => p.projectType));
+  projectCategories: string[] = [
+    'Implementation & Deployment',
+    'Implementation & Migration',
+    'Products',
+    'AMC (Annual Maintenance Contract)',
+    'FMS (Resource Contract)',
+    'Rental',
+    'Corporate Training',
+    'POC',
+    'Other',
+    'Inbound',
+    'Implementation',
+    'Software',
+    'Enterprise'
+  ];
+
+  categoryOptions = computed(() => {
+    const fromProjects = this.distinctFrom(p => p.category);
+    const combined = new Set([...this.projectCategories, ...fromProjects]);
+    return Array.from(combined);
+  });
+
+  allBoardsForSelect = computed(() => {
+    const list = this.myProjects();
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  });
+
+  allTasksForSelect = computed(() => {
+    const list = this.myTasks();
+    return [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  });
+
+  // Create / Edit Modal Searchable Selects
+  clientDropdownOpen = signal<boolean>(false);
+  clientSearchQuery = signal<string>('');
+
+  categoryDropdownOpen = signal<boolean>(false);
+  categorySearchQuery = signal<string>('');
+
+  filteredLeadContacts = computed(() => {
+    const list = this.leadContacts() || [];
+    const q = this.clientSearchQuery().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(c => 
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.companyName && c.companyName.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.toLowerCase().includes(q))
+    );
+  });
+
+  getSelectedLeadContact(): any | null {
+    if (!this.projectForm.leadContactId) return null;
+    return (this.leadContacts() || []).find(c => c.id === this.projectForm.leadContactId) || null;
+  }
+
+  getContactInitial(c: any): string {
+    const n = c?.name || c?.companyName || '?';
+    return n.charAt(0).toUpperCase();
+  }
+
+  selectLeadContact(c: any | null) {
+    this.projectForm.leadContactId = c ? c.id : null;
+    this.clientDropdownOpen.set(false);
+    this.clientSearchQuery.set('');
+  }
+
+  filteredCategories = computed(() => {
+    const q = this.categorySearchQuery().toLowerCase().trim();
+    if (!q) return this.projectCategories;
+    return this.projectCategories.filter(c => c.toLowerCase().includes(q));
+  });
+
+  selectCategory(cat: string) {
+    this.projectForm.category = cat;
+    this.categoryDropdownOpen.set(false);
+    this.categorySearchQuery.set('');
+  }
+
+  departmentDropdownOpen = signal<boolean>(false);
+  departmentSearchQuery = signal<string>('');
+
+  filteredDepartments = computed(() => {
+    const list = this.departments() || [];
+    const q = this.departmentSearchQuery().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter((d: any) => (d.name && d.name.toLowerCase().includes(q)));
+  });
+
+  getSelectedDepartment(): any | null {
+    if (!this.projectForm.departmentId) return null;
+    return (this.departments() || []).find((d: any) => d.id === this.projectForm.departmentId) || null;
+  }
+
+  selectDepartment(d: any | null) {
+    this.projectForm.departmentId = d ? d.id : null;
+    this.departmentDropdownOpen.set(false);
+    this.departmentSearchQuery.set('');
+  }
+
+  closeAllModalDropdowns() {
+    this.pmDropdownOpen.set(false);
+    this.clientDropdownOpen.set(false);
+    this.categoryDropdownOpen.set(false);
+    this.departmentDropdownOpen.set(false);
+  }
+
+  // Deadline cannot precede the start date. Checked on both fields and again
+  // on save, so a value typed straight into the date input cannot slip past.
+  isDateRangeInvalid(): boolean {
+    if (!this.projectForm.startDate || !this.projectForm.endDate) return false;
+    return this.projectForm.endDate < this.projectForm.startDate;
+  }
+
+  onStartDateChange() {
+    if (this.projectForm.startDate && this.projectForm.endDate && this.projectForm.endDate < this.projectForm.startDate) {
+      this.projectForm.endDate = this.projectForm.startDate;
+    }
+  }
+
+  onEndDateChange() {
+    if (this.projectForm.startDate && this.projectForm.endDate && this.projectForm.endDate < this.projectForm.startDate) {
+      this.toast.warning('Deadline must be equal to or after Start Date');
+    }
+  }
 
   activeFilterCount = computed(() =>
     [
       this.filterClientId(), this.filterPmId(), this.filterDepartmentId(),
-      this.filterCategory(), this.filterStatus(), this.filterPriority(),
-      this.filterProjectType()
+      this.filterCategory(), this.filterStatus(), this.filterPriority()
     ].filter(v => v !== 'ALL').length
     + (this.filterStartFrom() ? 1 : 0)
     + (this.filterDeadlineTo() ? 1 : 0)
@@ -948,7 +1078,6 @@ export class ProjectsComponent implements OnInit {
     this.filterCategory.set('ALL');
     this.filterStatus.set('ALL');
     this.filterPriority.set('ALL');
-    this.filterProjectType.set('ALL');
     this.filterStartFrom.set('');
     this.filterDeadlineTo.set('');
   }
@@ -960,7 +1089,6 @@ export class ProjectsComponent implements OnInit {
     const category = this.filterCategory();
     const status = this.filterStatus();
     const priority = this.filterPriority();
-    const type = this.filterProjectType();
     const startFrom = this.filterStartFrom();
     const deadlineTo = this.filterDeadlineTo();
 
@@ -970,7 +1098,6 @@ export class ProjectsComponent implements OnInit {
       if (category !== 'ALL' && (p.category || '') !== category) return false;
       if (status !== 'ALL' && (p.workStatus || '') !== status) return false;
       if (priority !== 'ALL' && (p.priority || 'MEDIUM') !== priority) return false;
-      if (type !== 'ALL' && (p.projectType || '') !== type) return false;
 
       if (pm !== 'ALL') {
         const isPm = (p.members || []).some(
@@ -2425,7 +2552,6 @@ export class ProjectsComponent implements OnInit {
       pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || [],
       address: project.address || '',
       category: project.category || '',
-      projectType: project.projectType || '',
       priority: project.priority || 'MEDIUM',
       departmentId: project.department?.id ?? project.departmentId ?? null,
       workStatus: project.workStatus || 'ACTIVE',
@@ -2448,13 +2574,21 @@ export class ProjectsComponent implements OnInit {
 
   closeCreateModal() {
     this.isCreateModalOpen.set(false);
-    this.pmDropdownOpen.set(false);
-    this.pmSearchQuery = '';
+    this.closeAllModalDropdowns();
+    this.pmSearchQuery.set('');
+    this.clientSearchQuery.set('');
+    this.categorySearchQuery.set('');
+    this.departmentSearchQuery.set('');
   }
 
   saveProject() {
     this.isSubmitted.set(true);
     if (!this.projectForm.name.trim()) return;
+
+    if (this.isDateRangeInvalid()) {
+      this.toast.error('Deadline must be equal to or after Start Date');
+      return;
+    }
 
     const bgValue = this.selectedBg().startsWith('http') 
       ? `url(${this.selectedBg()})` 
@@ -2476,7 +2610,6 @@ export class ProjectsComponent implements OnInit {
       pmIds: this.projectForm.pmIds,
       address: this.projectForm.address || null,
       category: this.projectForm.category || null,
-      projectType: this.projectForm.projectType || null,
       priority: this.projectForm.priority,
       departmentId: this.projectForm.departmentId || null,
       workStatus: this.projectForm.workStatus,

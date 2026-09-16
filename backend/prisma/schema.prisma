@@ -1416,7 +1416,6 @@ model Project {
   /// PAYMENT_PENDING.
   closureStatus String      @default("WORK_PENDING")
   priority      String      @default("MEDIUM") // CRITICAL, HIGH, MEDIUM, LOW
-  projectType   String? // free-text, e.g. "Implementation", "AMC", "T&M"
   /// The delivery team accountable for the project, so the list can be filtered
   /// by department without inferring it from whoever happens to be a member.
   departmentId  Int?
