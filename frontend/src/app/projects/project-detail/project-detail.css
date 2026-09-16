@@ -6549,3 +6549,23 @@ input[type=text], input[type=email], input[type=password] {
   padding: 1px 6px;
   border-radius: 4px;
 }
+
+/* §15 Milestone picker on the task modal. The only place a task is linked to
+   a milestone — without it a milestone's task count can never leave 0/0. */
+.modal-milestone-section .milestone-picker {
+  width: 100%;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 9px 11px;
+  outline: none;
+  cursor: pointer;
+}
+
+.modal-milestone-section .milestone-picker:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+}

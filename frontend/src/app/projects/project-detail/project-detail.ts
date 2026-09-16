@@ -776,6 +776,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       next: () => {
         // We will reload everything to keep UI completely in sync, including time tracking
         this.loadBoardAndIssues();
+        // Task counts on the Milestones tab move when a task's milestone does.
+        this.loadProjectMilestones();
         
         // Also manually update the selected issue right away for fast UI response
         const current = this.selectedIssue();
@@ -1327,6 +1329,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.loadProjectDetails();
         this.loadBoardAndIssues();
         this.loadActivity();
+        // Needed by the task modal's Milestone picker, which can be opened
+        // before the Milestones tab is ever visited.
+        this.loadProjectMilestones();
         
         // Socket integration for the whole project
         this.socketService.joinProject(this.projectId);
@@ -1466,6 +1471,31 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * §15: milestones offered on the task modal's Milestone picker.
+   *
+   * Loaded once with the project rather than per card. The endpoint answers
+   * permissions too, but only the identity is needed here — amounts never
+   * appear on a task.
+   */
+  projectMilestones = signal<any[]>([]);
+
+  loadProjectMilestones() {
+    this.projectsService.getMilestones(this.projectId).subscribe({
+      next: (res) => this.projectMilestones.set(res?.milestones || []),
+      error: () => this.projectMilestones.set([]),
+    });
+  }
+
+  setIssueMilestone(milestoneId: number | null) {
+    const issue = this.selectedIssue();
+    if (!issue) return;
+    // Optimistic, so the select does not snap back while the save is in
+    // flight; loadBoardAndIssues reconciles it either way.
+    this.selectedIssue.set({ ...issue, milestoneId });
+    this.updateIssueDetails({ milestoneId });
+  }
+
   loadBoardAndIssues() {
     this.isLoading.set(true);
     this.projectsService.getBoard(this.projectId).subscribe({
@@ -1486,6 +1516,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
               }
             });
             this.issuesByColumn.set(map);
+            // Re-point the open task modal at its refreshed row. Without this
+            // the modal keeps rendering the copy it was opened with, so time
+            // logged from inside it appears to do nothing until you close and
+            // reopen the card.
+            const open = this.selectedIssue();
+            if (open) {
+              const fresh = issues.find((i: any) => i.id === open.id);
+              if (fresh) this.selectedIssue.set(fresh);
+            }
             this.isLoading.set(false);
             // A task opened from My Tasks arrives as ?task=<id>. The id is
             // captured in ngOnInit but can only be acted on here, once

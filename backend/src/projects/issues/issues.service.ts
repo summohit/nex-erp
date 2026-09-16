@@ -74,7 +74,10 @@ export class IssuesService {
         position,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         startDate: data.startDate ? new Date(data.startDate) : null,
-        parentId: data.parentId ? Number(data.parentId) : null
+        parentId: data.parentId ? Number(data.parentId) : null,
+        // §15: optional at creation — a task often exists before anyone
+        // decides which milestone it belongs to.
+        milestoneId: await this.resolveMilestoneId(companyId, projectId, data.milestoneId)
       }
     });
 
@@ -103,6 +106,8 @@ export class IssuesService {
         parent: { select: { id: true, key: true, title: true, type: true, status: true } },
         children: { select: { id: true, key: true, title: true, type: true, status: true, priority: true, assignee: { select: { avatarUrl: true } } }, orderBy: { position: 'asc' } },
         timeLogs: { select: { id: true, durationMin: true, startedAt: true, endedAt: true } },
+        // §15: so the card and the task modal can show and change it.
+        milestone: { select: { id: true, name: true, status: true } },
         _count: { select: { comments: true } }
       },
       orderBy: { position: 'asc' }
@@ -274,6 +279,11 @@ export class IssuesService {
     if (data.type !== undefined) updateData.type = data.type;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.priority !== undefined) updateData.priority = data.priority;
+    // §15: the milestone this task delivers. Validated against the project so
+    // a task cannot be attached to another project's milestone.
+    if (data.milestoneId !== undefined) {
+      updateData.milestoneId = await this.resolveMilestoneId(companyId, projectId, data.milestoneId);
+    }
     let isRestrictedTarget = data.status === 'DONE';
 
     if (data.columnId !== undefined) {
@@ -488,6 +498,59 @@ export class IssuesService {
     return employee.id;
   }
 
+  /**
+   * Validate a milestone belongs to this project before attaching a task.
+   *
+   * Milestone ids are unique company-wide, so without this check a task could
+   * be pointed at another project's milestone — which would then count it in
+   * that milestone's progress and, once invoicing lands, against its value.
+   */
+  private async resolveMilestoneId(
+    companyId: number,
+    projectId: number,
+    milestoneId: any,
+  ): Promise<number | null> {
+    if (milestoneId === null || milestoneId === '' || milestoneId === undefined) return null;
+
+    const id = Number(milestoneId);
+    const milestone = await this.prisma.projectMilestone.findFirst({
+      where: { id, projectId, companyId },
+      select: { id: true },
+    });
+    if (!milestone) throw new BadRequestException('That milestone does not belong to this project');
+    return milestone.id;
+  }
+
+  /**
+   * Move a task out of a To Do column the moment work is logged against it.
+   *
+   * A task with hours on it is demonstrably not "to do". Only ever promotes
+   * out of TODO: a retrospective log against something already in review or
+   * done must not drag it backwards, which is why this is not a blanket
+   * "set IN_PROGRESS".
+   */
+  private async promoteFromTodoOnWork(projectId: number, issue: { id: number; columnId: number | null; status: string }) {
+    const currentCol = issue.columnId
+      ? await this.prisma.boardColumn.findUnique({ where: { id: issue.columnId } })
+      : null;
+
+    const isTodo = currentCol ? currentCol.type === 'TODO' : issue.status === 'TODO';
+    if (!isTodo) return;
+
+    const inProgress = await this.prisma.boardColumn.findFirst({
+      where: { board: { projectId }, type: 'IN_PROGRESS', isArchived: false },
+      orderBy: { position: 'asc' },
+    });
+
+    await this.prisma.issue.update({
+      where: { id: issue.id },
+      data: {
+        status: 'IN_PROGRESS',
+        ...(inProgress ? { columnId: inProgress.id } : {}),
+      },
+    });
+  }
+
   async startTimeTracking(companyId: number, userId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
@@ -506,6 +569,8 @@ export class IssuesService {
     await this.prisma.issueActivity.create({
       data: { action: 'WORK_STARTED', issueId, actorId: employeeId }
     });
+
+    await this.promoteFromTodoOnWork(projectId, issue);
 
     return { success: true, startedAt: now };
   }
@@ -560,13 +625,20 @@ export class IssuesService {
         employeeId,
         startedAt,
         endedAt: now,
-        durationMin: data.durationMin
+        durationMin: data.durationMin,
+        // Log Work is manual by definition. It defaulted to TIMER, which made
+        // the weekly timesheet treat hand-entered time as timer evidence and
+        // refuse to correct it downwards ("you have 0.50h tracked by timer")
+        // for time no timer ever ran.
+        source: 'MANUAL',
       }
     });
 
     await this.prisma.issueActivity.create({
       data: { action: 'TIME_LOGGED', issueId, actorId: employeeId }
     });
+
+    await this.promoteFromTodoOnWork(projectId, issue);
 
     return { success: true, log };
   }

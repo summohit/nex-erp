@@ -2505,6 +2505,19 @@
         </div>
       </div>
 
+      <!-- §15: the milestone this task delivers. This is the only place the
+           link is made — without it a milestone's task count is always 0/0. -->
+      <div class="modal-milestone-section mb-6" *ngIf="projectMilestones().length > 0">
+        <div class="section-label-subtitle">Milestone</div>
+        <select
+          class="milestone-picker"
+          [ngModel]="selectedIssue()?.milestoneId ?? null"
+          (ngModelChange)="setIssueMilestone($event)">
+          <option [ngValue]="null">No milestone</option>
+          <option *ngFor="let m of projectMilestones()" [ngValue]="m.id">{{ m.name }}</option>
+        </select>
+      </div>
+
       <!-- Time Tracking Section -->
       <div class="modal-time-tracking-section mb-6">
         <div class="section-header time-tracking-header">
