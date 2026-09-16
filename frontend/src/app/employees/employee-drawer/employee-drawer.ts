@@ -50,6 +50,10 @@ export class EmployeeDrawerComponent implements OnInit {
       shiftId: [null, Validators.required],
       managerId: [null],
       isProjectManager: [false],
+      // §23. Not part of the employee payload — saved through its own
+      // endpoint after the profile save, because only Admin and Finance may
+      // set it and it must not ride in beside a phone number.
+      hourlyCostRate: [null as number | null],
       role: ['EMPLOYEE', Validators.required],
       employmentCategory: ['PERMANENT', Validators.required]
     });
@@ -76,6 +80,33 @@ export class EmployeeDrawerComponent implements OnInit {
       if (this.isProjectManagerDesignation(designationId)) {
         this.form.patchValue({ isProjectManager: true });
       }
+    });
+  }
+
+  /**
+   * Only Admin, Superadmin and Finance see or set a charge-out rate. The
+   * server enforces this too — this just keeps a field on screen that the
+   * viewer could not save.
+   */
+  get canSetCostRate(): boolean {
+    const role = this.authService.currentUser()?.role;
+    return role === 'SUPERADMIN' || role === 'ADMIN' || role === 'FINANCE';
+  }
+
+  /**
+   * Fire-and-report: the profile has already saved by this point, so a failure
+   * here must not claim the whole save failed. Skipped entirely when the value
+   * has not changed, so an ordinary edit does not touch the rate at all.
+   */
+  private persistCostRate(employeeId: number, rate: number | null) {
+    if (!this.canSetCostRate) return;
+
+    const previous = this.employeeData?.hourlyCostRate ?? null;
+    const next = rate === null || (rate as any) === '' ? null : Number(rate);
+    if (previous === next) return;
+
+    this.employeeService.setCostRate(employeeId, next).subscribe({
+      error: (err) => this.toast.error(err?.error?.message || 'Employee saved, but the cost rate did not'),
     });
   }
 
@@ -106,6 +137,9 @@ export class EmployeeDrawerComponent implements OnInit {
           shiftId: this.employeeData.shiftId,
           managerId: this.employeeData.managerId,
           isProjectManager: this.employeeData.isProjectManager || this.isProjectManagerDesignation(this.employeeData.designationId),
+          // Absent from the payload entirely when the viewer may not see it,
+          // so the field stays blank rather than showing a misleading zero.
+          hourlyCostRate: this.employeeData.hourlyCostRate ?? null,
           role: this.employeeData.user?.role || 'EMPLOYEE',
           employmentCategory: this.employeeData.employmentCategory || 'PERMANENT'
         });
@@ -181,11 +215,14 @@ export class EmployeeDrawerComponent implements OnInit {
     }
 
     this.isSaving = true;
-    const data = this.form.getRawValue(); // gets disabled fields too
+    // The cost rate travels on its own endpoint, so it never reaches the
+    // employee payload — the server would ignore it there in any case.
+    const { hourlyCostRate, ...data } = this.form.getRawValue();
 
     if (this.employeeData && this.employeeData.id) {
       this.employeeService.updateEmployee(this.employeeData.id, data).subscribe({
         next: () => {
+          this.persistCostRate(this.employeeData.id, hourlyCostRate);
           this.toast.success('Employee updated successfully');
           this.isSaving = false;
           this.saveSuccess.emit();

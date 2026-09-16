@@ -1,0 +1,337 @@
+.ms-tab {
+  padding: 4px 0 24px;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+
+.ms-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.ms-summary {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.ms-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ms-stat-value {
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ms-stat-value.ms-warn {
+  color: #b91c1c;
+}
+
+.ms-stat-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.ms-btn-primary,
+.ms-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.ms-btn-primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.ms-btn-primary:hover { background: #1d4ed8; }
+.ms-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.ms-btn-ghost {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.ms-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.ms-icon-btn:hover:not(:disabled) { border-color: #cbd5e1; color: #1e293b; }
+.ms-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.ms-icon-btn.ms-danger:hover { border-color: #fca5a5; color: #b91c1c; }
+
+/* ── Form ─────────────────────────────────────────────────────────────── */
+
+.ms-form {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.ms-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.ms-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.ms-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ms-field-wide { grid-column: 1 / -1; }
+
+.ms-field > span {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.ms-field input,
+.ms-field select,
+.ms-field textarea {
+  width: 100%;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  outline: none;
+  resize: vertical;
+}
+
+.ms-field input:focus,
+.ms-field select:focus,
+.ms-field textarea:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+}
+
+.ms-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ── List ─────────────────────────────────────────────────────────────── */
+
+.ms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.ms-row-done { background: #f8fdf9; border-color: #d3ead9; }
+
+.ms-order {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ms-order .ms-icon-btn { width: 24px; height: 20px; }
+
+.ms-main { flex: 1; min-width: 0; }
+
+.ms-title-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.ms-name {
+  font-size: 14px;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.ms-status {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.ms-pending     { background: #f1f5f9; color: #475569; }
+.ms-in-progress { background: #dbeafe; color: #1d4ed8; }
+.ms-completed   { background: #dcfce7; color: #15803d; }
+.ms-cancelled   { background: #fee2e2; color: #b91c1c; }
+
+.ms-overdue {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #b91c1c;
+  background: #fee2e2;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.ms-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ms-desc {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.ms-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.ms-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.ms-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.ms-progress-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  min-width: 32px;
+  text-align: right;
+}
+
+.ms-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.ms-amount-value { font-size: 14px; font-weight: 700; color: #0f172a; }
+.ms-amount-pct   { font-size: 11.5px; color: #94a3b8; }
+
+.ms-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ms-status-select {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  padding: 5px 7px;
+  outline: none;
+}
+
+/* ── Empty & loading ──────────────────────────────────────────────────── */
+
+.ms-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 20px;
+  text-align: center;
+  color: #94a3b8;
+  background: #ffffff;
+  border: 1px dashed #e2e8f0;
+  border-radius: 14px;
+}
+
+.ms-empty h3 { margin: 4px 0 0; font-size: 15px; color: #334155; }
+.ms-empty p  { margin: 0 0 8px; font-size: 13px; max-width: 420px; }
+
+.ms-loading {
+  padding: 32px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* ── Narrow screens ───────────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+  .ms-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .ms-main { flex-basis: 100%; }
+  .ms-progress { width: auto; flex: 1; }
+  .ms-amount { width: auto; align-items: flex-start; }
+}

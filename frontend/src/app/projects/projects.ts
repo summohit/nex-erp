@@ -676,14 +676,31 @@ export class ProjectsComponent implements OnInit {
           cellRenderer: (params: any) => this.money(params.value, params.data)
         },
         {
-          headerName: 'Budget used',
-          field: 'budgetUsed',
+          // §23: logged hours × each person's internal cost rate.
+          headerName: 'Employee cost',
+          field: 'employeeCost',
+          width: 150,
+          type: 'numericColumn',
+          cellRenderer: (params: any) => {
+            const base = this.money(params.value, params.data);
+            const unpriced = params.data?.unratedHours ?? 0;
+            if (!params.data?.canViewFinancials || unpriced <= 0) return base;
+            // The figure is an understatement whenever somebody logged hours
+            // without a cost rate. Saying so beats a number that looks whole.
+            return `<span title="Excludes ${unpriced}h logged by people with no cost rate set">${base}<span class="cost-partial">*</span></span>`;
+          }
+        },
+        {
+          // Employee cost + approved expenses. This is what the project has
+          // actually consumed, and what budget remaining is measured against.
+          headerName: 'Actual cost',
+          field: 'actualCost',
           width: 140,
           type: 'numericColumn',
           cellRenderer: (params: any) => this.money(params.value, params.data)
         },
         {
-          headerName: 'Remaining',
+          headerName: 'Budget left',
           field: 'budgetRemaining',
           width: 140,
           type: 'numericColumn',

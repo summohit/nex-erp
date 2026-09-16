@@ -3758,3 +3758,13 @@
   cursor: pointer;
   margin: 0;
 }
+
+/* Marks an employee-cost figure that could not price every logged hour,
+   because whoever logged them has no cost rate set. The title attribute
+   carries the number of hours missing. */
+.boards-grid-table .cost-partial {
+  color: #c2410c;
+  font-weight: 700;
+  margin-left: 2px;
+  cursor: help;
+}

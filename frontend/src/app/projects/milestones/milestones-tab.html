@@ -1,0 +1,169 @@
+<div class="ms-tab">
+  <!-- Header: the §41 milestone card, plus the money summary for those who
+       may see it. Totals are absent (not zeroed) for everyone else. -->
+  <div class="ms-header">
+    <div class="ms-summary">
+      <div class="ms-stat">
+        <span class="ms-stat-value">{{ completedCount() }} / {{ milestones().length }}</span>
+        <span class="ms-stat-label">Milestones complete</span>
+      </div>
+
+      <ng-container *ngIf="totals() as t">
+        <div class="ms-stat">
+          <span class="ms-stat-value">{{ money(t.milestoneValue) }}</span>
+          <span class="ms-stat-label">Milestone value</span>
+        </div>
+        <div class="ms-stat" *ngIf="t.budgetAmount != null">
+          <span class="ms-stat-value">{{ money(t.budgetAmount) }}</span>
+          <span class="ms-stat-label">Project budget</span>
+        </div>
+        <!-- A gap either way is a planning error, so it is called out rather
+             than left for the reader to subtract. -->
+        <div class="ms-stat" *ngIf="t.unallocated != null && t.unallocated !== 0">
+          <span class="ms-stat-value" [class.ms-warn]="t.unallocated < 0">{{ money(t.unallocated) }}</span>
+          <span class="ms-stat-label">{{ t.unallocated < 0 ? 'Over-allocated' : 'Unallocated' }}</span>
+        </div>
+      </ng-container>
+    </div>
+
+    <button type="button" class="ms-btn-primary" *ngIf="canManage()" (click)="openCreate()">
+      <svg lucidePlus size="14"></svg> Add milestone
+    </button>
+  </div>
+
+  <div class="ms-loading" *ngIf="loading()">Loading milestones…</div>
+
+  <!-- Create / edit form -->
+  <div class="ms-form" *ngIf="editing() !== null">
+    <div class="ms-form-head">
+      <strong>{{ editing() === 'new' ? 'New milestone' : 'Edit milestone' }}</strong>
+      <button type="button" class="ms-icon-btn" (click)="cancelEdit()"><svg lucideX size="14"></svg></button>
+    </div>
+
+    <div class="ms-form-grid">
+      <label class="ms-field ms-field-wide">
+        <span>Name</span>
+        <input type="text" [(ngModel)]="form.name" placeholder="e.g. UAT sign-off" />
+      </label>
+
+      <label class="ms-field">
+        <span>Start date</span>
+        <input type="date" [(ngModel)]="form.startDate" />
+      </label>
+
+      <label class="ms-field">
+        <span>Due date</span>
+        <input type="date" [(ngModel)]="form.dueDate" />
+      </label>
+
+      <label class="ms-field">
+        <span>Status</span>
+        <select [(ngModel)]="form.status">
+          <option *ngFor="let s of STATUSES" [value]="s">{{ s.replace('_', ' ') }}</option>
+        </select>
+      </label>
+
+      <label class="ms-field">
+        <span>Owner</span>
+        <select [(ngModel)]="form.ownerId">
+          <option [ngValue]="null">Unassigned</option>
+          <option *ngFor="let e of employees()" [ngValue]="e.id">{{ e.firstName }} {{ e.lastName }}</option>
+        </select>
+      </label>
+
+      <!-- Money is only rendered for viewers the server said may see it. -->
+      <ng-container *ngIf="canViewFinancials()">
+        <label class="ms-field">
+          <span>Amount ({{ symbol() }})</span>
+          <input type="number" [(ngModel)]="form.amount" placeholder="e.g. 200000" />
+        </label>
+        <label class="ms-field">
+          <span>Share of project (%)</span>
+          <input type="number" [(ngModel)]="form.percentage" placeholder="e.g. 20" />
+        </label>
+      </ng-container>
+
+      <label class="ms-field ms-field-wide">
+        <span>Description</span>
+        <textarea rows="2" [(ngModel)]="form.description" placeholder="What this milestone delivers"></textarea>
+      </label>
+    </div>
+
+    <div class="ms-form-actions">
+      <button type="button" class="ms-btn-ghost" (click)="cancelEdit()">Cancel</button>
+      <button type="button" class="ms-btn-primary" [disabled]="saving()" (click)="save()">
+        <svg lucideCheck size="14"></svg> {{ saving() ? 'Saving…' : 'Save milestone' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="ms-empty" *ngIf="!loading() && milestones().length === 0 && editing() === null">
+    <svg lucideFlag size="28"></svg>
+    <h3>No milestones yet</h3>
+    <p>
+      Milestones break the project into dated, costed stages. Completing one is
+      what makes an invoice eligible.
+    </p>
+    <button type="button" class="ms-btn-primary" *ngIf="canManage()" (click)="openCreate()">
+      <svg lucidePlus size="14"></svg> Add the first milestone
+    </button>
+  </div>
+
+  <!-- List -->
+  <div class="ms-list" *ngIf="!loading() && milestones().length > 0">
+    <div class="ms-row" *ngFor="let m of milestones(); let i = index" [class.ms-row-done]="m.status === 'COMPLETED'">
+      <div class="ms-order" *ngIf="canManage()">
+        <button type="button" class="ms-icon-btn" [disabled]="i === 0" (click)="move(m, -1)" title="Move up">
+          <svg lucideChevronUp size="13"></svg>
+        </button>
+        <button type="button" class="ms-icon-btn" [disabled]="i === milestones().length - 1" (click)="move(m, 1)" title="Move down">
+          <svg lucideChevronDown size="13"></svg>
+        </button>
+      </div>
+
+      <div class="ms-main">
+        <div class="ms-title-row">
+          <span class="ms-name">{{ m.name }}</span>
+          <span [class]="statusClass(m.status)">{{ m.status.replace('_', ' ') }}</span>
+          <span class="ms-overdue" *ngIf="isOverdue(m)">Overdue</span>
+        </div>
+        <div class="ms-meta">
+          <span>{{ ownerName(m) }}</span>
+          <span *ngIf="m.dueDate">Due {{ m.dueDate | date: 'mediumDate' }}</span>
+          <span *ngIf="m.completedAt">Completed {{ m.completedAt | date: 'mediumDate' }}</span>
+          <span>{{ m.taskDone }} / {{ m.taskTotal }} tasks</span>
+        </div>
+        <p class="ms-desc" *ngIf="m.description">{{ m.description }}</p>
+      </div>
+
+      <div class="ms-progress">
+        <div class="ms-progress-track">
+          <div class="ms-progress-fill" [style.width.%]="m.progress"></div>
+        </div>
+        <span class="ms-progress-label">{{ m.progress }}%</span>
+      </div>
+
+      <div class="ms-amount" *ngIf="canViewFinancials()">
+        <span class="ms-amount-value">{{ money(m.amount) }}</span>
+        <span class="ms-amount-pct" *ngIf="m.percentage != null">{{ m.percentage }}%</span>
+      </div>
+
+      <div class="ms-actions" *ngIf="canManage()">
+        <select
+          class="ms-status-select"
+          [ngModel]="m.status"
+          (ngModelChange)="setStatus(m, $event)"
+          title="Change status">
+          <option *ngFor="let s of STATUSES" [value]="s">{{ s.replace('_', ' ') }}</option>
+        </select>
+        <button type="button" class="ms-icon-btn" (click)="openEdit(m)" title="Edit">
+          <svg lucidePencil size="14"></svg>
+        </button>
+        <button type="button" class="ms-icon-btn ms-danger" (click)="remove(m)" title="Delete">
+          <svg lucideTrash2 size="14"></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

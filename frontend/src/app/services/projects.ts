@@ -240,4 +240,58 @@ export class ProjectsService {
   reorderBoardColumns(projectId: number, columnIds: number[]) {
     return this.http.put<any>(`${this.apiUrl}/${projectId}/boards/columns/reorder`, { columnIds });
   }
+
+  // ── Milestones (§13) ──────────────────────────────────────────────────
+  // The list response carries `canViewFinancials` and `canManage` alongside
+  // the rows: the server decides both, and the UI reads its answer rather than
+  // re-deriving one from the user's role and getting a different result.
+
+  getMilestones(projectId: number) {
+    return this.http.get<MilestoneList>(`${this.apiUrl}/${projectId}/milestones`);
+  }
+
+  createMilestone(projectId: number, data: Partial<Milestone>) {
+    return this.http.post<Milestone>(`${this.apiUrl}/${projectId}/milestones`, data);
+  }
+
+  updateMilestone(projectId: number, milestoneId: number, data: Partial<Milestone>) {
+    return this.http.put<Milestone>(`${this.apiUrl}/${projectId}/milestones/${milestoneId}`, data);
+  }
+
+  deleteMilestone(projectId: number, milestoneId: number) {
+    return this.http.delete<{ success: boolean }>(`${this.apiUrl}/${projectId}/milestones/${milestoneId}`);
+  }
+
+  reorderMilestones(projectId: number, orderedIds: number[]) {
+    return this.http.put<{ success: boolean }>(`${this.apiUrl}/${projectId}/milestones/reorder`, { orderedIds });
+  }
+}
+
+export interface Milestone {
+  id: number;
+  projectId: number;
+  name: string;
+  description?: string | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  completedAt?: string | null;
+  ownerId?: number | null;
+  owner?: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
+  position: number;
+  taskTotal: number;
+  taskDone: number;
+  progress: number;
+  /** Absent entirely when the viewer may not see the project's money. */
+  amount?: number | null;
+  percentage?: number | null;
+}
+
+export interface MilestoneList {
+  milestones: Milestone[];
+  /** Null for a viewer who may not see money — not a zeroed object. */
+  totals: { milestoneValue: number; budgetAmount: number | null; unallocated: number | null } | null;
+  canManage: boolean;
+  canViewFinancials: boolean;
+  currency: string;
 }

@@ -14,6 +14,34 @@ export class EmployeesService {
     private mailService: MailService
   ) {}
 
+  /**
+   * Roles allowed to see and set an employee's internal charge-out rate (§23).
+   *
+   * Deliberately narrower than directory access: HR can see the whole
+   * directory and must not see what the company charges a project for
+   * somebody's hour. A project manager sees cost rolled up on their own
+   * project's dashboard, never per person here.
+   */
+  private static readonly COST_RATE_ROLES = ['SUPERADMIN', 'ADMIN', 'FINANCE'];
+
+  private canSeeCostRate(role: string): boolean {
+    return EmployeesService.COST_RATE_ROLES.includes(role);
+  }
+
+  /**
+   * Remove hourlyCostRate unless the viewer may see it.
+   *
+   * Applied on the way out of every endpoint that returns whole Employee
+   * rows. The alternative — a `select` on each query — means the next field
+   * somebody adds is exposed by default, which is the wrong way round for a
+   * commercial figure.
+   */
+  private stripCostRate<T extends Record<string, any>>(row: T, role: string): T {
+    if (this.canSeeCostRate(role)) return row;
+    const { hourlyCostRate, ...rest } = row as any;
+    return rest as T;
+  }
+
   private async assertDirectoryAccess(companyId: number, role: string) {
     if (role === 'SUPERADMIN') return;
     const hasAccess = await this.permissions.hasPermission(companyId, role, 'employees/directory', 'VIEW');
@@ -24,7 +52,7 @@ export class EmployeesService {
 
   async findAll(companyId: number, role: string) {
     await this.assertDirectoryAccess(companyId, role);
-    return this.prisma.employee.findMany({
+    const employees = await this.prisma.employee.findMany({
       where: { companyId },
       include: {
         user: { select: { email: true, role: true, status: true } },
@@ -36,6 +64,8 @@ export class EmployeesService {
       },
       orderBy: { createdAt: 'desc' }
     });
+    // Directory access is not cost access — see canSeeCostRate.
+    return employees.map((e) => this.stripCostRate(e, role));
   }
 
   // Minimal name/avatar list for populating dropdowns and resolving display names
@@ -259,6 +289,34 @@ export class EmployeesService {
     });
   }
 
+  /**
+   * Set an employee's internal charge-out rate (§23).
+   *
+   * Its own endpoint rather than a field on update(): that method is reachable
+   * by every role that can edit an employee, and a commercial rate should not
+   * ride in on the same payload as a phone number. Null clears the rate, which
+   * makes the person's hours unpriced rather than free — the project rollup
+   * reports those hours separately so the cost is never quietly understated.
+   */
+  async setCostRate(id: number, companyId: number, role: string, rate: number | null) {
+    if (!this.canSeeCostRate(role)) {
+      throw new ForbiddenException('Only an administrator or finance can set a cost rate');
+    }
+
+    const employee = await this.prisma.employee.findFirst({ where: { id, companyId } });
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    if (rate != null && (!Number.isFinite(rate) || rate < 0)) {
+      throw new BadRequestException('Cost rate must be a positive number');
+    }
+
+    return this.prisma.employee.update({
+      where: { id },
+      data: { hourlyCostRate: rate },
+      select: { id: true, firstName: true, lastName: true, hourlyCostRate: true },
+    });
+  }
+
   async update(id: number, companyId: number, data: any) {
     const employee = await this.prisma.employee.findFirst({ where: { id, companyId } });
     if (!employee) throw new NotFoundException('Employee not found');
@@ -396,7 +454,10 @@ export class EmployeesService {
       employee.documents = [];
     }
 
-    return { ...employee, isOwner, canManageDocuments: canViewDocuments };
+    // An employee opening their own profile does not get to read their own
+    // charge-out rate either: it is what the company bills for their time,
+    // not a fact about their employment, and it is not theirs to see.
+    return { ...this.stripCostRate(employee, role), isOwner, canManageDocuments: canViewDocuments };
   }
 
   /**

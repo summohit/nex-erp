@@ -30,6 +30,9 @@ export const PROJECT_FINANCIAL_FIELDS = [
   'budgetRemaining',
   'budgetUtilization',
   'employeeCost',
+  // Hours, but only meaningful as a caveat on employeeCost — on its own it is
+  // a number with nothing to qualify. It goes with the cost it belongs to.
+  'unratedHours',
   'expenseTotal',
   'paidExpenseTotal',
   'actualCost',
@@ -37,6 +40,10 @@ export const PROJECT_FINANCIAL_FIELDS = [
   'paidAmount',
   'pendingAmount',
   'margin',
+  // Milestone money. A milestone's name, dates and status are delivery facts
+  // every member should see; its amount is the contract.
+  'milestoneValue',
+  'milestoneInvoicedValue',
 ] as const;
 
 export interface FinancialViewer {

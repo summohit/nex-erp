@@ -422,7 +422,7 @@ export class ProjectsService {
       where: whereClause,
       include: {
         _count: {
-          select: { members: true, issues: true }
+          select: { members: true, issues: true, milestones: true }
         },
         lead: {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true }
@@ -456,13 +456,17 @@ export class ProjectsService {
       }
     });
 
-    const loggedHoursByProject = await this.getLoggedHoursByProject(projects.map((p) => p.id));
+    const costByProject = await this.getCostRollupByProject(projects.map((p) => p.id));
 
     const rows = projects.map(({ issues, expenseClaims, ...p }) => {
       const totalIssues = issues.length;
       const doneIssues = issues.filter((i) => i.status === 'DONE').length;
-      const loggedHours = loggedHoursByProject.get(p.id) ?? 0;
+      const cost = costByProject.get(p.id) ?? { loggedHours: 0, employeeCost: 0, unratedHours: 0 };
       const expenseTotal = expenseClaims.reduce((sum, c) => sum + c.amount, 0);
+      // §23: what the project has actually consumed — the people on it plus
+      // the expenses approved against it. Approved, not merely claimed: an
+      // unreviewed claim is not yet a cost.
+      const actualCost = Math.round((cost.employeeCost + expenseTotal) * 100) / 100;
 
       return {
         ...p,
@@ -471,19 +475,24 @@ export class ProjectsService {
         doneIssues,
         // §11: progress from task completion, unless a PM has set it by hand.
         progress: p.progress ?? (totalIssues ? Math.round((doneIssues / totalIssues) * 100) : 0),
-        loggedHours,
-        remainingHours: p.estimatedHours == null ? null : p.estimatedHours - loggedHours,
+        loggedHours: cost.loggedHours,
+        remainingHours: p.estimatedHours == null ? null : p.estimatedHours - cost.loggedHours,
         expenseTotal,
         paidExpenseTotal: expenseClaims
           .filter((c) => c.status === 'PAID')
           .reduce((sum, c) => sum + c.amount, 0),
-        // Employee cost lands in phase 2, when employees have a cost rate.
-        // Until then budget used is expenses alone, and saying so is better
-        // than publishing a number that will silently change meaning.
-        budgetUsed: expenseTotal,
-        budgetRemaining: p.budgetAmount == null ? null : p.budgetAmount - expenseTotal,
+        employeeCost: cost.employeeCost,
+        /// Hours the cost figure could not price, because the person who
+        /// logged them has no rate. Non-zero means employeeCost is an
+        /// understatement, and the UI says so rather than letting the number
+        /// pass as complete.
+        unratedHours: cost.unratedHours,
+        actualCost,
+        budgetUsed: actualCost,
+        budgetRemaining: p.budgetAmount == null ? null : Math.round((p.budgetAmount - actualCost) * 100) / 100,
         budgetUtilization:
-          p.budgetAmount ? Math.round((expenseTotal / p.budgetAmount) * 100) : null,
+          p.budgetAmount ? Math.round((actualCost / p.budgetAmount) * 100) : null,
+        milestoneTotal: p._count?.milestones ?? 0,
       };
     });
 
@@ -491,25 +500,50 @@ export class ProjectsService {
   }
 
   /**
-   * Logged minutes per project, rolled up to hours.
+   * Logged hours and employee cost per project (§8, §23).
    *
    * One grouped query rather than including `timeLogs` on every issue: a
    * project with a thousand tasks and years of timer sessions would otherwise
    * pull every row across the wire to add them up.
+   *
+   * `unratedHours` is the part of the total logged by people with no
+   * hourlyCostRate. It is carried alongside the cost rather than folded into
+   * it, because those hours are real work that cost is silently missing — a
+   * project reporting itself cheaper than it is would be worse than one
+   * saying which hours it could not price.
    */
-  private async getLoggedHoursByProject(projectIds: number[]): Promise<Map<number, number>> {
+  private async getCostRollupByProject(projectIds: number[]): Promise<
+    Map<number, { loggedHours: number; employeeCost: number; unratedHours: number }>
+  > {
     if (!projectIds.length) return new Map();
 
-    const rows = await this.prisma.$queryRaw<{ projectId: number; minutes: bigint | null }[]>`
-      SELECT i."projectId" AS "projectId", SUM(COALESCE(t."durationMin", 0)) AS minutes
+    const rows = await this.prisma.$queryRaw<
+      { projectId: number; minutes: bigint | null; cost: number | null; unratedMinutes: bigint | null }[]
+    >`
+      SELECT i."projectId"                        AS "projectId",
+             SUM(COALESCE(t."durationMin", 0))    AS minutes,
+             SUM(COALESCE(t."durationMin", 0) / 60.0
+                 * COALESCE(e."hourlyCostRate", 0)) AS cost,
+             SUM(CASE WHEN e."hourlyCostRate" IS NULL
+                      THEN COALESCE(t."durationMin", 0) ELSE 0 END) AS "unratedMinutes"
         FROM "IssueTimeLog" t
-        JOIN "Issue" i ON i.id = t."issueId"
+        JOIN "Issue" i    ON i.id = t."issueId"
+        JOIN "Employee" e ON e.id = t."employeeId"
        WHERE i."projectId" IN (${Prisma.join(projectIds)})
        GROUP BY i."projectId"
     `;
 
+    const toHours = (min: bigint | null) => Math.round((Number(min ?? 0) / 60) * 100) / 100;
+
     return new Map(
-      rows.map((r) => [r.projectId, Math.round((Number(r.minutes ?? 0) / 60) * 100) / 100]),
+      rows.map((r) => [
+        r.projectId,
+        {
+          loggedHours: toHours(r.minutes),
+          employeeCost: Math.round(Number(r.cost ?? 0) * 100) / 100,
+          unratedHours: toHours(r.unratedMinutes),
+        },
+      ]),
     );
   }
 

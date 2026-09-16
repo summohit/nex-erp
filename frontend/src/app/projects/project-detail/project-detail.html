@@ -483,6 +483,7 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'summary'" (click)="setProjectTab('summary')"><svg lucideGlobe size="14"></svg> Summary</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'board'" (click)="setProjectTab('board')"><svg lucideKanban size="14"></svg> Board</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'list'" (click)="setProjectTab('list')"><svg lucideList size="14"></svg> List</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'milestones'" (click)="setProjectTab('milestones')"><svg lucideFlag size="14"></svg> Milestones</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'roadmap'" (click)="setProjectTab('roadmap')"><svg lucideGanttChart size="14"></svg> Roadmap</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'attachments'" (click)="setProjectTab('attachments')"><svg lucidePaperclip size="14"></svg> Attachments</button>
@@ -834,6 +835,15 @@
   </div>
 
   <!-- Roadmap View Container -->
+  <!-- §13 Milestones. A self-contained component: it owns its own endpoint
+       and its own permission answers, so this page does not grow a fifth copy
+       of "may this person see money". -->
+  <!-- projectId is set from the route, so the guard keeps the required input
+       from ever being bound undefined on a direct load of this tab. -->
+  <div class="milestones-panel" *ngIf="activeProjectTab() === 'milestones' && projectId" style="padding: 20px 24px;">
+    <app-milestones-tab [projectId]="projectId" />
+  </div>
+
   <div class="roadmap-dashboard" *ngIf="activeProjectTab() === 'roadmap'" style="height: calc(100vh - 180px); width: 100%; display: flex; flex-direction: column; background-color: white; border-top: 1px solid #e2e8f0; overflow: hidden;">
     
     <!-- Top toolbar / Header -->

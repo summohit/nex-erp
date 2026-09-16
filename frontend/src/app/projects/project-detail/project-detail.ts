@@ -6,6 +6,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ProjectsService, ProjectSummary } from '../../services/projects';
+import { MilestonesTabComponent } from '../milestones/milestones-tab';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
 import { 
   LucideLayoutDashboard, LucideKanban,
@@ -15,7 +16,7 @@ import {
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
   LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
   LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
-  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive,
+  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive, LucideFlag,
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
   LucideFileUp, LucideUpload,
@@ -37,7 +38,7 @@ declare var Quill: any;
   selector: 'app-project-detail',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, DragDropModule,
+    CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     LucideLayoutDashboard, LucideKanban,
     LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
     LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
@@ -45,7 +46,7 @@ declare var Quill: any;
     LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
     LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
     LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
-    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive,
+    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive, LucideFlag,
     LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
     LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
     LucideFileUp, LucideUpload,
