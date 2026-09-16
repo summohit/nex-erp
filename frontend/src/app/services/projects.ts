@@ -256,6 +256,25 @@ export class ProjectsService {
     );
   }
 
+  // ── Project documents (§6) ────────────────────────────────────────────
+  // Project-level files — scope, proposal, agreement — as distinct from the
+  // attachments that belong to an individual task.
+
+  // Upload is uploadProjectDocument() further up — it predates this block,
+  // having been written for the AI onboarding wizard, and is the same endpoint.
+  getProjectDocuments(projectId: number) {
+    return this.http.get<ProjectDocument[]>(`${this.apiUrl}/${projectId}/documents`);
+  }
+
+  /** The server keeps the original extension whatever `name` contains. */
+  renameProjectDocument(projectId: number, documentId: number, name: string) {
+    return this.http.patch<ProjectDocument>(`${this.apiUrl}/${projectId}/documents/${documentId}`, { name });
+  }
+
+  deleteProjectDocument(projectId: number, documentId: number) {
+    return this.http.delete<{ success: boolean }>(`${this.apiUrl}/${projectId}/documents/${documentId}`);
+  }
+
   // ── Milestones (§13) ──────────────────────────────────────────────────
   // The list response carries `canViewFinancials` and `canManage` alongside
   // the rows: the server decides both, and the UI reads its answer rather than
@@ -280,6 +299,17 @@ export class ProjectsService {
   reorderMilestones(projectId: number, orderedIds: number[]) {
     return this.http.put<{ success: boolean }>(`${this.apiUrl}/${projectId}/milestones/reorder`, { orderedIds });
   }
+}
+
+export interface ProjectDocument {
+  id: number;
+  name: string;
+  url: string;
+  type: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  employee?: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
 }
 
 export interface LeadContactOption {

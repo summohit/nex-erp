@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { applyFinancialVisibilityAll } from './project-visibility';
 import { buildInitialMembers } from './project-members';
+import { renameKeepingExtension, InvalidDocumentName } from './document-naming';
 import { CrmService } from '../crm/crm.service';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -352,6 +353,67 @@ export class ProjectsService {
         status: 'ACTIVE'
       }
     });
+  }
+
+  /**
+   * Project-level documents (§6): the scope, the proposal, the agreement.
+   *
+   * Distinct from task attachments, which the Attachments tab was showing on
+   * its own — those belong to a work item, these belong to the project.
+   */
+  async listProjectDocuments(companyId: number, projectId: number) {
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { id: true } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    return this.prisma.projectDocument.findMany({
+      where: { projectId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, name: true, url: true, type: true, status: true,
+        createdAt: true, updatedAt: true,
+        employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+  }
+
+  /**
+   * Rename a document, keeping whatever extension it was uploaded with.
+   *
+   * The bytes are not re-uploaded, so the extension must not move: it is what
+   * decides whether a browser previews or downloads the file, and which parser
+   * reads it. See document-naming.ts.
+   */
+  async renameProjectDocument(companyId: number, projectId: number, documentId: number, requestedName: string) {
+    const doc = await this.prisma.projectDocument.findFirst({
+      where: { id: documentId, projectId, project: { companyId } },
+      select: { id: true, name: true },
+    });
+    if (!doc) throw new NotFoundException('Document not found');
+
+    let name: string;
+    try {
+      name = renameKeepingExtension(doc.name, requestedName);
+    } catch (e) {
+      if (e instanceof InvalidDocumentName) throw new BadRequestException(e.message);
+      throw e;
+    }
+
+    return this.prisma.projectDocument.update({
+      where: { id: documentId },
+      data: { name },
+      select: { id: true, name: true, url: true, type: true, updatedAt: true },
+    });
+  }
+
+  async deleteProjectDocument(companyId: number, projectId: number, documentId: number) {
+    const doc = await this.prisma.projectDocument.findFirst({
+      where: { id: documentId, projectId, project: { companyId } },
+      select: { id: true },
+    });
+    if (!doc) throw new NotFoundException('Document not found');
+
+    await this.prisma.projectDocument.delete({ where: { id: documentId } });
+    return { success: true };
   }
 
   async uploadProjectDocument(companyId: number, projectId: number, uploadedBy: number, file: Express.Multer.File) {

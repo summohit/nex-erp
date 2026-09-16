@@ -29,7 +29,37 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File
   ) {
-    return this.projectsService.uploadProjectDocument(req.user.companyId, id, req.user.sub, file);
+    // employeeId, not sub. ProjectDocument.uploadedBy is a foreign key to
+    // Employee, and this was passing the User id — so "uploaded by" resolved
+    // to whichever employee happened to share that number, or to nobody.
+    return this.projectsService.uploadProjectDocument(
+      req.user.companyId, id, req.user.employeeId ?? req.user.sub, file,
+    );
+  }
+
+  @Get(':id/documents')
+  listProjectDocuments(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.listProjectDocuments(req.user.companyId, id);
+  }
+
+  /** Renames the document. The extension is kept whatever the caller sends. */
+  @Patch(':id/documents/:documentId')
+  renameProjectDocument(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('documentId', ParseIntPipe) documentId: number,
+    @Body('name') name: string,
+  ) {
+    return this.projectsService.renameProjectDocument(req.user.companyId, id, documentId, name);
+  }
+
+  @Delete(':id/documents/:documentId')
+  deleteProjectDocument(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('documentId', ParseIntPipe) documentId: number,
+  ) {
+    return this.projectsService.deleteProjectDocument(req.user.companyId, id, documentId);
   }
 
   @Post(':id/analyze')

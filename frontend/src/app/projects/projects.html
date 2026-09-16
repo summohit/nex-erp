@@ -1990,6 +1990,39 @@
         </div>
       </div>
 
+      <!-- §6: files attached while creating. The project has no id yet, so
+           these are held in memory and uploaded the moment it is created. -->
+      <div class="cbm-form-section">
+        <div class="cbm-section-title">
+          <span class="cbm-section-number">4</span>
+          <span>Project Documents</span>
+        </div>
+
+        <div class="cbm-field-group">
+          <label class="cbm-field-label">Attachments</label>
+          <label class="cbm-file-drop">
+            <svg lucideUploadCloud size="18"></svg>
+            <span>Choose scope documents, proposals, agreements…</span>
+            <input type="file" multiple hidden (change)="onStagedFilesPicked($event)" />
+          </label>
+
+          <div class="cbm-staged-list" *ngIf="stagedFiles().length > 0">
+            <div class="cbm-staged-file" *ngFor="let f of stagedFiles(); let i = index">
+              <svg lucideFileText size="14" class="cbm-staged-icon"></svg>
+              <span class="cbm-staged-name" [title]="f.name">{{ f.name }}</span>
+              <span class="cbm-staged-size">{{ formatFileSize(f.size) }}</span>
+              <button type="button" class="cbm-staged-remove" (click)="removeStagedFile(i)" title="Remove">
+                <svg lucideX size="12"></svg>
+              </button>
+            </div>
+          </div>
+          <span class="cbm-field-helper">
+            Uploaded once the board is created. You can add, rename and remove files
+            any time from the project's Attachments tab.
+          </span>
+        </div>
+      </div>
+
       <!-- Form Section 4: Budget & Commercial Terms -->
       <div class="cbm-form-section">
         <div class="cbm-section-title">

@@ -914,6 +914,65 @@ export class ProjectsComponent implements OnInit {
   // Each is 'ALL' or an exact value; dates are ISO yyyy-mm-dd or ''. Held as
   // separate signals rather than one object so a change to any of them
   // recomputes the list without a manual trigger.
+  /**
+   * Files chosen in the create form (§6).
+   *
+   * Held in memory until the project exists: the upload endpoint is
+   * /projects/:id/documents, and there is no id to upload against until the
+   * create call returns. They go up immediately afterwards.
+   */
+  stagedFiles = signal<File[]>([]);
+  stagedUploading = signal(false);
+
+  onStagedFilesPicked(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const picked = Array.from(input.files || []);
+    if (picked.length) this.stagedFiles.update(list => [...list, ...picked]);
+    // Clearing it means picking the same file twice in a row still fires.
+    input.value = '';
+  }
+
+  removeStagedFile(index: number) {
+    this.stagedFiles.update(list => list.filter((_, i) => i !== index));
+  }
+
+  /**
+   * Upload the staged files against a project that now exists.
+   *
+   * Failures are reported but never block: the project has already been
+   * created by this point, and refusing to navigate would strand the user on
+   * a form for a project that is already saved. They can re-upload from the
+   * Attachments tab.
+   */
+  private uploadStagedFiles(projectId: number, done: () => void) {
+    const files = this.stagedFiles();
+    if (!files.length) {
+      done();
+      return;
+    }
+
+    this.stagedUploading.set(true);
+    let remaining = files.length;
+    let failed = 0;
+
+    const finish = () => {
+      if (--remaining > 0) return;
+      this.stagedUploading.set(false);
+      this.stagedFiles.set([]);
+      if (failed) {
+        this.toast.error(`${failed} of ${files.length} file(s) did not upload. Add them from the Attachments tab.`);
+      }
+      done();
+    };
+
+    for (const file of files) {
+      this.projectsService.uploadProjectDocument(projectId, file).subscribe({
+        next: () => finish(),
+        error: () => { failed++; finish(); },
+      });
+    }
+  }
+
   /** Collapsed by default — see the note in projects.html. */
   filtersOpen = signal<boolean>(false);
   filterClientId = signal<string>('ALL');
@@ -2592,6 +2651,7 @@ export class ProjectsComponent implements OnInit {
   openCreateModal() {
     this.editingProjectId.set(null);
     this.projectForm = this.emptyProjectForm();
+    this.stagedFiles.set([]);
     this.selectedBg.set(this.colorBackgrounds[1]);
     this.isSubmitted.set(false);
     this.isCreateModalOpen.set(true);
@@ -2707,8 +2767,13 @@ export class ProjectsComponent implements OnInit {
       this.projectsService.createProject(payload).subscribe({
         next: (res) => {
           this.loadProjects();
-          this.closeCreateModal();
-          this.goToProject(res.id);
+          // Files first, then navigate — landing on the board while uploads
+          // are still in flight would show an Attachments tab that is missing
+          // what the user just added.
+          this.uploadStagedFiles(res.id, () => {
+            this.closeCreateModal();
+            this.goToProject(res.id);
+          });
         },
         error: (err) => this.toast.error(err?.error?.message || 'Error creating project')
       });

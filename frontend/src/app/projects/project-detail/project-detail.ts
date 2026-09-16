@@ -248,11 +248,44 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Project-level documents (§6) — scope, proposal, agreement.
+   *
+   * Separate from task attachments: these belong to the project, not to a
+   * work item. The Attachments tab used to show only the latter, so a file
+   * uploaded against the project itself had nowhere to appear.
+   */
+  projectDocuments = signal<any[]>([]);
+  documentsUploading = signal(false);
+  renamingDocumentId = signal<number | null>(null);
+  renameDraft = '';
+
+  loadProjectDocuments() {
+    this.projectsService.getProjectDocuments(this.projectId).subscribe({
+      next: (docs) => this.projectDocuments.set(docs || []),
+      error: () => this.projectDocuments.set([]),
+    });
+  }
+
   // Compute all attachments across the project
   projectAttachments = computed(() => {
     const issues = this.activeIssues();
     let allAtts: any[] = [];
-    
+
+    // Project documents first: they are the contract-level files, and they
+    // are shown in the same list so there is one place to look rather than
+    // two competing ideas of "the project's files".
+    for (const doc of this.projectDocuments()) {
+      allAtts.push({
+        id: doc.id,
+        fileName: doc.name,
+        fileUrl: doc.url,
+        createdAt: doc.createdAt,
+        uploader: doc.employee,
+        isProjectDocument: true,
+      });
+    }
+
     for (const issue of issues) {
       if (issue.attachments && issue.attachments.length > 0) {
         issue.attachments.forEach((a: any) => {
@@ -778,6 +811,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.loadBoardAndIssues();
         // Task counts on the Milestones tab move when a task's milestone does.
         this.loadProjectMilestones();
+        this.loadProjectDocuments();
         
         // Also manually update the selected issue right away for fast UI response
         const current = this.selectedIssue();
@@ -1539,6 +1573,93 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       error: () => {
         this.isLoading.set(false);
       }
+    });
+  }
+
+  // ── Project document actions (§6) ──────────────────────────────────────
+
+  onProjectDocumentPicked(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+
+    this.documentsUploading.set(true);
+    let remaining = files.length;
+
+    for (const file of files) {
+      this.projectsService.uploadProjectDocument(this.projectId, file).subscribe({
+        next: () => {
+          if (--remaining === 0) {
+            this.documentsUploading.set(false);
+            this.loadProjectDocuments();
+            this.toast.success(files.length === 1 ? 'File uploaded' : `${files.length} files uploaded`);
+          }
+        },
+        error: (err) => {
+          if (--remaining === 0) this.documentsUploading.set(false);
+          this.toast.error(err?.error?.message || `Could not upload ${file.name}`);
+        },
+      });
+    }
+    // Clearing it means picking the same file twice in a row still fires.
+    input.value = '';
+  }
+
+  /**
+   * Start renaming. The extension is shown but not edited — the server keeps
+   * whatever the file was uploaded with, so offering it here would only invite
+   * a change that is then silently undone.
+   */
+  startRenameDocument(doc: any) {
+    this.renamingDocumentId.set(doc.id);
+    this.renameDraft = this.documentBaseName(doc.fileName);
+  }
+
+  documentBaseName(fileName: string): string {
+    const dot = (fileName || '').lastIndexOf('.');
+    return dot > 0 ? fileName.slice(0, dot) : (fileName || '');
+  }
+
+  documentExtension(fileName: string): string {
+    const dot = (fileName || '').lastIndexOf('.');
+    return dot > 0 ? fileName.slice(dot) : '';
+  }
+
+  cancelRenameDocument() {
+    this.renamingDocumentId.set(null);
+    this.renameDraft = '';
+  }
+
+  confirmRenameDocument(doc: any) {
+    const name = this.renameDraft.trim();
+    if (!name) {
+      this.toast.error('A file name is required');
+      return;
+    }
+    if (name === this.documentBaseName(doc.fileName)) {
+      this.cancelRenameDocument();
+      return;
+    }
+
+    this.projectsService.renameProjectDocument(this.projectId, doc.id, name).subscribe({
+      next: () => {
+        this.cancelRenameDocument();
+        this.loadProjectDocuments();
+        this.toast.success('File renamed');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not rename the file'),
+    });
+  }
+
+  deleteProjectDocument(doc: any) {
+    if (!confirm(`Delete "${doc.fileName}"? This cannot be undone.`)) return;
+
+    this.projectsService.deleteProjectDocument(this.projectId, doc.id).subscribe({
+      next: () => {
+        this.loadProjectDocuments();
+        this.toast.success('File deleted');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not delete the file'),
     });
   }
 
