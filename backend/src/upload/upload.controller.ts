@@ -1,8 +1,10 @@
-import { Controller, Post, UseInterceptors, UploadedFile, UseGuards, UseFilters, HttpException, HttpStatus, ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
+import { Controller, Post, Req, UseInterceptors, UploadedFile, UseGuards, UseFilters, HttpException, HttpStatus, ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../auth/auth.guard';
 import * as path from 'path';
+import { join } from 'path';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import axios from 'axios';
 import FormData from 'form-data';
 import { MulterError } from 'multer';
@@ -82,8 +84,8 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file', {
     limits: { fileSize: MAX_UPLOAD_FILE_SIZE }
   }))
-  async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    return this.processUpload(file, '/erp_uploads');
+  async uploadFile(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    return this.processUpload(file, '/erp_uploads', req);
   }
 
   @Post('resume')
@@ -91,8 +93,8 @@ export class UploadController {
     fileFilter: resumeFileFilter,
     limits: { fileSize: MAX_RESUME_FILE_SIZE }
   }))
-  async uploadResume(@UploadedFile() file: Express.Multer.File) {
-    return this.processUpload(file, '/resumes');
+  async uploadResume(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    return this.processUpload(file, '/resumes', req);
   }
 
   @Post('image')
@@ -106,8 +108,8 @@ export class UploadController {
     },
     limits: { fileSize: 5 * 1024 * 1024 }
   }))
-  async uploadImage(@UploadedFile() file: Express.Multer.File) {
-    return this.processUpload(file, '/candidate_photos');
+  async uploadImage(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    return this.processUpload(file, '/candidate_photos', req);
   }
 
   @UseGuards(AuthGuard)
@@ -130,18 +132,18 @@ export class UploadController {
     },
     limits: { fileSize: MAX_TICKET_FILE_SIZE }
   }))
-  async uploadTicketAttachment(@UploadedFile() file: Express.Multer.File) {
-    return this.processUpload(file, '/ticket_attachments');
+  async uploadTicketAttachment(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    return this.processUpload(file, '/ticket_attachments', req);
   }
 
-  private async processUpload(file: Express.Multer.File, folder: string) {
+  private async processUpload(file: Express.Multer.File, folder: string, req: any) {
     if (!file) {
       throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
     }
 
     const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
     if (!privateKey) {
-      throw new HttpException('ImageKit not configured', HttpStatus.INTERNAL_SERVER_ERROR);
+      return this.saveLocal(file, folder, req);
     }
 
     try {
@@ -171,5 +173,19 @@ export class UploadController {
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
+  }
+
+  /** No ImageKit keys in this environment: store the file on this backend's own
+   *  disk and serve it through the /uploads/ static route (see main.ts). */
+  private saveLocal(file: Express.Multer.File, folder: string, req: any) {
+    const localDir = folder.replace(/^\/+|\/+$/g, '');
+    const dir = join(process.cwd(), 'uploads', localDir);
+    fs.mkdirSync(dir, { recursive: true });
+    const ext = path.extname(file.originalname);
+    const filename = `${crypto.randomBytes(16).toString('hex')}${ext}`;
+    fs.writeFileSync(join(dir, filename), file.buffer);
+
+    const host = process.env.PUBLIC_BASE_URL || (req ? `${req.protocol}://${req.get('host')}` : '');
+    return { url: `${host}/uploads/${localDir}/${filename}` };
   }
 }

@@ -2702,41 +2702,61 @@ export class CrmService {
       }
     }
 
-    const task = await this.prisma.preSalesTask.create({
-      data: {
-        companyId, leadId,
-        assignedById: employeeId ?? 0,
-        assignedToId,
-        title,
-        taskType: (data?.taskType || '').trim() || null,
-        description: (data?.description || data?.remark || '').trim() || null,
-        scheduledAt,
-        estimatedMinutes,
-        status: 'NEW',
-        history: {
-          create: {
-            companyId, newStatus: 'NEW', previousStatus: null,
-            remark: 'Task created', changedById: employeeId ?? 0,
-          },
+    const files = Array.isArray(data?.attachments)
+      ? data.attachments.filter((a: any) => a?.fileUrl)
+      : [];
+
+    const task = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.preSalesTask.create({
+        data: {
+          companyId, leadId,
+          assignedById: employeeId ?? 0,
+          assignedToId,
+          title,
+          taskType: (data?.taskType || '').trim() || null,
+          description: (data?.description || data?.remark || '').trim() || null,
+          scheduledAt,
+          estimatedMinutes,
+          status: 'NEW',
         },
-        ...(Array.isArray(data?.attachments) && data.attachments.length
-          ? {
-              attachments: {
-                create: data.attachments
-                  .filter((a: any) => a?.fileUrl)
-                  .map((a: any) => ({
-                    companyId,
-                    fileName: a.fileName || 'attachment',
-                    fileUrl: a.fileUrl,
-                    fileSize: a.fileSize ? Number(a.fileSize) : null,
-                    uploadedById: employeeId ?? 0,
-                  })),
-              },
-            }
-          : {}),
-      },
-      include: { assignedTo: { select: { id: true, firstName: true, lastName: true } }, attachments: true },
+        include: { assignedTo: { select: { id: true, firstName: true, lastName: true } }, attachments: true },
+      });
+
+      // The opening entry of the trail, and the owner of the files attached at
+      // creation: without a historyId the files would never reach the timeline,
+      // so "what was handed over when the task was raised" would stay invisible.
+      const history = await tx.preSalesTaskStatusHistory.create({
+        data: {
+          companyId, taskId: created.id, newStatus: 'NEW', previousStatus: null,
+          remark: 'Task created', changedById: employeeId ?? 0,
+        },
+      });
+
+      if (files.length) {
+        await tx.preSalesTaskAttachment.createMany({
+          data: files.map((a: any) => ({
+            companyId, taskId: created.id, historyId: history.id,
+            fileName: a.fileName || 'attachment',
+            fileUrl: a.fileUrl,
+            fileSize: a.fileSize ? Number(a.fileSize) : null,
+            uploadedById: employeeId ?? 0,
+          })),
+        });
+      }
+
+      return created;
     });
+
+    // The files were written after the task row existed, so pull the finished
+    // shape back out for the caller — otherwise the freshly attached files
+    // would be missing from the response.
+    if (files.length) {
+      const withAttachments = await this.prisma.preSalesTask.findUnique({
+        where: { id: task.id },
+        include: { assignedTo: { select: { id: true, firstName: true, lastName: true } }, attachments: true },
+      });
+      return withAttachments ?? task;
+    }
 
     const leadName = access.lead.companyName || access.lead.title || 'a deal';
     await this.notificationsService.notifyEmployees([assignedToId], {
@@ -2816,20 +2836,59 @@ export class CrmService {
       }
     }
 
-    return this.prisma.preSalesTask.update({
-      where: { id: taskId },
-      data: {
-        ...(data?.title !== undefined ? { title: String(data.title).trim() } : {}),
-        ...(data?.taskType !== undefined ? { taskType: String(data.taskType).trim() || null } : {}),
-        ...(data?.description !== undefined ? { description: String(data.description).trim() || null } : {}),
-        ...(data?.assignedToId !== undefined ? { assignedToId: Number(data.assignedToId) } : {}),
-        ...(data?.scheduledDate !== undefined || data?.scheduledAt !== undefined
-          ? { scheduledAt: this.parseScheduledAt(data) } : {}),
-        ...(data?.estimatedMinutes !== undefined || data?.durationHours !== undefined
-          ? { estimatedMinutes: this.parseDurationMinutes(data) } : {}),
-      },
-      include: { assignedTo: { select: { id: true, firstName: true, lastName: true } }, attachments: true },
+    const files = Array.isArray(data?.attachments)
+      ? data.attachments.filter((a: any) => a?.fileUrl)
+      : [];
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.preSalesTask.update({
+        where: { id: taskId },
+        data: {
+          ...(data?.title !== undefined ? { title: String(data.title).trim() } : {}),
+          ...(data?.taskType !== undefined ? { taskType: String(data.taskType).trim() || null } : {}),
+          ...(data?.description !== undefined ? { description: String(data.description).trim() || null } : {}),
+          ...(data?.assignedToId !== undefined ? { assignedToId: Number(data.assignedToId) } : {}),
+          ...(data?.scheduledDate !== undefined || data?.scheduledAt !== undefined
+            ? { scheduledAt: this.parseScheduledAt(data) } : {}),
+          ...(data?.estimatedMinutes !== undefined || data?.durationHours !== undefined
+            ? { estimatedMinutes: this.parseDurationMinutes(data) } : {}),
+        },
+        include: { assignedTo: { select: { id: true, firstName: true, lastName: true } }, attachments: true },
+      });
+
+      // Files attached while editing the task are pinned to a history entry too,
+      // so they show up in the timeline exactly like the ones from a status
+      // change — otherwise an attachment added mid-edit would vanish.
+      if (files.length) {
+        const history = await tx.preSalesTaskStatusHistory.create({
+          data: {
+            companyId, taskId: row.id, newStatus: row.status, previousStatus: row.status,
+            remark: 'Task edited — file(s) attached', changedById: employeeId ?? 0,
+          },
+        });
+        await tx.preSalesTaskAttachment.createMany({
+          data: files.map((a: any) => ({
+            companyId, taskId: row.id, historyId: history.id,
+            fileName: a.fileName || 'attachment',
+            fileUrl: a.fileUrl,
+            fileSize: a.fileSize ? Number(a.fileSize) : null,
+            uploadedById: employeeId ?? 0,
+          })),
+        });
+      }
+
+      return row;
     });
+
+    if (files.length) {
+      const withAttachments = await this.prisma.preSalesTask.findUnique({
+        where: { id: updated.id },
+        include: { assignedTo: { select: { id: true, firstName: true, lastName: true } }, attachments: true },
+      });
+      return withAttachments ?? updated;
+    }
+
+    return updated;
   }
 
   /**

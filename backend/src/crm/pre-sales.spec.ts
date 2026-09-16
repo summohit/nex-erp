@@ -60,7 +60,7 @@ describe('CrmService — pre-sales', () => {
         update: jest.fn(async ({ data }: any) => ({ id: 61, ...data })),
         updateMany: jest.fn(async () => ({ count: 1 })),
       },
-      preSalesTask: { findMany: jest.fn(async () => []), findFirst: jest.fn(async () => null), create: jest.fn(async ({ data }: any) => ({ id: 21, ...data, assignedTo: { firstName: 'Rahul', lastName: 'Sharma' } })), update: jest.fn(async ({ data }: any) => ({ id: 21, ...data, assignedTo: { firstName: 'Rahul', lastName: 'Sharma' }, assignedById: CREATOR.employeeId, title: 'T' })) },
+      preSalesTask: { findMany: jest.fn(async () => []), findFirst: jest.fn(async () => null), create: jest.fn(async ({ data }: any) => ({ id: 21, ...data, assignedTo: { firstName: 'Rahul', lastName: 'Sharma' } })), update: jest.fn(async ({ data }: any) => ({ id: 21, ...data, assignedTo: { firstName: 'Rahul', lastName: 'Sharma' }, assignedById: CREATOR.employeeId, title: 'T' })), findUnique: jest.fn(async ({ include }: any) => ({ id: 21, assignedTo: { firstName: 'Rahul', lastName: 'Sharma' }, attachments: include?.attachments ? [{ id: 71, fileName: 'brief.pdf', fileUrl: 'https://ik/b.pdf' }] : [] })) },
       preSalesTaskStatusHistory: { create: jest.fn(async ({ data }: any) => ({ id: 31, ...data })), findMany: jest.fn(async () => []) },
       preSalesTaskAttachment: { createMany: jest.fn(async () => ({ count: 1 })) },
       leadActivity: { create: jest.fn(async () => ({})) },
@@ -391,9 +391,22 @@ describe('CrmService — pre-sales', () => {
     });
 
     it('opens its own history with the creation entry', async () => {
-      const out: any = await service.createPreSalesTask(COMPANY, LEAD, ADMIN, task);
-      expect(out.history.create.newStatus).toBe('NEW');
-      expect(out.history.create.previousStatus).toBeNull();
+      await service.createPreSalesTask(COMPANY, LEAD, ADMIN, task);
+      const entry = prisma.preSalesTaskStatusHistory.create.mock.calls[0][0].data;
+      expect(entry.taskId).toBe(21);
+      expect(entry.newStatus).toBe('NEW');
+      expect(entry.previousStatus).toBeNull();
+    });
+
+    it('pins creation attachments to the opening history entry', async () => {
+      await service.createPreSalesTask(COMPANY, LEAD, ADMIN, {
+        ...task,
+        attachments: [{ fileName: 'brief.pdf', fileUrl: 'https://ik/b.pdf' }],
+      });
+      expect(prisma.preSalesTaskAttachment.createMany).toHaveBeenCalled();
+      const data = prisma.preSalesTaskAttachment.createMany.mock.calls[0][0].data[0];
+      expect(data.historyId).toBe(31);
+      expect(data.fileUrl).toBe('https://ik/b.pdf');
     });
 
     it('notifies the assignee', async () => {
