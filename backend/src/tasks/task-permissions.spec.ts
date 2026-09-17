@@ -75,4 +75,47 @@ describe('canCreateTask', () => {
       canCreateTask(prismaWith(renamed) as any, COMPANY, 9, 'EMPLOYEE'),
     ).resolves.toBe(true);
   });
+  /**
+   * A project manager raising work in their own project.
+   *
+   * They could not before, which sat oddly beside everything else a PM does:
+   * approving that project's timesheets, owning its milestones, and being the
+   * only non-admin able to move a task assigned to another PM.
+   */
+  describe('a project manager', () => {
+    const pmPrisma = (managing: boolean) => ({
+      employee: { findFirst: jest.fn(async () => ({ department: { canCreateTasks: false } })) },
+      projectMember: { findFirst: jest.fn(async () => (managing ? { id: 1 } : null)) },
+    });
+
+    it('may raise a task in a project they manage', async () => {
+      await expect(
+        canCreateTask(pmPrisma(true) as any, COMPANY, 42, 'EMPLOYEE', { id: 7, leadId: 99 }),
+      ).resolves.toBe(true);
+    });
+
+    // Managing one project says nothing about anybody else's.
+    it('may not raise one in a project they do not manage', async () => {
+      await expect(
+        canCreateTask(pmPrisma(false) as any, COMPANY, 42, 'EMPLOYEE', { id: 8, leadId: 99 }),
+      ).resolves.toBe(false);
+    });
+
+    // A general task has no project to manage, so the department flag decides.
+    it('falls back to the department flag when there is no project', async () => {
+      const prisma = pmPrisma(true);
+      await expect(canCreateTask(prisma as any, COMPANY, 42, 'EMPLOYEE')).resolves.toBe(false);
+      expect(prisma.projectMember.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('scopes the membership check to the project in hand', async () => {
+      const prisma = pmPrisma(true);
+      await canCreateTask(prisma as any, COMPANY, 42, 'EMPLOYEE', { id: 7, leadId: 99 });
+      expect(prisma.projectMember.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { projectId: 7, employeeId: 42, role: 'PROJECT_MANAGER' },
+        }),
+      );
+    });
+  });
 });

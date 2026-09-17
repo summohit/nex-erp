@@ -11,6 +11,12 @@ import { LabelsService } from './labels/labels.service';
 import { MilestonesController } from './milestones/milestones.controller';
 import { MilestonesService } from './milestones/milestones.service';
 import { IssueRemindersCron } from './issues/issue-reminders.cron';
+import { ProjectTicketsController } from './tickets/project-tickets.controller';
+import { ProjectTicketsService } from './tickets/project-tickets.service';
+import { BudgetRequestsController } from './budget-requests/budget-requests.controller';
+import { BudgetRequestsService } from './budget-requests/budget-requests.service';
+import { ProjectDiscussionsController } from './discussions/project-discussions.controller';
+import { ProjectDiscussionsService } from './discussions/project-discussions.service';
 
 import { PrismaModule } from '../prisma/prisma.module';
 import { EventsModule } from '../events/events.module';
@@ -20,7 +26,7 @@ import { CrmModule } from '../crm/crm.module';
 
 @Module({
   imports: [PrismaModule, EventsModule, NotificationsModule, CrmModule],
-  controllers: [ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController],
-  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron]
+  controllers: [ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, ProjectDiscussionsController],
+  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, ProjectDiscussionsService]
 })
 export class ProjectsModule {}

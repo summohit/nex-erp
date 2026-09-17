@@ -49,7 +49,7 @@ export class TasksService {
     companyId: number,
     actorEmployeeId: number | null,
     role: string | undefined,
-    project?: { leadId: number | null } | null,
+    project?: { id?: number; leadId: number | null } | null,
   ): Promise<boolean> {
     return canCreateTask(this.prisma as any, companyId, actorEmployeeId, role, project);
   }
@@ -58,11 +58,12 @@ export class TasksService {
     companyId: number,
     actorEmployeeId: number | null,
     role: string | undefined,
-    project?: { leadId: number | null } | null,
+    project?: { id?: number; leadId: number | null } | null,
   ): Promise<void> {
     if (await this.canCreateTask(companyId, actorEmployeeId, role, project)) return;
     throw new ForbiddenException(
-      'You do not have permission to create tasks. Ask an administrator to enable it for your department.',
+      'You do not have permission to create tasks here. A project manager can raise tasks ' +
+      'inside a project they manage; otherwise ask an administrator to enable it for your department.',
     );
   }
 
@@ -76,8 +77,32 @@ export class TasksService {
    */
   async getCapabilities(companyId: number, actorEmployeeId: number | null, role?: string) {
     const canCreate = await this.canCreateTask(companyId, actorEmployeeId, role);
+
+    /**
+     * A project manager can raise tasks, but only inside the projects they
+     * manage — and this question is asked with no project in hand, so the
+     * per-project rule cannot answer it.
+     *
+     * "Do they manage anything at all" is the right granularity for a button:
+     * it decides whether Add Task is worth showing, and createIssue still
+     * checks the actual project when the form is submitted. Without this the
+     * server would allow the thing the screen never offers.
+     */
+    const managesAProject =
+      !canCreate && actorEmployeeId != null
+        ? !!(await this.prisma.projectMember.findFirst({
+            where: {
+              employeeId: actorEmployeeId,
+              role: 'PROJECT_MANAGER',
+              project: { companyId },
+            },
+            select: { id: true },
+          }))
+        : false;
+
     return {
-      canCreateTask: canCreate,
+      canCreateTask: canCreate || managesAProject,
+      // General tasks belong to no project, so managing one grants nothing here.
       canCreateGeneral: canCreate,
       isAdmin: role === 'SUPERADMIN' || role === 'ADMIN',
     };

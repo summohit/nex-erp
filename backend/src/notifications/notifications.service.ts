@@ -82,6 +82,11 @@ export class NotificationsService {
     linkUrl?: string,
     companyId?: number
   ) {
+    if (!userId) {
+      this.logger.warn(`createNotification aborted: userId is null or undefined for message "${message}"`);
+      return;
+    }
+
     try {
       // Find companyId from user if not passed
       let effectiveCompanyId = companyId;

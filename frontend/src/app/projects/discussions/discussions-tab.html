@@ -1,0 +1,641 @@
+<div class="discussion-shell">
+
+  <!-- =========================================================
+       HEADER
+       ========================================================= -->
+  <header class="discussion-header">
+    <div class="discussion-header-main">
+      <div class="discussion-breadcrumb">
+        <span>Project</span>
+        <svg lucideChevronRight size="13"></svg>
+        <span>Discussions</span>
+      </div>
+
+      <div class="discussion-title-row">
+        <div class="discussion-title-icon">
+          <svg lucideMessageSquare size="19"></svg>
+        </div>
+
+        <div>
+          <div class="discussion-title-line">
+            <h1>Discussions</h1>
+            <span class="discussion-total">{{ discussions().length }}</span>
+          </div>
+          <p>Project conversations, decisions and team updates.</p>
+        </div>
+      </div>
+    </div>
+
+    <button class="discussion-primary-btn" type="button" (click)="openCreateView()">
+      <svg lucidePlus size="16"></svg>
+      New discussion
+    </button>
+  </header>
+
+  <!-- =========================================================
+       LIST VIEW
+       ========================================================= -->
+  <ng-container *ngIf="view() === 'list'">
+
+    <section class="discussion-toolbar">
+
+      <div class="discussion-view-tabs">
+        <button
+          type="button"
+          class="discussion-view-tab active"
+          (click)="$event.stopPropagation()"
+        >
+          <svg lucideMessageSquare size="14"></svg>
+          All discussions
+          <span>{{ discussions().length }}</span>
+        </button>
+      </div>
+
+      <div class="discussion-toolbar-actions">
+        <div class="discussion-search">
+          <svg lucideSearch size="15"></svg>
+          <input
+            type="text"
+            [(ngModel)]="discussionSearch"
+            placeholder="Search discussions..."
+            aria-label="Search discussions"
+          />
+          <kbd>⌘ K</kbd>
+        </div>
+
+        <button
+          type="button"
+          class="discussion-icon-btn"
+          title="Refresh discussions"
+          (click)="loadDiscussions()"
+        >
+          <svg lucideRefreshCw size="15"></svg>
+        </button>
+      </div>
+    </section>
+
+    <div class="discussion-layout">
+
+      <!-- Main discussion list -->
+      <main class="discussion-main-column">
+
+        <div *ngIf="isLoading()" class="discussion-skeleton-list">
+          <div class="discussion-skeleton-card" *ngFor="let item of [1,2,3,4]">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton-content">
+              <div class="skeleton skeleton-line wide"></div>
+              <div class="skeleton skeleton-line medium"></div>
+              <div class="skeleton skeleton-line small"></div>
+            </div>
+          </div>
+        </div>
+
+        <ng-container *ngIf="!isLoading()">
+
+          <div
+            *ngIf="filteredDiscussions().length === 0 && discussions().length > 0"
+            class="discussion-empty-search"
+          >
+            <div class="discussion-empty-search-icon">
+              <svg lucideSearch size="19"></svg>
+            </div>
+            <strong>No discussions found</strong>
+            <span>Try a different title or clear the search.</span>
+            <button type="button" (click)="discussionSearch = ''">
+              Clear search
+            </button>
+          </div>
+
+          <div
+            *ngIf="discussions().length === 0"
+            class="discussion-empty"
+          >
+            <div class="discussion-empty-icon">
+              <svg lucideMessageSquare size="27"></svg>
+            </div>
+
+            <h2>No discussions yet</h2>
+            <p>
+              Start a conversation with your team. Use discussions for
+              questions, decisions, announcements and project updates.
+            </p>
+
+            <button class="discussion-primary-btn" type="button" (click)="openCreateView()">
+              <svg lucidePlus size="16"></svg>
+              Start a discussion
+            </button>
+          </div>
+
+          <div class="discussion-list" *ngIf="filteredDiscussions().length > 0">
+
+            <article
+              *ngFor="let disc of filteredDiscussions(); trackBy: trackDiscussion"
+              class="discussion-row"
+              [class.is-selected]="selectedDiscussion()?.id === disc.id"
+              (click)="openDiscussion(disc.id)"
+              tabindex="0"
+              role="button"
+            >
+
+              <div class="discussion-row-avatar">
+                <img
+                  *ngIf="disc.author?.avatarUrl"
+                  [src]="disc.author.avatarUrl"
+                  alt=""
+                />
+                <span *ngIf="!disc.author?.avatarUrl">
+                  {{ getInitials(disc.author?.firstName, disc.author?.lastName) }}
+                </span>
+              </div>
+
+              <div class="discussion-row-body">
+
+                <div class="discussion-row-title">
+                  <span>{{ disc.title }}</span>
+                  <span
+                    *ngIf="isRecent(disc.createdAt)"
+                    class="discussion-new-label"
+                  >
+                    New
+                  </span>
+                </div>
+
+                <div class="discussion-row-meta">
+                  <strong>
+                    {{ disc.author?.firstName }} {{ disc.author?.lastName }}
+                  </strong>
+
+                  <span>·</span>
+
+                  <span>{{ formatRelativeDate(disc.createdAt) }}</span>
+
+                  <span>·</span>
+
+                  <span>
+                    {{ disc._count?.comments || 0 }}
+                    {{ (disc._count?.comments || 0) === 1 ? 'reply' : 'replies' }}
+                  </span>
+                </div>
+
+              </div>
+
+              <div class="discussion-row-right">
+                <div
+                  *ngIf="disc._count?.comments"
+                  class="discussion-comment-pill"
+                >
+                  <svg lucideMessageSquare size="13"></svg>
+                  {{ disc._count?.comments }}
+                </div>
+
+                <svg
+                  lucideChevronRight
+                  size="15"
+                  class="discussion-row-arrow"
+                ></svg>
+              </div>
+
+            </article>
+
+          </div>
+        </ng-container>
+      </main>
+
+      <!-- Sidebar -->
+      <aside class="discussion-sidebar">
+
+        <section class="discussion-sidebar-card">
+          <div class="discussion-sidebar-heading">
+            <div>
+              <span class="sidebar-eyebrow">WORKSPACE</span>
+              <h3>Discussion guide</h3>
+            </div>
+            <svg lucideInfo size="15"></svg>
+          </div>
+
+          <div class="discussion-guide-item">
+            <span class="guide-number">01</span>
+            <div>
+              <strong>Ask questions</strong>
+              <p>Keep project questions visible to everyone.</p>
+            </div>
+          </div>
+
+          <div class="discussion-guide-item">
+            <span class="guide-number">02</span>
+            <div>
+              <strong>Document decisions</strong>
+              <p>Use one thread for important project decisions.</p>
+            </div>
+          </div>
+
+          <div class="discussion-guide-item">
+            <span class="guide-number">03</span>
+            <div>
+              <strong>Share updates</strong>
+              <p>Post progress updates without creating unnecessary tasks.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="discussion-sidebar-card compact">
+          <div class="discussion-sidebar-heading">
+            <h3>Quick stats</h3>
+          </div>
+
+          <div class="discussion-stat-grid">
+            <div>
+              <strong>{{ discussions().length }}</strong>
+              <span>Threads</span>
+            </div>
+
+            <div>
+              <strong>{{ totalComments() }}</strong>
+              <span>Replies</span>
+            </div>
+          </div>
+        </section>
+
+      </aside>
+    </div>
+  </ng-container>
+
+  <!-- =========================================================
+       CREATE VIEW
+       ========================================================= -->
+  <ng-container *ngIf="view() === 'create'">
+
+    <div class="discussion-subpage">
+
+      <button class="discussion-back-btn" type="button" (click)="view.set('list')">
+        <svg lucideArrowLeft size="15"></svg>
+        Discussions
+      </button>
+
+      <div class="discussion-form-intro">
+        <div class="discussion-form-icon">
+          <svg lucidePlus size="18"></svg>
+        </div>
+
+        <div>
+          <span class="sidebar-eyebrow">NEW DISCUSSION</span>
+          <h2>Start a new conversation</h2>
+          <p>Share context first. Your team can then reply directly in this thread.</p>
+        </div>
+      </div>
+
+      <section class="discussion-composer">
+
+        <div class="composer-field">
+          <label for="discussion-title">Title</label>
+
+          <input
+            id="discussion-title"
+            type="text"
+            [(ngModel)]="newDiscussionTitle"
+            maxlength="200"
+            placeholder="What would you like to discuss?"
+            autocomplete="off"
+          />
+
+          <div class="composer-input-footer">
+            <span>Keep it short and specific.</span>
+            <span>{{ newDiscussionTitle.length }}/200</span>
+          </div>
+        </div>
+
+        <div class="composer-divider"></div>
+
+        <div class="composer-field">
+          <label>Message</label>
+
+          <div class="discussion-editor">
+            <div class="quill-editor-container" #createQuillContainer></div>
+          </div>
+
+          <div class="composer-hint">
+            <span>
+              <svg lucideAtSign size="12"></svg>
+              Mention teammates with &#64;
+            </span>
+            <span>Markdown-style formatting is supported by the editor.</span>
+          </div>
+        </div>
+
+        <div class="composer-footer">
+
+          <button
+            class="discussion-secondary-btn"
+            type="button"
+            (click)="view.set('list')"
+            [disabled]="isSubmitting()"
+          >
+            Cancel
+          </button>
+
+          <button
+            class="discussion-primary-btn"
+            type="button"
+            [disabled]="isSubmitting() || !newDiscussionTitle.trim() || !newDiscussionContent.trim()"
+            (click)="createDiscussion()"
+          >
+            <svg
+              *ngIf="!isSubmitting()"
+              lucideSend
+              size="15"
+            ></svg>
+
+            <svg
+              *ngIf="isSubmitting()"
+              lucideLoader2
+              size="15"
+              class="animate-spin"
+            ></svg>
+
+            {{ isSubmitting() ? 'Creating...' : 'Create discussion' }}
+          </button>
+
+        </div>
+      </section>
+    </div>
+
+  </ng-container>
+
+  <!-- =========================================================
+       DETAIL VIEW
+       ========================================================= -->
+  <ng-container *ngIf="view() === 'detail' && selectedDiscussion()">
+
+    <div class="discussion-subpage detail-page">
+
+      <button class="discussion-back-btn" type="button" (click)="view.set('list')">
+        <svg lucideArrowLeft size="15"></svg>
+        All discussions
+      </button>
+
+      <div class="thread-layout">
+
+        <main class="thread-main">
+
+          <!-- Original discussion -->
+          <article class="thread-card original-thread">
+
+            <div class="thread-topbar">
+              <div class="thread-type">
+                <span class="thread-type-dot"></span>
+                Discussion
+              </div>
+
+              <span class="thread-date">
+                {{ selectedDiscussion()?.createdAt | date:'MMM d, y · h:mm a' }}
+              </span>
+            </div>
+
+            <h1 class="thread-title">
+              {{ selectedDiscussion()?.title }}
+            </h1>
+
+            <div class="thread-author">
+              <img
+                *ngIf="selectedDiscussion()?.author?.avatarUrl"
+                [src]="selectedDiscussion()?.author?.avatarUrl"
+                alt=""
+              />
+
+              <span
+                *ngIf="!selectedDiscussion()?.author?.avatarUrl"
+                class="thread-avatar-fallback"
+              >
+                {{ getInitials(
+                  selectedDiscussion()?.author?.firstName,
+                  selectedDiscussion()?.author?.lastName
+                ) }}
+              </span>
+
+              <div>
+                <strong>
+                  {{ selectedDiscussion()?.author?.firstName }}
+                  {{ selectedDiscussion()?.author?.lastName }}
+                </strong>
+                <span>
+                  Started this discussion ·
+                  {{ formatRelativeDate(selectedDiscussion()?.createdAt) }}
+                </span>
+              </div>
+            </div>
+
+            <div
+              class="thread-content"
+              [innerHTML]="getSafeHtml(selectedDiscussion()?.content)"
+            ></div>
+
+            <div
+              class="thread-attachments"
+              *ngIf="selectedDiscussion()?.attachments?.length"
+            >
+              <div class="thread-attachments-title">
+                <svg lucidePaperclip size="13"></svg>
+                Attachments
+              </div>
+
+              <a
+                *ngFor="let att of selectedDiscussion()?.attachments"
+                [href]="att.fileUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="thread-attachment"
+              >
+                <svg lucideFileText size="14"></svg>
+                <span>{{ att.fileName }}</span>
+                <svg lucideExternalLink size="12"></svg>
+              </a>
+            </div>
+
+          </article>
+
+          <!-- Conversation -->
+          <section class="conversation-section">
+
+            <div class="conversation-header">
+              <div>
+                <h2>Conversation</h2>
+                <span>
+                  {{ selectedDiscussion()?.comments?.length || 0 }}
+                  {{ (selectedDiscussion()?.comments?.length || 0) === 1 ? 'reply' : 'replies' }}
+                </span>
+              </div>
+            </div>
+
+            <div
+              *ngIf="!selectedDiscussion()?.comments?.length"
+              class="conversation-empty"
+            >
+              <div>
+                <svg lucideMessageSquare size="17"></svg>
+              </div>
+              <span>No replies yet. Start the conversation below.</span>
+            </div>
+
+            <div class="comment-list" *ngIf="selectedDiscussion()?.comments?.length">
+
+              <article
+                class="comment-item"
+                *ngFor="let comment of selectedDiscussion()?.comments; let i = index"
+              >
+
+                <div class="comment-avatar">
+                  <img
+                    *ngIf="comment.author?.avatarUrl"
+                    [src]="comment.author.avatarUrl"
+                    alt=""
+                  />
+
+                  <span *ngIf="!comment.author?.avatarUrl">
+                    {{ getInitials(comment.author?.firstName, comment.author?.lastName) }}
+                  </span>
+                </div>
+
+                <div class="comment-body">
+
+                  <div class="comment-header">
+                    <div>
+                      <strong>
+                        {{ comment.author?.firstName }}
+                        {{ comment.author?.lastName }}
+                      </strong>
+
+                      <span>
+                        {{ formatRelativeDate(comment.createdAt) }}
+                      </span>
+                    </div>
+
+                    <button class="comment-more" type="button" title="More">
+                      <svg lucideMoreHorizontal size="15"></svg>
+                    </button>
+                  </div>
+
+                  <div
+                    class="comment-content"
+                    [innerHTML]="getSafeHtml(comment.content)"
+                  ></div>
+
+                </div>
+              </article>
+
+            </div>
+          </section>
+
+          <!-- Reply composer -->
+          <section class="reply-composer">
+
+            <div class="reply-composer-header">
+              <div class="reply-icon">
+                <svg lucideMessageSquare size="15"></svg>
+              </div>
+
+              <div>
+                <strong>Reply to this discussion</strong>
+                <span>Keep the conversation moving.</span>
+              </div>
+            </div>
+
+            <div class="discussion-editor">
+              <div class="quill-editor-container" #commentQuillContainer></div>
+            </div>
+
+            <div class="reply-composer-footer">
+
+              <div class="reply-tools">
+
+                <label class="discussion-attach">
+                  <svg lucidePaperclip size="14"></svg>
+                  Attach
+                  <input
+                    type="file"
+                    hidden
+                    (change)="onFileSelected($event)"
+                  />
+                </label>
+
+                <span
+                  *ngIf="isUploading()"
+                  class="uploading-state"
+                >
+                  <svg lucideLoader2 size="12" class="animate-spin"></svg>
+                  Uploading...
+                </span>
+
+                <span class="mention-help">
+                  <svg lucideAtSign size="12"></svg>
+                  Mention someone
+                </span>
+
+              </div>
+
+              <button
+                class="discussion-primary-btn"
+                type="button"
+                [disabled]="isSubmitting() || isUploading() || !newCommentContent.trim()"
+                (click)="addComment()"
+              >
+                <svg
+                  *ngIf="!isSubmitting()"
+                  lucideSend
+                  size="14"
+                ></svg>
+
+                <svg
+                  *ngIf="isSubmitting()"
+                  lucideLoader2
+                  size="14"
+                  class="animate-spin"
+                ></svg>
+
+                {{ isSubmitting() ? 'Posting...' : 'Post reply' }}
+              </button>
+
+            </div>
+
+          </section>
+
+        </main>
+
+        <!-- Thread sidebar -->
+        <aside class="thread-sidebar">
+
+          <section class="thread-sidebar-card">
+            <span class="sidebar-eyebrow">THREAD</span>
+
+            <div class="thread-sidebar-stat">
+              <svg lucideMessageSquare size="15"></svg>
+              <div>
+                <strong>{{ selectedDiscussion()?.comments?.length || 0 }}</strong>
+                <span>Replies</span>
+              </div>
+            </div>
+
+            <div class="thread-sidebar-stat">
+              <svg lucideCalendarDays size="15"></svg>
+              <div>
+                <strong>{{ selectedDiscussion()?.createdAt | date:'MMM d' }}</strong>
+                <span>Created</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="thread-sidebar-card">
+            <span class="sidebar-eyebrow">TIP</span>
+            <p class="thread-sidebar-tip">
+              Use this thread for one topic. If the conversation changes direction,
+              start a new discussion so information stays easy to find.
+            </p>
+          </section>
+
+        </aside>
+
+      </div>
+    </div>
+
+  </ng-container>
+
+</div>

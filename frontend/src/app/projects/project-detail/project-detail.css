@@ -4416,6 +4416,21 @@ input[type=text], input[type=email], input[type=password] {
   box-sizing: border-box;
 }
 
+/* Tickets & Budget Requests Panels - Modern White/Slate Canvas with Vertical Scroll */
+.tickets-panel,
+.budget-requests-panel,
+.discussions-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8fafc !important;
+  min-height: 0;
+  height: calc(100vh - 96px);
+  width: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Summary Dashboard Styles - Modern Executive White UI
    ═══════════════════════════════════════════════════════════════════════════ */

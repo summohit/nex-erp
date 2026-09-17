@@ -114,8 +114,6 @@ model Company {
   taskTypes             TaskType[]
   projectMilestones     ProjectMilestone[]
   timesheetDays         TimesheetDay[]
-  projectTickets        ProjectTicket[]
-  projectBudgetRequests ProjectBudgetRequest[]
 }
 
 // Authentication & RBAC
@@ -505,16 +503,6 @@ model Employee {
   ticketTimeEntries         TicketTimeEntry[]
   timesheetDays             TimesheetDay[]
   reviewedTimesheets        TimesheetDay[]              @relation("TimesheetReviewer")
-
-  discussionsAuthored   ProjectDiscussion[]           @relation("DiscussionAuthor")
-  discussionComments    ProjectDiscussionComment[]    @relation("DiscussionCommentAuthor")
-  discussionAttachments ProjectDiscussionAttachment[] @relation("DiscussionAttachmentUploader")
-
-  projectTicketsRaised   ProjectTicket[]        @relation("TicketRaisedBy")
-  projectTicketsProposed ProjectTicket[]        @relation("TicketProposedAssignee")
-  projectTicketsReviewed ProjectTicket[]        @relation("TicketReviewedBy")
-  budgetRequests         ProjectBudgetRequest[] @relation("BudgetRequestedBy")
-  budgetRequestsReviewed ProjectBudgetRequest[] @relation("BudgetReviewedBy")
 
   @@unique([companyId, employeeCode])
 }
@@ -1490,11 +1478,6 @@ model Project {
   rosterEntries ShiftRosterEntry[]
   attendances   Attendance[]         @relation("ProjectAttendance")
 
-  discussions ProjectDiscussion[]
-
-  projectTickets ProjectTicket[]
-  budgetRequests ProjectBudgetRequest[]
-
   @@unique([key, companyId])
   @@index([companyId, workStatus])
   @@index([departmentId])
@@ -2043,9 +2026,8 @@ model Issue {
   blockedBy   IssueDependency[] @relation("IssueBlockedBy")
   blocking    IssueDependency[] @relation("IssueBlocks")
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  projectTicket ProjectTicket?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([key, companyId])
   /// "What is assigned to me, soonest first" — the My Tasks query.
@@ -3451,121 +3433,4 @@ model TicketTimeEntry {
 
   @@index([ticketId])
   @@index([userId])
-}
-
-// ═══════════════════════════════════════════
-// PROJECT DISCUSSIONS
-// ═══════════════════════════════════════════
-
-model ProjectDiscussion {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String   @db.Text
-  projectId Int
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  authorId  Int
-  author    Employee @relation("DiscussionAuthor", fields: [authorId], references: [id])
-
-  comments    ProjectDiscussionComment[]
-  attachments ProjectDiscussionAttachment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([projectId])
-  @@index([authorId])
-}
-
-model ProjectDiscussionComment {
-  id           Int               @id @default(autoincrement())
-  content      String            @db.Text
-  discussionId Int
-  discussion   ProjectDiscussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
-  authorId     Int
-  author       Employee          @relation("DiscussionCommentAuthor", fields: [authorId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([discussionId])
-  @@index([authorId])
-}
-
-model ProjectDiscussionAttachment {
-  id           Int               @id @default(autoincrement())
-  fileName     String
-  fileUrl      String
-  fileSize     Int?
-  discussionId Int
-  discussion   ProjectDiscussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
-  uploadedById Int
-  uploadedBy   Employee          @relation("DiscussionAttachmentUploader", fields: [uploadedById], references: [id])
-
-  createdAt DateTime @default(now())
-}
-
-model ProjectTicket {
-  id                 Int       @id @default(autoincrement())
-  ticketNumber       String    @unique
-  title              String
-  description        String?   @db.Text
-  projectId          Int
-  project            Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  companyId          Int
-  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  raisedById         Int
-  raisedBy           Employee  @relation("TicketRaisedBy", fields: [raisedById], references: [id])
-  proposedAssigneeId Int?
-  proposedAssignee   Employee? @relation("TicketProposedAssignee", fields: [proposedAssigneeId], references: [id])
-  priority           String    @default("MEDIUM")
-  startDate          DateTime?
-  dueDate            DateTime?
-  estimatedHours     Float?
-  status             String    @default("REQUESTED") // REQUESTED, APPROVED, REJECTED
-
-  reviewedById     Int?
-  reviewedBy       Employee? @relation("TicketReviewedBy", fields: [reviewedById], references: [id])
-  reviewedAt       DateTime?
-  rejectionReason  String?   @db.Text
-  convertedIssueId Int?      @unique
-  convertedAt DateTime?
-  convertedIssue   Issue?    @relation(fields: [convertedIssueId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([projectId])
-}
-
-model ProjectBudgetRequest {
-  id            Int      @id @default(autoincrement())
-  projectId     Int
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  companyId     Int
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  requestedById Int
-  requestedBy   Employee @relation("BudgetRequestedBy", fields: [requestedById], references: [id])
-
-  additionalHours  Float?
-  hoursBefore      Float?
-  hoursAfter       Float?
-  budgetBefore     Float?
-  budgetAfter      Float?
-  additionalBudget Float?
-  reason           String  @db.Text
-  attachmentUrl    String?
-  attachmentName   String?
-
-  status          String    @default("REQUESTED")
-  reviewedById    Int?
-  reviewedBy      Employee? @relation("BudgetReviewedBy", fields: [reviewedById], references: [id])
-  reviewedAt      DateTime?
-  rejectionReason String?   @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([projectId])
 }

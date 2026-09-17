@@ -1,0 +1,310 @@
+<div class="tk-tab">
+  <div class="tk-container">
+
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <div class="tk-header">
+      <div class="tk-title-group">
+        <div class="tk-title-badge">
+          <svg lucideTicket size="20"></svg>
+        </div>
+        <div>
+          <h2 class="tk-title">Tickets</h2>
+          <p class="tk-subtitle">
+            Work the client has asked for that needs approval before it becomes a task.
+          </p>
+        </div>
+      </div>
+
+      <div class="tk-header-actions">
+        <span class="tk-awaiting" *ngIf="awaitingCount()">
+          {{ awaitingCount() }} awaiting approval
+        </span>
+        <button class="tk-btn-primary" (click)="openNew()" *ngIf="editing() === null">
+          <svg lucidePlus size="15"></svg> Raise a ticket
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Filter ──────────────────────────────────────────────────────── -->
+    <div class="tk-filters" *ngIf="!loading() && tickets().length">
+      <button *ngFor="let s of STATUSES" class="tk-chip"
+              [class.active]="statusFilter() === s.value"
+              (click)="statusFilter.set(s.value)">
+        {{ s.label }}
+      </button>
+    </div>
+
+    <!-- ── The form ────────────────────────────────────────────────────── -->
+    <div class="tk-form" *ngIf="editing() !== null">
+      <div class="tk-form-head">
+        <div>
+          <h3>{{ editing() === 'new' ? 'Raise a ticket' : 'Edit ticket' }}</h3>
+          <p class="tk-form-desc">All fields below are required to propose this work.</p>
+        </div>
+        <button class="tk-icon-btn" (click)="closeForm()" title="Close">
+          <svg lucideX size="16"></svg>
+        </button>
+      </div>
+
+      <div class="tk-form-grid">
+        <label class="tk-field tk-span-2">
+          <span class="tk-label-text">What is being asked for <span class="tk-req">*</span></span>
+          <input type="text" [(ngModel)]="form.title" 
+                 placeholder="e.g. Add a second firewall pair at the Gurgaon site"
+                 [class.invalid]="submitted() && !form.title.trim()">
+          <small class="tk-error-msg" *ngIf="submitted() && !form.title.trim()">Title is required.</small>
+        </label>
+
+        <label class="tk-field tk-span-2">
+          <span class="tk-label-text">Details <span class="tk-req">*</span></span>
+          <textarea rows="3" [(ngModel)]="form.description"
+                    placeholder="What the client asked for, and anything the approver needs to weigh it up"
+                    [class.invalid]="submitted() && !form.description.trim()"></textarea>
+          <small class="tk-error-msg" *ngIf="submitted() && !form.description.trim()">Details are required.</small>
+        </label>
+
+        <!-- Searchable Assignee with User Icons -->
+        <div class="tk-field tk-relative">
+          <span class="tk-label-text">Who would do it <span class="tk-req">*</span></span>
+
+          <div class="emp-select-wrap">
+            <button type="button" 
+                    class="emp-select-trigger" 
+                    [class.invalid]="submitted() && !form.proposedAssigneeId"
+                    [class.open]="assigneeDropdownOpen()"
+                    (click)="toggleAssigneeDropdown()">
+              
+              <div class="emp-trigger-content" *ngIf="selectedMember() as sm; else noMember">
+                <div class="emp-avatar-wrap">
+                  <img *ngIf="sm.avatarUrl" [src]="sm.avatarUrl" class="emp-avatar-img" [alt]="fullName(sm)">
+                  <div *ngIf="!sm.avatarUrl" class="emp-avatar-fallback" [style.background-color]="getMemberColor(sm)">
+                    <span *ngIf="initials(sm) !== '?'">{{ initials(sm) }}</span>
+                    <svg lucideUser size="12" *ngIf="initials(sm) === '?'"></svg>
+                  </div>
+                </div>
+                <div class="emp-trigger-meta">
+                  <span class="emp-trigger-name">{{ fullName(sm) }}</span>
+                  <span class="emp-trigger-sub" *ngIf="sm.memberRole">{{ sm.memberRole | titlecase }}</span>
+                </div>
+              </div>
+
+              <ng-template #noMember>
+                <div class="emp-trigger-empty">
+                  <div class="emp-avatar-wrap">
+                    <div class="emp-avatar-fallback placeholder">
+                      <svg lucideUser size="14"></svg>
+                    </div>
+                  </div>
+                  <span>Select employee...</span>
+                </div>
+              </ng-template>
+
+              <svg lucideChevronDown size="15" class="emp-chevron" [class.rotated]="assigneeDropdownOpen()"></svg>
+            </button>
+
+            <!-- Dropdown Popover -->
+            <div class="emp-popover" *ngIf="assigneeDropdownOpen()">
+              <div class="emp-search-box">
+                <svg lucideSearch size="14" class="emp-search-icon"></svg>
+                <input type="text"
+                       class="emp-search-input"
+                       placeholder="Search employee by name or role..."
+                       [ngModel]="assigneeSearchQuery()"
+                       (ngModelChange)="assigneeSearchQuery.set($event)"
+                       (click)="$event.stopPropagation()">
+                <button type="button" class="emp-search-clear" *ngIf="assigneeSearchQuery()" (click)="assigneeSearchQuery.set('')">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </div>
+
+              <div class="emp-options-list">
+                <div class="emp-option"
+                     *ngFor="let m of filteredMembers()"
+                     [class.selected]="form.proposedAssigneeId === m.id"
+                     (click)="selectMember(m)">
+                  <div class="emp-avatar-wrap">
+                    <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="emp-avatar-img" [alt]="fullName(m)">
+                    <div *ngIf="!m.avatarUrl" class="emp-avatar-fallback" [style.background-color]="getMemberColor(m)">
+                      <span *ngIf="initials(m) !== '?'">{{ initials(m) }}</span>
+                      <svg lucideUser size="12" *ngIf="initials(m) === '?'"></svg>
+                    </div>
+                  </div>
+                  <div class="emp-option-meta">
+                    <span class="emp-option-name">{{ fullName(m) }}</span>
+                    <span class="emp-option-sub">{{ m.memberRole ? (m.memberRole | titlecase) : 'Team Member' }}</span>
+                  </div>
+                  <svg lucideCheck size="14" class="emp-option-check" *ngIf="form.proposedAssigneeId === m.id"></svg>
+                </div>
+
+                <div class="emp-empty-state" *ngIf="filteredMembers().length === 0">
+                  <svg lucideUser size="18"></svg>
+                  <span>No team members match "{{ assigneeSearchQuery() }}"</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Backdrop -->
+            <div class="emp-backdrop" *ngIf="assigneeDropdownOpen()" (click)="assigneeDropdownOpen.set(false)"></div>
+          </div>
+
+          <small class="tk-error-msg" *ngIf="submitted() && !form.proposedAssigneeId">Employee is required.</small>
+          <small class="tk-hint" *ngIf="!submitted() || form.proposedAssigneeId">Project members only.</small>
+        </div>
+
+        <label class="tk-field">
+          <span class="tk-label-text">Priority <span class="tk-req">*</span></span>
+          <select [(ngModel)]="form.priority" [class.invalid]="submitted() && !form.priority">
+            <option *ngFor="let p of PRIORITIES" [value]="p">{{ p | titlecase }}</option>
+          </select>
+          <small class="tk-error-msg" *ngIf="submitted() && !form.priority">Priority is required.</small>
+        </label>
+
+        <label class="tk-field">
+          <span class="tk-label-text">Start date <span class="tk-req">*</span></span>
+          <input type="date" [(ngModel)]="form.startDate" [class.invalid]="(submitted() && !form.startDate) || dateError()">
+          <small class="tk-error-msg" *ngIf="submitted() && !form.startDate">Start date is required.</small>
+        </label>
+
+        <label class="tk-field">
+          <span class="tk-label-text">Due date <span class="tk-req">*</span></span>
+          <input type="date" [(ngModel)]="form.dueDate" [min]="form.startDate" [class.invalid]="(submitted() && !form.dueDate) || dateError()">
+          <small class="tk-error-msg" *ngIf="submitted() && !form.dueDate">Due date is required.</small>
+          <small class="tk-error-msg" *ngIf="dateError()">{{ dateError() }}</small>
+        </label>
+
+        <label class="tk-field">
+          <span class="tk-label-text">Estimated hours <span class="tk-req">*</span></span>
+          <input type="number" min="0.5" step="0.5" [(ngModel)]="form.estimatedHours" placeholder="e.g. 12"
+                 [class.invalid]="submitted() && (form.estimatedHours == null || form.estimatedHours <= 0)">
+          <small class="tk-error-msg" *ngIf="submitted() && (form.estimatedHours == null || form.estimatedHours <= 0)">
+            Estimated hours are required (> 0).
+          </small>
+          <small class="tk-hint" *ngIf="!submitted() || (form.estimatedHours != null && form.estimatedHours > 0)">
+            Carried onto task for actual comparison.
+          </small>
+        </label>
+      </div>
+
+      <div class="tk-form-actions">
+        <button class="tk-btn-ghost" (click)="closeForm()">Cancel</button>
+        <button class="tk-btn-primary" (click)="save()" [disabled]="saving()">
+          <svg *ngIf="saving()" lucideLoader2 size="14" class="spin"></svg>
+          {{ editing() === 'new' ? 'Send for approval' : 'Save changes' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Loading / empty ─────────────────────────────────────────────── -->
+    <div class="tk-loading" *ngIf="loading()">
+      <svg lucideLoader2 size="22" class="spin"></svg>
+      <span>Loading tickets…</span>
+    </div>
+
+    <div class="tk-empty" *ngIf="!loading() && !tickets().length && editing() === null">
+      <svg lucideTicket size="40"></svg>
+      <h3>No tickets on this project</h3>
+      <p>
+        Raise one when the client asks for something outside what was agreed. A ticket becomes a
+        task once an administrator approves it — work already inside scope can just be added as a
+        task directly.
+      </p>
+    </div>
+
+    <div class="tk-empty sm" *ngIf="!loading() && tickets().length && !visible().length">
+      <p>No tickets with that status.</p>
+    </div>
+
+    <!-- ── The list ────────────────────────────────────────────────────── -->
+    <div class="tk-list" *ngIf="!loading()">
+      <div class="tk-card" *ngFor="let t of visible(); trackBy: trackById"
+           [class.settled]="!isOpen(t)">
+
+        <div class="tk-card-top">
+          <div class="tk-card-id">
+            <span class="tk-number">{{ t.ticketNumber }}</span>
+            <span class="tk-priority" [ngClass]="t.priority.toLowerCase()">{{ t.priority | titlecase }}</span>
+          </div>
+          <span class="tk-status" [ngClass]="t.status.toLowerCase()">{{ statusLabel(t.status) }}</span>
+        </div>
+
+        <h4 class="tk-card-title">{{ t.title }}</h4>
+        <p class="tk-card-desc" *ngIf="t.description">{{ t.description }}</p>
+
+        <div class="tk-meta">
+          <!-- Assignee with Avatar / Icon -->
+          <div class="tk-meta-person" *ngIf="t.proposedAssignee">
+            <div class="tk-meta-avatar">
+              <img *ngIf="t.proposedAssignee.avatarUrl" [src]="t.proposedAssignee.avatarUrl" class="tk-avatar-img" [alt]="fullName(t.proposedAssignee)">
+              <div *ngIf="!t.proposedAssignee.avatarUrl" class="tk-avatar-fallback" [style.background-color]="getMemberColor(t.proposedAssignee)">
+                <span *ngIf="initials(t.proposedAssignee) !== '?'">{{ initials(t.proposedAssignee) }}</span>
+                <svg lucideUser size="11" *ngIf="initials(t.proposedAssignee) === '?'"></svg>
+              </div>
+            </div>
+            <span class="tk-meta-name">{{ fullName(t.proposedAssignee) }}</span>
+          </div>
+
+          <span class="tk-meta-item tk-unassigned" *ngIf="!t.proposedAssignee">
+            <svg lucideUser size="13"></svg>
+            Unassigned
+          </span>
+
+          <span class="tk-meta-item">
+            <svg lucideClock size="13"></svg>
+            {{ hours(t.estimatedHours) }}
+          </span>
+
+          <span class="tk-meta-item" *ngIf="t.startDate">
+            <svg lucideCalendar size="13"></svg>
+            starts {{ t.startDate | date:'d MMM y' }}
+          </span>
+
+          <span class="tk-meta-item" *ngIf="t.dueDate">
+            <svg lucideCalendar size="13"></svg>
+            due {{ t.dueDate | date:'d MMM y' }}
+          </span>
+
+          <span class="tk-meta-item tk-dim">
+            raised by {{ fullName(t.raisedBy) }} · {{ t.createdAt | date:'d MMM y' }}
+          </span>
+        </div>
+
+        <!-- Converted: the ticket stops being something you act on and becomes
+             the record of why a task exists (§30). -->
+        <div class="tk-linked" *ngIf="t.convertedIssue as task">
+          <svg lucideArrowRight size="14"></svg>
+          <span>
+            Became <strong class="mono">{{ task.key }}</strong> — {{ task.title }}
+            <span class="tk-task-status">{{ task.status }}</span>
+          </span>
+        </div>
+
+        <div class="tk-rejected" *ngIf="t.status === 'REJECTED' && t.rejectionReason">
+          <svg lucideAlertTriangle size="14"></svg>
+          <span>
+            <strong>Rejected by {{ fullName(t.reviewedBy) }}:</strong> {{ t.rejectionReason }}
+          </span>
+        </div>
+
+        <div class="tk-card-actions" *ngIf="isOpen(t)">
+          <button class="tk-btn-ghost sm" (click)="openEdit(t)">
+            <svg lucidePencil size="13"></svg> Edit
+          </button>
+          <button class="tk-btn-ghost sm" (click)="cancel(t)" [disabled]="isBusy(t.id)">
+            Withdraw
+          </button>
+
+          <ng-container *ngIf="isAdmin()">
+            <button class="tk-btn-approve" (click)="approve(t)" [disabled]="isBusy(t.id)">
+              <svg lucideCheck size="13"></svg> Approve &amp; create task
+            </button>
+            <button class="tk-btn-reject" (click)="reject(t)" [disabled]="isBusy(t.id)">
+              <svg lucideX size="13"></svg> Reject
+            </button>
+          </ng-container>
+          <span class="tk-dim sm" *ngIf="!isAdmin()">Waiting on an administrator</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

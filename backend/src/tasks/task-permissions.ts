@@ -7,11 +7,14 @@
  * through TasksModule. One implementation, no dependency graph.
  */
 export async function canCreateTask(
-  prisma: { employee: { findFirst: Function } },
+  prisma: {
+    employee: { findFirst: Function };
+    projectMember?: { findFirst: Function };
+  },
   companyId: number,
   actorEmployeeId: number | null | undefined,
   role: string | undefined,
-  project?: { leadId: number | null } | null,
+  project?: { id?: number; leadId: number | null } | null,
 ): Promise<boolean> {
   // Admins always may.
   if (role === 'SUPERADMIN' || role === 'ADMIN') return true;
@@ -20,6 +23,24 @@ export async function canCreateTask(
   // A project's owner may, within their own project. This is the rule
   // issues.service has enforced all along, preserved exactly.
   if (project && project.leadId === actorEmployeeId) return true;
+
+  // A project manager may raise work inside a project they manage.
+  //
+  // They could not before, which made no sense next to everything else a PM
+  // does here: they approve its timesheets, own its milestones, and are the
+  // only non-admin who can move a task assigned to another PM. Running the
+  // delivery of a project without being able to write down what it needs is
+  // not a permission boundary, it is an oversight.
+  //
+  // Scoped to the project in hand. Managing one project says nothing about
+  // anybody else's, and there is no project to manage on a general task.
+  if (project?.id != null && prisma.projectMember?.findFirst) {
+    const managing = await prisma.projectMember.findFirst({
+      where: { projectId: project.id, employeeId: actorEmployeeId, role: 'PROJECT_MANAGER' },
+      select: { id: true },
+    });
+    if (managing) return true;
+  }
 
   // Beyond those, it is a per-department flag.
   //

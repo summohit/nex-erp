@@ -7,6 +7,9 @@ import { HttpClient } from '@angular/common/http';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ProjectsService, ProjectSummary } from '../../services/projects';
 import { MilestonesTabComponent } from '../milestones/milestones-tab';
+import { TicketsTabComponent } from '../tickets/tickets-tab';
+import { BudgetRequestsTabComponent } from '../budget-requests/budget-requests-tab';
+import { DiscussionsTabComponent } from '../discussions/discussions-tab';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
 import { 
   LucideLayoutDashboard, LucideKanban,
@@ -17,6 +20,7 @@ import {
   LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
   LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
   LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive, LucideFlag,
+  LucideTicket,
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
   LucideFileUp, LucideUpload, LucideUploadCloud,
@@ -41,6 +45,7 @@ declare var Quill: any;
   standalone: true,
   imports: [
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
+    TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     LucideLayoutDashboard, LucideKanban,
     LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
     LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
@@ -49,6 +54,7 @@ declare var Quill: any;
     LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
     LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
     LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive, LucideFlag,
+    LucideTicket,
     LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
     LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
     LucideFileUp, LucideUpload, LucideUploadCloud,
@@ -1669,24 +1675,58 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
           })
         );
 
-        const savedTab = localStorage.getItem('project_active_tab');
-        if (savedTab) {
-          this.setProjectTab(savedTab);
-        } else {
-          this.setProjectTab('board');
-        }
+        // Restoring the remembered tab, not a click: the loads above have
+        // just run. Summary and field visits are the exception — nothing has
+        // fetched those yet, so they still need their own call.
+        const savedTab = localStorage.getItem('project_active_tab') || 'board';
+        const needsOwnFetch = ['summary', 'reports', 'field-visits', 'archived', 'discussions'].includes(savedTab);
+        this.setProjectTab(savedTab, needsOwnFetch);
       }
     });
   }
 
-  setProjectTab(tab: string) {
+  /**
+   * Switching tab refetches that tab's data.
+   *
+   * Board, list and calendar all read the same issues, and they were loaded
+   * once when the page opened — so a task created anywhere else (converted
+   * from a ticket, added from My Tasks, moved by a colleague) was simply
+   * absent until a full reload. Only summary, reports and field visits
+   * refetched, which is why those three always looked right and the rest
+   * drifted.
+   *
+   * Milestones, tickets and budget requests are not listed here: each sits
+   * behind an *ngIf, so leaving the tab destroys the component and returning
+   * builds a new one that loads itself.
+   *
+   * `refetch` is false only when restoring the remembered tab on page load,
+   * where ngOnInit has already fetched the board and the documents — without
+   * that, opening the page would request both twice.
+   */
+  setProjectTab(tab: string, refetch = true) {
     this.activeProjectTab.set(tab);
     localStorage.setItem('project_active_tab', tab);
-    if (tab === 'summary' || tab === 'reports') {
-      this.loadSummary();
-    }
-    if (tab === 'field-visits') {
-      this.loadFieldVisits();
+    if (!refetch) return;
+
+    switch (tab) {
+      case 'summary':
+      case 'reports':
+        this.loadSummary();
+        break;
+      case 'field-visits':
+        this.loadFieldVisits();
+        break;
+      case 'board':
+      case 'list':
+      case 'calendar':
+        this.loadBoardAndIssues();
+        break;
+      case 'attachments':
+        this.loadProjectDocuments();
+        break;
+      case 'archived':
+        this.loadArchivedColumns();
+        break;
     }
   }
 

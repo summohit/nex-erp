@@ -37,7 +37,7 @@ describe('IssuesService — moving a task to Done or Archived', () => {
         findUnique: jest.fn(async () => ({ firstName: 'Mohit', lastName: 'Singh' })),
       },
     };
-    service = new IssuesService(prisma, {} as any, {} as any);
+    service = new IssuesService(prisma, {} as any, {} as any, { onIssueStatusChanged: jest.fn() } as any);
     // The assignee reports to MANAGER and to nobody else.
     (service as any).getAssigneeUpperHierarchy = jest.fn(async () => [MANAGER]);
   });

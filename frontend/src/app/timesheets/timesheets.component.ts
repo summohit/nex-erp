@@ -1,12 +1,15 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideChevronLeft, LucideChevronRight, LucideClock, LucideUser, LucideUsers,
   LucideBuilding2, LucideCoins, LucideCheck, LucideX, LucideSend, LucideFilter,
   LucideChevronDown, LucideAlertTriangle, LucideTimer, LucidePencilLine,
   LucideCalendarDays, LucideLoader2, LucideRotateCcw, LucideInfo,
+  LucideCheckCircle2, LucideAlertCircle, LucideBriefcase, LucideTag,
+  LucideCalendar, LucideFileText, LucideHourglass, LucideSearch,
 } from '@lucide/angular';
 import {
   TimesheetsService, TimesheetScope, TimesheetWeek, TimesheetOverview,
@@ -47,6 +50,8 @@ import { MasterDataService } from '../services/master-data.service';
     LucideBuilding2, LucideCoins, LucideCheck, LucideX, LucideSend, LucideFilter,
     LucideChevronDown, LucideAlertTriangle, LucideTimer, LucidePencilLine,
     LucideCalendarDays, LucideLoader2, LucideRotateCcw, LucideInfo,
+    LucideCheckCircle2, LucideAlertCircle, LucideBriefcase, LucideTag,
+    LucideCalendar, LucideFileText, LucideHourglass, LucideSearch,
   ],
   templateUrl: './timesheets.html',
   styleUrls: ['./timesheets.css'],
@@ -59,6 +64,7 @@ export class TimesheetsComponent implements OnInit {
   private clientsService = inject(ClientsService);
   private masterData = inject(MasterDataService);
   private toast = inject(HotToastService);
+  private router = inject(Router);
 
   // ── Scope ──────────────────────────────────────────────────────────────
 
@@ -94,30 +100,99 @@ export class TimesheetsComponent implements OnInit {
    * did last quarter actually go" is a question the same table answers.
    */
   rangeDays = signal<number>(7);
+  customEndDate = signal<Date | null>(null);
+  durationDropdownOpen = signal<boolean>(false);
+  selectedDuration = signal<string>('This Week');
+  customFromDate = signal<string>('');
+  customToDate = signal<string>('');
+  tableSearchQuery = signal<string>('');
+
+  calMonth1 = signal<Date>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  calMonth2 = computed(() => {
+    const m = this.calMonth1();
+    return new Date(m.getFullYear(), m.getMonth() + 1, 1);
+  });
+  pickerStart = signal<Date | null>(new Date());
+  pickerEnd = signal<Date | null>(new Date());
+
+  readonly DOW_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  daysMonth1 = computed(() => this.getCalendarDays(this.calMonth1()));
+  daysMonth2 = computed(() => this.getCalendarDays(this.calMonth2()));
+
+  pickerFormattedRange = computed(() => {
+    const s = this.pickerStart();
+    const e = this.pickerEnd();
+    if (!s) return '01-01-2026 To 01-01-2026';
+    const fmt = (d: Date) => {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    };
+    if (!e) return `${fmt(s)} To ${fmt(s)}`;
+    const minD = s < e ? s : e;
+    const maxD = s < e ? e : s;
+    return `${fmt(minD)} To ${fmt(maxD)}`;
+  });
+
+  readonly DURATION_OPTIONS = [
+    'Today',
+    'Last 30 Days',
+    'This Month',
+    'Last Month',
+    'Last 90 Days',
+    'Last 6 Months',
+    'Last 1 Year',
+    'Custom Range',
+  ] as const;
 
   weekEnd = computed(() => {
+    if (this.customEndDate()) {
+      return this.customEndDate()!;
+    }
     const d = new Date(this.weekStart());
     d.setDate(d.getDate() + this.rangeDays() - 1);
     return d;
   });
 
   /** The grid gets a column per day, so it only stays readable for a week. */
-  showDayColumns = computed(() => this.rangeDays() <= 7);
+  showDayColumns = computed(() => {
+    const s = this.weekStart().getTime();
+    const e = this.weekEnd().getTime();
+    const days = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    return days <= 7;
+  });
 
   weekDays = computed(() => {
+    if (!this.showDayColumns()) return [];
     const out: { date: Date; key: string; isToday: boolean }[] = [];
     const todayKey = this.dayKey(new Date());
-    for (let i = 0; i < this.rangeDays(); i++) {
-      const d = new Date(this.weekStart());
-      d.setDate(d.getDate() + i);
-      const key = this.dayKey(d);
-      out.push({ date: d, key, isToday: key === todayKey });
+    const s = new Date(this.weekStart());
+    const e = new Date(this.weekEnd());
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      const cur = new Date(d);
+      const key = this.dayKey(cur);
+      out.push({ date: cur, key, isToday: key === todayKey });
     }
     return out;
   });
 
+  durationDateText = computed(() => {
+    const s = this.weekStart();
+    const e = this.weekEnd();
+    if (!s || !e) return 'Start Date To End Date';
+    const fmt = (d: Date) => {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = d.toLocaleString('en-US', { month: 'short' });
+      const year = d.getFullYear();
+      return `${day} ${month} ${year}`;
+    };
+    return `${fmt(s)} To ${fmt(e)}`;
+  });
+
   isCurrentWeek = computed(
-    () => this.dayKey(this.weekStart()) === this.dayKey(this.mondayOf(new Date())),
+    () => !this.customEndDate() && this.dayKey(this.weekStart()) === this.dayKey(this.mondayOf(new Date())),
   );
 
   // ── Data ───────────────────────────────────────────────────────────────
@@ -164,6 +239,12 @@ export class TimesheetsComponent implements OnInit {
   clients = signal<any[]>([]);
   departments = signal<any[]>([]);
 
+  // Searchable filter dropdown states
+  fEmployeeDropdownOpen = signal<boolean>(false);
+  fEmployeeSearchQuery = signal<string>('');
+  fProjectDropdownOpen = signal<boolean>(false);
+  fProjectSearchQuery = signal<string>('');
+
   projectManagers = computed(() => this.employees().filter((e) => e.isProjectManager));
 
   activeFilterCount = computed(
@@ -179,6 +260,94 @@ export class TimesheetsComponent implements OnInit {
     { value: 'APPROVED', label: 'Approved' },
     { value: 'REJECTED', label: 'Rejected' },
   ];
+
+  filteredEmployees = computed(() => {
+    const q = this.fEmployeeSearchQuery().toLowerCase().trim();
+    const list = this.employees();
+    if (!q) return list;
+    return list.filter((e) => {
+      const name = this.fullName(e).toLowerCase();
+      const email = (e.email || e.user?.email || '').toLowerCase();
+      const dept = (e.department?.name || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || dept.includes(q);
+    });
+  });
+
+  filteredProjects = computed(() => {
+    const q = this.fProjectSearchQuery().toLowerCase().trim();
+    const list = this.projects();
+    if (!q) return list;
+    return list.filter((p) => {
+      const name = (p.name || '').toLowerCase();
+      const code = (p.projectCode || p.code || '').toLowerCase();
+      return name.includes(q) || code.includes(q);
+    });
+  });
+
+  filteredTableEmployees = computed(() => {
+    const data = this.overview();
+    if (!data || !data.employees) return [];
+    const q = this.tableSearchQuery().toLowerCase().trim();
+    if (!q) return data.employees;
+    return data.employees.filter((row) => {
+      const name = this.fullName(row.employee).toLowerCase();
+      const code = (row.employee.employeeCode || '').toLowerCase();
+      const dept = (row.employee.department?.name || '').toLowerCase();
+      const email = ((row.employee as any).email || (row.employee as any).user?.email || '').toLowerCase();
+      return name.includes(q) || code.includes(q) || dept.includes(q) || email.includes(q);
+    });
+  });
+
+  tableTotals = computed(() => {
+    const list = this.filteredTableEmployees();
+    let loginHours = 0;
+    let loggedHours = 0;
+    let unloggedHours = 0;
+    let cost = 0;
+    let unratedHours = 0;
+    for (const r of list) {
+      loginHours += r.totals.loginHours || 0;
+      loggedHours += r.totals.loggedHours || 0;
+      unloggedHours += r.totals.unloggedHours || 0;
+      if (r.cost?.amount != null) {
+        cost += r.cost.amount;
+      } else if (r.totals.loggedHours > 0) {
+        unratedHours += r.totals.loggedHours;
+      }
+    }
+    return { loginHours, loggedHours, unloggedHours, cost, unratedHours };
+  });
+
+  selectedEmployee = computed(() => {
+    const id = this.fEmployee();
+    if (id === 'ALL') return null;
+    return this.employees().find((e) => String(e.id) === String(id)) || null;
+  });
+
+  selectedProject = computed(() => {
+    const id = this.fProject();
+    if (id === 'ALL') return null;
+    return this.projects().find((p) => String(p.id) === String(id)) || null;
+  });
+
+  selectEmployee(id: string) {
+    this.fEmployee.set(id);
+    this.fEmployeeDropdownOpen.set(false);
+  }
+
+  selectProject(id: string) {
+    this.fProject.set(id);
+    this.fProjectDropdownOpen.set(false);
+  }
+
+  closeFilterDropdowns() {
+    this.closeAllDropdowns();
+  }
+
+  goToTask(issueKey: string) {
+    this.closeEntry();
+    this.router.navigate(['/tasks'], { queryParams: { search: issueKey } });
+  }
 
   ngOnInit() {
     this.load();
@@ -241,6 +410,8 @@ export class TimesheetsComponent implements OnInit {
   nextWeek() { this.shiftWeek(this.rangeDays()); }
 
   thisWeek() {
+    this.customEndDate.set(null);
+    this.selectedDuration.set('This Week');
     this.weekStart.set(this.mondayOf(new Date()));
     this.rangeDays.set(7);
     this.load();
@@ -251,10 +422,13 @@ export class TimesheetsComponent implements OnInit {
    * than starting today — the question is always about work already done.
    */
   setRange(days: number) {
+    this.customEndDate.set(null);
     this.rangeDays.set(days);
     if (days === 7) {
+      this.selectedDuration.set('This Week');
       this.weekStart.set(this.mondayOf(new Date()));
     } else {
+      this.selectedDuration.set(`Last ${days} Days`);
       const start = new Date();
       start.setDate(start.getDate() - (days - 1));
       start.setHours(0, 0, 0, 0);
@@ -270,10 +444,200 @@ export class TimesheetsComponent implements OnInit {
     { days: 90, label: '90 days' },
   ];
 
+  toggleDurationDropdown() {
+    if (!this.durationDropdownOpen()) {
+      const s = this.weekStart();
+      const e = this.weekEnd();
+      this.pickerStart.set(s);
+      this.pickerEnd.set(e);
+      this.calMonth1.set(new Date(s.getFullYear(), s.getMonth(), 1));
+      this.durationDropdownOpen.set(true);
+    } else {
+      this.durationDropdownOpen.set(false);
+    }
+  }
+
+  monthName(d: Date): string {
+    return d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  prevMonth() {
+    const m = new Date(this.calMonth1());
+    m.setMonth(m.getMonth() - 1);
+    this.calMonth1.set(m);
+  }
+
+  nextMonth() {
+    const m = new Date(this.calMonth1());
+    m.setMonth(m.getMonth() + 1);
+    this.calMonth1.set(m);
+  }
+
+  prevMonth2() {
+    this.prevMonth();
+  }
+
+  nextMonth2() {
+    this.nextMonth();
+  }
+
+  selectPreset(preset: string) {
+    this.selectedDuration.set(preset);
+    if (preset === 'Custom Range') {
+      return;
+    }
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    let start: Date;
+    let end: Date;
+
+    if (preset === 'Today') {
+      start = new Date(now);
+      end = new Date(now);
+    } else if (preset === 'Last 30 Days') {
+      start = new Date(now);
+      start.setDate(start.getDate() - 29);
+      end = new Date(now);
+    } else if (preset === 'This Month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else if (preset === 'Last Month') {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end = new Date(now.getFullYear(), now.getMonth(), 0);
+    } else if (preset === 'Last 90 Days') {
+      start = new Date(now);
+      start.setDate(start.getDate() - 89);
+      end = new Date(now);
+    } else if (preset === 'Last 6 Months') {
+      start = new Date(now);
+      start.setMonth(start.getMonth() - 6);
+      end = new Date(now);
+    } else if (preset === 'Last 1 Year') {
+      start = new Date(now);
+      start.setFullYear(start.getFullYear() - 1);
+      end = new Date(now);
+    } else {
+      start = this.mondayOf(now);
+      end = new Date(start);
+      end.setDate(end.getDate() + 6);
+    }
+
+    this.pickerStart.set(start);
+    this.pickerEnd.set(end);
+    this.calMonth1.set(new Date(start.getFullYear(), start.getMonth(), 1));
+  }
+
+  onDayClick(day: { date: Date; dateKey: string; isCurrentMonth: boolean }) {
+    const clicked = new Date(day.date);
+    clicked.setHours(0, 0, 0, 0);
+
+    if (!this.pickerStart() || (this.pickerStart() && this.pickerEnd())) {
+      this.pickerStart.set(clicked);
+      this.pickerEnd.set(null);
+      this.selectedDuration.set('Custom Range');
+    } else {
+      const s = this.pickerStart()!;
+      if (clicked < s) {
+        this.pickerStart.set(clicked);
+        this.pickerEnd.set(s);
+      } else {
+        this.pickerEnd.set(clicked);
+      }
+      this.selectedDuration.set('Custom Range');
+    }
+  }
+
+  isStartDate(d: Date): boolean {
+    if (!this.pickerStart()) return false;
+    return this.dayKey(d) === this.dayKey(this.pickerStart()!);
+  }
+
+  isEndDate(d: Date): boolean {
+    if (!this.pickerEnd()) return false;
+    return this.dayKey(d) === this.dayKey(this.pickerEnd()!);
+  }
+
+  isInRange(d: Date): boolean {
+    const s = this.pickerStart();
+    const e = this.pickerEnd();
+    if (!s || !e) return false;
+    const k = this.dayKey(d);
+    const sk = this.dayKey(s);
+    const ek = this.dayKey(e);
+    const minK = sk < ek ? sk : ek;
+    const maxK = sk < ek ? ek : sk;
+    return k > minK && k < maxK;
+  }
+
+  getCalendarDays(monthDate: Date): { date: Date; dayNumber: number; isCurrentMonth: boolean; dateKey: string }[] {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const startDow = (firstDay.getDay() + 6) % 7; // Mon = 0, Sun = 6
+
+    const days: { date: Date; dayNumber: number; isCurrentMonth: boolean; dateKey: string }[] = [];
+    const cur = new Date(year, month, 1 - startDow);
+    for (let i = 0; i < 42; i++) {
+      days.push({
+        date: new Date(cur),
+        dayNumber: cur.getDate(),
+        isCurrentMonth: cur.getMonth() === month,
+        dateKey: this.dayKey(cur),
+      });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return days;
+  }
+
+  applyCustomRange() {
+    const s = this.pickerStart();
+    const e = this.pickerEnd() || s;
+    if (!s || !e) return;
+
+    const start = s < e ? s : e;
+    const end = s < e ? e : s;
+
+    this.weekStart.set(start);
+    this.customEndDate.set(end);
+    const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    this.rangeDays.set(diffDays);
+    this.durationDropdownOpen.set(false);
+    this.load();
+  }
+
+  cancelCustomRange() {
+    this.customEndDate.set(null);
+    this.selectedDuration.set('This Week');
+    const mon = this.mondayOf(new Date());
+    this.weekStart.set(mon);
+    this.rangeDays.set(7);
+
+    this.pickerStart.set(mon);
+    const endMon = new Date(mon);
+    endMon.setDate(endMon.getDate() + 6);
+    this.pickerEnd.set(endMon);
+    this.calMonth1.set(new Date(mon.getFullYear(), mon.getMonth(), 1));
+
+    this.durationDropdownOpen.set(false);
+    this.load();
+  }
+
+  closeAllDropdowns() {
+    this.fEmployeeDropdownOpen.set(false);
+    this.fProjectDropdownOpen.set(false);
+    this.durationDropdownOpen.set(false);
+  }
+
   private shiftWeek(days: number) {
     const d = new Date(this.weekStart());
     d.setDate(d.getDate() + days);
     this.weekStart.set(d);
+    if (this.customEndDate()) {
+      const end = new Date(this.customEndDate()!);
+      end.setDate(end.getDate() + days);
+      this.customEndDate.set(end);
+    }
     this.load();
   }
 
@@ -286,6 +650,10 @@ export class TimesheetsComponent implements OnInit {
     this.fEmployee.set('ALL'); this.fProject.set('ALL'); this.fClient.set('ALL');
     this.fDepartment.set('ALL'); this.fPm.set('ALL'); this.fSource.set('ALL');
     this.fStatus.set('ALL'); this.fTask.set(''); this.fBillable.set('ALL');
+    this.fEmployeeSearchQuery.set('');
+    this.fProjectSearchQuery.set('');
+    this.tableSearchQuery.set('');
+    this.closeAllDropdowns();
     this.load();
   }
 
@@ -339,20 +707,41 @@ export class TimesheetsComponent implements OnInit {
     this.review(employeeId, day, 'APPROVED');
   }
 
+  // ── Rejection Modal (§22) ─────────────────────────────────────────────
+  rejectModalOpen = signal(false);
+  rejectTarget = signal<{ employeeId: number; day: TimesheetDay; employeeName?: string } | null>(null);
+  rejectReasonText = signal('');
+
+  openRejectModal(employeeId: number, day: TimesheetDay, employeeName?: string) {
+    this.rejectTarget.set({ employeeId, day, employeeName });
+    this.rejectReasonText.set('');
+    this.rejectModalOpen.set(true);
+  }
+
+  closeRejectModal() {
+    this.rejectModalOpen.set(false);
+    this.rejectTarget.set(null);
+    this.rejectReasonText.set('');
+  }
+
+  confirmRejection() {
+    const target = this.rejectTarget();
+    if (!target) return;
+    const reason = this.rejectReasonText().trim();
+    if (!reason) {
+      this.toast.error('A rejection requires a reason explaining what needs to change.');
+      return;
+    }
+    this.closeRejectModal();
+    this.review(target.employeeId, target.day, 'REJECTED', reason);
+  }
+
   /**
    * §22: a rejection with no reason is an instruction nobody can act on, so
    * the reason is collected before the request rather than refused after it.
    */
-  rejectDay(employeeId: number, day: TimesheetDay) {
-    const reason = window.prompt(
-      `Why is ${this.shortDate(day.date)} being rejected?\n\nThe employee sees this, so say what needs to change.`,
-    );
-    if (reason === null) return;
-    if (!reason.trim()) {
-      this.toast.error('A rejection needs a reason.');
-      return;
-    }
-    this.review(employeeId, day, 'REJECTED', reason.trim());
+  rejectDay(employeeId: number, day: TimesheetDay, employeeName?: string) {
+    this.openRejectModal(employeeId, day, employeeName);
   }
 
   private review(

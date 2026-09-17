@@ -45,6 +45,7 @@ describe('IssuesService — blockers on the Review/Done transition', () => {
       prisma,
       { emitIssueUpdated: jest.fn(), emitActivityAdded: jest.fn() } as any,
       { notifyEmployees: jest.fn(async () => 0), createNotification: jest.fn(async () => ({})) } as any,
+      { onIssueStatusChanged: jest.fn() } as any,
     );
   });
 

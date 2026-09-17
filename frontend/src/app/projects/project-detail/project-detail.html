@@ -488,6 +488,9 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'attachments'" (click)="setProjectTab('attachments')"><svg lucidePaperclip size="14"></svg> Attachments</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Field Visits</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'tickets'" (click)="setProjectTab('tickets')"><svg lucideTicket size="14"></svg> Tickets</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'discussions'" (click)="setProjectTab('discussions')"><svg lucideMessageSquare size="14"></svg> Discussions</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'budget-requests'" (click)="setProjectTab('budget-requests')"><svg lucideTrendingUp size="14"></svg> Budget requests</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'reports'" (click)="setProjectTab('reports')"><svg lucideBarChart size="14"></svg> Reports</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'archived'" (click)="setProjectTab('archived')"><svg lucideArchive size="14"></svg> Archived work items</button>
   </div>
@@ -1323,6 +1326,22 @@
     <app-milestones-tab [projectId]="projectId" />
   </div>
 
+  <!-- §29/§30 Project tickets, and §25 budget requests. Self-contained
+       components for the same reason milestones is one: this page is already
+       four and a half thousand lines, and each owns its own endpoint and its
+       own permission answers. -->
+  <div class="tickets-panel" *ngIf="activeProjectTab() === 'tickets' && projectId">
+    <app-tickets-tab [projectId]="projectId" />
+  </div>
+
+  <div class="budget-requests-panel" *ngIf="activeProjectTab() === 'budget-requests' && projectId">
+    <app-budget-requests-tab [projectId]="projectId" />
+  </div>
+
+  <div class="discussions-panel" *ngIf="activeProjectTab() === 'discussions' && projectId">
+    <app-discussions-tab [projectId]="projectId" />
+  </div>
+
   <div class="roadmap-dashboard" *ngIf="activeProjectTab() === 'roadmap'" style="height: calc(100vh - 180px); width: 100%; display: flex; flex-direction: column; background-color: white; border-top: 1px solid #e2e8f0; overflow: hidden;">
     
     <!-- Top toolbar / Header -->
@@ -1422,7 +1441,7 @@
       </div>
 
     </div>
-  </div>
+    </div>
 
   <!-- Calendar Dashboard Container -->
   <div class="calendar-dashboard" *ngIf="activeProjectTab() === 'calendar'" style="height: calc(100vh - 180px); width: 100%; padding: 24px; display: flex; flex-direction: column; background-color: #ebf3fe; overflow-y: auto;">

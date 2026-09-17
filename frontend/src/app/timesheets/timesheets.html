@@ -5,7 +5,7 @@
     <div class="ts-header">
       <div class="ts-title-group">
         <div class="ts-title-badge">
-          <svg lucideClock size="20"></svg>
+          <svg lucideClock size="22"></svg>
         </div>
         <div>
           <h2 class="ts-title">Timesheet</h2>
@@ -14,19 +14,23 @@
       </div>
 
       <div class="ts-week-nav">
-        <button class="ts-nav-btn" (click)="previousWeek()" title="Previous week">
-          <svg lucideChevronLeft size="16"></svg>
-        </button>
-        <div class="ts-week-label">
-          <svg lucideCalendarDays size="14"></svg>
-          <span>{{ weekStart() | date:'d MMM' }} – {{ weekEnd() | date:'d MMM y' }}</span>
+        <div class="ts-nav-group">
+          <button class="ts-nav-btn" (click)="previousWeek()" title="Previous week">
+            <svg lucideChevronLeft size="16"></svg>
+          </button>
+          <div class="ts-week-label">
+            <svg lucideCalendarDays size="15"></svg>
+            <span>{{ weekStart() | date:'d MMM' }} – {{ weekEnd() | date:'d MMM y' }}</span>
+          </div>
+          <button class="ts-nav-btn" (click)="nextWeek()" title="Next week">
+            <svg lucideChevronRight size="16"></svg>
+          </button>
         </div>
-        <button class="ts-nav-btn" (click)="nextWeek()" title="Next week">
-          <svg lucideChevronRight size="16"></svg>
-        </button>
+
         <button class="ts-today-btn" (click)="thisWeek()"
                 [disabled]="isCurrentWeek() && rangeDays() === 7">
-          This week
+          <svg lucideCalendar size="14"></svg>
+          <span>This week</span>
         </button>
 
         <div class="ts-range-picker">
@@ -54,86 +58,256 @@
       </div>
 
       <div class="ts-bar-actions">
-      <button class="ts-filter-btn" (click)="legendOpen.set(!legendOpen())" title="What the marks on this screen mean">
-        <svg lucideInfo size="15"></svg>
-        <span>Legend</span>
-      </button>
+        <button class="ts-action-pill" (click)="legendOpen.set(!legendOpen())" [class.active]="legendOpen()" title="What the marks on this screen mean">
+          <svg lucideInfo size="14"></svg>
+          <span>Legend</span>
+        </button>
 
-      <button
-        *ngIf="scope() !== 'ME'"
-        class="ts-filter-btn"
-        [class.has-filters]="activeFilterCount() > 0"
-        (click)="filtersOpen.set(!filtersOpen())">
-        <svg lucideFilter size="15"></svg>
-        <span>Filters</span>
-        <span class="ts-filter-count" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
-        <svg lucideChevronDown size="14" [class.flipped]="filtersOpen()"></svg>
-      </button>
+        <button
+          *ngIf="scope() !== 'ME'"
+          class="ts-action-pill"
+          [class.has-filters]="activeFilterCount() > 0"
+          [class.active]="filtersOpen()"
+          (click)="filtersOpen.set(!filtersOpen())">
+          <svg lucideFilter size="14"></svg>
+          <span>Filters</span>
+          <span class="ts-filter-count" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
+          <svg lucideChevronDown size="14" [class.flipped]="filtersOpen()"></svg>
+        </button>
       </div>
     </div>
 
     <!-- ── Legend ──────────────────────────────────────────────────────── -->
     <div class="ts-legend" *ngIf="legendOpen()">
-      <div class="ts-legend-group">
-        <h4>The three hour figures</h4>
-        <p><b>Login</b> — how long the person was clocked in, from Attendance.</p>
-        <p><b>Logged</b> — how much of that they booked to a task.</p>
-        <p><b>Unlogged</b> — the gap between the two. This is the number the screen exists for.</p>
+      <div class="ts-legend-header">
+        <div class="ts-legend-title">
+          <svg lucideInfo size="16"></svg>
+          <span>Timesheet Guide & Indicator Legend</span>
+        </div>
+        <button class="ts-btn-ghost sm ts-legend-close" (click)="legendOpen.set(false)">
+          <svg lucideX size="14"></svg> Close
+        </button>
       </div>
 
-      <div class="ts-legend-group">
-        <h4>Marks on a day</h4>
-        <p><span class="ts-pill alert">unstopped timer?</span> One entry runs over 12 hours — almost certainly a timer nobody stopped. Common in time migrated from Workway.</p>
-        <p><span class="ts-pill alert">no attendance</span> Time booked on a day with no clock-in at all.</p>
-        <p><span class="ts-pill warn">over-booked</span> More hours booked than the person was clocked in for.</p>
-        <p><span class="ts-pill running-pill">still clocked in</span> The day is still open. Login hours stay empty until clock-out, so a running day does not climb through the afternoon on its own.</p>
-        <p><span class="ts-pill warn">auto-closed</span> Nobody clocked out; the 23:00 sweep closed the day. The login hours are a cutoff, not an observation.</p>
-        <p><span class="ts-pill warn">edited since</span> The logs changed after the day was submitted for approval.</p>
-        <p><span class="ts-cell-flag">!</span> In the team views, this day carries one of the marks above.</p>
-      </div>
+      <div class="ts-legend-grid">
+        <div class="ts-legend-card">
+          <h4>The Three Hour Figures</h4>
+          <p><b>Login:</b> How long the person was clocked in, from Attendance.</p>
+          <p><b>Logged:</b> How much of that they booked to a task.</p>
+          <p><b>Unlogged:</b> The gap between login and logged hours. The key metric for audit.</p>
+        </div>
 
-      <div class="ts-legend-group">
-        <h4>Approval (§22)</h4>
-        <p><span class="ts-status not_submitted">Not submitted</span> Nothing sent for review yet.</p>
-        <p><span class="ts-status submitted">Pending</span> Waiting on a project manager or admin.</p>
-        <p><span class="ts-status approved">Approved</span> Counted as reviewed time.</p>
-        <p><span class="ts-status rejected">Rejected</span> Sent back with a reason; the employee re-submits.</p>
-      </div>
+        <div class="ts-legend-card">
+          <h4>Marks on a Day</h4>
+          <p><span class="ts-pill alert">unstopped timer?</span> One entry runs over 12 hours — almost certainly a forgotten timer.</p>
+          <p><span class="ts-pill alert">no attendance</span> Time booked on a day with no clock-in at all.</p>
+          <p><span class="ts-pill warn">over-booked</span> More hours booked than the person was clocked in for.</p>
+          <p><span class="ts-pill running-pill">still clocked in</span> The day is still open. Login hours stay empty until clock-out.</p>
+          <p><span class="ts-pill warn">auto-closed</span> Closed by the 23:00 automatic sweep cutoff.</p>
+          <p><span class="ts-pill warn">edited since</span> The logs changed after the day was submitted for approval.</p>
+          <p><span class="ts-cell-flag">!</span> In the team views, this day carries one of the marks above.</p>
+        </div>
 
-      <div class="ts-legend-group">
-        <h4>Entries</h4>
-        <p><span class="ts-source"><svg lucideTimer size="12"></svg> Timer</span> Recorded by starting and stopping the timer.</p>
-        <p><span class="ts-source manual"><svg lucidePencilLine size="12"></svg> Manual</span> Typed in by hand, or migrated from Workway.</p>
-        <p><span class="ts-inactive-badge">Inactive</span> The user account is suspended — in practice, someone who has left. Their hours stay because the history is real.</p>
-      </div>
+        <div class="ts-legend-card">
+          <h4>Approval (§22)</h4>
+          <p><span class="ts-status not_submitted">Not submitted</span> Nothing sent for review yet.</p>
+          <p><span class="ts-status submitted">Pending</span> Waiting on a project manager or admin.</p>
+          <p><span class="ts-status approved">Approved</span> Counted as reviewed time.</p>
+          <p><span class="ts-status rejected">Rejected</span> Sent back with a reason; employee re-submits.</p>
+        </div>
 
-      <button class="ts-btn-ghost sm ts-legend-close" (click)="legendOpen.set(false)">Close</button>
+        <div class="ts-legend-card">
+          <h4>Entries</h4>
+          <p><span class="ts-source"><svg lucideTimer size="12"></svg> Timer</span> Recorded by starting and stopping the timer.</p>
+          <p><span class="ts-source manual"><svg lucidePencilLine size="12"></svg> Manual</span> Typed in by hand, or migrated from Workway.</p>
+          <p><span class="ts-inactive-badge">Inactive</span> The user account is suspended or left the company.</p>
+        </div>
+      </div>
     </div>
 
     <!-- ── Filters (§21) ───────────────────────────────────────────────── -->
+    <div class="ts-dropdown-backdrop" *ngIf="fEmployeeDropdownOpen() || fProjectDropdownOpen() || durationDropdownOpen()" (click)="closeAllDropdowns()"></div>
+
     <div class="ts-filters" *ngIf="filtersOpen() && scope() !== 'ME'">
+      <div class="ts-filters-head">
+        <div class="ts-filters-title">
+          <svg lucideFilter size="15"></svg>
+          <span>Timesheet Filters</span>
+          <span class="ts-filter-badge" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }} active</span>
+        </div>
+        <div class="ts-filters-actions">
+          <button class="ts-btn-ghost sm" *ngIf="activeFilterCount() > 0" (click)="clearFilters()">
+            <svg lucideRotateCcw size="13"></svg> Reset
+          </button>
+          <button class="ts-btn-primary sm" (click)="applyFilters()">Apply filters</button>
+          <button class="ts-btn-icon-close" (click)="filtersOpen.set(false); closeFilterDropdowns()" title="Close filters">
+            <svg lucideX size="15"></svg>
+          </button>
+        </div>
+      </div>
+
       <div class="ts-filter-grid">
-        <label class="ts-field">
+        <!-- 1. Searchable Employee Filter -->
+        <div class="ts-field">
           <span>Employee</span>
-          <select [ngModel]="fEmployee()" (ngModelChange)="fEmployee.set($event)">
-            <option value="ALL">All employees</option>
-            <option *ngFor="let e of employees()" [value]="e.id">{{ fullName(e) }}</option>
-          </select>
-        </label>
+          <div class="ts-dropdown-anchor">
+            <button
+              type="button"
+              class="ts-select-trigger"
+              [class.is-active]="fEmployee() !== 'ALL'"
+              [class.is-open]="fEmployeeDropdownOpen()"
+              (click)="fEmployeeDropdownOpen.set(!fEmployeeDropdownOpen()); fProjectDropdownOpen.set(false)">
+              <div class="ts-trigger-content">
+                <ng-container *ngIf="fEmployee() === 'ALL'">
+                  <div class="ts-trigger-avatar-all">
+                    <svg lucideUsers size="13"></svg>
+                  </div>
+                  <span class="ts-trigger-text">All employees</span>
+                </ng-container>
+                <ng-container *ngIf="fEmployee() !== 'ALL' && selectedEmployee() as sel">
+                  <img
+                    *ngIf="sel.avatarUrl || sel.profilePicture"
+                    [src]="sel.avatarUrl || sel.profilePicture"
+                    class="ts-trigger-avatar-img"
+                    alt="" />
+                  <span
+                    *ngIf="!sel.avatarUrl && !sel.profilePicture"
+                    class="ts-trigger-avatar-initials">
+                    {{ initials(sel.firstName, sel.lastName) }}
+                  </span>
+                  <span class="ts-trigger-text" [title]="fullName(sel)">{{ fullName(sel) }}</span>
+                </ng-container>
+              </div>
+              <svg lucideChevronDown size="14" class="ts-chevron" [class.flipped]="fEmployeeDropdownOpen()"></svg>
+            </button>
+
+            <div class="ts-dropdown-panel ts-dropdown-employee" *ngIf="fEmployeeDropdownOpen()">
+              <div class="ts-search-box">
+                <svg lucideSearch size="14" class="ts-search-icon"></svg>
+                <input
+                  type="text"
+                  [value]="fEmployeeSearchQuery()"
+                  (input)="fEmployeeSearchQuery.set($any($event.target).value)"
+                  placeholder="Search employee by name..."
+                  (click)="$event.stopPropagation()" />
+                <button
+                  type="button"
+                  class="ts-search-clear"
+                  *ngIf="fEmployeeSearchQuery()"
+                  (click)="fEmployeeSearchQuery.set('')">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </div>
+              <div class="ts-options-list">
+                <div
+                  class="ts-option-item"
+                  [class.selected]="fEmployee() === 'ALL'"
+                  (click)="selectEmployee('ALL')">
+                  <div class="ts-trigger-avatar-all">
+                    <svg lucideUsers size="13"></svg>
+                  </div>
+                  <div class="ts-option-info">
+                    <span class="ts-option-label">All employees</span>
+                  </div>
+                  <svg lucideCheck size="14" class="ts-check-icon" *ngIf="fEmployee() === 'ALL'"></svg>
+                </div>
+                <div
+                  class="ts-option-item"
+                  *ngFor="let emp of filteredEmployees()"
+                  [class.selected]="fEmployee() === emp.id + ''"
+                  (click)="selectEmployee(emp.id + '')">
+                  <img
+                    *ngIf="emp.avatarUrl || emp.profilePicture"
+                    [src]="emp.avatarUrl || emp.profilePicture"
+                    class="ts-trigger-avatar-img"
+                    alt="" />
+                  <span
+                    *ngIf="!emp.avatarUrl && !emp.profilePicture"
+                    class="ts-trigger-avatar-initials">
+                    {{ initials(emp.firstName, emp.lastName) }}
+                  </span>
+                  <div class="ts-option-info">
+                    <span class="ts-option-label">{{ fullName(emp) }}</span>
+                    <span class="ts-option-sub" *ngIf="emp.department?.name">{{ emp.department?.name }}</span>
+                  </div>
+                  <svg lucideCheck size="14" class="ts-check-icon" *ngIf="fEmployee() === emp.id + ''"></svg>
+                </div>
+                <div class="ts-empty-list" *ngIf="filteredEmployees().length === 0">
+                  No employee matches search
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Searchable Project Filter -->
+        <div class="ts-field">
+          <span>Project</span>
+          <div class="ts-dropdown-anchor">
+            <button
+              type="button"
+              class="ts-select-trigger"
+              [class.is-active]="fProject() !== 'ALL'"
+              [class.is-open]="fProjectDropdownOpen()"
+              (click)="fProjectDropdownOpen.set(!fProjectDropdownOpen()); fEmployeeDropdownOpen.set(false)">
+              <div class="ts-trigger-content">
+                <svg lucideBriefcase size="14" class="ts-trigger-icon"></svg>
+                <span class="ts-trigger-text" [title]="selectedProject()?.name || 'All projects'">
+                  {{ selectedProject()?.name || 'All projects' }}
+                </span>
+              </div>
+              <svg lucideChevronDown size="14" class="ts-chevron" [class.flipped]="fProjectDropdownOpen()"></svg>
+            </button>
+
+            <div class="ts-dropdown-panel" *ngIf="fProjectDropdownOpen()">
+              <div class="ts-search-box">
+                <svg lucideSearch size="14" class="ts-search-icon"></svg>
+                <input
+                  type="text"
+                  [value]="fProjectSearchQuery()"
+                  (input)="fProjectSearchQuery.set($any($event.target).value)"
+                  placeholder="Search projects..."
+                  (click)="$event.stopPropagation()" />
+                <button
+                  type="button"
+                  class="ts-search-clear"
+                  *ngIf="fProjectSearchQuery()"
+                  (click)="fProjectSearchQuery.set('')">
+                  <svg lucideX size="12"></svg>
+                </button>
+              </div>
+              <div class="ts-options-list">
+                <div
+                  class="ts-option-item"
+                  [class.selected]="fProject() === 'ALL'"
+                  (click)="selectProject('ALL')">
+                  <span class="ts-option-label">All projects</span>
+                  <svg lucideCheck size="14" class="ts-check-icon" *ngIf="fProject() === 'ALL'"></svg>
+                </div>
+                <div
+                  class="ts-option-item"
+                  *ngFor="let p of filteredProjects()"
+                  [class.selected]="fProject() === p.id + ''"
+                  (click)="selectProject(p.id + '')">
+                  <div class="ts-option-info">
+                    <span class="ts-option-label">{{ p.name }}</span>
+                    <span class="ts-code-pill sm" *ngIf="p.projectCode || p.code">{{ p.projectCode || p.code }}</span>
+                  </div>
+                  <svg lucideCheck size="14" class="ts-check-icon" *ngIf="fProject() === p.id + ''"></svg>
+                </div>
+                <div class="ts-empty-list" *ngIf="filteredProjects().length === 0">
+                  No projects found
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <label class="ts-field">
           <span>Department</span>
           <select [ngModel]="fDepartment()" (ngModelChange)="fDepartment.set($event)">
             <option value="ALL">All departments</option>
             <option *ngFor="let d of departments()" [value]="d.id">{{ d.name }}</option>
-          </select>
-        </label>
-
-        <label class="ts-field">
-          <span>Project</span>
-          <select [ngModel]="fProject()" (ngModelChange)="fProject.set($event)">
-            <option value="ALL">All projects</option>
-            <option *ngFor="let p of projects()" [value]="p.id">{{ p.name }}</option>
           </select>
         </label>
 
@@ -186,13 +360,6 @@
           </select>
         </label>
       </div>
-
-      <div class="ts-filter-actions">
-        <button class="ts-btn-ghost" (click)="clearFilters()">
-          <svg lucideRotateCcw size="14"></svg> Clear
-        </button>
-        <button class="ts-btn-primary" (click)="applyFilters()">Apply filters</button>
-      </div>
     </div>
 
     <!-- Narrowing the logs makes "unlogged" meaningless, so the screen says so
@@ -216,17 +383,34 @@
 
       <div class="ts-cards">
         <div class="ts-card">
-          <span class="ts-card-label">Login hours</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">Login hours</span>
+            <div class="ts-card-icon-badge blue">
+              <svg lucideClock size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ hhmm(week.totals.loginHours) }}</span>
           <span class="ts-card-hint">Time clocked in</span>
         </div>
+
         <div class="ts-card">
-          <span class="ts-card-label">Logged hours</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">Logged hours</span>
+            <div class="ts-card-icon-badge emerald">
+              <svg lucideTimer size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ hhmm(week.totals.loggedHours) }}</span>
           <span class="ts-card-hint">Booked to tasks</span>
         </div>
+
         <div class="ts-card" [class.warn]="week.totals.unloggedHours > 0">
-          <span class="ts-card-label">Unlogged hours</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">Unlogged hours</span>
+            <div class="ts-card-icon-badge amber">
+              <svg lucideAlertTriangle size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ hhmm(week.totals.unloggedHours) }}</span>
           <span class="ts-card-hint">Clocked in, not accounted for</span>
         </div>
@@ -243,12 +427,13 @@
             </div>
 
             <div class="ts-day-clock">
+              <svg lucideClock size="14" class="ts-clock-icon" *ngIf="day.clockIn"></svg>
               <span *ngIf="day.clockIn">{{ time(day.clockIn) }} – {{ day.sessionOpen ? 'now' : time(day.clockOut) }}</span>
               <span class="ts-dim" *ngIf="!day.clockIn">No attendance</span>
               <span class="ts-pill warn" *ngIf="day.autoClockedOut" title="Closed by the 23:00 sweep, not by the employee">
                 auto-closed
               </span>
-              <span class="ts-pill" *ngIf="day.sessionOpen">still running</span>
+              <span class="ts-pill running-pill" *ngIf="day.sessionOpen">still running</span>
             </div>
 
             <div class="ts-day-hours">
@@ -258,7 +443,7 @@
               </div>
               <div class="ts-hour-cell">
                 <span class="ts-hour-label">Logged</span>
-                <span class="ts-hour-value">{{ hhmm(day.loggedHours) }}</span>
+                <span class="ts-hour-value strong">{{ hhmm(day.loggedHours) }}</span>
               </div>
               <div class="ts-hour-cell" [class.warn]="day.unloggedHours > 0">
                 <span class="ts-hour-label">Unlogged</span>
@@ -298,19 +483,21 @@
                 *ngIf="day.status === 'SUBMITTED' && day.changedSinceSubmission"
                 [disabled]="isBusy(day.date)"
                 (click)="submitDay(day)">
-                Re-submit
+                <svg lucideRotateCcw size="13"></svg> Re-submit
               </button>
-              <svg lucideChevronDown size="16" class="ts-chevron"
-                   [class.flipped]="expandedDay() === day.date"></svg>
+              <button class="ts-btn-icon" (click)="toggleDay(day.date)" title="Toggle day details">
+                <svg lucideChevronDown size="16" class="ts-chevron"
+                     [class.flipped]="expandedDay() === day.date"></svg>
+              </button>
             </div>
           </div>
 
           <div class="ts-reject-note" *ngIf="day.status === 'REJECTED' && day.rejectionReason">
-            <svg lucideX size="14"></svg>
-            <span><strong>Rejected:</strong> {{ day.rejectionReason }}</span>
+            <svg lucideAlertCircle size="15"></svg>
+            <span><strong>Rejection Feedback:</strong> {{ day.rejectionReason }}</span>
           </div>
 
-          <!-- §20's entry columns -->
+          <!-- Entry columns (§20) -->
           <div class="ts-entries" *ngIf="expandedDay() === day.date">
             <table class="ts-entry-table" *ngIf="day.entries?.length; else noEntries">
               <thead>
@@ -331,17 +518,24 @@
                 <tr *ngFor="let e of day.entries; trackBy: trackByEntry"
                     class="ts-entry-row"
                     (click)="showEntry(e, day.date, fullName(week.employee))">
-                  <td>{{ e.projectName || '—' }}</td>
-                  <td class="mono">{{ e.projectCode || '—' }}</td>
+                  <td>
+                    <span class="ts-proj-name">{{ e.projectName || '—' }}</span>
+                  </td>
+                  <td>
+                    <span class="ts-code-pill" *ngIf="e.projectCode">{{ e.projectCode }}</span>
+                    <span *ngIf="!e.projectCode" class="ts-dim">—</span>
+                  </td>
                   <td>{{ e.clientName || '—' }}</td>
                   <td>
-                    <span class="mono ts-dim">{{ e.issueKey }}</span>
-                    {{ e.issueTitle }}
+                    <div class="ts-task-cell">
+                      <span class="ts-key-badge">{{ e.issueKey }}</span>
+                      <span class="ts-task-title">{{ e.issueTitle }}</span>
+                    </div>
                   </td>
                   <td>{{ e.taskType || '—' }}</td>
                   <td>{{ time(e.startedAt) }}</td>
                   <td>{{ time(e.endedAt) }}</td>
-                  <td class="num">{{ hhmm(e.hours) }}</td>
+                  <td class="num strong">{{ hhmm(e.hours) }}</td>
                   <td>
                     <span class="ts-source" [class.manual]="e.source === 'MANUAL'">
                       <svg *ngIf="e.source === 'MANUAL'" lucidePencilLine size="12"></svg>
@@ -376,34 +570,69 @@
 
       <div class="ts-cards" *ngIf="data.employees.length">
         <div class="ts-card">
-          <span class="ts-card-label">People</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">People</span>
+            <div class="ts-card-icon-badge indigo">
+              <svg lucideUsers size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ data.employees.length }}</span>
           <span class="ts-card-hint">{{ inactiveCount(data) }} with an inactive account</span>
         </div>
+
         <div class="ts-card">
-          <span class="ts-card-label">Login hours</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">Login hours</span>
+            <div class="ts-card-icon-badge blue">
+              <svg lucideClock size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ hhmm(data.totals.loginHours) }}</span>
           <span class="ts-card-hint">Time clocked in</span>
         </div>
+
         <div class="ts-card">
-          <span class="ts-card-label">Logged hours</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">Logged hours</span>
+            <div class="ts-card-icon-badge emerald">
+              <svg lucideTimer size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ hhmm(data.totals.loggedHours) }}</span>
           <span class="ts-card-hint">
             {{ hhmm(data.totals.timerHours) }} timer · {{ hhmm(data.totals.manualHours) }} manual
           </span>
         </div>
+
         <div class="ts-card" *ngIf="!data.hoursFiltered" [class.warn]="data.totals.unloggedHours > 0">
-          <span class="ts-card-label">Unlogged hours</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">Unlogged hours</span>
+            <div class="ts-card-icon-badge amber">
+              <svg lucideAlertTriangle size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ hhmm(data.totals.unloggedHours) }}</span>
           <span class="ts-card-hint">Clocked in, not accounted for</span>
         </div>
+
         <div class="ts-card" [class.warn]="pendingCount(data) > 0">
-          <span class="ts-card-label">Waiting on review</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">Waiting on review</span>
+            <div class="ts-card-icon-badge purple">
+              <svg lucideHourglass size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ pendingCount(data) }}</span>
           <span class="ts-card-hint">{{ attentionCount(data) }} day(s) that do not add up</span>
         </div>
+
         <div class="ts-card" *ngIf="data.canViewCost && scope() === 'FINANCE'">
-          <span class="ts-card-label">Cost</span>
+          <div class="ts-card-top">
+            <span class="ts-card-label">Cost</span>
+            <div class="ts-card-icon-badge emerald">
+              <svg lucideCoins size="16"></svg>
+            </div>
+          </div>
           <span class="ts-card-value">{{ money(data.totals.cost) }}</span>
           <span class="ts-card-hint">
             <ng-container *ngIf="data.totals.unratedHours > 0">
@@ -414,15 +643,148 @@
         </div>
       </div>
 
+      <!-- ── Quick Table Filter Bar (Employee Search + Duration Filter) ── -->
+      <div class="ts-table-toolbar" *ngIf="data.employees.length">
+        <!-- 1. Search by employee name and employee code -->
+        <div class="ts-toolbar-search">
+          <svg lucideSearch size="15" class="ts-tb-search-icon"></svg>
+          <input
+            type="text"
+            class="ts-tb-search-input"
+            [ngModel]="tableSearchQuery()"
+            (ngModelChange)="tableSearchQuery.set($event)"
+            placeholder="Search by employee name or code…" />
+          <button
+            type="button"
+            class="ts-tb-search-clear"
+            *ngIf="tableSearchQuery()"
+            (click)="tableSearchQuery.set('')"
+            title="Clear search">
+            <svg lucideX size="13"></svg>
+          </button>
+          <span class="ts-tb-search-badge" *ngIf="tableSearchQuery()">
+            {{ filteredTableEmployees().length }} of {{ data.employees.length }}
+          </span>
+        </div>
+
+        <!-- 2. Duration Filter (Dual-Calendar Date Range Picker matching media_1789628550977.png) -->
+        <div class="ts-duration-anchor">
+          <button
+            type="button"
+            class="ts-duration-trigger"
+            [class.is-open]="durationDropdownOpen()"
+            (click)="toggleDurationDropdown()">
+            <div class="ts-duration-trigger-text">
+              <span class="ts-duration-title">Duration</span>
+              <span class="ts-duration-subtitle">{{ durationDateText() }}</span>
+            </div>
+            <svg lucideChevronDown size="14" class="ts-chevron" [class.flipped]="durationDropdownOpen()"></svg>
+          </button>
+
+          <!-- Popover dropdown -->
+          <div class="ts-duration-popover" *ngIf="durationDropdownOpen()" (click)="$event.stopPropagation()">
+            <div class="ts-popover-arrow"></div>
+
+            <div class="ts-picker-body">
+              <!-- Left Sidebar: Preset options -->
+              <div class="ts-picker-sidebar">
+                <div
+                  *ngFor="let opt of DURATION_OPTIONS"
+                  class="ts-picker-preset-item"
+                  [class.active]="selectedDuration() === opt"
+                  (click)="selectPreset(opt)">
+                  <span>{{ opt }}</span>
+                </div>
+              </div>
+
+              <!-- Right Pane: Dual Month Calendars & Footer -->
+              <div class="ts-picker-calendars-wrap">
+                <div class="ts-picker-calendars">
+
+                  <!-- Calendar 1: Left Month -->
+                  <div class="ts-picker-cal">
+                    <div class="ts-cal-header">
+                      <button type="button" class="ts-cal-nav-btn" (click)="prevMonth()" title="Previous month">
+                        <svg lucideChevronLeft size="16"></svg>
+                      </button>
+                      <span class="ts-cal-title">{{ monthName(calMonth1()) }}</span>
+                      <button type="button" class="ts-cal-nav-btn" (click)="nextMonth()" title="Next month">
+                        <svg lucideChevronRight size="16"></svg>
+                      </button>
+                    </div>
+
+                    <div class="ts-cal-grid">
+                      <div class="ts-cal-dow" *ngFor="let dow of DOW_HEADERS">{{ dow }}</div>
+                      <div
+                        *ngFor="let day of daysMonth1()"
+                        class="ts-cal-cell"
+                        [class.is-other-month]="!day.isCurrentMonth"
+                        [class.range-start]="isStartDate(day.date)"
+                        [class.range-end]="isEndDate(day.date)"
+                        [class.in-range]="isInRange(day.date)"
+                        (click)="onDayClick(day)">
+                        <span class="ts-cal-num">{{ day.dayNumber }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Calendar 2: Right Month -->
+                  <div class="ts-picker-cal">
+                    <div class="ts-cal-header">
+                      <button type="button" class="ts-cal-nav-btn" (click)="prevMonth2()" title="Previous month">
+                        <svg lucideChevronLeft size="16"></svg>
+                      </button>
+                      <span class="ts-cal-title">{{ monthName(calMonth2()) }}</span>
+                      <button type="button" class="ts-cal-nav-btn" (click)="nextMonth2()" title="Next month">
+                        <svg lucideChevronRight size="16"></svg>
+                      </button>
+                    </div>
+
+                    <div class="ts-cal-grid">
+                      <div class="ts-cal-dow" *ngFor="let dow of DOW_HEADERS">{{ dow }}</div>
+                      <div
+                        *ngFor="let day of daysMonth2()"
+                        class="ts-cal-cell"
+                        [class.is-other-month]="!day.isCurrentMonth"
+                        [class.range-start]="isStartDate(day.date)"
+                        [class.range-end]="isEndDate(day.date)"
+                        [class.in-range]="isInRange(day.date)"
+                        (click)="onDayClick(day)">
+                        <span class="ts-cal-num">{{ day.dayNumber }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- Footer with formatted range, Cancel and Apply -->
+                <div class="ts-picker-footer">
+                  <span class="ts-picker-range-text">{{ pickerFormattedRange() }}</span>
+                  <div class="ts-picker-footer-actions">
+                    <button type="button" class="ts-picker-btn-cancel" (click)="cancelCustomRange()">
+                      Cancel
+                    </button>
+                    <button type="button" class="ts-picker-btn-apply" (click)="applyCustomRange()">
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="ts-table-wrap" *ngIf="data.employees.length">
         <table class="ts-table">
           <thead>
             <tr>
               <th class="ts-col-person">Employee</th>
               <ng-container *ngIf="showDayColumns()">
-                <th class="num" *ngFor="let d of weekDays()" [class.today]="d.isToday">
+                <th class="num ts-th-day" *ngFor="let d of weekDays()" [class.today]="d.isToday">
                   <span class="ts-th-dow">{{ d.date | date:'EEE' }}</span>
-                  <span class="ts-th-num">{{ d.date | date:'d' }}</span>
+                  <span class="ts-th-num" [class.active-today]="d.isToday">{{ d.date | date:'d' }}</span>
                 </th>
               </ng-container>
               <th class="num">Login</th>
@@ -434,7 +796,24 @@
           </thead>
 
           <tbody>
-            <ng-container *ngFor="let row of data.employees; trackBy: trackByEmployee">
+            <!-- No match state for quick employee search -->
+            <tr class="ts-no-match-row" *ngIf="filteredTableEmployees().length === 0">
+              <td [attr.colspan]="detailColspan(data)">
+                <div class="ts-no-match-box">
+                  <svg lucideSearch size="28" class="ts-no-match-icon"></svg>
+                  <div class="ts-no-match-text">
+                    <h4>No matching employees</h4>
+                    <p>No employee matches "<strong>{{ tableSearchQuery() }}</strong>"</p>
+                  </div>
+                  <button type="button" class="ts-btn-ghost sm" (click)="tableSearchQuery.set('')">
+                    <svg lucideRotateCcw size="13"></svg>
+                    <span>Clear search</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <ng-container *ngFor="let row of filteredTableEmployees(); trackBy: trackByEmployee">
               <tr class="ts-row" (click)="toggleEmployee(row.employee.id)"
                   [class.open]="expandedEmployee() === row.employee.id">
                 <td class="ts-col-person">
@@ -444,7 +823,10 @@
                       {{ initials(row.employee.firstName, row.employee.lastName) }}
                     </span>
                     <div class="ts-person-text">
-                      <span class="ts-person-name">{{ fullName(row.employee) }}</span>
+                      <div class="ts-person-name-row">
+                        <span class="ts-person-name">{{ fullName(row.employee) }}</span>
+                        <span class="ts-emp-code-pill" *ngIf="row.employee.employeeCode">{{ row.employee.employeeCode }}</span>
+                      </div>
                       <span class="ts-person-meta">
                         {{ row.employee.department?.name || 'No department' }}
                         <span class="ts-inactive-badge" *ngIf="row.employee.isInactive"
@@ -467,7 +849,7 @@
                           [title]="statusLabel(cell.status)"></span>
                     <span class="ts-cell-flag"
                           *ngIf="cell.hasImplausibleEntry || cell.loggedWithoutLogin"
-                          title="This day does not add up — open the row to see why">!</span>
+                          title="This day does not add up — click to inspect">!</span>
                     <span class="ts-cell-running" *ngIf="cell.sessionOpen"
                           title="Still clocked in — login hours are counted once the day is closed"></span>
                   </ng-container>
@@ -483,7 +865,6 @@
 
                 <td class="num" *ngIf="data.canViewCost && scope() === 'FINANCE'">
                   <span *ngIf="row.cost?.amount != null">{{ money(row.cost?.amount) }}</span>
-                  <!-- Phase 2's rule: unpriced hours are reported, never costed at zero. -->
                   <span class="ts-unrated" *ngIf="row.cost?.amount == null && row.totals.loggedHours > 0"
                         title="No hourly cost rate set for this employee">
                     no rate
@@ -531,21 +912,21 @@
                         </div>
 
                         <div class="ts-detail-hours">
-                          <!-- An open day has no login total yet, by design. Saying
-                               "running since 9:28" is the difference between a rule
-                               and an empty cell that reads as broken data. -->
                           <span class="ts-dh running" *ngIf="day.sessionOpen">
-                            <i>login</i>
+                            <span class="ts-dh-label">LOGIN</span>
                             <span class="ts-running">since {{ time(day.clockIn) }}</span>
                           </span>
                           <span class="ts-dh" *ngIf="!day.sessionOpen">
-                            <i>login</i>{{ hhmm(day.loginHours) }}
+                            <span class="ts-dh-label">LOGIN</span>
+                            <span class="ts-dh-val">{{ hhmm(day.loginHours) }}</span>
                           </span>
                           <span class="ts-dh strong">
-                            <i>logged</i>{{ hhmm(day.loggedHours) }}
+                            <span class="ts-dh-label">LOGGED</span>
+                            <span class="ts-dh-val strong">{{ hhmm(day.loggedHours) }}</span>
                           </span>
                           <span class="ts-dh" [class.warn]="day.unloggedHours > 0">
-                            <i>unlogged</i>{{ hhmm(day.unloggedHours) }}
+                            <span class="ts-dh-label">UNLOGGED</span>
+                            <span class="ts-dh-val" [class.warn-val]="day.unloggedHours > 0">{{ hhmm(day.unloggedHours) }}</span>
                           </span>
                         </div>
 
@@ -553,14 +934,16 @@
                           <button *ngFor="let e of day.entries" class="ts-task-chip"
                                   [title]="e.issueKey + ' · ' + e.issueTitle + ' — click for details'"
                                   (click)="$event.stopPropagation(); showEntry(e, day.date, fullName(row.employee))">
-                            {{ e.projectCode || e.projectName || 'Task' }} · {{ hhmm(e.hours) }}
+                            <span class="ts-task-chip-code">{{ e.projectCode || e.projectName || 'Task' }}</span>
+                            <span class="ts-task-chip-sep">·</span>
+                            <span class="ts-task-chip-time">{{ hhmm(e.hours) }}</span>
                           </button>
                           <span class="ts-dim" *ngIf="!day.entries?.length">Nothing booked</span>
                         </div>
 
                         <div class="ts-detail-status">
                           <span class="ts-pill running-pill" *ngIf="day.sessionOpen"
-                                title="Still clocked in. Login hours are counted once the day is closed, so they do not climb through the afternoon.">
+                                title="Still clocked in. Login hours are counted once the day is closed.">
                             still clocked in
                           </span>
                           <span class="ts-status" [ngClass]="day.status.toLowerCase()">
@@ -584,7 +967,7 @@
                               <svg lucideCheck size="13"></svg> Approve
                             </button>
                             <button class="ts-btn-reject" [disabled]="isBusy(day.date)"
-                                    (click)="rejectDay(row.employee.id, day)">
+                                    (click)="openRejectModal(row.employee.id, day, fullName(row.employee))">
                               <svg lucideX size="13"></svg> Reject
                             </button>
                           </ng-container>
@@ -610,18 +993,21 @@
 
           <tfoot>
             <tr>
-              <td class="ts-col-person">Total</td>
+              <td class="ts-col-person">
+                <span>Total</span>
+                <span class="ts-foot-count" *ngIf="tableSearchQuery()"> ({{ filteredTableEmployees().length }})</span>
+              </td>
               <ng-container *ngIf="showDayColumns()">
                 <td class="num" *ngFor="let d of weekDays()"></td>
               </ng-container>
-              <td class="num">{{ hhmm(data.totals.loginHours) }}</td>
-              <td class="num strong">{{ hhmm(data.totals.loggedHours) }}</td>
-              <td class="num" *ngIf="!data.hoursFiltered">{{ hhmm(data.totals.unloggedHours) }}</td>
+              <td class="num">{{ hhmm(tableTotals().loginHours) }}</td>
+              <td class="num strong">{{ hhmm(tableTotals().loggedHours) }}</td>
+              <td class="num" *ngIf="!data.hoursFiltered">{{ hhmm(tableTotals().unloggedHours) }}</td>
               <td class="num" *ngIf="data.canViewCost && scope() === 'FINANCE'">
-                {{ money(data.totals.cost) }}
-                <span class="ts-unrated block" *ngIf="data.totals.unratedHours > 0"
+                {{ money(tableTotals().cost) }}
+                <span class="ts-unrated block" *ngIf="tableTotals().unratedHours > 0"
                       title="Hours worked by people with no cost rate set. Not included in the total.">
-                  + {{ hhmm(data.totals.unratedHours) }} unpriced
+                  + {{ hhmm(tableTotals().unratedHours) }} unpriced
                 </span>
               </td>
               <td></td>
@@ -637,7 +1023,7 @@
   <div class="ts-modal-backdrop" *ngIf="openEntry() as open" (click)="closeEntry()">
     <div class="ts-modal" (click)="$event.stopPropagation()">
       <div class="ts-modal-head">
-        <div>
+        <div class="ts-modal-title-wrap">
           <h3>Time log details</h3>
           <p>{{ shortDate(open.date) }} · {{ entrySpan(open.entry) }}</p>
         </div>
@@ -649,20 +1035,18 @@
       <div class="ts-modal-hero">
         <span class="ts-modal-hours">{{ hhmm(open.entry.hours) }}</span>
         <span class="ts-source" [class.manual]="open.entry.source === 'MANUAL'">
-          <svg *ngIf="open.entry.source === 'MANUAL'" lucidePencilLine size="12"></svg>
-          <svg *ngIf="open.entry.source === 'TIMER'" lucideTimer size="12"></svg>
-          {{ open.entry.source === 'MANUAL' ? 'Manual entry' : 'Timer' }}
+          <svg *ngIf="open.entry.source === 'MANUAL'" lucidePencilLine size="13"></svg>
+          <svg *ngIf="open.entry.source === 'TIMER'" lucideTimer size="13"></svg>
+          {{ open.entry.source === 'MANUAL' ? 'Manual entry' : 'Timer entry' }}
         </span>
       </div>
 
-      <!-- A single entry this long is the unstopped-timer case; the modal is
-           where somebody decides what to do about it, so it says so here. -->
+      <!-- Implausible entry alert -->
       <div class="ts-note alert" *ngIf="isImplausibleEntry(open.entry)">
-        <svg lucideAlertTriangle size="15"></svg>
+        <svg lucideAlertTriangle size="16"></svg>
         <span>
           This single entry runs {{ hhmm(open.entry.hours) }}. That is almost certainly a timer
-          left running rather than time worked — most of these came across from Workway, which
-          had no auto-stop.
+          left running rather than time worked.
         </span>
       </div>
 
@@ -675,10 +1059,10 @@
         <dd *ngIf="!open.entry.endedAt" class="ts-dim">Still running</dd>
 
         <dt>Total hours</dt>
-        <dd>{{ hhmm(open.entry.hours) }}</dd>
+        <dd class="strong">{{ hhmm(open.entry.hours) }}</dd>
 
         <dt>Note</dt>
-        <dd *ngIf="open.entry.note">{{ open.entry.note }}</dd>
+        <dd *ngIf="open.entry.note" class="ts-modal-note-text">{{ open.entry.note }}</dd>
         <dd *ngIf="!open.entry.note" class="ts-dim">Nothing written</dd>
 
         <dt>Project</dt>
@@ -686,7 +1070,9 @@
         <dd *ngIf="!open.entry.projectName" class="ts-dim">No project</dd>
 
         <dt>Project code</dt>
-        <dd class="mono" *ngIf="open.entry.projectCode">{{ open.entry.projectCode }}</dd>
+        <dd *ngIf="open.entry.projectCode">
+          <span class="ts-code-pill">{{ open.entry.projectCode }}</span>
+        </dd>
         <dd *ngIf="!open.entry.projectCode" class="ts-dim">—</dd>
 
         <dt>Client</dt>
@@ -694,15 +1080,67 @@
         <dd *ngIf="!open.entry.clientName" class="ts-dim">No client</dd>
 
         <dt>Task</dt>
-        <dd><span class="mono ts-dim">{{ open.entry.issueKey }}</span> {{ open.entry.issueTitle }}</dd>
+        <dd>
+          <a class="ts-task-link" (click)="goToTask(open.entry.issueKey)" title="Open this task in Tasks view">
+            <span class="ts-task-link-key">{{ open.entry.issueKey }}</span>
+            <span class="ts-task-title-text">{{ open.entry.issueTitle }}</span>
+          </a>
+        </dd>
 
         <dt>Task type</dt>
         <dd *ngIf="open.entry.taskType">{{ open.entry.taskType }}</dd>
         <dd *ngIf="!open.entry.taskType" class="ts-dim">Not set</dd>
 
         <dt>Employee</dt>
-        <dd>{{ open.who }}</dd>
+        <dd class="ts-modal-employee">{{ open.who }}</dd>
       </dl>
     </div>
   </div>
+
+  <!-- ── Rejection Reason Modal (§22) ──────────────────────────────────── -->
+  <div class="ts-modal-backdrop" *ngIf="rejectModalOpen() && rejectTarget() as target" (click)="closeRejectModal()">
+    <div class="ts-modal ts-reject-modal" (click)="$event.stopPropagation()">
+      <div class="ts-modal-head">
+        <div class="ts-modal-title-wrap">
+          <div class="ts-reject-icon-badge">
+            <svg lucideAlertCircle size="18"></svg>
+          </div>
+          <div>
+            <h3>Reject Timesheet Day</h3>
+            <p>{{ shortDate(target.day.date) }} for <strong>{{ target.employeeName || 'Employee' }}</strong></p>
+          </div>
+        </div>
+        <button class="ts-modal-close" (click)="closeRejectModal()" title="Close">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
+
+      <div class="ts-reject-body">
+        <label class="ts-reject-label" for="rejectReason">
+          Reason for rejection <span class="ts-req">*</span>
+        </label>
+        <textarea
+          id="rejectReason"
+          class="ts-reject-textarea"
+          rows="4"
+          placeholder="Explain what needs to be changed (e.g. unlogged hours, missing task descriptions, incorrect task allocation)..."
+          [ngModel]="rejectReasonText()"
+          (ngModelChange)="rejectReasonText.set($event)"
+          autofocus>
+        </textarea>
+        <div class="ts-reject-tip">
+          <svg lucideInfo size="14"></svg>
+          <span>The employee will see this feedback so they know what to correct and re-submit.</span>
+        </div>
+      </div>
+
+      <div class="ts-reject-foot">
+        <button type="button" class="ts-btn-ghost" (click)="closeRejectModal()">Cancel</button>
+        <button type="button" class="ts-btn-reject-confirm" [disabled]="!rejectReasonText().trim()" (click)="confirmRejection()">
+          <svg lucideX size="14"></svg> Confirm Rejection
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, HttpException, HttpStatus, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ProjectTicketsService } from '../tickets/project-tickets.service';
 import axios from 'axios';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -13,7 +14,8 @@ export class IssuesService {
   constructor(
     private prisma: PrismaService,
     private tasksGateway: TasksGateway,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private projectTickets: ProjectTicketsService,
   ) {}
 
   async createIssue(companyId: number, reporterId: number, projectId: number, data: any, role?: string) {
@@ -52,12 +54,20 @@ export class IssuesService {
       }
     }
 
-    // Get max position in that column
-    const lastIssue = await this.prisma.issue.findFirst({
+    /**
+     * A new task goes to the TOP of its column, not the bottom.
+     *
+     * The thing somebody just created is the thing they are looking for, and
+     * on a column with forty cards the bottom is off screen. Done by taking
+     * one BELOW the current minimum rather than renumbering every sibling:
+     * position is only ever read as an ordering, so a negative is fine, and
+     * shifting the whole column would be forty writes to place one card.
+     */
+    const firstIssue = await this.prisma.issue.findFirst({
       where: { columnId },
-      orderBy: { position: 'desc' }
+      orderBy: { position: 'asc' }
     });
-    const position = lastIssue ? lastIssue.position + 1 : 0;
+    const position = firstIssue ? firstIssue.position - 1 : 0;
 
     const issue = await this.prisma.issue.create({
       data: {
@@ -357,6 +367,14 @@ export class IssuesService {
       where: { id: issueId },
       data: updateData
     });
+
+    // §30: a task that came from a ticket updates that ticket when it is
+    // finished — and pulls it back if the task is reopened. Fire-and-forget by
+    // design: bookkeeping on a ticket must never fail somebody's attempt to
+    // close a task, and most tasks were never tickets.
+    if (updateData.status && updateData.status !== prevStatus) {
+      await this.projectTickets.onIssueStatusChanged(issueId, updateData.status);
+    }
 
     // Auto time tracking: start timer when card moves to IN_PROGRESS,
     // stop timer when card moves to IN_REVIEW.

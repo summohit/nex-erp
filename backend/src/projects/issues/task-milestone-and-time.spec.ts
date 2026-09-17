@@ -31,7 +31,7 @@ function makeService(over: any = {}) {
     employee: { findFirst: jest.fn().mockResolvedValue({ id: 60 }) },
     ...over,
   };
-  return { service: new IssuesService(prisma, {} as any, {} as any), prisma };
+  return { service: new IssuesService(prisma, {} as any, {} as any, { onIssueStatusChanged: jest.fn() } as any), prisma };
 }
 
 const call = (service: any, name: string, ...args: any[]) => service[name](...args);

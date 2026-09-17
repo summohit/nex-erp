@@ -1,0 +1,193 @@
+<div class="br-tab">
+  <div class="br-container">
+
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <div class="br-header">
+      <div class="br-title-group">
+        <div class="br-title-badge">
+          <svg lucideTrendingUp size="20"></svg>
+        </div>
+        <div>
+          <h2 class="br-title">Budget &amp; hours requests</h2>
+          <p class="br-subtitle">
+            Ask for more than the project was scoped for. An administrator approves, and the
+            project itself changes.
+          </p>
+        </div>
+      </div>
+
+      <div class="br-header-actions">
+        <span class="br-awaiting" *ngIf="pendingCount()">
+          {{ pendingCount() }} awaiting approval
+        </span>
+        <button class="br-btn-primary" *ngIf="canRequest() && !formOpen() && !forbidden()"
+                (click)="openForm()">
+          <svg lucidePlus size="15"></svg> Request an increase
+        </button>
+      </div>
+    </div>
+
+    <!-- Rule 1: most of the company never sees a project's money, and this
+         whole screen is money. Say so plainly rather than render an empty table. -->
+    <div class="br-forbidden" *ngIf="forbidden()">
+      <svg lucideAlertTriangle size="18"></svg>
+      <div>
+        <strong>This project's budget is not yours to see.</strong>
+        <p>Budget and hours requests are visible to the project's managers, finance and administrators.</p>
+      </div>
+    </div>
+
+    <!-- ── Where the project stands ────────────────────────────────────── -->
+    <div class="br-current" *ngIf="!loading() && !forbidden()">
+      <div class="br-current-item">
+        <span class="br-current-label">Estimated hours</span>
+        <span class="br-current-value">{{ hours(current().estimatedHours) }}</span>
+      </div>
+      <div class="br-current-item">
+        <span class="br-current-label">Budget</span>
+        <span class="br-current-value">{{ money(current().budgetAmount) }}</span>
+      </div>
+    </div>
+
+    <!-- ── The form ────────────────────────────────────────────────────── -->
+    <div class="br-form" *ngIf="formOpen()">
+      <div class="br-form-head">
+        <div>
+          <h3>Request an increase</h3>
+          <p class="br-form-desc">Provide additional hours, budget, or both to request an increase.</p>
+        </div>
+        <button class="br-icon-btn" (click)="closeForm()" title="Close">
+          <svg lucideX size="16"></svg>
+        </button>
+      </div>
+
+      <div class="br-form-grid">
+        <label class="br-field">
+          <span class="br-label-text">Additional hours <span class="br-req">*</span></span>
+          <input type="number" min="1" step="1" [(ngModel)]="form.additionalHours" placeholder="e.g. 500"
+                 [class.invalid]="submitted() && !hasAmount()">
+          <small class="br-error-msg" *ngIf="submitted() && !hasAmount()">
+            Additional hours or budget is required (> 0).
+          </small>
+          <small class="br-hint" *ngIf="!submitted() || hasAmount()">
+            <ng-container *ngIf="current().estimatedHours != null">Current {{ hours(current().estimatedHours) }}</ng-container>
+          </small>
+        </label>
+
+        <label class="br-field">
+          <span class="br-label-text">Additional budget <span class="br-req">*</span></span>
+          <input type="number" min="1" step="1000" [(ngModel)]="form.additionalBudget" placeholder="e.g. 200000"
+                 [class.invalid]="submitted() && !hasAmount()">
+          <small class="br-error-msg" *ngIf="submitted() && !hasAmount()">
+            Additional hours or budget is required (> 0).
+          </small>
+          <small class="br-hint" *ngIf="!submitted() || hasAmount()">
+            <ng-container *ngIf="current().budgetAmount != null">Current {{ money(current().budgetAmount) }}</ng-container>
+          </small>
+        </label>
+
+        <label class="br-field br-span-2">
+          <span class="br-label-text">Reason <span class="br-req">*</span></span>
+          <textarea rows="3" [(ngModel)]="form.reason"
+                    placeholder="What changed, and why the project cannot absorb it"
+                    [class.invalid]="submitted() && !form.reason.trim()"></textarea>
+          <small class="br-error-msg" *ngIf="submitted() && !form.reason.trim()">
+            Reason is required.
+          </small>
+          <small class="br-hint" *ngIf="!submitted() || form.reason.trim()">
+            This is what the approver rules on, so be specific.
+          </small>
+        </label>
+      </div>
+
+      <div class="br-form-actions">
+        <button class="br-btn-ghost" (click)="closeForm()">Cancel</button>
+        <button class="br-btn-primary" (click)="save()" [disabled]="saving()">
+          <svg *ngIf="saving()" lucideLoader2 size="14" class="spin"></svg>
+          Send for approval
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Loading / empty ─────────────────────────────────────────────── -->
+    <div class="br-loading" *ngIf="loading()">
+      <svg lucideLoader2 size="22" class="spin"></svg>
+      <span>Loading requests…</span>
+    </div>
+
+    <div class="br-empty" *ngIf="!loading() && !forbidden() && !requests().length && !formOpen()">
+      <svg lucideTrendingUp size="40"></svg>
+      <h3>No requests on this project</h3>
+      <p>
+        The project is running to the hours and budget it was scoped for. Raise a request when
+        that stops being true — every approved one is recorded here with what it changed.
+      </p>
+    </div>
+
+    <!-- ── History ─────────────────────────────────────────────────────── -->
+    <div class="br-list" *ngIf="!loading() && requests().length">
+      <div class="br-card" *ngFor="let r of requests(); trackBy: trackById"
+           [class.settled]="r.status !== 'PENDING'">
+
+        <div class="br-card-top">
+          <div class="br-asks">
+            <span class="br-ask" *ngIf="r.additionalHours != null">
+              <svg lucidePlus size="12"></svg>{{ hours(r.additionalHours) }}
+            </span>
+            <span class="br-ask money" *ngIf="r.additionalBudget != null">
+              <svg lucidePlus size="12"></svg>{{ money(r.additionalBudget) }}
+            </span>
+          </div>
+          <span class="br-status" [ngClass]="r.status.toLowerCase()">{{ statusLabel(r.status) }}</span>
+        </div>
+
+        <p class="br-reason">{{ r.reason }}</p>
+
+        <!-- The history §25 asks for: not "+500 hrs" but "2,000 → 2,500". -->
+        <div class="br-moved" *ngIf="r.status === 'APPROVED'">
+          <div class="br-moved-row" *ngIf="movedHours(r)">
+            <span class="br-moved-label">Hours</span>
+            <span class="br-moved-from">{{ hours(r.hoursBefore) }}</span>
+            <svg lucideArrowRight size="13"></svg>
+            <span class="br-moved-to">{{ hours(r.hoursAfter) }}</span>
+          </div>
+          <div class="br-moved-row" *ngIf="movedBudget(r)">
+            <span class="br-moved-label">Budget</span>
+            <span class="br-moved-from">{{ money(r.budgetBefore) }}</span>
+            <svg lucideArrowRight size="13"></svg>
+            <span class="br-moved-to">{{ money(r.budgetAfter) }}</span>
+          </div>
+        </div>
+
+        <div class="br-rejected" *ngIf="r.status === 'REJECTED' && r.rejectionReason">
+          <svg lucideAlertTriangle size="14"></svg>
+          <span><strong>Rejected by {{ fullName(r.reviewedBy) }}:</strong> {{ r.rejectionReason }}</span>
+        </div>
+
+        <div class="br-meta">
+          <span>Requested by {{ fullName(r.requestedBy) }} · {{ r.createdAt | date:'d MMM y' }}</span>
+          <span *ngIf="r.reviewedAt">
+            · {{ statusLabel(r.status) | lowercase }} by {{ fullName(r.reviewedBy) }}
+            on {{ r.reviewedAt | date:'d MMM y' }}
+          </span>
+        </div>
+
+        <div class="br-actions" *ngIf="r.status === 'PENDING'">
+          <button class="br-btn-ghost sm" *ngIf="canRequest()" (click)="cancel(r)" [disabled]="isBusy(r.id)">
+            Withdraw
+          </button>
+          <ng-container *ngIf="canApprove()">
+            <button class="br-btn-approve" (click)="approve(r)" [disabled]="isBusy(r.id)">
+              <svg lucideCheck size="13"></svg> Approve &amp; update project
+            </button>
+            <button class="br-btn-reject" (click)="reject(r)" [disabled]="isBusy(r.id)">
+              <svg lucideX size="13"></svg> Reject
+            </button>
+          </ng-container>
+          <span class="br-dim" *ngIf="!canApprove()">Waiting on an administrator</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
