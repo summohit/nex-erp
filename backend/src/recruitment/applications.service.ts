@@ -525,6 +525,107 @@ export class ApplicationsService {
     return { ...newEmployee, lettersIssued: letters.titles };
   }
 
+  // ── Compensation Annexure & CTC Structure ──────────────────────────────────
+  //
+  // The annexure is built from an ordered list of monthly components. Every
+  // component carries `group` (EARNINGS = part of gross pay, DEDUCTIONS =
+  // employer contributions that still count towards CTC) and `kind`
+  // (FIXED = value entered by the recruiter, BALANCER = recomputed last so the
+  // rows always add up to the offered CTC). A candidate can have a customised
+  // structure persisted on `JobApplication.compensationStructure`; when none
+  // exists the company's default percentage split is used.
+
+  /**
+   * Normalise raw component input. Every component carries:
+   *  - `included`  – a checkbox-style flag; excluded rows are kept (so a
+   *                  toggled-off component can be restored later) but are not
+   *                  counted in the totals and not shown in the table.
+   *  - `kind`      – FIXED (value entered by the recruiter) or BALANCER. A
+   *                  single auto row is derived, never authored by the client:
+   *                  when the included fixed components don't reach the offered
+   *                  monthly CTC, the difference shows as a transparent
+   *                  "Balance / Flexible Allowance" row so the annexure always
+   *                  adds up. No fixed component is ever silently overwritten.
+   *
+   * Returns EARNINGS components first, then DEDUCTIONS, plus the derived
+   * `annual` (= monthly * 12) on every row.
+   */
+  private normalizeComponents(
+    raw: any[],
+    targetMonthly: number,
+  ): { id: string; name: string; group: 'EARNINGS' | 'DEDUCTIONS'; kind: 'FIXED' | 'BALANCER'; monthly: number; annual: number; included: boolean }[] {
+    const items: { id: string; name: string; group: 'EARNINGS' | 'DEDUCTIONS'; kind: 'FIXED' | 'BALANCER'; monthly: number; included: boolean }[] =
+      raw.map((c) => {
+        const group: 'EARNINGS' | 'DEDUCTIONS' = c?.group === 'DEDUCTIONS' ? 'DEDUCTIONS' : 'EARNINGS';
+        const kind: 'FIXED' | 'BALANCER' = c?.kind === 'BALANCER' ? 'BALANCER' : 'FIXED';
+        const monthly = Math.max(0, Math.round(Number(c?.monthly) || 0));
+        const included = c?.included !== false;
+        const id = String(c?.id || `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`).slice(0, 60);
+        const name = String(c?.name || 'Allowance').slice(0, 100);
+        return { id, name, group, kind, monthly, included };
+      });
+
+    // The client never authors a BALANCER row; it is always derived here.
+    const fixed = items.filter((c) => c.kind !== 'BALANCER');
+    const includedFixedSum = fixed
+      .filter((c) => c.included)
+      .reduce((sum, c) => sum + c.monthly, 0);
+
+    const balanceMonthly = Math.max(0, targetMonthly - includedFixedSum);
+    let withBalance = [...fixed];
+    if (balanceMonthly > 0) {
+      withBalance.push({
+        id: 'balance', name: 'Balance / Flexible Allowance',
+        group: 'EARNINGS', kind: 'BALANCER', monthly: balanceMonthly, included: true,
+      });
+    }
+
+    const sorted = [
+      ...withBalance.filter((c) => c.group === 'EARNINGS'),
+      ...withBalance.filter((c) => c.group === 'DEDUCTIONS'),
+    ];
+
+    return sorted.map((c) => ({ ...c, annual: c.monthly * 12 }));
+  }
+
+  /** Reduces an ordered component list to the annexure response shape. */
+  private renderAnnexure(application: any, components: any[]) {
+    const visible = components.filter((c) => c.included !== false);
+    const earnings = visible.filter((c) => c.group === 'EARNINGS');
+    const deductions = visible.filter((c) => c.group === 'DEDUCTIONS');
+
+    const grossMonthly = earnings.reduce((sum, c) => sum + c.monthly, 0);
+    const dedMonthly = deductions.reduce((sum, c) => sum + c.monthly, 0);
+    const grossAnnual = earnings.reduce((sum, c) => sum + c.annual, 0);
+    const dedAnnual = deductions.reduce((sum, c) => sum + c.annual, 0);
+    const totalMonthly = grossMonthly + dedMonthly;
+    const netMonthly = Math.max(0, grossMonthly - dedMonthly);
+
+    return {
+      candidateName: application.fullName,
+      jobTitle: application.job?.title || 'Position',
+      isCustomized: !!application.compensationStructure,
+      totalCTC: totalMonthly * 12,
+      monthlyCTC: totalMonthly,
+      components: visible,
+      // Every component, including ones toggled off — the edit modal uses this
+      // so opting back in restores the previous amount instead of resetting it.
+      allComponents: components,
+      breakdown: {
+        earnings: {
+          totalGross: { annual: grossAnnual, monthly: grossMonthly },
+        },
+        deductions: {
+          totalDeductions: { annual: dedAnnual, monthly: dedMonthly },
+        },
+        netPay: {
+          annual: netMonthly * 12,
+          monthly: netMonthly,
+        },
+      },
+    };
+  }
+
   async generateAnnexure(id: number, companyId: number) {
     const application = await this.findOne(id, companyId);
     if (!application.offeredSalary) {
@@ -532,40 +633,63 @@ export class ApplicationsService {
     }
 
     const ctc = application.offeredSalary;
-    const settings = await this.payrollSettingsService.getSettings(companyId);
+    const targetMonthly = Math.round(ctc / 12);
 
-    const basic = Math.round(ctc * (settings.basicPercent / 100));
-    const hra = Math.round(ctc * (settings.hraPercent / 100));
-    const pf = Math.round(basic * (settings.pfPercent / 100));
-    const gratuity = Math.round(basic * (settings.gratuityPercent / 100));
-    const specialAllowance = Math.max(0, Math.round(ctc - (basic + hra + pf + gratuity)));
+    let components: any[];
+    if (Array.isArray((application as any).compensationStructure?.components)) {
+      components = this.normalizeComponents((application as any).compensationStructure.components, targetMonthly);
+    } else {
+      const settings = await this.payrollSettingsService.getSettings(companyId);
+      const basic = Math.round(targetMonthly * (settings.basicPercent / 100));
+      const hra = Math.round(targetMonthly * (settings.hraPercent / 100));
+      const pf = Math.round(basic * (settings.pfPercent / 100));
+      const gratuity = Math.round(basic * (settings.gratuityPercent / 100));
+      const special = Math.max(0, targetMonthly - (basic + hra + pf + gratuity));
+      components = this.normalizeComponents(
+        [
+          { id: 'basic', name: 'Basic Salary', group: 'EARNINGS', kind: 'FIXED', monthly: basic },
+          { id: 'hra', name: 'House Rent Allowance (HRA)', group: 'EARNINGS', kind: 'FIXED', monthly: hra },
+          { id: 'special', name: 'Special Allowance / Bonus', group: 'EARNINGS', kind: 'FIXED', monthly: special },
+          { id: 'pf', name: 'Provident Fund (Employer PF)', group: 'DEDUCTIONS', kind: 'FIXED', monthly: pf },
+          { id: 'gratuity', name: 'Gratuity Allocation', group: 'DEDUCTIONS', kind: 'FIXED', monthly: gratuity },
+        ],
+        targetMonthly,
+      );
+    }
 
-    const grossAnnual = basic + hra + specialAllowance;
-    const netPayAnnual = Math.max(0, grossAnnual - pf);
+    return this.renderAnnexure(application, components);
+  }
 
-    return {
-      candidateName: application.fullName,
-      jobTitle: application.job?.title || 'Position',
-      totalCTC: ctc,
-      monthlyCTC: Math.round(ctc / 12),
-      breakdown: {
-        earnings: {
-          basic: { annual: basic, monthly: Math.round(basic / 12) },
-          hra: { annual: hra, monthly: Math.round(hra / 12) },
-          specialAllowance: { annual: specialAllowance, monthly: Math.round(specialAllowance / 12) },
-          totalGross: { annual: grossAnnual, monthly: Math.round(grossAnnual / 12) }
-        },
-        deductions: {
-          pf: { annual: pf, monthly: Math.round(pf / 12) },
-          gratuity: { annual: gratuity, monthly: Math.round(gratuity / 12) }, // Employer contribution
-          totalDeductions: { annual: pf + gratuity, monthly: Math.round((pf + gratuity) / 12) }
-        },
-        netPay: {
-          annual: netPayAnnual, // Gratuity isn't typically deducted from monthly in-hand directly, but depends on company. We'll simplify to Gross - PF.
-          monthly: Math.round(netPayAnnual / 12)
-        }
-      }
-    };
+  /**
+   * Persist a customised CTC structure for the candidate. The BALANCER row is
+   * always recomputed on save so the annexure stays internally consistent.
+   */
+  async saveAnnexure(id: number, companyId: number, body: any) {
+    const application = await this.findOne(id, companyId);
+    if (!application.offeredSalary) {
+      throw new BadRequestException('Cannot save an annexure. Salary is not finalized for this application.');
+    }
+
+    if (!Array.isArray(body?.components) || body.components.length === 0) {
+      throw new BadRequestException('At least one salary component is required.');
+    }
+
+    const targetMonthly = Math.round(application.offeredSalary / 12);
+    const components = this.normalizeComponents(body.components, targetMonthly);
+
+    // `annual` is derived from `monthly` and the BALANCER row is re-derived on
+    // load, so persist only the fixed rows (including toggled-off ones).
+    const persisted = components
+      .filter((c: any) => c.kind !== 'BALANCER')
+      .map(({ annual, ...c }: any) => c);
+
+    await this.prisma.jobApplication.update({
+      where: { id },
+      data: { compensationStructure: { version: 1, components: persisted } },
+    });
+
+    (application as any).compensationStructure = { version: 1, components: persisted };
+    return this.renderAnnexure(application, components);
   }
 
   // --- Interview Methods ---

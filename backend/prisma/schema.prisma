@@ -1260,6 +1260,10 @@ model JobApplication {
   approvalDecidedAt      DateTime?
   approvalDecidedById    Int?
   answers                String?      @db.Text // Store JSON string of answers
+  // Custom CTC composition for the Compensation Annexure. JSON document:
+  // { version, components: [{ id, name, group, kind, monthly }] }. When null the
+  // annexure falls back to the company's default percentage split.
+  compensationStructure  Json?
   aiScore                Int?
   aiSummary              String?      @db.Text
   isAiScored             Boolean      @default(false)

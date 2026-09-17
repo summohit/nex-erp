@@ -106,6 +106,11 @@ export class ApplicationsController {
     return this.applicationsService.generateAnnexure(id, req.user.companyId);
   }
 
+  @Put(':id/annexure')
+  saveAnnexure(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return this.applicationsService.saveAnnexure(id, req.user.companyId, body);
+  }
+
   @Get(':id/offer-letter')
   getOfferLetter(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.offerLettersService.getForApplication(id, req.user.companyId);

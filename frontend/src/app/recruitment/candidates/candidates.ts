@@ -19,7 +19,8 @@ import {
   LucideCheck, LucideMapPin,
   LucideEdit2,
   LucideSearch,
-  LucideRotateCcw
+  LucideRotateCcw,
+  LucideCirclePlus
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry, RowClassRules, GridOptions, GridApi } from 'ag-grid-community';
@@ -43,6 +44,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideEdit2,
     LucideSearch,
     LucideRotateCcw,
+    LucideCirclePlus,
     SearchableSelectComponent,
   ],
   templateUrl: './candidates.html',
@@ -416,6 +418,48 @@ export class CandidatesComponent implements OnInit {
   showAnnexureModal = signal(false);
   annexureData = signal<any>(null);
   isLoadingAnnexure = signal(false);
+  annexureAppId = signal<number | null>(null);
+
+  // Editable CTC structure state — mirrors the breakdown from the backend but
+  // lets the recruiter tweak amounts and add/remove components live.
+  annexureEditing = signal(false);
+  isSavingAnnexure = signal(false);
+  annexureComponents = signal<any[]>([]);
+  annexureCatId = signal('');
+
+  annexureEarningsComps = computed(() => this.annexureComponents().filter(c => c.group === 'EARNINGS'));
+  annexureDeductionsComps = computed(() => this.annexureComponents().filter(c => c.group === 'DEDUCTIONS'));
+  annexureEarningsMonthly = computed(() => this.annexureEarningsComps().filter(c => c.included !== false).reduce((s, c) => s + (Number(c.monthly) || 0), 0));
+  annexureDeductionsMonthly = computed(() => this.annexureDeductionsComps().filter(c => c.included !== false).reduce((s, c) => s + (Number(c.monthly) || 0), 0));
+  annexureTotalMonthly = computed(() => this.annexureEarningsMonthly() + this.annexureDeductionsMonthly());
+  annexureTotalAnnual = computed(() => this.annexureTotalMonthly() * 12);
+
+  /** Components the recruiter may add to the structure from the picker. */
+  annexureCatalogue: { id: string; group: 'EARNINGS' | 'DEDUCTIONS'; name: string }[] = [
+    { id: 'basic', group: 'EARNINGS', name: 'Basic Salary' },
+    { id: 'hra', group: 'EARNINGS', name: 'House Rent Allowance (HRA)' },
+    { id: 'special', group: 'EARNINGS', name: 'Special Allowance / Bonus' },
+    { id: 'conveyance', group: 'EARNINGS', name: 'Conveyance Allowance' },
+    { id: 'medical', group: 'EARNINGS', name: 'Medical Allowance' },
+    { id: 'lta', group: 'EARNINGS', name: 'Leave Travel Allowance (LTA)' },
+    { id: 'leave-encashment', group: 'EARNINGS', name: 'Leave Encashment' },
+    { id: 'performance-bonus', group: 'EARNINGS', name: 'Performance Bonus' },
+    { id: 'telephone', group: 'EARNINGS', name: 'Telephone / Reimbursement Allowance' },
+    { id: 'fuel', group: 'EARNINGS', name: 'Fuel Allowance' },
+    { id: 'shift', group: 'EARNINGS', name: 'Shift Allowance' },
+    { id: 'night-shift', group: 'EARNINGS', name: 'Night Shift Allowance' },
+    { id: 'education', group: 'EARNINGS', name: 'Education Allowance' },
+    { id: 'books', group: 'EARNINGS', name: 'Books & Periodicals' },
+    { id: 'uniform', group: 'EARNINGS', name: 'Uniform Allowance' },
+    { id: 'relocation', group: 'EARNINGS', name: 'Relocation Allowance' },
+    { id: 'other-allowance', group: 'EARNINGS', name: 'Other Allowance' },
+    { id: 'pf', group: 'DEDUCTIONS', name: 'Provident Fund (Employer PF)' },
+    { id: 'gratuity', group: 'DEDUCTIONS', name: 'Gratuity Allocation' },
+    { id: 'esi', group: 'DEDUCTIONS', name: 'Employer ESI' },
+    { id: 'health-insurance', group: 'DEDUCTIONS', name: 'Group Health Insurance' },
+    { id: 'term-life', group: 'DEDUCTIONS', name: 'Group Term Life' },
+    { id: 'other-contribution', group: 'DEDUCTIONS', name: 'Other Employer Contribution' },
+  ];
 
   offerLetter = signal<any>(null);
   isGeneratingOfferLetter = signal(false);
@@ -1016,6 +1060,10 @@ export class CandidatesComponent implements OnInit {
   }
 
   viewAnnexure(applicationId: number) {
+    this.annexureAppId.set(applicationId);
+    this.annexureEditing.set(false);
+    this.annexureComponents.set([]);
+    this.annexureCatId.set('');
     this.isLoadingAnnexure.set(true);
     this.showAnnexureModal.set(true);
     this.candidatesService.getAnnexure(applicationId).subscribe({
@@ -1034,7 +1082,135 @@ export class CandidatesComponent implements OnInit {
   closeAnnexureModal() {
     this.showAnnexureModal.set(false);
     this.annexureData.set(null);
+    this.annexureAppId.set(null);
+    this.annexureComponents.set([]);
+    this.annexureEditing.set(false);
     this.isLoadingAnnexure.set(false);
+  }
+
+  /** Read-mode helpers — group the visible (included) components for the two table sections. */
+  annexureEarnings(d: any): any[] {
+    return d?.components?.filter((c: any) => c.group === 'EARNINGS' && c.included !== false) ?? [];
+  }
+
+  annexureDeductions(d: any): any[] {
+    return d?.components?.filter((c: any) => c.group === 'DEDUCTIONS' && c.included !== false) ?? [];
+  }
+
+  /** Catalogue entries not yet present in the structure (matched by name). */
+  availableAnnexureCatalogue(): any[] {
+    const present = this.annexureComponents().map(c => String(c.name || '').trim().toLowerCase());
+    return this.annexureCatalogue.filter(i => !present.includes(i.name.trim().toLowerCase()));
+  }
+
+  /**
+   * Recompute the editor state after any change: keep every fixed row (toggled
+   * rows keep their amounts), then derive the BALANCER row so the included
+   * components reach the offered monthly CTC — nothing is ever overwritten.
+   */
+  private recalcAnnexure(list: any[]): any[] {
+    const target = Math.max(1, Math.round((this.annexureData()?.totalCTC ?? 0) / 12));
+    const base = list.filter(c => c.kind !== 'BALANCER');
+    const includedFixed = base.filter(c => c.included !== false).reduce((s, c) => s + (Number(c.monthly) || 0), 0);
+    const balanceMonthly = Math.max(0, target - includedFixed);
+    const out = base.map(c => ({ ...c }));
+    if (balanceMonthly > 0) {
+      out.push({
+        id: 'balance',
+        name: 'Balance / Flexible Allowance',
+        group: 'EARNINGS',
+        kind: 'BALANCER',
+        included: true,
+        monthly: balanceMonthly,
+        annual: balanceMonthly * 12,
+      });
+    }
+    return out;
+  }
+
+  enterAnnexureEdit() {
+    const d = this.annexureData();
+    if (!d) return;
+    const source = Array.isArray(d.allComponents) ? d.allComponents : (this.annexureComponents() as any[]);
+    if (!Array.isArray(source) || source.length === 0) return;
+    this.annexureComponents.set(this.recalcAnnexure(source.map(c => ({
+      ...c,
+      included: c.included !== false,
+      isCustom: (c.isCustom === true || String(c.id).startsWith('custom_')),
+    }))));
+    this.annexureCatId.set('');
+    this.annexureEditing.set(true);
+  }
+
+  cancelAnnexureEdit() {
+    this.annexureEditing.set(false);
+    this.annexureComponents.set([]);
+    this.annexureCatId.set('');
+  }
+
+  /** Include/exclude a component. Excluded rows keep their amount for later. */
+  toggleAnnexureComponent(id: string) {
+    const next = this.annexureComponents().map(c => c.id === id ? { ...c, included: c.included === false } : c);
+    this.annexureComponents.set(this.recalcAnnexure(next));
+  }
+
+  updateAnnexureComponent(id: string, monthly: number) {
+    const val = Math.max(0, Math.round(Number(monthly) || 0));
+    const next = this.annexureComponents().map(c => (c.id === id ? { ...c, monthly: val } : c));
+    this.annexureComponents.set(this.recalcAnnexure(next));
+  }
+
+  addAnnexureComponent() {
+    const catId = this.annexureCatId();
+    const item = this.annexureCatalogue.find(i => i.id === catId);
+    if (!item) {
+      this.toast.error('Select a component to add');
+      return;
+    }
+    if (!this.availableAnnexureCatalogue().some(i => i.id === item.id)) {
+      this.toast.warning(`${item.name} is already part of the structure`);
+      return;
+    }
+    const next = [
+      ...this.annexureComponents(),
+      {
+        id: `custom_${Date.now()}`,
+        name: item.name,
+        group: item.group,
+        kind: 'FIXED',
+        monthly: 0,
+        annual: 0,
+        included: true,
+        isCustom: true,
+      },
+    ];
+    this.annexureComponents.set(this.recalcAnnexure(next));
+    this.annexureCatId.set('');
+  }
+
+  removeAnnexureComponent(id: string) {
+    this.annexureComponents.set(this.recalcAnnexure(this.annexureComponents().filter(c => c.id !== id)));
+  }
+
+  saveAnnexure() {
+    const appId = this.annexureAppId();
+    if (!appId) return;
+    const components = this.annexureComponents().map(({ annual, ...c }: any) => c);
+    this.isSavingAnnexure.set(true);
+    this.candidatesService.saveAnnexure(appId, { components }).subscribe({
+      next: (data) => {
+        this.annexureData.set(data);
+        this.annexureEditing.set(false);
+        this.annexureComponents.set([]);
+        this.isSavingAnnexure.set(false);
+        this.toast.success('CTC structure saved');
+      },
+      error: (err) => {
+        console.error('Failed to save annexure', err);
+        this.isSavingAnnexure.set(false);
+        this.toast.error(err.error?.message || 'Failed to save the CTC structure');
+      }
+    });
   }
 
   printAnnexure() {

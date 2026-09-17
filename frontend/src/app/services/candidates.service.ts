@@ -123,6 +123,10 @@ export class CandidatesService {
     return this.http.get<any>(`${this.apiUrl}/${applicationId}/annexure`);
   }
 
+  saveAnnexure(applicationId: number, body: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/${applicationId}/annexure`, body);
+  }
+
   getOfferLetter(applicationId: number): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/${applicationId}/offer-letter`);
   }

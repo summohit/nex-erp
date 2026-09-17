@@ -1499,22 +1499,22 @@
       <div class="annexure-metrics-grid">
         <div class="annexure-metric-card highlight">
           <span class="metric-label">Total Annual CTC</span>
-          <strong class="metric-val text-orange">₹{{ d.totalCTC | number }}</strong>
-          <span class="metric-badge" *ngIf="d.totalCTC >= 100000">{{ (d.totalCTC / 100000).toFixed(2) }} LPA</span>
+          <strong class="metric-val text-orange">₹{{ annexureEditing() ? annexureTotalAnnual() : d.totalCTC | number }}</strong>
+          <span class="metric-badge" *ngIf="(annexureEditing() ? annexureTotalAnnual() : d.totalCTC) >= 100000">{{ ((annexureEditing() ? annexureTotalAnnual() : d.totalCTC) / 100000).toFixed(2) }} LPA</span>
         </div>
         <div class="annexure-metric-card">
           <span class="metric-label">Monthly Gross Cost</span>
-          <strong class="metric-val">₹{{ d.monthlyCTC | number }}</strong>
+          <strong class="metric-val">₹{{ annexureEditing() ? annexureTotalMonthly() : d.monthlyCTC | number }}</strong>
           <span class="metric-subtext">per calendar month</span>
         </div>
         <div class="annexure-metric-card">
           <span class="metric-label">Monthly Gross Pay (A)</span>
-          <strong class="metric-val text-blue">₹{{ d.breakdown.earnings.totalGross.monthly | number }}</strong>
+          <strong class="metric-val text-blue">₹{{ annexureEditing() ? annexureEarningsMonthly() : d.breakdown.earnings.totalGross.monthly | number }}</strong>
           <span class="metric-subtext">Base + Allowances</span>
         </div>
         <div class="annexure-metric-card">
           <span class="metric-label">Monthly Deductions (B)</span>
-          <strong class="metric-val text-slate">₹{{ d.breakdown.deductions.totalDeductions.monthly | number }}</strong>
+          <strong class="metric-val text-slate">₹{{ annexureEditing() ? annexureDeductionsMonthly() : d.breakdown.deductions.totalDeductions.monthly | number }}</strong>
           <span class="metric-subtext">PF + Gratuity</span>
         </div>
       </div>
@@ -1530,62 +1530,122 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Part A -->
+            <!-- Part A: EARNINGS & ALLOWANCES -->
             <tr class="table-section-title">
               <td colspan="3">
                 <span class="section-pill earnings">A. EARNINGS & ALLOWANCES</span>
               </td>
             </tr>
-            <tr>
-              <td class="col-component indent">Basic Salary</td>
-              <td class="col-num">{{ d.breakdown.earnings.basic.monthly | number }}</td>
-              <td class="col-num font-semibold">{{ d.breakdown.earnings.basic.annual | number }}</td>
-            </tr>
-            <tr>
-              <td class="col-component indent">House Rent Allowance (HRA)</td>
-              <td class="col-num">{{ d.breakdown.earnings.hra.monthly | number }}</td>
-              <td class="col-num font-semibold">{{ d.breakdown.earnings.hra.annual | number }}</td>
-            </tr>
-            <tr>
-              <td class="col-component indent">Special Allowance / Bonus</td>
-              <td class="col-num">{{ d.breakdown.earnings.specialAllowance.monthly | number }}</td>
-              <td class="col-num font-semibold">{{ d.breakdown.earnings.specialAllowance.annual | number }}</td>
-            </tr>
-            <tr class="table-subtotal-row earnings-subtotal">
+            <ng-container *ngIf="!annexureEditing(); else earningsEditRows">
+              <tr *ngFor="let c of annexureEarnings(d)">
+                <td class="col-component indent">{{ c.name }}</td>
+                <td class="col-num">{{ c.monthly | number }}</td>
+                <td class="col-num font-semibold">{{ c.annual | number }}</td>
+              </tr>
+            </ng-container>
+            <ng-template #earningsEditRows>
+              <tr *ngFor="let c of annexureEarningsComps()" [class.annexure-excluded]="c.included === false">
+                <td class="col-component indent annexure-comp-name-cell">
+                  <input *ngIf="c.kind !== 'BALANCER'" type="checkbox" class="annexure-comp-toggle"
+                         [checked]="c.included !== false" (change)="toggleAnnexureComponent(c.id)"
+                         title="Include {{ c.name }} in the CTC" />
+                  <span class="annexure-comp-label" [class.annexure-strike]="c.included === false">{{ c.name }}</span>
+                  <button *ngIf="c.isCustom" type="button" class="annexure-remove-btn" (click)="removeAnnexureComponent(c.id)" title="Remove {{ c.name }}">
+                    <svg lucideX size="13"></svg>
+                  </button>
+                </td>
+                <td class="col-num">
+                  <ng-container *ngIf="c.kind === 'BALANCER'; else fixedMonthlyInput">
+                    <span class="annexure-auto-val"><strong>₹{{ c.monthly | number }}</strong><span class="annexure-auto-badge">Auto</span></span>
+                  </ng-container>
+                  <ng-template #fixedMonthlyInput>
+                    <input type="number" class="annexure-comp-input" min="0" step="1"
+                           [ngModel]="c.monthly" (ngModelChange)="updateAnnexureComponent(c.id, $event)"
+                           [hidden]="c.included === false"
+                           title="Monthly amount for {{ c.name }}" />
+                  </ng-template>
+                </td>
+                <td class="col-num font-semibold">{{ (c.monthly * 12) | number }}</td>
+              </tr>
+            </ng-template>
+            <tr class="table-subtotal-row earnings-subtotal" [class.annexure-live]="annexureEditing()">
               <td class="col-component"><strong>Total Gross Salary (A)</strong></td>
-              <td class="col-num"><strong>₹{{ d.breakdown.earnings.totalGross.monthly | number }}</strong></td>
-              <td class="col-num"><strong>₹{{ d.breakdown.earnings.totalGross.annual | number }}</strong></td>
+              <td class="col-num"><strong>₹{{ annexureEditing() ? (annexureEarningsMonthly() | number) : d.breakdown.earnings.totalGross.monthly | number }}</strong></td>
+              <td class="col-num"><strong>₹{{ annexureEditing() ? (annexureEarningsMonthly() * 12 | number) : d.breakdown.earnings.totalGross.annual | number }}</strong></td>
             </tr>
             
-            <!-- Part B -->
+            <!-- Part B: EMPLOYER CONTRIBUTIONS & STATUTORY -->
             <tr class="table-section-title">
               <td colspan="3">
                 <span class="section-pill deductions">B. EMPLOYER CONTRIBUTIONS & STATUTORY</span>
               </td>
             </tr>
-            <tr>
-              <td class="col-component indent">Provident Fund (Employer PF)</td>
-              <td class="col-num">{{ d.breakdown.deductions.pf.monthly | number }}</td>
-              <td class="col-num font-semibold">{{ d.breakdown.deductions.pf.annual | number }}</td>
-            </tr>
-            <tr>
-              <td class="col-component indent">Gratuity Allocation</td>
-              <td class="col-num">{{ d.breakdown.deductions.gratuity.monthly | number }}</td>
-              <td class="col-num font-semibold">{{ d.breakdown.deductions.gratuity.annual | number }}</td>
-            </tr>
-            <tr class="table-subtotal-row deductions-subtotal">
+            <ng-container *ngIf="!annexureEditing(); else deductionsEditRows">
+              <tr *ngFor="let c of annexureDeductions(d)">
+                <td class="col-component indent">{{ c.name }}</td>
+                <td class="col-num">{{ c.monthly | number }}</td>
+                <td class="col-num font-semibold">{{ c.annual | number }}</td>
+              </tr>
+            </ng-container>
+            <ng-template #deductionsEditRows>
+              <tr *ngFor="let c of annexureDeductionsComps()" [class.annexure-excluded]="c.included === false">
+                <td class="col-component indent annexure-comp-name-cell">
+                  <input *ngIf="c.kind !== 'BALANCER'" type="checkbox" class="annexure-comp-toggle"
+                         [checked]="c.included !== false" (change)="toggleAnnexureComponent(c.id)"
+                         title="Include {{ c.name }} in the CTC" />
+                  <span class="annexure-comp-label" [class.annexure-strike]="c.included === false">{{ c.name }}</span>
+                  <button *ngIf="c.isCustom" type="button" class="annexure-remove-btn" (click)="removeAnnexureComponent(c.id)" title="Remove {{ c.name }}">
+                    <svg lucideX size="13"></svg>
+                  </button>
+                </td>
+                <td class="col-num">
+                  <ng-container *ngIf="c.kind === 'BALANCER'; else dedFixedMonthlyInput">
+                    <span class="annexure-auto-val"><strong>₹{{ c.monthly | number }}</strong><span class="annexure-auto-badge">Auto</span></span>
+                  </ng-container>
+                  <ng-template #dedFixedMonthlyInput>
+                    <input type="number" class="annexure-comp-input" min="0" step="1"
+                           [ngModel]="c.monthly" (ngModelChange)="updateAnnexureComponent(c.id, $event)"
+                           [hidden]="c.included === false"
+                           title="Monthly amount for {{ c.name }}" />
+                  </ng-template>
+                </td>
+                <td class="col-num font-semibold">{{ (c.monthly * 12) | number }}</td>
+              </tr>
+            </ng-template>
+            <tr class="table-subtotal-row deductions-subtotal" [class.annexure-live]="annexureEditing()">
               <td class="col-component"><strong>Total Employer Deductions (B)</strong></td>
-              <td class="col-num"><strong>₹{{ d.breakdown.deductions.totalDeductions.monthly | number }}</strong></td>
-              <td class="col-num"><strong>₹{{ d.breakdown.deductions.totalDeductions.annual | number }}</strong></td>
+              <td class="col-num"><strong>₹{{ annexureEditing() ? (annexureDeductionsMonthly() | number) : d.breakdown.deductions.totalDeductions.monthly | number }}</strong></td>
+              <td class="col-num"><strong>₹{{ annexureEditing() ? (annexureDeductionsMonthly() * 12 | number) : d.breakdown.deductions.totalDeductions.annual | number }}</strong></td>
+            </tr>
+
+            <!-- Add Component (edit mode only) -->
+            <tr class="annexure-add-row" *ngIf="annexureEditing()">
+              <td colspan="3">
+                <div class="annexure-add-controls">
+                  <span class="annexure-edit-hint">Tick or clear a checkbox to include / exclude that component from the CTC. You can edit any amount directly.</span>
+                </div>
+                <div class="annexure-add-controls">
+                  <select class="annexure-component-select" [(ngModel)]="annexureCatId" title="Add a salary component">
+                    <option value="" disabled>Select component to add…</option>
+                    <option *ngFor="let item of availableAnnexureCatalogue()" [value]="item.id">
+                      {{ item.name }} — {{ item.group === 'DEDUCTIONS' ? 'Employer Contribution' : 'Allowance' }}
+                    </option>
+                  </select>
+                  <button type="button" class="annexure-add-btn" (click)="addAnnexureComponent()">
+                    <svg lucideCirclePlus size="15"></svg>
+                    <span>Add Component</span>
+                  </button>
+                </div>
+              </td>
             </tr>
 
             <!-- Grand Total -->
-            <tr class="table-grand-total-row">
+            <tr class="table-grand-total-row" [class.annexure-live]="annexureEditing()">
               <td class="col-component">
                 <span class="grand-total-label">Total Cost to Company (CTC = A + B)</span>
               </td>
-              <td class="col-num grand-val">₹{{ d.monthlyCTC | number }}</td>
-              <td class="col-num grand-val">₹{{ d.totalCTC | number }}</td>
+              <td class="col-num grand-val">₹{{ annexureEditing() ? (annexureTotalMonthly() | number) : d.monthlyCTC | number }}</td>
+              <td class="col-num grand-val">₹{{ annexureEditing() ? (annexureTotalAnnual() | number) : d.totalCTC | number }}</td>
             </tr>
           </tbody>
         </table>
@@ -1601,10 +1661,28 @@
     <!-- Footer -->
     <div class="annexure-modal-footer">
       <button type="button" class="btn-modal-cancel" (click)="closeAnnexureModal()">Close</button>
-      <button type="button" class="btn-annexure-print" (click)="printAnnexure()" [disabled]="isLoadingAnnexure()">
-        <svg lucideDownload size="16"></svg>
-        <span>Print / Save PDF</span>
-      </button>
+      <div class="annexure-footer-actions">
+        <ng-container *ngIf="!annexureEditing(); else editActions">
+          <button type="button" class="btn-annexure-edit" (click)="enterAnnexureEdit()" [disabled]="isLoadingAnnexure()">
+            <svg lucidePenLine size="15"></svg>
+            <span>Edit Structure</span>
+          </button>
+        </ng-container>
+        <ng-template #editActions>
+          <button type="button" class="btn-annexure-cancel-edit" (click)="cancelAnnexureEdit()" [disabled]="isSavingAnnexure()">
+            <svg lucideRotateCcw size="15"></svg>
+            <span>Cancel</span>
+          </button>
+          <button type="button" class="btn-annexure-save" (click)="saveAnnexure()" [disabled]="isSavingAnnexure()">
+            <svg lucideCheck size="15"></svg>
+            <span>{{ isSavingAnnexure() ? 'Saving…' : 'Save Changes' }}</span>
+          </button>
+        </ng-template>
+        <button type="button" class="btn-annexure-print" (click)="printAnnexure()" [disabled]="isLoadingAnnexure()">
+          <svg lucideDownload size="16"></svg>
+          <span>Print / Save PDF</span>
+        </button>
+      </div>
     </div>
   </div>
 </div>
