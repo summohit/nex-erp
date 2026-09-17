@@ -551,6 +551,30 @@ export class IssuesService {
     });
   }
 
+  /**
+   * §9: refuse hand-entered time on a project that requires the timer.
+   *
+   * The switch has existed since the Delivery module's first phase and was
+   * written by the project form, read by nothing — so a project set to
+   * "timer only" still accepted typed hours. Checked here rather than in the
+   * controller because both the Log Work button and the weekly grid write
+   * manual rows, and a rule enforced in one path is not a rule.
+   *
+   * The timer is never blocked: it records observed work, which is the thing
+   * the setting exists to prefer.
+   */
+  private async assertManualLoggingAllowed(projectId: number) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { allowManualTimeLogging: true, name: true },
+    });
+    if (project && !project.allowManualTimeLogging) {
+      throw new BadRequestException(
+        `${project.name} does not allow manual time entry. Use the timer to record work on this project.`,
+      );
+    }
+  }
+
   async startTimeTracking(companyId: number, userId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
@@ -614,6 +638,7 @@ export class IssuesService {
     if (!data?.durationMin || data.durationMin <= 0) {
       throw new BadRequestException('durationMin must be a positive number of minutes');
     }
+    await this.assertManualLoggingAllowed(projectId);
     const employeeId = await this.resolveEmployeeId(companyId, userId);
 
     const now = new Date();
@@ -673,6 +698,7 @@ export class IssuesService {
     const dayEnd = new Date(dayStart);
     dayEnd.setHours(23, 59, 59, 999);
 
+    await this.assertManualLoggingAllowed(projectId);
     const employeeId = await this.resolveEmployeeId(companyId, userId);
 
     const sameDay = { employeeId, issueId, startedAt: { gte: dayStart, lte: dayEnd } };

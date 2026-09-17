@@ -66,4 +66,25 @@ describe('SystemSettingsService.updateSettings', () => {
     expect(updateArg()).not.toHaveProperty('quotationSignatoryName');
     expect(updateArg()).not.toHaveProperty('quotationSignatureUrl');
   });
+  /**
+   * §22's switch. The bug worth guarding is not turning it on — it is a save
+   * from another part of the settings screen silently turning it off, which
+   * would re-open every project's cost to unapproved time with nobody having
+   * asked for that.
+   */
+  it('leaves the timesheet approval switch alone when the save omits it', async () => {
+    await service.updateSettings(COMPANY, { shiftRosterVisibleToEmployees: true });
+    expect(updateArg()).not.toHaveProperty('timesheetApprovalRequired');
+  });
+
+  it('turns the timesheet approval switch on when asked', async () => {
+    await service.updateSettings(COMPANY, { timesheetApprovalRequired: true });
+    expect(updateArg().timesheetApprovalRequired).toBe(true);
+  });
+
+  // false is a value, not an absence — the distinction the spread protects.
+  it('turns the timesheet approval switch off when asked', async () => {
+    await service.updateSettings(COMPANY, { timesheetApprovalRequired: false });
+    expect(updateArg().timesheetApprovalRequired).toBe(false);
+  });
 });

@@ -45,6 +45,40 @@
       </div>
     </div>
 
+    <!-- Card: timesheet approval (§22) -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap shift-icon">
+          <svg lucideCalendarClock size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <h3>Cost projects from approved time only</h3>
+          <p>
+            When on, only timesheet days a project manager has approved count toward project
+            cost. When off, every logged hour counts except days that were explicitly rejected.
+          </p>
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle-switch">
+            <input type="checkbox" [checked]="s.timesheetApprovalRequired" (change)="toggleTimesheetApproval()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="card-footer-note" [class.warning-note]="s.timesheetApprovalRequired">
+        <svg lucideInfo size="14"></svg>
+        <span *ngIf="!s.timesheetApprovalRequired">
+          Leave this off unless timesheets are actually being reviewed. Turning it on re-prices
+          every project against approved days only — hours nobody has got round to approving stop
+          counting, and project cost drops accordingly.
+        </span>
+        <span *ngIf="s.timesheetApprovalRequired">
+          Project cost now counts approved days only. Any project whose time has not been
+          reviewed will report a lower cost than the work it actually took.
+        </span>
+      </div>
+    </div>
+
     <!-- Card: default quotation terms -->
     <div class="setting-card">
       <div class="card-top">

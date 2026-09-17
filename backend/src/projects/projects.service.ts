@@ -617,7 +617,7 @@ export class ProjectsService {
       }
     });
 
-    const costByProject = await this.getCostRollupByProject(projects.map((p) => p.id));
+    const costByProject = await this.getCostRollupByProject(projects.map((p) => p.id), companyId);
 
     const rows = projects.map(({ issues, expenseClaims, ...p }) => {
       const totalIssues = issues.length;
@@ -661,7 +661,7 @@ export class ProjectsService {
   }
 
   /**
-   * Logged hours and employee cost per project (§8, §23).
+   * Logged hours and employee cost per project (§8, §22, §23).
    *
    * One grouped query rather than including `timeLogs` on every issue: a
    * project with a thousand tasks and years of timer sessions would otherwise
@@ -672,11 +672,36 @@ export class ProjectsService {
    * it, because those hours are real work that cost is silently missing — a
    * project reporting itself cheaper than it is would be worse than one
    * saying which hours it could not price.
+   *
+   * ── Which hours count (§22) ────────────────────────────────────────────
+   * A day is joined to its TimesheetDay, and the company setting decides how
+   * strictly that judgement is applied:
+   *
+   *   OFF (default) — everything counts EXCEPT days somebody rejected.
+   *     Absence of a row means "not submitted", never "rejected": every hour
+   *     logged before approvals existed has no row, and treating those as
+   *     refused would drop project cost to zero across the whole history the
+   *     moment this shipped. Rejection is the one thing that excludes.
+   *
+   *   ON — only APPROVED days count. The stricter reading, for a company that
+   *     wants cost measured from reviewed time and nothing else.
+   *
+   * Until now neither applied: rejected hours were costed exactly like
+   * approved ones, so rejecting a day changed a status and nothing else.
    */
-  private async getCostRollupByProject(projectIds: number[]): Promise<
+  private async getCostRollupByProject(
+    projectIds: number[],
+    companyId: number,
+  ): Promise<
     Map<number, { loggedHours: number; employeeCost: number; unratedHours: number }>
   > {
     if (!projectIds.length) return new Map();
+
+    const settings = await this.prisma.systemSetting.findUnique({
+      where: { companyId },
+      select: { timesheetApprovalRequired: true },
+    });
+    const approvalRequired = settings?.timesheetApprovalRequired ?? false;
 
     const rows = await this.prisma.$queryRaw<
       { projectId: number; minutes: bigint | null; cost: number | null; unratedMinutes: bigint | null }[]
@@ -690,7 +715,17 @@ export class ProjectsService {
         FROM "IssueTimeLog" t
         JOIN "Issue" i    ON i.id = t."issueId"
         JOIN "Employee" e ON e.id = t."employeeId"
+        -- The day this log belongs to, if anybody has judged it. LEFT, because
+        -- most days have no row at all and those hours still count.
+        LEFT JOIN "TimesheetDay" d
+               ON d."employeeId" = t."employeeId"
+              AND d."date" = (t."startedAt")::date
        WHERE i."projectId" IN (${Prisma.join(projectIds)})
+         AND ${
+           approvalRequired
+             ? Prisma.sql`d."status" = 'APPROVED'`
+             : Prisma.sql`(d."status" IS NULL OR d."status" <> 'REJECTED')`
+         }
        GROUP BY i."projectId"
     `;
 

@@ -275,6 +275,22 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * §22: measure project cost from approved time only.
+   *
+   * Off by default and deliberately hard to turn on by accident — every
+   * project in the system was costed on all logged time, and flipping this
+   * re-prices the entire history against whatever happens to be approved.
+   */
+  toggleTimesheetApproval() {
+    const current = this.settings();
+    if (!current) return;
+    this.settings.set({
+      ...current,
+      timesheetApprovalRequired: !current.timesheetApprovalRequired,
+    });
+  }
+
   /** Shown when the company has saved none, so the screen displays what a
    *  quote would actually use rather than an empty box. */
   readonly defaultQuotationTerms = DEFAULT_QUOTATION_TERMS;

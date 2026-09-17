@@ -7,6 +7,8 @@ export interface SystemSetting {
   id: number;
   companyId: number;
   shiftRosterVisibleToEmployees: boolean;
+  /** §22: cost projects from approved timesheet days only. */
+  timesheetApprovalRequired: boolean;
   offerLetterTemplateHtml?: string | null;
   offerLetterTemplateDocxUrl?: string | null;
   offerLetterConfig?: Record<string, any> | null;

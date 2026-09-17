@@ -23,6 +23,8 @@ export class SystemSettingsService {
     companyId: number,
     data: {
       shiftRosterVisibleToEmployees?: boolean;
+      /// §22. On, only APPROVED timesheet hours reach project cost.
+      timesheetApprovalRequired?: boolean;
       offerLetterTemplateHtml?: string;
       offerLetterTemplateDocxUrl?: string;
       offerLetterConfig?: any;
@@ -39,6 +41,7 @@ export class SystemSettingsService {
       create: {
         companyId,
         shiftRosterVisibleToEmployees: data.shiftRosterVisibleToEmployees ?? false,
+        timesheetApprovalRequired: data.timesheetApprovalRequired ?? false,
         offerLetterTemplateHtml: data.offerLetterTemplateHtml,
         offerLetterTemplateDocxUrl: data.offerLetterTemplateDocxUrl,
         offerLetterConfig: data.offerLetterConfig ?? undefined,
@@ -58,6 +61,10 @@ export class SystemSettingsService {
         ...(data.defaultTicketAssigneeId !== undefined && { defaultTicketAssigneeId: data.defaultTicketAssigneeId }),
         ...(data.attendanceTicketAssigneeId !== undefined && { attendanceTicketAssigneeId: data.attendanceTicketAssigneeId }),
         ...(data.twoFactorRequired !== undefined && { twoFactorRequired: data.twoFactorRequired }),
+        // Spread rather than assigned: an update that does not mention the
+        // switch must leave it alone, not quietly reset it to false and
+        // re-open every project's cost to unapproved time.
+        ...(data.timesheetApprovalRequired !== undefined && { timesheetApprovalRequired: data.timesheetApprovalRequired }),
         // Spread-guarded like the others: a PUT that omits the field must not
         // wipe the saved terms back to null.
         ...(data.quotationTerms !== undefined && { quotationTerms: data.quotationTerms }),

@@ -22,6 +22,11 @@ function makeService(over: any = {}) {
       findFirst: jest.fn().mockResolvedValue({ id: 11, type: 'IN_PROGRESS' }),
     },
     issueTimeLog: { create: jest.fn().mockResolvedValue({ id: 1 }) },
+    // §9: manual entry is refused on a project set to timer-only, so every
+    // hand-entry path now asks the project first.
+    project: {
+      findUnique: jest.fn().mockResolvedValue({ allowManualTimeLogging: true, name: 'P' }),
+    },
     issueActivity: { create: jest.fn().mockResolvedValue({}) },
     employee: { findFirst: jest.fn().mockResolvedValue({ id: 60 }) },
     ...over,
@@ -126,5 +131,44 @@ describe('Log Work records manual time as manual', () => {
   it('rejects a non-positive duration', async () => {
     const { service } = makeService();
     await expect(service.addManualTimeLog(1, 11, 2, 5, { durationMin: 0 })).rejects.toThrow(BadRequestException);
+  });
+});
+
+/**
+ * §9: the per-project "allow manual time logging" switch.
+ *
+ * It shipped with the Delivery module's first phase, was written by the project
+ * form, and was read by nothing — so a project set to timer-only accepted typed
+ * hours anyway. Checked in the service because both the Log Work button and the
+ * weekly grid write manual rows, and a rule enforced on one path is not a rule.
+ */
+describe('manual time entry against a timer-only project', () => {
+  const timerOnly = {
+    project: {
+      findUnique: jest.fn().mockResolvedValue({
+        allowManualTimeLogging: false,
+        name: 'Pan 2.0_DC_Delhi',
+      }),
+    },
+  };
+
+  it('refuses a hand-entered log, naming the project', async () => {
+    const { service } = makeService(timerOnly);
+    await expect(
+      call(service, 'addManualTimeLog', 1, 2, 3, 5, { durationMin: 60 }),
+    ).rejects.toThrow(/Pan 2\.0_DC_Delhi does not allow manual time entry/);
+  });
+
+  it('refuses the weekly grid writing the same day', async () => {
+    const { service } = makeService(timerOnly);
+    await expect(
+      call(service, 'setDayTimeTotal', 1, 2, 3, 5, { date: '2026-09-14', durationMin: 60 }),
+    ).rejects.toThrow(/does not allow manual time entry/);
+  });
+
+  it('still allows it where the project permits', async () => {
+    const { service, prisma } = makeService();
+    await call(service, 'addManualTimeLog', 1, 2, 3, 5, { durationMin: 60 });
+    expect(prisma.issueTimeLog.create).toHaveBeenCalled();
   });
 });

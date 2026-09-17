@@ -113,6 +113,7 @@ model Company {
   tickets               Ticket[]
   taskTypes             TaskType[]
   projectMilestones     ProjectMilestone[]
+  timesheetDays         TimesheetDay[]
 }
 
 // Authentication & RBAC
@@ -500,6 +501,8 @@ model Employee {
   ticketAttachments         TicketAttachment[]          @relation("TicketAttachmentUploader")
   ticketActivities          TicketActivity[]            @relation("TicketActivityActor")
   ticketTimeEntries         TicketTimeEntry[]
+  timesheetDays             TimesheetDay[]
+  reviewedTimesheets        TimesheetDay[]              @relation("TimesheetReviewer")
 
   @@unique([companyId, employeeCode])
 }
@@ -2105,9 +2108,58 @@ model IssueTimeLog {
   // are the timesheet grid's own entry — one per employee/issue/day, upserted.
   // Defaults to TIMER so pre-existing rows are never eligible for deletion.
   source      String    @default("TIMER") // TIMER, MANUAL
+  /// What the person was actually doing (§19). Nullable and staying that way:
+  /// the timer records a span without asking for a sentence, and thousands of
+  /// rows predate the field. Migrated Workway logs carry their memo here.
+  note        String?   @db.Text
   createdAt   DateTime  @default(now())
 
   @@index([employeeId, issueId, startedAt])
+}
+
+/// One employee's time for one day, as a thing that can be submitted and
+/// reviewed (§22).
+///
+/// The unit is a DAY, not an individual time log. A day is what a person
+/// actually submits and what a manager actually reads; approving thirty timer
+/// sessions one at a time is a review nobody performs. The logs themselves are
+/// untouched — this records a judgement about them.
+///
+/// Absence of a row means "not submitted", NOT "rejected". Every hour logged
+/// before approvals existed has no row, and treating that as refused would
+/// erase the project cost history overnight.
+model TimesheetDay {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// The calendar day being submitted, at midnight.
+  date       DateTime @db.Date
+
+  /// SUBMITTED, APPROVED, REJECTED. There is no DRAFT: a day with nothing to
+  /// review simply has no row.
+  status String @default("SUBMITTED")
+
+  /// Hours as they stood at submission, so a later edit to the logs is
+  /// visible as a discrepancy rather than silently re-writing what was
+  /// approved.
+  submittedHours Float
+  submittedAt    DateTime @default(now())
+
+  reviewedById    Int?
+  reviewedBy      Employee? @relation("TimesheetReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  /// Required on REJECTED. A rejection with no reason is an instruction the
+  /// employee cannot act on.
+  rejectionReason String?   @db.Text
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([companyId, status, date])
 }
 
 model IssueComment {
@@ -2664,6 +2716,10 @@ model SystemSetting {
   companyId                     Int      @unique
   company                       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   shiftRosterVisibleToEmployees Boolean  @default(false)
+  /// Rule 2, "where applicable": when on, only APPROVED timesheet hours count
+  /// toward project cost. Off by default — every existing project was costed
+  /// on all logged time, and flipping that silently would rewrite history.
+  timesheetApprovalRequired     Boolean  @default(false)
   offerLetterTemplateHtml       String?  @db.Text
   offerLetterTemplateDocxUrl    String? // ImageKit URL for the uploaded Word Template
   // Company legal identity, statutory policy constants and salary-structure ratios

@@ -1,66 +1,708 @@
-<div class="timesheets-container">
-  <div class="timesheets-header">
-    <h2>Timesheets</h2>
-    
-    <div class="date-controls">
-      <button class="btn-icon" (click)="previousWeek()">
-        <svg lucideChevronLeft size="18"></svg>
-      </button>
-      <div class="week-display">
-        {{ startDate | date:'MMM d' }} - {{ endDate | date:'MMM d, y' }}
-      </div>
-      <button class="btn-icon" (click)="nextWeek()">
-        <svg lucideChevronRight size="18"></svg>
-      </button>
-      <button class="btn btn-outline" (click)="currentWeek()">Today</button>
-    </div>
-  </div>
+<div class="ts-page">
+  <div class="ts-container">
 
-  <div class="timesheet-grid">
-    <!-- Header Row -->
-    <div class="grid-header project-col">Project / Task</div>
-    <div class="grid-header" *ngFor="let day of weekDays">
-      <div>{{ day.date | date:'EEE' }}</div>
-      <div style="font-size: 0.8em; color: var(--text-muted)">{{ day.date | date:'dd' }}</div>
-    </div>
-    <div class="grid-header">Total</div>
-
-    <!-- Data Rows -->
-    <div class="grid-row" *ngFor="let row of rows">
-      <div class="grid-cell project-col">
-        <div class="project-name">
-          <span class="badge" [style.backgroundColor]="row.projectColor" style="width: 8px; height: 8px; display: inline-block; border-radius: 50%; margin-right: 6px; padding: 0;"></span>
-          {{ row.projectName }}
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <div class="ts-header">
+      <div class="ts-title-group">
+        <div class="ts-title-badge">
+          <svg lucideClock size="20"></svg>
         </div>
-        <div class="task-name">{{ row.issueKey }} - {{ row.issueTitle }}</div>
+        <div>
+          <h2 class="ts-title">Timesheet</h2>
+          <p class="ts-subtitle">Login, logged and unlogged hours, day by day.</p>
+        </div>
       </div>
-      
-      <div class="grid-cell" *ngFor="let day of weekDays">
-        <input type="text" class="time-input" 
-               [value]="formatDuration(row.days[day.dateString])"
-               (blur)="updateTime(row, day.dateString, $event)">
-      </div>
-      
-      <div class="grid-cell font-mono font-medium">
-        {{ formatDuration(row.total) }}
+
+      <div class="ts-week-nav">
+        <button class="ts-nav-btn" (click)="previousWeek()" title="Previous week">
+          <svg lucideChevronLeft size="16"></svg>
+        </button>
+        <div class="ts-week-label">
+          <svg lucideCalendarDays size="14"></svg>
+          <span>{{ weekStart() | date:'d MMM' }} – {{ weekEnd() | date:'d MMM y' }}</span>
+        </div>
+        <button class="ts-nav-btn" (click)="nextWeek()" title="Next week">
+          <svg lucideChevronRight size="16"></svg>
+        </button>
+        <button class="ts-today-btn" (click)="thisWeek()"
+                [disabled]="isCurrentWeek() && rangeDays() === 7">
+          This week
+        </button>
+
+        <div class="ts-range-picker">
+          <button *ngFor="let r of RANGES" class="ts-range-btn"
+                  [class.active]="rangeDays() === r.days"
+                  (click)="setRange(r.days)">{{ r.label }}</button>
+        </div>
       </div>
     </div>
 
-    <!-- Footer / Totals -->
-    <div class="grid-footer" *ngIf="rows.length > 0">
-      <div class="grid-cell project-col">Total</div>
-      <div class="grid-cell font-mono" *ngFor="let day of weekDays">
-        {{ formatDuration(dailyTotals[day.dateString] || 0) }}
+    <!-- ── Scope switcher (§21) ────────────────────────────────────────── -->
+    <div class="ts-scope-bar">
+      <div class="ts-scope-tabs">
+        <button
+          *ngFor="let s of scopes()"
+          class="ts-scope-tab"
+          [class.active]="scope() === s.key"
+          (click)="setScope(s.key)">
+          <svg *ngIf="s.icon === 'user'" lucideUser size="15"></svg>
+          <svg *ngIf="s.icon === 'users'" lucideUsers size="15"></svg>
+          <svg *ngIf="s.icon === 'building'" lucideBuilding2 size="15"></svg>
+          <svg *ngIf="s.icon === 'coins'" lucideCoins size="15"></svg>
+          <span>{{ s.label }}</span>
+        </button>
       </div>
-      <div class="grid-cell font-mono text-primary">
-        {{ formatDuration(grandTotal) }}
+
+      <div class="ts-bar-actions">
+      <button class="ts-filter-btn" (click)="legendOpen.set(!legendOpen())" title="What the marks on this screen mean">
+        <svg lucideInfo size="15"></svg>
+        <span>Legend</span>
+      </button>
+
+      <button
+        *ngIf="scope() !== 'ME'"
+        class="ts-filter-btn"
+        [class.has-filters]="activeFilterCount() > 0"
+        (click)="filtersOpen.set(!filtersOpen())">
+        <svg lucideFilter size="15"></svg>
+        <span>Filters</span>
+        <span class="ts-filter-count" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
+        <svg lucideChevronDown size="14" [class.flipped]="filtersOpen()"></svg>
+      </button>
       </div>
     </div>
+
+    <!-- ── Legend ──────────────────────────────────────────────────────── -->
+    <div class="ts-legend" *ngIf="legendOpen()">
+      <div class="ts-legend-group">
+        <h4>The three hour figures</h4>
+        <p><b>Login</b> — how long the person was clocked in, from Attendance.</p>
+        <p><b>Logged</b> — how much of that they booked to a task.</p>
+        <p><b>Unlogged</b> — the gap between the two. This is the number the screen exists for.</p>
+      </div>
+
+      <div class="ts-legend-group">
+        <h4>Marks on a day</h4>
+        <p><span class="ts-pill alert">unstopped timer?</span> One entry runs over 12 hours — almost certainly a timer nobody stopped. Common in time migrated from Workway.</p>
+        <p><span class="ts-pill alert">no attendance</span> Time booked on a day with no clock-in at all.</p>
+        <p><span class="ts-pill warn">over-booked</span> More hours booked than the person was clocked in for.</p>
+        <p><span class="ts-pill running-pill">still clocked in</span> The day is still open. Login hours stay empty until clock-out, so a running day does not climb through the afternoon on its own.</p>
+        <p><span class="ts-pill warn">auto-closed</span> Nobody clocked out; the 23:00 sweep closed the day. The login hours are a cutoff, not an observation.</p>
+        <p><span class="ts-pill warn">edited since</span> The logs changed after the day was submitted for approval.</p>
+        <p><span class="ts-cell-flag">!</span> In the team views, this day carries one of the marks above.</p>
+      </div>
+
+      <div class="ts-legend-group">
+        <h4>Approval (§22)</h4>
+        <p><span class="ts-status not_submitted">Not submitted</span> Nothing sent for review yet.</p>
+        <p><span class="ts-status submitted">Pending</span> Waiting on a project manager or admin.</p>
+        <p><span class="ts-status approved">Approved</span> Counted as reviewed time.</p>
+        <p><span class="ts-status rejected">Rejected</span> Sent back with a reason; the employee re-submits.</p>
+      </div>
+
+      <div class="ts-legend-group">
+        <h4>Entries</h4>
+        <p><span class="ts-source"><svg lucideTimer size="12"></svg> Timer</span> Recorded by starting and stopping the timer.</p>
+        <p><span class="ts-source manual"><svg lucidePencilLine size="12"></svg> Manual</span> Typed in by hand, or migrated from Workway.</p>
+        <p><span class="ts-inactive-badge">Inactive</span> The user account is suspended — in practice, someone who has left. Their hours stay because the history is real.</p>
+      </div>
+
+      <button class="ts-btn-ghost sm ts-legend-close" (click)="legendOpen.set(false)">Close</button>
+    </div>
+
+    <!-- ── Filters (§21) ───────────────────────────────────────────────── -->
+    <div class="ts-filters" *ngIf="filtersOpen() && scope() !== 'ME'">
+      <div class="ts-filter-grid">
+        <label class="ts-field">
+          <span>Employee</span>
+          <select [ngModel]="fEmployee()" (ngModelChange)="fEmployee.set($event)">
+            <option value="ALL">All employees</option>
+            <option *ngFor="let e of employees()" [value]="e.id">{{ fullName(e) }}</option>
+          </select>
+        </label>
+
+        <label class="ts-field">
+          <span>Department</span>
+          <select [ngModel]="fDepartment()" (ngModelChange)="fDepartment.set($event)">
+            <option value="ALL">All departments</option>
+            <option *ngFor="let d of departments()" [value]="d.id">{{ d.name }}</option>
+          </select>
+        </label>
+
+        <label class="ts-field">
+          <span>Project</span>
+          <select [ngModel]="fProject()" (ngModelChange)="fProject.set($event)">
+            <option value="ALL">All projects</option>
+            <option *ngFor="let p of projects()" [value]="p.id">{{ p.name }}</option>
+          </select>
+        </label>
+
+        <label class="ts-field">
+          <span>Client</span>
+          <select [ngModel]="fClient()" (ngModelChange)="fClient.set($event)">
+            <option value="ALL">All clients</option>
+            <option *ngFor="let c of clients()" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </label>
+
+        <label class="ts-field">
+          <span>Project manager</span>
+          <select [ngModel]="fPm()" (ngModelChange)="fPm.set($event)">
+            <option value="ALL">Any manager</option>
+            <option *ngFor="let p of projectManagers()" [value]="p.id">{{ fullName(p) }}</option>
+          </select>
+        </label>
+
+        <label class="ts-field">
+          <span>Entry type</span>
+          <select [ngModel]="fSource()" (ngModelChange)="fSource.set($event)">
+            <option value="ALL">Timer and manual</option>
+            <option value="TIMER">Timer only</option>
+            <option value="MANUAL">Manual only</option>
+          </select>
+        </label>
+
+        <label class="ts-field">
+          <span>Task</span>
+          <input type="text" placeholder="Task name or key"
+                 [ngModel]="fTask()" (ngModelChange)="fTask.set($event)"
+                 (keyup.enter)="applyFilters()">
+        </label>
+
+        <label class="ts-field">
+          <span>Billable</span>
+          <select [ngModel]="fBillable()" (ngModelChange)="fBillable.set($event)">
+            <option value="ALL">Billable and non-billable</option>
+            <option value="BILLABLE">Billable only</option>
+            <option value="NON_BILLABLE">Non-billable only</option>
+          </select>
+        </label>
+
+        <label class="ts-field">
+          <span>Approval status</span>
+          <select [ngModel]="fStatus()" (ngModelChange)="fStatus.set($event)">
+            <option value="ALL">Any status</option>
+            <option *ngFor="let s of STATUS_OPTIONS" [value]="s.value">{{ s.label }}</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="ts-filter-actions">
+        <button class="ts-btn-ghost" (click)="clearFilters()">
+          <svg lucideRotateCcw size="14"></svg> Clear
+        </button>
+        <button class="ts-btn-primary" (click)="applyFilters()">Apply filters</button>
+      </div>
+    </div>
+
+    <!-- Narrowing the logs makes "unlogged" meaningless, so the screen says so
+         rather than quietly dropping a column. -->
+    <div class="ts-note" *ngIf="overview()?.hoursFiltered && scope() !== 'ME'">
+      <svg lucideAlertTriangle size="15"></svg>
+      <span>
+        A project, client, manager or entry-type filter is on, so logged hours cover only the
+        matching entries. Unlogged hours are hidden — they only mean something against a whole day.
+      </span>
+    </div>
+
+    <!-- ── Loading ─────────────────────────────────────────────────────── -->
+    <div class="ts-loading" *ngIf="loading()">
+      <svg lucideLoader2 size="22" class="spin"></svg>
+      <span>Loading the week…</span>
+    </div>
+
+    <!-- ═══ My Timesheet ═══════════════════════════════════════════════ -->
+    <ng-container *ngIf="!loading() && scope() === 'ME' && myWeek() as week">
+
+      <div class="ts-cards">
+        <div class="ts-card">
+          <span class="ts-card-label">Login hours</span>
+          <span class="ts-card-value">{{ hhmm(week.totals.loginHours) }}</span>
+          <span class="ts-card-hint">Time clocked in</span>
+        </div>
+        <div class="ts-card">
+          <span class="ts-card-label">Logged hours</span>
+          <span class="ts-card-value">{{ hhmm(week.totals.loggedHours) }}</span>
+          <span class="ts-card-hint">Booked to tasks</span>
+        </div>
+        <div class="ts-card" [class.warn]="week.totals.unloggedHours > 0">
+          <span class="ts-card-label">Unlogged hours</span>
+          <span class="ts-card-value">{{ hhmm(week.totals.unloggedHours) }}</span>
+          <span class="ts-card-hint">Clocked in, not accounted for</span>
+        </div>
+      </div>
+
+      <div class="ts-day-list">
+        <div class="ts-day" *ngFor="let day of week.days; trackBy: trackByDate"
+             [class.muted]="isEmptyWeekend(day)">
+
+          <div class="ts-day-row" (click)="toggleDay(day.date)">
+            <div class="ts-day-date">
+              <span class="ts-day-dow">{{ day.date + 'T00:00:00' | date:'EEE' }}</span>
+              <span class="ts-day-num">{{ day.date + 'T00:00:00' | date:'d MMM' }}</span>
+            </div>
+
+            <div class="ts-day-clock">
+              <span *ngIf="day.clockIn">{{ time(day.clockIn) }} – {{ day.sessionOpen ? 'now' : time(day.clockOut) }}</span>
+              <span class="ts-dim" *ngIf="!day.clockIn">No attendance</span>
+              <span class="ts-pill warn" *ngIf="day.autoClockedOut" title="Closed by the 23:00 sweep, not by the employee">
+                auto-closed
+              </span>
+              <span class="ts-pill" *ngIf="day.sessionOpen">still running</span>
+            </div>
+
+            <div class="ts-day-hours">
+              <div class="ts-hour-cell">
+                <span class="ts-hour-label">Login</span>
+                <span class="ts-hour-value">{{ hhmm(day.loginHours) }}</span>
+              </div>
+              <div class="ts-hour-cell">
+                <span class="ts-hour-label">Logged</span>
+                <span class="ts-hour-value">{{ hhmm(day.loggedHours) }}</span>
+              </div>
+              <div class="ts-hour-cell" [class.warn]="day.unloggedHours > 0">
+                <span class="ts-hour-label">Unlogged</span>
+                <span class="ts-hour-value">{{ hhmm(day.unloggedHours) }}</span>
+              </div>
+            </div>
+
+            <div class="ts-day-status">
+              <span class="ts-status" [ngClass]="day.status.toLowerCase()">{{ statusLabel(day.status) }}</span>
+              <span class="ts-pill warn" *ngIf="day.overLogged" title="More time booked than clocked in for">
+                over-booked
+              </span>
+              <span class="ts-pill alert" *ngIf="day.hasImplausibleEntry"
+                    [title]="'A single entry of ' + hhmm(day.longestEntryHours) + ' — almost certainly a timer left running. Migrated from Workway.'">
+                unstopped timer?
+              </span>
+              <span class="ts-pill alert" *ngIf="day.loggedWithoutLogin"
+                    title="Time booked on a day with no clock-in at all">
+                no attendance
+              </span>
+              <span class="ts-pill warn" *ngIf="day.changedSinceSubmission"
+                    title="The logs changed after this day was submitted">
+                edited since
+              </span>
+            </div>
+
+            <div class="ts-day-actions" (click)="$event.stopPropagation()">
+              <button
+                class="ts-btn-primary sm"
+                *ngIf="day.loggedHours > 0 && day.status !== 'APPROVED' && day.status !== 'SUBMITTED'"
+                [disabled]="isBusy(day.date)"
+                (click)="submitDay(day)">
+                <svg lucideSend size="13"></svg> Submit
+              </button>
+              <button
+                class="ts-btn-ghost sm"
+                *ngIf="day.status === 'SUBMITTED' && day.changedSinceSubmission"
+                [disabled]="isBusy(day.date)"
+                (click)="submitDay(day)">
+                Re-submit
+              </button>
+              <svg lucideChevronDown size="16" class="ts-chevron"
+                   [class.flipped]="expandedDay() === day.date"></svg>
+            </div>
+          </div>
+
+          <div class="ts-reject-note" *ngIf="day.status === 'REJECTED' && day.rejectionReason">
+            <svg lucideX size="14"></svg>
+            <span><strong>Rejected:</strong> {{ day.rejectionReason }}</span>
+          </div>
+
+          <!-- §20's entry columns -->
+          <div class="ts-entries" *ngIf="expandedDay() === day.date">
+            <table class="ts-entry-table" *ngIf="day.entries?.length; else noEntries">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Code</th>
+                  <th>Client</th>
+                  <th>Task</th>
+                  <th>Type</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th class="num">Hours</th>
+                  <th>Entry</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let e of day.entries; trackBy: trackByEntry"
+                    class="ts-entry-row"
+                    (click)="showEntry(e, day.date, fullName(week.employee))">
+                  <td>{{ e.projectName || '—' }}</td>
+                  <td class="mono">{{ e.projectCode || '—' }}</td>
+                  <td>{{ e.clientName || '—' }}</td>
+                  <td>
+                    <span class="mono ts-dim">{{ e.issueKey }}</span>
+                    {{ e.issueTitle }}
+                  </td>
+                  <td>{{ e.taskType || '—' }}</td>
+                  <td>{{ time(e.startedAt) }}</td>
+                  <td>{{ time(e.endedAt) }}</td>
+                  <td class="num">{{ hhmm(e.hours) }}</td>
+                  <td>
+                    <span class="ts-source" [class.manual]="e.source === 'MANUAL'">
+                      <svg *ngIf="e.source === 'MANUAL'" lucidePencilLine size="12"></svg>
+                      <svg *ngIf="e.source === 'TIMER'" lucideTimer size="12"></svg>
+                      {{ e.source === 'MANUAL' ? 'Manual' : 'Timer' }}
+                    </span>
+                  </td>
+                  <td class="ts-note-cell" [title]="e.note || ''">{{ e.note || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <ng-template #noEntries>
+              <div class="ts-empty-inline">Nothing booked on this day.</div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- ═══ Team / All / Finance ═══════════════════════════════════════ -->
+    <ng-container *ngIf="!loading() && scope() !== 'ME' && overview() as data">
+
+      <div class="ts-empty" *ngIf="!data.employees.length">
+        <svg lucideUsers size="40"></svg>
+        <h3>Nobody to show for this week</h3>
+        <p *ngIf="scope() === 'TEAM'">
+          A team timesheet lists the people on the projects you manage. If you don't manage a
+          project yet, there is nothing here to review.
+        </p>
+        <p *ngIf="scope() !== 'TEAM'">No employee matches these filters.</p>
+      </div>
+
+      <div class="ts-cards" *ngIf="data.employees.length">
+        <div class="ts-card">
+          <span class="ts-card-label">People</span>
+          <span class="ts-card-value">{{ data.employees.length }}</span>
+          <span class="ts-card-hint">{{ inactiveCount(data) }} with an inactive account</span>
+        </div>
+        <div class="ts-card">
+          <span class="ts-card-label">Login hours</span>
+          <span class="ts-card-value">{{ hhmm(data.totals.loginHours) }}</span>
+          <span class="ts-card-hint">Time clocked in</span>
+        </div>
+        <div class="ts-card">
+          <span class="ts-card-label">Logged hours</span>
+          <span class="ts-card-value">{{ hhmm(data.totals.loggedHours) }}</span>
+          <span class="ts-card-hint">
+            {{ hhmm(data.totals.timerHours) }} timer · {{ hhmm(data.totals.manualHours) }} manual
+          </span>
+        </div>
+        <div class="ts-card" *ngIf="!data.hoursFiltered" [class.warn]="data.totals.unloggedHours > 0">
+          <span class="ts-card-label">Unlogged hours</span>
+          <span class="ts-card-value">{{ hhmm(data.totals.unloggedHours) }}</span>
+          <span class="ts-card-hint">Clocked in, not accounted for</span>
+        </div>
+        <div class="ts-card" [class.warn]="pendingCount(data) > 0">
+          <span class="ts-card-label">Waiting on review</span>
+          <span class="ts-card-value">{{ pendingCount(data) }}</span>
+          <span class="ts-card-hint">{{ attentionCount(data) }} day(s) that do not add up</span>
+        </div>
+        <div class="ts-card" *ngIf="data.canViewCost && scope() === 'FINANCE'">
+          <span class="ts-card-label">Cost</span>
+          <span class="ts-card-value">{{ money(data.totals.cost) }}</span>
+          <span class="ts-card-hint">
+            <ng-container *ngIf="data.totals.unratedHours > 0">
+              excludes {{ hhmm(data.totals.unratedHours) }} at no rate
+            </ng-container>
+            <ng-container *ngIf="!data.totals.unratedHours">every hour priced</ng-container>
+          </span>
+        </div>
+      </div>
+
+      <div class="ts-table-wrap" *ngIf="data.employees.length">
+        <table class="ts-table">
+          <thead>
+            <tr>
+              <th class="ts-col-person">Employee</th>
+              <ng-container *ngIf="showDayColumns()">
+                <th class="num" *ngFor="let d of weekDays()" [class.today]="d.isToday">
+                  <span class="ts-th-dow">{{ d.date | date:'EEE' }}</span>
+                  <span class="ts-th-num">{{ d.date | date:'d' }}</span>
+                </th>
+              </ng-container>
+              <th class="num">Login</th>
+              <th class="num">Logged</th>
+              <th class="num" *ngIf="!data.hoursFiltered">Unlogged</th>
+              <th class="num" *ngIf="data.canViewCost && scope() === 'FINANCE'">Cost</th>
+              <th>Approvals</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <ng-container *ngFor="let row of data.employees; trackBy: trackByEmployee">
+              <tr class="ts-row" (click)="toggleEmployee(row.employee.id)"
+                  [class.open]="expandedEmployee() === row.employee.id">
+                <td class="ts-col-person">
+                  <div class="ts-person">
+                    <img *ngIf="row.employee.avatarUrl" [src]="row.employee.avatarUrl" alt="" class="ts-avatar">
+                    <span *ngIf="!row.employee.avatarUrl" class="ts-avatar ts-avatar-initials">
+                      {{ initials(row.employee.firstName, row.employee.lastName) }}
+                    </span>
+                    <div class="ts-person-text">
+                      <span class="ts-person-name">{{ fullName(row.employee) }}</span>
+                      <span class="ts-person-meta">
+                        {{ row.employee.department?.name || 'No department' }}
+                        <span class="ts-inactive-badge" *ngIf="row.employee.isInactive"
+                              title="This account is no longer active. The hours remain because the history is real.">
+                          Inactive
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <ng-container *ngIf="showDayColumns()">
+                <td class="num ts-day-cell" *ngFor="let d of weekDays()" [class.today]="d.isToday">
+                  <ng-container *ngIf="dayOf(row, d.key) as cell">
+                    <span class="ts-cell-hours" [class.zero]="!cell.loggedHours">
+                      {{ cell.loggedHours ? hhmm(cell.loggedHours) : '·' }}
+                    </span>
+                    <span class="ts-cell-dot" [ngClass]="cell.status.toLowerCase()"
+                          *ngIf="cell.status !== 'NOT_SUBMITTED'"
+                          [title]="statusLabel(cell.status)"></span>
+                    <span class="ts-cell-flag"
+                          *ngIf="cell.hasImplausibleEntry || cell.loggedWithoutLogin"
+                          title="This day does not add up — open the row to see why">!</span>
+                    <span class="ts-cell-running" *ngIf="cell.sessionOpen"
+                          title="Still clocked in — login hours are counted once the day is closed"></span>
+                  </ng-container>
+                </td>
+                </ng-container>
+
+                <td class="num">{{ hhmm(row.totals.loginHours) }}</td>
+                <td class="num strong">{{ hhmm(row.totals.loggedHours) }}</td>
+                <td class="num" *ngIf="!data.hoursFiltered"
+                    [class.warn]="row.totals.unloggedHours > 0">
+                  {{ hhmm(row.totals.unloggedHours) }}
+                </td>
+
+                <td class="num" *ngIf="data.canViewCost && scope() === 'FINANCE'">
+                  <span *ngIf="row.cost?.amount != null">{{ money(row.cost?.amount) }}</span>
+                  <!-- Phase 2's rule: unpriced hours are reported, never costed at zero. -->
+                  <span class="ts-unrated" *ngIf="row.cost?.amount == null && row.totals.loggedHours > 0"
+                        title="No hourly cost rate set for this employee">
+                    no rate
+                  </span>
+                  <span class="ts-dim" *ngIf="row.cost?.amount == null && !row.totals.loggedHours">—</span>
+                </td>
+
+                <td>
+                  <div class="ts-counts">
+                    <span class="ts-count pending" *ngIf="row.counts.pending" title="Waiting on review">
+                      {{ row.counts.pending }} pending
+                    </span>
+                    <span class="ts-count approved" *ngIf="row.counts.approved">
+                      {{ row.counts.approved }} approved
+                    </span>
+                    <span class="ts-count rejected" *ngIf="row.counts.rejected">
+                      {{ row.counts.rejected }} rejected
+                    </span>
+                    <span class="ts-count alert" *ngIf="row.counts.needsAttention"
+                          title="Days with an over-booking, an unstopped timer, or time booked with no attendance">
+                      {{ row.counts.needsAttention }} to check
+                    </span>
+                    <span class="ts-dim" *ngIf="!row.counts.pending && !row.counts.approved && !row.counts.rejected">
+                      Nothing submitted
+                    </span>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- The opened week, with the approve/reject buttons (§22). -->
+              <tr class="ts-detail-row" *ngIf="expandedEmployee() === row.employee.id">
+                <td [attr.colspan]="detailColspan(data)">
+                  <div class="ts-detail">
+                    <div class="ts-loading sm" *ngIf="expandedLoading()">
+                      <svg lucideLoader2 size="18" class="spin"></svg>
+                      <span>Loading {{ row.employee.firstName }}'s week…</span>
+                    </div>
+
+                    <div class="ts-detail-days" *ngIf="!expandedLoading() && expandedWeek() as w">
+                      <div class="ts-detail-day" *ngFor="let day of w.days; trackBy: trackByDate"
+                           [class.muted]="isEmptyWeekend(day)">
+                        <div class="ts-detail-date">
+                          <span class="ts-day-dow">{{ day.date + 'T00:00:00' | date:'EEE' }}</span>
+                          <span class="ts-day-num">{{ day.date + 'T00:00:00' | date:'d MMM' }}</span>
+                        </div>
+
+                        <div class="ts-detail-hours">
+                          <!-- An open day has no login total yet, by design. Saying
+                               "running since 9:28" is the difference between a rule
+                               and an empty cell that reads as broken data. -->
+                          <span class="ts-dh running" *ngIf="day.sessionOpen">
+                            <i>login</i>
+                            <span class="ts-running">since {{ time(day.clockIn) }}</span>
+                          </span>
+                          <span class="ts-dh" *ngIf="!day.sessionOpen">
+                            <i>login</i>{{ hhmm(day.loginHours) }}
+                          </span>
+                          <span class="ts-dh strong">
+                            <i>logged</i>{{ hhmm(day.loggedHours) }}
+                          </span>
+                          <span class="ts-dh" [class.warn]="day.unloggedHours > 0">
+                            <i>unlogged</i>{{ hhmm(day.unloggedHours) }}
+                          </span>
+                        </div>
+
+                        <div class="ts-detail-tasks">
+                          <button *ngFor="let e of day.entries" class="ts-task-chip"
+                                  [title]="e.issueKey + ' · ' + e.issueTitle + ' — click for details'"
+                                  (click)="$event.stopPropagation(); showEntry(e, day.date, fullName(row.employee))">
+                            {{ e.projectCode || e.projectName || 'Task' }} · {{ hhmm(e.hours) }}
+                          </button>
+                          <span class="ts-dim" *ngIf="!day.entries?.length">Nothing booked</span>
+                        </div>
+
+                        <div class="ts-detail-status">
+                          <span class="ts-pill running-pill" *ngIf="day.sessionOpen"
+                                title="Still clocked in. Login hours are counted once the day is closed, so they do not climb through the afternoon.">
+                            still clocked in
+                          </span>
+                          <span class="ts-status" [ngClass]="day.status.toLowerCase()">
+                            {{ statusLabel(day.status) }}
+                          </span>
+                          <span class="ts-pill warn" *ngIf="day.changedSinceSubmission">edited since</span>
+                          <span class="ts-pill alert" *ngIf="day.hasImplausibleEntry"
+                                [title]="'A single entry of ' + hhmm(day.longestEntryHours) + ' — almost certainly a timer left running.'">
+                            unstopped timer?
+                          </span>
+                          <span class="ts-pill alert" *ngIf="day.loggedWithoutLogin"
+                                title="Time booked on a day with no clock-in">
+                            no attendance
+                          </span>
+                        </div>
+
+                        <div class="ts-detail-actions">
+                          <ng-container *ngIf="day.status === 'SUBMITTED'">
+                            <button class="ts-btn-approve" [disabled]="isBusy(day.date)"
+                                    (click)="approveDay(row.employee.id, day)">
+                              <svg lucideCheck size="13"></svg> Approve
+                            </button>
+                            <button class="ts-btn-reject" [disabled]="isBusy(day.date)"
+                                    (click)="rejectDay(row.employee.id, day)">
+                              <svg lucideX size="13"></svg> Reject
+                            </button>
+                          </ng-container>
+                          <span class="ts-dim sm" *ngIf="day.status === 'NOT_SUBMITTED'">
+                            Not submitted yet
+                          </span>
+                          <span class="ts-dim sm" *ngIf="day.status === 'APPROVED' && day.reviewedBy">
+                            by {{ fullName(day.reviewedBy) }}
+                          </span>
+                          <button class="ts-btn-ghost sm" *ngIf="day.status === 'REJECTED'"
+                                  [disabled]="isBusy(day.date)"
+                                  (click)="approveDay(row.employee.id, day)">
+                            Approve anyway
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+
+          <tfoot>
+            <tr>
+              <td class="ts-col-person">Total</td>
+              <ng-container *ngIf="showDayColumns()">
+                <td class="num" *ngFor="let d of weekDays()"></td>
+              </ng-container>
+              <td class="num">{{ hhmm(data.totals.loginHours) }}</td>
+              <td class="num strong">{{ hhmm(data.totals.loggedHours) }}</td>
+              <td class="num" *ngIf="!data.hoursFiltered">{{ hhmm(data.totals.unloggedHours) }}</td>
+              <td class="num" *ngIf="data.canViewCost && scope() === 'FINANCE'">
+                {{ money(data.totals.cost) }}
+                <span class="ts-unrated block" *ngIf="data.totals.unratedHours > 0"
+                      title="Hours worked by people with no cost rate set. Not included in the total.">
+                  + {{ hhmm(data.totals.unratedHours) }} unpriced
+                </span>
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </ng-container>
+
   </div>
-  
-  <div class="empty-state" *ngIf="rows.length === 0">
-    <svg lucideClock size="48" style="color: var(--text-muted); margin-bottom: 16px;"></svg>
-    <h3>No time logged this week</h3>
-    <p class="text-muted">Start tracking time on your assigned tasks.</p>
+
+  <!-- ── Entry detail (§20's columns, one entry at a time) ──────────────── -->
+  <div class="ts-modal-backdrop" *ngIf="openEntry() as open" (click)="closeEntry()">
+    <div class="ts-modal" (click)="$event.stopPropagation()">
+      <div class="ts-modal-head">
+        <div>
+          <h3>Time log details</h3>
+          <p>{{ shortDate(open.date) }} · {{ entrySpan(open.entry) }}</p>
+        </div>
+        <button class="ts-modal-close" (click)="closeEntry()" title="Close">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
+
+      <div class="ts-modal-hero">
+        <span class="ts-modal-hours">{{ hhmm(open.entry.hours) }}</span>
+        <span class="ts-source" [class.manual]="open.entry.source === 'MANUAL'">
+          <svg *ngIf="open.entry.source === 'MANUAL'" lucidePencilLine size="12"></svg>
+          <svg *ngIf="open.entry.source === 'TIMER'" lucideTimer size="12"></svg>
+          {{ open.entry.source === 'MANUAL' ? 'Manual entry' : 'Timer' }}
+        </span>
+      </div>
+
+      <!-- A single entry this long is the unstopped-timer case; the modal is
+           where somebody decides what to do about it, so it says so here. -->
+      <div class="ts-note alert" *ngIf="isImplausibleEntry(open.entry)">
+        <svg lucideAlertTriangle size="15"></svg>
+        <span>
+          This single entry runs {{ hhmm(open.entry.hours) }}. That is almost certainly a timer
+          left running rather than time worked — most of these came across from Workway, which
+          had no auto-stop.
+        </span>
+      </div>
+
+      <dl class="ts-modal-grid">
+        <dt>Start time</dt>
+        <dd>{{ open.entry.startedAt | date:'d MMM y, h:mm a' }}</dd>
+
+        <dt>End time</dt>
+        <dd *ngIf="open.entry.endedAt">{{ open.entry.endedAt | date:'d MMM y, h:mm a' }}</dd>
+        <dd *ngIf="!open.entry.endedAt" class="ts-dim">Still running</dd>
+
+        <dt>Total hours</dt>
+        <dd>{{ hhmm(open.entry.hours) }}</dd>
+
+        <dt>Note</dt>
+        <dd *ngIf="open.entry.note">{{ open.entry.note }}</dd>
+        <dd *ngIf="!open.entry.note" class="ts-dim">Nothing written</dd>
+
+        <dt>Project</dt>
+        <dd *ngIf="open.entry.projectName">{{ open.entry.projectName }}</dd>
+        <dd *ngIf="!open.entry.projectName" class="ts-dim">No project</dd>
+
+        <dt>Project code</dt>
+        <dd class="mono" *ngIf="open.entry.projectCode">{{ open.entry.projectCode }}</dd>
+        <dd *ngIf="!open.entry.projectCode" class="ts-dim">—</dd>
+
+        <dt>Client</dt>
+        <dd *ngIf="open.entry.clientName">{{ open.entry.clientName }}</dd>
+        <dd *ngIf="!open.entry.clientName" class="ts-dim">No client</dd>
+
+        <dt>Task</dt>
+        <dd><span class="mono ts-dim">{{ open.entry.issueKey }}</span> {{ open.entry.issueTitle }}</dd>
+
+        <dt>Task type</dt>
+        <dd *ngIf="open.entry.taskType">{{ open.entry.taskType }}</dd>
+        <dd *ngIf="!open.entry.taskType" class="ts-dim">Not set</dd>
+
+        <dt>Employee</dt>
+        <dd>{{ open.who }}</dd>
+      </dl>
+    </div>
   </div>
 </div>

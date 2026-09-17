@@ -1151,3 +1151,13 @@
 .btn-sig-upload:disabled,
 .btn-sig-remove:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-sig-upload .spin { animation: spin 1s linear infinite; }
+
+
+/* A footer note that states a consequence rather than a reassurance. */
+.card-footer-note.warning-note {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.card-footer-note.warning-note svg { color: #d97706; }
