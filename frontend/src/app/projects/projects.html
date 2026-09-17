@@ -614,77 +614,332 @@
       <!-- §17 Task filters. The chips above answer "what needs me today";
            these answer "find the one I am thinking of". Collapsed by default so
            the list stays the point of the screen. -->
+      <!-- Backdrop to close open filter dropdowns -->
+      <div class="tf-dropdown-backdrop" *ngIf="tfAssigneeDropdownOpen() || tfProjectDropdownOpen() || tfProjectCodeDropdownOpen()" (click)="closeTaskFilterDropdowns()"></div>
+
       <div class="task-filters-panel" *ngIf="taskFiltersOpen()">
-        <label class="project-filter-field">
-          <span>Project</span>
-          <select [ngModel]="tfProject()" (ngModelChange)="tfProject.set($event)">
-            <option value="ALL">All projects</option>
-            <option *ngFor="let p of taskProjectOptions()" [value]="p">{{ p }}</option>
-          </select>
-        </label>
+        <!-- Header with Title, Active Filter Badge, and Action Buttons (Clear, Clear & Close, Close) -->
+        <div class="tf-panel-header">
+          <div class="tf-header-title">
+            <div class="tf-title-badge">
+              <svg lucideFilter size="14"></svg>
+            </div>
+            <span class="tf-title-text">Task Filters</span>
+            <span class="tf-active-badge" *ngIf="activeTaskFilterCount() > 0">
+              {{ activeTaskFilterCount() }} active
+            </span>
+          </div>
+          <div class="tf-header-actions">
+            <button
+              type="button"
+              class="tf-btn-clear"
+              *ngIf="activeTaskFilterCount() > 0"
+              (click)="clearTaskFilters()"
+              title="Reset all active filters">
+              <svg lucideRotateCcw size="13"></svg>
+              <span>Clear</span>
+            </button>
+            <button
+              type="button"
+              class="tf-btn-close"
+              (click)="taskFiltersOpen.set(false); closeTaskFilterDropdowns()"
+              title="Close filter panel">
+              <svg lucideX size="15"></svg>
+            </button>
+          </div>
+        </div>
 
-        <label class="project-filter-field">
-          <span>Project code</span>
-          <select [ngModel]="tfProjectCode()" (ngModelChange)="tfProjectCode.set($event)">
-            <option value="ALL">All codes</option>
-            <option *ngFor="let c of taskCodeOptions()" [value]="c">{{ c }}</option>
-          </select>
-        </label>
+        <!-- Filter Controls Grid -->
+        <div class="tf-fields-grid">
+          <!-- 1. Searchable Project Filter -->
+          <div class="tf-field-group">
+            <label class="tf-field-label">Project</label>
+            <div class="tf-dropdown-anchor">
+              <button
+                type="button"
+                class="tf-select-trigger"
+                [class.is-active]="tfProject() !== 'ALL'"
+                [class.is-open]="tfProjectDropdownOpen()"
+                (click)="tfProjectDropdownOpen.set(!tfProjectDropdownOpen()); tfAssigneeDropdownOpen.set(false); tfProjectCodeDropdownOpen.set(false)">
+                <div class="tf-trigger-content">
+                  <svg lucideBriefcase size="14" class="tf-trigger-icon"></svg>
+                  <span class="tf-trigger-text" [title]="tfProject() === 'ALL' ? 'All projects' : tfProject()">
+                    {{ tfProject() === 'ALL' ? 'All projects' : tfProject() }}
+                  </span>
+                </div>
+                <svg lucideChevronDown size="14" class="tf-chevron" [class.rotated]="tfProjectDropdownOpen()"></svg>
+              </button>
 
-        <label class="project-filter-field">
-          <span>Assignee</span>
-          <select [ngModel]="tfAssignee()" (ngModelChange)="tfAssignee.set($event)">
-            <option value="ALL">Anyone</option>
-            <option *ngFor="let a of taskAssigneeOptions()" [value]="a.id">{{ a.name }}</option>
-          </select>
-        </label>
+              <div class="tf-dropdown-panel" *ngIf="tfProjectDropdownOpen()">
+                <div class="tf-search-box">
+                  <svg lucideSearch size="14" class="tf-search-icon"></svg>
+                  <input
+                    type="text"
+                    [value]="tfProjectSearchQuery()"
+                    (input)="tfProjectSearchQuery.set($any($event.target).value)"
+                    placeholder="Search projects..."
+                    (click)="$event.stopPropagation()" />
+                  <button
+                    type="button"
+                    class="tf-search-clear"
+                    *ngIf="tfProjectSearchQuery()"
+                    (click)="tfProjectSearchQuery.set('')">
+                    <svg lucideX size="12"></svg>
+                  </button>
+                </div>
+                <div class="tf-options-list">
+                  <div
+                    class="tf-option-item"
+                    [class.selected]="tfProject() === 'ALL'"
+                    (click)="selectTfProject('ALL')">
+                    <span class="tf-option-label">All projects</span>
+                    <svg lucideCheck size="14" class="tf-check-icon" *ngIf="tfProject() === 'ALL'"></svg>
+                  </div>
+                  <div
+                    class="tf-option-item"
+                    *ngFor="let p of filteredTfProjects()"
+                    [class.selected]="tfProject() === p"
+                    (click)="selectTfProject(p)">
+                    <span class="tf-option-label">{{ p }}</span>
+                    <svg lucideCheck size="14" class="tf-check-icon" *ngIf="tfProject() === p"></svg>
+                  </div>
+                  <div class="tf-empty-list" *ngIf="filteredTfProjects().length === 0">
+                    No projects found
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <label class="project-filter-field">
-          <span>Status</span>
-          <select [ngModel]="tfStatus()" (ngModelChange)="tfStatus.set($event)">
-            <option value="ALL">Any status</option>
-            <option *ngFor="let st of taskStatusOptions" [value]="st">{{ st.replace('_', ' ') }}</option>
-          </select>
-        </label>
+          <!-- 2. Searchable Project Code Filter -->
+          <div class="tf-field-group">
+            <label class="tf-field-label">Project code</label>
+            <div class="tf-dropdown-anchor">
+              <button
+                type="button"
+                class="tf-select-trigger"
+                [class.is-active]="tfProjectCode() !== 'ALL'"
+                [class.is-open]="tfProjectCodeDropdownOpen()"
+                (click)="tfProjectCodeDropdownOpen.set(!tfProjectCodeDropdownOpen()); tfProjectDropdownOpen.set(false); tfAssigneeDropdownOpen.set(false)">
+                <div class="tf-trigger-content">
+                  <svg lucideTag size="14" class="tf-trigger-icon"></svg>
+                  <span class="tf-trigger-text" [title]="tfProjectCode() === 'ALL' ? 'All codes' : tfProjectCode()">
+                    {{ tfProjectCode() === 'ALL' ? 'All codes' : tfProjectCode() }}
+                  </span>
+                </div>
+                <svg lucideChevronDown size="14" class="tf-chevron" [class.rotated]="tfProjectCodeDropdownOpen()"></svg>
+              </button>
 
-        <label class="project-filter-field">
-          <span>Priority</span>
-          <select [ngModel]="tfPriority()" (ngModelChange)="tfPriority.set($event)">
-            <option value="ALL">Any priority</option>
-            <option *ngFor="let pr of taskPriorityOptions()" [value]="pr">{{ pr }}</option>
-          </select>
-        </label>
+              <div class="tf-dropdown-panel" *ngIf="tfProjectCodeDropdownOpen()">
+                <div class="tf-search-box">
+                  <svg lucideSearch size="14" class="tf-search-icon"></svg>
+                  <input
+                    type="text"
+                    [value]="tfProjectCodeSearchQuery()"
+                    (input)="tfProjectCodeSearchQuery.set($any($event.target).value)"
+                    placeholder="Search codes..."
+                    (click)="$event.stopPropagation()" />
+                  <button
+                    type="button"
+                    class="tf-search-clear"
+                    *ngIf="tfProjectCodeSearchQuery()"
+                    (click)="tfProjectCodeSearchQuery.set('')">
+                    <svg lucideX size="12"></svg>
+                  </button>
+                </div>
+                <div class="tf-options-list">
+                  <div
+                    class="tf-option-item"
+                    [class.selected]="tfProjectCode() === 'ALL'"
+                    (click)="selectTfProjectCode('ALL')">
+                    <span class="tf-option-label">All codes</span>
+                    <svg lucideCheck size="14" class="tf-check-icon" *ngIf="tfProjectCode() === 'ALL'"></svg>
+                  </div>
+                  <div
+                    class="tf-option-item"
+                    *ngFor="let c of filteredTfProjectCodes()"
+                    [class.selected]="tfProjectCode() === c"
+                    (click)="selectTfProjectCode(c)">
+                    <span class="tf-option-label">{{ c }}</span>
+                    <svg lucideCheck size="14" class="tf-check-icon" *ngIf="tfProjectCode() === c"></svg>
+                  </div>
+                  <div class="tf-empty-list" *ngIf="filteredTfProjectCodes().length === 0">
+                    No codes found
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <label class="project-filter-field">
-          <span>Category</span>
-          <select [ngModel]="tfType()" (ngModelChange)="tfType.set($event)">
-            <option value="ALL">All categories</option>
-            <option *ngFor="let t of taskTypeOptions()" [value]="t">{{ t }}</option>
-          </select>
-        </label>
+          <!-- 3. Searchable Assignee Filter with Profile Picture / Avatar & Email -->
+          <div class="tf-field-group">
+            <label class="tf-field-label">Assignee</label>
+            <div class="tf-dropdown-anchor">
+              <button
+                type="button"
+                class="tf-select-trigger"
+                [class.is-active]="tfAssignee() !== 'ALL'"
+                [class.is-open]="tfAssigneeDropdownOpen()"
+                (click)="tfAssigneeDropdownOpen.set(!tfAssigneeDropdownOpen()); tfProjectDropdownOpen.set(false); tfProjectCodeDropdownOpen.set(false)">
+                <div class="tf-trigger-content">
+                  <ng-container *ngIf="tfAssignee() === 'ALL'">
+                    <div class="tf-trigger-avatar-all">
+                      <svg lucideUsers size="13"></svg>
+                    </div>
+                    <span class="tf-trigger-text">All assignees</span>
+                  </ng-container>
+                  <ng-container *ngIf="tfAssignee() !== 'ALL' && getSelectedTaskAssignee() as sel">
+                    <img
+                      *ngIf="sel.avatarUrl"
+                      [src]="sel.avatarUrl"
+                      class="tf-trigger-avatar-img"
+                      alt="" />
+                    <span
+                      *ngIf="!sel.avatarUrl"
+                      class="tf-trigger-avatar-initials">
+                      {{ getUserInitials(sel.name) }}
+                    </span>
+                    <span class="tf-trigger-text" [title]="sel.name">{{ sel.name }}</span>
+                  </ng-container>
+                </div>
+                <svg lucideChevronDown size="14" class="tf-chevron" [class.rotated]="tfAssigneeDropdownOpen()"></svg>
+              </button>
 
-        <label class="project-filter-field" *ngIf="taskMilestoneOptions().length > 0">
-          <span>Milestone</span>
-          <select [ngModel]="tfMilestone()" (ngModelChange)="tfMilestone.set($event)">
-            <option value="ALL">All milestones</option>
-            <option *ngFor="let m of taskMilestoneOptions()" [value]="m">{{ m }}</option>
-          </select>
-        </label>
+              <div class="tf-dropdown-panel tf-dropdown-assignee" *ngIf="tfAssigneeDropdownOpen()">
+                <div class="tf-search-box">
+                  <svg lucideSearch size="14" class="tf-search-icon"></svg>
+                  <input
+                    type="text"
+                    [value]="tfAssigneeSearchQuery()"
+                    (input)="tfAssigneeSearchQuery.set($any($event.target).value)"
+                    placeholder="Search assignee by name..."
+                    (click)="$event.stopPropagation()" />
+                  <button
+                    type="button"
+                    class="tf-search-clear"
+                    *ngIf="tfAssigneeSearchQuery()"
+                    (click)="tfAssigneeSearchQuery.set('')">
+                    <svg lucideX size="12"></svg>
+                  </button>
+                </div>
+                <div class="tf-options-list">
+                  <div
+                    class="tf-user-item"
+                    [class.selected]="tfAssignee() === 'ALL'"
+                    (click)="selectTfAssignee('ALL')">
+                    <div class="tf-user-avatar-all">
+                      <svg lucideUsers size="14"></svg>
+                    </div>
+                    <div class="tf-user-info">
+                      <span class="tf-user-name">All assignees</span>
+                      <span class="tf-user-subtitle">Show tasks assigned to anyone</span>
+                    </div>
+                    <svg lucideCheck size="14" class="tf-check-icon" *ngIf="tfAssignee() === 'ALL'"></svg>
+                  </div>
 
-        <label class="project-filter-field">
-          <span>Due on or after</span>
-          <input type="date" [ngModel]="tfDueFrom()" (ngModelChange)="tfDueFrom.set($event)" />
-        </label>
+                  <div
+                    class="tf-user-item"
+                    *ngFor="let u of filteredTfAssignees()"
+                    [class.selected]="tfAssignee() === u.id.toString()"
+                    (click)="selectTfAssignee(u.id)">
+                    <img
+                      *ngIf="u.avatarUrl"
+                      [src]="u.avatarUrl"
+                      class="tf-user-avatar-img"
+                      alt="" />
+                    <span
+                      *ngIf="!u.avatarUrl"
+                      class="tf-user-avatar-initials">
+                      {{ getUserInitials(u.name) }}
+                    </span>
+                    <div class="tf-user-info">
+                      <span class="tf-user-name">{{ u.name }}</span>
+                      <span class="tf-user-subtitle" *ngIf="u.email">{{ u.email }}</span>
+                    </div>
+                    <svg lucideCheck size="14" class="tf-check-icon" *ngIf="tfAssignee() === u.id.toString()"></svg>
+                  </div>
 
-        <label class="project-filter-field">
-          <span>Due on or before</span>
-          <input type="date" [ngModel]="tfDueTo()" (ngModelChange)="tfDueTo.set($event)" />
-        </label>
+                  <div class="tf-empty-list" *ngIf="filteredTfAssignees().length === 0">
+                    No assignees found
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <div class="task-filters-actions" *ngIf="activeTaskFilterCount() > 0">
-          <button type="button" class="project-filters-clear" (click)="clearTaskFilters()">
-            <svg lucideX size="13"></svg> Clear all
-          </button>
+          <!-- 4. Status Filter -->
+          <div class="tf-field-group">
+            <label class="tf-field-label">Status</label>
+            <select
+              class="tf-select-control"
+              [class.is-active]="tfStatus() !== 'ALL'"
+              [ngModel]="tfStatus()"
+              (ngModelChange)="tfStatus.set($event)">
+              <option value="ALL">Any status</option>
+              <option *ngFor="let st of taskStatusOptions" [value]="st">{{ st.replace('_', ' ') }}</option>
+            </select>
+          </div>
+
+          <!-- 5. Priority Filter -->
+          <div class="tf-field-group">
+            <label class="tf-field-label">Priority</label>
+            <select
+              class="tf-select-control"
+              [class.is-active]="tfPriority() !== 'ALL'"
+              [ngModel]="tfPriority()"
+              (ngModelChange)="tfPriority.set($event)">
+              <option value="ALL">Any priority</option>
+              <option *ngFor="let pr of taskPriorityOptions()" [value]="pr">{{ pr }}</option>
+            </select>
+          </div>
+
+          <!-- 6. Milestone Filter (Conditional) -->
+          <div class="tf-field-group" *ngIf="taskMilestoneOptions().length > 0">
+            <label class="tf-field-label">Milestone</label>
+            <select
+              class="tf-select-control"
+              [class.is-active]="tfMilestone() !== 'ALL'"
+              [ngModel]="tfMilestone()"
+              (ngModelChange)="tfMilestone.set($event)">
+              <option value="ALL">All milestones</option>
+              <option *ngFor="let m of taskMilestoneOptions()" [value]="m">{{ m }}</option>
+            </select>
+          </div>
+
+          <!-- 7. Duration Filter -->
+          <div class="tf-field-group">
+            <label class="tf-field-label">Duration</label>
+            <select
+              class="tf-select-control"
+              [class.is-active]="tfDuration() !== 'ALL'"
+              [ngModel]="tfDuration()"
+              (ngModelChange)="tfDuration.set($event)">
+              <option value="ALL">Any time</option>
+              <option *ngFor="let d of taskDurationOptions" [value]="d">{{ d }}</option>
+            </select>
+          </div>
+
+          <!-- 8. Due on or after -->
+          <div class="tf-field-group">
+            <label class="tf-field-label">Due on or after</label>
+            <input
+              type="date"
+              class="tf-date-control"
+              [class.is-active]="!!tfDueFrom()"
+              [ngModel]="tfDueFrom()"
+              (ngModelChange)="tfDueFrom.set($event)" />
+          </div>
+
+          <!-- 9. Due on or before -->
+          <div class="tf-field-group">
+            <label class="tf-field-label">Due on or before</label>
+            <input
+              type="date"
+              class="tf-date-control"
+              [class.is-active]="!!tfDueTo()"
+              [ngModel]="tfDueTo()"
+              (ngModelChange)="tfDueTo.set($event)" />
+          </div>
         </div>
       </div>
     </div>

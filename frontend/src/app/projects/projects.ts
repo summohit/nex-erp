@@ -2085,12 +2085,22 @@ export class ProjectsComponent implements OnInit {
   tfAssignee = signal<string>('ALL');
   tfStatus = signal<string>('ALL');
   tfPriority = signal<string>('ALL');
-  tfType = signal<string>('ALL');
+
   tfMilestone = signal<string>('ALL');
   tfDueFrom = signal<string>('');
   tfDueTo = signal<string>('');
+  tfDuration = signal<string>('ALL');
+
+  // Dropdown states for searchable filter selects
+  tfAssigneeDropdownOpen = signal<boolean>(false);
+  tfAssigneeSearchQuery = signal<string>('');
+  tfProjectDropdownOpen = signal<boolean>(false);
+  tfProjectSearchQuery = signal<string>('');
+  tfProjectCodeDropdownOpen = signal<boolean>(false);
+  tfProjectCodeSearchQuery = signal<string>('');
 
   readonly taskStatusOptions = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'DONE', 'CANCELLED'] as const;
+  readonly taskDurationOptions = ['Today', 'Last 30 Days', 'This Month', 'Last Month', 'Last 90 Days', 'Last 6 Months', 'Last 1 Year'] as const;
 
   /**
    * Options come from the tasks on screen, not from master data: offering a
@@ -2112,20 +2122,97 @@ export class ProjectsComponent implements OnInit {
   taskMilestoneOptions = computed(() => this.taskOptionsFrom(t => t.milestone?.name));
   taskPriorityOptions = computed(() => this.taskOptionsFrom(t => t.priority));
 
-  taskAssigneeOptions = computed(() => {
-    const byId = new Map<number, string>();
+  taskAssigneeList = computed(() => {
+    const byId = new Map<number, { id: number; name: string; email?: string; avatarUrl?: string | null }>();
     for (const t of this.myTasks()) {
       for (const a of t.assignees || []) {
-        byId.set(a.id, `${a.firstName || ''} ${a.lastName || ''}`.trim());
+        if (!byId.has(a.id)) {
+          const emp = this.employees().find((e: any) => e.id === a.id);
+          const fullName = `${a.firstName || emp?.firstName || ''} ${a.lastName || emp?.lastName || ''}`.trim() || `User #${a.id}`;
+          const avatarUrl = a.avatarUrl || emp?.avatarUrl || emp?.profilePicture || null;
+          const email = emp?.email || emp?.user?.email || '';
+          byId.set(a.id, { id: a.id, name: fullName, email, avatarUrl });
+        }
       }
     }
-    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
   });
+
+  taskAssigneeOptions = computed(() => {
+    return this.taskAssigneeList().map(u => ({ id: u.id, name: u.name }));
+  });
+
+  filteredTfAssignees = computed(() => {
+    const q = this.tfAssigneeSearchQuery().toLowerCase().trim();
+    const list = this.taskAssigneeList();
+    if (!q) return list;
+    return list.filter(u => u.name.toLowerCase().includes(q) || (u.email && u.email.toLowerCase().includes(q)));
+  });
+
+  filteredTfProjects = computed(() => {
+    const q = this.tfProjectSearchQuery().toLowerCase().trim();
+    const list = this.taskProjectOptions();
+    if (!q) return list;
+    return list.filter(p => p.toLowerCase().includes(q));
+  });
+
+  filteredTfProjectCodes = computed(() => {
+    const q = this.tfProjectCodeSearchQuery().toLowerCase().trim();
+    const list = this.taskCodeOptions();
+    if (!q) return list;
+    return list.filter(c => c.toLowerCase().includes(q));
+  });
+
+  getSelectedTaskAssignee(): { id: number; name: string; email?: string; avatarUrl?: string | null } | null {
+    const selId = this.tfAssignee();
+    if (!selId || selId === 'ALL') return null;
+    return this.taskAssigneeList().find(a => String(a.id) === selId) || null;
+  }
+
+  selectTfAssignee(id: string | number) {
+    this.tfAssignee.set(String(id));
+    this.tfAssigneeDropdownOpen.set(false);
+    this.tfAssigneeSearchQuery.set('');
+  }
+
+  selectTfProject(p: string) {
+    this.tfProject.set(p);
+    this.tfProjectDropdownOpen.set(false);
+    this.tfProjectSearchQuery.set('');
+  }
+
+  selectTfProjectCode(c: string) {
+    this.tfProjectCode.set(c);
+    this.tfProjectCodeDropdownOpen.set(false);
+    this.tfProjectCodeSearchQuery.set('');
+  }
+
+  closeTaskFilterDropdowns() {
+    this.tfAssigneeDropdownOpen.set(false);
+    this.tfProjectDropdownOpen.set(false);
+    this.tfProjectCodeDropdownOpen.set(false);
+  }
+
+  clearAndCloseTaskFilters() {
+    this.clearTaskFilters();
+    this.closeTaskFilterDropdowns();
+    this.taskFiltersOpen.set(false);
+  }
+
+  getUserInitials(name: string): string {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
 
   activeTaskFilterCount = computed(() =>
     [
       this.tfProject(), this.tfProjectCode(), this.tfAssignee(),
-      this.tfStatus(), this.tfPriority(), this.tfType(), this.tfMilestone(),
+      this.tfStatus(), this.tfPriority(), this.tfMilestone(),
+      this.tfDuration()
     ].filter(v => v !== 'ALL').length
     + (this.tfDueFrom() ? 1 : 0)
     + (this.tfDueTo() ? 1 : 0)
@@ -2137,8 +2224,8 @@ export class ProjectsComponent implements OnInit {
     this.tfAssignee.set('ALL');
     this.tfStatus.set('ALL');
     this.tfPriority.set('ALL');
-    this.tfType.set('ALL');
     this.tfMilestone.set('ALL');
+    this.tfDuration.set('ALL');
     this.tfDueFrom.set('');
     this.tfDueTo.set('');
   }
@@ -2149,8 +2236,8 @@ export class ProjectsComponent implements OnInit {
     const assignee = this.tfAssignee();
     const status = this.tfStatus();
     const priority = this.tfPriority();
-    const type = this.tfType();
     const milestone = this.tfMilestone();
+    const duration = this.tfDuration();
     const dueFrom = this.tfDueFrom();
     const dueTo = this.tfDueTo();
 
@@ -2159,12 +2246,54 @@ export class ProjectsComponent implements OnInit {
       if (code !== 'ALL' && (t.projectCode || '') !== code) return false;
       if (status !== 'ALL' && t.status !== status) return false;
       if (priority !== 'ALL' && (t.priority || '') !== priority) return false;
-      if (type !== 'ALL' && (t.taskType || '') !== type) return false;
       if (milestone !== 'ALL' && (t.milestone?.name || '') !== milestone) return false;
 
       if (assignee !== 'ALL') {
         const has = (t.assignees || []).some((a: any) => String(a.id) === assignee);
         if (!has) return false;
+      }
+
+      if (duration !== 'ALL') {
+        if (!t.dueDate) return false;
+        const taskDate = new Date(t.dueDate);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        let fd: Date | null = null;
+        let td: Date | null = null;
+
+        if (duration === 'Today') {
+          fd = new Date(now);
+          td = new Date(now);
+          td.setHours(23, 59, 59, 999);
+        } else if (duration === 'Last 30 Days') {
+          fd = new Date(now);
+          fd.setDate(fd.getDate() - 30);
+          td = new Date(now);
+          td.setHours(23, 59, 59, 999);
+        } else if (duration === 'This Month') {
+          fd = new Date(now.getFullYear(), now.getMonth(), 1);
+          td = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        } else if (duration === 'Last Month') {
+          fd = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          td = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        } else if (duration === 'Last 90 Days') {
+          fd = new Date(now);
+          fd.setDate(fd.getDate() - 90);
+          td = new Date(now);
+          td.setHours(23, 59, 59, 999);
+        } else if (duration === 'Last 6 Months') {
+          fd = new Date(now);
+          fd.setMonth(fd.getMonth() - 6);
+          td = new Date(now);
+          td.setHours(23, 59, 59, 999);
+        } else if (duration === 'Last 1 Year') {
+          fd = new Date(now);
+          fd.setFullYear(fd.getFullYear() - 1);
+          td = new Date(now);
+          td.setHours(23, 59, 59, 999);
+        }
+
+        if (fd && td && (taskDate < fd || taskDate > td)) return false;
       }
 
       // A task with no due date is not "due before X", so it drops out of a
