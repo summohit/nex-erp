@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
+import {
+  Req, Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import { LabelsService } from './labels.service';
 
@@ -41,10 +42,14 @@ export class LabelsController {
 
   @Post('issues/:issueId/labels/:labelId/toggle')
   toggleIssueLabel(
+    @Req() req,
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('issueId', ParseIntPipe) issueId: number,
     @Param('labelId', ParseIntPipe) labelId: number
   ) {
-    return this.labelsService.toggleIssueLabel(projectId, issueId, labelId);
+    return this.labelsService.toggleIssueLabel(
+      projectId, issueId, labelId,
+      req.user.companyId, req.user.employeeId ?? req.user.sub, req.user.role,
+    );
   }
 }

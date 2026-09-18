@@ -458,3 +458,97 @@ describe('changing the assigned hours', () => {
     await expect(update(svc(), 60, 'EMPLOYEE', '2')).resolves.toBeDefined();
   });
 });
+
+/**
+ * The line between doing the work and deciding what the work is.
+ *
+ * An employee moves their own card, logs time and attaches evidence. Priority,
+ * dates, the milestone, who is on it and whether it exists belong to whoever
+ * runs the project -- otherwise every constraint on a task can be lifted by
+ * the person it constrains.
+ */
+describe('fields only management may change', () => {
+  const svc = (over: any = {}) => {
+    const STORED = {
+      id: 5, columnId: 10, status: 'TODO', estimatedHours: 2,
+      priority: 'MEDIUM', milestoneId: 3, assigneeId: 60,
+      title: 'T', description: 'D',
+      dueDate: new Date('2026-09-20T00:00:00.000Z'),
+    };
+
+    // updateIssue walks a long way past the permission check -- columns,
+    // timers, activity, sockets. Only what the rule reads is pinned; the rest
+    // auto-stubs, so this stays a test about permissions.
+    const model = (o: any = {}) =>
+      new Proxy(o, { get: (t, k: string) => (k in t ? t[k] : jest.fn().mockResolvedValue(null)) });
+
+    const prisma: any = new Proxy(
+      {
+        issue: model({
+          findUnique: jest.fn().mockResolvedValue(STORED),
+          findUniqueOrThrow: jest.fn().mockResolvedValue(STORED),
+          update: jest.fn().mockResolvedValue(STORED),
+        }),
+        project: model({ findFirst: jest.fn().mockResolvedValue({ leadId: 70 }) }),
+        projectMember: model({ findFirst: jest.fn().mockResolvedValue(null) }),
+        projectMilestone: model({ findFirst: jest.fn().mockResolvedValue({ id: 9 }) }),
+        boardColumn: model({
+          findUnique: jest.fn().mockResolvedValue({ id: 10, type: 'TODO' }),
+          findFirst: jest.fn().mockResolvedValue({ id: 11, type: 'IN_PROGRESS' }),
+        }),
+        issueTimeLog: model({
+          aggregate: jest.fn().mockResolvedValue({ _sum: { durationMin: 0 } }),
+        }),
+        employee: model({ findFirst: jest.fn().mockResolvedValue({ id: 60 }) }),
+        ...over,
+      },
+      {
+        get: (t: any, k: string) => {
+          if (k in t) return t[k];
+          if (k === '$transaction') return jest.fn().mockImplementation((fn: any) => fn(prisma));
+          return model();
+        },
+      },
+    );
+
+    const anyMethod = () => new Proxy({}, { get: () => jest.fn() }) as any;
+    return new IssuesService(prisma, anyMethod(), anyMethod(), anyMethod());
+  };
+
+  const asEmployee = (data: any) => (svc() as any).updateIssue(1, 60, 3, 5, data, 'EMPLOYEE');
+  const asLead = (data: any) => (svc() as any).updateIssue(1, 70, 3, 5, data, 'EMPLOYEE');
+
+  it.each([
+    ['priority', { priority: 'CRITICAL' }, /the priority/],
+    ['the due date', { dueDate: '2027-01-01T00:00:00.000Z' }, /the due date/],
+    ['the milestone', { milestoneId: 9 }, /the milestone/],
+    ['the assignee', { assigneeId: 61 }, /who the task is assigned to/],
+  ])('refuses an employee changing %s', async (_label, data, message) => {
+    await expect(asEmployee(data)).rejects.toThrow(message);
+  });
+
+  it('allows the project lead to change the same field', async () => {
+    await expect(asLead({ priority: 'CRITICAL' })).resolves.toBeDefined();
+  });
+
+  // Moving your own card IS the work, so the board must keep working.
+  it('still lets an employee move their card between columns', async () => {
+    await expect(asEmployee({ status: 'IN_PROGRESS' })).resolves.toBeDefined();
+  });
+
+  it('still lets an employee reorder their card', async () => {
+    await expect(asEmployee({ position: 3 })).resolves.toBeDefined();
+  });
+
+  // Every edit posts the whole form back, so an untouched field must not read
+  // as an attempt to change it.
+  it('ignores fields resubmitted unchanged', async () => {
+    await expect(
+      asEmployee({ priority: 'MEDIUM', milestoneId: 3, dueDate: '2026-09-20T00:00:00.000Z' }),
+    ).resolves.toBeDefined();
+  });
+
+  it('treats a numeric id sent as a string as unchanged', async () => {
+    await expect(asEmployee({ milestoneId: '3' })).resolves.toBeDefined();
+  });
+});

@@ -224,9 +224,17 @@ export class ProjectsService {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/labels/${labelId}/toggle`, {});
   }
 
-  uploadAttachment(projectId: number, issueId: number, file: File) {
+  /**
+   * Attach one or more files to a task (§2).
+   *
+   * Several files go up in one request under `files`; the server still accepts
+   * a lone `file` for anything not yet updated. A single upload answers with
+   * the attachment itself, a batch with an array.
+   */
+  uploadAttachment(projectId: number, issueId: number, file: File | File[]) {
     const formData = new FormData();
-    formData.append('file', file);
+    const list = Array.isArray(file) ? file : [file];
+    for (const f of list) formData.append('files', f);
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/attachments/upload`, formData);
   }
 

@@ -55,3 +55,40 @@ export async function canCreateTask(
   });
   return employee?.department?.canCreateTasks === true;
 }
+
+/**
+ * Who may manage a task rather than merely work on it: an administrator, the
+ * project lead, or a member carrying the PROJECT_MANAGER role.
+ *
+ * The line between doing the work and deciding what the work is. An employee
+ * moves their own card, logs time, comments and attaches evidence; changing
+ * what the task is worth, when it is due, who is on it or whether it exists is
+ * somebody else's call — otherwise every constraint placed on a task can be
+ * lifted by the person it constrains.
+ *
+ * Lives here rather than in one service because several of them enforce it,
+ * and a second copy is a second thing to forget when the rule changes.
+ */
+export async function canManageTask(
+  prisma: any,
+  companyId: number,
+  projectId: number | null | undefined,
+  actorEmployeeId: number | null | undefined,
+  role?: string,
+): Promise<boolean> {
+  if (role === 'SUPERADMIN' || role === 'ADMIN') return true;
+  if (actorEmployeeId == null || projectId == null) return false;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, companyId },
+    select: { leadId: true },
+  });
+  if (!project) return false;
+  if (project.leadId === actorEmployeeId) return true;
+
+  const managing = await prisma.projectMember.findFirst({
+    where: { projectId, employeeId: actorEmployeeId, role: 'PROJECT_MANAGER' },
+    select: { id: true },
+  });
+  return !!managing;
+}

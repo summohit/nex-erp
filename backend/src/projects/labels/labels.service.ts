@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { canManageTask } from '../../tasks/task-permissions';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -44,7 +45,29 @@ export class LabelsService {
     });
   }
 
-  async toggleIssueLabel(projectId: number, issueId: number, labelId: number) {
+  /**
+   * Labelling a task is a management act, not part of doing it (§ employee
+   * permissions): labels drive filters, reports and what other people see as
+   * the shape of the work, so an employee re-tagging their own task changes
+   * everybody's picture of the project.
+   */
+  async toggleIssueLabel(
+    projectId: number,
+    issueId: number,
+    labelId: number,
+    companyId?: number,
+    actorEmployeeId?: number,
+    role?: string,
+  ) {
+    if (companyId !== undefined) {
+      const allowed = await canManageTask(
+        this.prisma as any, companyId, projectId, actorEmployeeId, role,
+      );
+      if (!allowed) {
+        throw new ForbiddenException('Only the project manager can change the labels on a task.');
+      }
+    }
+
     const existing = await this.prisma.issueLabel.findFirst({
       where: { issueId, labelId }
     });

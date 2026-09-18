@@ -7,7 +7,28 @@ import * as crypto from 'crypto';
 import FormData from 'form-data';
 import { TasksGateway } from '../../events/tasks/tasks.gateway';
 import { NotificationsService } from '../../notifications/notifications.service';
-import { canCreateTask } from '../../tasks/task-permissions';
+import { canCreateTask, canManageTask } from '../../tasks/task-permissions';
+
+/**
+ * Whether a submitted value actually differs from what is stored.
+ *
+ * Every edit posts the whole form back, so equality has to mean "unchanged" or
+ * an employee moving their own card would be refused for the dates they never
+ * touched. Dates arrive as ISO strings against Date objects, and numeric ids
+ * as strings, so both are normalised before comparing.
+ */
+function sameValue(next: unknown, current: unknown): boolean {
+  if (next == null && current == null) return true;
+  if (next == null || current == null) return false;
+
+  if (current instanceof Date) {
+    const t = new Date(next as any).getTime();
+    return !Number.isNaN(t) && t === current.getTime();
+  }
+  if (typeof current === 'number') return Number(next) === current;
+  if (typeof current === 'boolean') return Boolean(next) === current;
+  return String(next) === String(current);
+}
 import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
 
 @Injectable()
@@ -51,6 +72,19 @@ export class IssuesService {
       if (targetCol && this.isRestrictedColumn(targetCol)) {
         await this.assertCanCompleteOrArchive(
           companyId, reporterId, { projectId, assigneeId: data.assigneeId ? Number(data.assigneeId) : null }, role,
+        );
+      }
+    }
+
+    // Breaking a task into sub-tasks is planning it, not doing it, so raising
+    // a child under someone else's task is a management act.
+    if (data.parentId) {
+      const mayManage = await canManageTask(
+        this.prisma as any, companyId, projectId, reporterId, role,
+      );
+      if (!mayManage) {
+        throw new ForbiddenException(
+          'Only the project manager can add a child task under an existing task.',
         );
       }
     }
@@ -286,15 +320,41 @@ export class IssuesService {
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
 
-    // Editing task content (title/description/priority) is restricted to the project owner.
-    // Moving cards between columns / changing status remains open to all members.
-    if (data.title !== undefined || data.description !== undefined || data.priority !== undefined) {
-      if (!(role === 'SUPERADMIN' || role === 'ADMIN')) {
-        const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { leadId: true } });
-        if (!project) throw new NotFoundException('Project not found');
-        if (project.leadId !== employeeId) {
-          throw new ForbiddenException('Only the project owner can edit task content');
-        }
+
+    /**
+     * Fields only management may change.
+     *
+     * Deliberately a list of what is CLOSED rather than what is open: a field
+     * added later should need a decision to become editable by everyone, not
+     * become editable by everyone through being forgotten.
+     *
+     * status, columnId and position stay open -- moving your own card across
+     * the board is the work, not a decision about it.
+     */
+    const MANAGED_FIELDS: { key: string; label: string }[] = [
+      { key: 'title', label: 'the title' },
+      { key: 'description', label: 'the description' },
+      { key: 'priority', label: 'the priority' },
+      { key: 'dueDate', label: 'the due date' },
+      { key: 'startDate', label: 'the start date' },
+      { key: 'dueReminder', label: 'the reminder' },
+      { key: 'recurring', label: 'the recurrence' },
+      { key: 'milestoneId', label: 'the milestone' },
+      { key: 'phaseId', label: 'the phase' },
+      { key: 'assigneeId', label: 'who the task is assigned to' },
+      { key: 'parentId', label: 'the parent task' },
+      { key: 'isArchived', label: 'whether the task is archived' },
+    ];
+
+    const attempted = MANAGED_FIELDS.filter(
+      (f) => data[f.key] !== undefined && !sameValue(data[f.key], (oldIssue as any)[f.key]),
+    );
+
+    if (attempted.length) {
+      if (!(await this.mayManageTask(companyId, projectId, employeeId, role))) {
+        throw new ForbiddenException(
+          `Only the project manager can change ${attempted[0].label} on a task.`,
+        );
       }
     }
 
@@ -312,7 +372,7 @@ export class IssuesService {
      */
     if (data.estimatedHours !== undefined
         && Number(data.estimatedHours ?? 0) !== Number(oldIssue.estimatedHours ?? 0)) {
-      if (!(await this.mayAssignHours(companyId, projectId, employeeId, role))) {
+      if (!(await this.mayManageTask(companyId, projectId, employeeId, role))) {
         throw new ForbiddenException(
           'Only the project manager can change the hours assigned to a task. ' +
           'Raise an additional-hours request instead.',
@@ -567,34 +627,47 @@ export class IssuesService {
    * that milestone's progress and, once invoicing lands, against its value.
    */
   /**
-   * Who may set the hours a task is assigned (§3): an administrator, the
+   * Refuse a management act to somebody who only works on the task.
+   *
+   * `what` completes the sentence, so the refusal names the thing that was
+   * refused rather than saying no in the abstract.
+   */
+  private async assertMayManageTask(
+    companyId: number,
+    projectId: number,
+    actorEmployeeId: number | undefined,
+    role: string | undefined,
+    what: string,
+  ) {
+    if (actorEmployeeId === undefined) return;
+    if (await this.mayManageTask(companyId, projectId, actorEmployeeId, role)) return;
+    throw new ForbiddenException(`Only the project manager can change ${what} on a task.`);
+  }
+
+  /**
+   * Who may manage a task rather than merely work on it: an administrator, the
    * project lead, or a member carrying the PROJECT_MANAGER role.
    *
-   * Deliberately the same people who approve additional-hours requests. If the
-   * two sets differed, somebody could grant themselves hours through whichever
-   * door was left open.
+   * This is the line between doing the work and deciding what the work is.
+   * An employee moves their own card, logs time against it, comments on it and
+   * attaches evidence to it. Changing what it is worth, when it is due, who is
+   * on it, what it is called or whether it exists at all is somebody else's
+   * call -- otherwise every constraint placed on the task can be lifted by the
+   * person it constrains.
+   *
+   * Deliberately the same set that approves additional-hours requests. If the
+   * two differed, somebody could grant themselves hours through whichever door
+   * was left open.
    */
-  private async mayAssignHours(
+  private mayManageTask(
     companyId: number,
     projectId: number,
     employeeId: number,
     role?: string,
   ): Promise<boolean> {
-    if (role === 'SUPERADMIN' || role === 'ADMIN') return true;
-
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, companyId },
-      select: { leadId: true },
-    });
-    if (!project) throw new NotFoundException('Project not found');
-    if (project.leadId === employeeId) return true;
-
-    const managing = await this.prisma.projectMember.findFirst({
-      where: { projectId, employeeId, role: 'PROJECT_MANAGER' },
-      select: { id: true },
-    });
-    return !!managing;
+    return canManageTask(this.prisma as any, companyId, projectId, employeeId, role);
   }
+
 
   /**
    * The phase id to store, from whatever the form sent (§8).
@@ -1056,7 +1129,8 @@ export class IssuesService {
     });
   }
 
-  async createChecklist(companyId: number, projectId: number, issueId: number, title: string) {
+  async createChecklist(companyId: number, projectId: number, issueId: number, title: string, actorEmployeeId?: number, role?: string) {
+    await this.assertMayManageTask(companyId, projectId, actorEmployeeId, role, 'the checklist');
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
 
@@ -1071,7 +1145,8 @@ export class IssuesService {
     });
   }
 
-  async updateChecklist(companyId: number, projectId: number, issueId: number, checklistId: number, title: string) {
+  async updateChecklist(companyId: number, projectId: number, issueId: number, checklistId: number, title: string, actorEmployeeId?: number, role?: string) {
+    await this.assertMayManageTask(companyId, projectId, actorEmployeeId, role, 'the checklist');
     const checklist = await this.prisma.checklist.findUnique({ where: { id: checklistId, issueId } });
     if (!checklist) throw new NotFoundException('Checklist not found');
 
@@ -1081,7 +1156,8 @@ export class IssuesService {
     });
   }
 
-  async deleteChecklist(companyId: number, projectId: number, issueId: number, checklistId: number) {
+  async deleteChecklist(companyId: number, projectId: number, issueId: number, checklistId: number, actorEmployeeId?: number, role?: string) {
+    await this.assertMayManageTask(companyId, projectId, actorEmployeeId, role, 'the checklist');
     const checklist = await this.prisma.checklist.findUnique({ where: { id: checklistId, issueId } });
     if (!checklist) throw new NotFoundException('Checklist not found');
 
@@ -1090,7 +1166,8 @@ export class IssuesService {
     });
   }
 
-  async addChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, title: string) {
+  async addChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, title: string, actorEmployeeId?: number, role?: string) {
+    await this.assertMayManageTask(companyId, projectId, actorEmployeeId, role, 'the checklist');
     const checklist = await this.prisma.checklist.findUnique({ where: { id: checklistId, issueId } });
     if (!checklist) throw new NotFoundException('Checklist not found');
 
@@ -1102,13 +1179,18 @@ export class IssuesService {
     });
   }
 
-  async updateChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, itemId: number, data: any) {
+  async updateChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, itemId: number, data: any, actorEmployeeId?: number, role?: string) {
     const item = await this.prisma.checklistItem.findFirst({ where: { id: itemId, checklistId } });
     if (!item) throw new NotFoundException('Checklist item not found');
 
     const updateData: any = {};
+    // Ticking an item off is doing the work, so anyone on the task may do it.
+    // Renaming one is editing the checklist, which is not.
     if (data.isCompleted !== undefined) updateData.isCompleted = Boolean(data.isCompleted);
-    if (data.title !== undefined) updateData.title = data.title;
+    if (data.title !== undefined && data.title !== item.title) {
+      await this.assertMayManageTask(companyId, projectId, actorEmployeeId, role, 'the checklist');
+      updateData.title = data.title;
+    }
 
     return this.prisma.checklistItem.update({
       where: { id: itemId },
@@ -1116,7 +1198,8 @@ export class IssuesService {
     });
   }
 
-  async deleteChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, itemId: number) {
+  async deleteChecklistItem(companyId: number, projectId: number, issueId: number, checklistId: number, itemId: number, actorEmployeeId?: number, role?: string) {
+    await this.assertMayManageTask(companyId, projectId, actorEmployeeId, role, 'the checklist');
     const item = await this.prisma.checklistItem.findFirst({ where: { id: itemId, checklistId } });
     if (!item) throw new NotFoundException('Checklist item not found');
 

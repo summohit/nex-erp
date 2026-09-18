@@ -3645,6 +3645,19 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return this.isProjectOwner || this.isCurrentUserPM();
   }
 
+  /**
+   * Who may manage this task rather than merely work on it.
+   *
+   * Mirrors canManageTask on the server. An employee moves their own card,
+   * logs time, comments and attaches evidence; priority, labels, members,
+   * checklists, dates, the milestone and archiving belong to whoever runs the
+   * project. Hiding these does not enforce anything -- the endpoints do -- it
+   * just stops offering an action that would be refused on save.
+   */
+  get canManageTask(): boolean {
+    return this.isProjectOwner || this.isCurrentUserPM();
+  }
+
   // PMs and the project Owner can bypass the proof-of-completion requirement; regular
   // employees must attach at least one supporting document before moving the task.
   get canSkipProofUpload(): boolean {
@@ -4589,11 +4602,16 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   onFileSelected(event: any) {
-    const file = event.target?.files?.[0];
-    if (!file) return;
+    // §2: evidence arrives in batches, so take every file the picker returned
+    // rather than only the first.
+    const files: File[] = Array.from(event.target?.files || []);
+    if (!files.length) return;
 
     const issue = this.selectedIssue();
     if (!issue) return;
+
+    // Clearing it means picking the same file twice in a row still fires.
+    if (event.target) event.target.value = '';
 
     this.isUploadingAttachment.set(true);
     this.uploadProgress.set(15);
@@ -4602,16 +4620,20 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       this.uploadProgress.update(p => (p < 85 ? p + 15 : p));
     }, 250);
 
-    this.uploadSubscription = this.projectsService.uploadAttachment(this.projectId, issue.id, file).subscribe({
+    this.uploadSubscription = this.projectsService.uploadAttachment(this.projectId, issue.id, files).subscribe({
       next: (att) => {
         clearInterval(this.uploadProgressInterval);
         this.uploadProgress.set(100);
         setTimeout(() => {
           this.isUploadingAttachment.set(false);
           this.uploadProgress.set(0);
-          const updatedAtts = [att, ...(issue.attachments || [])];
+          // One file answers with the attachment, several with an array.
+          const added = Array.isArray(att) ? att : [att];
+          const updatedAtts = [...added, ...(issue.attachments || [])];
           this.selectedIssue.update(i => i ? { ...i, attachments: updatedAtts } : null);
-          this.toast.success(`Attached ${file.name}`);
+          this.toast.success(
+            files.length === 1 ? `Attached ${files[0].name}` : `Attached ${files.length} files`,
+          );
           this.closePopover();
           this.loadBoardAndIssues();
         }, 300);

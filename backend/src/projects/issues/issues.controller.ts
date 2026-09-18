@@ -1,7 +1,8 @@
-import { Controller, Post, Get, Put, Delete, Body, Req, Param, ParseIntPipe, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Post, Get, Put, Delete, Body, Req, Param, ParseIntPipe, UseGuards, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException } from '@nestjs/common';
+import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { IssuesService } from './issues.service';
 import { AuthGuard } from '../../auth/auth.guard';
+import { MAX_DOCUMENT_BYTES } from '../document-naming';
 
 @UseGuards(AuthGuard)
 @Controller('projects/:projectId/issues')
@@ -151,7 +152,7 @@ export class IssuesController {
     @Param('id', ParseIntPipe) id: number,
     @Body('title') title: string
   ) {
-    return this.issuesService.createChecklist(req.user.companyId, projectId, id, title);
+    return this.issuesService.createChecklist(req.user.companyId, projectId, id, title, req.user.employeeId ?? req.user.sub, req.user.role);
   }
 
   @Put(':id/checklists/:checklistId')
@@ -162,7 +163,7 @@ export class IssuesController {
     @Param('checklistId', ParseIntPipe) checklistId: number,
     @Body('title') title: string
   ) {
-    return this.issuesService.updateChecklist(req.user.companyId, projectId, id, checklistId, title);
+    return this.issuesService.updateChecklist(req.user.companyId, projectId, id, checklistId, title, req.user.employeeId ?? req.user.sub, req.user.role);
   }
 
   @Delete(':id/checklists/:checklistId')
@@ -172,7 +173,7 @@ export class IssuesController {
     @Param('id', ParseIntPipe) id: number,
     @Param('checklistId', ParseIntPipe) checklistId: number
   ) {
-    return this.issuesService.deleteChecklist(req.user.companyId, projectId, id, checklistId);
+    return this.issuesService.deleteChecklist(req.user.companyId, projectId, id, checklistId, req.user.employeeId ?? req.user.sub, req.user.role);
   }
 
   @Post(':id/checklists/:checklistId/items')
@@ -183,7 +184,7 @@ export class IssuesController {
     @Param('checklistId', ParseIntPipe) checklistId: number,
     @Body('title') title: string
   ) {
-    return this.issuesService.addChecklistItem(req.user.companyId, projectId, id, checklistId, title);
+    return this.issuesService.addChecklistItem(req.user.companyId, projectId, id, checklistId, title, req.user.employeeId ?? req.user.sub, req.user.role);
   }
 
   @Put(':id/checklists/:checklistId/items/:itemId')
@@ -195,7 +196,7 @@ export class IssuesController {
     @Param('itemId', ParseIntPipe) itemId: number,
     @Body() data: any
   ) {
-    return this.issuesService.updateChecklistItem(req.user.companyId, projectId, id, checklistId, itemId, data);
+    return this.issuesService.updateChecklistItem(req.user.companyId, projectId, id, checklistId, itemId, data, req.user.employeeId ?? req.user.sub, req.user.role);
   }
 
   @Delete(':id/checklists/:checklistId/items/:itemId')
@@ -206,7 +207,7 @@ export class IssuesController {
     @Param('checklistId', ParseIntPipe) checklistId: number,
     @Param('itemId', ParseIntPipe) itemId: number
   ) {
-    return this.issuesService.deleteChecklistItem(req.user.companyId, projectId, id, checklistId, itemId);
+    return this.issuesService.deleteChecklistItem(req.user.companyId, projectId, id, checklistId, itemId, req.user.employeeId ?? req.user.sub, req.user.role);
   }
 
   @Post(':id/checklist/generate')
@@ -234,15 +235,43 @@ export class IssuesController {
     return this.issuesService.toggleIssueMember(req.user.companyId, projectId, id, employeeId, actorEmployeeId, req.user.role);
   }
 
+  /**
+   * Evidence goes up several files at a time (§2).
+   *
+   * Accepts both shapes on purpose: `files` for a multi-select, and a single
+   * `file` for anything still posting one. A task's attachments are its
+   * evidence, and evidence arrives in batches -- making people repeat the
+   * picker once per document is how attachments get left off.
+   */
   @Post(':id/attachments/upload')
-  @UseInterceptors(FileInterceptor('file'))
-  uploadAttachment(
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [{ name: 'files', maxCount: 20 }, { name: 'file', maxCount: 1 }],
+      { limits: { fileSize: MAX_DOCUMENT_BYTES } },
+    ),
+  )
+  async uploadAttachment(
     @Req() req,
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('id', ParseIntPipe) id: number,
-    @UploadedFile() file: Express.Multer.File
+    @UploadedFiles() uploaded: { files?: Express.Multer.File[]; file?: Express.Multer.File[] },
   ) {
-    return this.issuesService.uploadAttachmentToImageKit(req.user.companyId, req.user.sub, projectId, id, file);
+    const incoming = [...(uploaded?.files || []), ...(uploaded?.file || [])];
+    if (!incoming.length) throw new BadRequestException('No file provided');
+
+    // Sequential rather than parallel: ImageKit is rate limited, and twenty
+    // simultaneous uploads is how a batch half-fails.
+    const results: any[] = [];
+    for (const f of incoming) {
+      results.push(
+        await this.issuesService.uploadAttachmentToImageKit(
+          req.user.companyId, req.user.sub, projectId, id, f,
+        ),
+      );
+    }
+    // A single upload still answers with the attachment itself, so nothing
+    // that posted one file has to learn a new response shape.
+    return incoming.length === 1 ? results[0] : results;
   }
 
   @Post(':id/attachments/link')

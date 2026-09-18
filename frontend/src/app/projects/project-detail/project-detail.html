@@ -2756,7 +2756,7 @@
 
         <!-- Priority -->
         <div class="popover-container">
-          <button class="modal-action-btn" (click)="isProjectOwner && togglePopover('priority')" [style.cursor]="isProjectOwner ? 'pointer' : 'default'">
+          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('priority')">
             <svg lucideZap size="14" class="btn-icon-svg"></svg>
             <span>Priority</span>
           </button>
@@ -2793,7 +2793,7 @@
 
         <!-- Labels -->
         <div class="popover-container">
-          <button class="modal-action-btn" (click)="togglePopover('labels')">
+          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('labels')">
             <svg lucideTag size="14" class="btn-icon-svg"></svg>
             <span>Labels</span>
           </button>
@@ -2913,7 +2913,7 @@
 
         <!-- Checklist -->
         <div class="popover-container">
-          <button class="modal-action-btn" (click)="togglePopover('checklist')">
+          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('checklist')">
             <svg lucideCheckSquare size="14" class="btn-icon-svg"></svg>
             <span>Checklist</span>
           </button>
@@ -2939,7 +2939,7 @@
 
         <!-- Members Popover -->
         <div class="popover-container">
-          <button class="modal-action-btn" (click)="togglePopover('members')">
+          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('members')">
             <svg lucideUsers size="14" class="btn-icon-svg"></svg>
             <span>Members</span>
           </button>
@@ -3006,7 +3006,7 @@
               <div class="attach-section-desc">You can also drag and drop files to upload them.</div>
               
               <label class="btn-choose-file-trello" *ngIf="!isUploadingAttachment()">
-                <input type="file" (change)="onFileSelected($event)" style="display: none;">
+                <input type="file" multiple (change)="onFileSelected($event)" style="display: none;">
                 <span>Choose a file</span>
               </label>
 
@@ -3045,7 +3045,7 @@
           </div>
         </div>
 
-        <button class="modal-action-btn" (click)="toggleIssueArchive(selectedIssue()!.id)">
+        <button class="modal-action-btn" *ngIf="canManageTask" (click)="toggleIssueArchive(selectedIssue()!.id)">
           <svg lucideArchive size="14" class="btn-icon-svg"></svg>
           <span>{{ selectedIssue()?.isArchived ? 'Unarchive' : 'Archive' }}</span>
         </button>
@@ -3074,7 +3074,7 @@
               +{{ getRemainingMembersCount(selectedIssue()?.members) }}
             </div>
 
-            <button class="btn-add-member-circle" *ngIf="isProjectOwner" (click)="togglePopover('members')" type="button" title="Add members">
+            <button class="btn-add-member-circle" *ngIf="canManageTask" (click)="togglePopover('members')" type="button" title="Add members">
               <svg lucidePlus size="16"></svg>
             </button>
           </div>
@@ -3087,7 +3087,7 @@
             <div class="attached-label-pill" *ngFor="let il of selectedIssue()?.labels" [style.background-color]="il.label?.color || il.color" [style.color]="getLabelTextColor(il.label?.color || il.color)" (click)="togglePopover('labels')">
               <span>{{ il.label?.name || il.name }}</span>
             </div>
-            <button class="btn-add-label-pill" (click)="togglePopover('labels')" type="button" title="Add label">
+            <button class="btn-add-label-pill" *ngIf="canManageTask" (click)="togglePopover('labels')" type="button" title="Add label">
               <svg lucidePlus size="16"></svg>
             </button>
           </div>
