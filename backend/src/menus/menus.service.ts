@@ -92,6 +92,39 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Sales menu auto-seeded successfully.');
         }
         
+        // ── Notice Board ───────────────────────────────────────────────
+        // Its own item rather than a settings page: a notice is something the
+        // whole company reads, not a preference somebody configures, and
+        // burying it three levels down is how announcements go unread.
+        //
+        // The old Settings > Notice Board row is retired below rather than
+        // moved, so an install that seeded it before this change converges on
+        // the same sidebar as a fresh one.
+        const noticeBoard = await this.prisma.menu.findFirst({
+          where: { route: '/notices', parentId: parent.id },
+        });
+        if (!noticeBoard) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Notice Board',
+              route: '/notices',
+              icon: 'megaphone',
+              displayOrder: 7,
+              parentId: parent.id,
+              isActive: true,
+            },
+          });
+          this.logger.log('Notice Board menu auto-seeded successfully.');
+        }
+
+        const { count: retiredNoticeRows } = await this.prisma.menu.updateMany({
+          where: { route: '/settings/notices', isActive: true },
+          data: { isActive: false },
+        });
+        if (retiredNoticeRows > 0) {
+          this.logger.log('Notice Board moved out of Settings to the top level.');
+        }
+
         // ── Delivery ───────────────────────────────────────────────────
         // Projects is a section, not a link: Projects, Tasks, Timesheet and
         // Client Visits live under it. Reconciled on every boot rather than
@@ -230,24 +263,6 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Payroll Rules menu auto-seeded successfully.');
         }
 
-        // The notice board's admin side: posting an announcement is an
-        // administrative act, so it sits with the other settings rather than
-        // beside the dashboard where the notices themselves appear.
-        const noticeBoardMenu = await this.prisma.menu.findFirst({
-          where: { route: '/settings/notices', parentId: settingsParent.id },
-        });
-        if (!noticeBoardMenu) {
-          await this.prisma.menu.create({
-            data: {
-              title: 'Notice Board',
-              route: '/settings/notices',
-              displayOrder: 11,
-              parentId: settingsParent.id,
-              isActive: true
-            }
-          });
-          this.logger.log('Notice Board menu auto-seeded successfully.');
-        }
       }
 
       // Also ensure Lead Forms is under CRM

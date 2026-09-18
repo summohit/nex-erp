@@ -3755,7 +3755,8 @@ model Notice {
   createdById Int
   createdBy   Employee @relation("NoticeAuthor", fields: [createdById], references: [id])
 
-  reads NoticeRead[]
+  reads       NoticeRead[]
+  attachments NoticeAttachment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3778,4 +3779,25 @@ model NoticeRead {
 
   @@unique([noticeId, userId])
   @@index([userId])
+}
+
+
+/// A file attached to a notice -- the policy PDF, the floor plan, the form
+/// people are being asked to fill in.
+///
+/// Its own table rather than a JSON column on Notice: these are listed,
+/// counted and opened individually, and a JSON blob makes each of those a
+/// string operation instead of a query.
+model NoticeAttachment {
+  id       Int    @id @default(autoincrement())
+  noticeId Int
+  notice   Notice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+
+  fileName String
+  fileUrl  String
+  fileSize Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([noticeId])
 }

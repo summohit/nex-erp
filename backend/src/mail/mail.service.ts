@@ -562,7 +562,7 @@ export class MailService {
    * trusted: a notice is written by a person and read by ninety, and an
    * unescaped angle bracket should not become markup in all of their inboxes.
    */
-  async sendNoticeEmail(email: string, title: string, body: string) {
+  async sendNoticeEmail(email: string, title: string, body: string, attachmentCount = 0) {
     const baseUrl = process.env.APP_URL || 'http://localhost:4200';
     const escape = (t: string) =>
       t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -571,6 +571,7 @@ export class MailService {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
         <h2 style="color: #1e3a8a; text-align: center;">${escape(title)}</h2>
         <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin: 20px 0; color: #1e293b; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${escape(body)}</div>
+        ${attachmentCount > 0 ? `<p style="color: #475569; font-size: 14px;">${attachmentCount} file${attachmentCount === 1 ? '' : 's'} attached &mdash; open the notice board to download ${attachmentCount === 1 ? 'it' : 'them'}.</p>` : ''}
         <div style="text-align: center; margin: 30px 0;">
           <a href="${baseUrl}/dashboard" style="background-color: #3b82f6; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">Open the dashboard</a>
         </div>

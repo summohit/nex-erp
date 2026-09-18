@@ -116,6 +116,14 @@ export class PermissionsComponent implements OnInit {
       subItems: []
     },
     {
+      // Who may reach the notice board's admin page. Posting itself is
+      // restricted to administrators and HR on the server regardless of this
+      // switch -- turning it on for a role lets them see the page, not
+      // announce things over the company's head.
+      id: 'notices', title: 'Notice Board', isExpanded: true, enabled: false,
+      subItems: []
+    },
+    {
       id: 'crm/leads', title: 'CRM', isExpanded: true, enabled: false,
       subItems: [], viewAllEnabled: false
     },

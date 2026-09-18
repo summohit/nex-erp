@@ -4,8 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideMegaphone, LucidePlus, LucideX, LucideMail, LucideArchive, LucideEdit2,
+  LucidePaperclip, LucideUploadCloud, LucideFileText, LucideLoader2,
 } from '@lucide/angular';
 import { NoticesService, Notice } from '../../services/notices';
+import { UploadService } from '../../services/upload.service';
 
 /**
  * Posting to the company notice board.
@@ -20,6 +22,7 @@ import { NoticesService, Notice } from '../../services/notices';
   imports: [
     CommonModule, FormsModule,
     LucideMegaphone, LucidePlus, LucideX, LucideMail, LucideArchive, LucideEdit2,
+    LucidePaperclip, LucideUploadCloud, LucideFileText, LucideLoader2,
   ],
   templateUrl: './notices.html',
   styleUrls: ['./notices.css'],
@@ -27,6 +30,7 @@ import { NoticesService, Notice } from '../../services/notices';
 export class NoticesComponent {
   private api = inject(NoticesService);
   private toast = inject(HotToastService);
+  private uploads = inject(UploadService);
 
   notices = signal<Notice[]>([]);
   loading = signal(true);
@@ -35,6 +39,59 @@ export class NoticesComponent {
   editingId = signal<number | null>(null);
 
   form = this.blank();
+
+  /**
+   * Files chosen for the notice being written.
+   *
+   * Uploaded as they are picked rather than on submit, so a slow upload does
+   * not sit between the author pressing Post and the notice existing -- and
+   * so a failure is reported next to the file that failed rather than as one
+   * opaque error at the end.
+   */
+  attachments = signal<{ fileName: string; fileUrl: string; fileSize?: number }[]>([]);
+  uploading = signal(false);
+
+  onFilesPicked(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+
+    this.uploading.set(true);
+    let remaining = files.length;
+
+    for (const file of files) {
+      this.uploads.uploadFile(file).subscribe({
+        next: (res: any) => {
+          const url = res?.url || res?.fileUrl || res?.secure_url;
+          if (url) {
+            this.attachments.update((list) => [
+              ...list,
+              { fileName: file.name, fileUrl: url, fileSize: file.size },
+            ]);
+          } else {
+            this.toast.error(`${file.name} uploaded but returned no link`);
+          }
+          if (--remaining === 0) this.uploading.set(false);
+        },
+        error: (err) => {
+          if (--remaining === 0) this.uploading.set(false);
+          this.toast.error(err?.error?.message || `Could not upload ${file.name}`);
+        },
+      });
+    }
+  }
+
+  removeAttachment(index: number) {
+    this.attachments.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  fileSize(bytes?: number): string {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
 
   activeCount = computed(() => this.notices().filter((n) => n.isActive).length);
 
@@ -72,6 +129,7 @@ export class NoticesComponent {
 
   openNew() {
     this.form = this.blank();
+    this.attachments.set([]);
     this.editingId.set(null);
     this.formOpen.set(true);
   }
@@ -109,6 +167,7 @@ export class NoticesComponent {
       publishedAt: this.form.publishedAt || null,
       expiresAt: this.form.expiresAt || null,
       sendEmail: this.form.sendEmail,
+      attachments: this.attachments(),
     };
 
     this.saving.set(true);

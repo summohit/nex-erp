@@ -108,3 +108,49 @@
   .page-container { padding: 16px; }
   .nb-field-row { flex-direction: column; gap: 0; }
 }
+
+/* ── Attachments ──────────────────────────────────────────────────────── */
+.nb-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color .15s, background .15s;
+}
+.nb-dropzone:hover { border-color: #2563eb; background: #eff6ff; }
+.nb-dropzone.busy { cursor: progress; opacity: .75; }
+.nb-dropzone span { font-size: 13px; font-weight: 600; color: #334155; }
+.nb-dropzone small { font-size: 11px; color: #94a3b8; }
+
+.nb-spin { animation: nb-spin 1s linear infinite; }
+@keyframes nb-spin { to { transform: rotate(360deg); } }
+
+.nb-file-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.nb-file {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #fff; color: #475569;
+}
+.nb-file-name {
+  flex: 1; min-width: 0; font-size: 13px; color: #0f172a;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nb-file-size { font-size: 11px; color: #94a3b8; flex-shrink: 0; }
+
+/* On a posted notice: the files, as things to open. */
+.nb-attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.nb-attachment {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border: 1px solid #e2e8f0; border-radius: 9999px;
+  background: #f8fafc; color: #334155;
+  font-size: 12px; text-decoration: none; max-width: 260px;
+}
+.nb-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nb-attachment:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }

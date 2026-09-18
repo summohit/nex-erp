@@ -39,6 +39,14 @@
 
       <p class="nb-body">{{ n.body }}</p>
 
+      <div class="nb-attachments" *ngIf="n.attachments?.length">
+        <a class="nb-attachment" *ngFor="let a of n.attachments"
+           [href]="a.fileUrl" target="_blank" rel="noopener" [title]="a.fileName">
+          <svg lucidePaperclip size="13"></svg>
+          <span>{{ a.fileName }}</span>
+        </a>
+      </div>
+
       <div class="nb-meta">
         <span>{{ n.publishedAt | date:'MMM d, y' }}</span>
         <span *ngIf="n.expiresAt">· until {{ n.expiresAt | date:'MMM d, y' }}</span>
@@ -87,6 +95,28 @@
           <label>Stop showing on</label>
           <input type="date" [(ngModel)]="form.expiresAt" />
           <small>Leave blank to run until retired.</small>
+        </div>
+      </div>
+
+      <div class="nb-field">
+        <label>Attachments</label>
+        <label class="nb-dropzone" [class.busy]="uploading()">
+          <input type="file" multiple hidden [disabled]="uploading()" (change)="onFilesPicked($event)" />
+          <svg *ngIf="!uploading()" lucideUploadCloud size="22"></svg>
+          <svg *ngIf="uploading()" lucideLoader2 size="22" class="nb-spin"></svg>
+          <span>{{ uploading() ? 'Uploading…' : 'Choose files, or drop them here' }}</span>
+          <small>The policy, the form, the floor plan — anything people need with the notice.</small>
+        </label>
+
+        <div class="nb-file-list" *ngIf="attachments().length > 0">
+          <div class="nb-file" *ngFor="let a of attachments(); let i = index">
+            <svg lucideFileText size="15"></svg>
+            <span class="nb-file-name" [title]="a.fileName">{{ a.fileName }}</span>
+            <span class="nb-file-size">{{ fileSize(a.fileSize) }}</span>
+            <button type="button" class="nb-btn" (click)="removeAttachment(i)" title="Remove">
+              <svg lucideX size="13"></svg>
+            </button>
+          </div>
         </div>
       </div>
 

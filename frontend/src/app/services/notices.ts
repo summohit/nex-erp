@@ -21,8 +21,16 @@ export interface Notice {
   createdAt: string;
   updatedAt: string;
   createdBy: { id: number; firstName: string; lastName: string } | null;
+  attachments?: NoticeAttachment[];
   /** Only on the dashboard feed: whether this reader has dismissed it. */
   isRead?: boolean;
+}
+
+export interface NoticeAttachment {
+  id: number;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number | null;
 }
 
 export interface NewNotice {
@@ -33,6 +41,7 @@ export interface NewNotice {
   expiresAt?: string | null;
   /** Defaults to true server-side — posting a notice emails it. */
   sendEmail?: boolean;
+  attachments?: { fileName: string; fileUrl: string; fileSize?: number }[];
 }
 
 @Injectable({ providedIn: 'root' })

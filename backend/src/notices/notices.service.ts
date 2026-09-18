@@ -33,6 +33,10 @@ export class NoticesService {
     publishedAt: true, expiresAt: true, isActive: true, emailSentAt: true,
     createdAt: true, updatedAt: true,
     createdBy: { select: { id: true, firstName: true, lastName: true } },
+    attachments: {
+      select: { id: true, fileName: true, fileUrl: true, fileSize: true },
+      orderBy: { id: 'asc' as const },
+    },
   } as const;
 
   /** Everything, for the admin screen. */
@@ -73,7 +77,11 @@ export class NoticesService {
     companyId: number,
     employeeId: number,
     role: string,
-    data: { title?: string; body?: string; priority?: string; publishedAt?: string; expiresAt?: string; sendEmail?: boolean },
+    data: {
+      title?: string; body?: string; priority?: string;
+      publishedAt?: string; expiresAt?: string; sendEmail?: boolean;
+      attachments?: { fileName: string; fileUrl: string; fileSize?: number }[];
+    },
   ) {
     this.assertMayPublish(role);
 
@@ -95,6 +103,17 @@ export class NoticesService {
         publishedAt, expiresAt,
         companyId,
         createdById: employeeId,
+        // Written with the notice so a half-posted announcement with orphaned
+        // files is not a state this can end up in.
+        attachments: {
+          create: (data.attachments || [])
+            .filter((a) => a?.fileUrl && a?.fileName)
+            .map((a) => ({
+              fileName: a.fileName,
+              fileUrl: a.fileUrl,
+              fileSize: a.fileSize ?? null,
+            })),
+        },
       },
       select: this.SELECT,
     });
@@ -102,7 +121,7 @@ export class NoticesService {
     if (data.sendEmail !== false) {
       // Not awaited, and never fatal: the notice is posted either way, and a
       // mail server having a bad afternoon must not lose the announcement.
-      this.emailEveryone(companyId, notice.id, title, body).catch((err) =>
+      this.emailEveryone(companyId, notice.id, title, body, notice.attachments?.length ?? 0).catch((err) =>
         this.logger.error(`Notice ${notice.id} posted but not emailed: ${err}`),
       );
     }
@@ -116,7 +135,7 @@ export class NoticesService {
    * Sequential rather than parallel: ninety simultaneous sends is how a
    * provider starts refusing them, and nobody is waiting on this.
    */
-  private async emailEveryone(companyId: number, noticeId: number, title: string, body: string) {
+  private async emailEveryone(companyId: number, noticeId: number, title: string, body: string, attachmentCount = 0) {
     const recipients = await this.prisma.user.findMany({
       where: { companyId, status: 'ACTIVE', email: { not: '' } },
       select: { email: true },
@@ -125,7 +144,7 @@ export class NoticesService {
     let sent = 0;
     for (const r of recipients) {
       try {
-        await this.mail.sendNoticeEmail(r.email, title, body);
+        await this.mail.sendNoticeEmail(r.email, title, body, attachmentCount);
         sent++;
       } catch (err) {
         this.logger.warn(`Notice ${noticeId}: could not email ${r.email}`);
