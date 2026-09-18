@@ -142,6 +142,47 @@ export class ProjectTicketsService {
       }
     }
 
+    /**
+     * An administrator's ticket becomes a task immediately (§6).
+     *
+     * The approval step exists so somebody senior rules on whether the work
+     * should happen. An administrator IS that person, so routing their own
+     * ticket into a queue for their own approval is a round trip that answers
+     * nothing -- and leaves real work sitting as a request nobody thinks to
+     * look at. A project manager's ticket still waits, which is the whole
+     * point of the distinction.
+     *
+     * The ticket row is still written, and still says CONVERTED with the
+     * admin as its reviewer: the paper trail is the same, only the waiting is
+     * skipped.
+     */
+    if (this.ADMIN_ROLES.includes(role)) {
+      return this.prisma.$transaction(async (tx) => {
+        const ticket = await tx.projectTicket.create({
+          data: {
+            ticketNumber: await this.nextTicketNumber(companyId),
+            title,
+            description: data.description?.trim() || null,
+            projectId,
+            companyId,
+            raisedById: actorEmployeeId as number,
+            proposedAssigneeId: data.proposedAssigneeId ? Number(data.proposedAssigneeId) : null,
+            priority,
+            startDate,
+            dueDate,
+            // Same coercion as the ordinary create path below, deliberately.
+            estimatedHours:
+              data.estimatedHours != null && Number.isFinite(Number(data.estimatedHours))
+                ? Number(data.estimatedHours)
+                : null,
+          },
+          include: { project: { select: { id: true, key: true } } },
+        });
+
+        return this.convertTicketToTask(tx, ticket, actorEmployeeId, companyId);
+      });
+    }
+
     return this.prisma.projectTicket.create({
       data: {
         ticketNumber: await this.nextTicketNumber(companyId),
@@ -269,64 +310,78 @@ export class ProjectTicketsService {
     }
 
     // Approved: create the task and link it, in one transaction. Half of this
-    // is worse than none — an approved ticket with no task, or a task no
+    // is worse than none -- an approved ticket with no task, or a task no
     // ticket admits to.
-    return this.prisma.$transaction(async (tx) => {
-      const count = await tx.issue.count({ where: { projectId: ticket.projectId, companyId } });
+    return this.prisma.$transaction((tx) =>
+      this.convertTicketToTask(tx, ticket, reviewerEmployeeId, companyId),
+    );
+  }
 
-      /**
-       * The board column, without which the task exists but renders nowhere.
-       *
-       * A task with a null columnId is invisible on the board while showing
-       * up in the list — which is exactly what an approved ticket looked like
-       * before this: converted, linked, and apparently lost.
-       */
-      const board = await tx.board.findFirst({
-        where: { projectId: ticket.projectId },
-        include: { columns: { orderBy: { position: 'asc' } } },
-      });
-      const columnId = board?.columns?.[0]?.id ?? null;
+  /**
+   * Turn an approved ticket into a real task, and mark the ticket converted.
+   *
+   * Shared by the approval path and the administrator fast-path below, so the
+   * two cannot drift: a task raised by an admin and one approved by an admin
+   * should be the same task, made the same way.
+   */
+  private async convertTicketToTask(
+    tx: any,
+    ticket: any,
+    reviewerEmployeeId: number | null,
+    companyId: number,
+  ) {
+    const count = await tx.issue.count({ where: { projectId: ticket.projectId, companyId } });
 
-      // Top of the column, as a freshly created task is everywhere else.
-      const firstIssue = columnId
-        ? await tx.issue.findFirst({ where: { columnId }, orderBy: { position: 'asc' } })
-        : null;
-      const position = firstIssue ? firstIssue.position - 1 : 0;
+    /**
+     * The board column, without which the task exists but renders nowhere.
+     *
+     * A task with a null columnId is invisible on the board while showing up
+     * in the list -- which is exactly what an approved ticket looked like
+     * before this: converted, linked, and apparently lost.
+     */
+    const board = await tx.board.findFirst({
+      where: { projectId: ticket.projectId },
+      include: { columns: { orderBy: { position: 'asc' } } },
+    });
+    const columnId = board?.columns?.[0]?.id ?? null;
 
-      const issue = await tx.issue.create({
-        data: {
-          key: `${ticket.project.key || 'TASK'}-${count + 1}`,
-          title: ticket.title,
-          description: ticket.description,
-          projectId: ticket.projectId,
-          companyId,
-          priority: ticket.priority,
-          assigneeId: ticket.proposedAssigneeId,
-          reporterId: ticket.raisedById,
-          startDate: ticket.startDate,
-          dueDate: ticket.dueDate,
-          estimatedHours: ticket.estimatedHours,
-          status: 'TODO',
-          columnId,
-          position,
-        },
-        select: { id: true, key: true, title: true, status: true },
-      });
+    // Top of the column, as a freshly created task is everywhere else.
+    const firstIssue = columnId
+      ? await tx.issue.findFirst({ where: { columnId }, orderBy: { position: 'asc' } })
+      : null;
+    const position = firstIssue ? firstIssue.position - 1 : 0;
 
-      const updated = await tx.projectTicket.update({
-        where: { id: ticketId },
-        data: {
-          status: 'CONVERTED',
-          reviewedById: reviewerEmployeeId,
-          reviewedAt: new Date(),
-          rejectionReason: null,
-          convertedIssueId: issue.id,
-          convertedAt: new Date(),
-        },
-        select: this.LIST_SELECT,
-      });
+    const issue = await tx.issue.create({
+      data: {
+        key: `${ticket.project?.key || 'TASK'}-${count + 1}`,
+        title: ticket.title,
+        description: ticket.description,
+        projectId: ticket.projectId,
+        companyId,
+        priority: ticket.priority,
+        assigneeId: ticket.proposedAssigneeId,
+        reporterId: ticket.raisedById,
+        startDate: ticket.startDate,
+        dueDate: ticket.dueDate,
+        estimatedHours: ticket.estimatedHours,
+        status: 'TODO',
+        columnId,
+        position,
+      },
+      select: { id: true, key: true, title: true, status: true },
+    });
 
-      return updated;
+    return tx.projectTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: 'CONVERTED',
+        reviewedById: reviewerEmployeeId,
+        reviewedAt: new Date(),
+        rejectionReason: null,
+        convertedIssueId: issue.id,
+        convertedAt: new Date(),
+      },
+      select: this.LIST_SELECT,
     });
   }
 

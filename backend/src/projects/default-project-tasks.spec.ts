@@ -19,6 +19,7 @@ function make(over: any = {}) {
     defaultProjectTask: { findMany: jest.fn().mockResolvedValue(DEFAULTS) },
     boardColumn: { findFirst: jest.fn().mockResolvedValue({ id: 10 }) },
     issue: {
+      count: jest.fn().mockResolvedValue(0),
       createMany: jest.fn().mockImplementation((a: any) => {
         created.push(...a.data);
         return Promise.resolve({ count: a.data.length });
@@ -110,5 +111,43 @@ describe('default project tasks', () => {
       issue: { createMany: jest.fn().mockRejectedValue(new Error('db down')) },
     });
     await expect(seed(service)).resolves.toBeUndefined();
+  });
+});
+
+
+/**
+ * Kickoff runs the same seeding on a project that already has tasks: the AI
+ * analysis has just written its own, numbered from one.
+ */
+describe('seeding onto a project that already has tasks', () => {
+  const withExisting = (n: number) => make({
+    issue: {
+      count: jest.fn().mockResolvedValue(n),
+      createMany: jest.fn().mockImplementation((a: any) => Promise.resolve({ count: a.data.length })),
+    },
+  });
+
+  it('numbers keys after the tasks already there, not from one', async () => {
+    const { service, prisma } = withExisting(12);
+    await seed(service);
+    const written = prisma.issue.createMany.mock.calls[0][0].data;
+    expect(written.map((t: any) => t.key)).toEqual([
+      'CES/0926/03-13', 'CES/0926/03-14', 'CES/0926/03-15',
+    ]);
+  });
+
+  it('positions them after the existing tasks', async () => {
+    const { service, prisma } = withExisting(12);
+    await seed(service);
+    const written = prisma.issue.createMany.mock.calls[0][0].data;
+    expect(written.map((t: any) => t.position)).toEqual([12, 13, 14]);
+  });
+
+  it('advances issueSeq past everything, not just its own rows', async () => {
+    const { service, prisma } = withExisting(12);
+    await seed(service);
+    expect(prisma.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { issueSeq: 15 } }),
+    );
   });
 });

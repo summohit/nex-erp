@@ -275,3 +275,81 @@ describe('the task reporting back (§30)', () => {
     await expect(service.onIssueStatusChanged(500, 'DONE')).resolves.toBeUndefined();
   });
 });
+
+/**
+ * §6: an administrator's ticket becomes a task immediately.
+ *
+ * The approval step exists so somebody senior rules on whether the work should
+ * happen. An administrator is that person, so queueing their ticket for their
+ * own approval answers nothing and leaves real work sitting as a request.
+ */
+describe('who has to wait for approval', () => {
+  const TICKET = {
+    id: 5, projectId: 3, title: 'Fix the importer', description: null,
+    priority: 'MEDIUM', proposedAssigneeId: 60, raisedById: 9,
+    startDate: null, dueDate: null, estimatedHours: 4,
+    project: { id: 3, key: 'CES/0926/01' },
+  };
+
+  function makeService(over: any = {}) {
+    const prisma: any = {
+      project: {
+        findFirst: jest.fn().mockResolvedValue({ id: 3 }),
+        // nextTicketNumber reads the company off the project.
+        findUnique: jest.fn().mockResolvedValue({ id: 3, companyId: 1 }),
+      },
+      projectMember: { findFirst: jest.fn().mockResolvedValue({ id: 1 }) },
+      company: { findUnique: jest.fn().mockResolvedValue({ id: 1 }) },
+      projectTicket: {
+        create: jest.fn().mockResolvedValue(TICKET),
+        update: jest.fn().mockImplementation((a: any) => Promise.resolve({ id: 5, ...a.data })),
+        findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      issue: {
+        count: jest.fn().mockResolvedValue(4),
+        create: jest.fn().mockResolvedValue({ id: 77, key: 'CES/0926/01-5' }),
+        findFirst: jest.fn().mockResolvedValue({ position: 0 }),
+      },
+      board: {
+        findFirst: jest.fn().mockResolvedValue({ columns: [{ id: 10, position: 0 }] }),
+      },
+      ...over,
+    };
+    prisma.$transaction = jest.fn().mockImplementation((fn: any) => fn(prisma));
+    return { service: new ProjectTicketsService(prisma), prisma };
+  }
+
+  const raise = (service: any, role: string) =>
+    (service as any).create(1, 9, role, 3, { title: 'Fix the importer', proposedAssigneeId: 60 });
+
+  it('converts an administrator’s ticket to a task straight away', async () => {
+    const { service, prisma } = makeService();
+    await raise(service, 'ADMIN');
+    expect(prisma.issue.create).toHaveBeenCalled();
+  });
+
+  it('marks that ticket CONVERTED, with the admin as its reviewer', async () => {
+    const { service, prisma } = makeService();
+    await raise(service, 'ADMIN');
+    expect(prisma.projectTicket.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'CONVERTED', reviewedById: 9 }),
+      }),
+    );
+  });
+
+  it('still makes a project manager wait', async () => {
+    const { service, prisma } = makeService();
+    await raise(service, 'EMPLOYEE');
+    expect(prisma.issue.create).not.toHaveBeenCalled();
+  });
+
+  it('leaves the PM’s ticket as a request for somebody else to rule on', async () => {
+    const { service, prisma } = makeService();
+    await raise(service, 'EMPLOYEE');
+    // No status written: the schema default of REQUESTED stands.
+    const written = prisma.projectTicket.create.mock.calls[0][0].data;
+    expect(written.status).toBeUndefined();
+  });
+});

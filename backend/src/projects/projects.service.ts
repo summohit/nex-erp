@@ -233,11 +233,21 @@ export class ProjectsService {
         select: { id: true },
       });
 
+      /**
+       * Number from whatever the project already holds, not from one.
+       *
+       * On a brand-new project that is zero. At AI-wizard kickoff it is not:
+       * the analysis has just written its own tasks numbered from one, and
+       * starting again would collide on @@unique([key, companyId]) and take
+       * the whole kickoff down with it.
+       */
+      const existing = await this.prisma.issue.count({
+        where: { projectId: project.id, companyId },
+      });
+
       await this.prisma.issue.createMany({
         data: defaults.map((t, index) => ({
-          // The project is new, so the sequence starts at one and these are
-          // the only writers -- no count query to race with.
-          key: `${project.key}-${index + 1}`,
+          key: `${project.key}-${existing + index + 1}`,
           title: t.name,
           description: t.description,
           type: 'TASK',
@@ -248,7 +258,7 @@ export class ProjectsService {
           columnId: todo?.id ?? null,
           assigneeId,
           reporterId: leadId,
-          position: index,
+          position: existing + index,
         })),
       });
 
@@ -256,7 +266,7 @@ export class ProjectsService {
       // hand collides with one of these on @@unique([key, companyId]).
       await this.prisma.project.update({
         where: { id: project.id },
-        data: { issueSeq: defaults.length },
+        data: { issueSeq: existing + defaults.length },
       });
     } catch (err) {
       this.logger.error(
@@ -425,6 +435,23 @@ export class ProjectsService {
         data: issues
       });
     }
+
+    // §1: the six management tasks, now that this is a real project.
+    //
+    // Not at createAiProject: that writes a DRAFT placeholder named "Project
+    // Setup <timestamp>" before anybody has confirmed the project exists.
+    // Kickoff is the moment it becomes real, and is already guarded against
+    // running twice by the COMPLETED check above.
+    const pmMembers = await this.prisma.projectMember.findMany({
+      where: { projectId, role: 'PROJECT_MANAGER' },
+      select: { employeeId: true },
+    });
+    await this.seedDefaultProjectTasks(
+      companyId,
+      { id: projectId, key: project.key },
+      project.leadId ?? 0,
+      { pmIds: pmMembers.map((m) => m.employeeId) },
+    );
 
     return this.prisma.project.update({
       where: { id: projectId },
@@ -865,7 +892,7 @@ export class ProjectsService {
       where: { id: projectId, companyId },
       include: {
         lead: {
-          select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } } }
+          select: { id: true, userId: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } } }
         },
         members: {
           include: {
@@ -1067,7 +1094,7 @@ export class ProjectsService {
     return this.prisma.projectMember.findMany({
       where: { projectId, project: { companyId } },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } } } }
+        employee: { select: { id: true, userId: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } } } }
       }
     });
   }
