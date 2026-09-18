@@ -338,6 +338,14 @@
       <div class="legend-icon-wrapper bg-day-off"><svg lucideCalendar class="status-day-off status-icon"></svg></div>
       <span>Day Off</span>
     </div>
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-overtime"><svg lucideZap class="status-overtime status-icon"></svg></div>
+      <span>Overtime</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon-wrapper bg-clockoff"><svg lucideTimerOff class="status-clockoff status-icon"></svg></div>
+      <span>Missed Clock Out</span>
+    </div>
   </div>
   </div>
 
@@ -407,6 +415,8 @@
                   <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
                   <span *ngIf="day.record?.clockInLat" class="day-location-pin" title="GPS location logged">📍</span>
+                  <svg *ngIf="day.record?.overtimeHours" lucideZap class="day-corner-symbol day-ot-symbol status-overtime" title="Overtime — worked past the shift and clocked out late"></svg>
+                  <svg *ngIf="day.record?.clockOutReason" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Missed clock out — closed late with a recorded reason"></svg>
                 </ng-container>
                 <span *ngIf="day.isFuture" class="future-dot">·</span>
               </div>
@@ -622,6 +632,15 @@
           Nobody clocked out, so the system closed the day at its 11:00 PM cutoff and reused the
           clock-in location. The clock-out time and coordinates below are not a recorded departure,
           and any overtime on this day follows from the cutoff rather than from hours actually worked.
+        </span>
+      </div>
+
+      <!-- Missed clock out: the day was left open and closed late with a reason -->
+      <div class="missed-clockout-note" *ngIf="selectedDayDetails()?.missedClockOutReason">
+        <svg lucideTimerOff [size]="15"></svg>
+        <span>
+          <span class="note-title">Missed clock out — closed late (reason recorded)</span>
+          <span class="note-reason">“{{ selectedDayDetails()?.missedClockOutReason }}”</span>
         </span>
       </div>
 

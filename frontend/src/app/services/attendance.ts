@@ -31,6 +31,13 @@ export interface AttendanceRecord {
   autoClockedOut?: boolean;
   totalHours?: number;
   overtimeHours?: number;
+  /**
+   * The day was left open past IST midnight and closed late — the server asked
+   * for (and stored) a reason for the missed clock-out.
+   */
+  clockOutReason?: string | null;
+  /** Live "session still open and overdue" flag; cleared once the day closes. */
+  missedClockOut?: boolean;
   employeeId: number;
   employee?: any;
   logs?: any[];
