@@ -1,0 +1,108 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Notice Board</h1>
+      <p>Announcements posted to everyone's dashboard, and emailed when posted.</p>
+    </div>
+    <button class="btn-primary" (click)="openNew()">
+      <svg lucidePlus size="18"></svg> Post a Notice
+    </button>
+  </div>
+
+  <div class="nb-loading" *ngIf="loading()">Loading notices…</div>
+
+  <div class="nb-empty" *ngIf="!loading() && notices().length === 0">
+    <svg lucideMegaphone size="28"></svg>
+    <p>Nothing has been announced yet.</p>
+    <span>A notice appears on every employee's dashboard and is emailed to them.</span>
+  </div>
+
+  <div class="nb-list" *ngIf="!loading() && notices().length > 0">
+    <div class="nb-card" *ngFor="let n of notices()" [class.retired]="!n.isActive">
+      <div class="nb-card-head">
+        <div class="nb-title-row">
+          <span class="nb-badge" [class]="'nb-' + n.priority.toLowerCase()">{{ n.priority }}</span>
+          <h3>{{ n.title }}</h3>
+          <span class="nb-retired-tag" *ngIf="!n.isActive">Retired</span>
+        </div>
+
+        <div class="nb-actions">
+          <button type="button" class="nb-btn" (click)="openEdit(n)" title="Edit">
+            <svg lucideEdit2 size="14"></svg>
+          </button>
+          <button type="button" class="nb-btn nb-btn-danger" *ngIf="n.isActive"
+                  (click)="retire(n)" title="Retire">
+            <svg lucideArchive size="14"></svg>
+          </button>
+        </div>
+      </div>
+
+      <p class="nb-body">{{ n.body }}</p>
+
+      <div class="nb-meta">
+        <span>{{ n.publishedAt | date:'MMM d, y' }}</span>
+        <span *ngIf="n.expiresAt">· until {{ n.expiresAt | date:'MMM d, y' }}</span>
+        <span *ngIf="n.createdBy">· {{ n.createdBy.firstName }} {{ n.createdBy.lastName }}</span>
+        <!-- Whether it actually went out, rather than whether it was meant to. -->
+        <span class="nb-emailed" *ngIf="n.emailSentAt">
+          <svg lucideMail size="12"></svg> emailed
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compose -->
+  <div class="nb-modal-overlay" *ngIf="formOpen()" (click)="close()">
+    <div class="nb-modal" (click)="$event.stopPropagation()">
+      <div class="nb-modal-head">
+        <h2>{{ editingId() ? 'Edit notice' : 'Post a notice' }}</h2>
+        <button type="button" class="nb-btn" (click)="close()"><svg lucideX size="16"></svg></button>
+      </div>
+
+      <div class="nb-field">
+        <label>Title <span class="req">*</span></label>
+        <input type="text" [(ngModel)]="form.title" placeholder="e.g. Office closed on Friday" />
+      </div>
+
+      <div class="nb-field">
+        <label>Notice <span class="req">*</span></label>
+        <textarea rows="7" [(ngModel)]="form.body"
+                  placeholder="What everybody needs to know. Line breaks are kept."></textarea>
+      </div>
+
+      <div class="nb-field">
+        <label>Priority</label>
+        <select [(ngModel)]="form.priority">
+          <option *ngFor="let p of priorities" [value]="p.value">{{ p.label }}</option>
+        </select>
+      </div>
+
+      <div class="nb-field-row">
+        <div class="nb-field">
+          <label>Publish on</label>
+          <input type="date" [(ngModel)]="form.publishedAt" />
+          <small>Leave blank to post it now.</small>
+        </div>
+        <div class="nb-field">
+          <label>Stop showing on</label>
+          <input type="date" [(ngModel)]="form.expiresAt" />
+          <small>Leave blank to run until retired.</small>
+        </div>
+      </div>
+
+      <!-- Off by default when editing: the announcement already went out, and
+           mailing everybody again reads as a second announcement. -->
+      <label class="nb-check">
+        <input type="checkbox" [(ngModel)]="form.sendEmail" />
+        <span>Email this to everyone</span>
+      </label>
+
+      <div class="nb-modal-actions">
+        <button type="button" class="nb-btn-secondary" (click)="close()">Cancel</button>
+        <button type="button" class="btn-primary" [disabled]="saving()" (click)="save()">
+          {{ saving() ? 'Saving…' : (editingId() ? 'Save changes' : 'Post notice') }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,110 @@
+.page-container { padding: 24px 32px; }
+.page-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 22px;
+}
+.page-header h1 { margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; }
+.page-header p { margin: 4px 0 0; font-size: 13px; color: #64748b; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 10px 18px; border: none; border-radius: 8px;
+  background: #2563eb; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+
+.nb-loading, .nb-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 56px 24px; color: #94a3b8; text-align: center;
+}
+.nb-empty p { margin: 8px 0 0; font-size: 15px; font-weight: 600; color: #0f172a; }
+.nb-empty span { font-size: 13px; max-width: 460px; }
+
+.nb-list { display: flex; flex-direction: column; gap: 12px; }
+
+.nb-card {
+  border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 16px 18px; background: #fff;
+}
+/* Retired notices stay: a notice that was read and acted on is the record of
+   what the company was told and when. */
+.nb-card.retired { background: #f8fafc; opacity: .72; }
+
+.nb-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.nb-title-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; min-width: 0; }
+.nb-title-row h3 { margin: 0; font-size: 15px; font-weight: 700; color: #0f172a; }
+
+.nb-badge {
+  padding: 2px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 800; letter-spacing: .03em;
+}
+.nb-high   { background: #fef2f2; color: #b91c1c; }
+.nb-normal { background: #eff6ff; color: #1d4ed8; }
+.nb-low    { background: #f1f5f9; color: #64748b; }
+
+.nb-retired-tag { font-size: 11px; color: #94a3b8; font-style: italic; }
+
+.nb-body {
+  margin: 10px 0 0; font-size: 14px; line-height: 1.6; color: #334155;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+.nb-meta {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 12px; font-size: 12px; color: #94a3b8;
+}
+.nb-emailed { display: inline-flex; align-items: center; gap: 4px; color: #047857; }
+
+.nb-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.nb-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: 1px solid #e2e8f0; border-radius: 6px;
+  background: #fff; color: #64748b; cursor: pointer;
+}
+.nb-btn:hover { background: #f1f5f9; color: #0f172a; }
+.nb-btn-danger:hover { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+
+.nb-btn-secondary {
+  padding: 10px 18px; border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #fff; color: #475569; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.nb-btn-secondary:hover { background: #f8fafc; }
+
+/* ── Compose ────────────────────────────────────────────────────────────── */
+.nb-modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(15, 23, 42, .55);
+}
+.nb-modal {
+  width: 100%; max-width: 620px; max-height: 88vh; overflow-y: auto;
+  background: #fff; border-radius: 14px; padding: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .3);
+}
+.nb-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.nb-modal-head h2 { margin: 0; font-size: 18px; font-weight: 700; color: #0f172a; }
+
+.nb-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; flex: 1; }
+.nb-field label { font-size: 12px; font-weight: 600; color: #475569; }
+.nb-field small { font-size: 11px; color: #94a3b8; }
+.req { color: #dc2626; }
+
+.nb-field input, .nb-field textarea, .nb-field select {
+  padding: 9px 12px; border: 2px solid #e2e8f0; border-radius: 8px;
+  font-size: 14px; color: #0f172a; outline: none; font-family: inherit;
+}
+.nb-field input:focus, .nb-field textarea:focus, .nb-field select:focus { border-color: #2563eb; }
+.nb-field textarea { resize: vertical; line-height: 1.6; }
+
+.nb-field-row { display: flex; gap: 14px; flex-wrap: wrap; }
+
+.nb-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; margin-bottom: 20px; }
+.nb-check input { width: 15px; height: 15px; }
+
+.nb-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+@media (max-width: 640px) {
+  .page-container { padding: 16px; }
+  .nb-field-row { flex-direction: column; gap: 0; }
+}

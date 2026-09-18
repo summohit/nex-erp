@@ -928,6 +928,43 @@
       </div>
     </div>
 
+    <!-- Notice board: what the company has told everybody. Spans the grid,
+         because an announcement competing with a widget for a third of a row
+         is an announcement nobody reads. -->
+    <div class="dashboard-card notices-wide" *ngIf="notices().length > 0">
+      <div class="card-header">
+        <div class="flex items-center gap-2.5">
+          <div class="card-icon-badge bg-orange-tint">
+            <svg lucideMegaphone size="16"></svg>
+          </div>
+          <div>
+            <h3>Notice Board</h3>
+            <p>Company announcements</p>
+          </div>
+        </div>
+        <span class="notice-unread-pill" *ngIf="unreadNotices().length > 0">
+          {{ unreadNotices().length }} unread
+        </span>
+      </div>
+
+      <div class="notice-list">
+        <button type="button" class="notice-row" *ngFor="let n of notices()"
+                [class.unread]="!n.isRead" (click)="openNotice(n)">
+          <span class="notice-dot" [class.high]="n.priority === 'HIGH'"></span>
+          <span class="notice-row-text">
+            <span class="notice-row-title">{{ n.title }}</span>
+            <span class="notice-row-meta">
+              {{ n.publishedAt | date:'MMM d, y' }}
+              <ng-container *ngIf="n.createdBy">
+                · {{ n.createdBy.firstName }} {{ n.createdBy.lastName }}
+              </ng-container>
+            </span>
+          </span>
+          <span class="notice-badge-high" *ngIf="n.priority === 'HIGH'">Important</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Row 2: Probation | Upcoming Holidays | Birthdays -->
     <div class="dashboard-card">
       <div class="card-header">
@@ -1052,6 +1089,33 @@
         </div>
         <div class="loading-spinner" *ngIf="isCompletingTask() === task.id"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- The notice itself. Opens by itself only for HIGH priority; everything
+     else waits to be clicked in the list above. -->
+<div class="notice-modal-overlay" *ngIf="activeNotice() as n" (click)="dismissNotice(n)">
+  <div class="notice-modal" (click)="$event.stopPropagation()">
+    <div class="notice-modal-head">
+      <span class="notice-badge-high" *ngIf="n.priority === 'HIGH'">Important</span>
+      <h2>{{ n.title }}</h2>
+      <p class="notice-modal-meta">
+        {{ n.publishedAt | date:'MMMM d, y' }}
+        <ng-container *ngIf="n.createdBy">
+          · posted by {{ n.createdBy.firstName }} {{ n.createdBy.lastName }}
+        </ng-container>
+      </p>
+    </div>
+
+    <!-- The author typed plain text, so it is rendered as plain text; only the
+         line breaks are honoured. -->
+    <div class="notice-modal-body">{{ n.body }}</div>
+
+    <div class="notice-modal-actions">
+      <button type="button" class="notice-dismiss-btn" (click)="dismissNotice(n)">
+        Got it
+      </button>
     </div>
   </div>
 </div>

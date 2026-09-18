@@ -64,6 +64,14 @@ export const routes: Routes = [
         loadComponent: () => import('./settings/master-data/master-data').then(m => m.MasterDataComponent)
       },
       {
+        // The notice board's admin side. Posting is restricted server-side to
+        // administrators and HR; this shares the settings permission.
+        path: 'settings/notices',
+        canActivate: [permissionGuard],
+        data: { module: 'settings/notices' },
+        loadComponent: () => import('./settings/notices/notices').then(m => m.NoticesComponent)
+      },
+      {
         path: 'settings/letter-templates',
         canActivate: [permissionGuard],
         data: { module: 'settings/letter-templates' },

@@ -118,11 +118,14 @@ model Company {
   taskHoursRequests     TaskHoursRequest[]
   projectPhases         ProjectPhase[]
   defaultProjectTasks   DefaultProjectTask[]
+  notices               Notice[]
   projectBudgetRequests ProjectBudgetRequest[]
 }
 
 // Authentication & RBAC
 model User {
+  /// Notices this person has dismissed from their dashboard.
+  noticeReads              NoticeRead[]
   id                       Int                        @id @default(autoincrement())
   email                    String                     @unique
   password                 String
@@ -521,6 +524,7 @@ model Employee {
   taskHoursRequested     TaskHoursRequest[]     @relation("TaskHoursRequestedBy")
   taskHoursReviewed      TaskHoursRequest[]     @relation("TaskHoursReviewedBy")
   taskHoursActivities    TaskHoursRequestActivity[]
+  noticesAuthored        Notice[]                  @relation("NoticeAuthor")
 
   @@unique([companyId, employeeCode])
 }
@@ -3717,4 +3721,61 @@ model DefaultProjectTask {
   updatedAt DateTime @updatedAt
 
   @@unique([companyId, name])
+}
+
+
+/// A company announcement, shown on everyone's dashboard until they dismiss it.
+///
+/// Deliberately not a notification: a notification is about something that
+/// happened to you, arrives in a feed and is read once. A notice is the
+/// company talking to everybody at once, and it stays in front of people until
+/// each of them has actually seen it -- which is what NoticeRead below records.
+model Notice {
+  id      Int     @id @default(autoincrement())
+  title   String
+  body    String  @db.Text
+  /// LOW, NORMAL, HIGH -- HIGH is what makes the dashboard popup open by
+  /// itself rather than waiting to be noticed in the list.
+  priority String @default("NORMAL")
+
+  /// When it starts and stops being shown. publishedAt in the future is a
+  /// notice written today for Monday; expiresAt null means it runs until
+  /// somebody retires it.
+  publishedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  /// Retired rather than deleted: a notice that has been read and acted on is
+  /// a record of what the company was told and when.
+  isActive    Boolean   @default(true)
+  /// Whether publishing it emailed everybody. Recorded so a later edit does
+  /// not send the announcement twice.
+  emailSentAt DateTime?
+
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdById Int
+  createdBy   Employee @relation("NoticeAuthor", fields: [createdById], references: [id])
+
+  reads NoticeRead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, isActive, publishedAt])
+}
+
+/// One person having seen one notice.
+///
+/// A row per person rather than a flag on the notice: "everybody has seen it"
+/// is not a thing a company of ninety can say, and the dashboard needs to know
+/// about the reader in front of it, not the average.
+model NoticeRead {
+  id       Int      @id @default(autoincrement())
+  noticeId Int
+  notice   Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  userId   Int
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt   DateTime @default(now())
+
+  @@unique([noticeId, userId])
+  @@index([userId])
 }

@@ -1,4 +1,5 @@
 ﻿import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { NoticesService, Notice } from '../services/notices';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
@@ -10,7 +11,7 @@ import { StatCardComponent } from '../shared/components/stat-card/stat-card.comp
 import {
   LucideCheckCircle2, LucideCircle, LucideClock,
   LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
-  LucideAlertCircle, LucideArrowRight,
+  LucideAlertCircle, LucideArrowRight, LucideMegaphone,
   LucideShield, LucideAward, LucideBanknote, LucideReceipt, LucideTrendingUp,
   LucideShoppingCart, LucideTarget, LucideCake, LucidePartyPopper, LucideGift,
   LucideSparkles, LucidePlay, LucideSquare, LucideMapPin,
@@ -35,12 +36,58 @@ import { HotToastService } from '@ngneat/hot-toast';
     LucideSparkles, LucidePlay, LucideSquare, LucideMapPin,
     LucideChevronRight, LucideFolderKanban,
     LucideCheck, LucideX, LucideTicket, LucideUserPlus, LucideTrophy, LucideTimer,
-    LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock
+    LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock,
+    LucideMegaphone
   ],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css']
 })
 export class DashboardComponent implements OnInit, OnDestroy {
+  // ── Notice board ────────────────────────────────────────────────────────
+  private noticesService = inject(NoticesService);
+
+  notices = signal<Notice[]>([]);
+  /** The one being shown in the popup, or null. */
+  activeNotice = signal<Notice | null>(null);
+
+  unreadNotices = computed(() => this.notices().filter((n) => !n.isRead));
+
+  private loadNotices() {
+    this.noticesService.forDashboard().subscribe({
+      next: (list) => {
+        this.notices.set(list || []);
+        // Only HIGH priority interrupts. Everything else waits to be noticed
+        // in the list -- a popup for every routine announcement is a popup
+        // people learn to dismiss without reading.
+        const urgent = (list || []).find((n) => !n.isRead && n.priority === 'HIGH');
+        if (urgent) this.activeNotice.set(urgent);
+      },
+      // Silent: a dashboard that loads without its notices is better than one
+      // that greets people with an error.
+      error: () => {},
+    });
+  }
+
+  openNotice(n: Notice) {
+    this.activeNotice.set(n);
+  }
+
+  /**
+   * Dismiss, and remember that this person has seen it.
+   *
+   * The local state is updated first so the popup closes at once; the request
+   * only has to persist what the reader has already been told has happened.
+   */
+  dismissNotice(n: Notice | null) {
+    this.activeNotice.set(null);
+    if (!n || n.isRead) return;
+
+    this.notices.update((list) =>
+      list.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)),
+    );
+    this.noticesService.markRead(n.id).subscribe({ error: () => {} });
+  }
+
   private authService = inject(AuthService);
   private router = inject(Router);
   private onboardingService = inject(OnboardingService);
@@ -192,6 +239,8 @@ myLeaveBalanceDays = computed(() => {
   }
 
   ngOnInit() {
+    this.loadNotices();
+
     this.clockInterval = setInterval(() => {
       this.currentTime.set(new Date());
     }, 1000);

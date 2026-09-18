@@ -1965,3 +1965,96 @@
   border-radius: 999px;
 }
 
+
+/* ── Notice board ─────────────────────────────────────────────────────────
+   The company talking to everybody. Spans the grid rather than sitting in a
+   column: an announcement competing with a widget for a third of a row is an
+   announcement nobody reads. */
+.notices-wide { grid-column: 1 / -1; }
+
+.notice-unread-pill {
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: #fff7ed;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.notice-list { display: flex; flex-direction: column; }
+
+.notice-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 4px;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s;
+}
+.notice-row:last-child { border-bottom: none; }
+.notice-row:hover { background: #f8fafc; }
+
+/* Unread is carried by weight and a dot, not a colour wash: the row is still
+   a row, it just has not been read. */
+.notice-row.unread .notice-row-title { font-weight: 700; color: #0f172a; }
+
+.notice-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #cbd5e1; flex-shrink: 0;
+}
+.notice-row.unread .notice-dot { background: #2563eb; }
+.notice-dot.high { background: #dc2626; }
+
+.notice-row-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.notice-row-title {
+  font-size: 14px; color: #334155;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.notice-row-meta { font-size: 12px; color: #94a3b8; }
+
+.notice-badge-high {
+  padding: 2px 8px; border-radius: 9999px;
+  background: #fef2f2; color: #b91c1c;
+  font-size: 10px; font-weight: 800; letter-spacing: .03em;
+  text-transform: uppercase; flex-shrink: 0;
+}
+
+/* ── The popup ──────────────────────────────────────────────────────────── */
+.notice-modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, .55);
+}
+
+.notice-modal {
+  width: 100%; max-width: 560px;
+  max-height: 80vh; overflow-y: auto;
+  background: #fff; border-radius: 14px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .3);
+  padding: 26px;
+}
+
+.notice-modal-head h2 { margin: 10px 0 4px; font-size: 20px; font-weight: 700; color: #0f172a; }
+.notice-modal-meta { margin: 0; font-size: 12px; color: #94a3b8; }
+
+.notice-modal-body {
+  margin: 18px 0 24px;
+  font-size: 15px; line-height: 1.65; color: #334155;
+  /* The author typed plain text; honour their line breaks and nothing else. */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notice-modal-actions { display: flex; justify-content: flex-end; }
+.notice-dismiss-btn {
+  padding: 10px 22px; border: none; border-radius: 8px;
+  background: #2563eb; color: #fff;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.notice-dismiss-btn:hover { background: #1d4ed8; }

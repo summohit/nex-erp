@@ -555,6 +555,47 @@ export class MailService {
     }
   }
 
+  /**
+   * A company notice, sent to everybody when one is posted.
+   *
+   * The body is plain text the author typed, so it is escaped rather than
+   * trusted: a notice is written by a person and read by ninety, and an
+   * unescaped angle bracket should not become markup in all of their inboxes.
+   */
+  async sendNoticeEmail(email: string, title: string, body: string) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const escape = (t: string) =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #1e3a8a; text-align: center;">${escape(title)}</h2>
+        <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin: 20px 0; color: #1e293b; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${escape(body)}</div>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${baseUrl}/dashboard" style="background-color: #3b82f6; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">Open the dashboard</a>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px; text-align: center;">You are receiving this because it was posted to your company's notice board.</p>
+      </div>
+    `;
+
+    try {
+      if (this.brevoApiKey) {
+        await this.sendBrevoEmail({ to: email, subject: `Notice: ${title}`, html: htmlContent });
+        return;
+      }
+      await this.sendWithRetry({
+        from: `"NEX ERP" <${this.fromEmail}>`,
+        envelope: { from: this.fromEmail, to: email },
+        to: email,
+        subject: `Notice: ${title}`,
+        html: htmlContent,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send notice email to ${email}`, error as any);
+      throw error;
+    }
+  }
+
   async sendTicketAssignedEmail(email: string, ticketNumber: string, ticketTitle: string) {
     const baseUrl = process.env.APP_URL || 'http://localhost:4200';
     const ticketLink = `${baseUrl}/crm/tickets`;

@@ -229,6 +229,25 @@ export class MenusService implements OnModuleInit {
           });
           this.logger.log('Payroll Rules menu auto-seeded successfully.');
         }
+
+        // The notice board's admin side: posting an announcement is an
+        // administrative act, so it sits with the other settings rather than
+        // beside the dashboard where the notices themselves appear.
+        const noticeBoardMenu = await this.prisma.menu.findFirst({
+          where: { route: '/settings/notices', parentId: settingsParent.id },
+        });
+        if (!noticeBoardMenu) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Notice Board',
+              route: '/settings/notices',
+              displayOrder: 11,
+              parentId: settingsParent.id,
+              isActive: true
+            }
+          });
+          this.logger.log('Notice Board menu auto-seeded successfully.');
+        }
       }
 
       // Also ensure Lead Forms is under CRM
