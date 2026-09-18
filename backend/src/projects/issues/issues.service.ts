@@ -1316,6 +1316,7 @@ export class IssuesService {
       where: { companyId },
       select: {
         id: true,
+        userId: true,
         firstName: true,
         lastName: true,
         avatarUrl: true,

@@ -314,7 +314,7 @@
           </div>
 
           <div class="composer-hint">
-            <span>
+            <span class="mention-help cursor-pointer" (click)="triggerMention('create')">
               <svg lucideAtSign size="12"></svg>
               Mention teammates with &#64;
             </span>
@@ -565,10 +565,15 @@
                   Uploading...
                 </span>
 
-                <span class="mention-help">
+                <button
+                  type="button"
+                  class="mention-help cursor-pointer"
+                  (click)="triggerMention('comment')"
+                  title="Mention someone"
+                >
                   <svg lucideAtSign size="12"></svg>
                   Mention someone
-                </span>
+                </button>
 
               </div>
 

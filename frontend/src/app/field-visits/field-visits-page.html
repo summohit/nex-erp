@@ -4,12 +4,12 @@
   <div class="page-header-card">
     <div>
       <div class="header-title-row">
-        <h1>Field Visits</h1>
+        <h1>{{ isEmployee() ? 'My Field Visits' : 'Field Visits' }}</h1>
         <span class="live-pill" *ngIf="summary().active > 0">
           <span class="live-dot"></span>{{ summary().active }} out now
         </span>
       </div>
-      <p>Every visit logged from the mobile app, across all projects.</p>
+      <p>{{ isEmployee() ? 'Your visits logged from the mobile app.' : 'Every visit logged from the mobile app, across all projects.' }}</p>
     </div>
 
     <div class="header-actions-group">
@@ -62,7 +62,7 @@
       </div>
     </div>
 
-    <div class="kpi-card">
+    <div class="kpi-card" *ngIf="isManager()">
       <div class="kpi-icon ic-teal"><svg lucideUsers [size]="17"></svg></div>
       <div>
         <div class="kpi-value" *ngIf="!isLoading()">{{ summary().employeesOut }}</div>
@@ -103,7 +103,7 @@
           (ngModelChange)="search.set($event)" />
       </div>
 
-      <select [ngModel]="employeeId()" (ngModelChange)="employeeId.set($event); load()">
+      <select *ngIf="isManager()" [ngModel]="employeeId()" (ngModelChange)="employeeId.set($event); load()">
         <option [ngValue]="null">All employees</option>
         <option *ngFor="let e of employees()" [ngValue]="e.id">{{ e.label }}</option>
       </select>
@@ -153,7 +153,9 @@
         <p>
           {{ hasActiveFilters()
               ? 'Nothing matches these filters. Try widening the date range.'
-              : 'When someone starts a visit from the mobile app, it will show up here.' }}
+              : (isEmployee()
+                ? 'When you start a visit from the mobile app, it will show up here.'
+                : 'When someone starts a visit from the mobile app, it will show up here.') }}
         </p>
       </div>
 

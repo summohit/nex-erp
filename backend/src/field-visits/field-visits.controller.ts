@@ -86,7 +86,7 @@ export class FieldVisitsController {
       employeeId: employeeId ? parseInt(employeeId, 10) : undefined,
       projectId: projectId ? parseInt(projectId, 10) : undefined,
       status: status || undefined,
-    });
+    }, { userId: req.user.sub, role: req.user.role, employeeId: req.user.employeeId });
   }
 
   @Get('project/:projectId')

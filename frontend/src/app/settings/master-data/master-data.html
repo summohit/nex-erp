@@ -10,27 +10,97 @@
     </button>
   </div>
 
-  <div class="tabs">
+  <div class="tabs" role="tablist" aria-label="Master data tabs">
     <button 
+      type="button"
+      role="tab"
       class="tab-btn" 
       [class.active]="activeTab() === 'departments'" 
+      [attr.aria-selected]="activeTab() === 'departments'"
       (click)="switchTab('departments')">
       Departments
     </button>
     <button 
+      type="button"
+      role="tab"
       class="tab-btn" 
       [class.active]="activeTab() === 'designations'" 
+      [attr.aria-selected]="activeTab() === 'designations'"
       (click)="switchTab('designations')">
       Designations
     </button>
-    <button class="tab-btn" [class.active]="activeTab() === 'branches'" (click)="switchTab('branches')">Branches</button>
-    <button class="tab-btn" [class.active]="activeTab() === 'shifts'" (click)="switchTab('shifts')">Shifts</button>
-    <button class="tab-btn" [class.active]="activeTab() === 'leave-types'" (click)="switchTab('leave-types')">Leave Types</button>
-    <button class="tab-btn" [class.active]="activeTab() === 'task-types'" (click)="switchTab('task-types')">Task Types</button>
-    <button class="tab-btn" [class.active]="activeTab() === 'project-phases'" (click)="switchTab('project-phases')">Project Phases</button>
-    <button class="tab-btn" [class.active]="activeTab() === 'default-project-tasks'" (click)="switchTab('default-project-tasks')">Default Project Tasks</button>
-    <button class="tab-btn" [class.active]="activeTab() === 'holidays'" (click)="switchTab('holidays')">Holidays</button>
-    <button class="tab-btn" [class.active]="activeTab() === 'blackout-dates'" (click)="switchTab('blackout-dates')">Blackout Dates</button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'branches'" 
+      [attr.aria-selected]="activeTab() === 'branches'"
+      (click)="switchTab('branches')">
+      Branches
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'shifts'" 
+      [attr.aria-selected]="activeTab() === 'shifts'"
+      (click)="switchTab('shifts')">
+      Shifts
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'leave-types'" 
+      [attr.aria-selected]="activeTab() === 'leave-types'"
+      (click)="switchTab('leave-types')">
+      Leave Types
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'task-types'" 
+      [attr.aria-selected]="activeTab() === 'task-types'"
+      (click)="switchTab('task-types')">
+      Task Types
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'project-phases'" 
+      [attr.aria-selected]="activeTab() === 'project-phases'"
+      (click)="switchTab('project-phases')">
+      Project Phases
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'default-project-tasks'" 
+      [attr.aria-selected]="activeTab() === 'default-project-tasks'"
+      (click)="switchTab('default-project-tasks')">
+      Default Project Tasks
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'holidays'" 
+      [attr.aria-selected]="activeTab() === 'holidays'"
+      (click)="switchTab('holidays')">
+      Holidays
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'blackout-dates'" 
+      [attr.aria-selected]="activeTab() === 'blackout-dates'"
+      (click)="switchTab('blackout-dates')">
+      Blackout Dates
+    </button>
   </div>
 
   <div class="table-container">

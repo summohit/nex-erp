@@ -579,34 +579,52 @@
 }
 
 .btn-add-card-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: #0c66e4;
   color: #ffffff;
-  border: none;
-  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  padding: 7px 14px;
   border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
 }
 
 .btn-add-card-submit:hover {
   background: #0055cc;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-add-card-submit:active {
+  transform: translateY(0);
 }
 
 .btn-cancel-inline {
-  background: transparent;
-  border: none;
-  color: #44546f;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.15s ease;
 }
 
 .btn-cancel-inline:hover {
-  color: #172b4d;
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
 }
 
 /* Column Footer Trigger */
@@ -1026,41 +1044,46 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-left: 38px;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 
 .modal-action-btn {
-  background: #f4f6fa;
+  background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 6px 14px;
+  border-radius: 8px;
+  padding: 6px 12px;
   font-size: 13px;
   font-weight: 500;
-  color: #1e293b;
-  display: flex;
+  color: #334155;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  transition: all 140ms ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  height: 32px;
+  box-sizing: border-box;
 }
 
 .modal-action-btn:hover {
-  background: #ebf3ff;
-  border-color: #cce0ff;
-  color: #0c66e4;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
   transform: translateY(-1px);
+  box-shadow: 0 3px 6px -1px rgba(15, 23, 42, 0.08);
 }
 
 .modal-action-btn:hover .btn-icon-svg {
   color: #0c66e4;
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .modal-action-btn:active {
-  transform: scale(0.96);
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .modal-action-btn svg,
@@ -3078,17 +3101,72 @@ svg[lucide], svg[class*=lucide] {
   margin-bottom: 1rem;
 }
 
-.section-label-subtitle {
-  font-size: 12px;
-  font-weight: 600;
-  color: #44546f;
-}
-
-.attached-labels-flex-row {
+.modal-meta-attached-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 20px;
+  margin-left: 38px;
+  margin-bottom: 22px;
+}
+
+.section-label-subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 6px;
+  line-height: 1;
+}
+
+.modal-attached-members-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attached-members-flex-row {
+  display: flex;
   align-items: center;
   gap: 6px;
+  height: 36px;
+}
+
+.attached-member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+
+.btn-add-member-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-add-member-circle:hover {
+  background: #f1f5f9;
+  border-color: #0c66e4;
+  color: #0c66e4;
 }
 
 .modal-attached-duedate-section {
@@ -3103,33 +3181,147 @@ svg[lucide], svg[class*=lucide] {
   background: #ffffff;
   border: 1px solid #dcdfe4;
   border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #172b4d;
-  display: flex;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
-.attached-duedate-btn:hover {
-  background: rgba(9, 30, 66, 0.04);
-  border-color: #8c9bab;
+.attached-duedate-btn:hover:not(.is-readonly) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
+}
+
+.attached-duedate-btn.is-readonly {
+  cursor: default;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.duedate-icon {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+/* Priority in Meta Row */
+.modal-attached-priority-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attached-priority-btn {
+  height: 36px;
+  padding: 0 12px;
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.attached-priority-btn:hover:not(.is-readonly) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
+}
+
+.attached-priority-btn.is-readonly {
+  cursor: default;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.priority-dot-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Quick Attach Action in Meta Row (when non-manager) */
+.modal-attached-action-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attached-action-btn {
+  height: 36px;
+  padding: 0 12px;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.attached-action-btn:hover {
+  background: #f8fafc;
+  border-color: #0c66e4;
+  color: #0c66e4;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
+}
+
+.attached-action-btn:hover .btn-icon-svg {
+  color: #0c66e4;
+}
+
+/* Labels Section */
+.modal-attached-labels-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attached-labels-flex-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
 }
 
 .attached-label-pill {
-  height: 32px;
+  height: 36px;
   padding: 0 12px;
-  border-radius: 4px;
-  display: flex;
+  border-radius: 8px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.14s ease;
   user-select: none;
+  box-sizing: border-box;
 }
 
 .attached-label-pill:hover {
@@ -3137,22 +3329,24 @@ svg[lucide], svg[class*=lucide] {
 }
 
 .btn-add-label-pill {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  background: #091e420f;
-  border: none;
-  color: #44546f;
-  display: flex;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  color: #64748b;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
 .btn-add-label-pill:hover {
-  background: #091e4214;
-  color: #172b4d;
+  background: #f1f5f9;
+  color: #0c66e4;
+  border-color: #0c66e4;
 }
 
 /* Dates Popover Styling */
@@ -6565,24 +6759,114 @@ input[type=text], input[type=email], input[type=password] {
   border-radius: 4px;
 }
 
-/* §15 Milestone picker on the task modal. The only place a task is linked to
-   a milestone — without it a milestone's task count can never leave 0/0. */
+/* §8 & §15 Delivery Phase & Milestone in Meta Row */
+.modal-phase-milestone-grid {
+  display: contents;
+}
+
+.modal-milestone-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 150px;
+  max-width: 240px;
+}
+
+.milestone-picker-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.milestone-picker-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+  transition: color 0.15s ease;
+  z-index: 1;
+}
+
+.milestone-picker-chevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+  transition: color 0.15s ease;
+  z-index: 1;
+}
+
 .modal-milestone-section .milestone-picker {
   width: 100%;
-  font-size: 13.5px;
+  height: 36px;
+  font-size: 13px;
+  font-weight: 500;
   font-family: inherit;
-  color: #1e293b;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
   border-radius: 8px;
-  padding: 9px 11px;
+  padding: 0 28px 0 32px;
   outline: none;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.modal-milestone-section .milestone-picker:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
 }
 
 .modal-milestone-section .milestone-picker:focus {
-  border-color: #2563eb;
+  border-color: #0c66e4;
   background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(12, 102, 228, 0.15);
+}
+
+.modal-milestone-section .milestone-picker:focus ~ .milestone-picker-chevron,
+.modal-milestone-section .milestone-picker-wrapper:focus-within .milestone-picker-icon {
+  color: #0c66e4;
+}
+
+.milestone-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  box-sizing: border-box;
+  width: 100%;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.milestone-readonly .milestone-picker-icon {
+  position: static;
+  transform: none;
+  color: #64748b;
+  flex-shrink: 0;
 }
 
 /* ── §6 Project documents in the Attachments tab ──────────────────────── */
@@ -7701,9 +7985,100 @@ input[type=text], input[type=email], input[type=password] {
 }
 
 
-/* §3: the hours field on the board's inline add-card form. Deliberately quiet
-   — a quick add should still feel quick — but present, because a card created
-   with no estimate is unbounded and the hours ceiling never applies to it. */
+/* §3: the hours field on the board's inline add-card form. */
+.inline-card-hours-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* The helper drops to its own line rather than fighting the field for room:
+     a board column is ~350px, and "Leave blank for no limit" beside the label,
+     icon and input has nowhere to go but on top of them. */
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 6px 0 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.inline-hours-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.inline-hours-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: #eff6ff;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.inline-hours-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.inline-hours-field-box {
+  display: flex;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  transition: all 0.15s ease;
+}
+
+.inline-hours-field-box:focus-within {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.inline-hours-numeric-input {
+  width: 44px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+  text-align: right;
+  padding: 2px 2px;
+  font-family: inherit;
+}
+
+.inline-hours-numeric-input::-webkit-inner-spin-button,
+.inline-hours-numeric-input::-webkit-outer-spin-button {
+  opacity: 0.4;
+}
+
+.inline-hours-unit-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-left: 3px;
+  user-select: none;
+}
+
+.inline-hours-helper {
+  font-size: 10.5px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
 .inline-card-hours {
   display: flex;
   align-items: center;
@@ -7729,6 +8104,13 @@ input[type=text], input[type=email], input[type=password] {
 }
 .inline-card-hours input:focus { border-color: #2563eb; }
 .inline-card-hours-hint { font-size: 11px; color: #97a0af; }
+
+/* Keeps the helper on its own row inside the wrapped card above. */
+.inline-card-hours-card .inline-hours-helper {
+  flex: 1 0 100%;
+  text-align: left;
+}
+.inline-card-hours-card .inline-hours-left { flex: 1 1 auto; min-width: 0; }
 
 /* §3: the assigned hours as an employee sees them — a figure, not a field. */
 .tt-estimate-readonly { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
@@ -7760,10 +8142,15 @@ input[type=text], input[type=email], input[type=password] {
 .type-pill.ticket-origin {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   background-color: #fff7ed;
   color: #b45309;
   border: 1px solid #fed7aa;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  line-height: 15px;
 }
 
 .ticket-origin-banner {
@@ -7819,3 +8206,19 @@ input[type=text], input[type=email], input[type=password] {
 }
 .proof-rename-ok:hover, .proof-file-rename:hover { background: #e6f2ff; color: #2563eb; }
 .proof-rename-cancel:hover { background: #ffebe6; color: #dc2626; }
+
+/* §8: the phase select on the board's inline add-card form, sized to sit in
+   the same card as the hours field above it. */
+.inline-phase-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid #dfe1e6;
+  border-radius: 5px;
+  font-size: 13px;
+  color: #172b4d;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+}
+.inline-phase-select:focus { border-color: #2563eb; }

@@ -2453,7 +2453,7 @@
                      ticket-raised task is identifiable without opening it. -->
                 <span class="type-pill ticket-origin" *ngIf="issue.projectTicket"
                       [title]="'From ticket ' + issue.projectTicket.ticketNumber + ': ' + issue.projectTicket.title">
-                  <svg lucideTicket size="10"></svg> {{ issue.projectTicket.ticketNumber }}
+                  {{ issue.projectTicket.ticketNumber }}
                 </span>
                 <span class="type-pill" *ngIf="issue.type && issue.type !== 'TASK'" [ngClass]="issue.type.toLowerCase()">{{ issue.type }}</span>
                 <span class="type-pill" *ngIf="issue.rejectionReason" style="background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5;" [title]="issue.rejectionReason">
@@ -2519,19 +2519,54 @@
           <!-- §3: the hours this card is assigned. Optional -- a quick add must
                stay quick -- but asked here, because a card created without an
                estimate is unbounded and the hours ceiling never applies to it. -->
-          <div class="inline-card-hours">
-            <label>Estimated hours</label>
-            <input type="number" min="0" step="0.5" placeholder="e.g. 4"
-                   [ngModel]="inlineCardHours()"
-                   (ngModelChange)="inlineCardHours.set($event)"
-                   (keydown.enter)="$event.preventDefault(); submitInlineCard(col.id)" />
-            <span class="inline-card-hours-hint">Leave blank for no limit</span>
+          <!-- §3: Estimated hours on inline card creation -->
+          <div class="inline-card-hours-card">
+            <div class="inline-hours-left">
+              <span class="inline-hours-icon-badge">
+                <svg lucideClock size="13"></svg>
+              </span>
+              <span class="inline-hours-label">Estimated</span>
+              <div class="inline-hours-field-box">
+                <input 
+                  type="number" 
+                  min="0" 
+                  step="0.5" 
+                  placeholder="0"
+                  class="inline-hours-numeric-input"
+                  [ngModel]="inlineCardHours()"
+                  (ngModelChange)="inlineCardHours.set($event)"
+                  (keydown.enter)="$event.preventDefault(); submitInlineCard(col.id)" />
+                <span class="inline-hours-unit-tag">hrs</span>
+              </div>
+            </div>
+            <span class="inline-hours-helper">Leave blank for no limit</span>
+          </div>
+
+          <!-- §8: the delivery phase. Same card treatment as the hours above,
+               so the quick-add reads as one small form rather than a title box
+               with things bolted under it. -->
+          <div class="inline-card-hours-card" *ngIf="allPhases().length > 0">
+            <div class="inline-hours-left">
+              <span class="inline-hours-icon-badge">
+                <svg lucideFlag size="13"></svg>
+              </span>
+              <span class="inline-hours-label">Phase</span>
+              <select class="inline-phase-select"
+                      [ngModel]="inlineCardPhaseId()"
+                      (ngModelChange)="inlineCardPhaseId.set($event)">
+                <option [ngValue]="null">No phase</option>
+                <option *ngFor="let p of allPhases()" [ngValue]="p.id">{{ p.name }}</option>
+              </select>
+            </div>
           </div>
 
           <div class="inline-add-actions">
-            <button type="button" class="btn-add-card-submit" (click)="submitInlineCard(col.id)">Add card</button>
-            <button type="button" class="btn-cancel-inline" (click)="cancelInlineAdd()">
-              <svg lucideX size="20"></svg>
+            <button type="button" class="btn-add-card-submit" (click)="submitInlineCard(col.id)">
+              <svg lucidePlus size="14"></svg>
+              Add card
+            </button>
+            <button type="button" class="btn-cancel-inline" title="Cancel" (click)="cancelInlineAdd()">
+              <svg lucideX size="18"></svg>
             </button>
           </div>
         </div>
@@ -2783,7 +2818,7 @@
       </div>
 
       <!-- Action Buttons Row -->
-      <div class="modal-action-buttons">
+      <div class="modal-action-buttons" *ngIf="canManageTask || (isCurrentUserPM() && getColumnById(selectedIssue()?.columnId)?.type === 'REVIEW')">
 
         <!-- Review Actions (Only visible to PMs in REVIEW column) -->
         <ng-container *ngIf="isCurrentUserPM() && getColumnById(selectedIssue()?.columnId)?.type === 'REVIEW'">
@@ -2805,7 +2840,7 @@
             <span>Priority</span>
           </button>
 
-          <div class="trello-popover" *ngIf="isProjectOwner && activePopover() === 'priority'" (click)="$event.stopPropagation()">
+          <div class="trello-popover" *ngIf="canManageTask && activePopover() === 'priority'" (click)="$event.stopPropagation()">
             <div class="popover-header">
               <span>Change Priority</span>
               <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
@@ -3095,43 +3130,32 @@
         </button>
       </div>
 
-      <!-- Attached Members, Labels & Due Date Row -->
-      <div class="modal-meta-attached-row flex flex-wrap gap-4 my-3" *ngIf="(selectedIssue()?.members && selectedIssue()?.members.length > 0) || (selectedIssue()?.labels && selectedIssue()?.labels.length > 0) || selectedIssue()?.dueDate || selectedIssue()?.startDate">
+      <!-- Attached Task Properties & Attributes Row -->
+      <div class="modal-meta-attached-row flex flex-wrap gap-4 my-3" *ngIf="(selectedIssue()?.members && selectedIssue()?.members.length > 0) || (selectedIssue()?.labels && selectedIssue()?.labels.length > 0) || selectedIssue()?.dueDate || selectedIssue()?.startDate || issueForm.priority || selectedIssue()?.priority || allPhases().length > 0 || projectMilestones().length > 0 || !canManageTask">
         <!-- Members Section -->
-        <div class="modal-attached-members-section" *ngIf="selectedIssue()?.members && selectedIssue()?.members.length > 0">
+        <div class="modal-attached-members-section" *ngIf="(selectedIssue()?.members && selectedIssue()?.members.length > 0) || canManageTask">
           <div class="section-label-subtitle">Members</div>
           <div class="attached-members-flex-row flex items-center gap-1">
-            <div class="attached-member-avatar" 
-                 *ngFor="let m of getVisibleMembers(selectedIssue()?.members)" 
-                 [style.background-color]="getMemberColor(m)" 
-                 [title]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')"
-                 (click)="togglePopover('members')">
-              <img *ngIf="m.employee?.avatarUrl" [src]="m.employee?.avatarUrl" class="avatar-img" [alt]="m.employee?.firstName">
-              <span *ngIf="!m.employee?.avatarUrl">{{ getMemberInitials(m) }}</span>
-            </div>
+            <ng-container *ngIf="selectedIssue()?.members && selectedIssue()?.members.length > 0">
+              <div class="attached-member-avatar" 
+                   *ngFor="let m of getVisibleMembers(selectedIssue()?.members)" 
+                   [style.background-color]="getMemberColor(m)" 
+                   [title]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')"
+                   (click)="canManageTask && togglePopover('members')">
+                <img *ngIf="m.employee?.avatarUrl" [src]="m.employee?.avatarUrl" class="avatar-img" [alt]="m.employee?.firstName">
+                <span *ngIf="!m.employee?.avatarUrl">{{ getMemberInitials(m) }}</span>
+              </div>
 
-            <!-- Overflow Counter Badge -->
-            <div class="attached-member-overflow-badge" 
-                 *ngIf="getRemainingMembersCount(selectedIssue()?.members) > 0" 
-                 (click)="togglePopover('members')" 
-                 title="View all members">
-              +{{ getRemainingMembersCount(selectedIssue()?.members) }}
-            </div>
+              <!-- Overflow Counter Badge -->
+              <div class="attached-member-overflow-badge" 
+                   *ngIf="getRemainingMembersCount(selectedIssue()?.members) > 0" 
+                   (click)="canManageTask && togglePopover('members')" 
+                   title="View all members">
+                +{{ getRemainingMembersCount(selectedIssue()?.members) }}
+              </div>
+            </ng-container>
 
             <button class="btn-add-member-circle" *ngIf="canManageTask" (click)="togglePopover('members')" type="button" title="Add members">
-              <svg lucidePlus size="16"></svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Labels Section -->
-        <div class="modal-attached-labels-section" *ngIf="selectedIssue()?.labels && selectedIssue()?.labels.length > 0">
-          <div class="section-label-subtitle">Labels</div>
-          <div class="attached-labels-flex-row">
-            <div class="attached-label-pill" *ngFor="let il of selectedIssue()?.labels" [style.background-color]="il.label?.color || il.color" [style.color]="getLabelTextColor(il.label?.color || il.color)" (click)="togglePopover('labels')">
-              <span>{{ il.label?.name || il.name }}</span>
-            </div>
-            <button class="btn-add-label-pill" *ngIf="canManageTask" (click)="togglePopover('labels')" type="button" title="Add label">
               <svg lucidePlus size="16"></svg>
             </button>
           </div>
@@ -3143,50 +3167,175 @@
           <button class="attached-duedate-btn" type="button"
                   [class.is-readonly]="!canManageTask"
                   (click)="canManageTask && togglePopover('dates', $event)">
+            <svg lucideCalendar size="14" class="duedate-icon"></svg>
             <span>{{ formatDisplayDueDate(selectedIssue()) }}</span>
             <svg lucideRepeat size="14" *ngIf="selectedIssue()?.recurring && selectedIssue()?.recurring !== 'Never'" class="ml-1"></svg>
-            <!-- No chevron when it cannot be opened: the arrow is the promise
-                 that clicking does something. -->
-            <svg lucideChevronDown size="14" class="ml-1" *ngIf="canManageTask"></svg>
+            <svg lucideChevronDown size="13" class="ml-1" *ngIf="canManageTask"></svg>
           </button>
         </div>
-      </div>
 
-      <!-- §8: the delivery phase. The board's own task form has no room for
-           it and the inline add is a title box, so this is where a task
-           created on the board gets its phase. -->
-      <div class="modal-milestone-section mb-6" *ngIf="allPhases().length > 0">
-        <div class="section-label-subtitle">Phase</div>
-        <select
-          *ngIf="canManageTask; else phaseReadOnly"
-          class="milestone-picker"
-          [ngModel]="selectedIssue()?.phaseId ?? null"
-          (ngModelChange)="setIssuePhase($event)">
-          <option [ngValue]="null">No phase</option>
-          <option *ngFor="let p of allPhases()" [ngValue]="p.id">{{ p.name }}</option>
-        </select>
-        <ng-template #phaseReadOnly>
-          <div class="milestone-readonly">{{ selectedIssue()?.phase?.name || 'No phase' }}</div>
-        </ng-template>
-      </div>
+        <!-- Priority Section -->
+        <div class="modal-attached-priority-section" *ngIf="issueForm.priority || selectedIssue()?.priority">
+          <div class="section-label-subtitle">Priority</div>
+          <div class="popover-container">
+            <button class="attached-priority-btn" type="button"
+                    [class.is-readonly]="!canManageTask"
+                    (click)="canManageTask && togglePopover('priority-meta')">
+              <span class="priority-dot-indicator" [style.background-color]="getPriorityColor(issueForm.priority || selectedIssue()?.priority)"></span>
+              <span>{{ getPriorityLabel(issueForm.priority || selectedIssue()?.priority) }}</span>
+              <svg lucideChevronDown size="13" class="ml-1" *ngIf="canManageTask"></svg>
+            </button>
 
-      <!-- §15: the milestone this task delivers. This is the only place the
-           link is made — without it a milestone's task count is always 0/0. -->
-      <div class="modal-milestone-section mb-6" *ngIf="projectMilestones().length > 0">
-        <div class="section-label-subtitle">Milestone</div>
-        <select
-          *ngIf="canManageTask; else milestoneReadOnly"
-          class="milestone-picker"
-          [ngModel]="selectedIssue()?.milestoneId ?? null"
-          (ngModelChange)="setIssueMilestone($event)">
-          <option [ngValue]="null">No milestone</option>
-          <option *ngFor="let m of projectMilestones()" [ngValue]="m.id">{{ m.name }}</option>
-        </select>
-        <!-- Which milestone the task delivers is worth knowing even when it is
-             not yours to change. -->
-        <ng-template #milestoneReadOnly>
-          <div class="milestone-readonly">{{ selectedIssueMilestoneName() || 'No milestone' }}</div>
-        </ng-template>
+            <!-- Priority Popover for Meta Row -->
+            <div class="trello-popover" *ngIf="canManageTask && activePopover() === 'priority-meta'" (click)="$event.stopPropagation()">
+              <div class="popover-header">
+                <span>Change Priority</span>
+                <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
+              </div>
+              <div class="popover-body p-2">
+                <button class="popover-item" [class.selected]="issueForm.priority === 'LOW'" (click)="updatePriority('LOW')">
+                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #16a34a;"></span>
+                  <span class="flex-1 text-left">Low</span>
+                  <svg *ngIf="issueForm.priority === 'LOW'" lucideCheck size="14"></svg>
+                </button>
+                <button class="popover-item" [class.selected]="issueForm.priority === 'MEDIUM'" (click)="updatePriority('MEDIUM')">
+                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #ca8a04;"></span>
+                  <span class="flex-1 text-left">Medium</span>
+                  <svg *ngIf="issueForm.priority === 'MEDIUM'" lucideCheck size="14"></svg>
+                </button>
+                <button class="popover-item" [class.selected]="issueForm.priority === 'HIGH'" (click)="updatePriority('HIGH')">
+                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #ea580c;"></span>
+                  <span class="flex-1 text-left">High</span>
+                  <svg *ngIf="issueForm.priority === 'HIGH'" lucideCheck size="14"></svg>
+                </button>
+                <button class="popover-item" [class.selected]="issueForm.priority === 'CRITICAL'" (click)="updatePriority('CRITICAL')">
+                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #dc2626;"></span>
+                  <span class="flex-1 text-left">Critical</span>
+                  <svg *ngIf="issueForm.priority === 'CRITICAL'" lucideCheck size="14"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- §8: Phase Section -->
+        <div class="modal-milestone-section" *ngIf="allPhases().length > 0">
+          <div class="section-label-subtitle">Phase</div>
+          <div class="milestone-picker-wrapper" *ngIf="canManageTask; else phaseReadOnly">
+            <svg lucideLayers size="14" class="milestone-picker-icon"></svg>
+            <select
+              class="milestone-picker"
+              [ngModel]="selectedIssue()?.phaseId ?? null"
+              (ngModelChange)="setIssuePhase($event)">
+              <option [ngValue]="null">No phase</option>
+              <option *ngFor="let p of allPhases()" [ngValue]="p.id">{{ p.name }}</option>
+            </select>
+            <svg lucideChevronDown size="13" class="milestone-picker-chevron"></svg>
+          </div>
+          <ng-template #phaseReadOnly>
+            <div class="milestone-readonly">
+              <svg lucideLayers size="14" class="milestone-picker-icon"></svg>
+              <span>{{ selectedIssue()?.phase?.name || 'No phase' }}</span>
+            </div>
+          </ng-template>
+        </div>
+
+        <!-- §15: Milestone Section -->
+        <div class="modal-milestone-section" *ngIf="projectMilestones().length > 0">
+          <div class="section-label-subtitle">Milestone</div>
+          <div class="milestone-picker-wrapper" *ngIf="canManageTask; else milestoneReadOnly">
+            <svg lucideFlag size="14" class="milestone-picker-icon"></svg>
+            <select
+              class="milestone-picker"
+              [ngModel]="selectedIssue()?.milestoneId ?? null"
+              (ngModelChange)="setIssueMilestone($event)">
+              <option [ngValue]="null">No milestone</option>
+              <option *ngFor="let m of projectMilestones()" [ngValue]="m.id">{{ m.name }}</option>
+            </select>
+            <svg lucideChevronDown size="13" class="milestone-picker-chevron"></svg>
+          </div>
+          <ng-template #milestoneReadOnly>
+            <div class="milestone-readonly">
+              <svg lucideFlag size="14" class="milestone-picker-icon"></svg>
+              <span>{{ selectedIssueMilestoneName() || 'No milestone' }}</span>
+            </div>
+          </ng-template>
+        </div>
+
+        <!-- Labels Section -->
+        <div class="modal-attached-labels-section" *ngIf="selectedIssue()?.labels && selectedIssue()?.labels.length > 0">
+          <div class="section-label-subtitle">Labels</div>
+          <div class="attached-labels-flex-row">
+            <div class="attached-label-pill" *ngFor="let il of selectedIssue()?.labels" [style.background-color]="il.label?.color || il.color" [style.color]="getLabelTextColor(il.label?.color || il.color)" (click)="canManageTask && togglePopover('labels')">
+              <span>{{ il.label?.name || il.name }}</span>
+            </div>
+            <button class="btn-add-label-pill" *ngIf="canManageTask" (click)="togglePopover('labels')" type="button" title="Add label">
+              <svg lucidePlus size="16"></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Attachment Section (When user cannot manage task and not in review) -->
+        <div class="modal-attached-action-section" *ngIf="!canManageTask && !(isCurrentUserPM() && getColumnById(selectedIssue()?.columnId)?.type === 'REVIEW')">
+          <div class="section-label-subtitle">Attach</div>
+          <div class="popover-container">
+            <button class="attached-action-btn" type="button" (click)="togglePopover('attachment')">
+              <svg lucidePaperclip size="14" class="btn-icon-svg"></svg>
+              <span>Add File</span>
+            </button>
+
+            <div class="trello-popover attachment-popover" *ngIf="activePopover() === 'attachment'" (click)="$event.stopPropagation()">
+              <div class="popover-header">
+                <span class="popover-title">Attach</span>
+                <button class="btn-icon-tiny btn-close-popover" (click)="closePopover()"><svg lucideX size="16"></svg></button>
+              </div>
+              
+              <div class="popover-body attachment-popover-body">
+                <!-- Section 1: Computer Upload -->
+                <div class="attach-section-title">Attach a file from your computer</div>
+                <div class="attach-section-desc">You can also drag and drop files to upload them.</div>
+                
+                <label class="btn-choose-file-trello" *ngIf="!isUploadingAttachment()">
+                  <input type="file" multiple (change)="onFileSelected($event)" style="display: none;">
+                  <span>Choose a file</span>
+                </label>
+
+                <!-- Upload Progress Bar -->
+                <div class="upload-progress-box" *ngIf="isUploadingAttachment()">
+                  <div class="upload-progress-label">
+                    <span>Uploading to ImageKit...</span>
+                    <span>{{ uploadProgress() }}%</span>
+                  </div>
+                  <div class="progress-bar-track">
+                    <div class="progress-bar-fill" [style.width.%]="uploadProgress()"></div>
+                  </div>
+                  <button type="button" class="btn-cancel-upload" (click)="cancelUpload()">Cancel</button>
+                </div>
+
+                <hr class="attach-divider">
+
+                <!-- Section 2: Link Upload -->
+                <div class="attach-section-title required-link-title">
+                  <span>Search or paste a link</span>
+                  <span class="asterisk">*</span>
+                </div>
+                <input type="text" class="trello-input-field link-url-input" [(ngModel)]="attachmentLinkUrl" placeholder="Find recent links or paste a new link">
+
+                <!-- Section 3: Display Text -->
+                <div class="attach-section-title">Display text (optional)</div>
+                <input type="text" class="trello-input-field link-name-input" [(ngModel)]="attachmentLinkName" placeholder="Text to display">
+                <div class="attach-input-hint">Give this link a title or description</div>
+
+                <!-- Footer Action Buttons -->
+                <div class="attach-footer-actions">
+                  <button class="btn-trello-cancel-text" (click)="closePopover()" type="button">Cancel</button>
+                  <button class="btn-trello-insert-primary" (click)="addLinkAttachment()" type="button">Insert</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Time Tracking Section -->

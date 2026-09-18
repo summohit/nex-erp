@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit, computed, DestroyRef } from '@angular/core';
+import { Component, signal, inject, OnInit, computed, DestroyRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute, NavigationEnd } from '@angular/router';
@@ -1214,6 +1214,114 @@ export class ProjectsComponent implements OnInit {
     const list = this.myTasks();
     return [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   });
+
+  // Hub Control Bar Searchable Select
+  boardDropdownOpen = signal<boolean>(false);
+  boardFilterSearch = signal<string>('');
+
+  filteredBoardsForSelect = computed(() => {
+    const list = this.allBoardsForSelect();
+    const q = this.boardFilterSearch().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(p =>
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.key && p.key.toLowerCase().includes(q)) ||
+      (p.client?.name && p.client.name.toLowerCase().includes(q))
+    );
+  });
+
+  filteredTasksForSelect = computed(() => {
+    const list = this.allTasksForSelect();
+    const q = this.boardFilterSearch().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(t =>
+      (t.title && t.title.toLowerCase().includes(q)) ||
+      (t.refKey && t.refKey.toLowerCase().includes(q))
+    );
+  });
+
+  toggleBoardDropdown(event?: Event) {
+    if (event) event.stopPropagation();
+    const willOpen = !this.boardDropdownOpen();
+    this.boardDropdownOpen.set(willOpen);
+    if (willOpen) {
+      this.boardFilterSearch.set('');
+      setTimeout(() => {
+        const inputEl = document.querySelector('.dropdown-search-input') as HTMLInputElement;
+        if (inputEl) inputEl.focus();
+      }, 50);
+    }
+  }
+
+  closeBoardDropdown() {
+    this.boardDropdownOpen.set(false);
+    this.boardFilterSearch.set('');
+  }
+
+  selectBoardOption(val: string) {
+    this.searchQuery.set(val);
+    this.closeBoardDropdown();
+    if (val) {
+      if (this.activeTab() !== 'my-tasks' && this.activeTab() !== 'all') {
+        this.setActiveTab('all');
+      }
+      this.scrollToYourBoards();
+    }
+  }
+
+  onBoardFilterSearchEnter() {
+    const q = this.boardFilterSearch().trim();
+    if (this.activeTab() === 'my-tasks') {
+      const tasks = this.filteredTasksForSelect();
+      if (tasks.length > 0) {
+        this.selectBoardOption(tasks[0].title);
+      } else if (q) {
+        this.selectBoardOption(q);
+      }
+    } else {
+      const boards = this.filteredBoardsForSelect();
+      if (boards.length > 0) {
+        this.selectBoardOption(boards[0].name);
+      } else if (q) {
+        this.selectBoardOption(q);
+      }
+    }
+  }
+
+  scrollToYourBoards() {
+    setTimeout(() => {
+      const targetId = this.activeTab() === 'my-tasks' ? 'my-tasks-section' : 'your-boards-section';
+      const targetEl = document.getElementById(targetId);
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        const heading = Array.from(document.querySelectorAll('h2')).find(h => 
+          h.textContent?.toLowerCase().includes('your boards') || 
+          h.textContent?.toLowerCase().includes('all tasks') ||
+          h.textContent?.toLowerCase().includes('my tasks')
+        );
+        if (heading) {
+          heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }, 100);
+  }
+
+  clearBoardFilter(event: Event) {
+    event.stopPropagation();
+    this.searchQuery.set('');
+    this.boardFilterSearch.set('');
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    if (this.boardDropdownOpen()) {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.search-select-box')) {
+        this.closeBoardDropdown();
+      }
+    }
+  }
 
   // Create / Edit Modal Searchable Selects
   clientDropdownOpen = signal<boolean>(false);

@@ -20,7 +20,7 @@ import {
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
   LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
   LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
-  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive, LucideFlag,
+  LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive, LucideFlag, LucideLayers,
   LucideTicket,
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
@@ -55,7 +55,7 @@ declare var Quill: any;
     LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
     LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
     LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
-    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive, LucideFlag,
+    LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideArchive, LucideFlag, LucideLayers,
     LucideTicket,
     LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
     LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
@@ -1614,6 +1614,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   inlineCardTitle = signal<string>('');
   /** §3: hours for the card being added inline. Optional, but asked for. */
   inlineCardHours = signal<number | string | null>(null);
+  /** §8: the phase for the card being added inline. */
+  inlineCardPhaseId = signal<number | null>(null);
   
   // Issue Drawer / Modal
   isDrawerOpen = signal(false);
@@ -1724,6 +1726,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         // And by the Attachments tab, which otherwise shows only task
         // attachments and reports a project full of documents as empty.
         this.loadProjectDocuments();
+        // §8: and by the Phase pickers on the task modal and the inline add,
+        // both of which render only when there are phases to offer. This was
+        // being called after an edit instead of on load, so the list was
+        // always empty when a task was first opened and the picker never
+        // appeared at all.
+        this.loadPhases();
         
         // Socket integration for the whole project
         this.socketService.joinProject(this.projectId);
@@ -1821,6 +1829,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       'LOW': '#22c55e'
     };
     return colors[priority] || '#94a3b8';
+  }
+
+  getPriorityLabel(priority: string | undefined | null): string {
+    if (!priority) return 'None';
+    return priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase();
   }
 
   getAssigneeColor(index: number): string {
@@ -2642,12 +2655,14 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.addingCardColumnId.set(columnId);
     this.inlineCardTitle.set('');
     this.inlineCardHours.set(null);
+    this.inlineCardPhaseId.set(null);
   }
 
   cancelInlineAdd() {
     this.addingCardColumnId.set(null);
     this.inlineCardTitle.set('');
     this.inlineCardHours.set(null);
+    this.inlineCardPhaseId.set(null);
   }
 
   submitInlineCard(columnId: number) {
@@ -2665,6 +2680,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       estimatedHours: this.inlineCardHours() != null && this.inlineCardHours() !== ''
         ? Number(this.inlineCardHours())
         : null,
+      // §8: the delivery phase, chosen right here so a card added from the
+      // board is not stranded without one.
+      phaseId: this.inlineCardPhaseId() ?? null,
     };
 
     this.projectsService.createIssue(this.projectId, payload).subscribe({
@@ -3214,7 +3232,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         const tkt = params.data?.projectTicket;
         if (!tkt) return '<span style="color:#cbd5e1;">—</span>';
         const title = String(tkt.title || '').replace(/"/g, '&quot;');
-        return `<span title="From ticket ${tkt.ticketNumber}: ${title}" style="display:inline-flex;align-items:center;gap:4px;background:#fff7ed;color:#b45309;padding:3px 9px;border-radius:9999px;font-size:11px;font-weight:700;">🎫 ${tkt.ticketNumber}</span>`;
+        return `<span title="From ticket ${tkt.ticketNumber}: ${title}" style="display:inline-block;padding:2px 7px;background:#fff7ed;color:#b45309;border:1px solid #fed7aa;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.02em;line-height:16px;">${tkt.ticketNumber}</span>`;
       },
     },
 

@@ -12,6 +12,7 @@ import {
 } from '../services/field-visits';
 import { EmployeeService } from '../services/employee.service';
 import { ProjectsService } from '../services/projects';
+import { AuthService } from '../services/auth.service';
 import { SkeletonComponent } from '../shared/components/skeleton/skeleton.component';
 
 type RangeKey = '7d' | '30d' | '90d' | '6m' | '1y' | 'custom';
@@ -42,6 +43,15 @@ export class FieldVisitsPageComponent implements OnInit {
   private fieldVisitsService = inject(FieldVisitsService);
   private employeeService = inject(EmployeeService);
   private projectsService = inject(ProjectsService);
+  private authService = inject(AuthService);
+
+  /** Current user from AuthService. */
+  private user = computed(() => this.authService.currentUser());
+  userRole = computed(() => this.user()?.role || 'EMPLOYEE');
+  /** true when the logged-in user is admin/management and can see all employees' visits. */
+  isManager = computed(() => ['SUPERADMIN', 'ADMIN', 'HR', 'SUPER_ADMIN'].includes(this.userRole()));
+  /** true when user is a regular employee — can only see their own visits. */
+  isEmployee = computed(() => !this.isManager());
 
   visits = signal<FieldVisit[]>([]);
   summary = signal<FieldVisitSummary>(EMPTY_SUMMARY);
@@ -109,14 +119,18 @@ export class FieldVisitsPageComponent implements OnInit {
   ngOnInit() {
     this.applyRange('30d');
 
-    this.employeeService.getEmployeesBasicList().subscribe({
-      next: (list) => this.employees.set(
-        (list || [])
-          .map((e: any) => ({ id: e.id, label: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() }))
-          .sort((a, b) => a.label.localeCompare(b.label)),
-      ),
-      error: () => this.employees.set([]),
-    });
+    // Only load the employees dropdown for admin / management users.
+    // Employee-level users can only see their own visits — the server enforces it.
+    if (this.isManager()) {
+      this.employeeService.getEmployeesBasicList().subscribe({
+        next: (list) => this.employees.set(
+          (list || [])
+            .map((e: any) => ({ id: e.id, label: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() }))
+            .sort((a, b) => a.label.localeCompare(b.label)),
+        ),
+        error: () => this.employees.set([]),
+      });
+    }
 
     this.projectsService.getProjects().subscribe({
       next: (list: any) => this.projects.set(

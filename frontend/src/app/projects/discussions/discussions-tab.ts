@@ -42,6 +42,19 @@ import {
 
 declare var Quill: any;
 
+export interface MentionMember {
+  id: number;
+  value: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  roleBadgeClass: string;
+  avatarUrl: string;
+  initials: string;
+  order: number;
+}
+
 @Component({
   selector: 'app-discussions-tab',
   standalone: true,
@@ -93,6 +106,9 @@ export class DiscussionsTabComponent implements OnInit, OnDestroy {
 
   mentionedUserIds: number[] = [];
   projectMembers: any[] = [];
+  mentionMembers: MentionMember[] = [];
+  private rawProject: any = null;
+  private rawCompanyMembers: any[] = [];
 
   @ViewChild('createQuillContainer', { static: false })
   createQuillContainer!: ElementRef;
@@ -125,15 +141,130 @@ export class DiscussionsTabComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadDiscussions();
+    this.loadMembers();
+  }
 
+  loadMembers(): void {
+    // 1. Fetch project details to capture project Owner/Lead and all project members
     this.projectsApi.getProject(this.projectId()).subscribe({
       next: (project) => {
+        this.rawProject = project;
         this.projectMembers = project.members || [];
+        this.buildMentionMembers();
       },
       error: () => {
         this.projectMembers = [];
       }
     });
+
+    // 2. Fetch company members so that any coworker can be mentioned in discussions
+    this.projectsApi.getCompanyMembers(this.projectId()).subscribe({
+      next: (compMembers) => {
+        this.rawCompanyMembers = compMembers || [];
+        this.buildMentionMembers();
+      },
+      error: () => {
+        this.rawCompanyMembers = [];
+      }
+    });
+  }
+
+  private buildMentionMembers(): void {
+    const map = new Map<number, MentionMember>();
+
+    // 1. Project Owner / Lead
+    if (this.rawProject?.lead) {
+      const lead = this.rawProject.lead;
+      const id = lead.userId || lead.user?.id || lead.id;
+      const firstName = lead.firstName || '';
+      const lastName = lead.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim() || 'Project Owner';
+      if (id) {
+        map.set(id, {
+          id,
+          value: fullName,
+          firstName,
+          lastName,
+          email: lead.user?.email || '',
+          role: 'Owner',
+          roleBadgeClass: 'role-badge-owner',
+          avatarUrl: lead.avatarUrl || '',
+          initials: this.getInitials(firstName, lastName),
+          order: 1
+        });
+      }
+    }
+
+    // 2. Project Members (including Project Managers and Members)
+    const members = this.rawProject?.members || [];
+    for (const m of members) {
+      const emp = m.employee || m;
+      const id = emp.userId || emp.user?.id || m.userId || emp.id;
+      if (!id) continue;
+
+      const firstName = emp.firstName || '';
+      const lastName = emp.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim() || 'Member';
+      const isPm = m.role === 'PROJECT_MANAGER';
+      const isAdmin = m.role === 'ADMIN';
+      const role = isPm ? 'Project Manager' : isAdmin ? 'Admin' : 'Member';
+      const roleBadgeClass = isPm ? 'role-badge-pm' : isAdmin ? 'role-badge-admin' : 'role-badge-member';
+      const order = isPm ? 2 : 3;
+
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          value: fullName,
+          firstName,
+          lastName,
+          email: emp.user?.email || '',
+          role,
+          roleBadgeClass,
+          avatarUrl: emp.avatarUrl || '',
+          initials: this.getInitials(firstName, lastName),
+          order
+        });
+      }
+    }
+
+    // 3. Company Members (team members across the company)
+    for (const cm of this.rawCompanyMembers) {
+      const id = cm.userId || cm.user?.id || cm.id;
+      if (!id) continue;
+
+      if (!map.has(id)) {
+        const firstName = cm.firstName || '';
+        const lastName = cm.lastName || '';
+        const fullName = `${firstName} ${lastName}`.trim() || 'Team Member';
+        map.set(id, {
+          id,
+          value: fullName,
+          firstName,
+          lastName,
+          email: cm.user?.email || '',
+          role: cm.designation?.name || 'Team',
+          roleBadgeClass: 'role-badge-team',
+          avatarUrl: cm.avatarUrl || '',
+          initials: this.getInitials(firstName, lastName),
+          order: 4
+        });
+      }
+    }
+
+    this.mentionMembers = Array.from(map.values()).sort((a, b) => {
+      if (a.order !== b.order) return a.order - b.order;
+      return a.value.localeCompare(b.value);
+    });
+  }
+
+  triggerMention(type: 'create' | 'comment' = 'comment'): void {
+    const quill = type === 'create' ? this.createQuillInstance : this.commentQuillInstance;
+    if (!quill) return;
+    quill.focus();
+    const range = quill.getSelection(true);
+    const index = range ? range.index : quill.getLength();
+    quill.insertText(index, '@');
+    quill.setSelection(index + 1);
   }
 
   ngOnDestroy(): void {
@@ -316,26 +447,21 @@ export class DiscussionsTabComponent implements OnInit, OnDestroy {
       searchTerm: string,
       renderList: (items: any[], searchTerm: string) => void
     ) => {
-      const members = this.projectMembers || [];
+      const members = this.mentionMembers || [];
 
-      const mappedMembers = members
-        .filter((member: any) => member?.employee?.userId)
-        .map((member: any) => ({
-          id: member.employee.userId,
-          value: `${member.employee.firstName || ''} ${member.employee.lastName || ''}`.trim()
-        }));
-
-      if (!searchTerm?.length) {
-        renderList(mappedMembers, searchTerm);
+      if (!searchTerm?.trim().length) {
+        renderList(members, searchTerm);
         return;
       }
 
-      renderList(
-        mappedMembers.filter((member: any) =>
-          member.value.toLowerCase().includes(searchTerm.toLowerCase())
-        ),
-        searchTerm
+      const term = searchTerm.toLowerCase().trim();
+      const filtered = members.filter((member: MentionMember) =>
+        member.value.toLowerCase().includes(term) ||
+        member.email.toLowerCase().includes(term) ||
+        member.role.toLowerCase().includes(term)
       );
+
+      renderList(filtered, searchTerm);
     };
 
     const quill = new Quill(element, {
@@ -349,9 +475,35 @@ export class DiscussionsTabComponent implements OnInit, OnDestroy {
           ['clean']
         ],
         mention: {
-          allowedChars: /^[A-Za-z\sÅÄÖåäö]*$/,
+          allowedChars: /^[A-Za-z0-9\s._\-ÅÄÖåäö]*$/,
           mentionDenotationChars: ['@'],
-          source: mentionSource
+          source: mentionSource,
+          renderItem: (item: any) => {
+            const avatarHtml = item.avatarUrl
+              ? `<img src="${item.avatarUrl}" class="mention-avatar-img" alt="${item.value}" />`
+              : `<div class="mention-avatar-placeholder">${item.initials || '?'}</div>`;
+
+            const badgeHtml = item.role
+              ? `<span class="mention-role-pill ${item.roleBadgeClass || ''}">${item.role}</span>`
+              : '';
+
+            const emailHtml = item.email
+              ? `<span class="mention-email">${item.email}</span>`
+              : '';
+
+            return `
+              <div class="mention-item-card">
+                <div class="mention-avatar-circle">${avatarHtml}</div>
+                <div class="mention-info">
+                  <div class="mention-name-row">
+                    <span class="mention-name">${item.value}</span>
+                    ${badgeHtml}
+                  </div>
+                  ${emailHtml}
+                </div>
+              </div>
+            `;
+          }
         }
       }
     });

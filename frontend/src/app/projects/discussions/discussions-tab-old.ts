@@ -18,7 +18,7 @@ declare var Quill: any;
     CommonModule, FormsModule,
     LucidePlus, LucideMessageSquare, LucideArrowLeft, LucideLoader2, LucidePaperclip, LucideAtSign
   ],
-  templateUrl: './discussions-tab.html',
+  templateUrl: './discussions-tab-old.html',
   styleUrls: ['./discussions-tab.css'],
   encapsulation: ViewEncapsulation.None
 })

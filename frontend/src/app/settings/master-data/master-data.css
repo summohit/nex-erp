@@ -39,30 +39,73 @@
 /* Tabs */
 .tabs {
   display: flex;
-  gap: var(--space-md);
-  border-bottom: 1px solid var(--border-subtle);
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   margin-bottom: var(--space-xl);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabs::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.tabs::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .tab-btn {
-  background: none;
+  background: transparent;
   border: none;
-  padding: var(--space-sm) var(--space-md);
-  font-size: var(--fs-base);
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: var(--text-muted);
+  color: #64748b;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  line-height: 1.4;
+  letter-spacing: -0.1px;
 }
 
 .tab-btn:hover {
-  color: var(--text-main);
+  color: #0f172a;
+  background: #f1f5f9;
 }
 
 .tab-btn.active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
+  background: var(--color-primary, #FF5200);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(255, 82, 0, 0.28);
+}
+
+.tab-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #FF5200);
+  outline-offset: 2px;
 }
 
 /* AG Grid container */

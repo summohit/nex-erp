@@ -25,29 +25,123 @@
 <div class="boards-page">
   <!-- Search & Filter Control Bar -->
   <div class="hub-control-bar">
-    <div class="search-select-box">
-      <svg lucideSearch size="15" class="search-select-icon"></svg>
-      <select 
-        class="search-select-input" 
-        [ngModel]="searchQuery()" 
-        (ngModelChange)="searchQuery.set($event)">
-        <option value="">{{ activeTab() === 'my-tasks' ? 'All Tasks (Select to filter)' : 'All Boards (Select to filter)' }}</option>
-        <ng-container *ngIf="activeTab() !== 'my-tasks'">
-          <option *ngFor="let p of allBoardsForSelect()" [value]="p.name">{{ p.name }} {{ p.key ? '(' + p.key + ')' : '' }}</option>
-        </ng-container>
-        <ng-container *ngIf="activeTab() === 'my-tasks'">
-          <option *ngFor="let t of allTasksForSelect()" [value]="t.title">{{ t.title }}</option>
-        </ng-container>
-      </select>
+    <div class="search-select-box" [class.open]="boardDropdownOpen()">
       <button 
-        *ngIf="searchQuery()" 
         type="button" 
-        class="search-select-clear" 
-        (click)="searchQuery.set('')"
-        title="Clear selection">
-        <svg lucideX size="13"></svg>
+        class="search-select-trigger" 
+        (click)="toggleBoardDropdown($event)"
+        [title]="searchQuery() || (activeTab() === 'my-tasks' ? 'All Tasks (Select to filter)' : 'All Boards (Select to filter)')">
+        <svg lucideSearch size="15" class="search-select-icon"></svg>
+        <span class="search-select-label" [class.placeholder]="!searchQuery()">
+          {{ searchQuery() || (activeTab() === 'my-tasks' ? 'All Tasks (Select to filter)' : 'All Boards (Select to filter)') }}
+        </span>
+        <div class="search-select-actions">
+          <button 
+            *ngIf="searchQuery()" 
+            type="button" 
+            class="search-select-clear" 
+            (click)="clearBoardFilter($event)"
+            title="Clear selection">
+            <svg lucideX size="13"></svg>
+          </button>
+          <svg lucideChevronDown size="14" class="search-select-chevron" [class.rotated]="boardDropdownOpen()"></svg>
+        </div>
       </button>
-      <svg lucideChevronDown size="14" class="search-select-chevron" *ngIf="!searchQuery()"></svg>
+
+      <!-- Searchable Dropdown Panel -->
+      <div class="search-select-dropdown" *ngIf="boardDropdownOpen()" (click)="$event.stopPropagation()">
+        <div class="search-select-dropdown-header">
+          <svg lucideSearch size="14" class="dropdown-search-icon"></svg>
+          <input 
+            type="text" 
+            class="dropdown-search-input" 
+            [placeholder]="activeTab() === 'my-tasks' ? 'Search tasks by title...' : 'Search boards by name or code...'" 
+            [ngModel]="boardFilterSearch()" 
+            (ngModelChange)="boardFilterSearch.set($event)"
+            (keydown.escape)="closeBoardDropdown()"
+            (keydown.enter)="onBoardFilterSearchEnter()"
+            autofocus />
+          <button 
+            *ngIf="boardFilterSearch()" 
+            type="button" 
+            class="dropdown-search-clear" 
+            (click)="boardFilterSearch.set('')"
+            title="Clear search">
+            <svg lucideX size="12"></svg>
+          </button>
+        </div>
+
+        <div class="search-select-options">
+          <!-- Reset / All option -->
+          <div 
+            class="search-select-option reset-option" 
+            [class.selected]="!searchQuery()" 
+            (click)="selectBoardOption('')">
+            <div class="option-content">
+              <span class="option-name">{{ activeTab() === 'my-tasks' ? 'All Tasks (Select to filter)' : 'All Boards (Select to filter)' }}</span>
+            </div>
+            <svg *ngIf="!searchQuery()" lucideCheck size="14" class="option-check"></svg>
+          </div>
+
+          <!-- Boards List -->
+          <ng-container *ngIf="activeTab() !== 'my-tasks'">
+            <div 
+              class="search-select-option" 
+              *ngFor="let p of filteredBoardsForSelect()" 
+              [class.selected]="searchQuery() === p.name" 
+              (click)="selectBoardOption(p.name)">
+              <div class="option-content">
+                <span class="option-avatar-icon" [style.background]="p.color || '#3b82f6'">
+                  {{ (p.name || 'B')[0] | uppercase }}
+                </span>
+                <div class="option-text-stack">
+                  <div class="option-title-row">
+                    <span class="option-name" [title]="p.name">{{ p.name }}</span>
+                    <span class="option-badge" *ngIf="p.key">{{ p.key }}</span>
+                  </div>
+                  <span class="option-sub" *ngIf="p.client?.name">{{ p.client.name }}</span>
+                </div>
+              </div>
+              <svg *ngIf="searchQuery() === p.name" lucideCheck size="14" class="option-check"></svg>
+            </div>
+            <div class="search-select-empty" *ngIf="filteredBoardsForSelect().length === 0">
+              <svg lucideSearch size="20" class="empty-search-icon"></svg>
+              <span>No boards found matching "<strong>{{ boardFilterSearch() }}</strong>"</span>
+            </div>
+          </ng-container>
+
+          <!-- Tasks List -->
+          <ng-container *ngIf="activeTab() === 'my-tasks'">
+            <div 
+              class="search-select-option" 
+              *ngFor="let t of filteredTasksForSelect()" 
+              [class.selected]="searchQuery() === t.title" 
+              (click)="selectBoardOption(t.title)">
+              <div class="option-content">
+                <span class="option-avatar-icon task-avatar">
+                  <svg lucideCheckSquare size="12"></svg>
+                </span>
+                <div class="option-text-stack">
+                  <div class="option-title-row">
+                    <span class="option-name" [title]="t.title">{{ t.title }}</span>
+                    <span class="option-badge" *ngIf="t.refKey">#{{ t.refKey }}</span>
+                  </div>
+                </div>
+              </div>
+              <svg *ngIf="searchQuery() === t.title" lucideCheck size="14" class="option-check"></svg>
+            </div>
+            <div class="search-select-empty" *ngIf="filteredTasksForSelect().length === 0">
+              <svg lucideSearch size="20" class="empty-search-icon"></svg>
+              <span>No tasks found matching "<strong>{{ boardFilterSearch() }}</strong>"</span>
+            </div>
+          </ng-container>
+        </div>
+
+        <div class="search-select-footer">
+          <span>{{ activeTab() === 'my-tasks' ? filteredTasksForSelect().length : filteredBoardsForSelect().length }} items</span>
+          <span class="footer-hint">Esc to close</span>
+        </div>
+      </div>
     </div>
 
     <div class="filter-tabs">
@@ -203,7 +297,7 @@
   </div>
 
   <!-- 📁 Your Boards Section -->
-  <div class="section-container" *ngIf="activeTab() === 'all'">
+  <div class="section-container" id="your-boards-section" *ngIf="activeTab() === 'all'">
     <div class="section-header">
       <div class="section-title-group">
         <svg lucideUser size="20" class="section-icon"></svg>
@@ -484,7 +578,7 @@
   </div>
 
   <!-- ✅ My Tasks — project, general and pre-sales work in one list -->
-  <div class="section-container my-tasks-section" *ngIf="activeTab() === 'my-tasks'">
+  <div class="section-container my-tasks-section" id="my-tasks-section" *ngIf="activeTab() === 'my-tasks'">
     <div class="my-tasks-header-card">
       <!-- Top Row: Title, Subtitle, Scope Switch & Add Task -->
       <div class="my-tasks-card-top">

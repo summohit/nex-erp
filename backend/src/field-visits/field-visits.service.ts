@@ -203,10 +203,32 @@ export class FieldVisitsService {
       projectId?: number;
       status?: string;
     },
+    caller?: { userId?: number; role?: string; employeeId?: number },
   ) {
     const where: any = { companyId };
 
-    if (filters.employeeId) where.employeeId = filters.employeeId;
+    // ── Role-based scoping ──────────────────────────────────────────────────
+    // EMPLOYEE users may only see their own field visits. Admins, HR,
+    // SUPERADMIN, and management roles see everything.
+    const isEmployee = caller?.role === 'EMPLOYEE';
+    if (isEmployee) {
+      let scopedEmployeeId = caller?.employeeId;
+      // Fallback: older JWT tokens may not carry employeeId
+      if (!scopedEmployeeId && caller?.userId) {
+        const emp = await this.prisma.employee.findFirst({ where: { userId: caller.userId } });
+        scopedEmployeeId = emp?.id;
+      }
+      if (scopedEmployeeId) {
+        where.employeeId = scopedEmployeeId;
+      } else {
+        // Employee record not found — return empty so they never see others' data
+        return { visits: [], summary: { total: 0, active: 0, completed: 0, cancelled: 0, totalDistanceKm: 0, totalDurationMins: 0, photoCount: 0, employeesOut: 0 } };
+      }
+    } else {
+      // Admin / management — honour the optional employee filter
+      if (filters.employeeId) where.employeeId = filters.employeeId;
+    }
+
     if (filters.projectId) where.projectId = filters.projectId;
     if (filters.status) where.status = filters.status;
 

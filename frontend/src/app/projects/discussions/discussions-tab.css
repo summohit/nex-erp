@@ -1415,13 +1415,33 @@
   background: #f4f5f7;
 }
 
-.mention-help,
+.mention-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 9px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mention-help:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
 .uploading-state {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   color: #98a2b3;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .uploading-state {
@@ -1631,3 +1651,190 @@
     font-size: 7px;
   }
 }
+
+/* ==========================================================================
+   Quill Mention Dropdown Styling
+   ========================================================================== */
+
+.ql-mention-list-container {
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid #e2e8f0 !important;
+  overflow: hidden !important;
+  z-index: 10000 !important;
+  padding: 6px !important;
+  min-width: 280px !important;
+  max-width: 360px !important;
+  animation: mentionFadeIn 0.15s ease-out;
+}
+
+@keyframes mentionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ql-mention-list {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  max-height: 280px !important;
+  overflow-y: auto !important;
+}
+
+.ql-mention-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.ql-mention-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.ql-mention-list-item {
+  display: block !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  margin: 2px 0 !important;
+  cursor: pointer !important;
+  transition: all 0.12s ease !important;
+  border: 1px solid transparent !important;
+}
+
+.ql-mention-list-item.selected,
+.ql-mention-list-item:hover {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.mention-item-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+}
+
+.mention-avatar-circle {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+}
+
+.mention-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mention-avatar-placeholder {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+  text-transform: uppercase;
+}
+
+.mention-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mention-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mention-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-role-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.role-badge-owner {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.role-badge-pm {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+.role-badge-admin {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.role-badge-member {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #dbeafe;
+}
+
+.role-badge-team {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.mention-email {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mention blot inside editor content and rendered messages */
+.mention {
+  display: inline-flex !important;
+  align-items: center !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  padding: 1px 5px !important;
+  margin: 0 1px !important;
+  border: 1px solid #dbeafe !important;
+  font-size: 0.92em !important;
+}
+
+.mention .ql-mention-denotation-char {
+  color: #3b82f6 !important;
+  font-weight: 700 !important;
+}
+
