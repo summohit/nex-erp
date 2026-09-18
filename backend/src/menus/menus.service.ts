@@ -121,7 +121,7 @@ export class MenusService implements OnModuleInit {
             { title: 'Projects', route: '/projects', displayOrder: 1 },
             { title: 'Tasks', route: '/tasks', displayOrder: 2 },
             { title: 'Timesheet', route: '/timesheets', displayOrder: 3 },
-            { title: 'Field Visits', route: '/field-visits', displayOrder: 4 },
+            { title: 'Client Visits', route: '/field-visits', displayOrder: 4 },
             // §4: additional-hours requests across every project.
             { title: 'Requests', route: '/task-requests', displayOrder: 5 },
           ];
