@@ -501,19 +501,19 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'summary'" (click)="setProjectTab('summary')"><svg lucideGlobe size="14"></svg> Summary</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'board'" (click)="setProjectTab('board')"><svg lucideKanban size="14"></svg> Board</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'list'" (click)="setProjectTab('list')"><svg lucideList size="14"></svg> List</button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'milestones'" (click)="setProjectTab('milestones')"><svg lucideFlag size="14"></svg> Milestones</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'milestones'" (click)="setProjectTab('milestones')"><svg lucideFlag size="14"></svg> Milestones<span class="tab-count" *ngIf="projectMilestones().length > 0">{{ projectMilestones().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'roadmap'" (click)="setProjectTab('roadmap')"><svg lucideGanttChart size="14"></svg> Roadmap</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'attachments'" (click)="setProjectTab('attachments')"><svg lucidePaperclip size="14"></svg> Attachments</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'attachments'" (click)="setProjectTab('attachments')"><svg lucidePaperclip size="14"></svg> Attachments<span class="tab-count" *ngIf="projectDocuments().length > 0">{{ projectDocuments().length }}</span></button>
     <!-- §2: evidence is what is attached to a TASK. Attachments, beside it, is
          the project's own paperwork — the contract, the scope, the proposal. -->
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'evidence'" (click)="setProjectTab('evidence')"><svg lucideFileCheck size="14"></svg> Evidence<span class="tab-count" *ngIf="evidenceCount() > 0">{{ evidenceCount() }}</span></button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Field Visits</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Field Visits<span class="tab-count" *ngIf="fieldVisits().length > 0">{{ fieldVisits().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'tickets'" (click)="setProjectTab('tickets')"><svg lucideTicket size="14"></svg> Tickets</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'discussions'" (click)="setProjectTab('discussions')"><svg lucideMessageSquare size="14"></svg> Discussions</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'budget-requests'" (click)="setProjectTab('budget-requests')"><svg lucideTrendingUp size="14"></svg> Budget requests</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'reports'" (click)="setProjectTab('reports')"><svg lucideBarChart size="14"></svg> Reports</button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'archived'" (click)="setProjectTab('archived')"><svg lucideArchive size="14"></svg> Archived work items</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'archived'" (click)="setProjectTab('archived')"><svg lucideArchive size="14"></svg> Archived work items<span class="tab-count" *ngIf="archivedIssues().length > 0">{{ archivedIssues().length }}</span></button>
   </div>
 
   <!-- Summary Dashboard Container -->

@@ -8236,3 +8236,23 @@ input[type=text], input[type=email], input[type=password] {
 }
 .attachment-rename-input:focus { border-color: #2563eb; }
 .attachment-rename-ext { font-size: 12px; color: #97a0af; flex-shrink: 0; }
+
+/* Counts on the project tabs.
+   Only on tabs whose number is already loaded — a badge that needs its own
+   fetch would mean loading every tab's data just to draw the tab strip. */
+.project-tab-btn .tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.project-tab-btn.active .tab-count { background: #dbeafe; color: #1d4ed8; }

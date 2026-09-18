@@ -721,7 +721,11 @@ export class ProjectsService {
           where: { status: { in: ['APPROVED', 'PAID'] } },
           select: { amount: true, status: true }
         }
-      }
+      },
+      // Newest first. Without an order Prisma returns whatever the database
+      // hands back, which put a project somebody had just created at the
+      // bottom of the list they were looking at.
+      orderBy: { createdAt: 'desc' },
     });
 
     const costByProject = await this.getCostRollupByProject(projects.map((p) => p.id), companyId);
