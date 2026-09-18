@@ -93,6 +93,16 @@ export class IssuesService {
         // the milestone above, and because every task predating phases has
         // none -- requiring one here would refuse the board's quick-add.
         phaseId: await this.resolvePhaseId(companyId, data.phaseId),
+        /// The hours the task is assigned (§3).
+        ///
+        /// Accepted here as well as on update: the board's create form has
+        /// collected Estimated Hours all along and this method silently
+        /// dropped it, so a task created with "4h" typed into it came out
+        /// unestimated -- and an unestimated task is unbounded, meaning the
+        /// hours ceiling never applied to anything created from the board.
+        estimatedHours: data.estimatedHours != null && data.estimatedHours !== ''
+          ? Number(data.estimatedHours)
+          : null,
       }
     });
 

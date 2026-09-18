@@ -291,3 +291,96 @@ describe('attaching a task to a phase', () => {
     await expect(call(service, 'resolvePhaseId', 1, 7)).resolves.toBe(7);
   });
 });
+
+/**
+ * §3: the hours a task is assigned must survive its creation.
+ *
+ * createIssue accepted estimatedHours from the board's create form and never
+ * wrote it, so a task created with "4h" typed in came out unestimated -- and
+ * an unestimated task is unbounded, which meant the hours ceiling silently
+ * did not apply to anything raised from the board.
+ */
+describe('assigned hours at creation', () => {
+  /**
+   * createIssue touches a lot of tables on its way to the write -- permissions,
+   * the key sequence, columns, activity, sockets. Stubbing each one by name
+   * makes the test about the plumbing rather than the behaviour, so the whole
+   * client is auto-stubbed and only what matters is pinned.
+   */
+  function capture() {
+    const created: any[] = [];
+
+    const model = (overrides: any = {}) =>
+      new Proxy(overrides, {
+        get: (target, prop: string) =>
+          prop in target ? target[prop] : jest.fn().mockResolvedValue(null),
+      });
+
+    const prisma: any = new Proxy(
+      {
+        issue: model({
+          count: jest.fn().mockResolvedValue(0),
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockImplementation((a: any) => {
+            created.push(a.data);
+            return Promise.resolve({ id: 9, ...a.data });
+          }),
+        }),
+        project: model({
+          findUnique: jest.fn().mockResolvedValue({ allowManualTimeLogging: true, name: 'P' }),
+          update: jest.fn().mockResolvedValue({ issueSeq: 1, key: 'NEX' }),
+        }),
+        boardColumn: model({
+          findUnique: jest.fn().mockResolvedValue({ id: 10, type: 'TODO' }),
+          findFirst: jest.fn().mockResolvedValue({ id: 10, type: 'TODO' }),
+        }),
+        // Both halves of canCreateTask, simply satisfied.
+        projectMember: model({ findFirst: jest.fn().mockResolvedValue({ id: 1 }) }),
+        employee: model({
+          findFirst: jest.fn().mockResolvedValue({ id: 60, department: { canCreateTasks: true } }),
+        }),
+      },
+      {
+        get: (target: any, prop: string) => {
+          if (prop in target) return target[prop];
+          if (prop === '$transaction') {
+            return jest.fn().mockImplementation((fn: any) => fn(prisma));
+          }
+          return model();
+        },
+      },
+    );
+
+    return { created, prisma };
+  }
+
+  const create = async (data: any) => {
+    const { created, prisma } = capture();
+    const service = new IssuesService(
+      prisma, {} as any, {} as any, { onIssueStatusChanged: jest.fn() } as any,
+    );
+    try {
+      await (service as any).createIssue(1, 2, 3, data);
+    } catch {
+      // createIssue also emits sockets and notifications this test does not
+      // stand up. The write is what is under test, and it happens first.
+    }
+    return created[0];
+  };
+
+  it('writes the estimated hours the form sent', async () => {
+    expect(await create({ title: 'T', estimatedHours: 4 })).toMatchObject({ estimatedHours: 4 });
+  });
+
+  it('leaves it null when the form sent nothing, keeping the task unbounded', async () => {
+    expect(await create({ title: 'T' })).toMatchObject({ estimatedHours: null });
+  });
+
+  it('treats an empty string as no estimate rather than zero', async () => {
+    expect(await create({ title: 'T', estimatedHours: '' })).toMatchObject({ estimatedHours: null });
+  });
+
+  it('coerces a numeric string, since a number input yields one', async () => {
+    expect(await create({ title: 'T', estimatedHours: '6' })).toMatchObject({ estimatedHours: 6 });
+  });
+});
