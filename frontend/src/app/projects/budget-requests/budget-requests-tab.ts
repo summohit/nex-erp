@@ -67,7 +67,7 @@ export class BudgetRequestsTabComponent {
   currency = computed(() => this.data()?.currency ?? 'INR');
   current = computed(() => this.data()?.current ?? { estimatedHours: null, budgetAmount: null });
 
-  pendingCount = computed(() => this.requests().filter((r) => r.status === 'PENDING').length);
+  pendingCount = computed(() => this.requests().filter((r) => r.status === 'REQUESTED').length);
 
   constructor() {
     effect(() => {

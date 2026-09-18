@@ -99,7 +99,7 @@ export class BudgetRequestsService {
       throw new ForbiddenException('Only an administrator reviews budget requests');
     }
     return this.prisma.projectBudgetRequest.findMany({
-      where: { companyId, status: 'PENDING' },
+      where: { companyId, status: 'REQUESTED' },
       select: {
         ...this.SELECT,
         project: {
@@ -198,7 +198,7 @@ export class BudgetRequestsService {
       },
     });
     if (!request) throw new NotFoundException('Request not found');
-    if (request.status !== 'PENDING') {
+    if (request.status !== 'REQUESTED') {
       throw new BadRequestException(`This request is already ${request.status.toLowerCase()}`);
     }
 
@@ -267,7 +267,7 @@ export class BudgetRequestsService {
       select: { id: true, projectId: true, status: true },
     });
     if (!request) throw new NotFoundException('Request not found');
-    if (request.status !== 'PENDING') {
+    if (request.status !== 'REQUESTED') {
       throw new BadRequestException('Only a request still awaiting review can be cancelled');
     }
 

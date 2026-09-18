@@ -127,7 +127,7 @@
     <!-- ── History ─────────────────────────────────────────────────────── -->
     <div class="br-list" *ngIf="!loading() && requests().length">
       <div class="br-card" *ngFor="let r of requests(); trackBy: trackById"
-           [class.settled]="r.status !== 'PENDING'">
+           [class.settled]="r.status !== 'REQUESTED'">
 
         <div class="br-card-top">
           <div class="br-asks">
@@ -172,7 +172,7 @@
           </span>
         </div>
 
-        <div class="br-actions" *ngIf="r.status === 'PENDING'">
+        <div class="br-actions" *ngIf="r.status === 'REQUESTED'">
           <button class="br-btn-ghost sm" *ngIf="canRequest()" (click)="cancel(r)" [disabled]="isBusy(r.id)">
             Withdraw
           </button>

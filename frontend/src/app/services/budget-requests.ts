@@ -10,7 +10,9 @@ import { environment } from '../../environments/environment';
  * render and no field-stripping to mirror here.
  */
 
-export type BudgetRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+// REQUESTED, not PENDING: the server writes the schema default, and the two
+// spellings disagreeing is what made every raised request unapprovable.
+export type BudgetRequestStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
 export interface BudgetRequest {
   id: number;

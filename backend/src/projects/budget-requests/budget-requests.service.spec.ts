@@ -23,7 +23,9 @@ const PROJECT = {
 const REQUEST = {
   id: 5,
   projectId: 3,
-  status: 'PENDING',
+  // REQUESTED, not PENDING: this is the schema default, and so the only state
+  // a freshly raised request is ever actually in.
+  status: 'REQUESTED',
   additionalHours: 500,
   additionalBudget: 200_000,
 };
@@ -251,5 +253,45 @@ describe('who may read the history', () => {
   it('refuses a non-administrator the cross-project queue', async () => {
     const { service } = makeService();
     await expect(service.pending(1, 'EMPLOYEE')).rejects.toThrow(ForbiddenException);
+  });
+});
+
+/**
+ * The status a request is created with must be the one the review path
+ * accepts.
+ *
+ * These were two different strings: create() set none, so rows took the schema
+ * default of REQUESTED, while pending(), review() and cancel() all looked for
+ * PENDING. Every request raised was therefore invisible to the approver and
+ * impossible to approve, reject or cancel. The fixture above hard-coded
+ * PENDING, which is a state nothing could actually produce, so the suite
+ * agreed with itself and missed it.
+ */
+describe('the created status and the reviewable status agree', () => {
+  const STATUS_ON_CREATE = 'REQUESTED'; // schema default for ProjectBudgetRequest
+
+  it('reviews a request carrying the status create() actually produces', async () => {
+    const { service } = makeService({
+      projectBudgetRequest: {
+        findFirst: jest.fn().mockResolvedValue({ ...REQUEST, status: STATUS_ON_CREATE }),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockImplementation((a: any) => Promise.resolve(a.data)),
+        update: jest.fn().mockImplementation((a: any) => Promise.resolve(a.data)),
+      },
+    });
+
+    await expect(
+      service.review(1, 9, 'ADMIN', 5, 'APPROVED'),
+    ).resolves.toBeDefined();
+  });
+
+  it('lists requests in the state create() leaves them in', async () => {
+    const { service, prisma } = makeService();
+    await service.pending(1, 'ADMIN');
+    expect(prisma.projectBudgetRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: STATUS_ON_CREATE }),
+      }),
+    );
   });
 });
