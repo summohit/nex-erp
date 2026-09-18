@@ -3163,6 +3163,20 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         return `<div style="display: flex; align-items: center; height: 100%;">${membersHtml}</div>`;
       }
     },
+    // §6: where the task came from. Sortable, so every ticket-raised task in
+    // the project can be brought together in one click.
+    {
+      headerName: 'Origin',
+      width: 130,
+      valueGetter: (params: any) => params.data?.projectTicket?.ticketNumber || '',
+      cellRenderer: (params: any) => {
+        const tkt = params.data?.projectTicket;
+        if (!tkt) return '<span style="color:#cbd5e1;">—</span>';
+        const title = String(tkt.title || '').replace(/"/g, '&quot;');
+        return `<span title="From ticket ${tkt.ticketNumber}: ${title}" style="display:inline-flex;align-items:center;gap:4px;background:#fff7ed;color:#b45309;padding:3px 9px;border-radius:9999px;font-size:11px;font-weight:700;">🎫 ${tkt.ticketNumber}</span>`;
+      },
+    },
+
     // §8: the delivery phase this task belongs to.
     {
       headerName: 'Phase',

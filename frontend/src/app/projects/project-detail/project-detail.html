@@ -2410,7 +2410,13 @@
                 <svg lucideCornerDownLeft size="10"></svg> {{ issue.parent.key }}
               </div>
 
-              <div class="card-labels" *ngIf="(issue.type && issue.type !== 'TASK') || issue.rejectionReason">
+              <div class="card-labels" *ngIf="(issue.type && issue.type !== 'TASK') || issue.rejectionReason || issue.projectTicket">
+                <!-- §6: this task came from a ticket. Shown on the card so a
+                     ticket-raised task is identifiable without opening it. -->
+                <span class="type-pill ticket-origin" *ngIf="issue.projectTicket"
+                      [title]="'From ticket ' + issue.projectTicket.ticketNumber + ': ' + issue.projectTicket.title">
+                  <svg lucideTicket size="10"></svg> {{ issue.projectTicket.ticketNumber }}
+                </span>
                 <span class="type-pill" *ngIf="issue.type && issue.type !== 'TASK'" [ngClass]="issue.type.toLowerCase()">{{ issue.type }}</span>
                 <span class="type-pill" *ngIf="issue.rejectionReason" style="background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5;" [title]="issue.rejectionReason">
                   Rejected
@@ -3400,6 +3406,18 @@
             </div>
 
           </div>
+        </div>
+      </div>
+
+      <!-- §6: where this task came from, and who asked for it. -->
+      <div class="ticket-origin-banner" *ngIf="selectedIssue()?.projectTicket as tkt">
+        <svg lucideTicket size="15"></svg>
+        <div>
+          <strong>Raised from ticket {{ tkt.ticketNumber }}</strong>
+          <p>
+            {{ tkt.title }}<span *ngIf="tkt.raisedBy"> — asked for by
+            {{ tkt.raisedBy.firstName }} {{ tkt.raisedBy.lastName }}</span>
+          </p>
         </div>
       </div>
 

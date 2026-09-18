@@ -488,6 +488,8 @@ export class TasksService {
         lead: { select: { id: true, title: true, leadCode: true, companyName: true, contactName: true, flow: true } },
         taskType: { select: { name: true } },
         phase: { select: { id: true, name: true } },
+        // §6: the ticket this task was converted from, if any.
+        projectTicket: { select: { id: true, ticketNumber: true } },
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         members: {
           select: {
@@ -534,6 +536,7 @@ export class TasksService {
         priority: i.priority,
         taskType: i.taskType?.name ?? null,
         // §8: both id and name -- the name renders, the id drives the filter.
+        ticketNumber: i.projectTicket?.ticketNumber ?? null,
         phaseId: i.phase?.id ?? null,
         phase: i.phase?.name ?? null,
         // Null on a general or deal task, which has no project to code.

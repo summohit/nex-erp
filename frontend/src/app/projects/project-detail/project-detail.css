@@ -7753,3 +7753,28 @@ input[type=text], input[type=email], input[type=password] {
   font-size: 14px;
   color: #475569;
 }
+
+/* §6: a task that came from a ticket, marked so it reads as different work
+   without having to be opened. Amber rather than the type pill's grey — it is
+   provenance, not classification. */
+.type-pill.ticket-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #fff7ed;
+  color: #b45309;
+  border: 1px solid #fed7aa;
+}
+
+.ticket-origin-banner {
+  display: flex;
+  gap: 10px;
+  padding: 11px 14px;
+  margin-bottom: 20px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #b45309;
+}
+.ticket-origin-banner strong { font-size: 13px; display: block; }
+.ticket-origin-banner p { margin: 3px 0 0; font-size: 12px; color: #92400e; line-height: 1.5; }

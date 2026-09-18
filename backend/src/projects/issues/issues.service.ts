@@ -169,6 +169,15 @@ export class IssuesService {
         milestone: { select: { id: true, name: true, status: true } },
         // §8: so the card, the modal and the phase filter can all read it.
         phase: { select: { id: true, name: true, isActive: true } },
+        // §6: where the task came from. A task converted from a ticket should
+        // be identifiable without opening it -- the relation has existed since
+        // tickets shipped, it was simply never selected.
+        projectTicket: {
+          select: {
+            id: true, ticketNumber: true, title: true, status: true,
+            raisedBy: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
         _count: { select: { comments: true } }
       },
       orderBy: { position: 'asc' }
