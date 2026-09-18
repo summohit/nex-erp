@@ -1374,6 +1374,17 @@
     <!-- Top toolbar / Header -->
     <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
       <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin: 0;">Roadmap</h2>
+
+      <!-- §9: the roadmap as something you can send a client. The chart is for
+           the team; these rows are for the person asking what happens next. -->
+      <div class="roadmap-export">
+        <button type="button" class="roadmap-export-btn" (click)="exportRoadmap('csv')">
+          <svg lucideDownload size="14"></svg> Export CSV
+        </button>
+        <button type="button" class="roadmap-export-btn" (click)="exportRoadmap('excel')">
+          <svg lucideDownload size="14"></svg> Export Excel
+        </button>
+      </div>
     </div>
 
     <!-- Main split view -->

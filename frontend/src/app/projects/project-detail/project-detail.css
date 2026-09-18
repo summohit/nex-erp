@@ -7792,3 +7792,13 @@ input[type=text], input[type=email], input[type=password] {
 /* §2: who uploaded an attachment, in the meta line under its name. */
 .att-uploader { color: #64748b; }
 .att-uploader::before { content: '· '; color: #cbd5e1; }
+
+/* §9: roadmap export, in the Roadmap toolbar. */
+.roadmap-export { display: flex; gap: 8px; }
+.roadmap-export-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border: 1px solid #dfe1e6; background: #fff;
+  border-radius: 6px; font-size: 13px; font-weight: 600; color: #42526e; cursor: pointer;
+  transition: background .15s;
+}
+.roadmap-export-btn:hover { background: #f4f5f7; }

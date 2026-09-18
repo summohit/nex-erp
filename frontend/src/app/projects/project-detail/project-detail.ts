@@ -3349,6 +3349,116 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Export the roadmap for a client (§9).
+   *
+   * Built from the same tasks the Gantt draws, but flattened: a client reading
+   * "what is planned for each week" does not want a chart they have to
+   * interpret, they want rows they can scan, sort and put in a status report.
+   *
+   * Only dated work is included. A task with no start and no due date has no
+   * place on a roadmap -- it would export as a row of blanks and invite the
+   * question "when is this then", which is exactly what the roadmap is for.
+   */
+  exportRoadmap(format: 'csv' | 'excel') {
+    const rows = this.roadmapExportRows();
+    if (!rows.length) {
+      this.toast.error('Nothing to export — no task on this project has dates yet.');
+      return;
+    }
+
+    const headers = [
+      'Project', 'Phase', 'Task', 'Week', 'Start date', 'End date', 'Status', 'Assigned to',
+    ];
+    const fileName = `${(this.project()?.name || 'project').replace(/[^\w-]+/g, '_')}_roadmap`;
+
+    if (format === 'excel') {
+      // Tab-separated, which Excel opens natively without a parse dialog.
+      const tsv = [headers.join('\t')]
+        .concat(rows.map((r) => r.map((c) => String(c).replace(/\t/g, ' ')).join('\t')))
+        .join('\n');
+      this.downloadFile(tsv, `${fileName}.xls`, 'application/vnd.ms-excel');
+      this.toast.success('Roadmap exported as Excel (.xls)');
+      return;
+    }
+
+    const csv = [headers, ...rows]
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    this.downloadFile(csv, `${fileName}.csv`, 'text/csv');
+    this.toast.success('Roadmap exported as CSV');
+  }
+
+  /** One row per dated task, ordered as the roadmap reads: earliest first. */
+  private roadmapExportRows(): string[][] {
+    const projectName = this.project()?.name || '';
+
+    return this.activeIssues()
+      .filter((i: any) => i.startDate || i.dueDate)
+      .sort((a: any, b: any) => {
+        const at = new Date(a.startDate || a.dueDate).getTime();
+        const bt = new Date(b.startDate || b.dueDate).getTime();
+        return at - bt;
+      })
+      .map((i: any) => {
+        const start = i.startDate ? new Date(i.startDate) : null;
+        const end = i.dueDate ? new Date(i.dueDate) : null;
+        const assignees = [
+          i.assignee ? `${i.assignee.firstName} ${i.assignee.lastName}`.trim() : null,
+          ...(i.members || []).map((m: any) =>
+            m.employee ? `${m.employee.firstName} ${m.employee.lastName}`.trim() : null,
+          ),
+        ].filter(Boolean);
+
+        return [
+          projectName,
+          i.phase?.name || '',
+          `${i.key} — ${i.title}`,
+          this.weekLabel(start || end),
+          this.exportDate(start),
+          this.exportDate(end),
+          this.readableStatus(i.status),
+          // Deduplicated: the assignee is usually a member as well, and the
+          // same name twice in a client-facing document looks like an error.
+          Array.from(new Set(assignees)).join(', '),
+        ];
+      });
+  }
+
+  /**
+   * The week a task sits in, as a client would say it: "Week of 15 Sep 2026".
+   *
+   * An ISO week number alone ("W38") means nothing to somebody outside the
+   * team, and the whole point of this export is that it can be sent out.
+   */
+  private weekLabel(date: Date | null): string {
+    if (!date || isNaN(date.getTime())) return '';
+    const monday = new Date(date);
+    // getDay() is 0 for Sunday, which belongs to the week that just ended.
+    const offset = (monday.getDay() + 6) % 7;
+    monday.setDate(monday.getDate() - offset);
+    return `Week of ${monday.toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })}`;
+  }
+
+  private exportDate(date: Date | null): string {
+    if (!date || isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  /** TODO → "To Do": the stored value is not what a client should read. */
+  private readableStatus(status: string): string {
+    switch (status) {
+      case 'TODO': return 'To Do';
+      case 'IN_PROGRESS': return 'In Progress';
+      case 'IN_REVIEW': return 'In Review';
+      case 'DONE': return 'Done';
+      case 'CANCELLED': return 'Cancelled';
+      default: return status || '';
+    }
+  }
+
   private downloadFile(content: string, fileName: string, mimeType: string) {
     const blob = new Blob([content], { type: mimeType });
     const url = window.URL.createObjectURL(blob);
