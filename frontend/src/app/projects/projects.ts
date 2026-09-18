@@ -1065,14 +1065,23 @@ export class ProjectsComponent implements OnInit {
 
     this.stagedUploading.set(true);
     let remaining = files.length;
-    let failed = 0;
+    const failures: { name: string; reason: string }[] = [];
 
     const finish = () => {
       if (--remaining > 0) return;
       this.stagedUploading.set(false);
       this.stagedFiles.set([]);
-      if (failed) {
-        this.toast.error(`${failed} of ${files.length} file(s) did not upload. Add them from the Attachments tab.`);
+      if (failures.length) {
+        // Report what the server actually said. This used to be a bare count,
+        // which made a 413 from the proxy, an expired token and a rejected
+        // file name all read as the same unactionable sentence -- there was no
+        // way to tell from the UI why an upload had failed.
+        const [first] = failures;
+        this.toast.error(
+          failures.length === 1
+            ? `${first.name} did not upload: ${first.reason}`
+            : `${failures.length} of ${files.length} files did not upload. ${first.name}: ${first.reason}`,
+        );
       }
       done();
     };
@@ -1080,9 +1089,23 @@ export class ProjectsComponent implements OnInit {
     for (const entry of files) {
       this.projectsService.uploadProjectDocument(projectId, entry.file, entry.name).subscribe({
         next: () => finish(),
-        error: () => { failed++; finish(); },
+        error: (err) => { failures.push({ name: entry.name, reason: this.uploadFailureReason(err) }); finish(); },
       });
     }
+  }
+
+  /**
+   * A sentence explaining a failed upload, from whatever the server returned.
+   *
+   * 413 is called out by name because it is the one the app cannot fix from
+   * here: it comes from the reverse proxy, before the request ever reaches
+   * Nest, so there is no server-side message to pass on.
+   */
+  private uploadFailureReason(err: any): string {
+    if (err?.status === 413) return 'the file is larger than the server accepts';
+    if (err?.status === 0) return 'the server could not be reached';
+    if (err?.status === 401 || err?.status === 403) return 'you are not signed in, or lack permission';
+    return err?.error?.message || err?.message || `upload failed (HTTP ${err?.status ?? 'unknown'})`;
   }
 
   /** Collapsed by default — see the note in projects.html. */

@@ -17,6 +17,16 @@ const UNSAFE = /[\\/:*?"<>|\u0000-\u001f]/g;
 
 export const MAX_DOCUMENT_NAME_LENGTH = 180;
 
+/**
+ * The largest project document the API will accept, in bytes.
+ *
+ * Matched to the 50mb body limit set in main.ts so the two cannot disagree.
+ * Note this is only half the story: the reverse proxy in front of the app has
+ * its own `client_max_body_size`, which defaults to 1MB in nginx -- if uploads
+ * fail in production but work locally, that is the limit doing it.
+ */
+export const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
+
 export class InvalidDocumentName extends Error {}
 
 /**

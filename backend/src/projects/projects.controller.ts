@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ProjectsService } from './projects.service';
 import { ProjectAiService } from './project-ai.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { MAX_DOCUMENT_BYTES } from './document-naming';
 
 @UseGuards(AuthGuard)
 @Controller('projects')
@@ -23,7 +24,10 @@ export class ProjectsController {
   }
 
   @Post(':id/documents')
-  @UseInterceptors(FileInterceptor('file'))
+  // An explicit ceiling, rather than multer's default of none. Without it an
+  // oversized file is only stopped by the reverse proxy, which answers 413
+  // with an HTML error page and no message the UI can show.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
   uploadProjectDocument(
     @Req() req,
     @Param('id', ParseIntPipe) id: number,
