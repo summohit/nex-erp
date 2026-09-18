@@ -8,6 +8,7 @@ import FormData from 'form-data';
 import { TasksGateway } from '../../events/tasks/tasks.gateway';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { canCreateTask, canManageTask } from '../../tasks/task-permissions';
+import { renameKeepingExtension } from '../document-naming';
 
 /**
  * Whether a submitted value actually differs from what is stored.
@@ -17,6 +18,21 @@ import { canCreateTask, canManageTask } from '../../tasks/task-permissions';
  * touched. Dates arrive as ISO strings against Date objects, and numeric ids
  * as strings, so both are normalised before comparing.
  */
+/**
+ * The stored name for an attachment: what the user typed, or the file's own
+ * name when they typed nothing. An unusable name falls back rather than
+ * failing the upload -- the file is already in ImageKit by this point, and
+ * refusing the row over a name would strand it there.
+ */
+function resolveAttachmentName(originalName: string, requestedName?: string): string {
+  if (!requestedName?.trim()) return originalName;
+  try {
+    return renameKeepingExtension(originalName, requestedName);
+  } catch {
+    return originalName;
+  }
+}
+
 function sameValue(next: unknown, current: unknown): boolean {
   if (next == null && current == null) return true;
   if (next == null || current == null) return false;
@@ -1361,7 +1377,7 @@ export class IssuesService {
     }
   }
 
-  async uploadAttachmentToImageKit(companyId: number, employeeId: number, projectId: number, issueId: number, file: Express.Multer.File) {
+  async uploadAttachmentToImageKit(companyId: number, employeeId: number, projectId: number, issueId: number, file: Express.Multer.File, requestedName?: string) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
     if (!file) throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
@@ -1391,7 +1407,10 @@ export class IssuesService {
 
       return await this.prisma.issueAttachment.create({
         data: {
-          fileName: file.originalname,
+          // §2: the name the user gave it, when they renamed it before
+          // saving. The extension is carried over from the real file either
+          // way -- see renameKeepingExtension.
+          fileName: resolveAttachmentName(file.originalname, requestedName),
           fileUrl,
           fileSize: file.size,
           fileType: 'FILE',

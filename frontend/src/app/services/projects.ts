@@ -231,10 +231,19 @@ export class ProjectsService {
    * a lone `file` for anything not yet updated. A single upload answers with
    * the attachment itself, a batch with an array.
    */
-  uploadAttachment(projectId: number, issueId: number, file: File | File[]) {
+  uploadAttachment(
+    projectId: number,
+    issueId: number,
+    file: File | File[],
+    names?: string[],
+  ) {
     const formData = new FormData();
     const list = Array.isArray(file) ? file : [file];
     for (const f of list) formData.append('files', f);
+    // §2: positional, one per file. Always appended when names are given, so
+    // an untouched file keeps its own name by sending an empty string rather
+    // than shifting every later name up a slot.
+    if (names) for (const n of names) formData.append('names', n ?? '');
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/attachments/upload`, formData);
   }
 

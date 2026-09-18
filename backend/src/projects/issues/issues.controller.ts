@@ -255,17 +255,23 @@ export class IssuesController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() uploaded: { files?: Express.Multer.File[]; file?: Express.Multer.File[] },
+    // §2: names the user gave the files before saving, positionally matched to
+    // `files`. Sent as repeated fields, which arrives as a string when there is
+    // only one.
+    @Body('names') names?: string | string[],
   ) {
     const incoming = [...(uploaded?.files || []), ...(uploaded?.file || [])];
     if (!incoming.length) throw new BadRequestException('No file provided');
 
+    const wanted = names === undefined ? [] : Array.isArray(names) ? names : [names];
+
     // Sequential rather than parallel: ImageKit is rate limited, and twenty
     // simultaneous uploads is how a batch half-fails.
     const results: any[] = [];
-    for (const f of incoming) {
+    for (const [index, f] of incoming.entries()) {
       results.push(
         await this.issuesService.uploadAttachmentToImageKit(
-          req.user.companyId, req.user.sub, projectId, id, f,
+          req.user.companyId, req.user.sub, projectId, id, f, wanted[index],
         ),
       );
     }

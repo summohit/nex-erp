@@ -1134,6 +1134,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         // Task counts on the Milestones tab move when a task's milestone does.
         this.loadProjectMilestones();
         this.loadProjectDocuments();
+        this.loadPhases();
         
         // Also manually update the selected issue right away for fast UI response
         const current = this.selectedIssue();
@@ -1912,6 +1913,32 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * The company's phases, for the picker on the task detail (§8).
+   *
+   * Distinct from fdAllPhases, which holds only the phases already in use on
+   * this board: the filter should not offer an option that returns nothing,
+   * but the picker must offer every phase a task could be moved into.
+   */
+  allPhases = signal<any[]>([]);
+
+  private loadPhases() {
+    this.masterDataService.getProjectPhases(true).subscribe({
+      next: (p: any) => this.allPhases.set(p || []),
+      error: () => {},
+    });
+  }
+
+  setIssuePhase(phaseId: number | null) {
+    const issue = this.selectedIssue();
+    if (!issue) return;
+    const phase = this.allPhases().find((p: any) => p.id === phaseId) || null;
+    // Optimistic on both, so the select and its label agree while the save
+    // is in flight.
+    this.selectedIssue.set({ ...issue, phaseId, phase });
+    this.updateIssueDetails({ phaseId });
+  }
+
   setIssueMilestone(milestoneId: number | null) {
     const issue = this.selectedIssue();
     if (!issue) return;
@@ -2068,6 +2095,14 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   filterSelectedLabels = signal<number[]>([]);
+  /** §8: phases ticked in the board's own filter bar. */
+  filterSelectedPhases = signal<number[]>([]);
+
+  toggleFilterPhase(phaseId: number) {
+    this.filterSelectedPhases.update((ids) =>
+      ids.includes(phaseId) ? ids.filter((i) => i !== phaseId) : [...ids, phaseId],
+    );
+  }
 
   getColumnIssues(columnId: number): any[] {
     let issues = (this.issuesByColumn().get(columnId) || []).filter(i => !i.isArchived);
@@ -2079,6 +2114,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         i.title.toLowerCase().includes(query) || 
         i.key?.toLowerCase().includes(query)
       );
+    }
+
+    // §8: Phase
+    const phases = this.filterSelectedPhases();
+    if (phases.length > 0) {
+      issues = issues.filter(i => i.phase?.id && phases.includes(i.phase.id));
     }
 
     // Members Filter
@@ -3708,7 +3749,16 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   proofIssue = signal<any | null>(null);
   proofTargetColumnId = signal<number | null>(null);
   proofInsertIndex = signal<number>(0);
-  proofFiles = signal<File[]>([]);
+  /**
+   * Evidence staged for upload, each with the name it will be saved under (§2).
+   *
+   * The name rides beside the File rather than on it: File.name is read-only,
+   * so a rename has to live somewhere until the upload happens.
+   */
+  proofFiles = signal<{ file: File; name: string }[]>([]);
+  /** Index of the staged file being renamed, or null. */
+  renamingProofIndex = signal<number | null>(null);
+  proofNameDraft = '';
   proofNotes = signal<string>('');
   isUploadingProof = signal(false);
   proofUploadProgress = signal<number>(0);
@@ -3738,11 +3788,41 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   onProofFileSelected(event: any) {
     const files = Array.from(event.target.files || []) as File[];
-    this.proofFiles.update(prev => [...prev, ...files]);
+    this.proofFiles.update(prev => [...prev, ...files.map((f: File) => ({ file: f, name: f.name }))]);
   }
 
   removeProofFile(index: number) {
     this.proofFiles.update(prev => prev.filter((_, i) => i !== index));
+    this.renamingProofIndex.set(null);
+  }
+
+  /** Renaming edits the NAME only; the extension comes from the real file. */
+  startRenameProof(index: number) {
+    const entry = this.proofFiles()[index];
+    if (!entry) return;
+    this.proofNameDraft = entry.name.replace(/\.[^.]+$/, '');
+    this.renamingProofIndex.set(index);
+  }
+
+  confirmRenameProof(index: number) {
+    const draft = this.proofNameDraft.trim();
+    if (draft) {
+      this.proofFiles.update(list => list.map((entry, i) =>
+        i === index
+          ? { ...entry, name: draft + (entry.file.name.match(/\.[^.]+$/)?.[0] || '') }
+          : entry,
+      ));
+    }
+    this.renamingProofIndex.set(null);
+  }
+
+  cancelRenameProof() {
+    this.renamingProofIndex.set(null);
+    this.proofNameDraft = '';
+  }
+
+  proofExtension(fileName: string): string {
+    return fileName.match(/\.[^.]+$/)?.[0] || '';
   }
 
   /**
@@ -3867,7 +3947,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         return;
       }
 
-      this.projectsService.uploadAttachment(this.projectId, issue.id, files[index]).subscribe({
+      this.projectsService.uploadAttachment(
+        this.projectId, issue.id, files[index].file, [files[index].name],
+      ).subscribe({
         next: () => {
           uploadedCount++;
           this.proofUploadProgress.set(Math.round((uploadedCount / totalFiles) * 90));

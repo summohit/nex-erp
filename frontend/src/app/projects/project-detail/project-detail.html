@@ -310,6 +310,24 @@
               </div>
             </div>
 
+            <!-- §8: Phase. The board runs its own filter set, separate from the
+                 List view's drawer, so the phase filter has to exist in both. -->
+            <div class="filter-section" *ngIf="allPhases().length > 0">
+              <div class="filter-section-title">Phase</div>
+              <div class="filter-section-body">
+                <div class="filter-item" *ngFor="let ph of allPhases()">
+                  <input type="checkbox"
+                         [id]="'filter-phase-' + ph.id"
+                         class="filter-checkbox"
+                         [checked]="filterSelectedPhases().includes(ph.id)"
+                         (change)="toggleFilterPhase(ph.id)">
+                  <label [for]="'filter-phase-' + ph.id" class="filter-item-label">
+                    <span class="filter-item-text">{{ ph.name }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -3134,6 +3152,24 @@
         </div>
       </div>
 
+      <!-- §8: the delivery phase. The board's own task form has no room for
+           it and the inline add is a title box, so this is where a task
+           created on the board gets its phase. -->
+      <div class="modal-milestone-section mb-6" *ngIf="allPhases().length > 0">
+        <div class="section-label-subtitle">Phase</div>
+        <select
+          *ngIf="canManageTask; else phaseReadOnly"
+          class="milestone-picker"
+          [ngModel]="selectedIssue()?.phaseId ?? null"
+          (ngModelChange)="setIssuePhase($event)">
+          <option [ngValue]="null">No phase</option>
+          <option *ngFor="let p of allPhases()" [ngValue]="p.id">{{ p.name }}</option>
+        </select>
+        <ng-template #phaseReadOnly>
+          <div class="milestone-readonly">{{ selectedIssue()?.phase?.name || 'No phase' }}</div>
+        </ng-template>
+      </div>
+
       <!-- §15: the milestone this task delivers. This is the only place the
            link is made — without it a milestone's task count is always 0/0. -->
       <div class="modal-milestone-section mb-6" *ngIf="projectMilestones().length > 0">
@@ -4129,14 +4165,40 @@
 
       <!-- File List -->
       <div class="proof-file-list" *ngIf="proofFiles().length > 0">
-        <div class="proof-file-item" *ngFor="let file of proofFiles(); let i = index">
-          <div class="proof-file-icon-box" [class.img]="file.type?.startsWith('image/')" [class.pdf]="file.type === 'application/pdf'" [class.doc]="file.name?.match('\\.(doc|docx|xls|xlsx|txt)$')">
+        <div class="proof-file-item" *ngFor="let entry of proofFiles(); let i = index">
+          <div class="proof-file-icon-box" [class.img]="entry.file.type?.startsWith('image/')" [class.pdf]="entry.file.type === 'application/pdf'" [class.doc]="entry.file.name?.match('\\.(doc|docx|xls|xlsx|txt)$')">
             <svg lucideFile size="16"></svg>
           </div>
+
           <div class="proof-file-details">
-            <div class="proof-file-name">{{ file.name }}</div>
-            <div class="proof-file-size">{{ (file.size / 1024) | number:'1.0-0' }} KB</div>
+            <!-- §2: rename before saving. The extension is shown beside the
+                 input, greyed, because the server keeps whatever the file was
+                 uploaded with and letting it be typed invites a change that is
+                 silently undone. -->
+            <div class="proof-rename-row" *ngIf="renamingProofIndex() === i; else proofNameLabel">
+              <input type="text" class="proof-rename-input"
+                     [(ngModel)]="proofNameDraft"
+                     (keyup.enter)="confirmRenameProof(i)"
+                     (keyup.escape)="cancelRenameProof()"
+                     autofocus />
+              <span class="proof-rename-ext">{{ proofExtension(entry.file.name) }}</span>
+              <button type="button" class="proof-rename-ok" (click)="confirmRenameProof(i)" title="Save name">
+                <svg lucideCheck size="13"></svg>
+              </button>
+              <button type="button" class="proof-rename-cancel" (click)="cancelRenameProof()" title="Cancel">
+                <svg lucideX size="13"></svg>
+              </button>
+            </div>
+            <ng-template #proofNameLabel>
+              <div class="proof-file-name" [title]="entry.name">{{ entry.name }}</div>
+            </ng-template>
+            <div class="proof-file-size">{{ (entry.file.size / 1024) | number:'1.0-0' }} KB</div>
           </div>
+
+          <button class="proof-file-rename" *ngIf="renamingProofIndex() !== i"
+                  (click)="startRenameProof(i)" title="Rename before saving">
+            <svg lucideEdit2 size="13"></svg>
+          </button>
           <button class="proof-file-remove" (click)="removeProofFile(i)" title="Remove file">
             <svg lucideX size="14"></svg>
           </button>
