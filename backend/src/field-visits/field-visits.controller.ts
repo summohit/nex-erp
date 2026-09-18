@@ -63,12 +63,17 @@ export class FieldVisitsController {
   // "company" as an :id param and these never get hit.
   @Get('company/active')
   getCompanyActive(@Request() req) {
-    return this.fieldVisitsService.getCompanyActiveVisits(req.user.companyId);
+    return this.fieldVisitsService.getCompanyActiveVisits(req.user.companyId, req.user.sub, req.user.role);
   }
 
   @Get('company/recent')
   getCompanyRecent(@Request() req, @Query('limit') limit?: string) {
-    return this.fieldVisitsService.getCompanyRecentVisits(req.user.companyId, limit ? parseInt(limit, 10) : 10);
+    return this.fieldVisitsService.getCompanyRecentVisits(
+      req.user.companyId,
+      limit ? parseInt(limit, 10) : 10,
+      req.user.sub,
+      req.user.role,
+    );
   }
 
   @Get('company')
@@ -86,16 +91,16 @@ export class FieldVisitsController {
       employeeId: employeeId ? parseInt(employeeId, 10) : undefined,
       projectId: projectId ? parseInt(projectId, 10) : undefined,
       status: status || undefined,
-    });
+    }, req.user.sub, req.user.role);
   }
 
   @Get('project/:projectId')
   getByProject(@Request() req, @Param('projectId', ParseIntPipe) projectId: number) {
-    return this.fieldVisitsService.getProjectVisits(projectId, req.user.companyId);
+    return this.fieldVisitsService.getProjectVisits(projectId, req.user.companyId, req.user.sub, req.user.role);
   }
 
   @Get(':id')
   getOne(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.fieldVisitsService.getVisitById(id, req.user.companyId);
+    return this.fieldVisitsService.getVisitById(id, req.user.companyId, req.user.sub, req.user.role);
   }
 }

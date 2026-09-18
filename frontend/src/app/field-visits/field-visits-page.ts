@@ -12,6 +12,7 @@ import {
 } from '../services/field-visits';
 import { EmployeeService } from '../services/employee.service';
 import { ProjectsService } from '../services/projects';
+import { AuthService } from '../services/auth.service';
 import { SkeletonComponent } from '../shared/components/skeleton/skeleton.component';
 
 type RangeKey = '7d' | '30d' | '90d' | '6m' | '1y' | 'custom';
@@ -42,6 +43,7 @@ export class FieldVisitsPageComponent implements OnInit {
   private fieldVisitsService = inject(FieldVisitsService);
   private employeeService = inject(EmployeeService);
   private projectsService = inject(ProjectsService);
+  private authService = inject(AuthService);
 
   visits = signal<FieldVisit[]>([]);
   summary = signal<FieldVisitSummary>(EMPTY_SUMMARY);
@@ -49,6 +51,15 @@ export class FieldVisitsPageComponent implements OnInit {
 
   employees = signal<FilterOption[]>([]);
   projects = signal<FilterOption[]>([]);
+
+  /**
+   * Only admins can browse the whole company's visits. Everyone else sees just
+   * their own — matched server-side too, this only gates the filter UI.
+   */
+  isManager = computed(() => {
+    const role = this.authService.currentUser()?.role;
+    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN';
+  });
 
   range = signal<RangeKey>('30d');
   fromDate = signal('');
@@ -109,14 +120,18 @@ export class FieldVisitsPageComponent implements OnInit {
   ngOnInit() {
     this.applyRange('30d');
 
-    this.employeeService.getEmployeesBasicList().subscribe({
-      next: (list) => this.employees.set(
-        (list || [])
-          .map((e: any) => ({ id: e.id, label: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() }))
-          .sort((a, b) => a.label.localeCompare(b.label)),
-      ),
-      error: () => this.employees.set([]),
-    });
+    // Only managers get the employee filter; loading the list for everyone
+    // would hand every staff member a directory of their coworkers.
+    if (this.isManager()) {
+      this.employeeService.getEmployeesBasicList().subscribe({
+        next: (list) => this.employees.set(
+          (list || [])
+            .map((e: any) => ({ id: e.id, label: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() }))
+            .sort((a, b) => a.label.localeCompare(b.label)),
+        ),
+        error: () => this.employees.set([]),
+      });
+    }
 
     this.projectsService.getProjects().subscribe({
       next: (list: any) => this.projects.set(
@@ -157,7 +172,7 @@ export class FieldVisitsPageComponent implements OnInit {
     this.fieldVisitsService.getCompanyVisits({
       from: this.fromDate() || undefined,
       to: this.toDate() || undefined,
-      employeeId: this.employeeId() ?? undefined,
+      employeeId: this.isManager() ? (this.employeeId() ?? undefined) : undefined,
       projectId: this.projectId() ?? undefined,
       status: this.status() || undefined,
     }).subscribe({

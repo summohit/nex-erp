@@ -79,7 +79,7 @@ const menuSections: MenuSection[] = [
           { id: 'projects', title: 'Projects', route: '/projects' },
           { id: 'tasks', title: 'Tasks', route: '/tasks' },
           { id: 'timesheets', title: 'Timesheet', route: '/timesheets' },
-          { id: 'field-visits', title: 'Field Visits', route: '/field-visits' }
+          { id: 'field-visits', title: 'Client Visits', route: '/field-visits' }
         ]
       },
       {

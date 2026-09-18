@@ -487,7 +487,7 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'roadmap'" (click)="setProjectTab('roadmap')"><svg lucideGanttChart size="14"></svg> Roadmap</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'attachments'" (click)="setProjectTab('attachments')"><svg lucidePaperclip size="14"></svg> Attachments</button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Field Visits</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Client Visits</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'tickets'" (click)="setProjectTab('tickets')"><svg lucideTicket size="14"></svg> Tickets</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'discussions'" (click)="setProjectTab('discussions')"><svg lucideMessageSquare size="14"></svg> Discussions</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'budget-requests'" (click)="setProjectTab('budget-requests')"><svg lucideTrendingUp size="14"></svg> Budget requests</button>
@@ -1827,13 +1827,13 @@
     </div>
   </div>
 
-  <!-- Field Visits Tab Container -->
+  <!-- Client Visits Tab Container -->
   <div class="field-visits-tab-container" *ngIf="activeProjectTab() === 'field-visits'" style="display: flex; flex-direction: column; flex: 1; padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto;">
 
     <!-- Loading -->
     <div *ngIf="fieldVisitsLoading()" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 300px; gap: 12px; color: #5e6c84;">
       <svg lucideActivity size="28" style="color: #94a3b8;"></svg>
-      <span style="font-size: 14px;">Loading field visits&hellip;</span>
+      <span style="font-size: 14px;">Loading client visits&hellip;</span>
     </div>
 
     <!-- Empty State -->
@@ -1841,9 +1841,9 @@
       <div style="width: 76px; height: 76px; border-radius: 50%; background: #eff6ff; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
         <svg lucideMapPin size="34" style="color: #93c5fd;"></svg>
       </div>
-      <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">No field visits yet</h2>
+      <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">No client visits yet</h2>
       <p style="font-size: 14px; color: #5e6c84; max-width: 380px; text-align: center;">
-        When team members start a field visit for this project from the mobile app, their route, photos and notes will show up here.
+        When a client visit is started for this project from the mobile app, its route, photos and notes will show up here.
       </p>
     </div>
 
@@ -3936,7 +3936,7 @@
   </div>
 </div>
 
-<!-- Field Visit Detail Modal -->
+<!-- Client Visit Detail Modal -->
 <div class="trello-modal-overlay" *ngIf="selectedFieldVisit()" (click)="closeFieldVisitDetail()"></div>
 <div class="trello-modal" *ngIf="selectedFieldVisit() as visit" style="width: 600px; max-width: 92vw; max-height: 86vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
 
@@ -3948,7 +3948,7 @@
       <div style="width: 30px; height: 30px; border-radius: 8px; background: #eff6ff; display: flex; align-items: center; justify-content: center;">
         <svg lucideMapPin size="16" style="color: #2563eb;"></svg>
       </div>
-      <span style="font-size: 16px; font-weight: 700; color: #172b4d;">Field Visit Details</span>
+      <span style="font-size: 16px; font-weight: 700; color: #172b4d;">Client Visit Details</span>
     </div>
     <button (click)="closeFieldVisitDetail()" style="background: none; border: none; cursor: pointer; color: #6b7280; display: flex; padding: 6px; border-radius: 6px;" class="hover:bg-gray-100">
       <svg lucideX size="18"></svg>

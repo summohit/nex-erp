@@ -499,7 +499,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       : base;
   }
 
-  // Field Visits tab
+  // Client Visits tab
   fieldVisits = signal<FieldVisit[]>([]);
   fieldVisitsLoading = signal(false);
   fieldVisitsLoaded = false;
@@ -515,7 +515,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.fieldVisitsLoading.set(false);
       },
       error: (err) => {
-        console.error('Error loading field visits', err);
+        console.error('Error loading client visits', err);
         this.fieldVisitsLoading.set(false);
       }
     });

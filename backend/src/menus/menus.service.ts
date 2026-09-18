@@ -94,7 +94,7 @@ export class MenusService implements OnModuleInit {
         
         // ── Delivery ───────────────────────────────────────────────────
         // Projects is a section, not a link: Projects, Tasks, Timesheet and
-        // Field Visits live under it. Reconciled on every boot rather than
+        // Client Visits live under it. Reconciled on every boot rather than
         // seeded once, so an install that predates the Delivery module and one
         // created from prisma/seed-menus.ts converge on the same sidebar.
         //
@@ -121,7 +121,7 @@ export class MenusService implements OnModuleInit {
             { title: 'Projects', route: '/projects', displayOrder: 1 },
             { title: 'Tasks', route: '/tasks', displayOrder: 2 },
             { title: 'Timesheet', route: '/timesheets', displayOrder: 3 },
-            { title: 'Field Visits', route: '/field-visits', displayOrder: 4 },
+            { title: 'Client Visits', route: '/field-visits', displayOrder: 4 },
           ];
 
           for (const child of deliveryChildren) {
@@ -129,8 +129,13 @@ export class MenusService implements OnModuleInit {
               where: { parentId: deliveryMenu.id, route: child.route },
             });
             if (existing) {
-              if (!existing.isActive) {
-                await this.prisma.menu.update({ where: { id: existing.id }, data: { isActive: true } });
+              const updates: any = {};
+              if (!existing.isActive) updates.isActive = true;
+              // Renamed in place so installs from before the rename converge on
+              // "Client Visits" too, not just fresh seeds.
+              if (existing.title !== child.title) updates.title = child.title;
+              if (Object.keys(updates).length > 0) {
+                await this.prisma.menu.update({ where: { id: existing.id }, data: updates });
               }
               continue;
             }
@@ -140,14 +145,14 @@ export class MenusService implements OnModuleInit {
             this.logger.log(`Delivery > ${child.title} menu auto-seeded successfully.`);
           }
 
-          // Field Visits used to sit beside Projects at the top level. Retire
+          // Client Visits used to sit beside Projects at the top level. Retire
           // the old row rather than leaving it in two places.
           const { count: movedFieldVisits } = await this.prisma.menu.updateMany({
             where: { route: '/field-visits', parentId: parent.id, isActive: true },
             data: { isActive: false },
           });
           if (movedFieldVisits > 0) {
-            this.logger.log('Field Visits moved under Delivery.');
+            this.logger.log('Client Visits moved under Delivery.');
           }
         }
 

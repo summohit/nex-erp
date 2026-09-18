@@ -5,6 +5,21 @@ import { PrismaService } from '../prisma/prisma.service';
 export class FieldVisitsService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Only admins may browse other people's client visits. Everyone else — any
+   * employee role — is scoped to their own, regardless of what filter the
+   * client asks for. Mirrors the role set used by PermissionsGuard.
+   */
+  private canSeeAllVisits(role?: string): boolean {
+    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN';
+  }
+
+  private async requireOwnEmployeeId(userId: number): Promise<number> {
+    const employee = await this.prisma.employee.findFirst({ where: { userId } });
+    if (!employee) throw new NotFoundException('Employee not found');
+    return employee.id;
+  }
+
   async startVisit(userId: number, companyId: number, data: {
     projectId: number;
     startLat: number;
@@ -24,7 +39,7 @@ export class FieldVisitsService {
     });
     if (existing) {
       throw new ConflictException(
-        `You already have a field visit in progress for ${existing.project?.name ?? 'another project'}. End it before starting a new one.`,
+        `You already have a client visit in progress for ${existing.project?.name ?? 'another project'}. End it before starting a new one.`,
       );
     }
 
@@ -61,7 +76,7 @@ export class FieldVisitsService {
     if (!employee) throw new NotFoundException('Employee not found');
 
     const visit = await this.prisma.fieldVisit.findUnique({ where: { id: visitId } });
-    if (!visit) throw new NotFoundException('Field visit not found');
+    if (!visit) throw new NotFoundException('Client visit not found');
     if (visit.employeeId !== employee.id) throw new BadRequestException('Not your visit');
     if (visit.status !== 'IN_PROGRESS') throw new BadRequestException('Visit is not in progress');
 
@@ -91,7 +106,7 @@ export class FieldVisitsService {
     if (!employee) throw new NotFoundException('Employee not found');
 
     const visit = await this.prisma.fieldVisit.findUnique({ where: { id: visitId } });
-    if (!visit) throw new NotFoundException('Field visit not found');
+    if (!visit) throw new NotFoundException('Client visit not found');
     if (visit.employeeId !== employee.id) throw new BadRequestException('Not your visit');
     if (visit.status !== 'IN_PROGRESS') throw new BadRequestException('Visit is not in progress');
 
@@ -110,7 +125,7 @@ export class FieldVisitsService {
     if (!employee) throw new NotFoundException('Employee not found');
 
     const visit = await this.prisma.fieldVisit.findUnique({ where: { id: visitId } });
-    if (!visit) throw new NotFoundException('Field visit not found');
+    if (!visit) throw new NotFoundException('Client visit not found');
     if (visit.employeeId !== employee.id) throw new BadRequestException('Not your visit');
 
     return this.prisma.fieldVisitPhoto.create({
@@ -150,11 +165,16 @@ export class FieldVisitsService {
     });
   }
 
-  async getProjectVisits(projectId: number, companyId: number) {
+  async getProjectVisits(projectId: number, companyId: number, userId: number, role?: string) {
+    const where: any = { projectId, companyId };
+    if (!this.canSeeAllVisits(role)) {
+      // Non-admins only ever see their own visits on a project.
+      where.employeeId = await this.requireOwnEmployeeId(userId);
+    }
     // Scope by companyId too — projectId alone would let one company's user read
     // another company's field visits by guessing an id.
     return this.prisma.fieldVisit.findMany({
-      where: { projectId, companyId },
+      where,
       orderBy: { startTime: 'desc' },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -164,9 +184,11 @@ export class FieldVisitsService {
   }
 
   /** Everyone currently out on a visit, company-wide — powers the CRM "who's travelling" widget. */
-  async getCompanyActiveVisits(companyId: number) {
+  async getCompanyActiveVisits(companyId: number, userId: number, role?: string) {
+    const where: any = { companyId, status: 'IN_PROGRESS' };
+    if (!this.canSeeAllVisits(role)) where.employeeId = await this.requireOwnEmployeeId(userId);
     return this.prisma.fieldVisit.findMany({
-      where: { companyId, status: 'IN_PROGRESS' },
+      where,
       orderBy: { startTime: 'desc' },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -176,9 +198,11 @@ export class FieldVisitsService {
   }
 
   /** Most recently finished visits company-wide, for the same widget's activity feed. */
-  async getCompanyRecentVisits(companyId: number, limit: number) {
+  async getCompanyRecentVisits(companyId: number, limit: number, userId: number, role?: string) {
+    const where: any = { companyId, status: { in: ['COMPLETED', 'CANCELLED'] } };
+    if (!this.canSeeAllVisits(role)) where.employeeId = await this.requireOwnEmployeeId(userId);
     return this.prisma.fieldVisit.findMany({
-      where: { companyId, status: { in: ['COMPLETED', 'CANCELLED'] } },
+      where,
       orderBy: { startTime: 'desc' },
       take: Math.min(Math.max(limit, 1), 50),
       include: {
@@ -190,7 +214,7 @@ export class FieldVisitsService {
   }
 
   /**
-   * Company-wide visit log with filters, for the web Field Visits page.
+   * Company-wide visit log with filters, for the web Client Visits page.
    * Returns the rows plus a summary computed over the SAME filter set, so the
    * KPI cards always describe what the table is showing.
    */
@@ -203,12 +227,20 @@ export class FieldVisitsService {
       projectId?: number;
       status?: string;
     },
+    userId: number,
+    role?: string,
   ) {
     const where: any = { companyId };
 
     if (filters.employeeId) where.employeeId = filters.employeeId;
     if (filters.projectId) where.projectId = filters.projectId;
     if (filters.status) where.status = filters.status;
+
+    if (!this.canSeeAllVisits(role)) {
+      // Employees only ever see their own visits — any employeeId filter the
+      // caller sent is ignored, so the restriction cannot be widened.
+      where.employeeId = await this.requireOwnEmployeeId(userId);
+    }
 
     if (filters.from || filters.to) {
       where.startTime = {};
@@ -249,7 +281,7 @@ export class FieldVisitsService {
     };
   }
 
-  async getVisitById(visitId: number, companyId: number) {
+  async getVisitById(visitId: number, companyId: number, userId: number, role?: string) {
     const visit = await this.prisma.fieldVisit.findUnique({
       where: { id: visitId },
       include: {
@@ -258,9 +290,12 @@ export class FieldVisitsService {
         photos: { orderBy: { takenAt: 'asc' } },
       },
     });
-    // Same 404 for "missing" and "another company's" — an id probe should not be
-    // able to tell the two apart.
-    if (!visit || visit.companyId !== companyId) throw new NotFoundException('Field visit not found');
+    // Same 404 for "missing", "another company's" and (for non-admins) "another
+    // employee's" — an id probe should not be able to tell them apart.
+    if (!visit || visit.companyId !== companyId) throw new NotFoundException('Client visit not found');
+    if (!this.canSeeAllVisits(role) && visit.employeeId !== (await this.requireOwnEmployeeId(userId))) {
+      throw new NotFoundException('Client visit not found');
+    }
     return visit;
   }
 }
