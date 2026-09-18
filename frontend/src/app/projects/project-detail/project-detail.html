@@ -1640,7 +1640,7 @@
             </div>
 
             <!-- Hover + Add Button -->
-            <div *ngIf="isProjectOwner && activeCalendarCreateDate() !== day.dateStr"
+            <div *ngIf="canAddTasks && activeCalendarCreateDate() !== day.dateStr"
                  (click)="startCalendarInlineAdd(day.dateStr)"
                  class="calendar-add-btn"
                  title="Create issue">
@@ -2307,7 +2307,7 @@
                 <button class="btn-icon-tiny" (click)="activeColumnPopoverId.set(null)"><svg lucideX size="14"></svg></button>
               </div>
               <div class="popover-body list-actions-body">
-                <button class="list-action-btn" *ngIf="isProjectOwner" (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id); activeColumnPopoverId.set(null)">Add card</button>
+                <button class="list-action-btn" *ngIf="canAddTasks" (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id); activeColumnPopoverId.set(null)">Add card</button>
                 <div class="list-action-divider"></div>
                 
                 <div class="popover-subtitle-row">
@@ -2472,6 +2472,18 @@
             (ngModelChange)="inlineCardTitle.set($event)"
             (keydown.enter)="$event.preventDefault(); submitInlineCard(col.id)">
           </textarea>
+          <!-- §3: the hours this card is assigned. Optional -- a quick add must
+               stay quick -- but asked here, because a card created without an
+               estimate is unbounded and the hours ceiling never applies to it. -->
+          <div class="inline-card-hours">
+            <label>Estimated hours</label>
+            <input type="number" min="0" step="0.5" placeholder="e.g. 4"
+                   [ngModel]="inlineCardHours()"
+                   (ngModelChange)="inlineCardHours.set($event)"
+                   (keydown.enter)="$event.preventDefault(); submitInlineCard(col.id)" />
+            <span class="inline-card-hours-hint">Leave blank for no limit</span>
+          </div>
+
           <div class="inline-add-actions">
             <button type="button" class="btn-add-card-submit" (click)="submitInlineCard(col.id)">Add card</button>
             <button type="button" class="btn-cancel-inline" (click)="cancelInlineAdd()">
@@ -2480,8 +2492,8 @@
           </div>
         </div>
 
-        <!-- Column Footer (Trigger Inline Add) — Owner only -->
-        <div class="trello-column-footer" *ngIf="isProjectOwner && (!addingCardColumnId() || addingCardColumnId() !== col.id)">
+        <!-- Column Footer (Trigger Inline Add) — owner, admin or project manager -->
+        <div class="trello-column-footer" *ngIf="canAddTasks && (!addingCardColumnId() || addingCardColumnId() !== col.id)">
           <button class="btn-ghost"
                   [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'"
                   (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id)">

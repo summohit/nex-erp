@@ -1611,6 +1611,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   // Inline Quick Add Card
   addingCardColumnId = signal<number | null>(null);
   inlineCardTitle = signal<string>('');
+  /** §3: hours for the card being added inline. Optional, but asked for. */
+  inlineCardHours = signal<number | string | null>(null);
   
   // Issue Drawer / Modal
   isDrawerOpen = signal(false);
@@ -2598,11 +2600,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   startInlineAdd(columnId: number) {
     this.addingCardColumnId.set(columnId);
     this.inlineCardTitle.set('');
+    this.inlineCardHours.set(null);
   }
 
   cancelInlineAdd() {
     this.addingCardColumnId.set(null);
     this.inlineCardTitle.set('');
+    this.inlineCardHours.set(null);
   }
 
   submitInlineCard(columnId: number) {
@@ -2613,7 +2617,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       title,
       columnId,
       type: 'TASK',
-      priority: 'MEDIUM'
+      priority: 'MEDIUM',
+      // §3: the hours the card is assigned, asked for right here. Without it
+      // every card added from the board is unestimated, and an unestimated
+      // task is unbounded -- so the ceiling would never apply to it.
+      estimatedHours: this.inlineCardHours() != null && this.inlineCardHours() !== ''
+        ? Number(this.inlineCardHours())
+        : null,
     };
 
     this.projectsService.createIssue(this.projectId, payload).subscribe({
@@ -3609,6 +3619,19 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   removeProofFile(index: number) {
     this.proofFiles.update(prev => prev.filter((_, i) => i !== index));
+  }
+
+  /**
+   * Who may raise work on this board.
+   *
+   * `isProjectOwner` covers administrators and the project lead, but not a
+   * member carrying the PROJECT_MANAGER role -- so a PM could approve this
+   * project's timesheets, own its milestones and rule on its hours requests,
+   * yet had no "Add a card" button on its board. The server has always allowed
+   * them (canCreateTask in tasks/task-permissions.ts); only the UI disagreed.
+   */
+  get canAddTasks(): boolean {
+    return this.isProjectOwner || this.isCurrentUserPM();
   }
 
   // PMs and the project Owner can bypass the proof-of-completion requirement; regular
