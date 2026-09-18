@@ -93,6 +93,12 @@ export class ProjectsController {
     return this.projectsService.kickoffProject(req.user.companyId, id);
   }
 
+  /** Numbers for the project tab strip, in one call rather than five. */
+  @Get(':id/tab-counts')
+  getTabCounts(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.getTabCounts(req.user.companyId, id);
+  }
+
   @Get(':id/activity')
   getProjectActivity(@Req() req, @Param('id', ParseIntPipe) id: number, @Query('limit') limit?: string) {
     return this.projectsService.getProjectActivity(req.user.companyId, id, limit ? +limit : 50);

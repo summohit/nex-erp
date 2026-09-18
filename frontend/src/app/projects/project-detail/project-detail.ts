@@ -1752,6 +1752,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         // And by the Attachments tab, which otherwise shows only task
         // attachments and reports a project full of documents as empty.
         this.loadProjectDocuments();
+        // Counts for the tab strip: three numbers in one call, so the tabs
+        // that own their own data can still show a badge without loading it.
+        this.loadTabCounts();
         // §8: and by the Phase pickers on the task modal and the inline add,
         // both of which render only when there are phases to offer. This was
         // being called after an edit instead of on load, so the list was
@@ -1960,6 +1963,23 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
    * but the picker must offer every phase a task could be moved into.
    */
   allPhases = signal<any[]>([]);
+
+  /**
+   * Counts for the tabs whose data lives in their own components (§ tab
+   * counts). Fetched once per project as three counts, not three lists.
+   */
+  tabCounts = signal<{ tickets: number; discussions: number; budgetRequests: number }>({
+    tickets: 0, discussions: 0, budgetRequests: 0,
+  });
+
+  loadTabCounts() {
+    this.projectsService.getTabCounts(this.projectId).subscribe({
+      next: (c: any) => this.tabCounts.set(c || { tickets: 0, discussions: 0, budgetRequests: 0 }),
+      // Silent: a missing badge is a smaller problem than an error toast over
+      // a board that has otherwise loaded correctly.
+      error: () => {},
+    });
+  }
 
   private loadPhases() {
     this.masterDataService.getProjectPhases(true).subscribe({

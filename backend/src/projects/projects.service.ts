@@ -1391,6 +1391,35 @@ export class ProjectsService {
    * first. The rows were already being written on every status change, comment
    * and timer action — nothing surfaced them until now.
    */
+  /**
+   * The numbers behind the project tab strip (§ tab counts).
+   *
+   * One endpoint returning five counts, rather than each tab's component
+   * fetching its own records to report a badge. Tickets, discussions and
+   * budget requests each own their data and load it when opened; making the
+   * tab strip wait for all three would mean every project opens at the speed
+   * of its slowest tab to show a number nobody asked for yet.
+   *
+   * Counts only -- no rows leave here, so the financial visibility rule that
+   * governs budget requests is not at stake: how many there are says nothing
+   * about what any of them is worth.
+   */
+  async getTabCounts(companyId: number, projectId: number) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, companyId },
+      select: { id: true },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    const [tickets, discussions, budgetRequests] = await Promise.all([
+      this.prisma.projectTicket.count({ where: { projectId, companyId } }),
+      this.prisma.projectDiscussion.count({ where: { projectId } }),
+      this.prisma.projectBudgetRequest.count({ where: { projectId, companyId } }),
+    ]);
+
+    return { tickets, discussions, budgetRequests };
+  }
+
   async getProjectActivity(companyId: number, projectId: number, limit = 50) {
     const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId } });
     if (!project) throw new NotFoundException('Project not found');

@@ -60,6 +60,13 @@ export class ProjectsService {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/documents`, formData);
   }
 
+  /** Counts for the project tab strip, in one call. */
+  getTabCounts(projectId: number) {
+    return this.http.get<{ tickets: number; discussions: number; budgetRequests: number }>(
+      `${this.apiUrl}/${projectId}/tab-counts`,
+    );
+  }
+
   analyzeProjectDocuments(projectId: number, payload?: any) {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/analyze`, payload || {});
   }
