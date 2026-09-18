@@ -251,6 +251,17 @@ export const routes: Routes = [
         loadComponent: () => import('./projects/projects').then(m => m.ProjectsComponent)
       },
       {
+        // Delivery > Requests (§4). Cross-project by design: the question it
+        // answers is "what is waiting on a decision", which nobody asks one
+        // project at a time. Shares the projects permission, like the rest of
+        // the Delivery section — see menus.service.ts.
+        path: 'task-requests',
+        canActivate: [permissionGuard],
+        data: { module: 'projects' },
+        loadComponent: () => import('./projects/task-hours-requests/task-hours-requests-tab')
+          .then(m => m.TaskHoursRequestsTabComponent)
+      },
+      {
         // Delivery > Tasks. The task list is a tab of the projects screen
         // rather than a second copy of two thousand lines of grid, filter and
         // composer code; `forceTab` opens the component straight onto it.

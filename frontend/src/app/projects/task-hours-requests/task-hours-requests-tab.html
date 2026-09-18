@@ -1,0 +1,144 @@
+<div class="thr-wrap">
+
+  <!-- Toolbar -->
+  <div class="thr-toolbar">
+    <div class="thr-heading">
+      <h2>Additional hours requests</h2>
+      <p *ngIf="openCount() > 0">{{ openCount() }} awaiting a decision</p>
+      <p *ngIf="openCount() === 0 && !loading()">Nothing is waiting on a decision.</p>
+    </div>
+
+    <select class="thr-filter" [ngModel]="filterStatus()" (ngModelChange)="onStatusChange($event)">
+      <option *ngFor="let o of statusOptions" [value]="o.value">{{ o.label }}</option>
+    </select>
+  </div>
+
+  <div class="thr-loading" *ngIf="loading()">
+    <svg lucideLoader2 size="18" class="thr-spin"></svg> Loading requests…
+  </div>
+
+  <div class="thr-empty" *ngIf="!loading() && requests().length === 0">
+    <svg lucideClock size="28"></svg>
+    <p>No additional-hours requests yet.</p>
+    <span>When someone needs more time than a task was assigned, the request appears here.</span>
+  </div>
+
+  <!-- Requests -->
+  <div class="thr-list" *ngIf="!loading() && requests().length > 0">
+    <div class="thr-row-group" *ngFor="let r of requests()">
+
+      <div class="thr-row" [class.settled]="r.status !== 'REQUESTED'">
+
+        <button class="thr-expand" type="button" (click)="toggleTimeline(r)"
+                [attr.aria-label]="expanded().has(r.id) ? 'Hide history' : 'Show history'">
+          <svg *ngIf="!expanded().has(r.id)" lucideChevronRight size="16"></svg>
+          <svg *ngIf="expanded().has(r.id)" lucideChevronDown size="16"></svg>
+        </button>
+
+        <div class="thr-main">
+          <div class="thr-task">
+            <span class="thr-key">{{ r.issue.key }}</span>
+            <span class="thr-title" [title]="r.issue.title">{{ r.issue.title }}</span>
+          </div>
+          <div class="thr-project">{{ r.issue.project.name }}</div>
+          <div class="thr-reason" [title]="r.reason">{{ r.reason }}</div>
+        </div>
+
+        <div class="thr-hours">
+          <div class="thr-hours-cell">
+            <span class="thr-label">Requested</span>
+            <strong>{{ r.requestedHours }}h</strong>
+          </div>
+          <div class="thr-hours-cell">
+            <span class="thr-label">Approved</span>
+            <!-- A dash, not a zero: nothing has been granted yet, which is not
+                 the same as having been granted none. -->
+            <strong [class.thr-cut]="r.approvedHours != null && r.approvedHours < r.requestedHours">
+              {{ r.approvedHours != null ? r.approvedHours + 'h' : '—' }}
+            </strong>
+          </div>
+        </div>
+
+        <div class="thr-people">
+          <div><span class="thr-label">Requested by</span> {{ fullName(r.requestedBy) }}</div>
+          <div *ngIf="r.reviewedBy">
+            <span class="thr-label">{{ r.status === 'APPROVED' ? 'Approved by' : 'Rejected by' }}</span>
+            {{ fullName(r.reviewedBy) }}
+          </div>
+        </div>
+
+        <div class="thr-dates">
+          <div><span class="thr-label">Created</span> {{ r.createdAt | date:'MMM d, y' }}</div>
+          <div><span class="thr-label">Updated</span> {{ r.updatedAt | date:'MMM d, y' }}</div>
+        </div>
+
+        <div class="thr-status">
+          <span class="thr-badge" [class]="'thr-badge-' + r.status.toLowerCase()">{{ r.status }}</span>
+        </div>
+
+        <div class="thr-actions" *ngIf="canReview(r)">
+          <ng-container *ngIf="editingHoursId() !== r.id && rejectingId() !== r.id">
+            <button class="thr-btn thr-approve" type="button" [disabled]="isBusy(r.id)"
+                    (click)="approve(r)">
+              <svg lucideCheck size="14"></svg> Approve
+            </button>
+            <button class="thr-btn thr-partial" type="button" [disabled]="isBusy(r.id)"
+                    (click)="startApproveWithEdit(r)">
+              Approve less
+            </button>
+            <button class="thr-btn thr-reject" type="button" [disabled]="isBusy(r.id)"
+                    (click)="startReject(r)">
+              <svg lucideX size="14"></svg> Reject
+            </button>
+          </ng-container>
+
+          <!-- Granting fewer hours than were asked for -->
+          <div class="thr-inline" *ngIf="editingHoursId() === r.id">
+            <input type="number" min="0.25" step="0.25" class="thr-input"
+                   [(ngModel)]="approvedHoursDraft" placeholder="Hours" />
+            <button class="thr-btn thr-approve" type="button" [disabled]="isBusy(r.id)"
+                    (click)="approve(r, approvedHoursDraft)">
+              <svg lucideCheck size="14"></svg> Grant
+            </button>
+            <button class="thr-btn" type="button" (click)="cancelEdit()">Cancel</button>
+          </div>
+
+          <div class="thr-inline" *ngIf="rejectingId() === r.id">
+            <input type="text" class="thr-input thr-input-wide" [(ngModel)]="rejectReason"
+                   placeholder="Why is this refused?" (keyup.enter)="confirmReject(r)" />
+            <button class="thr-btn thr-reject" type="button" [disabled]="isBusy(r.id)"
+                    (click)="confirmReject(r)">Reject</button>
+            <button class="thr-btn" type="button" (click)="cancelReject()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rejection reason, once settled -->
+      <div class="thr-rejection" *ngIf="r.status === 'REJECTED' && r.rejectionReason">
+        <svg lucideAlertTriangle size="14"></svg> {{ r.rejectionReason }}
+      </div>
+
+      <!-- §4: the activity timeline -->
+      <div class="thr-timeline" *ngIf="expanded().has(r.id)">
+        <div class="thr-timeline-loading" *ngIf="timelineFor(r.id) === null">
+          <svg lucideLoader2 size="14" class="thr-spin"></svg> Loading history…
+        </div>
+
+        <ol *ngIf="timelineFor(r.id) as events">
+          <li *ngFor="let e of events" class="thr-event">
+            <span class="thr-dot" [class]="'thr-dot-' + e.action.toLowerCase()"></span>
+            <div class="thr-event-body">
+              <div class="thr-event-head">
+                <strong>{{ actionLabel(e.action) }}</strong>
+                <span class="thr-event-when">{{ e.createdAt | date:'MMM d, y, h:mm a' }}</span>
+              </div>
+              <div class="thr-event-detail" *ngIf="e.detail">{{ e.detail }}</div>
+              <div class="thr-event-actor">{{ fullName(e.actor) }}</div>
+            </div>
+          </li>
+          <li *ngIf="events.length === 0" class="thr-event-none">No history recorded.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>

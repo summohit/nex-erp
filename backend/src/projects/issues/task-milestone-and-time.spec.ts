@@ -21,7 +21,12 @@ function makeService(over: any = {}) {
       findUnique: jest.fn().mockResolvedValue({ id: 10, type: 'TODO' }),
       findFirst: jest.fn().mockResolvedValue({ id: 11, type: 'IN_PROGRESS' }),
     },
-    issueTimeLog: { create: jest.fn().mockResolvedValue({ id: 1 }) },
+    // §3: every hand-entry path now asks how much has already been logged,
+    // to check the write against the task's allowed hours.
+    issueTimeLog: {
+      create: jest.fn().mockResolvedValue({ id: 1 }),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { durationMin: 0 } }),
+    },
     // §9: manual entry is refused on a project set to timer-only, so every
     // hand-entry path now asks the project first.
     project: {
@@ -170,5 +175,78 @@ describe('manual time entry against a timer-only project', () => {
     const { service, prisma } = makeService();
     await call(service, 'addManualTimeLog', 1, 2, 3, 5, { durationMin: 60 });
     expect(prisma.issueTimeLog.create).toHaveBeenCalled();
+  });
+});
+
+/**
+ * §3: the assigned hours are a ceiling, enforced in the service.
+ *
+ * The arithmetic itself is covered in task-hours.spec.ts. What is pinned here
+ * is that the write paths actually consult it — the rule has to hold for
+ * anything reaching the API, not just for whatever the form allows.
+ */
+describe('logging beyond the hours assigned to a task', () => {
+  const fullTask = (estimatedHours: number | null, loggedMin: number, additionalHours = 0) => ({
+    issue: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 5, columnId: 10, status: 'TODO', estimatedHours, additionalHours,
+      }),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    issueTimeLog: {
+      create: jest.fn().mockResolvedValue({ id: 1 }),
+      update: jest.fn().mockResolvedValue({}),
+      delete: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { durationMin: loggedMin } }),
+    },
+  });
+
+  it('refuses a hand-entered log past the assigned hours', async () => {
+    const { service } = makeService(fullTask(4, 240));
+    await expect(
+      call(service, 'addManualTimeLog', 1, 2, 3, 5, { durationMin: 60 }),
+    ).rejects.toThrow(/All 4h assigned to this task have been logged/);
+  });
+
+  it('refuses a log that would only partly fit', async () => {
+    const { service } = makeService(fullTask(4, 180));
+    await expect(
+      call(service, 'addManualTimeLog', 1, 2, 3, 5, { durationMin: 120 }),
+    ).rejects.toThrow(/Only 1h of the 4h/);
+  });
+
+  it('allows the log once additional hours have been approved', async () => {
+    const { service, prisma } = makeService(fullTask(4, 240, 4));
+    await call(service, 'addManualTimeLog', 1, 2, 3, 5, { durationMin: 60 });
+    expect(prisma.issueTimeLog.create).toHaveBeenCalled();
+  });
+
+  it('leaves a task that was never estimated unbounded', async () => {
+    const { service, prisma } = makeService(fullTask(null, 6000));
+    await call(service, 'addManualTimeLog', 1, 2, 3, 5, { durationMin: 600 });
+    expect(prisma.issueTimeLog.create).toHaveBeenCalled();
+  });
+
+  it('refuses the weekly grid the same way', async () => {
+    const { service } = makeService(fullTask(4, 240));
+    await expect(
+      call(service, 'setDayTimeTotal', 1, 2, 3, 5, { date: '2026-09-14', durationMin: 60 }),
+    ).rejects.toThrow(/assigned to this task/);
+  });
+
+  it('refuses to start the timer with nothing left', async () => {
+    const { service } = makeService(fullTask(4, 240));
+    await expect(
+      call(service, 'startTimeTracking', 1, 2, 3, 5),
+    ).rejects.toThrow(/Request additional hours before starting the timer/);
+  });
+
+  // Stopping writes down work that has already happened. Refusing it would
+  // discard real time and leave the timer with no way to close.
+  it('never refuses a timer stop, even past the ceiling', async () => {
+    const { service } = makeService(fullTask(4, 600));
+    await expect(call(service, 'stopTimeTracking', 1, 2, 3, 5)).resolves.toBeDefined();
   });
 });

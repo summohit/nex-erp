@@ -115,6 +115,7 @@ model Company {
   projectMilestones     ProjectMilestone[]
   timesheetDays         TimesheetDay[]
   projectTickets        ProjectTicket[]
+  taskHoursRequests     TaskHoursRequest[]
   projectBudgetRequests ProjectBudgetRequest[]
 }
 
@@ -515,6 +516,9 @@ model Employee {
   projectTicketsReviewed ProjectTicket[]        @relation("TicketReviewedBy")
   budgetRequests         ProjectBudgetRequest[] @relation("BudgetRequestedBy")
   budgetRequestsReviewed ProjectBudgetRequest[] @relation("BudgetReviewedBy")
+  taskHoursRequested     TaskHoursRequest[]     @relation("TaskHoursRequestedBy")
+  taskHoursReviewed      TaskHoursRequest[]     @relation("TaskHoursReviewedBy")
+  taskHoursActivities    TaskHoursRequestActivity[]
 
   @@unique([companyId, employeeCode])
 }
@@ -2043,9 +2047,18 @@ model Issue {
   blockedBy   IssueDependency[] @relation("IssueBlockedBy")
   blocking    IssueDependency[] @relation("IssueBlocks")
 
+  /// Extra hours granted on top of `estimatedHours` by approved requests (§3).
+  ///
+  /// Denormalised deliberately: the allowed ceiling is read on every time log
+  /// and rendered for every row of the task list, and summing the approved
+  /// requests each time would put a join on both of those paths. Written only
+  /// by the approval, inside the same transaction that marks it approved.
+  additionalHours Float @default(0)
+
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   projectTicket ProjectTicket?
+  hoursRequests TaskHoursRequest[]
 
   @@unique([key, companyId])
   /// "What is assigned to me, soonest first" — the My Tasks query.
@@ -3572,4 +3585,71 @@ model ProjectBudgetRequest {
 
   @@index([companyId])
   @@index([projectId])
+}
+
+/// A request for more hours on one task (§3).
+///
+/// The task-level twin of ProjectBudgetRequest, and deliberately a separate
+/// model rather than a widened one: that request moves project budget and
+/// money, this one moves a single assignee's ceiling on a single task, and the
+/// two are approved by different people for different reasons.
+///
+/// Approving does not rewrite `Issue.estimatedHours`. What was originally
+/// estimated is evidence -- it is what the task was planned and quoted at, and
+/// a project that keeps needing more time is only visible if the first number
+/// survives. The grant accumulates in `Issue.additionalHours` instead.
+model TaskHoursRequest {
+  id            Int      @id @default(autoincrement())
+  issueId       Int
+  issue         Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  companyId     Int
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  requestedById Int
+  requestedBy   Employee @relation("TaskHoursRequestedBy", fields: [requestedById], references: [id])
+
+  /// What the employee asked for, in hours. Never changed by the review -- if
+  /// the PM grants less, that lands in `approvedHours` and the difference
+  /// between the two is the thing worth seeing.
+  requestedHours  Float
+  /// What the PM actually granted. Null until reviewed. May be less than
+  /// requested; §4 shows both columns side by side.
+  approvedHours   Float?
+  reason          String    @db.Text
+  status          String    @default("REQUESTED") // REQUESTED, APPROVED, REJECTED
+  reviewedById    Int?
+  reviewedBy      Employee? @relation("TaskHoursReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?   @db.Text
+
+  activities TaskHoursRequestActivity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([issueId])
+  @@index([requestedById])
+}
+
+/// One entry in a request's activity timeline (§4).
+///
+/// Modelled on IssueActivity, which is the pattern already used for task
+/// history. Kept as its own table rather than folded into IssueActivity: these
+/// rows are read as one request's story, and mixing them into the task feed
+/// would bury them among status changes and comments.
+model TaskHoursRequestActivity {
+  id        Int              @id @default(autoincrement())
+  requestId Int
+  request   TaskHoursRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  /// CREATED, SUBMITTED, APPROVED, REJECTED, HOURS_MODIFIED, UPDATED
+  action    String
+  /// Human-readable detail for the timeline line, e.g. "4h → 6h".
+  detail    String?
+  oldValue  String?
+  newValue  String?
+  actorId   Int
+  actor     Employee         @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@index([requestId, createdAt])
 }

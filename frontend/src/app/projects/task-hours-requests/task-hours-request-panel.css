@@ -1,0 +1,84 @@
+/* The additional-hours panel on the task detail (§3).
+   Sits directly under Time Tracking, so it borrows that section's spacing and
+   keeps its own visual weight low — it is a footnote to the hours above it
+   until the task actually runs out. */
+
+.thrp {
+  border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 12px 14px; margin-bottom: 24px; background: #fcfdfe;
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.thrp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.thrp-head-left {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: #6b778c;
+}
+
+.thrp-figures { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.thrp-fig { font-size: 12px; color: #5e6c84; }
+.thrp-fig strong { font-size: 13px; color: #172b4d; font-weight: 700; }
+.thrp-extra { color: #047857 !important; }
+.thrp-left strong { color: #047857; }
+.thrp-left.thrp-none strong { color: #b91c1c; }
+.thrp-unbounded { font-size: 12px; color: #97a0af; font-style: italic; }
+
+.thrp-warn, .thrp-pending {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 10px; border-radius: 4px; font-size: 12px;
+}
+.thrp-warn { background: #fef2f2; color: #b91c1c; }
+.thrp-pending { background: #fff7ed; color: #b45309; }
+
+.thrp-ask {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border: 1px solid #dfe1e6; background: #fff;
+  border-radius: 4px; font-size: 12px; font-weight: 600; color: #42526e; cursor: pointer;
+}
+.thrp-ask:hover { background: #f4f5f7; }
+
+/* ── Form ────────────────────────────────────────────────────────────── */
+.thrp-form { display: flex; flex-direction: column; gap: 10px; }
+.thrp-form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.thrp-form-row label { display: flex; flex-direction: column; gap: 4px; }
+.thrp-form-row label span { font-size: 11px; font-weight: 600; color: #6b778c; }
+.thrp-grow { flex: 1; min-width: 220px; }
+
+.thrp-input {
+  padding: 7px 10px; border: 2px solid #dfe1e6; border-radius: 4px;
+  font-size: 13px; color: #172b4d; outline: none; width: 100%; box-sizing: border-box;
+}
+.thrp-input:focus { border-color: #2563eb; }
+
+.thrp-form-actions { display: flex; gap: 6px; }
+.thrp-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border: 1px solid #dfe1e6; background: #fff;
+  border-radius: 4px; font-size: 12px; font-weight: 600; color: #42526e; cursor: pointer;
+}
+.thrp-btn:hover:not(:disabled) { background: #f4f5f7; }
+.thrp-btn:disabled { opacity: .55; cursor: not-allowed; }
+.thrp-send { border-color: #a7f3d0; background: #ecfdf5; color: #047857; }
+.thrp-send:hover:not(:disabled) { background: #d1fae5; }
+
+.thrp-spin { animation: thrp-spin 1s linear infinite; }
+@keyframes thrp-spin { to { transform: rotate(360deg); } }
+
+/* ── History ─────────────────────────────────────────────────────────── */
+.thrp-history { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #ebecf0; padding-top: 10px; }
+.thrp-hist-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #5e6c84; flex-wrap: wrap; }
+.thrp-hist-hours { color: #172b4d; font-weight: 600; }
+.thrp-hist-when { color: #97a0af; }
+.thrp-hist-reason {
+  color: #b91c1c; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 260px;
+}
+
+.thrp-chip {
+  padding: 2px 7px; border-radius: 9px; font-size: 10px; font-weight: 700; letter-spacing: .02em;
+}
+.thrp-chip-requested { background: #fff7ed; color: #b45309; }
+.thrp-chip-approved  { background: #ecfdf5; color: #047857; }
+.thrp-chip-rejected  { background: #fef2f2; color: #b91c1c; }

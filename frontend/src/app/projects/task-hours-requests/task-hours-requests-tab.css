@@ -1,0 +1,150 @@
+/* Request tracking (§4). Matches the budget-requests tab's visual language:
+   the two screens are the same idea at different scopes and should not look
+   like different products. */
+
+.thr-wrap { padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto; flex: 1; }
+
+/* ── Toolbar ─────────────────────────────────────────────────────────── */
+.thr-toolbar {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+}
+.thr-heading h2 { margin: 0; font-size: 18px; font-weight: 700; color: #172b4d; }
+.thr-heading p { margin: 4px 0 0; font-size: 13px; color: #6b778c; }
+
+.thr-filter {
+  padding: 8px 12px; border: 2px solid #dfe1e6; border-radius: 4px;
+  font-size: 14px; color: #172b4d; background: #fff; outline: none; cursor: pointer;
+}
+.thr-filter:focus { border-color: #2563eb; }
+
+/* ── Empty and loading ───────────────────────────────────────────────── */
+.thr-loading { display: flex; align-items: center; gap: 8px; color: #6b778c; font-size: 14px; padding: 24px 0; }
+.thr-spin { animation: thr-spin 1s linear infinite; }
+@keyframes thr-spin { to { transform: rotate(360deg); } }
+
+.thr-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 56px 24px; color: #6b778c; text-align: center;
+}
+.thr-empty p { margin: 8px 0 0; font-size: 15px; font-weight: 600; color: #172b4d; }
+.thr-empty span { font-size: 13px; max-width: 420px; }
+
+/* ── Rows ────────────────────────────────────────────────────────────── */
+.thr-list { display: flex; flex-direction: column; gap: 10px; }
+.thr-row-group { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #fff; }
+
+.thr-row {
+  display: grid;
+  grid-template-columns: 28px minmax(200px, 2fr) 150px 170px 130px 110px auto;
+  align-items: center; gap: 14px; padding: 12px 14px;
+}
+/* A settled request is history, not work — it recedes rather than disappears. */
+.thr-row.settled { background: #fafbfc; }
+
+.thr-expand {
+  border: none; background: transparent; cursor: pointer; color: #6b778c;
+  display: flex; align-items: center; justify-content: center; padding: 2px; border-radius: 3px;
+}
+.thr-expand:hover { background: #ebecf0; color: #172b4d; }
+
+.thr-main { min-width: 0; }
+.thr-task { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.thr-key { font-size: 12px; font-weight: 700; color: #2563eb; flex-shrink: 0; }
+.thr-title {
+  font-size: 14px; font-weight: 600; color: #172b4d;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.thr-project { font-size: 12px; color: #6b778c; margin-top: 2px; }
+.thr-reason {
+  font-size: 12px; color: #5e6c84; margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.thr-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #97a0af; }
+
+.thr-hours { display: flex; gap: 16px; }
+.thr-hours-cell strong { font-size: 15px; color: #172b4d; }
+/* Granted less than asked for: the gap is the point, so it is marked. */
+.thr-hours-cell strong.thr-cut { color: #b45309; }
+
+.thr-people, .thr-dates { font-size: 12px; color: #42526e; display: flex; flex-direction: column; gap: 4px; }
+
+.thr-badge {
+  display: inline-block; padding: 3px 9px; border-radius: 10px;
+  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+}
+.thr-badge-requested { background: #fff7ed; color: #b45309; }
+.thr-badge-approved  { background: #ecfdf5; color: #047857; }
+.thr-badge-rejected  { background: #fef2f2; color: #b91c1c; }
+
+/* ── Actions ─────────────────────────────────────────────────────────── */
+.thr-actions, .thr-inline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.thr-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border: 1px solid #dfe1e6; background: #fff;
+  border-radius: 4px; font-size: 13px; font-weight: 600; color: #42526e;
+  cursor: pointer; transition: background .15s, border-color .15s;
+}
+.thr-btn:hover:not(:disabled) { background: #f4f5f7; }
+.thr-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.thr-approve { border-color: #a7f3d0; background: #ecfdf5; color: #047857; }
+.thr-approve:hover:not(:disabled) { background: #d1fae5; }
+.thr-reject { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+.thr-reject:hover:not(:disabled) { background: #fee2e2; }
+.thr-partial { border-color: #fed7aa; background: #fff7ed; color: #b45309; }
+
+.thr-input {
+  width: 92px; padding: 6px 9px; border: 2px solid #dfe1e6; border-radius: 4px;
+  font-size: 13px; color: #172b4d; outline: none;
+}
+.thr-input-wide { width: 240px; }
+.thr-input:focus { border-color: #2563eb; }
+
+.thr-rejection {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 14px 11px 50px; font-size: 12px; color: #b91c1c; background: #fef2f2;
+  border-top: 1px solid #fee2e2;
+}
+
+/* ── Timeline (§4) ───────────────────────────────────────────────────── */
+.thr-timeline { padding: 14px 18px 16px 50px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+.thr-timeline-loading { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #6b778c; }
+.thr-timeline ol { list-style: none; margin: 0; padding: 0; }
+
+.thr-event { position: relative; padding: 0 0 16px 20px; }
+/* The connector, drawn behind the dots and stopped short on the last entry. */
+.thr-event::before {
+  content: ''; position: absolute; left: 4px; top: 12px; bottom: 0;
+  width: 1px; background: #dfe1e6;
+}
+.thr-event:last-child { padding-bottom: 0; }
+.thr-event:last-child::before { display: none; }
+
+.thr-dot {
+  position: absolute; left: 0; top: 5px;
+  width: 9px; height: 9px; border-radius: 50%; background: #97a0af;
+  border: 2px solid #f8fafc; box-sizing: content-box;
+}
+.thr-dot-created { background: #2563eb; }
+.thr-dot-approved { background: #047857; }
+.thr-dot-rejected { background: #b91c1c; }
+.thr-dot-hours_modified { background: #b45309; }
+
+.thr-event-body { font-size: 12px; }
+.thr-event-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.thr-event-head strong { font-size: 13px; color: #172b4d; }
+.thr-event-when { color: #97a0af; font-size: 11px; }
+.thr-event-detail { color: #42526e; margin-top: 2px; }
+.thr-event-actor { color: #6b778c; margin-top: 2px; }
+.thr-event-none { font-size: 12px; color: #97a0af; }
+
+/* ── Narrow screens ──────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .thr-wrap { padding: 16px; }
+  .thr-row { grid-template-columns: 24px 1fr; row-gap: 10px; }
+  .thr-hours, .thr-people, .thr-dates, .thr-status, .thr-actions { grid-column: 2; }
+  .thr-rejection, .thr-timeline { padding-left: 18px; }
+}

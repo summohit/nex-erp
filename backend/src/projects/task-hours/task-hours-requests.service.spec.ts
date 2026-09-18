@@ -1,0 +1,229 @@
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { TaskHoursRequestsService } from './task-hours-requests.service';
+
+/**
+ * §3: an employee runs out of hours on a task, asks for more, and the project
+ * manager rules on it.
+ *
+ * What matters here is that approval actually moves the ceiling — the whole
+ * point of the request is to unblock logging — that the decision and the move
+ * happen together, and that nobody approves their own.
+ */
+const ISSUE = {
+  id: 11, key: 'NEX-11', title: 'Wire the importer',
+  assigneeId: 60, reporterId: 71,
+  estimatedHours: 4, additionalHours: 0,
+  project: {
+    id: 3, name: 'Acme', leadId: 70,
+    members: [{ employeeId: 71, role: 'PROJECT_MANAGER' }, { employeeId: 60, role: 'MEMBER' }],
+  },
+};
+
+const REQUEST = {
+  id: 5, issueId: 11, status: 'REQUESTED', requestedHours: 4, requestedById: 60,
+};
+
+function makeService(over: any = {}) {
+  const prisma: any = {
+    issue: {
+      findFirst: jest.fn().mockResolvedValue(ISSUE),
+      findUnique: jest.fn().mockResolvedValue({ additionalHours: ISSUE.additionalHours }),
+      update: jest.fn().mockImplementation((a: any) => Promise.resolve(a.data)),
+    },
+    issueTimeLog: {
+      aggregate: jest.fn().mockResolvedValue({ _sum: { durationMin: 240 } }),
+    },
+    taskHoursRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockImplementation((a: any) => Promise.resolve({ id: 5, ...a.data })),
+      update: jest.fn().mockImplementation((a: any) => Promise.resolve({ id: 5, ...a.data })),
+    },
+    taskHoursRequestActivity: {
+      create: jest.fn().mockImplementation((a: any) => Promise.resolve(a.data)),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    projectMember: { findMany: jest.fn().mockResolvedValue([]) },
+    project: { findMany: jest.fn().mockResolvedValue([]) },
+    ...over,
+  };
+  prisma.$transaction = jest.fn().mockImplementation((fn: any) => fn(prisma));
+  return { service: new TaskHoursRequestsService(prisma), prisma };
+}
+
+describe('raising a request', () => {
+  it('lets the assignee ask for more hours', async () => {
+    const { service } = makeService();
+    const r: any = await service.create(1, 60, 'EMPLOYEE', 11, {
+      requestedHours: 4, reason: 'The import format changed',
+    });
+    expect(r.requestedHours).toBe(4);
+    expect(r.status).toBe('REQUESTED');
+  });
+
+  it('records the raising on the timeline', async () => {
+    const { service, prisma } = makeService();
+    await service.create(1, 60, 'EMPLOYEE', 11, { requestedHours: 4, reason: 'why' });
+    expect(prisma.taskHoursRequestActivity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'CREATED', actorId: 60 }),
+      }),
+    );
+  });
+
+  it('refuses a stranger to the project', async () => {
+    const { service } = makeService();
+    await expect(
+      service.create(1, 999, 'EMPLOYEE', 11, { requestedHours: 4, reason: 'why' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('insists on a reason, since that is what is being ruled on', async () => {
+    const { service } = makeService();
+    await expect(
+      service.create(1, 60, 'EMPLOYEE', 11, { requestedHours: 4, reason: '  ' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('refuses a second request while one is still open', async () => {
+    const { service } = makeService({
+      taskHoursRequest: {
+        findFirst: jest.fn().mockResolvedValue({ id: 9 }),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    await expect(
+      service.create(1, 60, 'EMPLOYEE', 11, { requestedHours: 4, reason: 'why' }),
+    ).rejects.toThrow(/already .* awaiting a decision/);
+  });
+});
+
+describe('reviewing a request', () => {
+  const open = () => ({
+    taskHoursRequest: {
+      findFirst: jest.fn().mockResolvedValue(REQUEST),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn().mockImplementation((a: any) => Promise.resolve({ id: 5, ...a.data })),
+    },
+  });
+
+  it('raises the task ceiling by the approved hours', async () => {
+    const { service, prisma } = makeService(open());
+    await service.review(1, 71, 'EMPLOYEE', 5, 'APPROVED');
+    expect(prisma.issue.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { additionalHours: 4 } }),
+    );
+  });
+
+  it('lets the manager grant less than was asked for', async () => {
+    const { service, prisma } = makeService(open());
+    const r: any = await service.review(1, 71, 'EMPLOYEE', 5, 'APPROVED', { approvedHours: 2 });
+    expect(r.approvedHours).toBe(2);
+    expect(prisma.issue.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { additionalHours: 2 } }),
+    );
+  });
+
+  it('records a reduction on the timeline, so the gap is visible', async () => {
+    const { service, prisma } = makeService(open());
+    await service.review(1, 71, 'EMPLOYEE', 5, 'APPROVED', { approvedHours: 2 });
+    expect(prisma.taskHoursRequestActivity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'HOURS_MODIFIED', oldValue: '4', newValue: '2' }),
+      }),
+    );
+  });
+
+  it('adds to hours already granted rather than replacing them', async () => {
+    const { service, prisma } = makeService({
+      ...open(),
+      issue: {
+        findFirst: jest.fn().mockResolvedValue(ISSUE),
+        findUnique: jest.fn().mockResolvedValue({ additionalHours: 3 }),
+        update: jest.fn().mockImplementation((a: any) => Promise.resolve(a.data)),
+      },
+    });
+    await service.review(1, 71, 'EMPLOYEE', 5, 'APPROVED');
+    expect(prisma.issue.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { additionalHours: 7 } }),
+    );
+  });
+
+  it('leaves the ceiling alone on a rejection', async () => {
+    const { service, prisma } = makeService(open());
+    await service.review(1, 71, 'EMPLOYEE', 5, 'REJECTED', { reason: 'Re-scope instead' });
+    expect(prisma.issue.update).not.toHaveBeenCalled();
+  });
+
+  it('insists on a reason when rejecting', async () => {
+    const { service } = makeService(open());
+    await expect(
+      service.review(1, 71, 'EMPLOYEE', 5, 'REJECTED', {}),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('refuses somebody who does not manage the project', async () => {
+    const { service } = makeService(open());
+    await expect(
+      service.review(1, 60, 'EMPLOYEE', 5, 'APPROVED'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('refuses to let the requester approve their own request', async () => {
+    const { service } = makeService({
+      taskHoursRequest: {
+        // The PM raised it on their own task, which is ordinary.
+        findFirst: jest.fn().mockResolvedValue({ ...REQUEST, requestedById: 71 }),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    await expect(
+      service.review(1, 71, 'EMPLOYEE', 5, 'APPROVED'),
+    ).rejects.toThrow(/cannot approve your own/);
+  });
+
+  it('refuses to rule twice', async () => {
+    const { service } = makeService({
+      taskHoursRequest: {
+        findFirst: jest.fn().mockResolvedValue({ ...REQUEST, status: 'APPROVED' }),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    await expect(
+      service.review(1, 71, 'EMPLOYEE', 5, 'APPROVED'),
+    ).rejects.toThrow(/already approved/);
+  });
+
+  it('lets an administrator approve as well as the manager', async () => {
+    const { service, prisma } = makeService(open());
+    await service.review(1, 99, 'ADMIN', 5, 'APPROVED');
+    expect(prisma.issue.update).toHaveBeenCalled();
+  });
+});
+
+describe('the task hours summary', () => {
+  it('reports assigned, logged and remaining together', async () => {
+    const { service } = makeService();
+    const r: any = await service.listForIssue(1, 11, 'EMPLOYEE', 60);
+    expect(r.hours).toMatchObject({ assigned: 4, logged: 4, remaining: 0, allowed: 4 });
+  });
+
+  it('shows the approved hours in the remaining figure', async () => {
+    const { service } = makeService({
+      issue: {
+        findFirst: jest.fn().mockResolvedValue({ ...ISSUE, additionalHours: 4 }),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    const r: any = await service.listForIssue(1, 11, 'EMPLOYEE', 60);
+    expect(r.hours).toMatchObject({ allowed: 8, logged: 4, remaining: 4 });
+  });
+});

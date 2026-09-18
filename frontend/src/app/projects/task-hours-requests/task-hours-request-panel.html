@@ -1,0 +1,89 @@
+<!-- Nothing to show until the task's hours are known. -->
+<div class="thrp" *ngIf="!loading() && data()">
+
+  <div class="thrp-head">
+    <div class="thrp-head-left">
+      <svg lucideClock size="14"></svg>
+      <span>Assigned hours</span>
+    </div>
+
+    <!-- The ceiling, spelled out. "4h assigned + 2h approved" is the whole
+         story of a task that has been extended once. -->
+    <div class="thrp-figures" *ngIf="hours() as h">
+      <span *ngIf="h.assigned == null" class="thrp-unbounded">No estimate set</span>
+      <ng-container *ngIf="h.assigned != null">
+        <span class="thrp-fig"><strong>{{ h.assigned }}h</strong> assigned</span>
+        <span class="thrp-fig" *ngIf="h.additional > 0">
+          <strong class="thrp-extra">+{{ h.additional }}h</strong> approved
+        </span>
+        <span class="thrp-fig"><strong>{{ h.logged }}h</strong> logged</span>
+        <span class="thrp-fig thrp-left" [class.thrp-none]="isExhausted()">
+          <strong>{{ h.remaining }}h</strong> left
+        </span>
+      </ng-container>
+    </div>
+  </div>
+
+  <!-- Out of hours, with nothing pending: the one moment this matters. -->
+  <div class="thrp-warn" *ngIf="isExhausted() && !openRequest() && canRequest() && !formOpen()">
+    <svg lucideAlertTriangle size="14"></svg>
+    <span>All assigned hours are used. Request more to keep logging time.</span>
+  </div>
+
+  <!-- Waiting on the manager -->
+  <div class="thrp-pending" *ngIf="openRequest() as open">
+    <svg lucideClock size="14"></svg>
+    <span>
+      <strong>{{ open.requestedHours }}h</strong> requested by {{ fullName(open.requestedBy) }} —
+      awaiting the project manager's decision.
+    </span>
+  </div>
+
+  <!-- Raise one -->
+  <button type="button" class="thrp-ask" *ngIf="canRequest() && !openRequest() && !formOpen()"
+          (click)="openForm()">
+    <svg lucidePlus size="13"></svg> Request additional hours
+  </button>
+
+  <div class="thrp-form" *ngIf="formOpen()">
+    <div class="thrp-form-row">
+      <label>
+        <span>Additional hours</span>
+        <input type="number" min="0.25" step="0.25" [(ngModel)]="form.requestedHours"
+               placeholder="e.g. 2" class="thrp-input" />
+      </label>
+      <label class="thrp-grow">
+        <span>Why are they needed?</span>
+        <input type="text" [(ngModel)]="form.reason" class="thrp-input"
+               placeholder="The manager reads this before deciding"
+               (keyup.enter)="submit()" />
+      </label>
+    </div>
+    <div class="thrp-form-actions">
+      <button type="button" class="thrp-btn thrp-send" [disabled]="saving()" (click)="submit()">
+        <svg *ngIf="!saving()" lucideCheck size="13"></svg>
+        <svg *ngIf="saving()" lucideLoader2 size="13" class="thrp-spin"></svg>
+        {{ saving() ? 'Sending…' : 'Send request' }}
+      </button>
+      <button type="button" class="thrp-btn" (click)="closeForm()">
+        <svg lucideX size="13"></svg> Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- What has already been decided on this task -->
+  <div class="thrp-history" *ngIf="requests().length > 0">
+    <div class="thrp-hist-row" *ngFor="let r of requests()">
+      <span class="thrp-chip" [class]="'thrp-chip-' + r.status.toLowerCase()">{{ r.status }}</span>
+      <span class="thrp-hist-hours">
+        {{ r.requestedHours }}h asked<ng-container *ngIf="r.approvedHours != null">,
+          {{ r.approvedHours }}h granted</ng-container>
+      </span>
+      <span class="thrp-hist-who">{{ fullName(r.requestedBy) }}</span>
+      <span class="thrp-hist-when">{{ r.createdAt | date:'MMM d' }}</span>
+      <span class="thrp-hist-reason" *ngIf="r.rejectionReason" [title]="r.rejectionReason">
+        {{ r.rejectionReason }}
+      </span>
+    </div>
+  </div>
+</div>

@@ -15,6 +15,8 @@ import { ProjectTicketsController } from './tickets/project-tickets.controller';
 import { ProjectTicketsService } from './tickets/project-tickets.service';
 import { BudgetRequestsController } from './budget-requests/budget-requests.controller';
 import { BudgetRequestsService } from './budget-requests/budget-requests.service';
+import { TaskHoursRequestsController } from './task-hours/task-hours-requests.controller';
+import { TaskHoursRequestsService } from './task-hours/task-hours-requests.service';
 import { ProjectDiscussionsController } from './discussions/project-discussions.controller';
 import { ProjectDiscussionsService } from './discussions/project-discussions.service';
 
@@ -26,7 +28,7 @@ import { CrmModule } from '../crm/crm.module';
 
 @Module({
   imports: [PrismaModule, EventsModule, NotificationsModule, CrmModule],
-  controllers: [ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, ProjectDiscussionsController],
-  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, ProjectDiscussionsService]
+  controllers: [ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, TaskHoursRequestsController, ProjectDiscussionsController],
+  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, TaskHoursRequestsService, ProjectDiscussionsService]
 })
 export class ProjectsModule {}

@@ -8,6 +8,7 @@ import FormData from 'form-data';
 import { TasksGateway } from '../../events/tasks/tasks.gateway';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { canCreateTask } from '../../tasks/task-permissions';
+import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
 
 @Injectable()
 export class IssuesService {
@@ -581,6 +582,50 @@ export class IssuesService {
    * The timer is never blocked: it records observed work, which is the thing
    * the setting exists to prefer.
    */
+  /**
+   * The state of a task's hours budget: what it was assigned, what approved
+   * requests have added, and everything logged against it so far (§3).
+   */
+  private async loadTaskHoursState(issueId: number) {
+    const [issue, agg] = await Promise.all([
+      this.prisma.issue.findUnique({
+        where: { id: issueId },
+        select: { estimatedHours: true, additionalHours: true },
+      }),
+      this.prisma.issueTimeLog.aggregate({
+        where: { issueId },
+        _sum: { durationMin: true },
+      }),
+    ]);
+    if (!issue) throw new NotFoundException('Issue not found');
+    return {
+      estimatedHours: issue.estimatedHours,
+      additionalHours: issue.additionalHours ?? 0,
+      loggedMinutes: agg._sum.durationMin ?? 0,
+    };
+  }
+
+  /**
+   * Refuse a write that would take a task past its allowed hours (§3).
+   *
+   * Enforced here, in the service, rather than only in the UI: the rule has to
+   * hold for anything that reaches the API, and the form is the one caller
+   * that can be bypassed.
+   */
+  private async assertTaskHoursAvailable(
+    issueId: number,
+    additionalMinutes: number,
+    excludeMinutes = 0,
+  ) {
+    const state = await this.loadTaskHoursState(issueId);
+    try {
+      assertWithinAllowedHours(state, additionalMinutes, excludeMinutes);
+    } catch (e) {
+      if (e instanceof HoursExceeded) throw new BadRequestException(e.message);
+      throw e;
+    }
+  }
+
   private async assertManualLoggingAllowed(projectId: number) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -597,6 +642,22 @@ export class IssuesService {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
     const employeeId = await this.resolveEmployeeId(companyId, userId);
+
+    // The timer is gated on START, never on stop.
+    //
+    // Stopping is the moment work that has already happened gets written down.
+    // Refusing it would discard real time and leave the timer running with no
+    // way to close it, so the check belongs at the point where there is still
+    // a decision to make: whether to begin at all.
+    const hoursState = await this.loadTaskHoursState(issueId);
+    const left = remainingHours(hoursState);
+    if (left != null && left <= 0) {
+      const allowed = (hoursState.estimatedHours ?? 0) + hoursState.additionalHours;
+      throw new BadRequestException(
+        `All ${allowed}h assigned to this task have been logged. ` +
+        `Request additional hours before starting the timer again.`,
+      );
+    }
 
     const now = new Date();
     await this.prisma.issue.update({
@@ -657,6 +718,7 @@ export class IssuesService {
       throw new BadRequestException('durationMin must be a positive number of minutes');
     }
     await this.assertManualLoggingAllowed(projectId);
+    await this.assertTaskHoursAvailable(issueId, data.durationMin);
     const employeeId = await this.resolveEmployeeId(companyId, userId);
 
     const now = new Date();
@@ -734,6 +796,13 @@ export class IssuesService {
     }
 
     const manualMin = target - trackedMin;
+
+    // Checked as a delta: this row is upserted, so raising a 2h entry to 3h
+    // adds one hour, not three. Passing the new total as a fresh log would
+    // refuse edits that actually fit.
+    if (manualMin > 0) {
+      await this.assertTaskHoursAvailable(issueId, manualMin, manualLog?.durationMin ?? 0);
+    }
 
     if (manualMin <= 0) {
       if (manualLog) await this.prisma.issueTimeLog.delete({ where: { id: manualLog.id } });
