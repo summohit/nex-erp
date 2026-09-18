@@ -1364,6 +1364,12 @@
 .status-day-off { color: #94a3b8; }
 .bg-day-off { background-color: rgba(148, 163, 184, 0.15); }
 
+.status-overtime { color: #d97706; }
+.bg-overtime { background-color: rgba(217, 119, 6, 0.15); }
+
+.status-clockoff { color: #8b5cf6; }
+.bg-clockoff { background-color: rgba(139, 92, 246, 0.15); }
+
 /* ==========================================================================
    MONTHLY MATRIX GRID FOR ALL EMPLOYEES
    ========================================================================== */
@@ -1609,6 +1615,25 @@
   top: 2px;
   right: 2px;
   opacity: 0.75;
+}
+
+/* Overtime / missed-clock-out mini symbols pinned to the day-cell corners */
+.day-corner-symbol {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  stroke-width: 3px;
+  z-index: 2;
+}
+
+.day-ot-symbol {
+  bottom: 2px;
+  right: 2px;
+}
+
+.day-missed-symbol {
+  top: 2px;
+  left: 2px;
 }
 
 .day-cell-badge:not(.is-empty):hover {
@@ -2056,6 +2081,42 @@
   text-transform: uppercase;
   vertical-align: middle;
   cursor: help;
+}
+
+/* The day was left open and closed late with a recorded reason. Violet, distinct
+   from the amber auto-close note — this one is a real employee statement. */
+.missed-clockout-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: #faf5ff;
+  border: 1px solid #ede9fe;
+  border-left: 3px solid #8b5cf6;
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #4c1d95;
+}
+
+.missed-clockout-note svg {
+  color: #7c3aed;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.missed-clockout-note .note-title {
+  display: block;
+  font-weight: 700;
+  color: #5b21b6;
+}
+
+.missed-clockout-note .note-reason {
+  display: block;
+  margin-top: 3px;
+  font-style: italic;
+  color: #4c1d95;
 }
 
 .session-geo-meta.is-inferred {

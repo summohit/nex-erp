@@ -7,11 +7,11 @@ import {
   LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideCheck, LucideFilter, LucideDownload,
   LucideRefreshCw, LucideUserCheck, LucideUserX, LucideClock,
   LucideAlertTriangle, LucideDoorOpen, LucideCalendarDays,
-  LucideBuilding, LucideUser, LucideTimer, LucideCheckCircle2,
+  LucideBuilding, LucideUser, LucideTimer, LucideTimerOff, LucideCheckCircle2,
   LucideLayers, LucideEye, LucideMapPin, LucideInbox,
   LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
   LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
-  LucideExternalLink
+  LucideZap, LucideExternalLink
 } from '@lucide/angular';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { MasterDataService, Department } from '../../services/master-data.service';
@@ -45,11 +45,11 @@ export interface EmployeeMatrixRow {
     LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideCheck, LucideFilter, LucideDownload,
     LucideRefreshCw, LucideUserCheck, LucideUserX, LucideClock,
     LucideAlertTriangle, LucideDoorOpen, LucideCalendarDays,
-    LucideBuilding, LucideUser, LucideTimer, LucideCheckCircle2,
+    LucideBuilding, LucideUser, LucideTimer, LucideTimerOff, LucideCheckCircle2,
     LucideLayers, LucideEye, LucideMapPin, LucideInbox,
     LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
     LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
-    LucideExternalLink
+    LucideZap, LucideExternalLink
   ],
   templateUrl: './all-attendance.html',
   styleUrls: ['./all-attendance.css']
@@ -83,6 +83,11 @@ export class AllAttendanceComponent implements OnInit {
     isToday: boolean;
     /** Nobody clocked out — the 23:00 sweep closed the day. */
     autoClockedOut: boolean;
+    /**
+     * The day was closed late (after IST midnight) and the employee was asked
+     * for a reason for the missed clock-out. Showed in the day modal.
+     */
+    missedClockOutReason: string | null;
   } | null>(null);
   isDetailsModalOpen = signal(false);
 
@@ -324,6 +329,12 @@ export class AllAttendanceComponent implements OnInit {
           const inTime = this.formatTime(record.clockIn);
           const outTime = record.clockOut ? this.formatTime(record.clockOut) : '...';
           tooltip = `In: ${inTime} · Out: ${outTime}`;
+          if (record.overtimeHours && record.overtimeHours > 0) {
+            tooltip += ` · Overtime ${record.overtimeHours}h`;
+          }
+          if (record.clockOutReason) {
+            tooltip += ' · Missed clock out';
+          }
           if (['Present', 'Late', 'Half Day'].includes(status)) {
             presentCount++;
           }
@@ -791,7 +802,8 @@ export class AllAttendanceComponent implements OnInit {
       logs,
       durationStr,
       isToday: this.getLocalDateString(new Date(day.date)) === this.getLocalDateString(new Date()),
-      autoClockedOut: !!record?.autoClockedOut
+      autoClockedOut: !!record?.autoClockedOut,
+      missedClockOutReason: record?.clockOutReason ?? null
     });
 
     this.isDetailsModalOpen.set(true);
