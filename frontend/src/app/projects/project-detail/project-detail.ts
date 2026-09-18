@@ -3034,6 +3034,41 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   // List Tab Grid
+  /**
+   * The hours picture for one task (§7): what it was assigned, what has been
+   * logged against it, and what is left.
+   *
+   * Mirrors the server's rule in tasks/task-hours.ts deliberately -- a task
+   * with no estimate is unbounded, not a task with zero hours left, so it
+   * reads as a dash rather than an alarming red 0.
+   */
+  listTaskHours(issue: any): { assigned: number | null; logged: number; remaining: number | null } {
+    const loggedMin = (issue?.timeLogs || []).reduce(
+      (sum: number, l: any) => sum + (l.durationMin || 0), 0,
+    );
+    const logged = Math.round((loggedMin / 60) * 100) / 100;
+
+    if (issue?.estimatedHours == null) return { assigned: null, logged, remaining: null };
+
+    const allowed = issue.estimatedHours + (issue.additionalHours || 0);
+    return {
+      assigned: allowed,
+      logged,
+      remaining: Math.round(Math.max(0, allowed - logged) * 100) / 100,
+    };
+  }
+
+  /** Attachments on a task are its evidence (§2/§7) -- the same rows. */
+  listTaskEvidence(issue: any): any[] {
+    return issue?.attachments || [];
+  }
+
+  /** Renders hours as "4h", or an em dash when the task was never estimated. */
+  private hoursCell(value: number | null, color: string): string {
+    if (value == null) return '<span style="color:#cbd5e1;">—</span>';
+    return `<span style="font-size:13px;font-weight:600;color:${color};">${value}h</span>`;
+  }
+
   listGridColDefs: ColDef[] = [
     { field: 'key', headerName: 'ID', width: 100, pinned: 'left' },
     { field: 'title', headerName: 'Task', minWidth: 200, flex: 1, filter: true },
@@ -3118,6 +3153,85 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         return `<div style="display: flex; align-items: center; height: 100%;">${membersHtml}</div>`;
       }
     },
+    // §8: the delivery phase this task belongs to.
+    {
+      headerName: 'Phase',
+      width: 130,
+      valueGetter: (params: any) => params.data?.phase?.name || '',
+      cellRenderer: (params: any) => {
+        const name = params.data?.phase?.name;
+        if (!name) return '<span style="color:#cbd5e1;">—</span>';
+        // A retired phase still reads as itself, just muted -- the task is
+        // genuinely in it, whatever the phase list now offers.
+        const retired = params.data?.phase?.isActive === false;
+        const bg = retired ? '#f1f5f9' : '#eef2ff';
+        const fg = retired ? '#94a3b8' : '#4338ca';
+        return `<span style="background:${bg};color:${fg};padding:3px 9px;border-radius:9999px;font-size:12px;font-weight:600;">${name}</span>`;
+      },
+    },
+
+    // §7: assigned, logged and remaining as three sortable columns rather than
+    // one combined cell -- "who is out of hours" is a question you answer by
+    // sorting on Remaining, which a single formatted string cannot do.
+    {
+      headerName: 'Assigned',
+      width: 110,
+      type: 'numericColumn',
+      valueGetter: (params: any) => this.listTaskHours(params.data).assigned,
+      cellRenderer: (params: any) => this.hoursCell(params.value, '#334155'),
+    },
+    {
+      headerName: 'Logged',
+      width: 100,
+      type: 'numericColumn',
+      valueGetter: (params: any) => this.listTaskHours(params.data).logged,
+      cellRenderer: (params: any) => this.hoursCell(params.value, '#0f766e'),
+    },
+    {
+      headerName: 'Remaining',
+      width: 115,
+      type: 'numericColumn',
+      valueGetter: (params: any) => this.listTaskHours(params.data).remaining,
+      cellRenderer: (params: any) => {
+        const v = params.value;
+        if (v == null) return this.hoursCell(null, '');
+        // Red at zero: the task cannot take more time without an approved
+        // additional-hours request (§3).
+        return this.hoursCell(v, v <= 0 ? '#b91c1c' : '#047857');
+      },
+    },
+
+    // §7/§2: evidence, previewable without opening the task.
+    {
+      headerName: 'Evidence',
+      width: 150,
+      sortable: true,
+      valueGetter: (params: any) => this.listTaskEvidence(params.data).length,
+      cellRenderer: (params: any) => {
+        const atts = this.listTaskEvidence(params.data);
+        if (!atts.length) return '<span style="color:#cbd5e1;">—</span>';
+
+        // Up to three thumbnails, then a count. data-att-url is what the cell
+        // click handler looks for, so a preview does not also open the task.
+        const shown = atts.slice(0, 3);
+        const thumbs = shown.map((a: any) => {
+          const name = (a.fileName || 'file').replace(/"/g, '&quot;');
+          const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(a.fileName || '');
+          const common = `data-att-url="${a.fileUrl}" title="${name}" style="width:24px;height:24px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;flex-shrink:0;`;
+          return isImage
+            ? `<img ${common}object-fit:cover;" src="${a.fileUrl}">`
+            : `<div ${common}background:#f1f5f9;color:#64748b;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;">${(a.fileName || 'F').split('.').pop()?.slice(0, 3).toUpperCase()}</div>`;
+        }).join('');
+
+        const more = atts.length > 3
+          ? `<span style="font-size:11px;color:#64748b;font-weight:600;">+${atts.length - 3}</span>`
+          : '';
+        const count = `<span style="font-size:12px;color:#475569;font-weight:600;margin-left:2px;">${atts.length}</span>`;
+
+        return `<div style="display:flex;align-items:center;gap:4px;height:100%;">${thumbs}${more}${count}</div>`;
+      },
+    },
+
     { 
       headerName: 'Due Date', 
       width: 150, 
@@ -3159,6 +3273,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   ];
 
   onListGridCellClicked(event: CellClickedEvent) {
+    // An evidence thumbnail is rendered inside the row, so a click on one
+    // arrives here as an ordinary cell click too. Previewing wins; anything
+    // else falls through to opening the task.
+    const hit = (event.event?.target as HTMLElement | undefined)
+      ?.closest?.('[data-att-url]') as HTMLElement | null;
+    const url = hit?.getAttribute('data-att-url');
+    if (url) {
+      window.open(url, '_blank', 'noopener');
+      return;
+    }
+
     const issue = event.data;
     if (issue) {
       this.openIssueDetails(issue);
