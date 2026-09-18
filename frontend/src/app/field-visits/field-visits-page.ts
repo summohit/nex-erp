@@ -45,20 +45,30 @@ export class FieldVisitsPageComponent implements OnInit {
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
 
-  /** Current user from AuthService. */
-  private user = computed(() => this.authService.currentUser());
-  userRole = computed(() => this.user()?.role || 'EMPLOYEE');
-  /** true when the logged-in user is admin/management and can see all employees' visits. */
-  isManager = computed(() => ['SUPERADMIN', 'ADMIN', 'HR', 'SUPER_ADMIN'].includes(this.userRole()));
-  /** true when user is a regular employee — can only see their own visits. */
-  isEmployee = computed(() => !this.isManager());
-
   visits = signal<FieldVisit[]>([]);
   summary = signal<FieldVisitSummary>(EMPTY_SUMMARY);
   isLoading = signal(true);
 
   employees = signal<FilterOption[]>([]);
   projects = signal<FilterOption[]>([]);
+
+  /**
+   * Only admins can browse the whole company's visits. Everyone else sees just
+   * their own — matched server-side too, this only gates the filter UI.
+   */
+  isManager = computed(() => {
+    const role = this.authService.currentUser()?.role;
+    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN';
+  });
+
+  /**
+   * The other side of isManager, for copy that addresses the reader: "My
+   * Client Visits" rather than "Client Visits". Derived from isManager rather
+   * than listing roles again, so the two can never disagree -- and so this
+   * cannot drift from canSeeAllVisits on the server, which is what actually
+   * decides whose visits come back.
+   */
+  isEmployee = computed(() => !this.isManager());
 
   range = signal<RangeKey>('30d');
   fromDate = signal('');
@@ -119,8 +129,8 @@ export class FieldVisitsPageComponent implements OnInit {
   ngOnInit() {
     this.applyRange('30d');
 
-    // Only load the employees dropdown for admin / management users.
-    // Employee-level users can only see their own visits — the server enforces it.
+    // Only managers get the employee filter; loading the list for everyone
+    // would hand every staff member a directory of their coworkers.
     if (this.isManager()) {
       this.employeeService.getEmployeesBasicList().subscribe({
         next: (list) => this.employees.set(
@@ -171,7 +181,7 @@ export class FieldVisitsPageComponent implements OnInit {
     this.fieldVisitsService.getCompanyVisits({
       from: this.fromDate() || undefined,
       to: this.toDate() || undefined,
-      employeeId: this.employeeId() ?? undefined,
+      employeeId: this.isManager() ? (this.employeeId() ?? undefined) : undefined,
       projectId: this.projectId() ?? undefined,
       status: this.status() || undefined,
     }).subscribe({

@@ -78,7 +78,7 @@ export class FieldVisitsService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/field-visits`;
 
-  /** Visit history for one project — powers the project detail "Field Visits" tab. */
+  /** Visit history for one project — powers the project detail "Client Visits" tab. */
   getProjectVisits(projectId: number) {
     return this.http.get<FieldVisit[]>(`${this.apiUrl}/project/${projectId}`);
   }
@@ -95,7 +95,7 @@ export class FieldVisitsService {
     });
   }
 
-  /** Filtered company-wide log + matching KPI summary — the Field Visits page. */
+  /** Filtered company-wide log + matching KPI summary — the Client Visits page. */
   getCompanyVisits(filters: FieldVisitFilters = {}) {
     let params = new HttpParams();
     if (filters.from) params = params.set('from', filters.from);

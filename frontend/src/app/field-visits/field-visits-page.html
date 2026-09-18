@@ -103,7 +103,10 @@
           (ngModelChange)="search.set($event)" />
       </div>
 
-      <select *ngIf="isManager()" [ngModel]="employeeId()" (ngModelChange)="employeeId.set($event); load()">
+      <select
+        *ngIf="isManager()"
+        [ngModel]="employeeId()"
+        (ngModelChange)="employeeId.set($event); load()">
         <option [ngValue]="null">All employees</option>
         <option *ngFor="let e of employees()" [ngValue]="e.id">{{ e.label }}</option>
       </select>
@@ -149,7 +152,7 @@
     <div *ngIf="!isLoading()">
       <div class="empty-state" *ngIf="filteredVisits().length === 0">
         <svg lucideMapPin [size]="34"></svg>
-        <h3>No field visits</h3>
+        <h3>No client visits</h3>
         <p>
           {{ hasActiveFilters()
               ? 'Nothing matches these filters. Try widening the date range.'
