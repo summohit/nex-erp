@@ -135,6 +135,8 @@ export class ProjectsService {
         name: data.name,
         key: finalKey,
         description: data.description,
+        // §1: the short statement of what the project is.
+        summary: data.summary ?? null,
         color: data.color || '#2563eb',
         icon: data.icon || 'folder',
         address: data.address ?? null,
@@ -305,6 +307,7 @@ export class ProjectsService {
           name: data.name,
           key: finalKey,
           description: data.description,
+          summary: data.summary ?? null,
           address: data.address ?? null,
           companyId,
           leadId,

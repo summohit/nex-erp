@@ -512,6 +512,9 @@
                 {{ project()?.status || 'ACTIVE' }}
               </span>
             </div>
+            <!-- §1: the summary reads first — it is the answer to "what is
+                 this project", where the description is the detail behind it. -->
+            <p class="summary-project-statement" *ngIf="project()?.summary">{{ project()?.summary }}</p>
             <p class="summary-project-desc" *ngIf="project()?.description">{{ project()?.description }}</p>
             <div class="summary-meta-pills">
               <span class="meta-pill" *ngIf="project()?.client">
@@ -1809,6 +1812,12 @@
            <div class="att-meta-sub">
              <span>{{ att.createdAt | date:'MMM d, y' }}</span>
              <span *ngIf="att.fileSize">{{ (att.fileSize / 1024 / 1024) | number:'1.1-2' }} MB</span>
+             <!-- §2: who uploaded it. Shown for task attachments too, not just
+                  project documents — evidence is only evidence if you can tell
+                  who produced it. -->
+             <span class="att-uploader" *ngIf="att.uploader">
+               {{ att.uploader.firstName }} {{ att.uploader.lastName }}
+             </span>
            </div>
            
            <!-- Task Heading -->

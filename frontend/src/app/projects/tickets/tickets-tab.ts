@@ -109,18 +109,33 @@ export class TicketsTabComponent {
     });
   });
 
-  selectedMember = computed(() => {
+  /**
+   * The employee currently chosen, for the closed selector (§6).
+   *
+   * A method, not a computed. `form` is a plain object, so a computed reading
+   * form.proposedAssigneeId has no signal to invalidate it: it evaluated once
+   * with nothing selected, cached null, and kept saying "Select employee…"
+   * after a choice was made. That is exactly the confusion this section is
+   * about, and it got worse the longer the list, because the picked name
+   * scrolled out of view with nothing on the trigger to confirm it.
+   *
+   * Resolved against the full member list rather than the filtered one, so a
+   * search that excludes the chosen person does not blank the trigger.
+   */
+  selectedMember() {
     const id = this.form.proposedAssigneeId;
     if (!id) return null;
     return this.members().find((m) => m.id === id) || null;
-  });
+  }
 
-  dateError = computed(() => {
+  /** Same reason as selectedMember above: `form` is not a signal. */
+  dateError() {
     if (this.form.startDate && this.form.dueDate && this.form.dueDate < this.form.startDate) {
       return 'Due date cannot be earlier than start date';
     }
     return null;
-  });
+  }
+
 
   private load(projectId: number) {
     this.loading.set(true);

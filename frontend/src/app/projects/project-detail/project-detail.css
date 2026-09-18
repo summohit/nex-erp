@@ -7778,3 +7778,17 @@ input[type=text], input[type=email], input[type=password] {
 }
 .ticket-origin-banner strong { font-size: 13px; display: block; }
 .ticket-origin-banner p { margin: 3px 0 0; font-size: 12px; color: #92400e; line-height: 1.5; }
+
+/* §1: the project summary, above the description on the Summary tab. Slightly
+   larger and darker — it is the sentence someone reads first. */
+.summary-project-statement {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #1e293b;
+  margin: 0 0 10px;
+  max-width: 88ch;
+}
+
+/* §2: who uploaded an attachment, in the meta line under its name. */
+.att-uploader { color: #64748b; }
+.att-uploader::before { content: '· '; color: #cbd5e1; }

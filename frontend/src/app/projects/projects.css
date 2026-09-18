@@ -5570,3 +5570,14 @@
     max-width: 100%;
   }
 }
+
+/* §1: the summary textarea in the project form — an input that happens to be
+   several lines, so it inherits the field styling rather than inventing its
+   own. */
+.cbm-input.cbm-textarea {
+  min-height: 78px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.55;
+  padding-top: 10px;
+}

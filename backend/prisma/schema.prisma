@@ -1421,6 +1421,13 @@ model Project {
   /// a deletion, which a count does.
   issueSeq      Int         @default(0)
   description   String?
+  /// A short statement of what the project is and why it exists (§1).
+  ///
+  /// Distinct from `description` above, which is the free-text detail, and
+  /// from the ProjectSummary model, which belongs to an AI analysis run and is
+  /// regenerated whenever the documents are re-read. This one is written by a
+  /// person and stays put.
+  summary       String?     @db.Text
   color         String      @default("#2563eb") // Project accent color
   icon          String      @default("folder") // Lucide icon name
   status        String      @default("ACTIVE") // ACTIVE, ARCHIVED (archive lifecycle only — unrelated to workStatus)

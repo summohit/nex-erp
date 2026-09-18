@@ -51,6 +51,20 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   BLOCKED: { bg: '#fee2e2', color: '#b91c1c' }
 };
 
+/**
+ * Where a project sits in the closure process (§5).
+ *
+ * Labels rather than raw values: WORK_PENDING is what the column holds, "Work
+ * in progress" is what somebody filtering for it has in mind.
+ */
+export const PROJECT_CLOSURE_STATUSES = [
+  { value: 'WORK_PENDING', label: 'Work in progress' },
+  { value: 'SIGNOFF_PENDING', label: 'Awaiting sign-off' },
+  { value: 'FINANCE_PENDING', label: 'Awaiting finance' },
+  { value: 'PAYMENT_PENDING', label: 'Awaiting payment' },
+  { value: 'FULLY_CLOSED', label: 'Fully closed' },
+];
+
 export const PROJECT_STATUSES = [
   'DRAFT', 'ACTIVE', 'ON_HOLD', 'AT_RISK', 'COMPLETED', 'CLOSED', 'CANCELLED'
 ] as const;
@@ -850,6 +864,8 @@ export class ProjectsComponent implements OnInit {
       name: '',
       visibility: 'Workspace',
       description: '',
+      /** §1: the short statement of what the project is. */
+      summary: '',
       startDate: '',
       endDate: '',
       billingType: 'NON_BILLABLE',
@@ -1115,11 +1131,14 @@ export class ProjectsComponent implements OnInit {
   filterDepartmentId = signal<string>('ALL');
   filterCategory = signal<string>('ALL');
   filterStatus = signal<string>('ALL');
+  /** §5: where the project sits in the closure process. */
+  filterClosureStatus = signal<string>('ALL');
   filterPriority = signal<string>('ALL');
   filterStartFrom = signal<string>('');
   filterDeadlineTo = signal<string>('');
 
   readonly projectStatusOptions = PROJECT_STATUSES;
+  readonly projectClosureStatusOptions = PROJECT_CLOSURE_STATUSES;
   readonly projectPriorityOptions = PROJECT_PRIORITIES;
 
   /**
@@ -1350,7 +1369,8 @@ export class ProjectsComponent implements OnInit {
   activeFilterCount = computed(() =>
     [
       this.filterClientId(), this.filterPmId(), this.filterDepartmentId(),
-      this.filterCategory(), this.filterStatus(), this.filterPriority()
+      this.filterCategory(), this.filterStatus(), this.filterPriority(),
+      this.filterClosureStatus()
     ].filter(v => v !== 'ALL').length
     + (this.filterStartFrom() ? 1 : 0)
     + (this.filterDeadlineTo() ? 1 : 0)
@@ -1362,6 +1382,7 @@ export class ProjectsComponent implements OnInit {
     this.filterDepartmentId.set('ALL');
     this.filterCategory.set('ALL');
     this.filterStatus.set('ALL');
+    this.filterClosureStatus.set('ALL');
     this.filterPriority.set('ALL');
     this.filterStartFrom.set('');
     this.filterDeadlineTo.set('');
@@ -1373,6 +1394,7 @@ export class ProjectsComponent implements OnInit {
     const dept = this.filterDepartmentId();
     const category = this.filterCategory();
     const status = this.filterStatus();
+    const closure = this.filterClosureStatus();
     const priority = this.filterPriority();
     const startFrom = this.filterStartFrom();
     const deadlineTo = this.filterDeadlineTo();
@@ -1382,6 +1404,9 @@ export class ProjectsComponent implements OnInit {
       if (dept !== 'ALL' && String(p.department?.id ?? '') !== dept) return false;
       if (category !== 'ALL' && (p.category || '') !== category) return false;
       if (status !== 'ALL' && (p.workStatus || '') !== status) return false;
+      // §5: WORK_PENDING is the default for every project, so a missing
+      // value matches it rather than dropping out of the filter.
+      if (closure !== 'ALL' && (p.closureStatus || 'WORK_PENDING') !== closure) return false;
       if (priority !== 'ALL' && (p.priority || 'MEDIUM') !== priority) return false;
 
       if (pm !== 'ALL') {
@@ -3113,6 +3138,7 @@ export class ProjectsComponent implements OnInit {
       startDate: project.startDate ? project.startDate.split('T')[0] : '',
       endDate: project.endDate ? project.endDate.split('T')[0] : '',
       billingType: project.billingType || 'NON_BILLABLE',
+      summary: project.summary || '',
       budgetAmount: project.budgetAmount,
       hourlyRate: project.hourlyRate,
       clientId: project.clientId,
@@ -3177,6 +3203,7 @@ export class ProjectsComponent implements OnInit {
     const payload = {
       name: this.projectForm.name.trim(),
       description: this.projectForm.description,
+      summary: this.projectForm.summary || null,
       color: bgValue,
       startDate: this.projectForm.startDate || null,
       endDate: this.projectForm.endDate || null,

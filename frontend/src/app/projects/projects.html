@@ -322,6 +322,17 @@
           </select>
         </label>
 
+        <!-- §5: where the project stands in the closure process — the
+             question "what is waiting on a sign-off" is asked of this, not of
+             the work status beside it. -->
+        <label class="project-filter-field">
+          <span>Sign-off status</span>
+          <select [ngModel]="filterClosureStatus()" (ngModelChange)="filterClosureStatus.set($event)">
+            <option value="ALL">All stages</option>
+            <option *ngFor="let cs of projectClosureStatusOptions" [value]="cs.value">{{ cs.label }}</option>
+          </select>
+        </label>
+
         <label class="project-filter-field">
           <span>Priority</span>
           <select [ngModel]="filterPriority()" (ngModelChange)="filterPriority.set($event)">
@@ -1906,6 +1917,19 @@
           </div>
           <div class="cbm-field-error" *ngIf="isSubmitted() && !projectForm.name.trim()">
             <svg lucideAlertTriangle size="13"></svg> Board title is required
+          </div>
+        </div>
+
+        <!-- §1: the project summary. Sits under the title because it answers
+             the same question the title only hints at: what is this. -->
+        <div class="cbm-field-group">
+          <label class="cbm-field-label">Summary</label>
+          <div class="cbm-input-wrapper">
+            <textarea
+              class="cbm-input cbm-textarea"
+              rows="3"
+              [(ngModel)]="projectForm.summary"
+              placeholder="What this project is and why it exists — the paragraph you would send someone joining it."></textarea>
           </div>
         </div>
 
