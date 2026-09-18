@@ -5890,3 +5890,26 @@
   line-height: 1.55;
   padding-top: 10px;
 }
+
+/* The client selector's "internal project" state. An absent contact is a
+   deliberate choice here, not an empty field, so it reads like a selection. */
+.cbm-select-internal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.cbm-contact-avatar.internal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  color: #64748b;
+}
+.cbm-contact-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

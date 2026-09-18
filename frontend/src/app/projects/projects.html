@@ -2049,10 +2049,19 @@
                     <span class="cbm-company-badge" *ngIf="contact.companyName">{{ contact.companyName }}</span>
                   </div>
                 </ng-container>
+                <!-- No contact IS the internal project: the dropdown already
+                     ticks "Internal Project (No Client)" whenever leadContactId
+                     is null, so the trigger says the same thing rather than
+                     reading as an empty field somebody forgot to fill. -->
                 <ng-template #noClientTemplate>
-                  <div class="cbm-select-placeholder">
-                    <svg lucideBuilding size="16" class="cbm-placeholder-icon"></svg>
-                    <span>Search &amp; select client or company contact...</span>
+                  <div class="cbm-select-internal">
+                    <span class="cbm-contact-avatar internal">
+                      <svg lucideBriefcase size="14"></svg>
+                    </span>
+                    <div class="cbm-contact-info">
+                      <span class="cbm-contact-name">Internal Project (No Client)</span>
+                      <span class="cbm-contact-sub">Not billed or linked to an external client</span>
+                    </div>
                   </div>
                 </ng-template>
               </div>
