@@ -21,6 +21,9 @@ import {
   LucideArrowRight,
   LucideChevronDown,
   LucideChevronUp,
+  LucideSearch,
+  LucideUsers,
+  LucideShieldOff,
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../services/auth.service';
@@ -50,6 +53,9 @@ import { AuthService } from '../../services/auth.service';
     LucideArrowRight,
     LucideChevronDown,
     LucideChevronUp,
+    LucideSearch,
+    LucideUsers,
+    LucideShieldOff,
   ],
   templateUrl: './security.html',
   styleUrls: ['./security.css'],
@@ -95,8 +101,161 @@ export class SecurityComponent implements OnInit {
     return !!s?.enabled && s.backupCodesRemaining > 0 && s.backupCodesRemaining <= 3;
   });
 
+  // ── Administration: resetting other people's two-factor ─────────────────
+  //
+  // The recovery path when someone loses their phone and their backup codes,
+  // and the only way back in when a stored secret can no longer be decrypted
+  // -- which is what an ENCRYPTION_KEY rotation does to everyone enrolled
+  // before it. The server restricts all of this to a SUPERADMIN in the caller's
+  // own company; this section simply does not render for anybody else.
+
+  adminUsers = signal<any[]>([]);
+  adminLoading = signal(false);
+  adminSearch = signal('');
+  /** userIds ticked for reset. */
+  adminSelected = signal<Set<number>>(new Set());
+  adminResetting = signal(false);
+  /** Shown instead of the button once a reset is staged, to force a pause. */
+  adminConfirming = signal(false);
+
+  get isSuperAdmin(): boolean {
+    return this.authService.currentUser()?.role === 'SUPERADMIN';
+  }
+
+  /** The signed-in user, who must not reset their own second factor here. */
+  private get myUserId(): number | null {
+    return this.authService.currentUser()?.id ?? null;
+  }
+
+  /** Template-side form of the above -- the service itself stays private. */
+  isMe(userId: number): boolean {
+    return this.myUserId === userId;
+  }
+
+  adminFiltered = computed(() => {
+    const q = this.adminSearch().toLowerCase().trim();
+    const rows = this.adminUsers();
+    if (!q) return rows;
+    return rows.filter((u) =>
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.role || '').toLowerCase().includes(q),
+    );
+  });
+
+  /** Only an enrolled user can be reset; the rest have nothing to clear. */
+  adminSelectable = computed(() =>
+    this.adminFiltered().filter((u) => u.enabled && u.userId !== this.myUserId),
+  );
+
+  adminSelectedCount = computed(() => this.adminSelected().size);
+
+  allVisibleSelected = computed(() => {
+    const selectable = this.adminSelectable();
+    if (!selectable.length) return false;
+    const sel = this.adminSelected();
+    return selectable.every((u) => sel.has(u.userId));
+  });
+
+  loadAdminUsers() {
+    if (!this.isSuperAdmin) return;
+    this.adminLoading.set(true);
+    this.authService.listTwoFactorUsers().subscribe({
+      next: (rows: any) => {
+        this.adminUsers.set(rows || []);
+        this.adminLoading.set(false);
+      },
+      error: (err: any) => {
+        this.adminLoading.set(false);
+        this.toast.error(err?.error?.message || 'Could not load the user list');
+      },
+    });
+  }
+
+  isAdminSelected(userId: number) { return this.adminSelected().has(userId); }
+
+  toggleAdminSelect(user: any) {
+    if (!user?.enabled || user.userId === this.myUserId) return;
+    const next = new Set(this.adminSelected());
+    next.has(user.userId) ? next.delete(user.userId) : next.add(user.userId);
+    this.adminSelected.set(next);
+    this.adminConfirming.set(false);
+  }
+
+  toggleSelectAllVisible() {
+    const selectable = this.adminSelectable();
+    const next = new Set(this.adminSelected());
+    if (this.allVisibleSelected()) {
+      selectable.forEach((u) => next.delete(u.userId));
+    } else {
+      selectable.forEach((u) => next.add(u.userId));
+    }
+    this.adminSelected.set(next);
+    this.adminConfirming.set(false);
+  }
+
+  clearAdminSelection() {
+    this.adminSelected.set(new Set());
+    this.adminConfirming.set(false);
+  }
+
+  /** The names behind the count, so the confirmation says who. */
+  selectedNames = computed(() => {
+    const sel = this.adminSelected();
+    return this.adminUsers()
+      .filter((u) => sel.has(u.userId))
+      .map((u) => u.name || u.email);
+  });
+
+  /**
+   * Reset every selected user, one request each.
+   *
+   * Deliberately not a new bulk endpoint: the single reset is already written,
+   * already scoped to the caller's company and already refuses self-reset, and
+   * a second server path doing the same thing is a second place for those
+   * checks to drift. Failures are collected rather than aborting the run --
+   * stopping halfway would leave the admin unsure who had been reset.
+   */
+  confirmBulkReset() {
+    const ids = [...this.adminSelected()];
+    if (!ids.length) return;
+
+    this.adminResetting.set(true);
+    let remaining = ids.length;
+    const failed: string[] = [];
+
+    const finish = () => {
+      if (--remaining > 0) return;
+      this.adminResetting.set(false);
+      this.adminConfirming.set(false);
+      this.clearAdminSelection();
+      this.loadAdminUsers();
+
+      if (failed.length) {
+        this.toast.error(`${failed.length} of ${ids.length} could not be reset: ${failed[0]}`);
+      } else {
+        this.toast.success(
+          ids.length === 1
+            ? 'Two-factor authentication reset. They can sign in with their password.'
+            : `Two-factor authentication reset for ${ids.length} users.`,
+        );
+      }
+    };
+
+    for (const id of ids) {
+      this.authService.resetTwoFactorForUser(id).subscribe({
+        next: () => finish(),
+        error: (err: any) => {
+          failed.push(err?.error?.message || `user ${id}`);
+          finish();
+        },
+      });
+    }
+  }
+
   ngOnInit() {
     this.load();
+    this.loadAdminUsers();
   }
 
   private load() {

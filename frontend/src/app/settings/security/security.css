@@ -1760,3 +1760,111 @@
 }
 
 .rotation-safety-note svg { flex-shrink: 0; margin-top: 1px; }
+
+/* ── Administration: resetting another user's two-factor ──────────────────
+   Visually quieter than the panels above it: this is a recovery tool an admin
+   reaches for rarely, not a thing to invite clicking. The only loud element is
+   the confirmation, which removes somebody's second factor. */
+
+.tfa-admin {
+  margin-top: 28px;
+  padding: 22px 24px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.tfa-admin-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.tfa-admin-title { display: flex; gap: 11px; color: #475569; }
+.tfa-admin-title h2 { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; }
+.tfa-admin-title p { margin: 4px 0 0; font-size: 13px; color: #64748b; max-width: 62ch; line-height: 1.5; }
+
+.tfa-admin-refresh {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border: 1px solid #e2e8f0; background: #fff;
+  border-radius: 6px; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer;
+}
+.tfa-admin-refresh:hover:not(:disabled) { background: #f8fafc; }
+.tfa-admin-refresh:disabled { opacity: .55; cursor: not-allowed; }
+
+.tfa-admin-search {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px;
+  margin-bottom: 14px; color: #94a3b8;
+}
+.tfa-admin-search:focus-within { border-color: #2563eb; }
+.tfa-admin-search input {
+  flex: 1; border: none; outline: none; font-size: 14px; color: #0f172a; background: transparent;
+}
+
+.tfa-admin-loading, .tfa-admin-empty {
+  padding: 22px; text-align: center; font-size: 13px; color: #94a3b8;
+}
+
+.tfa-admin-table { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+
+.tfa-admin-row {
+  display: grid;
+  grid-template-columns: 44px minmax(180px, 1fr) 130px 170px;
+  align-items: center; gap: 10px;
+  padding: 10px 12px; border-bottom: 1px solid #f1f5f9;
+}
+.tfa-admin-row:last-child { border-bottom: none; }
+.tfa-admin-header {
+  background: #f8fafc;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: #64748b;
+}
+.tfa-admin-row.tfa-selected { background: #fef2f2; }
+/* Not enrolled: nothing to reset, so the row reads as unavailable. */
+.tfa-admin-row.tfa-disabled { opacity: .55; }
+
+.tfa-check { display: flex; align-items: center; justify-content: center; }
+.tfa-check input { width: 15px; height: 15px; cursor: pointer; }
+.tfa-check input:disabled { cursor: not-allowed; }
+
+.tfa-col-user { display: flex; flex-direction: column; min-width: 0; }
+.tfa-col-user strong {
+  font-size: 13px; font-weight: 600; color: #0f172a;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tfa-col-user small { font-size: 11px; color: #94a3b8; }
+.tfa-col-role { font-size: 12px; color: #475569; }
+.tfa-col-state { display: flex; align-items: center; gap: 7px; }
+.tfa-col-state small { font-size: 11px; color: #94a3b8; font-style: italic; }
+
+.tfa-pill {
+  padding: 3px 9px; border-radius: 9999px;
+  font-size: 11px; font-weight: 700; background: #f1f5f9; color: #94a3b8;
+}
+.tfa-pill.on { background: #ecfdf5; color: #047857; }
+
+/* ── Action bar ─────────────────────────────────────────────────────────── */
+.tfa-admin-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 14px; padding: 12px 14px;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+}
+.tfa-admin-count { font-size: 13px; font-weight: 600; color: #334155; }
+
+.tfa-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border: 1px solid #e2e8f0; background: #fff;
+  border-radius: 6px; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer;
+}
+.tfa-btn:hover:not(:disabled) { background: #f1f5f9; }
+.tfa-btn:disabled { opacity: .55; cursor: not-allowed; }
+.tfa-btn-danger { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+.tfa-btn-danger:hover:not(:disabled) { background: #fee2e2; }
+
+.tfa-confirm { display: flex; gap: 9px; flex: 1; min-width: 260px; color: #b91c1c; }
+.tfa-confirm strong { font-size: 13px; display: block; }
+.tfa-confirm p { margin: 3px 0 0; font-size: 12px; color: #7f1d1d; line-height: 1.5; }
+
+@media (max-width: 720px) {
+  .tfa-admin-row { grid-template-columns: 36px 1fr; row-gap: 6px; }
+  .tfa-col-role, .tfa-col-state { grid-column: 2; }
+}

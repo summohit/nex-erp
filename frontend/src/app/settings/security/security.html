@@ -645,5 +645,107 @@
     </div>
   </ng-template>
 
-</div>
+  <!-- ── Administration: reset someone else's two-factor ──────────────────
+       Only a SUPERADMIN sees this, matching the server, which refuses these
+       endpoints to anybody else and to any user outside the caller's own
+       company. -->
+  <section class="tfa-admin" *ngIf="isSuperAdmin">
+    <div class="tfa-admin-head">
+      <div class="tfa-admin-title">
+        <svg lucideUsers size="18"></svg>
+        <div>
+          <h2>Reset two-factor for a user</h2>
+          <p>
+            The way back in when someone loses their phone and their backup
+            codes, or when their stored setup can no longer be read. They sign
+            in with their password afterwards and enrol again.
+          </p>
+        </div>
+      </div>
+      <button type="button" class="tfa-admin-refresh" (click)="loadAdminUsers()" [disabled]="adminLoading()">
+        <svg lucideRefreshCw size="14"></svg> Refresh
+      </button>
+    </div>
 
+    <div class="tfa-admin-search">
+      <svg lucideSearch size="15"></svg>
+      <input type="text" placeholder="Search by name, email or role…"
+             [ngModel]="adminSearch()" (ngModelChange)="adminSearch.set($event)" />
+    </div>
+
+    <div class="tfa-admin-loading" *ngIf="adminLoading()">Loading users…</div>
+
+    <div class="tfa-admin-table" *ngIf="!adminLoading()">
+      <div class="tfa-admin-row tfa-admin-header">
+        <label class="tfa-check">
+          <input type="checkbox" [checked]="allVisibleSelected()"
+                 [disabled]="adminSelectable().length === 0"
+                 (change)="toggleSelectAllVisible()" />
+        </label>
+        <span class="tfa-col-user">User</span>
+        <span class="tfa-col-role">Role</span>
+        <span class="tfa-col-state">Two-factor</span>
+      </div>
+
+      <div class="tfa-admin-row" *ngFor="let u of adminFiltered()"
+           [class.tfa-selected]="isAdminSelected(u.userId)"
+           [class.tfa-disabled]="!u.enabled">
+        <label class="tfa-check">
+          <!-- Only an enrolled user can be reset, and never yourself: the
+               server refuses a self-reset, and doing it here would be a
+               self-service bypass of your own second factor. -->
+          <input type="checkbox"
+                 [checked]="isAdminSelected(u.userId)"
+                 [disabled]="!u.enabled || isMe(u.userId)"
+                 (change)="toggleAdminSelect(u)" />
+        </label>
+        <span class="tfa-col-user">
+          <strong>{{ u.name || u.email }}</strong>
+          <small *ngIf="u.name">{{ u.email }}</small>
+        </span>
+        <span class="tfa-col-role">{{ u.role }}</span>
+        <span class="tfa-col-state">
+          <span class="tfa-pill" [class.on]="u.enabled">{{ u.enabled ? 'Enrolled' : 'Not enrolled' }}</span>
+          <small *ngIf="isMe(u.userId)">you</small>
+        </span>
+      </div>
+
+      <div class="tfa-admin-empty" *ngIf="adminFiltered().length === 0">
+        No users match that search.
+      </div>
+    </div>
+
+    <!-- Action bar, only once something is ticked -->
+    <div class="tfa-admin-actions" *ngIf="adminSelectedCount() > 0">
+      <ng-container *ngIf="!adminConfirming()">
+        <span class="tfa-admin-count">{{ adminSelectedCount() }} selected</span>
+        <button type="button" class="tfa-btn" (click)="clearAdminSelection()">Clear</button>
+        <button type="button" class="tfa-btn tfa-btn-danger" (click)="adminConfirming.set(true)">
+          <svg lucideShieldOff size="14"></svg> Reset two-factor
+        </button>
+      </ng-container>
+
+      <!-- Naming the people, not just the count: this removes a second factor,
+           and "3 selected" is not something you can check before agreeing. -->
+      <ng-container *ngIf="adminConfirming()">
+        <div class="tfa-confirm">
+          <svg lucideAlertTriangle size="16"></svg>
+          <div>
+            <strong>Reset two-factor for {{ selectedNames().join(', ') }}?</strong>
+            <p>
+              Their authenticator and backup codes stop working immediately, and
+              they sign in with only a password until they enrol again.
+            </p>
+          </div>
+        </div>
+        <button type="button" class="tfa-btn" (click)="adminConfirming.set(false)" [disabled]="adminResetting()">
+          Cancel
+        </button>
+        <button type="button" class="tfa-btn tfa-btn-danger" (click)="confirmBulkReset()" [disabled]="adminResetting()">
+          {{ adminResetting() ? 'Resetting…' : 'Yes, reset' }}
+        </button>
+      </ng-container>
+    </div>
+  </section>
+
+</div>
