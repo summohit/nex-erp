@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException, HttpException, HttpStatus } from '@nestjs/common';
+import { Logger, Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { applyFinancialVisibilityAll } from './project-visibility';
@@ -15,6 +15,7 @@ import * as xlsx from 'xlsx';
 
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
   constructor(
     private prisma: PrismaService,
     private crm: CrmService,
@@ -183,7 +184,83 @@ export class ProjectsService {
       }
     });
 
+    await this.seedDefaultProjectTasks(companyId, project, leadId, data);
+
     return project;
+  }
+
+  /**
+   * The tasks every project starts with, assigned to its project manager (§1).
+   *
+   * Created outside the normal task flow on purpose: this runs before anybody
+   * has opened the project, so there is no actor to check permissions against
+   * and no board interaction to react to. It writes the rows directly rather
+   * than going through IssuesService, which would refuse them -- the creator
+   * is not necessarily somebody who may raise work in a project that did not
+   * exist a moment ago.
+   *
+   * Never fatal. A project that exists without its checklist is a nuisance; a
+   * project creation that fails after the project row is committed is a
+   * broken half-project the user cannot retry.
+   */
+  private async seedDefaultProjectTasks(
+    companyId: number,
+    project: { id: number; key: string },
+    leadId: number,
+    data: any,
+  ) {
+    try {
+      const defaults = await this.prisma.defaultProjectTask.findMany({
+        where: { companyId, isActive: true },
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      });
+      if (!defaults.length) return;
+
+      // The PM these belong to: the first project manager named on the form,
+      // falling back to the lead. "Assigned to the PM" has to resolve to
+      // somebody, and the lead is who answers for the project when no
+      // separate manager was chosen.
+      const pmIds = Array.isArray(data?.pmIds)
+        ? data.pmIds.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)
+        : [];
+      const assigneeId = pmIds[0] ?? leadId;
+
+      const todo = await this.prisma.boardColumn.findFirst({
+        where: { board: { projectId: project.id }, type: 'TODO' },
+        orderBy: { position: 'asc' },
+        select: { id: true },
+      });
+
+      await this.prisma.issue.createMany({
+        data: defaults.map((t, index) => ({
+          // The project is new, so the sequence starts at one and these are
+          // the only writers -- no count query to race with.
+          key: `${project.key}-${index + 1}`,
+          title: t.name,
+          description: t.description,
+          type: 'TASK',
+          status: 'TODO',
+          priority: 'MEDIUM',
+          projectId: project.id,
+          companyId,
+          columnId: todo?.id ?? null,
+          assigneeId,
+          reporterId: leadId,
+          position: index,
+        })),
+      });
+
+      // issueSeq must know about them, or the first task somebody raises by
+      // hand collides with one of these on @@unique([key, companyId]).
+      await this.prisma.project.update({
+        where: { id: project.id },
+        data: { issueSeq: defaults.length },
+      });
+    } catch (err) {
+      this.logger.error(
+        `Default project tasks could not be created for project ${project.id}: ${err}`,
+      );
+    }
   }
 
   async createAiProject(companyId: number, leadId: number, data: any) {

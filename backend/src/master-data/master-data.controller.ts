@@ -407,6 +407,84 @@ export class MasterDataController {
     return this.prisma.projectPhase.delete({ where: { id, companyId: req.user.companyId } });
   }
 
+  // --- Default Project Task CRUD (§1) ---
+  //
+  // The tasks every new project starts with. Same shape as project phases
+  // above, plus a description, because these become real task descriptions.
+
+  @Get('default-project-tasks')
+  async getDefaultProjectTasks(@Request() req, @Query('activeOnly') activeOnly?: string) {
+    return this.prisma.defaultProjectTask.findMany({
+      where: {
+        companyId: req.user.companyId,
+        ...(activeOnly === 'true' ? { isActive: true } : {}),
+      },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  @Post('default-project-tasks')
+  async createDefaultProjectTask(
+    @Request() req,
+    @Body() data: { name: string; description?: string; position?: number },
+  ) {
+    if (!data?.name?.trim()) throw new BadRequestException('A default task needs a name');
+    const existing = await this.prisma.defaultProjectTask.findFirst({
+      where: { name: { equals: data.name.trim(), mode: 'insensitive' }, companyId: req.user.companyId },
+    });
+    if (existing) throw new BadRequestException('That default task already exists');
+
+    return this.prisma.defaultProjectTask.create({
+      data: {
+        name: data.name.trim(),
+        description: data.description?.trim() || null,
+        position: Number(data.position) || 0,
+        companyId: req.user.companyId,
+      },
+    });
+  }
+
+  @Put('default-project-tasks/:id')
+  async updateDefaultProjectTask(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { name?: string; description?: string; isActive?: boolean; position?: number },
+  ) {
+    const updateData: any = {};
+    if (data.name !== undefined) {
+      const name = data.name.trim();
+      if (!name) throw new BadRequestException('A default task needs a name');
+      const clash = await this.prisma.defaultProjectTask.findFirst({
+        where: {
+          name: { equals: name, mode: 'insensitive' },
+          companyId: req.user.companyId,
+          NOT: { id },
+        },
+      });
+      if (clash) throw new BadRequestException('Another default task already has that name');
+      updateData.name = name;
+    }
+    if (data.description !== undefined) updateData.description = data.description?.trim() || null;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.position !== undefined) updateData.position = Number(data.position) || 0;
+
+    return this.prisma.defaultProjectTask.update({
+      where: { id, companyId: req.user.companyId },
+      data: updateData,
+    });
+  }
+
+  @Delete('default-project-tasks/:id')
+  async deleteDefaultProjectTask(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    // Safe to delete outright, unlike task types and phases: nothing points at
+    // this row. The tasks it produced are ordinary tasks that carry their own
+    // copy of the name and description, so removing the template leaves the
+    // work already created by it untouched.
+    return this.prisma.defaultProjectTask.delete({
+      where: { id, companyId: req.user.companyId },
+    });
+  }
+
   // --- Holiday CRUD ---
   @Get('holidays')
   async getHolidays(@Request() req) {

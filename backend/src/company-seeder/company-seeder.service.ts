@@ -150,6 +150,27 @@ export class CompanySeederService implements OnModuleInit {
       }
     }
 
+    // 4c. Seed the tasks every new project starts with (§1)
+    const defaultProjectTasks = [
+      ['Project Planning and Management', 'Prepare and manage the overall project plan, including scope, timelines, resources, responsibilities, milestones, dependencies, and key deliverables.'],
+      ['Project Plan Approval', 'Review the prepared project plan with the relevant stakeholders and obtain the required internal/client approval before project execution begins.'],
+      ['Client Virtual Meeting', 'Conduct and document virtual meetings with the client to discuss project requirements, progress, planning, issues, deliverables, and next steps.'],
+      ['Client On-Site Meeting', 'Plan and conduct on-site meetings with the client when required for project discussions, requirement gathering, implementation, inspection, review, or coordination.'],
+      ['Project Sign-Off Documents', 'Prepare, collect, review, and maintain all required project sign-off documents, approvals, confirmations, and supporting evidence from the client.'],
+      ['Project Sign-Off', 'Complete the final project sign-off process after all agreed deliverables are completed, reviewed, and accepted by the client, and formally close the project.'],
+    ];
+
+    for (const [index, [name, description]] of defaultProjectTasks.entries()) {
+      const existing = await this.prisma.defaultProjectTask.findFirst({
+        where: { companyId, name },
+      });
+      if (!existing) {
+        await this.prisma.defaultProjectTask.create({
+          data: { name, description, position: index, companyId },
+        });
+      }
+    }
+
     // 5. Seed Default Holidays (Current Year)
     const currentYear = new Date().getFullYear();
     const defaultHolidays = [

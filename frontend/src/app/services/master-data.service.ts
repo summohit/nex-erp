@@ -52,6 +52,18 @@ export interface ProjectPhase {
   position: number;
 }
 
+/**
+ * A task created automatically on every new project and assigned to its
+ * project manager (§1). Rows, not constants -- a company edits these.
+ */
+export interface DefaultProjectTask {
+  id: number;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  position: number;
+}
+
 export interface LeaveType {
   id: number;
   name: string;
@@ -183,6 +195,24 @@ export class MasterDataService {
   deleteProjectPhase(id: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/project-phases/${id}`);
   }
+  // §1: the tasks every new project starts with.
+  getDefaultProjectTasks(activeOnly = false): Observable<DefaultProjectTask[]> {
+    const suffix = activeOnly ? '?activeOnly=true' : '';
+    return this.http.get<DefaultProjectTask[]>(`${this.apiUrl}/default-project-tasks${suffix}`);
+  }
+
+  createDefaultProjectTask(data: Partial<DefaultProjectTask>): Observable<DefaultProjectTask> {
+    return this.http.post<DefaultProjectTask>(`${this.apiUrl}/default-project-tasks`, data);
+  }
+
+  updateDefaultProjectTask(id: number, data: Partial<DefaultProjectTask>): Observable<DefaultProjectTask> {
+    return this.http.put<DefaultProjectTask>(`${this.apiUrl}/default-project-tasks/${id}`, data);
+  }
+
+  deleteDefaultProjectTask(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/default-project-tasks/${id}`);
+  }
+
 
 
   getLeaveTypes(): Observable<LeaveType[]> {

@@ -117,6 +117,7 @@ model Company {
   projectTickets        ProjectTicket[]
   taskHoursRequests     TaskHoursRequest[]
   projectPhases         ProjectPhase[]
+  defaultProjectTasks   DefaultProjectTask[]
   projectBudgetRequests ProjectBudgetRequest[]
 }
 
@@ -3679,6 +3680,32 @@ model ProjectPhase {
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   issues    Issue[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+}
+
+
+/// A task created automatically on every new project and assigned to its
+/// project manager (§1).
+///
+/// Rows, not constants, for the same reason ProjectPhase is: the six shipped
+/// here are a starting point a company will edit. Renaming "Client On-Site
+/// Meeting" or retiring it should not need a deploy.
+///
+/// Retiring one is `isActive: false`, which stops it appearing on FUTURE
+/// projects and leaves every task already created from it untouched -- those
+/// are real work with real time logged against them, not a template.
+model DefaultProjectTask {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String? @db.Text
+  isActive    Boolean @default(true)
+  position    Int     @default(0)
+  companyId   Int
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

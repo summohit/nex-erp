@@ -6,7 +6,7 @@
     </div>
     <button class="btn-primary" (click)="openModal('create')">
       <svg lucidePlus size="18"></svg>
-      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
+      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
     </button>
   </div>
 
@@ -28,6 +28,7 @@
     <button class="tab-btn" [class.active]="activeTab() === 'leave-types'" (click)="switchTab('leave-types')">Leave Types</button>
     <button class="tab-btn" [class.active]="activeTab() === 'task-types'" (click)="switchTab('task-types')">Task Types</button>
     <button class="tab-btn" [class.active]="activeTab() === 'project-phases'" (click)="switchTab('project-phases')">Project Phases</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'default-project-tasks'" (click)="switchTab('default-project-tasks')">Default Project Tasks</button>
     <button class="tab-btn" [class.active]="activeTab() === 'holidays'" (click)="switchTab('holidays')">Holidays</button>
     <button class="tab-btn" [class.active]="activeTab() === 'blackout-dates'" (click)="switchTab('blackout-dates')">Blackout Dates</button>
   </div>
@@ -164,6 +165,24 @@
       [gridOptions]="gridOptions">
     </ag-grid-angular>
 
+    <!-- §1: the tasks every new project starts with, assigned to its PM. -->
+    <div *ngIf="activeTab() === 'default-project-tasks'">
+      <p class="tab-intro">
+        Created automatically on every new project and assigned to its project
+        manager. Editing these changes what future projects start with; tasks
+        already created from them are ordinary tasks and are left alone.
+      </p>
+      <ag-grid-angular
+        class="ag-theme-quartz"
+        [theme]="'legacy'"
+        style="width: 100%; height: 500px;"
+        [rowData]="defaultProjectTasks()"
+        [columnDefs]="defaultProjectTaskColDefs"
+        [defaultColDef]="defaultColDef"
+        [gridOptions]="gridOptions">
+      </ag-grid-angular>
+    </div>
+
     <!-- Holidays -->
     <div *ngIf="activeTab() === 'holidays'" class="tab-content">
       <div class="header-actions">
@@ -251,7 +270,7 @@
           <div class="modal-header-icon-badge" *ngIf="activeTab() === 'shifts'">
             <svg lucideClock size="20"></svg>
           </div>
-          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
+          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
         </div>
         <p class="subtitle">{{ activeTab() === 'shifts' ? 'Configure shift timings, punch policies, and weekly working schedule' : 'Enter the details to keep your master data organized' }}</p>
       </div>
@@ -595,7 +614,12 @@
         </div>
 
         <!-- Leave Types -->
-        <div class="form-group" *ngIf="activeTab() === 'task-types' || activeTab() === 'project-phases'">
+        <div class="form-group full-width" *ngIf="activeTab() === 'default-project-tasks'">
+          <label>Description</label>
+          <textarea class="form-control" rows="4" [(ngModel)]="formData.description"
+                    placeholder="What this task covers — becomes the task's own description."></textarea>
+        </div>
+        <div class="form-group" *ngIf="activeTab() === 'task-types' || activeTab() === 'project-phases' || activeTab() === 'default-project-tasks'">
           <label>Display order</label>
           <input type="number" class="form-control" [(ngModel)]="formData.position" min="0">
           <small class="form-hint">Lower numbers appear first in the task form.</small>

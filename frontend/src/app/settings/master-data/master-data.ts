@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MasterDataService, Department, Designation, Branch, LeaveType, Holiday, TaskType, ProjectPhase } from '../../services/master-data.service';
+import { MasterDataService, Department, Designation, Branch, LeaveType, Holiday, TaskType, ProjectPhase, DefaultProjectTask } from '../../services/master-data.service';
 import { ShiftsService } from '../../services/shifts.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { 
@@ -16,7 +16,7 @@ import { StatusToggleRendererComponent } from '../../shared/components/status-to
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-types' | 'project-phases' | 'holidays' | 'blackout-dates' | 'shifts';
+type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-types' | 'project-phases' | 'default-project-tasks' | 'holidays' | 'blackout-dates' | 'shifts';
 
 export interface BlackoutDate {
   id: number;
@@ -51,6 +51,8 @@ export class MasterDataComponent implements OnInit {
   taskTypes = signal<TaskType[]>([]);
   /** §8: the company's delivery phases. */
   projectPhases = signal<ProjectPhase[]>([]);
+  /** §1: the tasks every new project starts with. */
+  defaultProjectTasks = signal<DefaultProjectTask[]>([]);
   holidays = signal<Holiday[]>([]);
   blackoutDates = signal<BlackoutDate[]>([]);
   shifts = signal<any[]>([]);
@@ -635,6 +637,39 @@ export class MasterDataComponent implements OnInit {
       },
     },
   ];
+  // §1: as phases above, plus the description that becomes the task's own.
+  defaultProjectTaskColDefs: ColDef[] = [
+    { field: 'name', headerName: 'Task', minWidth: 240 },
+    { field: 'description', headerName: 'Description', minWidth: 320, tooltipField: 'description' },
+    {
+      field: 'isActive',
+      headerName: 'Active',
+      width: 150,
+      cellRenderer: StatusToggleRendererComponent,
+      cellRendererParams: {
+        activeLabel: 'Yes', inactiveLabel: 'No',
+        onToggle: (data: any, isActive: boolean) => {
+          this.masterDataService.updateDefaultProjectTask(data.id, { isActive }).subscribe({
+            next: () => this.loadData(),
+            error: () => this.toast.error('Could not update the default task'),
+          });
+        },
+      },
+    },
+    { field: 'position', headerName: 'Order', width: 110 },
+    {
+      headerName: 'Actions',
+      width: 120,
+      flex: 0,
+      sortable: false,
+      filter: false,
+      cellRenderer: ActionCellRendererComponent,
+      cellRendererParams: {
+        onEdit: (data: any) => this.openModal('edit', data),
+        onDelete: (data: any) => this.deleteItem(data.id),
+      },
+    },
+  ];
 
   holidayColDefs: ColDef[] = [
     { field: 'name', headerName: 'Holiday Name' },
@@ -894,6 +929,7 @@ export class MasterDataComponent implements OnInit {
     this.masterDataService.getLeaveTypes().subscribe({ next: (data) => this.leaveTypes.set(data) });
     this.masterDataService.getTaskTypes().subscribe({ next: (data) => this.taskTypes.set(data) });
     this.masterDataService.getProjectPhases().subscribe({ next: (data) => this.projectPhases.set(data) });
+    this.masterDataService.getDefaultProjectTasks().subscribe({ next: (data) => this.defaultProjectTasks.set(data) });
     this.masterDataService.getHolidays().subscribe({ next: (data) => this.holidays.set(data) });
     this.masterDataService.getBlackoutDates().subscribe({ next: (data) => this.blackoutDates.set(data) });
     this.shiftsService.getShifts().subscribe({ next: (data) => this.shifts.set(data) });
@@ -1007,6 +1043,15 @@ export class MasterDataComponent implements OnInit {
       this.formData.position = Number(this.formData.position) || 0;
       if (mode === 'create') this.masterDataService.createProjectPhase(this.formData).subscribe({ next: () => onSuccess('Phase created'), error: onError });
       else this.masterDataService.updateProjectPhase(id, this.formData).subscribe({ next: () => onSuccess('Phase updated'), error: onError });
+    } else if (tab === 'default-project-tasks') {
+      if (!this.formData.name || !this.formData.name.trim()) {
+        this.toast.error('A default task needs a name');
+        this.isSaving.set(false);
+        return;
+      }
+      this.formData.position = Number(this.formData.position) || 0;
+      if (mode === 'create') this.masterDataService.createDefaultProjectTask(this.formData).subscribe({ next: () => onSuccess('Default task created'), error: onError });
+      else this.masterDataService.updateDefaultProjectTask(id, this.formData).subscribe({ next: () => onSuccess('Default task updated'), error: onError });
     } else if (tab === 'holidays') {
       if (!this.formData.name || this.formData.name.trim().length === 0) {
         this.toast.error('Holiday name is required');
@@ -1073,6 +1118,7 @@ export class MasterDataComponent implements OnInit {
     else if (tab === 'leave-types') deleteSub = this.masterDataService.deleteLeaveType(id);
     else if (tab === 'task-types') deleteSub = this.masterDataService.deleteTaskType(id);
     else if (tab === 'project-phases') deleteSub = this.masterDataService.deleteProjectPhase(id);
+    else if (tab === 'default-project-tasks') deleteSub = this.masterDataService.deleteDefaultProjectTask(id);
     else if (tab === 'holidays') deleteSub = this.masterDataService.deleteHoliday(id);
     else if (tab === 'blackout-dates') deleteSub = this.masterDataService.deleteBlackoutDate(id);
     else if (tab === 'shifts') deleteSub = this.shiftsService.deleteShift(id);

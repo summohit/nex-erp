@@ -1934,3 +1934,12 @@ input:checked + .slider:before {
   line-height: 1.5;
   color: #64748B;
 }
+
+/* A line of context above a tab's grid, where the rows are not self-evident. */
+.tab-intro {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.6;
+  max-width: 78ch;
+}
