@@ -31,6 +31,9 @@ export interface MyTask {
   /** Null for pre-sales, which genuinely has no priority. */
   priority: string | null;
   taskType: string | null;
+  /** §8: the delivery phase. Name for display and filtering, id for edits. */
+  phase: string | null;
+  phaseId: number | null;
   /** Project key, e.g. CES/0925/07. Null on a general or deal task. */
   projectCode?: string | null;
   /** The milestone this task delivers, when it has one. */

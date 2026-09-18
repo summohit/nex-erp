@@ -2141,6 +2141,8 @@ export class ProjectsComponent implements OnInit {
   tfPriority = signal<string>('ALL');
 
   tfMilestone = signal<string>('ALL');
+  /** §8: narrow My Tasks to one delivery phase. */
+  tfPhase = signal<string>('ALL');
   tfDueFrom = signal<string>('');
   tfDueTo = signal<string>('');
   tfDuration = signal<string>('ALL');
@@ -2174,6 +2176,8 @@ export class ProjectsComponent implements OnInit {
   taskCodeOptions = computed(() => this.taskOptionsFrom(t => t.projectCode));
   taskTypeOptions = computed(() => this.taskOptionsFrom(t => t.taskType));
   taskMilestoneOptions = computed(() => this.taskOptionsFrom(t => t.milestone?.name));
+  // §8: only phases actually present, so no option returns nothing.
+  taskPhaseOptions = computed(() => this.taskOptionsFrom(t => t.phase));
   taskPriorityOptions = computed(() => this.taskOptionsFrom(t => t.priority));
 
   taskAssigneeList = computed(() => {
@@ -2265,7 +2269,7 @@ export class ProjectsComponent implements OnInit {
   activeTaskFilterCount = computed(() =>
     [
       this.tfProject(), this.tfProjectCode(), this.tfAssignee(),
-      this.tfStatus(), this.tfPriority(), this.tfMilestone(),
+      this.tfStatus(), this.tfPriority(), this.tfMilestone(), this.tfPhase(),
       this.tfDuration()
     ].filter(v => v !== 'ALL').length
     + (this.tfDueFrom() ? 1 : 0)
@@ -2279,6 +2283,7 @@ export class ProjectsComponent implements OnInit {
     this.tfStatus.set('ALL');
     this.tfPriority.set('ALL');
     this.tfMilestone.set('ALL');
+    this.tfPhase.set('ALL');
     this.tfDuration.set('ALL');
     this.tfDueFrom.set('');
     this.tfDueTo.set('');
@@ -2291,6 +2296,7 @@ export class ProjectsComponent implements OnInit {
     const status = this.tfStatus();
     const priority = this.tfPriority();
     const milestone = this.tfMilestone();
+    const phase = this.tfPhase();
     const duration = this.tfDuration();
     const dueFrom = this.tfDueFrom();
     const dueTo = this.tfDueTo();
@@ -2301,6 +2307,7 @@ export class ProjectsComponent implements OnInit {
       if (status !== 'ALL' && t.status !== status) return false;
       if (priority !== 'ALL' && (t.priority || '') !== priority) return false;
       if (milestone !== 'ALL' && (t.milestone?.name || '') !== milestone) return false;
+      if (phase !== 'ALL' && (t.phase || '') !== phase) return false;
 
       if (assignee !== 'ALL') {
         const has = (t.assignees || []).some((a: any) => String(a.id) === assignee);

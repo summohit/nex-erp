@@ -906,6 +906,20 @@
             </select>
           </div>
 
+          <!-- §8: Phase. Conditional like Milestone above — hidden entirely
+               when none of the tasks in hand carry a phase. -->
+          <div class="tf-field-group" *ngIf="taskPhaseOptions().length > 0">
+            <label class="tf-field-label">Phase</label>
+            <select
+              class="tf-select-control"
+              [class.is-active]="tfPhase() !== 'ALL'"
+              [ngModel]="tfPhase()"
+              (ngModelChange)="tfPhase.set($event)">
+              <option value="ALL">All phases</option>
+              <option *ngFor="let p of taskPhaseOptions()" [value]="p">{{ p }}</option>
+            </select>
+          </div>
+
           <!-- 7. Duration Filter -->
           <div class="tf-field-group">
             <label class="tf-field-label">Duration</label>
