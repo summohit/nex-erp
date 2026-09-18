@@ -247,6 +247,14 @@ export class ProjectsService {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/attachments/upload`, formData);
   }
 
+  /** §2: rename a task attachment. The stored file is not touched. */
+  renameAttachment(projectId: number, issueId: number, attachmentId: number, name: string) {
+    return this.http.patch<any>(
+      `${this.apiUrl}/${projectId}/issues/${issueId}/attachments/${attachmentId}`,
+      { name },
+    );
+  }
+
   addLinkAttachment(projectId: number, issueId: number, linkUrl: string, linkName?: string) {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/attachments/link`, { linkUrl, linkName });
   }

@@ -1471,6 +1471,52 @@ export class IssuesService {
     });
   }
 
+  /**
+   * Rename a task attachment (§2).
+   *
+   * The stored file is untouched -- this is the name people read, not the
+   * object in ImageKit. The extension is carried over from the real file, as
+   * it is for project documents, so a rename cannot turn a PDF into something
+   * the browser refuses to open.
+   *
+   * Anyone who may see the task may rename its evidence: naming a file you
+   * uploaded so somebody can find it later is part of doing the work, not a
+   * decision about it.
+   */
+  async renameAttachment(
+    companyId: number,
+    projectId: number,
+    issueId: number,
+    attachmentId: number,
+    requestedName: string,
+  ) {
+    const issue = await this.prisma.issue.findFirst({
+      where: { id: issueId, companyId, projectId },
+      select: { id: true },
+    });
+    if (!issue) throw new NotFoundException('Issue not found');
+
+    const attachment = await this.prisma.issueAttachment.findFirst({
+      where: { id: attachmentId, issueId },
+    });
+    if (!attachment) throw new NotFoundException('Attachment not found');
+
+    if (!requestedName?.trim()) throw new BadRequestException('A file name is required');
+
+    let fileName: string;
+    try {
+      fileName = renameKeepingExtension(attachment.fileName, requestedName);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+
+    return this.prisma.issueAttachment.update({
+      where: { id: attachmentId },
+      data: { fileName },
+      include: { uploader: { select: { id: true, firstName: true, lastName: true } } },
+    });
+  }
+
   async deleteAttachment(companyId: number, projectId: number, issueId: number, attachmentId: number) {
     const attachment = await this.prisma.issueAttachment.findFirst({
       where: { id: attachmentId, issueId }

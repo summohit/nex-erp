@@ -413,3 +413,40 @@
 .btn-primary:active {
   transform: translateY(0);
 }
+
+/* A chosen file that cannot be shown: named and sized instead of a bare icon,
+   because "which file did I pick" is the only question this box has to answer. */
+.preview-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 44px 0 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.preview-file-meta { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.preview-file-name {
+  font-size: 13px; font-weight: 600; color: #172b4d;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.preview-file-size { font-size: 11px; color: #97a0af; }
+
+/* Sits above the file input, which covers the whole dropzone. */
+.preview-clear-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .1);
+}
+.preview-clear-btn:hover { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }

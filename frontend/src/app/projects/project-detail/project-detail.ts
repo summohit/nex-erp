@@ -2098,14 +2098,72 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.projectsService.renameProjectDocument(this.projectId, doc.id, name).subscribe({
+    /**
+     * Two kinds of row, two endpoints.
+     *
+     * A project document and a task attachment are different tables with
+     * overlapping ids, and this used to send both to the project-document
+     * endpoint -- so renaming evidence either failed or, worse, renamed an
+     * unrelated project file that happened to share the number.
+     */
+    const rename$ = doc.isProjectDocument
+      ? this.projectsService.renameProjectDocument(this.projectId, doc.id, name)
+      : this.projectsService.renameAttachment(this.projectId, doc.issueId, doc.id, name);
+
+    rename$.subscribe({
       next: () => {
         this.cancelRenameDocument();
-        this.loadProjectDocuments();
+        if (doc.isProjectDocument) this.loadProjectDocuments();
+        else this.loadBoardAndIssues();
         this.toast.success('File renamed');
       },
       error: (err) => this.toast.error(err?.error?.message || 'Could not rename the file'),
     });
+  }
+
+  // §2: renaming an attachment from the task itself, not only from the
+  // Evidence tab -- the task is where somebody notices IMG_4021.jpg.
+  renamingTaskAttachmentId = signal<number | null>(null);
+  taskAttachmentNameDraft = '';
+
+  startRenameTaskAttachment(att: any) {
+    this.taskAttachmentNameDraft = this.documentBaseName(att.fileName);
+    this.renamingTaskAttachmentId.set(att.id);
+  }
+
+  cancelRenameTaskAttachment() {
+    this.renamingTaskAttachmentId.set(null);
+    this.taskAttachmentNameDraft = '';
+  }
+
+  confirmRenameTaskAttachment(att: any) {
+    const name = this.taskAttachmentNameDraft.trim();
+    if (!name || name === this.documentBaseName(att.fileName)) {
+      this.cancelRenameTaskAttachment();
+      return;
+    }
+
+    const issue = this.selectedIssue();
+    this.projectsService.renameAttachment(this.projectId, att.issueId ?? issue?.id, att.id, name)
+      .subscribe({
+        next: (updated: any) => {
+          this.cancelRenameTaskAttachment();
+          // Patch the open task in place, so the new name is visible without
+          // the modal blinking through a full reload.
+          const current = this.selectedIssue();
+          if (current) {
+            this.selectedIssue.set({
+              ...current,
+              attachments: (current.attachments || []).map((a: any) =>
+                a.id === att.id ? { ...a, fileName: updated?.fileName ?? name } : a,
+              ),
+            });
+          }
+          this.loadBoardAndIssues();
+          this.toast.success('File renamed');
+        },
+        error: (err) => this.toast.error(err?.error?.message || 'Could not rename the file'),
+      });
   }
 
   deleteProjectDocument(doc: any) {

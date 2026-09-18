@@ -66,19 +66,39 @@
       <div class="form-group">
         <label>Upload File <span class="required">*</span> <span class="help-icon">?</span></label>
         <div class="upload-area">
-          <input type="file" class="file-input" (change)="handleFileInput($event)" accept="image/*,video/*,application/pdf">
-          <div class="upload-content" *ngIf="!selectedFileUrl">
+          <input #docFileInput type="file" class="file-input" (change)="handleFileInput($event)" accept="image/*,video/*,application/pdf">
+
+          <!-- Gated on the FILE, not on its preview URL: a PDF has no
+               thumbnail, and gating on the URL is why choosing one used to
+               leave this box still saying "Choose a file". -->
+          <div class="upload-content" *ngIf="!selectedFile">
             <svg lucideUploadCloud size="32" class="upload-icon"></svg>
             <p>Choose a file</p>
           </div>
-          <div class="upload-preview" *ngIf="selectedFileUrl">
-            <img *ngIf="selectedFileUrl.startsWith('data:image')" [src]="selectedFileUrl" class="preview-media">
-            <video *ngIf="selectedFileUrl.startsWith('data:video')" [src]="selectedFileUrl" class="preview-media" controls></video>
-            <svg *ngIf="!selectedFileUrl.startsWith('data:image') && !selectedFileUrl.startsWith('data:video')" lucideFileText size="32" class="upload-icon"></svg>
-            <div class="preview-overlay">
+
+          <div class="upload-preview" *ngIf="selectedFile">
+            <!-- An image or video shows itself; anything else is named. -->
+            <img *ngIf="selectedFileUrl?.startsWith('data:image')" [src]="selectedFileUrl" class="preview-media">
+            <video *ngIf="selectedFileUrl?.startsWith('data:video')" [src]="selectedFileUrl" class="preview-media" controls></video>
+
+            <div class="preview-file-row" *ngIf="!selectedIsPreviewable">
+              <svg lucideFileText size="28" class="upload-icon"></svg>
+              <div class="preview-file-meta">
+                <span class="preview-file-name" [title]="selectedFile?.name">{{ selectedFile?.name }}</span>
+                <span class="preview-file-size">{{ selectedFileSize() }}</span>
+              </div>
+            </div>
+
+            <div class="preview-overlay" *ngIf="selectedIsPreviewable">
               <p class="selected-file-name">{{ selectedFile?.name }}</p>
               <p class="change-text">Click to change</p>
             </div>
+
+            <!-- Clearing must not open the picker underneath it. -->
+            <button type="button" class="preview-clear-btn" title="Remove this file"
+                    (click)="clearSelectedFile($event, docFileInput)">
+              <svg lucideX size="14"></svg>
+            </button>
           </div>
         </div>
       </div>

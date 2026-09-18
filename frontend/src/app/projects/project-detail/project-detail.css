@@ -8222,3 +8222,17 @@ input[type=text], input[type=email], input[type=password] {
   cursor: pointer;
 }
 .inline-phase-select:focus { border-color: #2563eb; }
+
+/* §2: renaming an attachment in place on the task detail. */
+.attachment-rename-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 2px solid #dfe1e6;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #172b4d;
+  outline: none;
+}
+.attachment-rename-input:focus { border-color: #2563eb; }
+.attachment-rename-ext { font-size: 12px; color: #97a0af; flex-shrink: 0; }

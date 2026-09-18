@@ -1,14 +1,14 @@
 import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideEye, LucideFileText, LucidePlus, LucideTrash2, LucideUploadCloud, LucideFolderOpen } from '@lucide/angular';
+import { LucideEye, LucideFileText, LucidePlus, LucideTrash2, LucideUploadCloud, LucideFolderOpen, LucideX } from '@lucide/angular';
 import { EmployeeService } from '../../../services/employee.service';
 import { HotToastService } from '@ngneat/hot-toast';
 
 @Component({
   selector: 'app-documents-tab',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideEye, LucideFileText, LucidePlus, LucideTrash2, LucideUploadCloud, LucideFolderOpen],
+  imports: [CommonModule, FormsModule, LucideEye, LucideFileText, LucidePlus, LucideTrash2, LucideUploadCloud, LucideFolderOpen, LucideX],
   templateUrl: './documents-tab.html',
   styleUrls: ['./documents-tab.css']
 })
@@ -65,12 +65,52 @@ export class DocumentsTabComponent implements OnInit {
 
   handleFileInput(event: any) {
     const file = event.target.files[0];
-    if (file) {
-      this.selectedFile = file;
-      if (!this.fileName) {
-        this.fileName = file.name.split('.')[0];
-      }
+    if (!file) return;
+
+    this.selectedFile = file;
+    this.selectedFileUrl = null;
+
+    if (!this.fileName) {
+      // Everything before the extension: the box asks for a name, not a
+      // filename, and the user is about to read it back on a document card.
+      this.fileName = file.name.replace(/\.[^.]+$/, '');
     }
+
+    // A thumbnail only for what can actually be shown. Reading a 40MB PDF into
+    // a base64 data URL to render a generic file icon next to it costs the
+    // browser real memory and shows the user nothing.
+    if (file.type?.startsWith('image/') || file.type?.startsWith('video/')) {
+      const reader = new FileReader();
+      reader.onload = () => { this.selectedFileUrl = reader.result as string; };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  /** Whether the chosen file can be shown rather than merely named. */
+  get selectedIsPreviewable(): boolean {
+    return !!this.selectedFileUrl;
+  }
+
+  /**
+   * Drop the chosen file without closing the dialog.
+   *
+   * The input's value is cleared too, or picking the same file again fires no
+   * change event and the box stays stubbornly empty.
+   */
+  clearSelectedFile(event?: Event, input?: HTMLInputElement) {
+    event?.stopPropagation();
+    event?.preventDefault();
+    this.selectedFile = null;
+    this.selectedFileUrl = null;
+    if (input) input.value = '';
+  }
+
+  /** "2.4 MB" — the size as somebody would say it. */
+  selectedFileSize(): string {
+    const bytes = this.selectedFile?.size ?? 0;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
   submitDocument() {

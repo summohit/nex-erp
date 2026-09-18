@@ -3737,14 +3737,31 @@
 
             <!-- Details -->
             <div class="attachment-info">
-              <div class="attachment-name-row">
-                <span class="attachment-name cursor-pointer" (click)="openImageLightbox(att)" title="Click to preview image">
-                  {{ att.fileName }}
-                </span>
-                <a [href]="att.fileUrl" target="_blank" rel="noopener noreferrer" class="external-link-btn" title="Open in new tab">
-                  <svg lucideExternalLink size="14" class="external-link-icon"></svg>
-                </a>
+              <!-- §2: renaming in place. The extension is shown greyed beside
+                   the input, because the server keeps the real one whatever is
+                   typed and an edit that is silently undone is worse than one
+                   that was never offered. -->
+              <div class="attachment-name-row" *ngIf="renamingTaskAttachmentId() === att.id; else attNameRow">
+                <input type="text" class="attachment-rename-input"
+                       [(ngModel)]="taskAttachmentNameDraft"
+                       (keyup.enter)="confirmRenameTaskAttachment(att)"
+                       (keyup.escape)="cancelRenameTaskAttachment()"
+                       autofocus />
+                <span class="attachment-rename-ext">{{ documentExtension(att.fileName) }}</span>
+                <button type="button" class="action-link-btn" (click)="confirmRenameTaskAttachment(att)">Save</button>
+                <button type="button" class="action-link-btn" (click)="cancelRenameTaskAttachment()">Cancel</button>
               </div>
+
+              <ng-template #attNameRow>
+                <div class="attachment-name-row">
+                  <span class="attachment-name cursor-pointer" (click)="openImageLightbox(att)" title="Click to preview image">
+                    {{ att.fileName }}
+                  </span>
+                  <a [href]="att.fileUrl" target="_blank" rel="noopener noreferrer" class="external-link-btn" title="Open in new tab">
+                    <svg lucideExternalLink size="14" class="external-link-icon"></svg>
+                  </a>
+                </div>
+              </ng-template>
 
               <div class="attachment-meta">
                 <span *ngIf="att.fileSize">{{ formatFileSize(att.fileSize) }}</span>
@@ -3753,6 +3770,8 @@
                 <button class="action-link-btn" *ngIf="isImageAttachment(att)" (click)="toggleCoverAttachment(att)">
                   {{ att.isCover ? 'Remove cover' : 'Make cover' }}
                 </button>
+                <button class="action-link-btn" *ngIf="renamingTaskAttachmentId() !== att.id"
+                        (click)="startRenameTaskAttachment(att)">Rename</button>
                 <button class="action-link-btn delete-action-btn" (click)="deleteAttachment(att)">Delete</button>
               </div>
             </div>

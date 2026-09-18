@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Req, Param, ParseIntPipe, UseGuards, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Put, Patch, Delete, Body, Req, Param, ParseIntPipe, UseGuards, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException } from '@nestjs/common';
 import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { IssuesService } from './issues.service';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -289,6 +289,20 @@ export class IssuesController {
     @Body('linkName') linkName?: string
   ) {
     return this.issuesService.addLinkAttachment(req.user.companyId, req.user.sub, projectId, id, linkUrl, linkName);
+  }
+
+  /** §2: rename a task attachment. The stored file is untouched. */
+  @Patch(':id/attachments/:attachmentId')
+  renameAttachment(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @Body('name') name: string,
+  ) {
+    return this.issuesService.renameAttachment(
+      req.user.companyId, projectId, id, attachmentId, name,
+    );
   }
 
   @Delete(':id/attachments/:attachmentId')
