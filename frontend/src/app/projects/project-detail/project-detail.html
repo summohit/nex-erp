@@ -505,6 +505,9 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'roadmap'" (click)="setProjectTab('roadmap')"><svg lucideGanttChart size="14"></svg> Roadmap</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'attachments'" (click)="setProjectTab('attachments')"><svg lucidePaperclip size="14"></svg> Attachments</button>
+    <!-- §2: evidence is what is attached to a TASK. Attachments, beside it, is
+         the project's own paperwork — the contract, the scope, the proposal. -->
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'evidence'" (click)="setProjectTab('evidence')"><svg lucideFileCheck size="14"></svg> Evidence<span class="tab-count" *ngIf="evidenceCount() > 0">{{ evidenceCount() }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Field Visits</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'tickets'" (click)="setProjectTab('tickets')"><svg lucideTicket size="14"></svg> Tickets</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'discussions'" (click)="setProjectTab('discussions')"><svg lucideMessageSquare size="14"></svg> Discussions</button>
@@ -1737,7 +1740,7 @@
   </div>
 
   <!-- Attachments Tab Container -->
-  <div class="attachments-tab-container" *ngIf="activeProjectTab() === 'attachments'" style="display: flex; flex-direction: column; flex: 1; padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto;">
+  <div class="attachments-tab-container" *ngIf="activeProjectTab() === 'attachments' || activeProjectTab() === 'evidence'" style="display: flex; flex-direction: column; flex: 1; padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto;">
     
     <!-- Filter Toolbar -->
     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 40px; flex-wrap: wrap;">
@@ -1770,9 +1773,10 @@
         <svg lucideX size="14"></svg> Clear filters
       </button>
 
-      <!-- §6: upload straight into the project, rather than only onto a task.
-           Project documents and task attachments share this one list. -->
-      <label class="att-upload-btn" style="margin-left: auto;">
+      <!-- §6: upload straight into the project. Attachments only: this writes
+           a project document, and on the Evidence tab there is no task for it
+           to belong to -- evidence is attached from the task itself. -->
+      <label class="att-upload-btn" style="margin-left: auto;" *ngIf="activeProjectTab() === 'attachments'">
         <svg lucideUploadCloud size="15"></svg>
         <span>{{ documentsUploading() ? 'Uploading…' : 'Upload files' }}</span>
         <input type="file" multiple hidden [disabled]="documentsUploading()" (change)="onProjectDocumentPicked($event)" />
@@ -1780,8 +1784,8 @@
     </div>
 
     <!-- Populated Grid -->
-    <div *ngIf="projectAttachments().length > 0" class="att-grid">
-      <div *ngFor="let att of projectAttachments()" class="att-card">
+    <div *ngIf="tabAttachments().length > 0" class="att-grid">
+      <div *ngFor="let att of tabAttachments()" class="att-card">
         <!-- Thumbnail -->
         <div class="att-thumb-box group">
            <img *ngIf="isImageAttachment(att)" [src]="att.fileUrl" class="att-thumb-img" (error)="onImageError(att)">
@@ -1877,11 +1881,17 @@
     </div>
 
     <!-- Empty State -->
-    <div *ngIf="projectAttachments().length === 0" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 400px; padding-bottom: 10vh;">
+    <div *ngIf="tabAttachments().length === 0" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 400px; padding-bottom: 10vh;">
       <img src="/jira_empty_attachments_placeholder_v2.jpg" alt="No attachments" style="width: 380px; max-width: 100%; margin-bottom: 24px; border-radius: 12px; object-fit: contain;">
-      <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">There are no attachments</h2>
-      <p style="font-size: 14px; color: #5e6c84; margin-bottom: 24px;">Files attached to work items appear here, along with anything you upload straight to the project.</p>
-      <label class="att-upload-btn">
+      <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">
+        {{ activeProjectTab() === 'evidence' ? 'There is no evidence yet' : 'There are no attachments' }}
+      </h2>
+      <p style="font-size: 14px; color: #5e6c84; margin-bottom: 24px;">
+        {{ activeProjectTab() === 'evidence'
+            ? 'Files attached to a task appear here — including anything added when a task moves to Review.'
+            : 'The project’s own paperwork lives here: contracts, scopes and proposals uploaded straight to the project.' }}
+      </p>
+      <label class="att-upload-btn" *ngIf="activeProjectTab() === 'attachments'">
         <svg lucideUploadCloud size="15"></svg>
         <span>{{ documentsUploading() ? 'Uploading…' : 'Upload files' }}</span>
         <input type="file" multiple hidden [disabled]="documentsUploading()" (change)="onProjectDocumentPicked($event)" />

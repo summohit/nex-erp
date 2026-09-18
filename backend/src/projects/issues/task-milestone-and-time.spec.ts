@@ -552,3 +552,80 @@ describe('fields only management may change', () => {
     await expect(asEmployee({ milestoneId: '3' })).resolves.toBeDefined();
   });
 });
+
+/**
+ * §8: a new task must belong to a phase.
+ *
+ * Conditional on the company having any. The rule is about which phase work
+ * belongs to, which is meaningless where none exist -- enforcing it there
+ * would break the board rather than organise it.
+ */
+describe('requiring a phase on a new task', () => {
+  const svc = (activePhases: number) => {
+    const created: any[] = [];
+    const model = (o: any = {}) =>
+      new Proxy(o, { get: (t, k: string) => (k in t ? t[k] : jest.fn().mockResolvedValue(null)) });
+
+    const prisma: any = new Proxy(
+      {
+        issue: model({
+          count: jest.fn().mockResolvedValue(0),
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockImplementation((a: any) => {
+            created.push(a.data);
+            return Promise.resolve({ id: 9, ...a.data });
+          }),
+        }),
+        projectPhase: model({
+          count: jest.fn().mockResolvedValue(activePhases),
+          findFirst: jest.fn().mockResolvedValue({ id: 3 }),
+        }),
+        project: model({
+          findUnique: jest.fn().mockResolvedValue({ allowManualTimeLogging: true, name: 'P' }),
+          update: jest.fn().mockResolvedValue({ issueSeq: 1, key: 'NEX' }),
+        }),
+        boardColumn: model({
+          findUnique: jest.fn().mockResolvedValue({ id: 10, type: 'TODO' }),
+          findFirst: jest.fn().mockResolvedValue({ id: 10, type: 'TODO' }),
+        }),
+        projectMember: model({ findFirst: jest.fn().mockResolvedValue({ id: 1 }) }),
+        employee: model({
+          findFirst: jest.fn().mockResolvedValue({ id: 60, department: { canCreateTasks: true } }),
+        }),
+      },
+      {
+        get: (t: any, k: string) => {
+          if (k in t) return t[k];
+          if (k === '$transaction') return jest.fn().mockImplementation((fn: any) => fn(prisma));
+          return model();
+        },
+      },
+    );
+
+    const anyMethod = () => new Proxy({}, { get: () => jest.fn() }) as any;
+    return {
+      created,
+      service: new IssuesService(prisma, anyMethod(), anyMethod(), anyMethod()),
+    };
+  };
+
+  const create = (service: any, data: any) => (service as any).createIssue(1, 2, 3, data);
+
+  it('refuses a task raised without one', async () => {
+    const { service } = svc(5);
+    await expect(create(service, { title: 'T' })).rejects.toThrow(/Choose the project phase/);
+  });
+
+  it('accepts one that names a phase', async () => {
+    const { service, created } = svc(5);
+    try { await create(service, { title: 'T', phaseId: 3 }); } catch { /* sockets */ }
+    expect(created[0]).toMatchObject({ phaseId: 3 });
+  });
+
+  // A company that has retired every phase must not lose task creation.
+  it('does not require one when the company has no active phases', async () => {
+    const { service, created } = svc(0);
+    try { await create(service, { title: 'T' }); } catch { /* sockets */ }
+    expect(created[0]).toMatchObject({ phaseId: null });
+  });
+});

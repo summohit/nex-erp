@@ -314,6 +314,18 @@ export class TasksService {
 
     // Validated before the transaction opens: a brand-new task cannot be part
     // of a cycle, but a blocker id that does not exist still has to be caught.
+    // §8: a new task belongs to a phase -- the same rule the board enforces,
+    // and for the same reason it is conditional there: a company with no
+    // active phases would otherwise lose task creation altogether.
+    if (!data.phaseId) {
+      const phasesExist = await this.prisma.projectPhase.count({
+        where: { companyId, isActive: true },
+      });
+      if (phasesExist > 0) {
+        throw new BadRequestException('Choose the project phase this task belongs to.');
+      }
+    }
+
     const dependsOn = [...new Set((data.dependsOnIssueIds ?? []).map(Number).filter(Boolean))];
     if (dependsOn.length) {
       const found = await this.prisma.issue.findMany({

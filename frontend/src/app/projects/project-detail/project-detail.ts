@@ -19,7 +19,8 @@ import {
   LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
   LucideAlignLeft, LucideTag, LucideCheckSquare, LucideUsers, LucideCheck, LucideTrash2, LucideRepeat,
-  LucidePaperclip, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
+  LucidePaperclip,
+  LucideFileCheck, LucideExternalLink, LucideDownload, LucideMail, LucideCopy, LucideLock,
   LucideGlobe, LucideList, LucideGanttChart, LucideFileText, LucideFile, LucideBarChart, LucideBox, LucideArchive, LucideFlag, LucideLayers,
   LucideTicket,
   LucideUser, LucideSearch, LucideCornerDownLeft, LucideVideo, LucideMusic, LucideLayoutGrid,
@@ -62,7 +63,8 @@ declare var Quill: any;
     LucideFileUp, LucideUpload, LucideUploadCloud,
     LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
     LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory,
-    AgGridAngular
+    AgGridAngular,
+    LucideFileCheck
   ],
   templateUrl: './project-detail.html',
   styleUrls: ['./project-detail.css'],
@@ -379,6 +381,30 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
     return allAtts;
   });
+  /**
+   * What the Attachments and Evidence tabs each show (§2).
+   *
+   * One list, split by what the file is attached to. Evidence belongs to a
+   * task -- that is what makes it evidence, and why it carries the task's key
+   * and title. An Attachment belongs to the project itself: the contract, the
+   * scope, the proposal, answerable to no work item.
+   *
+   * Deliberately derived from projectAttachments rather than fetched
+   * separately, so both tabs share one set of filters and one sort, and a
+   * search on one behaves exactly as it does on the other.
+   */
+  tabAttachments = computed(() => {
+    const all = this.projectAttachments();
+    return this.activeProjectTab() === 'evidence'
+      ? all.filter((a: any) => !a.isProjectDocument)
+      : all.filter((a: any) => a.isProjectDocument);
+  });
+
+  /** Counts for the tab labels, unaffected by the filters above them. */
+  evidenceCount = computed(
+    () => this.activeIssues().reduce((n: number, i: any) => n + (i.attachments?.length || 0), 0),
+  );
+
 
   getAttachmentIcon(filename: string): string {
     const ext = filename?.split('.').pop()?.toLowerCase() || '';
@@ -2691,7 +2717,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.cancelInlineAdd();
         this.loadBoardAndIssues();
       },
-      error: (err) => this.toast.error('Failed to add card')
+      // Report what the server said: a card refused for want of a phase, or
+      // for hours past the ceiling, is a sentence the user can act on, where
+      // "Failed to add card" is a dead end.
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to add card')
     });
   }
 

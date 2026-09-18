@@ -92,6 +92,29 @@ export class IssuesService {
       }
     }
 
+    /**
+     * A new task must belong to a phase (§8).
+     *
+     * Only when the company actually has phases to choose from. A company
+     * that has retired all of them, or never had any, would otherwise lose
+     * task creation entirely -- a rule about which phase work belongs to is
+     * meaningless where there are no phases, and enforcing it there breaks
+     * the board rather than organising it.
+     *
+     * New tasks only. Editing a task raised before phases existed does not
+     * demand one: 1,400 of them have none, and refusing to save a title
+     * change until somebody classifies the backlog is not a business rule,
+     * it is a blockade.
+     */
+    if (!data.phaseId) {
+      const phasesExist = await this.prisma.projectPhase.count({
+        where: { companyId, isActive: true },
+      });
+      if (phasesExist > 0) {
+        throw new BadRequestException('Choose the project phase this task belongs to.');
+      }
+    }
+
     // Breaking a task into sub-tasks is planning it, not doing it, so raising
     // a child under someone else's task is a management act.
     if (data.parentId) {
