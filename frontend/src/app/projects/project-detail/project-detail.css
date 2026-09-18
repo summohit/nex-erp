@@ -6927,6 +6927,7 @@ input[type=text], input[type=email], input[type=password] {
   background: #fee2e2;
   color: #dc2626;
   border-color: #fca5a5;
+}
 
 /* ============================================================
    Filter Pipeline Drawer (slides in from the left)
@@ -7300,3 +7301,402 @@ input[type=text], input[type=email], input[type=password] {
     display: none !important;
   }
 }
+
+/* ── Board switcher ─────────────────────────────────────────────────────
+   Command palette / Quick Switcher modal. Swaps the board in place with
+   smooth transitions, rich metadata, and keyboard accessibility. */
+
+.bsw-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  z-index: 2500;
+  animation: bswFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bswFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bswPopIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.bsw-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%; max-width: 640px;
+  max-height: 80vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  animation: bswPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+.bsw-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.bsw-head-left {
+  display: flex; align-items: center; gap: 12px;
+}
+
+.bsw-title-badge {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.bsw-title-meta {
+  display: flex; flex-direction: column;
+}
+
+.bsw-title-row {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.bsw-title-row h3 {
+  margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.bsw-count-pill {
+  font-size: 11px; font-weight: 600; color: #64748b;
+  background: #f1f5f9; border: 1px solid #e2e8f0;
+  padding: 2px 8px; border-radius: 999px;
+}
+
+.bsw-subtitle {
+  margin: 2px 0 0; font-size: 12px; color: #64748b;
+}
+
+.bsw-close {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid #e2e8f0; background: #ffffff;
+  border-radius: 8px; color: #64748b; cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bsw-close:hover {
+  background: #f1f5f9; color: #0f172a; border-color: #cbd5e1;
+}
+
+/* ── Search Bar ──────────────────────────────────────────────────────── */
+
+.bsw-search-box {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+  transition: all 0.15s ease;
+}
+
+.bsw-search-box:focus-within {
+  background: #ffffff;
+  box-shadow: inset 0 -2px 0 #2563eb;
+}
+
+.bsw-search-icon-wrap {
+  color: #64748b;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.bsw-search-box input {
+  flex: 1; min-width: 0;
+  border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: 13.5px; color: #0f172a;
+}
+
+.bsw-search-box input::placeholder {
+  color: #94a3b8; font-size: 13px;
+}
+
+.bsw-clear-search {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: none; background: #e2e8f0;
+  color: #64748b; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+  padding: 0;
+}
+
+.bsw-clear-search:hover {
+  background: #cbd5e1; color: #0f172a;
+}
+
+.bsw-kbd-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; font-weight: 700;
+  color: #94a3b8; background: #ffffff;
+  border: 1px solid #e2e8f0; border-radius: 4px;
+  padding: 2px 5px; line-height: 1;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* ── Loading State ───────────────────────────────────────────────────── */
+
+.bsw-loading {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 12px;
+  padding: 44px 20px;
+  font-size: 13px; color: #64748b;
+}
+
+.bsw-spinner {
+  width: 24px; height: 24px;
+  border: 2.5px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: bswSpin 0.7s linear infinite;
+}
+
+@keyframes bswSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Board List ──────────────────────────────────────────────────────── */
+
+.bsw-list {
+  overflow-y: auto;
+  max-height: 52vh;
+  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+/* Custom Sleek Scrollbar */
+.bsw-list::-webkit-scrollbar { width: 6px; }
+.bsw-list::-webkit-scrollbar-track { background: transparent; }
+.bsw-list::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 999px; }
+.bsw-list::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+.bsw-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer; text-align: left;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.bsw-item:hover:not(.current) {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.bsw-item.current {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  cursor: default;
+}
+
+/* Project Key */
+.bsw-key-container {
+  flex-shrink: 0;
+}
+
+.bsw-key {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px 9px; border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.bsw-item:hover:not(.current) .bsw-key {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.bsw-key.current {
+  background: #ede9fe;
+  border-color: #ddd6fe;
+  color: #7c3aed;
+}
+
+/* Metadata */
+.bsw-meta {
+  display: flex; flex-direction: column; gap: 3px;
+  min-width: 0; flex: 1;
+}
+
+.bsw-name-row {
+  display: flex; align-items: center; gap: 6px;
+}
+
+.bsw-name {
+  font-size: 13.5px; font-weight: 600; color: #0f172a;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: color 0.12s;
+}
+
+.bsw-item:hover:not(.current) .bsw-name {
+  color: #2563eb;
+}
+
+.bsw-tags-row {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bsw-meta-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: #64748b; font-weight: 500;
+  max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.bsw-meta-tag svg {
+  flex-shrink: 0; opacity: 0.75;
+}
+
+.bsw-meta-tag.client {
+  color: #475569;
+}
+
+.bsw-meta-tag.dept {
+  color: #64748b;
+}
+
+.bsw-meta-tag.tasks {
+  color: #0369a1;
+  background: #f0f9ff;
+  border: 1px solid #e0f2fe;
+  padding: 1px 6px; border-radius: 4px;
+}
+
+/* Status / Action */
+.bsw-status-wrap {
+  flex-shrink: 0;
+  display: flex; align-items: center;
+}
+
+.bsw-current-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  background: #ecfdf5; border: 1px solid #a7f3d0;
+  color: #047857; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.bsw-current-pulse {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+
+.bsw-switch-hint {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border-radius: 6px;
+  font-size: 12px; font-weight: 600; color: #2563eb;
+  opacity: 0; transform: translateX(-4px);
+  transition: all 0.15s ease;
+}
+
+.bsw-item:hover:not(.current) .bsw-switch-hint {
+  opacity: 1; transform: translateX(0);
+}
+
+/* ── Empty State ─────────────────────────────────────────────────────── */
+
+.bsw-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center;
+  padding: 40px 20px;
+}
+
+.bsw-empty-icon-wrap {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: #f1f5f9; color: #94a3b8;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px;
+}
+
+.bsw-empty-title {
+  margin: 0 0 4px;
+  font-size: 14px; font-weight: 700; color: #334155;
+}
+
+.bsw-empty-desc {
+  margin: 0 0 14px;
+  font-size: 12.5px; color: #64748b;
+  max-width: 320px;
+}
+
+.bsw-reset-btn {
+  padding: 6px 12px; border-radius: 6px;
+  border: 1px solid #e2e8f0; background: #ffffff;
+  color: #2563eb; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+
+.bsw-reset-btn:hover {
+  background: #eff6ff; border-color: #bfdbfe;
+}
+
+/* ── Footer Command Bar ──────────────────────────────────────────────── */
+
+.bsw-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+  font-size: 11.5px; color: #94a3b8;
+}
+
+.bsw-footer-shortcuts {
+  display: flex; align-items: center; gap: 12px;
+}
+
+.bsw-shortcut {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: #64748b; font-weight: 500;
+}
+
+.bsw-shortcut kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; font-weight: 700;
+  color: #475569; background: #ffffff;
+  border: 1px solid #cbd5e1; border-radius: 3px;
+  padding: 1px 5px; box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+}
+
+.bsw-footer-brand {
+  display: flex; align-items: center; gap: 6px;
+  color: #94a3b8; font-weight: 500; font-size: 11px;
+}
+
+@media (max-width: 600px) {
+  .bsw-backdrop { padding: 12px; align-items: flex-end; }
+  .bsw-modal { max-height: 86vh; border-radius: 16px 16px 0 0; }
+  .bsw-footer-shortcuts { display: none; }
+  .bsw-tags-row { display: none; }
+}
+

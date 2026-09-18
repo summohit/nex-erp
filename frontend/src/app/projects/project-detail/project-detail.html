@@ -2494,22 +2494,147 @@
 
   <!-- Floating Bottom Navigation Pill Bar -->
   <div class="floating-bottom-nav">
-    <button type="button" class="bottom-nav-item">
-      <svg lucideInbox size="16"></svg>
-      <span>Inbox</span>
-    </button>
-    <button type="button" class="bottom-nav-item">
-      <svg lucideCalendar size="16"></svg>
-      <span>Planner</span>
-    </button>
     <button type="button" class="bottom-nav-item active">
       <svg lucideKanban size="16"></svg>
       <span>Board</span>
     </button>
-    <button type="button" class="bottom-nav-item switch-btn" (click)="goBack()">
+    <button type="button" class="bottom-nav-item switch-btn" (click)="openBoardSwitcher()">
       <svg lucideLayoutDashboard size="16"></svg>
       <span>Switch boards</span>
     </button>
+  </div>
+
+  <!-- Board switcher. Swaps the board in place rather than sending you back to
+       the projects list to start again. -->
+  <div class="bsw-backdrop" *ngIf="boardSwitcherOpen()" (click)="closeBoardSwitcher()">
+    <div class="bsw-modal" (click)="$event.stopPropagation()">
+
+      <!-- Modern Header -->
+      <div class="bsw-head">
+        <div class="bsw-head-left">
+          <div class="bsw-title-badge">
+            <svg lucideKanban size="18"></svg>
+          </div>
+          <div class="bsw-title-meta">
+            <div class="bsw-title-row">
+              <h3>Switch Board</h3>
+              <span class="bsw-count-pill" *ngIf="!boardsLoading()">
+                {{ filteredBoards().length }} {{ filteredBoards().length === 1 ? 'board' : 'boards' }}
+              </span>
+            </div>
+            <p class="bsw-subtitle">Jump to another project board or workspace</p>
+          </div>
+        </div>
+        <button type="button" class="bsw-close" (click)="closeBoardSwitcher()" title="Close (Esc)">
+          <svg lucideX size="16"></svg>
+        </button>
+      </div>
+
+      <!-- Command Palette Search Bar -->
+      <div class="bsw-search-box">
+        <div class="bsw-search-icon-wrap">
+          <svg lucideSearch size="16"></svg>
+        </div>
+        <input id="bsw-search-input"
+               type="text" 
+               placeholder="Search by project, code (e.g. CES/0326), or client..."
+               [ngModel]="boardSearch()" 
+               (ngModelChange)="boardSearch.set($event)"
+               (keydown.enter)="onBoardSearchEnter()"
+               (keydown.escape)="closeBoardSwitcher()"
+               autocomplete="off"
+               spellcheck="false">
+        <button type="button" class="bsw-clear-search" *ngIf="boardSearch()" (click)="boardSearch.set('')" title="Clear">
+          <svg lucideX size="13"></svg>
+        </button>
+        <span class="bsw-kbd-badge">ESC</span>
+      </div>
+
+      <!-- Loading State -->
+      <div class="bsw-loading" *ngIf="boardsLoading()">
+        <div class="bsw-spinner"></div>
+        <span>Loading your project boards…</span>
+      </div>
+
+      <!-- Board List -->
+      <div class="bsw-list" *ngIf="!boardsLoading()">
+        <button type="button" 
+                class="bsw-item"
+                *ngFor="let p of filteredBoards()"
+                [class.current]="p.id === projectId"
+                (click)="switchToBoard(p)">
+
+          <!-- Project Key Badge -->
+          <div class="bsw-key-container">
+            <span class="bsw-key" [class.current]="p.id === projectId">
+              {{ p.key || '—' }}
+            </span>
+          </div>
+
+          <!-- Project Details -->
+          <div class="bsw-meta">
+            <div class="bsw-name-row">
+              <span class="bsw-name" [title]="p.name">{{ p.name }}</span>
+            </div>
+            
+            <div class="bsw-tags-row" *ngIf="p.client?.name || p.department?.name || (p._count?.issues !== undefined && p._count?.issues > 0)">
+              <span class="bsw-meta-tag client" *ngIf="p.client?.name" [title]="'Client: ' + p.client.name">
+                <svg lucideBuilding size="11"></svg>
+                <span>{{ p.client.name }}</span>
+              </span>
+
+              <span class="bsw-meta-tag dept" *ngIf="p.department?.name" [title]="'Department: ' + p.department.name">
+                <svg lucideFolder size="11"></svg>
+                <span>{{ p.department.name }}</span>
+              </span>
+
+              <span class="bsw-meta-tag tasks" *ngIf="p._count?.issues !== undefined && p._count?.issues > 0">
+                <svg lucideCheckSquare size="11"></svg>
+                <span>{{ p._count.issues }} {{ p._count.issues === 1 ? 'task' : 'tasks' }}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Right Action / Status Badge -->
+          <div class="bsw-status-wrap">
+            <span class="bsw-current-badge" *ngIf="p.id === projectId">
+              <span class="bsw-current-pulse"></span>
+              Active
+            </span>
+            <span class="bsw-switch-hint" *ngIf="p.id !== projectId">
+              <span>Switch</span>
+              <svg lucideArrowRight size="13"></svg>
+            </span>
+          </div>
+
+        </button>
+
+        <!-- Empty State -->
+        <div class="bsw-empty" *ngIf="!filteredBoards().length">
+          <div class="bsw-empty-icon-wrap">
+            <svg lucideSearch size="22"></svg>
+          </div>
+          <p class="bsw-empty-title">No matching boards</p>
+          <p class="bsw-empty-desc">No project matches “{{ boardSearch() }}”</p>
+          <button type="button" class="bsw-reset-btn" (click)="boardSearch.set('')">
+            Clear search
+          </button>
+        </div>
+      </div>
+
+      <!-- Footer Bar -->
+      <div class="bsw-footer">
+        <div class="bsw-footer-shortcuts">
+          <span class="bsw-shortcut"><kbd>↵</kbd> Switch</span>
+          <span class="bsw-shortcut"><kbd>ESC</kbd> Close</span>
+        </div>
+        <div class="bsw-footer-brand">
+          <svg lucideLayoutDashboard size="12"></svg>
+          <span>Board Switcher</span>
+        </div>
+      </div>
+
+    </div>
   </div>
 
 </div>
@@ -3216,6 +3341,13 @@
           </div>
         </div>
       </div>
+
+      <!-- §3: additional-hours requests, directly under the time tracking they
+           constrain. The refusal message tells people to request more hours;
+           this is where they do it. -->
+      <app-task-hours-request-panel
+        *ngIf="selectedIssue()?.id"
+        [issueId]="selectedIssue().id" />
 
       <!-- Description Section -->
       <div class="modal-description-section mb-4">

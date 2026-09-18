@@ -790,7 +790,15 @@ export class ProjectsService {
         members: {
           include: {
             employee: {
-              select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } } }
+              // userId, because an @mention has to name a USER: notifications
+              // hang off User, not Employee. Without it the discussion
+              // mention list filtered every member out and the @ menu came up
+              // empty — the feature looked broken while the bug was a missing
+              // field in this select.
+              select: {
+                id: true, userId: true, firstName: true, lastName: true, avatarUrl: true,
+                user: { select: { email: true } }
+              }
             }
           }
         },

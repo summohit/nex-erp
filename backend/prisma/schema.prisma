@@ -3506,7 +3506,10 @@ model ProjectDiscussionAttachment {
 
 model ProjectTicket {
   id                 Int       @id @default(autoincrement())
-  ticketNumber       String    @unique
+  /// Unique per COMPANY, not globally — see @@unique below. Ticket numbers
+  /// restart at 1 for each company, so a global constraint would make the
+  /// second company's TKT-0001 collide with the first company's.
+  ticketNumber       String
   title              String
   description        String?   @db.Text
   projectId          Int
@@ -3534,7 +3537,8 @@ model ProjectTicket {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([companyId])
+  @@unique([companyId, ticketNumber])
+  @@index([companyId, status])
   @@index([projectId])
 }
 

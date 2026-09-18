@@ -9,6 +9,7 @@ import { ProjectsService, ProjectSummary } from '../../services/projects';
 import { MilestonesTabComponent } from '../milestones/milestones-tab';
 import { TicketsTabComponent } from '../tickets/tickets-tab';
 import { BudgetRequestsTabComponent } from '../budget-requests/budget-requests-tab';
+import { TaskHoursRequestPanelComponent } from '../task-hours-requests/task-hours-request-panel';
 import { DiscussionsTabComponent } from '../discussions/discussions-tab';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
 import { 
@@ -46,6 +47,7 @@ declare var Quill: any;
   imports: [
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
+    TaskHoursRequestPanelComponent,
     LucideLayoutDashboard, LucideKanban,
     LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
     LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
@@ -1117,6 +1119,27 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * The server's own explanation for a failed request.
+   *
+   * These time endpoints are called with fetch() rather than HttpClient, so
+   * the body is not unwrapped for us. They used to throw a fixed string and
+   * discard it, which mattered once the hours ceiling started refusing logs
+   * (§3): "Failed to log time" told the user nothing about the four hours
+   * they had already used or the request that would unblock them.
+   */
+  private async serverMessage(res: Response, fallback: string): Promise<string> {
+    try {
+      const body = await res.json();
+      const message = body?.message;
+      if (Array.isArray(message) && message.length) return String(message[0]);
+      if (typeof message === 'string' && message.trim()) return message;
+    } catch {
+      // No JSON body -- a proxy error page, or an empty 500.
+    }
+    return fallback;
+  }
+
   toggleTimeTimer() {
     const issue = this.selectedIssue();
     if (!issue) return;
@@ -1128,12 +1151,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       fetch(`${environment.apiUrl}/projects/${this.projectId}/issues/${issue.id}/time-stop`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${this.authService.getToken()}` }
-      }).then(res => {
-        if (!res.ok) throw new Error('Failed to stop timer');
+      }).then(async res => {
+        if (!res.ok) throw new Error(await this.serverMessage(res, 'Failed to stop timer'));
         this.toast.success('Timer stopped');
         this.loadBoardAndIssues(); // Refreshes time logs
         this.selectedIssue.set({ ...issue, workCompletedAt: new Date() }); // Optimistic
-      }).catch(() => this.toast.error('Failed to stop timer'))
+      }).catch((e) => this.toast.error(e?.message || 'Failed to stop timer'))
       .finally(() => this.isTimerLoading.set(false));
       
     } else {
@@ -1141,12 +1164,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       fetch(`${environment.apiUrl}/projects/${this.projectId}/issues/${issue.id}/time-start`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${this.authService.getToken()}` }
-      }).then(res => {
-        if (!res.ok) throw new Error('Failed to start timer');
+      }).then(async res => {
+        if (!res.ok) throw new Error(await this.serverMessage(res, 'Failed to start timer'));
         this.toast.success('Timer started');
         this.selectedIssue.set({ ...issue, workStartedAt: new Date(), workCompletedAt: null }); // Optimistic
         this.loadBoardAndIssues();
-      }).catch(() => this.toast.error('Failed to start timer'))
+      }).catch((e) => this.toast.error(e?.message || 'Failed to start timer'))
       .finally(() => this.isTimerLoading.set(false));
     }
   }
@@ -1172,8 +1195,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ durationMin: totalMin })
-    }).then(res => {
-      if (!res.ok) throw new Error('Failed to log time');
+    }).then(async res => {
+      if (!res.ok) throw new Error(await this.serverMessage(res, 'Failed to log time'));
       this.toast.success('Time logged successfully');
       this.isTimeLogModalOpen.set(false);
       this.timeLogHours.set(null);
@@ -1182,7 +1205,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       // Update selected issue time logs optimistically or reload all
       this.loadBoardAndIssues(); // This ensures tree/roadmap is updated
       
-    }).catch(() => this.toast.error('Failed to log time'))
+    }).catch((e) => this.toast.error(e?.message || 'Failed to log time'))
     .finally(() => this.isTimerLoading.set(false));
   }
 
@@ -1654,6 +1677,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.route.paramMap.subscribe(params => {
       const id = params.get('id');
       if (id) {
+        // Switching boards reuses this component rather than rebuilding it, so
+        // the previous project's socket handlers are still attached. Without
+        // dropping them, every issue event would reload the board once per
+        // board ever visited.
+        if (this.projectId && this.projectId !== +id) {
+          this.socketService.leaveProject(this.projectId);
+          this.projectSocketSubscriptions.forEach(sub => sub.unsubscribe());
+          this.projectSocketSubscriptions = [];
+        }
         this.projectId = +id;
         this.hasAccess.set(true);
         this.loadProjectDetails();
@@ -4602,5 +4634,74 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   goBack() {
     this.router.navigate(['/projects']);
+  }
+
+  // ── Board switcher ───────────────────────────────────────────────────────
+  //
+  // Switching used to mean going back to the projects list and picking again.
+  // This opens the list where you are and swaps the board underneath you —
+  // the route param changes, the paramMap subscription above reloads, and the
+  // component never unmounts.
+
+  boardSwitcherOpen = signal(false);
+  boardSearch = signal('');
+  switchableBoards = signal<any[]>([]);
+  boardsLoading = signal(false);
+
+  filteredBoards = computed(() => {
+    const q = this.boardSearch().trim().toLowerCase();
+    const list = this.switchableBoards();
+    if (!q) return list;
+    return list.filter((p: any) =>
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.key || '').toLowerCase().includes(q) ||
+      (p.client?.name || '').toLowerCase().includes(q),
+    );
+  });
+
+  openBoardSwitcher() {
+    this.boardSwitcherOpen.set(true);
+    this.boardSearch.set('');
+    setTimeout(() => {
+      const el = document.getElementById('bsw-search-input') as HTMLInputElement;
+      el?.focus();
+    }, 60);
+
+    // Fetched once and kept: the list rarely changes inside a session, and a
+    // spinner on every open makes a switcher feel heavier than the navigation
+    // it replaced.
+    if (this.switchableBoards().length) return;
+
+    this.boardsLoading.set(true);
+    this.projectsService.getProjects().subscribe({
+      next: (projects: any[]) => {
+        this.switchableBoards.set(projects || []);
+        this.boardsLoading.set(false);
+      },
+      error: () => {
+        this.boardsLoading.set(false);
+        this.toast.error('Could not load your boards.');
+      },
+    });
+  }
+
+  closeBoardSwitcher() {
+    this.boardSwitcherOpen.set(false);
+    this.boardSearch.set('');
+  }
+
+  onBoardSearchEnter() {
+    const list = this.filteredBoards();
+    if (!list.length) return;
+    const target = list.find((b: any) => b.id !== this.projectId) || list[0];
+    if (target) {
+      this.switchToBoard(target);
+    }
+  }
+
+  switchToBoard(project: any) {
+    this.closeBoardSwitcher();
+    if (!project?.id || project.id === this.projectId) return;
+    this.router.navigate(['/projects', project.id]);
   }
 }
