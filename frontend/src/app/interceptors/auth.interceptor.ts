@@ -1,6 +1,6 @@
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, switchMap, throwError, from } from 'rxjs';
+import { catchError, switchMap, throwError, from, EMPTY } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { SessionModalService } from '../services/session-modal.service';
 import { Router } from '@angular/router';
@@ -38,12 +38,23 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             if (shouldContinue) {
               return authService.refreshToken().pipe(
                 switchMap(() => {
-                  // Retry original request with new token
-                  const newToken = localStorage.getItem('access_token');
-                  const clonedReq = req.clone({
-                    setHeaders: { Authorization: `Bearer ${newToken}` }
-                  });
-                  return next(clonedReq);
+                  /**
+                   * Reload rather than retry the one request that failed.
+                   *
+                   * A screen usually fires several requests at once, and an
+                   * expired token fails all of them. Retrying only the one
+                   * that happened to trigger this modal leaves the rest of the
+                   * page holding the errors they already got -- empty lists,
+                   * missing counts, a board with no cards -- which reads as a
+                   * broken app even though the session is now perfectly good.
+                   *
+                   * The token has already been refreshed and stored, so the
+                   * reload comes back authenticated. EMPTY completes without
+                   * emitting, so nothing downstream acts on a response while
+                   * the page is being torn down.
+                   */
+                  window.location.reload();
+                  return EMPTY;
                 }),
                 catchError((refreshErr) => {
                   authService.logout();

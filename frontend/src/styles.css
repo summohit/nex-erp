@@ -903,6 +903,24 @@ button.btn-outline:hover,
   text-transform: uppercase;
 }
 
+/**
+ * The photo form of .avatar-circle-sm above.
+ *
+ * Global because ag-grid cell renderers build their HTML outside the component
+ * template, so a component's scoped styles never reach it. This existed only
+ * in all-attendance.css, which is exactly that mistake: every other grid
+ * rendering an employee photo got an unstyled full-size image that blew the
+ * row height apart and pushed the name out of the column.
+ */
+.avatar-img-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
 .user-text-stack {
   line-height: 1.25;
   font-size: 10px;
