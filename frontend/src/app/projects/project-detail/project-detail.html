@@ -3160,24 +3160,39 @@
                   <span class="tt-metric-label">Estimated</span>
                   <span class="tt-metric-sub">Budget</span>
                 </div>
-                <div class="tt-input-group">
-                  <input type="number" 
-                         class="tt-hour-input" 
-                         [(ngModel)]="issueForm.estimatedHours" 
-                         (change)="updateEstimatedHours()"
-                         (blur)="updateEstimatedHours()"
-                         placeholder="0"
-                         min="0"
-                         step="0.5">
-                  <span class="tt-input-unit">hrs</span>
-                </div>
-                <!-- Quick Estimate Presets -->
-                <div class="tt-quick-chips">
-                  <button type="button" class="tt-chip" (click)="setEstimatePreset(1)" [class.active]="issueForm.estimatedHours === 1">1h</button>
-                  <button type="button" class="tt-chip" (click)="setEstimatePreset(2)" [class.active]="issueForm.estimatedHours === 2">2h</button>
-                  <button type="button" class="tt-chip" (click)="setEstimatePreset(4)" [class.active]="issueForm.estimatedHours === 4">4h</button>
-                  <button type="button" class="tt-chip" (click)="setEstimatePreset(8)" [class.active]="issueForm.estimatedHours === 8">8h</button>
-                </div>
+                <!-- §3: the assigned hours are management's to set. An employee
+                     who can retype this never needs to request more, so for
+                     them it reads as a figure, not a field. The server refuses
+                     the change either way. -->
+                <ng-container *ngIf="canAssignHours; else estimateReadOnly">
+                  <div class="tt-input-group">
+                    <input type="number" 
+                           class="tt-hour-input" 
+                           [(ngModel)]="issueForm.estimatedHours" 
+                           (change)="updateEstimatedHours()"
+                           (blur)="updateEstimatedHours()"
+                           placeholder="0"
+                           min="0"
+                           step="0.5">
+                    <span class="tt-input-unit">hrs</span>
+                  </div>
+                  <!-- Quick Estimate Presets -->
+                  <div class="tt-quick-chips">
+                    <button type="button" class="tt-chip" (click)="setEstimatePreset(1)" [class.active]="issueForm.estimatedHours === 1">1h</button>
+                    <button type="button" class="tt-chip" (click)="setEstimatePreset(2)" [class.active]="issueForm.estimatedHours === 2">2h</button>
+                    <button type="button" class="tt-chip" (click)="setEstimatePreset(4)" [class.active]="issueForm.estimatedHours === 4">4h</button>
+                    <button type="button" class="tt-chip" (click)="setEstimatePreset(8)" [class.active]="issueForm.estimatedHours === 8">8h</button>
+                  </div>
+                </ng-container>
+
+                <ng-template #estimateReadOnly>
+                  <div class="tt-estimate-readonly">
+                    <span class="tt-estimate-value">
+                      {{ issueForm.estimatedHours ? issueForm.estimatedHours + 'h' : 'Not set' }}
+                    </span>
+                    <span class="tt-estimate-note">Set by the project manager</span>
+                  </div>
+                </ng-template>
               </div>
 
               <div class="tt-col-divider"></div>

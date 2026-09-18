@@ -3634,6 +3634,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return this.isProjectOwner || this.isCurrentUserPM();
   }
 
+  /**
+   * Who may set the hours a task is assigned (§3).
+   *
+   * The same people the server allows, and the same people who rule on
+   * additional-hours requests. If an employee could edit this they would never
+   * need to raise one, and the ceiling would enforce nothing.
+   */
+  get canAssignHours(): boolean {
+    return this.isProjectOwner || this.isCurrentUserPM();
+  }
+
   // PMs and the project Owner can bypass the proof-of-completion requirement; regular
   // employees must attach at least one supporting document before moving the task.
   get canSkipProofUpload(): boolean {

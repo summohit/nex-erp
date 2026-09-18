@@ -7729,3 +7729,8 @@ input[type=text], input[type=email], input[type=password] {
 }
 .inline-card-hours input:focus { border-color: #2563eb; }
 .inline-card-hours-hint { font-size: 11px; color: #97a0af; }
+
+/* §3: the assigned hours as an employee sees them — a figure, not a field. */
+.tt-estimate-readonly { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
+.tt-estimate-value { font-size: 20px; font-weight: 700; color: #172b4d; }
+.tt-estimate-note { font-size: 11px; color: #97a0af; }

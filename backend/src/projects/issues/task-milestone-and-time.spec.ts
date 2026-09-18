@@ -384,3 +384,77 @@ describe('assigned hours at creation', () => {
     expect(await create({ title: 'T', estimatedHours: '6' })).toMatchObject({ estimatedHours: 6 });
   });
 });
+
+/**
+ * §3: only management may change the hours a task is assigned.
+ *
+ * The ceiling is worth nothing if the person it constrains can lift it. An
+ * employee who retypes ESTIMATED from 2 to 40 never needs to ask for more
+ * hours, and the approval flow becomes decoration.
+ */
+describe('changing the assigned hours', () => {
+  const svc = (over: any = {}) => {
+    const prisma: any = {
+      issue: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 5, columnId: 10, status: 'TODO', estimatedHours: 2,
+        }),
+        update: jest.fn().mockResolvedValue({}),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      project: { findFirst: jest.fn().mockResolvedValue({ leadId: 70 }) },
+      projectMember: { findFirst: jest.fn().mockResolvedValue(null) },
+      issueActivity: { create: jest.fn().mockResolvedValue({}) },
+      employee: { findFirst: jest.fn().mockResolvedValue({ id: 60 }) },
+      boardColumn: { findUnique: jest.fn().mockResolvedValue({ id: 10, type: 'TODO' }) },
+      ...over,
+    };
+    // updateIssue emits on the sockets gateway and the notifications service
+    // on its way out. Neither is what these tests are about, so any method
+    // called on them is a no-op rather than a name to keep in sync.
+    const anyMethod = () => new Proxy({}, { get: () => jest.fn() }) as any;
+
+    return new IssuesService(prisma, anyMethod(), anyMethod(), anyMethod());
+  };
+
+  const update = (service: any, employeeId: number, role: string | undefined, hours: any) =>
+    (service as any).updateIssue(1, employeeId, 3, 5, { estimatedHours: hours }, role);
+
+  it('refuses an ordinary employee raising their own ceiling', async () => {
+    await expect(update(svc(), 60, 'EMPLOYEE', 40)).rejects.toThrow(
+      /Only the project manager can change the hours/,
+    );
+  });
+
+  it('points the employee at the request flow instead', async () => {
+    await expect(update(svc(), 60, 'EMPLOYEE', 40)).rejects.toThrow(
+      /additional-hours request/,
+    );
+  });
+
+  it('allows the project lead', async () => {
+    await expect(update(svc(), 70, 'EMPLOYEE', 40)).resolves.toBeDefined();
+  });
+
+  it('allows a project manager who is not the lead', async () => {
+    const service = svc({
+      projectMember: { findFirst: jest.fn().mockResolvedValue({ id: 1 }) },
+    });
+    await expect(update(service, 71, 'EMPLOYEE', 40)).resolves.toBeDefined();
+  });
+
+  it('allows an administrator', async () => {
+    await expect(update(svc(), 99, 'ADMIN', 40)).resolves.toBeDefined();
+  });
+
+  // Every other edit on a task sends the whole form back, estimatedHours
+  // included. Treating an unchanged value as an attempt to change it would
+  // refuse an employee moving their own card.
+  it('ignores an unchanged value, so ordinary edits still work', async () => {
+    await expect(update(svc(), 60, 'EMPLOYEE', 2)).resolves.toBeDefined();
+  });
+
+  it('treats a string of the same number as unchanged', async () => {
+    await expect(update(svc(), 60, 'EMPLOYEE', '2')).resolves.toBeDefined();
+  });
+});

@@ -298,6 +298,28 @@ export class IssuesService {
       }
     }
 
+    /**
+     * Changing the assigned hours is a management act, not an edit (§3).
+     *
+     * The ceiling only means anything if the person it constrains cannot lift
+     * it. An employee who can retype ESTIMATED from 2 to 40 never needs to
+     * request additional hours at all, and the whole approval flow becomes
+     * decoration -- so this is refused for anyone but the people who assign
+     * the work and rule on those requests.
+     *
+     * Checked here rather than only in the UI because hiding the input stops
+     * the form, not the endpoint.
+     */
+    if (data.estimatedHours !== undefined
+        && Number(data.estimatedHours ?? 0) !== Number(oldIssue.estimatedHours ?? 0)) {
+      if (!(await this.mayAssignHours(companyId, projectId, employeeId, role))) {
+        throw new ForbiddenException(
+          'Only the project manager can change the hours assigned to a task. ' +
+          'Raise an additional-hours request instead.',
+        );
+      }
+    }
+
     const prevStatus = oldIssue.status;
 
     const updateData: any = {};
@@ -544,6 +566,36 @@ export class IssuesService {
    * be pointed at another project's milestone — which would then count it in
    * that milestone's progress and, once invoicing lands, against its value.
    */
+  /**
+   * Who may set the hours a task is assigned (§3): an administrator, the
+   * project lead, or a member carrying the PROJECT_MANAGER role.
+   *
+   * Deliberately the same people who approve additional-hours requests. If the
+   * two sets differed, somebody could grant themselves hours through whichever
+   * door was left open.
+   */
+  private async mayAssignHours(
+    companyId: number,
+    projectId: number,
+    employeeId: number,
+    role?: string,
+  ): Promise<boolean> {
+    if (role === 'SUPERADMIN' || role === 'ADMIN') return true;
+
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, companyId },
+      select: { leadId: true },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.leadId === employeeId) return true;
+
+    const managing = await this.prisma.projectMember.findFirst({
+      where: { projectId, employeeId, role: 'PROJECT_MANAGER' },
+      select: { id: true },
+    });
+    return !!managing;
+  }
+
   /**
    * The phase id to store, from whatever the form sent (§8).
    *
