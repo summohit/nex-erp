@@ -272,6 +272,7 @@ export class TasksService {
       projectId?: number;
       leadId?: number;
       taskTypeId?: number;
+      phaseId?: number;
       priority?: string;
       status?: string;
       startDate?: string;
@@ -350,6 +351,8 @@ export class TasksService {
           projectId: project.id,
           leadId: data.leadId ? Number(data.leadId) : null,
           taskTypeId: data.taskTypeId ? Number(data.taskTypeId) : null,
+          // §8: the delivery phase the task belongs to.
+          phaseId: data.phaseId ? Number(data.phaseId) : null,
           companyId,
           columnId: firstColumn?.id ?? null,
           reporterId,
@@ -484,6 +487,7 @@ export class TasksService {
         milestone: { select: { id: true, name: true } },
         lead: { select: { id: true, title: true, leadCode: true, companyName: true, contactName: true, flow: true } },
         taskType: { select: { name: true } },
+        phase: { select: { id: true, name: true } },
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         members: {
           select: {
@@ -529,6 +533,9 @@ export class TasksService {
         rawStatus: i.status,
         priority: i.priority,
         taskType: i.taskType?.name ?? null,
+        // §8: both id and name -- the name renders, the id drives the filter.
+        phaseId: i.phase?.id ?? null,
+        phase: i.phase?.name ?? null,
         // Null on a general or deal task, which has no project to code.
         projectCode: general ? null : (i.project?.key ?? null),
         milestone: i.milestone ? { id: i.milestone.id, name: i.milestone.name } : null,

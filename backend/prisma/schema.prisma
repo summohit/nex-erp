@@ -116,6 +116,7 @@ model Company {
   timesheetDays         TimesheetDay[]
   projectTickets        ProjectTicket[]
   taskHoursRequests     TaskHoursRequest[]
+  projectPhases         ProjectPhase[]
   projectBudgetRequests ProjectBudgetRequest[]
 }
 
@@ -2047,6 +2048,11 @@ model Issue {
   blockedBy   IssueDependency[] @relation("IssueBlockedBy")
   blocking    IssueDependency[] @relation("IssueBlocks")
 
+  /// The delivery phase this task belongs to (§8). SetNull, not Cascade: a
+  /// phase being retired must not delete the work done in it.
+  phaseId     Int?
+  phase       ProjectPhase?     @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
   /// Extra hours granted on top of `estimatedHours` by approved requests (§3).
   ///
   /// Denormalised deliberately: the allowed ceiling is read on every time log
@@ -3652,4 +3658,29 @@ model TaskHoursRequestActivity {
   createdAt DateTime         @default(now())
 
   @@index([requestId, createdAt])
+}
+
+
+/// A delivery phase — "Phase 1", "Deployment", "UAT" (§8).
+///
+/// Company-wide master data rather than a per-project list, and modelled on
+/// TaskType for that reason: the vocabulary a company plans in is the same
+/// across its projects, and giving every project its own copy would mean
+/// seeding six rows per project and filtering across a union of them wherever
+/// phases are listed.
+model ProjectPhase {
+  id   Int    @id @default(autoincrement())
+  name String
+  /// Soft-disable rather than delete, exactly as TaskType does: a phase that
+  /// tasks already carry is the truth about those tasks, so it is hidden from
+  /// new ones instead of being removed from old ones.
+  isActive  Boolean  @default(true)
+  position  Int      @default(0)
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  issues    Issue[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
 }

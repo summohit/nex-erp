@@ -647,6 +647,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       issues = issues.filter(i => i.taskTypeId === this.fdTaskCategoryId());
     }
 
+    // §8: Phase
+    if (this.fdPhaseId()) {
+      issues = issues.filter(i => i.phase?.id === this.fdPhaseId());
+    }
+
     // ── Column-aligned pipeline filters ──
     // ID (matches grid "ID" column → issue key)
     if (this.fdIssueKey().trim()) {
@@ -757,6 +762,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.fdLabelIds.set([]);
     this.fdPriority.set(null);
     this.fdTaskCategoryId.set(null);
+    this.fdPhaseId.set(null);
     this.fdIssueKey.set('');
     this.fdTaskName.set('');
     this.fdColumnIds.set([]);
@@ -784,6 +790,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   fdLabelIds = signal<number[]>([]);
   fdPriority = signal<string | null>(null);
   fdTaskCategoryId = signal<number | null>(null);
+  /** §8: the delivery phase to narrow the board and list to. */
+  fdPhaseId = signal<number | null>(null);
+  fdAllPhases = signal<any[]>([]);
 
   // Column-aligned pipeline filters (mirror the tasks grid columns)
   fdIssueKey = signal<string>('');
@@ -814,6 +823,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (this.fdLabelIds().length > 0) n++;
     if (this.fdPriority()) n++;
     if (this.fdTaskCategoryId()) n++;
+    if (this.fdPhaseId()) n++;
     if (this.fdIssueKey().trim()) n++;
     if (this.fdTaskName().trim()) n++;
     if (this.fdColumnIds().length > 0) n++;
@@ -834,6 +844,14 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     );
     this.masterDataService.getTaskTypes().subscribe({ next: (t) => {
       this.fdAllTaskCategories.set((t || []).filter((tc: any) => usedTaskTypes.has(tc.id)));
+    }});
+    // §8: every phase actually used on this board, so the filter never offers
+    // a phase that would return nothing. Same rule as task categories above.
+    const usedPhases = new Set(
+      this.allIssues().map((i: any) => i.phase?.id).filter((x: any) => !!x)
+    );
+    this.masterDataService.getProjectPhases().subscribe({ next: (p: any) => {
+      this.fdAllPhases.set((p || []).filter((ph: any) => usedPhases.has(ph.id)));
     }});
     this.projectsService.getLabels(this.projectId).subscribe({ next: (l) => this.fdAllLabels.set(l || []) });
   }
@@ -886,6 +904,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (!id) return 'All';
     const t = this.fdAllTaskCategories().find(x => x.id === id);
     return t ? t.name : '—';
+  }
+
+  fdPhaseName(id: number | null): string {
+    if (!id) return 'All';
+    const p = this.fdAllPhases().find((x: any) => x.id === id);
+    return p ? p.name : '—';
   }
 
   // Time Tracking State

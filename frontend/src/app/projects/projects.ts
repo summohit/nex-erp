@@ -1677,6 +1677,10 @@ export class ProjectsComponent implements OnInit {
   isCreateTaskOpen = signal(false);
   isSavingTask = signal(false);
   taskTypes = signal<TaskType[]>([]);
+  /** §8: the company's active delivery phases, for the task form. */
+  projectPhases = signal<any[]>([]);
+  phaseDropdownOpen = signal(false);
+  phaseSearch = '';
   leadOptions = signal<LeadOption[]>([]);
   assigneeSearch = signal('');
 
@@ -1750,6 +1754,7 @@ export class ProjectsComponent implements OnInit {
       projectId: null as number | null,
       leadId: null as number | null,
       taskTypeId: null as number | null,
+      phaseId: null as number | null,
       priority: 'MEDIUM',
       startDate: '',
       dueDate: '',
@@ -1789,6 +1794,13 @@ export class ProjectsComponent implements OnInit {
     if (!this.taskTypes().length) {
       this.tasksService.getTaskTypes().subscribe({
         next: (t) => this.taskTypes.set(t || []),
+        error: () => {},
+      });
+    }
+    // §8: the phase list, fetched alongside the task types it sits beside.
+    if (!this.projectPhases().length) {
+      this.masterDataService.getProjectPhases().subscribe({
+        next: (p) => this.projectPhases.set(p || []),
         error: () => {},
       });
     }
@@ -1861,6 +1873,24 @@ export class ProjectsComponent implements OnInit {
   getSelectedTaskType(): any {
     return this.taskTypes().find((t) => t.id === this.taskForm.taskTypeId);
   }
+  /** §8: only active phases are offered; a retired one stays on old tasks. */
+  filteredModalPhases() {
+    const q = (this.phaseSearch || '').toLowerCase().trim();
+    const active = this.projectPhases().filter((p: any) => p.isActive);
+    if (!q) return active;
+    return active.filter((p: any) => (p.name || '').toLowerCase().includes(q));
+  }
+
+  getSelectedPhase() {
+    return this.projectPhases().find((p: any) => p.id === this.taskForm.phaseId);
+  }
+
+  selectPhase(id: number | null) {
+    this.taskForm.phaseId = id;
+    this.phaseDropdownOpen.set(false);
+    this.phaseSearch = '';
+  }
+
 
   getPriorityDetails(priority: string): { label: string; dotClass: string } {
     switch ((priority || '').toUpperCase()) {
@@ -2014,6 +2044,7 @@ export class ProjectsComponent implements OnInit {
       projectId: this.taskForm.parentKind === 'PROJECT' ? Number(this.taskForm.projectId) : undefined,
       leadId: this.taskForm.parentKind === 'LEAD' ? Number(this.taskForm.leadId) : undefined,
       taskTypeId: this.taskForm.taskTypeId ? Number(this.taskForm.taskTypeId) : undefined,
+      phaseId: this.taskForm.phaseId ? Number(this.taskForm.phaseId) : undefined,
       priority: this.taskForm.priority,
       startDate: this.taskForm.startDate || undefined,
       dueDate: this.taskForm.dueDate || undefined,

@@ -1259,6 +1259,30 @@
             </div>
           </div>
 
+          <!-- §8: Phase. Only phases actually present on this board are
+               offered, so no option here can return an empty list. -->
+          <div class="fd-section" *ngIf="fdAllPhases().length > 0">
+            <div class="fd-section-label">Phase</div>
+            <div class="fd-select-wrap">
+              <button class="fd-select-btn" (click)="toggleFdDropdown('phase', $event)">
+                <span [style.color]="fdPhaseId() ? '#0f172a' : '#94a3b8'">
+                  {{ fdPhaseName(fdPhaseId()) }}
+                </span>
+                <svg lucideChevronDown size="14"></svg>
+              </button>
+              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'phase'">
+                <button class="fd-select-option" [class.selected]="!fdPhaseId()" (click)="fdSetSingle(fdPhaseId, null); fdDropdownOpen.set(null)">
+                  <span>All</span>
+                  <svg lucideCheck *ngIf="!fdPhaseId()" size="14"></svg>
+                </button>
+                <button *ngFor="let ph of fdAllPhases()" class="fd-select-option" [class.selected]="fdPhaseId() === ph.id" (click)="fdSetSingle(fdPhaseId, ph.id); fdDropdownOpen.set(null)">
+                  <span>{{ ph.name }}</span>
+                  <svg lucideCheck *ngIf="fdPhaseId() === ph.id" size="14"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Task Category -->
           <div class="fd-section">
             <div class="fd-section-label">Task Category</div>

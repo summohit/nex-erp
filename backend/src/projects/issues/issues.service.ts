@@ -88,7 +88,11 @@ export class IssuesService {
         parentId: data.parentId ? Number(data.parentId) : null,
         // §15: optional at creation — a task often exists before anyone
         // decides which milestone it belongs to.
-        milestoneId: await this.resolveMilestoneId(companyId, projectId, data.milestoneId)
+        milestoneId: await this.resolveMilestoneId(companyId, projectId, data.milestoneId),
+        // §8: the delivery phase. Optional at creation for the same reason as
+        // the milestone above, and because every task predating phases has
+        // none -- requiring one here would refuse the board's quick-add.
+        phaseId: await this.resolvePhaseId(companyId, data.phaseId),
       }
     });
 
@@ -119,6 +123,8 @@ export class IssuesService {
         timeLogs: { select: { id: true, durationMin: true, startedAt: true, endedAt: true } },
         // §15: so the card and the task modal can show and change it.
         milestone: { select: { id: true, name: true, status: true } },
+        // §8: so the card, the modal and the phase filter can all read it.
+        phase: { select: { id: true, name: true, isActive: true } },
         _count: { select: { comments: true } }
       },
       orderBy: { position: 'asc' }
@@ -294,6 +300,10 @@ export class IssuesService {
     // a task cannot be attached to another project's milestone.
     if (data.milestoneId !== undefined) {
       updateData.milestoneId = await this.resolveMilestoneId(companyId, projectId, data.milestoneId);
+    }
+    // §8: the delivery phase, validated against the company's own list.
+    if (data.phaseId !== undefined) {
+      updateData.phaseId = await this.resolvePhaseId(companyId, data.phaseId);
     }
     let isRestrictedTarget = data.status === 'DONE';
 
@@ -524,6 +534,27 @@ export class IssuesService {
    * be pointed at another project's milestone — which would then count it in
    * that milestone's progress and, once invoicing lands, against its value.
    */
+  /**
+   * The phase id to store, from whatever the form sent (§8).
+   *
+   * Checked against the company's own phases so a task cannot be pinned to
+   * another company's phase by id. An inactive phase is still accepted on an
+   * existing task: retiring a phase hides it from new work, it does not make
+   * the tasks already in it unsaveable.
+   */
+  private async resolvePhaseId(companyId: number, phaseId: any): Promise<number | null> {
+    if (phaseId === null || phaseId === '' || phaseId === undefined) return null;
+    const id = Number(phaseId);
+    if (!Number.isFinite(id)) return null;
+
+    const phase = await this.prisma.projectPhase.findFirst({
+      where: { id, companyId },
+      select: { id: true },
+    });
+    if (!phase) throw new BadRequestException('That phase does not belong to this company');
+    return phase.id;
+  }
+
   private async resolveMilestoneId(
     companyId: number,
     projectId: number,

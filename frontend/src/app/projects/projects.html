@@ -1338,6 +1338,43 @@
       </div>
     </div>
 
+    <!-- §8: the delivery phase this task belongs to. Its own row above Task
+         Type rather than squeezed beside it, because the two-column grid below
+         is already full and phase is asked on every task. -->
+    <div class="form-group">
+      <label class="form-label">Project Phase</label>
+      <div class="searchable-select-container">
+        <button type="button" class="custom-select-trigger"
+                [class.active]="phaseDropdownOpen()"
+                (click)="phaseDropdownOpen.set(!phaseDropdownOpen()); taskTypeDropdownOpen.set(false); taskProjectDropdownOpen.set(false); taskLeadDropdownOpen.set(false); taskPriorityDropdownOpen.set(false); taskAssigneeDropdownOpen.set(false); $event.stopPropagation()">
+          <span class="custom-select-value font-medium" *ngIf="getSelectedPhase() as p">{{ p.name }}</span>
+          <span class="custom-select-placeholder" *ngIf="!getSelectedPhase()">No phase</span>
+          <svg lucideChevronDown size="15" class="custom-select-chevron" [class.open]="phaseDropdownOpen()"></svg>
+        </button>
+        <div class="custom-dropdown-panel" *ngIf="phaseDropdownOpen()" (click)="$event.stopPropagation()">
+          <div class="custom-dropdown-search">
+            <svg lucideSearch size="14" class="search-icon"></svg>
+            <input type="text" class="custom-search-input" [(ngModel)]="phaseSearch" placeholder="Search phases…" />
+          </div>
+          <div class="custom-dropdown-list">
+            <div class="custom-dropdown-item" [class.selected]="taskForm.phaseId === null" (click)="selectPhase(null)">
+              <span class="item-title">No phase</span>
+              <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.phaseId === null"></svg>
+            </div>
+            <div class="custom-dropdown-item" *ngFor="let p of filteredModalPhases()"
+                 [class.selected]="taskForm.phaseId === p.id"
+                 (click)="selectPhase(p.id)">
+              <span class="item-title">{{ p.name }}</span>
+              <svg lucideCheck size="14" class="item-check" *ngIf="taskForm.phaseId === p.id"></svg>
+            </div>
+            <div class="custom-dropdown-item" *ngIf="filteredModalPhases().length === 0">
+              <span class="item-title" style="color:#97a0af;">No phases match</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Attributes: Task Type & Priority (Searchable Selects) -->
     <div class="task-form-grid-2">
       <div class="form-group">

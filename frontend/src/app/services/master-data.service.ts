@@ -39,6 +39,19 @@ export interface TaskType {
   position: number;
 }
 
+/**
+ * A delivery phase — "Phase 1", "Deployment", "UAT" (§8).
+ *
+ * Company-wide, like TaskType above, and managed the same way: named,
+ * orderable, and soft-disabled rather than deleted once tasks carry it.
+ */
+export interface ProjectPhase {
+  id: number;
+  name: string;
+  isActive: boolean;
+  position: number;
+}
+
 export interface LeaveType {
   id: number;
   name: string;
@@ -153,6 +166,24 @@ export class MasterDataService {
   deleteTaskType(id: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/task-types/${id}`);
   }
+  // §8: project phases. Same four calls as task types above.
+  getProjectPhases(activeOnly = false): Observable<ProjectPhase[]> {
+    const suffix = activeOnly ? '?activeOnly=true' : '';
+    return this.http.get<ProjectPhase[]>(`${this.apiUrl}/project-phases${suffix}`);
+  }
+
+  createProjectPhase(data: Partial<ProjectPhase>): Observable<ProjectPhase> {
+    return this.http.post<ProjectPhase>(`${this.apiUrl}/project-phases`, data);
+  }
+
+  updateProjectPhase(id: number, data: Partial<ProjectPhase>): Observable<ProjectPhase> {
+    return this.http.put<ProjectPhase>(`${this.apiUrl}/project-phases/${id}`, data);
+  }
+
+  deleteProjectPhase(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/project-phases/${id}`);
+  }
+
 
   getLeaveTypes(): Observable<LeaveType[]> {
     return this.http.get<LeaveType[]>(`${this.apiUrl}/leave-types`);

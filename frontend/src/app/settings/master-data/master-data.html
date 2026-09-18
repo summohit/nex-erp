@@ -6,7 +6,7 @@
     </div>
     <button class="btn-primary" (click)="openModal('create')">
       <svg lucidePlus size="18"></svg>
-      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
+      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
     </button>
   </div>
 
@@ -27,6 +27,7 @@
     <button class="tab-btn" [class.active]="activeTab() === 'shifts'" (click)="switchTab('shifts')">Shifts</button>
     <button class="tab-btn" [class.active]="activeTab() === 'leave-types'" (click)="switchTab('leave-types')">Leave Types</button>
     <button class="tab-btn" [class.active]="activeTab() === 'task-types'" (click)="switchTab('task-types')">Task Types</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'project-phases'" (click)="switchTab('project-phases')">Project Phases</button>
     <button class="tab-btn" [class.active]="activeTab() === 'holidays'" (click)="switchTab('holidays')">Holidays</button>
     <button class="tab-btn" [class.active]="activeTab() === 'blackout-dates'" (click)="switchTab('blackout-dates')">Blackout Dates</button>
   </div>
@@ -149,6 +150,17 @@
       [rowData]="taskTypes()"
       [columnDefs]="taskTypeColDefs"
       [defaultColDef]="defaultColDef"
+      [gridOptions]="gridOptions"></ag-grid-angular>
+
+    <!-- §8: project phases, managed exactly like task types above. -->
+    <ag-grid-angular
+      *ngIf="activeTab() === 'project-phases'"
+      class="ag-theme-quartz"
+      [theme]="'legacy'"
+      style="width: 100%; height: 500px;"
+      [rowData]="projectPhases()"
+      [columnDefs]="projectPhaseColDefs"
+      [defaultColDef]="defaultColDef"
       [gridOptions]="gridOptions">
     </ag-grid-angular>
 
@@ -239,7 +251,7 @@
           <div class="modal-header-icon-badge" *ngIf="activeTab() === 'shifts'">
             <svg lucideClock size="20"></svg>
           </div>
-          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
+          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
         </div>
         <p class="subtitle">{{ activeTab() === 'shifts' ? 'Configure shift timings, punch policies, and weekly working schedule' : 'Enter the details to keep your master data organized' }}</p>
       </div>
@@ -583,7 +595,7 @@
         </div>
 
         <!-- Leave Types -->
-        <div class="form-group" *ngIf="activeTab() === 'task-types'">
+        <div class="form-group" *ngIf="activeTab() === 'task-types' || activeTab() === 'project-phases'">
           <label>Display order</label>
           <input type="number" class="form-control" [(ngModel)]="formData.position" min="0">
           <small class="form-hint">Lower numbers appear first in the task form.</small>

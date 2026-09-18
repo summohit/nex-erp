@@ -250,3 +250,44 @@ describe('logging beyond the hours assigned to a task', () => {
     await expect(call(service, 'stopTimeTracking', 1, 2, 3, 5)).resolves.toBeDefined();
   });
 });
+
+/**
+ * §8: a task's delivery phase.
+ *
+ * Phases are company-wide master data, so the check that matters is that a
+ * task cannot be pinned to another company's phase by guessing an id.
+ */
+describe('attaching a task to a phase', () => {
+  const withPhase = (phase: any) => ({
+    projectPhase: { findFirst: jest.fn().mockResolvedValue(phase) },
+  });
+
+  it('accepts a phase belonging to the same company', async () => {
+    const { service } = makeService(withPhase({ id: 7 }));
+    await expect(call(service, 'resolvePhaseId', 1, 7)).resolves.toBe(7);
+  });
+
+  it('refuses a phase from another company', async () => {
+    const { service } = makeService(withPhase(null));
+    await expect(call(service, 'resolvePhaseId', 1, 999)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('treats null, empty string and undefined as no phase', async () => {
+    const { service } = makeService(withPhase({ id: 7 }));
+    await expect(call(service, 'resolvePhaseId', 1, null)).resolves.toBeNull();
+    await expect(call(service, 'resolvePhaseId', 1, '')).resolves.toBeNull();
+    await expect(call(service, 'resolvePhaseId', 1, undefined)).resolves.toBeNull();
+  });
+
+  it('ignores a non-numeric id rather than throwing', async () => {
+    const { service } = makeService(withPhase({ id: 7 }));
+    await expect(call(service, 'resolvePhaseId', 1, 'Phase 1')).resolves.toBeNull();
+  });
+
+  // Retiring a phase hides it from new work; it must not make the tasks
+  // already sitting in it unsaveable.
+  it('still accepts an inactive phase on an existing task', async () => {
+    const { service } = makeService(withPhase({ id: 7 }));
+    await expect(call(service, 'resolvePhaseId', 1, 7)).resolves.toBe(7);
+  });
+});

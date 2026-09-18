@@ -326,6 +326,87 @@ export class MasterDataController {
     return this.prisma.taskType.delete({ where: { id, companyId: req.user.companyId } });
   }
 
+  // --- Project Phase CRUD (§8) ---
+  //
+  // Deliberately identical in shape to task-types above. Both are a named,
+  // orderable, soft-disableable list a company manages for itself, and a task
+  // form reads both the same way.
+
+  @Get('project-phases')
+  async getProjectPhases(@Request() req, @Query('activeOnly') activeOnly?: string) {
+    return this.prisma.projectPhase.findMany({
+      where: {
+        companyId: req.user.companyId,
+        ...(activeOnly === 'true' ? { isActive: true } : {}),
+      },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  @Post('project-phases')
+  async createProjectPhase(@Request() req, @Body() data: { name: string; position?: number }) {
+    if (!data?.name?.trim()) throw new BadRequestException('A phase needs a name');
+    const existing = await this.prisma.projectPhase.findFirst({
+      where: { name: { equals: data.name.trim(), mode: 'insensitive' }, companyId: req.user.companyId },
+    });
+    if (existing) throw new BadRequestException('That phase already exists');
+
+    return this.prisma.projectPhase.create({
+      data: {
+        name: data.name.trim(),
+        position: Number(data.position) || 0,
+        companyId: req.user.companyId,
+      },
+    });
+  }
+
+  @Put('project-phases/:id')
+  async updateProjectPhase(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { name?: string; isActive?: boolean; position?: number },
+  ) {
+    const updateData: any = {};
+    if (data.name !== undefined) {
+      const name = data.name.trim();
+      if (!name) throw new BadRequestException('A phase needs a name');
+      // Renaming onto another phase's name would trip the unique constraint
+      // as a 500; refuse it here with something the form can show.
+      const clash = await this.prisma.projectPhase.findFirst({
+        where: {
+          name: { equals: name, mode: 'insensitive' },
+          companyId: req.user.companyId,
+          NOT: { id },
+        },
+      });
+      if (clash) throw new BadRequestException('Another phase already has that name');
+      updateData.name = name;
+    }
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.position !== undefined) updateData.position = Number(data.position) || 0;
+
+    return this.prisma.projectPhase.update({
+      where: { id, companyId: req.user.companyId },
+      data: updateData,
+    });
+  }
+
+  @Delete('project-phases/:id')
+  async deleteProjectPhase(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    // A phase tasks already carry is the truth about those tasks. Hide it from
+    // new ones rather than rewriting history by deleting it.
+    const inUse = await this.prisma.issue.count({
+      where: { phaseId: id, companyId: req.user.companyId },
+    });
+    if (inUse > 0) {
+      return this.prisma.projectPhase.update({
+        where: { id, companyId: req.user.companyId },
+        data: { isActive: false },
+      });
+    }
+    return this.prisma.projectPhase.delete({ where: { id, companyId: req.user.companyId } });
+  }
+
   // --- Holiday CRUD ---
   @Get('holidays')
   async getHolidays(@Request() req) {

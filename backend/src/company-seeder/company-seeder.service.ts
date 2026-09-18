@@ -130,6 +130,26 @@ export class CompanySeederService implements OnModuleInit {
       }
     }
 
+    // 4b. Seed Default Project Phases (§8)
+    //
+    // Five numbered phases as a starting point, exactly as specified. They are
+    // ordinary rows, not constants: admins add "Deployment" and "UAT" beside
+    // them from Master Data, and the numbering carries no meaning the code
+    // relies on. Seeded only when absent, so a company that has renamed or
+    // retired these keeps its own list on every subsequent boot.
+    const defaultPhases = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
+
+    for (const [index, name] of defaultPhases.entries()) {
+      const existing = await this.prisma.projectPhase.findFirst({
+        where: { companyId, name },
+      });
+      if (!existing) {
+        await this.prisma.projectPhase.create({
+          data: { name, position: index, companyId },
+        });
+      }
+    }
+
     // 5. Seed Default Holidays (Current Year)
     const currentYear = new Date().getFullYear();
     const defaultHolidays = [
