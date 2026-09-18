@@ -2735,7 +2735,7 @@
             <svg *ngIf="issueForm.completed" lucideCheck size="14"></svg>
           </span>
         </button>
-        <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" placeholder="Card Title" [readOnly]="!isProjectOwner">
+        <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" placeholder="Card Title" [readOnly]="!canManageTask">
       </div>
 
       <!-- Action Buttons Row -->
@@ -2905,7 +2905,7 @@
 
         <!-- Dates -->
         <div class="popover-container">
-          <button class="modal-action-btn" (click)="togglePopover('dates', $event)">
+          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('dates', $event)">
             <svg lucideClock size="14" class="btn-icon-svg"></svg>
             <span>Dates</span>
           </button>
@@ -3096,10 +3096,14 @@
         <!-- Due Date Section -->
         <div class="modal-attached-duedate-section" *ngIf="selectedIssue()?.dueDate || selectedIssue()?.startDate">
           <div class="section-label-subtitle">Due date</div>
-          <button class="attached-duedate-btn" (click)="togglePopover('dates', $event)" type="button">
+          <button class="attached-duedate-btn" type="button"
+                  [class.is-readonly]="!canManageTask"
+                  (click)="canManageTask && togglePopover('dates', $event)">
             <span>{{ formatDisplayDueDate(selectedIssue()) }}</span>
             <svg lucideRepeat size="14" *ngIf="selectedIssue()?.recurring && selectedIssue()?.recurring !== 'Never'" class="ml-1"></svg>
-            <svg lucideChevronDown size="14" class="ml-1"></svg>
+            <!-- No chevron when it cannot be opened: the arrow is the promise
+                 that clicking does something. -->
+            <svg lucideChevronDown size="14" class="ml-1" *ngIf="canManageTask"></svg>
           </button>
         </div>
       </div>
@@ -3109,12 +3113,18 @@
       <div class="modal-milestone-section mb-6" *ngIf="projectMilestones().length > 0">
         <div class="section-label-subtitle">Milestone</div>
         <select
+          *ngIf="canManageTask; else milestoneReadOnly"
           class="milestone-picker"
           [ngModel]="selectedIssue()?.milestoneId ?? null"
           (ngModelChange)="setIssueMilestone($event)">
           <option [ngValue]="null">No milestone</option>
           <option *ngFor="let m of projectMilestones()" [ngValue]="m.id">{{ m.name }}</option>
         </select>
+        <!-- Which milestone the task delivers is worth knowing even when it is
+             not yours to change. -->
+        <ng-template #milestoneReadOnly>
+          <div class="milestone-readonly">{{ selectedIssueMilestoneName() || 'No milestone' }}</div>
+        </ng-template>
       </div>
 
       <!-- Time Tracking Section -->
@@ -3405,12 +3415,12 @@
         <div class="section-header">
           <svg lucideAlignLeft size="20" class="header-icon"></svg>
           <h3>Description</h3>
-          <button class="btn-edit-desc" *ngIf="isProjectOwner && !isEditingDescription() && issueForm.description" (click)="startDescriptionEdit()">Edit</button>
+          <button class="btn-edit-desc" *ngIf="canManageTask && !isEditingDescription() && issueForm.description" (click)="startDescriptionEdit()">Edit</button>
         </div>
 
         <div class="description-body">
           <!-- State 1: Collapsed / Preview Box (1st Screenshot) -->
-          <div class="description-preview-box" *ngIf="!isEditingDescription()" [style.cursor]="isProjectOwner ? 'pointer' : 'default'" (click)="isProjectOwner && startDescriptionEdit()">
+          <div class="description-preview-box" *ngIf="!isEditingDescription()" [style.cursor]="canManageTask ? 'pointer' : 'default'" (click)="isProjectOwner && startDescriptionEdit()">
             <div *ngIf="issueForm.description" [innerHTML]="getSafeHtml(issueForm.description)" class="desc-content-html"></div>
             <div *ngIf="!issueForm.description" class="desc-placeholder-text">
               Add a more detailed description...
@@ -3418,7 +3428,7 @@
           </div>
 
           <!-- State 2: Expanded Quill Rich Text Editor (2nd Screenshot) — Owner only -->
-          <div class="description-editor-container" *ngIf="isEditingDescription() && isProjectOwner">
+          <div class="description-editor-container" *ngIf="isEditingDescription() && canManageTask">
             <div class="quill-wrapper focus-blue-border">
               <div class="quill-container" #quillContainer></div>
             </div>

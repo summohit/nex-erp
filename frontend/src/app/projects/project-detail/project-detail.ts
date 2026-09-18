@@ -3658,6 +3658,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return this.isProjectOwner || this.isCurrentUserPM();
   }
 
+  /** The milestone's name, for the read-only view of it. */
+  selectedIssueMilestoneName(): string | null {
+    const id = this.selectedIssue()?.milestoneId;
+    if (!id) return null;
+    return this.projectMilestones().find((m: any) => m.id === id)?.name ?? null;
+  }
+
   // PMs and the project Owner can bypass the proof-of-completion requirement; regular
   // employees must attach at least one supporting document before moving the task.
   get canSkipProofUpload(): boolean {

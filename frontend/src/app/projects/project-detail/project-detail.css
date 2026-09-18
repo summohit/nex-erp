@@ -7734,3 +7734,22 @@ input[type=text], input[type=email], input[type=password] {
 .tt-estimate-readonly { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
 .tt-estimate-value { font-size: 20px; font-weight: 700; color: #172b4d; }
 .tt-estimate-note { font-size: 11px; color: #97a0af; }
+
+/* A due date an employee may read but not change: the chip stays, so the date
+   is still visible, but loses the affordances that promise it is editable. */
+.attached-duedate-btn.is-readonly {
+  cursor: default;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+.attached-duedate-btn.is-readonly:hover { background: #f8fafc; }
+
+.milestone-readonly {
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #475569;
+}
