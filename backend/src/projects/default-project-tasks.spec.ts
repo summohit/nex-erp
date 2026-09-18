@@ -20,12 +20,15 @@ function make(over: any = {}) {
     boardColumn: { findFirst: jest.fn().mockResolvedValue({ id: 10 }) },
     issue: {
       count: jest.fn().mockResolvedValue(0),
+      // Read back to attach members: createMany returns no ids.
+      findMany: jest.fn().mockResolvedValue([{ id: 101 }, { id: 102 }, { id: 103 }]),
       createMany: jest.fn().mockImplementation((a: any) => {
         created.push(...a.data);
         return Promise.resolve({ count: a.data.length });
       }),
     },
     project: { update: jest.fn().mockResolvedValue({}) },
+    issueMember: { createMany: jest.fn().mockResolvedValue({ count: 3 }) },
     ...over,
   };
   const service = new ProjectsService(prisma as any, {} as any);
@@ -123,6 +126,7 @@ describe('seeding onto a project that already has tasks', () => {
   const withExisting = (n: number) => make({
     issue: {
       count: jest.fn().mockResolvedValue(n),
+      findMany: jest.fn().mockResolvedValue([{ id: 101 }, { id: 102 }, { id: 103 }]),
       createMany: jest.fn().mockImplementation((a: any) => Promise.resolve({ count: a.data.length })),
     },
   });
@@ -149,5 +153,33 @@ describe('seeding onto a project that already has tasks', () => {
     expect(prisma.project.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { issueSeq: 15 } }),
     );
+  });
+});
+
+/**
+ * The PM is recorded as a member as well as the assignee, matching what the
+ * unified task form writes -- otherwise a default task is subtly unlike every
+ * other task and anything reading the member list alone sees nobody on it.
+ */
+describe('the PM is a member too', () => {
+  it('adds a member row per task, for the assignee', async () => {
+    const { service, prisma } = make();
+    await seed(service, { pmIds: [88] });
+    expect(prisma.issueMember.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          { issueId: 101, employeeId: 88 },
+          { issueId: 102, employeeId: 88 },
+          { issueId: 103, employeeId: 88 },
+        ],
+        skipDuplicates: true,
+      }),
+    );
+  });
+
+  it('still writes the tasks when there is nobody to assign them to', async () => {
+    const { service, created } = make({ project: { update: jest.fn().mockResolvedValue({}) } });
+    await (service as any).seedDefaultProjectTasks(1, { id: 7, key: 'CES/0926/03' }, 0, {});
+    expect(created.length).toBe(3);
   });
 });

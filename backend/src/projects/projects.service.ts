@@ -262,6 +262,31 @@ export class ProjectsService {
         })),
       });
 
+      /**
+       * Also record the PM as a member, not only as the assignee.
+       *
+       * The unified task form writes both, so without this a default task is
+       * subtly unlike every other task: the board card still shows the face,
+       * because it renders the assignee first, but anything reading the member
+       * list alone sees nobody on it.
+       *
+       * createMany returns no ids, so the rows are read back by the keys just
+       * written -- they are unique per company and nothing else can hold them.
+       */
+      if (assigneeId) {
+        const created = await this.prisma.issue.findMany({
+          where: {
+            projectId: project.id,
+            key: { in: defaults.map((_, i) => `${project.key}-${existing + i + 1}`) },
+          },
+          select: { id: true },
+        });
+        await this.prisma.issueMember.createMany({
+          data: created.map((i) => ({ issueId: i.id, employeeId: assigneeId })),
+          skipDuplicates: true,
+        });
+      }
+
       // issueSeq must know about them, or the first task somebody raises by
       // hand collides with one of these on @@unique([key, companyId]).
       await this.prisma.project.update({
