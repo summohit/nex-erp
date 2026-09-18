@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+﻿import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
@@ -7,16 +7,16 @@ import { AttendanceService, AttendanceRecord } from '../services/attendance';
 import { LeavesService } from '../services/leaves';
 import { DashboardService, DashboardPayload } from '../services/dashboard.service';
 import { StatCardComponent } from '../shared/components/stat-card/stat-card.component';
-import { ChartCardComponent } from '../shared/components/chart-card/chart-card.component';
 import {
-  LucideCheckCircle2, LucideCircle, LucideClock, LucideUsers, LucideBriefcase,
+  LucideCheckCircle2, LucideCircle, LucideClock,
   LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
-  LucideAlertCircle, LucideArrowRight, LucideBuilding, LucideLayers,
+  LucideAlertCircle, LucideArrowRight,
   LucideShield, LucideAward, LucideBanknote, LucideReceipt, LucideTrendingUp,
   LucideShoppingCart, LucideTarget, LucideCake, LucidePartyPopper, LucideGift,
-  LucideSparkles, LucidePlay, LucideSquare, LucideMapPin, LucideZap,
-  LucideArrowUpRight, LucideCalendarPlus, LucideChevronRight, LucideFolderKanban,
-  LucideCheck, LucideX
+  LucideSparkles, LucidePlay, LucideSquare, LucideMapPin,
+  LucideChevronRight, LucideFolderKanban,
+  LucideCheck, LucideX, LucideTicket, LucideUserPlus, LucideTrophy, LucideTimer,
+  LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
@@ -27,15 +27,15 @@ import { HotToastService } from '@ngneat/hot-toast';
     CommonModule,
     RouterModule,
     StatCardComponent,
-    ChartCardComponent,
-    LucideCheckCircle2, LucideCircle, LucideClock, LucideUsers, LucideBriefcase,
+    LucideCheckCircle2, LucideCircle, LucideClock,
     LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
-    LucideAlertCircle, LucideArrowRight, LucideBuilding, LucideLayers,
+    LucideAlertCircle, LucideArrowRight,
     LucideShield, LucideAward, LucideBanknote, LucideReceipt, LucideTrendingUp,
     LucideShoppingCart, LucideTarget, LucideCake, LucidePartyPopper, LucideGift,
-    LucideSparkles, LucidePlay, LucideSquare, LucideMapPin, LucideZap,
-    LucideArrowUpRight, LucideCalendarPlus, LucideChevronRight, LucideFolderKanban,
-    LucideCheck, LucideX
+    LucideSparkles, LucidePlay, LucideSquare, LucideMapPin,
+    LucideChevronRight, LucideFolderKanban,
+    LucideCheck, LucideX, LucideTicket, LucideUserPlus, LucideTrophy, LucideTimer,
+    LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock
   ],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css']
@@ -105,112 +105,91 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isFinance = computed(() => this.userRole() === 'FINANCE');
   isSales = computed(() => this.userRole() === 'SALES');
   isEmployee = computed(() => this.userRole() === 'EMPLOYEE');
-  showRevenueWidgets = computed(() => ['SUPERADMIN', 'ADMIN', 'FINANCE'].includes(this.userRole()));
-  showPayrollCharts = computed(() => ['SUPERADMIN', 'ADMIN', 'FINANCE'].includes(this.userRole()));
 
   // Dashboard Data
   dashboard = signal<DashboardPayload | null>(null);
   pendingApprovals = signal<any[]>([]);
   isLoadingMetrics = signal<boolean>(true);
-
-  myPendingTasksCount = computed(() => (this.dashboard()?.common?.myTasks || []).filter(t => t.status !== 'DONE').length);
-  myCompletedTasksCount = computed(() => (this.dashboard()?.common?.myTasks || []).filter(t => t.status === 'DONE').length);
-
-  // ---------------- CHART SERIES (computed from dashboard payload) ----------------
-
-  headcountTrendSeries = computed(() => {
-    const trend = this.dashboard()?.org?.headcountTrend || [];
-    return [{ name: 'Employees', data: trend.map(t => t.count) }];
-  });
-  headcountTrendCategories = computed(() => (this.dashboard()?.org?.headcountTrend || []).map(t => t.label));
-
-  deptDonutSeries = computed(() => (this.dashboard()?.org?.headcount?.byDepartment || []).map(d => d.count));
-  deptDonutLabels = computed(() => (this.dashboard()?.org?.headcount?.byDepartment || []).map(d => d.name));
-
-  todayAttendanceSeries = computed(() => {
-    const a = this.dashboard()?.org?.todayAttendance;
-    if (!a || !a.totalEmployees) return [];
-    const pct = (n: number) => Math.round((n / a.totalEmployees) * 100);
-    return [pct(a.present), pct(a.late), pct(a.onLeave), pct(a.notClockedIn)];
-  });
-  todayAttendanceLabels = ['Present', 'Late', 'On Leave', 'Not Clocked In'];
-
-  attendanceTrendSeries = computed(() => {
-    const trend = this.dashboard()?.org?.attendanceTrend || [];
-    return [{ name: 'Present', data: trend.map(t => t.present) }];
-  });
-  attendanceTrendCategories = computed(() =>
-    (this.dashboard()?.org?.attendanceTrend || []).map(t => new Date(t.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }))
-  );
-
-  projectStatusSeries = computed(() => (this.dashboard()?.org?.projectStatus || []).map(p => p.count));
-  projectStatusLabels = computed(() => (this.dashboard()?.org?.projectStatus || []).map(p => p.status));
-
-  recruitmentSeries = computed(() => {
-    const pipeline = this.dashboard()?.org?.recruitmentAnalytics?.pipeline;
-    if (!pipeline) return [];
-    return [{ name: 'Applications', data: Object.values(pipeline) }];
-  });
-  recruitmentCategories = computed(() => {
-    const pipeline = this.dashboard()?.org?.recruitmentAnalytics?.pipeline;
-    return pipeline ? Object.keys(pipeline) : [];
+myLeaveBalanceDays = computed(() => {
+    const b = (this.dashboard()?.common?.myLeaveBalance || []) as any[];
+    const total = b.reduce((s: number, x: any) => s + ((x.allocated || 0) - (x.used || 0)), 0);
+    return total % 1 !== 0 ? total.toFixed(1) : String(Math.round(total));
   });
 
-  onboardingPipelineSeries = computed(() => {
-    const pipeline = this.dashboard()?.org?.onboardingPipeline || [];
-    return [{ name: 'Employees', data: pipeline.map(p => p._count) }];
+  myOpenTicketsCount = computed(() => {
+    const t = this.dashboard()?.common?.myTickets || [];
+    return t.filter(x => !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(x.status)).length;
   });
-  onboardingPipelineCategories = computed(() => (this.dashboard()?.org?.onboardingPipeline || []).map(p => p.onboardingStatus));
 
-  leaveByTypeSeries = computed(() => {
-    const data = this.dashboard()?.org?.leaveByType || [];
-    return [{ name: 'Requests', data: data.map(d => d.count) }];
+  // ---------------- NEW WIDGET HELPERS ----------------
+
+  shiftDateFormat(d: string) {
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  calendarEventsFor(date: string) {
+    return (this.dashboard()?.common?.myCalendar?.events || []).filter(e => e.date === date);
+  }
+
+  calendarCalendarType(e: string): string {
+    const map: Record<string, string> = {
+      HOLIDAY: 'holiday',
+      BIRTHDAY: 'birthday',
+      LEAVE: 'leave',
+      SHIFT: 'shift',
+      DAY_OFF: 'day_off'
+    };
+    return map[e] || 'default';
+  }
+
+  anyTodayMilestones() {
+    const c = this.dashboard()?.common;
+    return !!((c?.todayJoinings?.length || 0) + (c?.todayAnniversaries?.length || 0));
+  }
+
+  minutesToHm(mins: number) {
+    if (!mins) return '0m';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  }
+
+  weekLogMaxMinutes = computed(() => {
+    const days = this.dashboard()?.common?.weekTimelogs?.days || [];
+    return Math.max(1, ...days.map(d => d.minutes || 0));
   });
-  leaveByTypeCategories = computed(() => (this.dashboard()?.org?.leaveByType || []).map(d => d.name));
 
-  payrollTrendSeries = computed(() => {
-    const trend = this.dashboard()?.finance?.payrollTrend || [];
-    return [
-      { name: 'Earnings', data: trend.map(t => Math.round(t.earnings)) },
-      { name: 'Deductions', data: trend.map(t => Math.round(t.deductions)) }
-    ];
+  weekBarHeight(mins: number) {
+    return Math.max(8, Math.round((mins / this.weekLogMaxMinutes()) * 100));
+  }
+
+  isOverdue(due: string | null | undefined) {
+    if (!due) return false;
+    return new Date(due) < this.todayDate;
+  }
+
+  todayKey = computed(() => {
+    const d = this.currentTime();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
-  payrollTrendCategories = computed(() => (this.dashboard()?.finance?.payrollTrend || []).map(t => t.label));
 
-  deptSalaryCostSeries = computed(() => [{ name: 'Salary Cost', data: (this.dashboard()?.finance?.deptSalaryCost || []).map(d => d.total) }]);
-  deptSalaryCostCategories = computed(() => (this.dashboard()?.finance?.deptSalaryCost || []).map(d => d.name));
+  daysUntil(date: string | null | undefined) {
+    if (!date) return 0;
+    const target = new Date(date + 'T00:00:00');
+    return Math.max(0, Math.round((target.getTime() - this.todayDate.getTime()) / 86400000));
+  }
 
-  expensesByCategorySeries = computed(() => (this.dashboard()?.finance?.expensesByCategory || []).map(e => e.total));
-  expensesByCategoryLabels = computed(() => (this.dashboard()?.finance?.expensesByCategory || []).map(e => e.category));
-
-  revenueTrendSeries = computed(() => {
-    const trend = this.dashboard()?.sales?.revenueTrend || [];
-    return [{ name: 'Revenue', data: trend.map(t => t.total) }];
-  });
-  revenueTrendCategories = computed(() => (this.dashboard()?.sales?.revenueTrend || []).map(t => t.label));
-
-  leadsPipelineSeries = computed(() => {
-    const data = this.dashboard()?.sales?.leadsPipeline?.byStatus || [];
-    return [{ name: 'Leads', data: data.map(d => d._count) }];
-  });
-  leadsPipelineCategories = computed(() => (this.dashboard()?.sales?.leadsPipeline?.byStatus || []).map(d => d.status));
-
-  quotationsByStatusSeries = computed(() => (this.dashboard()?.sales?.quotationsByStatus || []).map(q => q._count));
-  quotationsByStatusLabels = computed(() => (this.dashboard()?.sales?.quotationsByStatus || []).map(q => q.status));
-
-  myTasksByStatusSeries = computed(() => (this.dashboard()?.common?.myTasksByStatus || []).map(s => s.count));
-  myTasksByStatusLabels = computed(() => (this.dashboard()?.common?.myTasksByStatus || []).map(s => s.name));
-
-  myLeaveBalanceSeries = computed(() => {
-    const balances = this.dashboard()?.common?.myLeaveBalance || [];
-    return [{ name: 'Remaining', data: balances.map((b: any) => Math.max(b.allocated - b.used, 0)) }];
-  });
-  myLeaveBalanceCategories = computed(() => (this.dashboard()?.common?.myLeaveBalance || []).map((b: any) => b.leaveType?.name || 'Leave'));
-
-  myHoursLoggedSeries = computed(() => [{ name: 'Hours', data: (this.dashboard()?.common?.myHoursLogged || []).map(h => h.hours) }]);
-  myHoursLoggedCategories = computed(() =>
-    (this.dashboard()?.common?.myHoursLogged || []).map(h => new Date(h.date).toLocaleDateString('en-US', { weekday: 'short' }))
-  );
+  appreciationAwardColor(c: string) {
+    const colors: Record<string, string> = {
+      orange: '#f97316',
+      purple: '#9333ea',
+      blue: '#2563eb',
+      green: '#059669',
+      red: '#dc2626',
+      yellow: '#d97706'
+    };
+    return colors[c] || '#94a3b8';
+  }
 
   ngOnInit() {
     this.clockInterval = setInterval(() => {
@@ -293,7 +272,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.onboardingStatus.set(res.newStatus);
 
         if (res.newStatus === 'COMPLETED') {
-          this.toast.success('🎉 You have completed all onboarding tasks!', { duration: 5000 });
+          this.toast.success('ðŸŽ‰ You have completed all onboarding tasks!', { duration: 5000 });
         }
       },
       error: () => {

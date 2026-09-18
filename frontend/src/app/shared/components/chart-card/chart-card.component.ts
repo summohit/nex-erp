@@ -43,7 +43,16 @@ export class ChartCardComponent {
       toolbar: { show: false },
       stacked: this.stacked,
       fontFamily: 'inherit',
-      sparkline: { enabled: false }
+      sparkline: { enabled: false },
+      animations: {
+        // Slow, gentle entry once on load (~1.5s), and no fast flickering
+        // when options are re-bound on change-detection ticks.
+        enabled: true,
+        speed: 1500,
+        easing: 'easein',
+        animateGradually: { enabled: false, delay: 0 },
+        dynamicAnimation: { enabled: false, speed: 1500 }
+      }
     };
   }
 
