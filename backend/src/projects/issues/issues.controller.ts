@@ -9,6 +9,27 @@ import { MAX_DOCUMENT_BYTES } from '../document-naming';
 export class IssuesController {
   constructor(private readonly issuesService: IssuesService) {}
 
+  /**
+   * The acting EMPLOYEE's id, for the columns that foreign-key to Employee.
+   *
+   * `req.user.sub` is a USER id. The two are different numbers, and passing one
+   * where the other belongs only appears to work for the accounts whose ids
+   * happen to coincide -- for everybody else it is a foreign key violation at
+   * write time, surfacing as a 500 long after the upload itself succeeded.
+   * There is deliberately no `?? req.user.sub` fallback here: a user with no
+   * linked employee record cannot own an attachment, and saying so is better
+   * than writing an id that means something else.
+   */
+  private actingEmployeeId(req: any): number {
+    const employeeId = req.user?.employeeId;
+    if (!employeeId) {
+      throw new BadRequestException(
+        'Your account is not linked to an employee record, so it cannot own an attachment.',
+      );
+    }
+    return employeeId;
+  }
+
   @Post()
   createIssue(
     @Req() req,
@@ -271,7 +292,7 @@ export class IssuesController {
     for (const [index, f] of incoming.entries()) {
       results.push(
         await this.issuesService.uploadAttachmentToImageKit(
-          req.user.companyId, req.user.sub, projectId, id, f, wanted[index],
+          req.user.companyId, this.actingEmployeeId(req), projectId, id, f, wanted[index],
         ),
       );
     }
@@ -288,7 +309,7 @@ export class IssuesController {
     @Body('linkUrl') linkUrl: string,
     @Body('linkName') linkName?: string
   ) {
-    return this.issuesService.addLinkAttachment(req.user.companyId, req.user.sub, projectId, id, linkUrl, linkName);
+    return this.issuesService.addLinkAttachment(req.user.companyId, this.actingEmployeeId(req), projectId, id, linkUrl, linkName);
   }
 
   /** §2: rename a task attachment. The stored file is untouched. */

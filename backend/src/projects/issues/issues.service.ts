@@ -533,12 +533,12 @@ export class IssuesService {
     let timerSideEffectApplied = false;
     if (targetStatus === 'IN_PROGRESS' && prevStatus !== 'IN_PROGRESS') {
       if (!oldIssue.workStartedAt || oldIssue.workCompletedAt) {
-        await this.startTimeTracking(companyId, employeeId, projectId, issueId);
+        await this.startTimerForEmployee(companyId, employeeId, projectId, issueId);
         timerSideEffectApplied = true;
       }
     } else if (targetStatus === 'IN_REVIEW' && prevStatus !== 'IN_REVIEW') {
       if (oldIssue.workStartedAt && !oldIssue.workCompletedAt) {
-        await this.stopTimeTracking(companyId, employeeId, projectId, issueId);
+        await this.stopTimerForEmployee(companyId, employeeId, projectId, issueId);
         timerSideEffectApplied = true;
       }
     }
@@ -852,10 +852,25 @@ export class IssuesService {
     }
   }
 
+  /**
+   * Entry point for the HTTP endpoint, which carries the JWT `sub` (a User id).
+   *
+   * Callers that already hold an EMPLOYEE id must use startTimerForEmployee
+   * instead. updateIssue used to call this one with an employee id when a card
+   * moved to In Progress, so the lookup below searched for an employee whose
+   * userId was really an employee id -- a 404 for everybody whose two ids had
+   * drifted apart, and silent success for everybody else.
+   */
   async startTimeTracking(companyId: number, userId: number, projectId: number, issueId: number) {
+    return this.startTimerForEmployee(
+      companyId, await this.resolveEmployeeId(companyId, userId), projectId, issueId,
+    );
+  }
+
+  /** The timer itself, for callers that already know the employee. */
+  async startTimerForEmployee(companyId: number, employeeId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
-    const employeeId = await this.resolveEmployeeId(companyId, userId);
 
     // The timer is gated on START, never on stop.
     //
@@ -892,10 +907,17 @@ export class IssuesService {
     return { success: true, startedAt: now };
   }
 
+  /** Entry point for the HTTP endpoint; takes a User id. See startTimeTracking. */
   async stopTimeTracking(companyId: number, userId: number, projectId: number, issueId: number) {
+    return this.stopTimerForEmployee(
+      companyId, await this.resolveEmployeeId(companyId, userId), projectId, issueId,
+    );
+  }
+
+  /** The timer itself, for callers that already know the employee. */
+  async stopTimerForEmployee(companyId: number, employeeId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
-    const employeeId = await this.resolveEmployeeId(companyId, userId);
 
     const now = new Date();
     
@@ -1409,6 +1431,7 @@ export class IssuesService {
     const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
     if (!privateKey) throw new HttpException('ImageKit not configured', HttpStatus.INTERNAL_SERVER_ERROR);
 
+    let fileUrl: string;
     try {
       const ext = path.extname(file.originalname);
       const filename = `${crypto.randomBytes(12).toString('hex')}${ext}`;
@@ -1427,8 +1450,17 @@ export class IssuesService {
         }
       });
 
-      const fileUrl = response.data.url;
+      fileUrl = response.data.url;
+    } catch (error: any) {
+      console.error('Attachment ImageKit upload error:', error.response?.data || error.message);
+      throw new HttpException('Failed to upload file to ImageKit', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
+    // Outside the try on purpose. This used to sit inside it, so a failed row
+    // insert was logged and reported as an ImageKit failure -- which sent
+    // everyone looking at the storage provider while the real fault was a bad
+    // uploadedBy id going into a foreign key.
+    try {
       return await this.prisma.issueAttachment.create({
         data: {
           // §2: the name the user gave it, when they renamed it before
@@ -1444,8 +1476,9 @@ export class IssuesService {
         include: { uploader: { select: { id: true, firstName: true, lastName: true } } }
       });
     } catch (error: any) {
-      console.error('Attachment ImageKit upload error:', error.response?.data || error.message);
-      throw new HttpException('Failed to upload file to ImageKit', HttpStatus.INTERNAL_SERVER_ERROR);
+      // The file is already in ImageKit at this point; only the record failed.
+      console.error('Attachment record create failed:', error.message);
+      throw new HttpException('Failed to save the attachment record', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
