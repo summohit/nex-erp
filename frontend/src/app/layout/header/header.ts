@@ -6,7 +6,6 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { NotificationsService } from '../../services/notifications.service';
 import { AttendanceService } from '../../services/attendance';
-import { EmployeeService } from '../../services/employee.service';
 import { TicketService } from '../../services/ticket.service';
 import { SpotlightSearchComponent } from '../../shared/components/spotlight-search/spotlight-search.component';
 import { LayoutService } from '../../services/layout.service';
@@ -43,7 +42,6 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);
-  private employeeService = inject(EmployeeService);
   private ticketService = inject(TicketService);
   private toast = inject(HotToastService);
   private dialog = inject(DialogService);
@@ -422,14 +420,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const employeeId = this.currentUser()?.employee?.id;
-    if (!employeeId) {
-      this.toast.error('Could not determine your employee profile');
-      return;
-    }
-
     this.isChangingPassword.set(true);
-    this.employeeService.updateProfile(employeeId, { password: this.newPassword }).subscribe({
+    this.authService.changePassword(this.newPassword).subscribe({
       next: () => {
         this.toast.success('Password reset successfully');
         this.isChangingPassword.set(false);

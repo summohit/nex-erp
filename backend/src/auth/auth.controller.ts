@@ -93,6 +93,14 @@ export class AuthController {
     return this.authService.resetPassword(body.email, body.otp, body.newPassword);
   }
 
+  @UseGuards(AuthGuard, ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(900), limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('change-password')
+  changePassword(@Req() req: any, @Body() body: { newPassword: string }) {
+    return this.authService.changeOwnPassword(req.user.sub, body.newPassword);
+  }
+
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
   @Post('reset-password-email')

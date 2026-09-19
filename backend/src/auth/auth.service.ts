@@ -358,6 +358,31 @@ export class AuthService {
     return { message: 'If an account exists for this email, a password reset code has been sent.' };
   }
 
+  /**
+   * Self-service password change for an already-authenticated user. Deliberately
+   * touches nothing but the user row: the header's dialog used to do this through
+   * PUT /employees/:id/profile, whose full-row overwrite then NULLed every profile
+   * field the narrow `{ password }` payload had not mentioned.
+   */
+  async changeOwnPassword(userId: number, newPassword: string) {
+    if (!newPassword || newPassword.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters.');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    });
+
+    return { message: 'Password updated successfully.' };
+  }
+
   async resetPassword(email: string, otp: string, newPassword: string) {
     if (!otp) {
       throw new BadRequestException('Verification code is required.');

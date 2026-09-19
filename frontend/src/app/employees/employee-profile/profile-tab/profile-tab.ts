@@ -296,15 +296,6 @@ export class ProfileTabComponent implements OnInit {
 
   initForm() {
     if (this.employeeData) {
-      // Load extra profile metadata from localStorage
-      let extraMeta: any = {};
-      try {
-        const stored = localStorage.getItem(`emp_extra_profile_${this.employeeData.id}`);
-        if (stored) {
-          extraMeta = JSON.parse(stored);
-        }
-      } catch (e) {}
-
       this.formData = {
         salutation: this.employeeData.salutation || 'Mr',
         firstName: this.employeeData.firstName,

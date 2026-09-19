@@ -500,91 +500,114 @@ export class EmployeesService {
     return employee;
   }
 
+  /**
+   * Partial update: a key the caller did not send is left untouched, and only an
+   * explicit null/'' clears a column. This used to write every whitelisted column
+   * on every call as `data.x || null`, so any caller that posted a narrow payload
+   * silently NULLed everything it had not mentioned — bank details, identity and
+   * visa numbers, and the department/designation/branch/manager links included.
+   */
   async updateProfile(id: number, companyId: number, currentUserId: number, role: string, data: any) {
-    const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    await this.checkProfileEditPermission(id, companyId, currentUserId, role);
 
-    if (data.password) {
-       const hashedPassword = await bcrypt.hash(data.password, 10);
-       await this.prisma.user.update({
-         where: { id: employee.userId },
-         data: { password: hashedPassword }
-       });
+    const updateData: any = {};
+
+    // Blank input means "clear this field", so '' collapses to null. Absent means
+    // "leave alone", so the key is never added to updateData at all.
+    const setText = (key: string, source: string = key) => {
+      if (data[source] !== undefined) updateData[key] = data[source] || null;
+    };
+    const setDate = (key: string, source: string = key) => {
+      if (data[source] !== undefined) updateData[key] = data[source] ? new Date(data[source]) : null;
+    };
+    const setNumber = (key: string, source: string = key) => {
+      if (data[source] === undefined) return;
+      updateData[key] = data[source] === null || data[source] === '' ? null : Number(data[source]);
+    };
+
+    // Identity & basics
+    setText('salutation');
+    setText('firstName');
+    setText('lastName');
+    setText('phone');
+    setText('country');
+    setText('state');
+    setText('city');
+    setText('language');
+    setText('gender');
+    setDate('dateOfBirth');
+    setText('slackId');
+    setText('maritalStatus');
+    setText('address');
+    setText('about');
+    setText('avatarUrl');
+
+    // Org links
+    setNumber('managerId');
+    setNumber('branchId');
+    setNumber('departmentId');
+    setNumber('designationId');
+
+    // Work details
+    if (data.usualWorkLocation !== undefined) {
+      updateData.usualWorkLocation = data.usualWorkLocation ? data.usualWorkLocation : null;
     }
+    setText('workLocation');
+    setText('workNotes');
+    setText('pfNumber');
+    setText('esiNumber');
+    setDate('joiningDate');
+    if (data.employmentCategory !== undefined) updateData.employmentCategory = data.employmentCategory;
+    setDate('nextAppraisalDate');
+
+    // Bank details
+    setText('bankName');
+    setText('bankAccountNumber');
+    setText('ifscCode');
+
+    // Place of birth
+    setText('placeOfBirthCity');
+    setText('placeOfBirthCountry');
+
+    // Citizenship & identification
+    setText('nationality');
+    setText('identificationNo');
+    setText('passportNo');
+
+    // Visa & permit
+    setText('visaNo');
+    setText('workPermitNo');
+
+    // Location & distance
+    setText('zipCode');
+    setNumber('homeWorkDistanceKm');
+
+    // Family
+    setText('spouseName');
+    setDate('spouseBirthdate');
+    setNumber('childrenCount');
+
+    // Education
+    setText('educationLevel');
+    setText('fieldOfStudy');
+
+    // Passwords are not editable here. They go through POST /auth/change-password,
+    // which touches nothing but the user row — this endpoint used to accept a
+    // `password` key, which is how the header's change-password dialog ended up
+    // wiping the profile it was never meant to touch.
+
+    // skills / resumeLines are intentionally NOT accepted here — they used
+    // to be a `deleteMany + create` full-replace driven by whatever array
+    // the client happened to hold locally. Any device with a stale copy of
+    // the form (e.g. hadn't refetched since another device added a skill)
+    // would silently wipe that other device's change on its next unrelated
+    // save. addSkill/updateSkill/deleteSkill and their resumeLine
+    // equivalents below replace this — each touches exactly the row it
+    // means to, using the row's real id, never the whole list.
 
     return this.prisma.employee.update({
       where: { id },
-      data: {
-        salutation: data.salutation,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        country: data.country,
-        state: data.state,
-        city: data.city,
-        language: data.language,
-        gender: data.gender,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-        slackId: data.slackId,
-        maritalStatus: data.maritalStatus,
-        address: data.address,
-        about: data.about,
-        avatarUrl: data.avatarUrl,
-        managerId: data.managerId || null,
-        branchId: data.branchId || null,
-        departmentId: data.departmentId || null,
-        designationId: data.designationId || null,
-        
-        usualWorkLocation: data.usualWorkLocation ? data.usualWorkLocation : null,
-        workLocation: data.workLocation || null,
-        workNotes: data.workNotes || null,
-        pfNumber: data.pfNumber || null,
-        esiNumber: data.esiNumber || null,
-
-        // Work Details Additions
-        joiningDate: data.joiningDate ? new Date(data.joiningDate) : undefined,
-        employmentCategory: data.employmentCategory !== undefined ? data.employmentCategory : undefined,
-        nextAppraisalDate: data.nextAppraisalDate ? new Date(data.nextAppraisalDate) : null,
-
-        // Bank Details
-        bankName: data.bankName || null,
-        bankAccountNumber: data.bankAccountNumber || null,
-        ifscCode: data.ifscCode || null,
-
-        // Place of Birth
-        placeOfBirthCity: data.placeOfBirthCity || null,
-        placeOfBirthCountry: data.placeOfBirthCountry || null,
-
-        // Citizenship & Identification
-        nationality: data.nationality || null,
-        identificationNo: data.identificationNo || null,
-        passportNo: data.passportNo || null,
-
-        // Visa & Permit
-        visaNo: data.visaNo || null,
-        workPermitNo: data.workPermitNo || null,
-
-        // Location & Distance
-        zipCode: data.zipCode || null,
-        homeWorkDistanceKm: data.homeWorkDistanceKm ? Number(data.homeWorkDistanceKm) : null,
-
-        // Family Details
-        spouseName: data.spouseName || null,
-        spouseBirthdate: data.spouseBirthdate ? new Date(data.spouseBirthdate) : null,
-        childrenCount: data.childrenCount !== null && data.childrenCount !== undefined ? Number(data.childrenCount) : null,
-
-        // Education
-        educationLevel: data.educationLevel || null,
-        fieldOfStudy: data.fieldOfStudy || null,
-
-        // skills / resumeLines are intentionally NOT accepted here — they used
-        // to be a `deleteMany + create` full-replace driven by whatever array
-        // the client happened to hold locally. Any device with a stale copy of
-        // the form (e.g. hadn't refetched since another device added a skill)
-        // would silently wipe that other device's change on its next unrelated
-        // save. addSkill/updateSkill/deleteSkill and their resumeLine
-        // equivalents below replace this — each touches exactly the row it
-        // means to, using the row's real id, never the whole list.
-      }
+      data: updateData
     });
   }
 
