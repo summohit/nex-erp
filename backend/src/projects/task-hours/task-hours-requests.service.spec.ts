@@ -48,7 +48,14 @@ function makeService(over: any = {}) {
     ...over,
   };
   prisma.$transaction = jest.fn().mockImplementation((fn: any) => fn(prisma));
-  return { service: new TaskHoursRequestsService(prisma), prisma };
+  const notifications: any = {
+    notifyEmployees: jest.fn().mockResolvedValue(1),
+  };
+  return {
+    service: new TaskHoursRequestsService(prisma, notifications),
+    prisma,
+    notifications,
+  };
 }
 
 describe('raising a request', () => {
@@ -225,5 +232,111 @@ describe('the task hours summary', () => {
     });
     const r: any = await service.listForIssue(1, 11, 'EMPLOYEE', 60);
     expect(r.hours).toMatchObject({ allowed: 8, logged: 4, remaining: 4 });
+  });
+});
+
+/**
+ * §3: a request nobody is told about is a request that sits until the person
+ * waiting on it chases someone. Raising one used to write the row and the
+ * activity entry and notify nobody at all, so the PM only ever found out by
+ * opening the requests screen on the off chance.
+ */
+describe('telling the approvers a request is waiting', () => {
+  const raise = (service: TaskHoursRequestsService) =>
+    service.create(1, 60, 'EMPLOYEE', 11, {
+      requestedHours: 4, reason: 'The import format changed',
+    });
+
+  it('notifies the project lead and the project managers', async () => {
+    const { service, notifications } = makeService();
+    await raise(service);
+
+    expect(notifications.notifyEmployees).toHaveBeenCalledTimes(1);
+    const [targets, opts] = notifications.notifyEmployees.mock.calls[0];
+    // 70 leads the project, 71 is its PM. 60 is a MEMBER and does not rule.
+    expect(new Set(targets)).toEqual(new Set([70, 71]));
+    expect(targets).not.toContain(60);
+    expect(opts.companyId).toBe(1);
+  });
+
+  it('marks it action-required so a mute cannot swallow it', async () => {
+    const { service, notifications } = makeService();
+    await raise(service);
+
+    const [, opts] = notifications.notifyEmployees.mock.calls[0];
+    expect(opts.type).toBe('ACTION_REQUIRED');
+    expect(opts.linkUrl).toBe('/task-requests');
+  });
+
+  it('says who asked, for how long, and on which task', async () => {
+    const { service, notifications } = makeService();
+    await raise(service);
+
+    const [, opts] = notifications.notifyEmployees.mock.calls[0];
+    expect(opts.message).toContain('4h');
+    expect(opts.message).toContain('NEX-11');
+    expect(opts.message).toContain('Wire the importer');
+  });
+
+  it('never notifies the requester about their own request', async () => {
+    // The PM raising one on their own task is ordinary; they should not then
+    // be told that somebody is waiting on them.
+    const { service, notifications } = makeService();
+    await service.create(1, 71, 'EMPLOYEE', 11, {
+      requestedHours: 2, reason: 'Scope grew',
+    });
+
+    const [, opts] = notifications.notifyEmployees.mock.calls[0];
+    expect(opts.excludeEmployeeId).toBe(71);
+  });
+
+  it('does not notify before the row is committed', async () => {
+    const { service, prisma, notifications } = makeService();
+    prisma.$transaction = jest.fn().mockRejectedValue(new Error('rolled back'));
+
+    await expect(raise(service)).rejects.toThrow('rolled back');
+    expect(notifications.notifyEmployees).not.toHaveBeenCalled();
+  });
+});
+
+describe('telling the requester what was decided', () => {
+  const pending = {
+    taskHoursRequest: {
+      findFirst: jest.fn().mockResolvedValue(REQUEST),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn().mockImplementation((a: any) => Promise.resolve({
+        id: 5, requestedHours: REQUEST.requestedHours,
+        requestedBy: { id: REQUEST.requestedById }, ...a.data,
+      })),
+    },
+  };
+
+  it('tells the requester when their hours are approved', async () => {
+    const { service, notifications } = makeService(pending);
+    await service.review(1, 71, 'EMPLOYEE', 5, 'APPROVED');
+
+    const [targets, opts] = notifications.notifyEmployees.mock.calls[0];
+    expect(targets).toEqual([60]);
+    expect(opts.type).toBe('SUCCESS');
+    expect(opts.linkUrl).toBe('/projects/3?task=11');
+  });
+
+  it('says how many hours were granted when it is not what was asked for', async () => {
+    const { service, notifications } = makeService(pending);
+    await service.review(1, 71, 'EMPLOYEE', 5, 'APPROVED', { approvedHours: 2 });
+
+    const [, opts] = notifications.notifyEmployees.mock.calls[0];
+    expect(opts.message).toContain('4h requested, 2h approved');
+  });
+
+  it('tells the requester why it was declined', async () => {
+    const { service, notifications } = makeService(pending);
+    await service.review(1, 71, 'EMPLOYEE', 5, 'REJECTED', { reason: 'Re-scope it instead' });
+
+    const [targets, opts] = notifications.notifyEmployees.mock.calls[0];
+    expect(targets).toEqual([60]);
+    expect(opts.type).toBe('WARNING');
+    expect(opts.message).toContain('Re-scope it instead');
   });
 });

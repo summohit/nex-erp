@@ -1,7 +1,8 @@
 import {
-  Injectable, NotFoundException, ForbiddenException, BadRequestException,
+  Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { allowedHours, remainingHours } from '../../tasks/task-hours';
 
 /**
@@ -14,7 +15,12 @@ import { allowedHours, remainingHours } from '../../tasks/task-hours';
  */
 @Injectable()
 export class TaskHoursRequestsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(TaskHoursRequestsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   private readonly ADMIN_ROLES = ['SUPERADMIN', 'ADMIN'];
 
@@ -73,6 +79,28 @@ export class TaskHoursRequestsService {
   private mayApprove(issue: any, role: string, employeeId: number | null): boolean {
     return this.ADMIN_ROLES.includes(role) || this.managesProject(issue, employeeId);
   }
+
+  /**
+   * The people a request is actually waiting on: the project's lead and its
+   * project managers. Deliberately the same set `managesProject` tests, so the
+   * request cannot land in the queue of someone who is then refused the
+   * decision — nor stay silent for someone who can make it.
+   *
+   * Administrators may also approve, but they are not notified: they can
+   * approve on any project in the company, and a company-wide broadcast for
+   * every task's hours is noise, not an approval queue.
+   */
+  private approverEmployeeIds(issue: any): number[] {
+    const ids = new Set<number>();
+    if (issue.project?.leadId) ids.add(issue.project.leadId);
+    for (const m of issue.project?.members || []) {
+      if (m.role === 'PROJECT_MANAGER' && m.employeeId) ids.add(m.employeeId);
+    }
+    return [...ids];
+  }
+
+  /** Where a request is actioned — the §4 cross-project decision queue. */
+  private readonly REQUESTS_LINK = '/task-requests';
 
   /** Who may ask: whoever is doing the work, or anybody on the project. */
   private mayRequest(issue: any, role: string, employeeId: number | null): boolean {
@@ -161,8 +189,8 @@ export class TaskHoursRequestsService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const request = await tx.taskHoursRequest.create({
+    const request = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.taskHoursRequest.create({
         data: {
           issueId, companyId,
           requestedById: employeeId as number,
@@ -175,7 +203,7 @@ export class TaskHoursRequestsService {
 
       await tx.taskHoursRequestActivity.create({
         data: {
-          requestId: request.id,
+          requestId: created.id,
           action: 'CREATED',
           detail: `Requested ${requestedHours}h`,
           newValue: String(requestedHours),
@@ -183,7 +211,63 @@ export class TaskHoursRequestsService {
         },
       });
 
-      return request;
+      return created;
+    });
+
+    // After the commit, never inside it: notifyEmployees swallows its own
+    // errors, but a push round trip has no business holding a database
+    // transaction open, and a notification for a request that then rolled back
+    // would point at nothing.
+    await this.notifyRaised(companyId, issue, request, employeeId);
+
+    return request;
+  }
+
+  /**
+   * Tell the project's approvers that somebody is waiting on them (§3).
+   *
+   * ACTION_REQUIRED because the requester is blocked until this is ruled on —
+   * that is precisely the notification a mute must not swallow.
+   */
+  private async notifyRaised(
+    companyId: number, issue: any, request: any, requesterId: number | null,
+  ) {
+    const approvers = this.approverEmployeeIds(issue);
+    const who = `${request.requestedBy?.firstName ?? ''} ${request.requestedBy?.lastName ?? ''}`.trim()
+      || 'Someone';
+
+    const reached = await this.notifications.notifyEmployees(approvers, {
+      companyId,
+      excludeEmployeeId: requesterId,
+      title: 'Additional hours requested',
+      message: `${who} asked for ${request.requestedHours}h more on ${issue.key} — ${issue.title}.`,
+      type: 'ACTION_REQUIRED',
+      linkUrl: this.REQUESTS_LINK,
+    });
+
+    // A project with no lead and no PM leaves the request sitting in a queue
+    // nobody is watching. It still has to be approved, so say so here rather
+    // than let it age silently.
+    if (reached === 0) {
+      this.logger.warn(
+        `Additional-hours request ${request.id} on ${issue.key} reached no approver — ` +
+        `project ${issue.project?.id} has no lead or project manager other than the requester.`,
+      );
+    }
+  }
+
+  /** Tell the requester what was decided, and where the task is. */
+  private async notifyDecided(
+    companyId: number, issue: any, request: any,
+    decision: 'APPROVED' | 'REJECTED', reviewerId: number | null, detail: string,
+  ) {
+    await this.notifications.notifyEmployees([request.requestedBy?.id], {
+      companyId,
+      excludeEmployeeId: reviewerId,
+      title: decision === 'APPROVED' ? 'Additional hours approved' : 'Additional hours declined',
+      message: `${issue.key} — ${issue.title}: ${detail}`,
+      type: decision === 'APPROVED' ? 'SUCCESS' : 'WARNING',
+      linkUrl: `/projects/${issue.project?.id}?task=${issue.id}`,
     });
   }
 
@@ -225,7 +309,7 @@ export class TaskHoursRequestsService {
       if (!reason) {
         throw new BadRequestException('A reason is required when rejecting a request');
       }
-      return this.prisma.$transaction(async (tx) => {
+      const rejected = await this.prisma.$transaction(async (tx) => {
         const updated = await tx.taskHoursRequest.update({
           where: { id: requestId },
           data: {
@@ -244,6 +328,12 @@ export class TaskHoursRequestsService {
         });
         return updated;
       });
+
+      await this.notifyDecided(
+        companyId, issue, rejected, 'REJECTED', reviewerEmployeeId,
+        `your request for ${rejected.requestedHours}h was declined — ${reason}`,
+      );
+      return rejected;
     }
 
     // The PM may grant less than was asked for. Null means "grant what was
@@ -257,7 +347,7 @@ export class TaskHoursRequestsService {
       approvedHours = n;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const approved = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.taskHoursRequest.update({
         where: { id: requestId },
         data: {
@@ -302,6 +392,17 @@ export class TaskHoursRequestsService {
 
       return updated;
     });
+
+    // Says what was granted rather than just "approved": the PM may have
+    // granted fewer hours than were asked for, and that is the number the
+    // requester has to work to.
+    await this.notifyDecided(
+      companyId, issue, approved, 'APPROVED', reviewerEmployeeId,
+      approvedHours === request.requestedHours
+        ? `your request for ${approvedHours}h was approved`
+        : `${request.requestedHours}h requested, ${approvedHours}h approved`,
+    );
+    return approved;
   }
 
   /** One request's full history, oldest first — the §4 timeline. */
