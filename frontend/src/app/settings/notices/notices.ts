@@ -62,7 +62,7 @@ export class NoticesComponent {
 
   // Form State
   form = this.blank();
-  attachments = signal<{ fileName: string; fileUrl: string; fileSize?: number }[]>([]);
+  attachments = signal<{ fileName: string; fileUrl: string; fileSize?: number | null }[]>([]);
   uploading = signal(false);
 
   // Visual Priority Options for Composer
@@ -264,7 +264,15 @@ export class NoticesComponent {
       expiresAt: n.expiresAt ? n.expiresAt.slice(0, 10) : "",
       sendEmail: false,
     };
-    this.attachments.set(n.attachments ? [...n.attachments] : []);
+    this.attachments.set(
+      n.attachments
+        ? n.attachments.map((a) => ({
+            fileName: a.fileName,
+            fileUrl: a.fileUrl,
+            fileSize: a.fileSize,
+          }))
+        : []
+    );
     this.editingId.set(n.id);
     this.formOpen.set(true);
   }

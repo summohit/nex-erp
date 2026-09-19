@@ -1,4 +1,4 @@
-﻿import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { NoticesService, Notice } from '../services/notices';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
@@ -17,7 +17,9 @@ import {
   LucideSparkles, LucidePlay, LucideSquare, LucideMapPin,
   LucideChevronRight, LucideFolderKanban,
   LucideCheck, LucideX, LucideTicket, LucideUserPlus, LucideTrophy, LucideTimer,
-  LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock
+  LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock,
+  LucideAlertTriangle, LucideBell, LucidePaperclip, LucideImage, LucideFileSpreadsheet,
+  LucideFile, LucideExternalLink
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
@@ -37,7 +39,8 @@ import { HotToastService } from '@ngneat/hot-toast';
     LucideChevronRight, LucideFolderKanban,
     LucideCheck, LucideX, LucideTicket, LucideUserPlus, LucideTrophy, LucideTimer,
     LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock,
-    LucideMegaphone
+    LucideMegaphone, LucideAlertTriangle, LucideBell, LucidePaperclip, LucideImage,
+    LucideFileSpreadsheet, LucideFile, LucideExternalLink
   ],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css']
@@ -86,6 +89,45 @@ export class DashboardComponent implements OnInit, OnDestroy {
       list.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)),
     );
     this.noticesService.markRead(n.id).subscribe({ error: () => {} });
+  }
+
+  getInitials(first?: string, last?: string): string {
+    const f = (first || '').trim()[0] || '';
+    const l = (last || '').trim()[0] || '';
+    return (f + l).toUpperCase() || 'NB';
+  }
+
+  getAvatarBg(first?: string, last?: string): string {
+    const str = `${first || ''}${last || ''}`.toLowerCase();
+    const colors = [
+      'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+      'linear-gradient(135deg, #10B981 0%, #047857 100%)',
+      'linear-gradient(135deg, #F59E0B 0%, #B45309 100%)',
+      'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
+      'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)',
+      'linear-gradient(135deg, #06B6D4 0%, #0E7490 100%)',
+    ];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  getFileType(fileName?: string): 'pdf' | 'image' | 'spreadsheet' | 'doc' | 'other' {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
+    if (ext === 'pdf') return 'pdf';
+    if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)) return 'image';
+    if (['xlsx', 'xls', 'csv'].includes(ext)) return 'spreadsheet';
+    if (['doc', 'docx', 'txt', 'rtf'].includes(ext)) return 'doc';
+    return 'other';
+  }
+
+  fileSize(bytes?: number | null): string {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
   private authService = inject(AuthService);

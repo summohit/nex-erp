@@ -41,7 +41,7 @@ export interface NewNotice {
   expiresAt?: string | null;
   /** Defaults to true server-side — posting a notice emails it. */
   sendEmail?: boolean;
-  attachments?: { fileName: string; fileUrl: string; fileSize?: number }[];
+  attachments?: { fileName: string; fileUrl: string; fileSize?: number | null }[];
 }
 
 @Injectable({ providedIn: 'root' })

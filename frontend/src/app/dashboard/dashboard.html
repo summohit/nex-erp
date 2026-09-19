@@ -52,6 +52,94 @@
   </div>
 
   <!-- ======================================================================= -->
+  <!-- 1.5 COMPANY NOTICE BOARD (TOP ANNOUNCEMENT HUB) -->
+  <!-- ======================================================================= -->
+  <div class="dash-notice-board" *ngIf="notices().length > 0">
+    <!-- Header -->
+    <div class="dash-notice-header">
+      <div class="dash-notice-header-left">
+        <div class="dash-notice-icon-wrap">
+          <svg lucideMegaphone size="18"></svg>
+        </div>
+        <div class="dash-notice-title-group">
+          <div class="dash-notice-title-row">
+            <h3>Company Notice Board</h3>
+            <span class="dash-notice-count-pill" *ngIf="unreadNotices().length > 0">
+              <span class="dash-notice-pulse"></span>
+              {{ unreadNotices().length }} new
+            </span>
+            <span class="dash-notice-count-pill neutral" *ngIf="unreadNotices().length === 0">
+              {{ notices().length }} {{ notices().length === 1 ? 'announcement' : 'announcements' }}
+            </span>
+          </div>
+          <p>Official announcements, policy updates, and broadcast alerts</p>
+        </div>
+      </div>
+
+      <div class="dash-notice-header-right">
+        <a routerLink="/notices" class="dash-notice-view-all">
+          <span>View All Notices</span>
+          <svg lucideChevronRight size="14"></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- Notices Feed Items (Top 3 Announcements) -->
+    <div class="dash-notice-grid">
+      <div class="dash-notice-card" *ngFor="let n of notices().slice(0, 3)"
+           [class.unread]="!n.isRead"
+           [class.high-priority]="n.priority === 'HIGH'"
+           [class.normal-priority]="n.priority === 'NORMAL'"
+           [class.low-priority]="n.priority === 'LOW'"
+           (click)="openNotice(n)">
+        <div class="dash-notice-card-top">
+          <div class="dash-notice-badges">
+            <span class="dash-p-badge" [class]="'p-' + n.priority.toLowerCase()">
+              <svg *ngIf="n.priority === 'HIGH'" lucideAlertTriangle size="11"></svg>
+              <svg *ngIf="n.priority === 'NORMAL'" lucideBell size="11"></svg>
+              <svg *ngIf="n.priority === 'LOW'" lucideFileText size="11"></svg>
+              <span>{{ n.priority === 'HIGH' ? 'Urgent' : (n.priority === 'NORMAL' ? 'Notice' : 'Info') }}</span>
+            </span>
+
+            <span class="dash-new-badge" *ngIf="!n.isRead">
+              <span class="dash-new-dot"></span> New
+            </span>
+
+            <span class="dash-file-badge" *ngIf="n.attachments && n.attachments.length > 0">
+              <svg lucidePaperclip size="11"></svg>
+              <span>{{ n.attachments.length }}</span>
+            </span>
+          </div>
+
+          <span class="dash-notice-date">
+            <svg lucideCalendar size="12"></svg>
+            {{ n.publishedAt | date:'MMM d, y' }}
+          </span>
+        </div>
+
+        <h4 class="dash-notice-card-title">{{ n.title }}</h4>
+
+        <p class="dash-notice-card-snippet">{{ n.body }}</p>
+
+        <div class="dash-notice-card-footer">
+          <div class="dash-notice-author">
+            <div class="dash-notice-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
+              {{ getInitials(n.createdBy?.firstName, n.createdBy?.lastName) }}
+            </div>
+            <span class="dash-author-name">
+              {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}
+            </span>
+          </div>
+          <span class="dash-read-hint">
+            <span>Read notice</span>
+            <svg lucideChevronRight size="13"></svg>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
   <!-- 2. EXECUTIVE BENTO KPI METRICS GRID -->
   <!-- ======================================================================= -->
   <div class="kpi-grid" *ngIf="user()">
@@ -928,42 +1016,6 @@
       </div>
     </div>
 
-    <!-- Notice board: what the company has told everybody. Spans the grid,
-         because an announcement competing with a widget for a third of a row
-         is an announcement nobody reads. -->
-    <div class="dashboard-card notices-wide" *ngIf="notices().length > 0">
-      <div class="card-header">
-        <div class="flex items-center gap-2.5">
-          <div class="card-icon-badge bg-orange-tint">
-            <svg lucideMegaphone size="16"></svg>
-          </div>
-          <div>
-            <h3>Notice Board</h3>
-            <p>Company announcements</p>
-          </div>
-        </div>
-        <span class="notice-unread-pill" *ngIf="unreadNotices().length > 0">
-          {{ unreadNotices().length }} unread
-        </span>
-      </div>
-
-      <div class="notice-list">
-        <button type="button" class="notice-row" *ngFor="let n of notices()"
-                [class.unread]="!n.isRead" (click)="openNotice(n)">
-          <span class="notice-dot" [class.high]="n.priority === 'HIGH'"></span>
-          <span class="notice-row-text">
-            <span class="notice-row-title">{{ n.title }}</span>
-            <span class="notice-row-meta">
-              {{ n.publishedAt | date:'MMM d, y' }}
-              <ng-container *ngIf="n.createdBy">
-                · {{ n.createdBy.firstName }} {{ n.createdBy.lastName }}
-              </ng-container>
-            </span>
-          </span>
-          <span class="notice-badge-high" *ngIf="n.priority === 'HIGH'">Important</span>
-        </button>
-      </div>
-    </div>
 
     <!-- Row 2: Probation | Upcoming Holidays | Birthdays -->
     <div class="dashboard-card">
@@ -1098,23 +1150,70 @@
 <div class="notice-modal-overlay" *ngIf="activeNotice() as n" (click)="dismissNotice(n)">
   <div class="notice-modal" (click)="$event.stopPropagation()">
     <div class="notice-modal-head">
-      <span class="notice-badge-high" *ngIf="n.priority === 'HIGH'">Important</span>
+      <div class="notice-modal-top-bar">
+        <span class="dash-p-badge" [class]="'p-' + n.priority.toLowerCase()">
+          <svg *ngIf="n.priority === 'HIGH'" lucideAlertTriangle size="12"></svg>
+          <svg *ngIf="n.priority === 'NORMAL'" lucideBell size="12"></svg>
+          <svg *ngIf="n.priority === 'LOW'" lucideFileText size="12"></svg>
+          <span>{{ n.priority === 'HIGH' ? 'Urgent Announcement' : (n.priority === 'NORMAL' ? 'Company Notice' : 'Informational') }}</span>
+        </span>
+        <button type="button" class="notice-modal-close" (click)="dismissNotice(n)" title="Close">
+          <svg lucideX size="16"></svg>
+        </button>
+      </div>
+
       <h2>{{ n.title }}</h2>
-      <p class="notice-modal-meta">
-        {{ n.publishedAt | date:'MMMM d, y' }}
-        <ng-container *ngIf="n.createdBy">
-          · posted by {{ n.createdBy.firstName }} {{ n.createdBy.lastName }}
-        </ng-container>
-      </p>
+
+      <div class="notice-modal-author-row">
+        <div class="dash-notice-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
+          {{ getInitials(n.createdBy?.firstName, n.createdBy?.lastName) }}
+        </div>
+        <div class="notice-modal-author-meta">
+          <span class="notice-modal-author-name">
+            {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}
+          </span>
+          <span class="notice-modal-meta">
+            {{ n.publishedAt | date:'MMMM d, y' }}
+            <ng-container *ngIf="n.expiresAt"> · Valid until {{ n.expiresAt | date:'mediumDate' }}</ng-container>
+          </span>
+        </div>
+      </div>
     </div>
 
-    <!-- The author typed plain text, so it is rendered as plain text; only the
-         line breaks are honoured. -->
+    <!-- Notice Body -->
     <div class="notice-modal-body">{{ n.body }}</div>
 
+    <!-- Attachments if any -->
+    <div class="notice-modal-attachments" *ngIf="n.attachments && n.attachments.length > 0">
+      <span class="notice-modal-att-title">
+        <svg lucidePaperclip size="13"></svg>
+        Attached Documents ({{ n.attachments.length }})
+      </span>
+      <div class="notice-modal-att-grid">
+        <a *ngFor="let a of n.attachments" [href]="a.fileUrl" target="_blank" rel="noopener" class="notice-modal-att-card">
+          <div class="att-icon-box" [class]="'att-' + getFileType(a.fileName)">
+            <svg *ngIf="getFileType(a.fileName) === 'pdf'" lucideFileText size="15"></svg>
+            <svg *ngIf="getFileType(a.fileName) === 'image'" lucideImage size="15"></svg>
+            <svg *ngIf="getFileType(a.fileName) === 'spreadsheet'" lucideFileSpreadsheet size="15"></svg>
+            <svg *ngIf="getFileType(a.fileName) === 'doc' || getFileType(a.fileName) === 'other'" lucideFile size="15"></svg>
+          </div>
+          <div class="att-info">
+            <span class="att-name" [title]="a.fileName">{{ a.fileName }}</span>
+            <span class="att-size" *ngIf="a.fileSize">{{ fileSize(a.fileSize) }}</span>
+          </div>
+          <svg lucideExternalLink size="13" class="att-arrow"></svg>
+        </a>
+      </div>
+    </div>
+
     <div class="notice-modal-actions">
+      <a routerLink="/notices" (click)="dismissNotice(n)" class="notice-modal-all-link">
+        <span>Go to Notice Board</span>
+        <svg lucideChevronRight size="14"></svg>
+      </a>
       <button type="button" class="notice-dismiss-btn" (click)="dismissNotice(n)">
-        Got it
+        <svg lucideCheck size="15"></svg>
+        <span>Got it</span>
       </button>
     </div>
   </div>
