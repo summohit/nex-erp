@@ -14,7 +14,7 @@
         <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'modules'" (click)="scrollTo('modules')">
           <span>All Modules</span>
         </button>
-        <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'mobile'" (click)="scrollTo('mobile')">
+        <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'mobile'" *ngIf="showMobileApp" (click)="scrollTo('mobile')">
           <span>Mobile App</span>
           <span class="nav-badge-pill">APK</span>
         </button>
@@ -30,7 +30,7 @@
         <button type="button" class="lp-btn-login" (click)="goToLogin()">
           Sign In
         </button>
-        <button type="button" class="lp-btn-signup" (click)="goToSignup()">
+        <button type="button" class="lp-btn-signup" *ngIf="showSignup" (click)="goToSignup()">
           <span>Sign Up Free</span>
           <svg lucideArrowRight size="15" class="nav-arrow"></svg>
         </button>
@@ -46,7 +46,7 @@
     <div class="lp-mobile-menu" *ngIf="mobileNavOpen()">
       <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'tour'" (click)="scrollTo('tour')">Product Tour</button>
       <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'modules'" (click)="scrollTo('modules')">All Modules</button>
-      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'mobile'" (click)="scrollTo('mobile')">
+      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'mobile'" *ngIf="showMobileApp" (click)="scrollTo('mobile')">
         <span>Mobile App</span>
         <span class="nav-badge-pill">APK</span>
       </button>
@@ -54,7 +54,7 @@
       <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'faq'" (click)="scrollTo('faq')">FAQ</button>
       <div class="lp-mobile-actions">
         <button type="button" class="lp-btn-login full" (click)="goToLogin()">Sign In</button>
-        <button type="button" class="lp-btn-signup full" (click)="goToSignup()">
+        <button type="button" class="lp-btn-signup full" *ngIf="showSignup" (click)="goToSignup()">
           <span>Sign Up Free</span>
           <svg lucideArrowRight size="15"></svg>
         </button>
@@ -139,7 +139,7 @@
         </div>
 
         <div class="lp-hero-cta">
-          <button type="button" class="lp-hero-btn-primary" (click)="goToSignup()">
+          <button type="button" class="lp-hero-btn-primary" *ngIf="showSignup" (click)="goToSignup()">
             <span>Start Free 14-Day Trial</span>
             <svg lucideArrowRight size="17" class="hero-cta-arrow"></svg>
           </button>
@@ -806,7 +806,7 @@
                 <span><strong>Broker & Partner Tracking:</strong> Attribute leads to external partners under "Lead Brought By"</span>
               </li>
             </ul>
-            <button class="lp-btn-primary" (click)="goToSignup()">
+            <button class="lp-btn-primary" *ngIf="showSignup" (click)="goToSignup()">
               Try CRM Board Free
               <svg lucideArrowRight size="15"></svg>
             </button>
@@ -866,7 +866,7 @@
                 <span><strong>Automatic Shift Rosters:</strong> Multi-shift rotations and automated overtime multipliers</span>
               </li>
             </ul>
-            <button class="lp-btn-primary" (click)="goToSignup()">
+            <button class="lp-btn-primary" *ngIf="showSignup" (click)="goToSignup()">
               Explore Attendance Suite
               <svg lucideArrowRight size="15"></svg>
             </button>
@@ -926,7 +926,7 @@
                 <span><strong>Salary Components & Deductions:</strong> Custom HRA, Special Allowance, PF & Gratuity</span>
               </li>
             </ul>
-            <button class="lp-btn-primary" (click)="goToSignup()">
+            <button class="lp-btn-primary" *ngIf="showSignup" (click)="goToSignup()">
               Try Payroll Engine
               <svg lucideArrowRight size="15"></svg>
             </button>
@@ -996,7 +996,7 @@
                 <span><strong>1-Click Employee Conversion:</strong> Hired candidates instantly enter HRMS</span>
               </li>
             </ul>
-            <button class="lp-btn-primary" (click)="goToSignup()">
+            <button class="lp-btn-primary" *ngIf="showSignup" (click)="goToSignup()">
               Explore Recruitment ATS
               <svg lucideArrowRight size="15"></svg>
             </button>
@@ -1051,7 +1051,7 @@
                 <span><strong>Task Workloads & Deadlines:</strong> Prevent burnout with clear task assignments</span>
               </li>
             </ul>
-            <button class="lp-btn-primary" (click)="goToSignup()">
+            <button class="lp-btn-primary" *ngIf="showSignup" (click)="goToSignup()">
               Explore Project Boards
               <svg lucideArrowRight size="15"></svg>
             </button>
@@ -1129,7 +1129,7 @@
   </section>
 
   <!-- ================= MOBILE APP SHOWCASE ================= -->
-  <section class="lp-mobile-section" id="mobile">
+  <section class="lp-mobile-section" id="mobile" *ngIf="showMobileApp">
     <div class="lp-mobile-inner">
 
       <div class="lp-mobile-copy">
@@ -1389,7 +1389,7 @@
       <h2>Ready to unify your entire company?</h2>
       <p>Join hundreds of forward-thinking teams streamlining their operations with NEX ERP today.</p>
       <div class="lp-cta-buttons">
-        <button type="button" class="lp-btn-cta-primary" (click)="goToSignup()">
+        <button type="button" class="lp-btn-cta-primary" *ngIf="showSignup" (click)="goToSignup()">
           <span>Start Your Free Account</span>
           <svg lucideArrowRight size="17"></svg>
         </button>
@@ -1428,7 +1428,7 @@
 
       <div class="lp-footer-col">
         <h4>Platform</h4>
-        <button type="button" (click)="scrollTo('mobile')">Android App (APK)</button>
+        <button type="button" *ngIf="showMobileApp" (click)="scrollTo('mobile')">Android App (APK)</button>
         <button type="button" (click)="scrollTo('why')">Why NEX ERP</button>
         <button type="button" (click)="scrollTo('faq')">FAQ</button>
         <button type="button" (click)="scrollTo('modules')">All Modules</button>
@@ -1437,7 +1437,7 @@
       <div class="lp-footer-col">
         <h4>Account &amp; Access</h4>
         <button type="button" (click)="goToLogin()">Sign In</button>
-        <button type="button" (click)="goToSignup()">Create Company</button>
+        <button type="button" *ngIf="showSignup" (click)="goToSignup()">Create Company</button>
         <a routerLink="/careers" class="footer-link">Careers at CES</a>
       </div>
     </div>

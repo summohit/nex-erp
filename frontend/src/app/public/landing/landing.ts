@@ -122,6 +122,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   billingCycle = signal<'monthly' | 'yearly'>('yearly');
   currentYear = new Date().getFullYear();
 
+  // Public sign-up and the mobile-app section are temporarily hidden from the
+  // marketing site. Gated rather than deleted: both features still work, and
+  // restoring them is one flag in environment.ts.
+  showSignup = environment.publicSignupEnabled;
+  showMobileApp = environment.mobileAppSectionEnabled;
+
   // Android APK download link
   androidApkUrl = environment.androidApkUrl;
 
@@ -165,6 +171,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
    * is not worth surfacing — the CTA simply stays in its "Coming Soon" state.
    */
   private async probeAndroidBuild() {
+    if (!this.showMobileApp) return;
     if (!this.androidApkUrl || typeof fetch === 'undefined') return;
     try {
       const res = await fetch(`${this.androidApkUrl}/info`);

@@ -18,6 +18,7 @@ import {
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-auth',
@@ -43,6 +44,10 @@ import { Router, ActivatedRoute, RouterLink } from '@angular/router';
   styleUrls: ['./auth.component.css']
 })
 export class AuthComponent implements OnInit {
+  // Sign-up is temporarily hidden from the public site; the login card stops
+  // offering "Create an account" while it is off. See environment.ts.
+  showSignup = environment.publicSignupEnabled;
+
   currentView: 'login' | 'register' = 'login';
 
   private fb = inject(FormBuilder);

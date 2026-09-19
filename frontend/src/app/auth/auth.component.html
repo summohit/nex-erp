@@ -414,7 +414,7 @@
       </form>
 
       <!-- CARD FOOTER: CREATE ACCOUNT -->
-      <div class="card-footer">
+      <div class="card-footer" *ngIf="showSignup">
         <span class="footer-text">New to NEX ERP?</span>
         <a class="signup-link" (click)="toggleView()">
           <span>Create an account</span>
