@@ -54,9 +54,12 @@ export class NoticesService {
     return this.http.get<Notice[]>(`${this.api}/dashboard`);
   }
 
-  /** Every notice, for the admin screen. */
+  /**
+   * The board. Everybody may read it; whoever may post also sees retired and
+   * scheduled notices, and gets canPost back so the page knows what to offer.
+   */
   list() {
-    return this.http.get<Notice[]>(this.api);
+    return this.http.get<{ notices: Notice[]; canPost: boolean }>(this.api);
   }
 
   create(data: NewNotice) {

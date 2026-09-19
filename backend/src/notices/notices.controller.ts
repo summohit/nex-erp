@@ -20,10 +20,16 @@ export class NoticesController {
     return this.notices.forDashboard(req.user.companyId, req.user.sub);
   }
 
-  /** Every notice, for the admin screen. */
+  /**
+   * The board. Everybody may read it; what comes back depends on the role.
+   *
+   * canPost rides along so the page knows whether to offer Post and Retire,
+   * rather than the client deciding from a role string of its own.
+   */
   @Get()
-  list(@Req() req) {
-    return this.notices.list(req.user.companyId, req.user.role);
+  async list(@Req() req) {
+    const notices = await this.notices.list(req.user.companyId, req.user.role);
+    return { notices, canPost: this.notices.canPost(req.user.role) };
   }
 
   @Post()

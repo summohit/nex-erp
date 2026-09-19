@@ -40,13 +40,43 @@ export class NoticesService {
   } as const;
 
   /** Everything, for the admin screen. */
+  /**
+   * The notice board itself, which everybody may read.
+   *
+   * Posting is restricted; reading is the entire point. An announcement only
+   * the people who wrote it can open is not a notice board.
+   *
+   * What differs by role is how much is shown. Whoever may post sees
+   * everything, including retired notices and ones scheduled for next week,
+   * because they are managing the board. Everybody else sees what is
+   * currently live -- a notice written today for Monday is not an
+   * announcement yet, and a retired one is no longer being made.
+   */
   async list(companyId: number, role: string) {
-    this.assertMayPublish(role);
+    if (this.ADMIN_ROLES.includes(role)) {
+      return this.prisma.notice.findMany({
+        where: { companyId },
+        orderBy: [{ publishedAt: 'desc' }],
+        select: this.SELECT,
+      });
+    }
+
+    const now = new Date();
     return this.prisma.notice.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        isActive: true,
+        publishedAt: { lte: now },
+        OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+      },
       orderBy: [{ publishedAt: 'desc' }],
       select: this.SELECT,
     });
+  }
+
+  /** Whether this role may post, so the page knows what to offer. */
+  canPost(role: string): boolean {
+    return this.ADMIN_ROLES.includes(role);
   }
 
   /**

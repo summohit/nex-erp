@@ -2,9 +2,11 @@
   <div class="page-header">
     <div class="header-content">
       <h1>Notice Board</h1>
-      <p>Announcements posted to everyone's dashboard, and emailed when posted.</p>
+      <p>{{ canPost()
+        ? 'Announcements posted to everyone\'s dashboard, and emailed when posted.'
+        : 'Announcements from your company.' }}</p>
     </div>
-    <button class="btn-primary" (click)="openNew()">
+    <button class="btn-primary" *ngIf="canPost()" (click)="openNew()">
       <svg lucidePlus size="18"></svg> Post a Notice
     </button>
   </div>
@@ -14,7 +16,9 @@
   <div class="nb-empty" *ngIf="!loading() && notices().length === 0">
     <svg lucideMegaphone size="28"></svg>
     <p>Nothing has been announced yet.</p>
-    <span>A notice appears on every employee's dashboard and is emailed to them.</span>
+    <span>{{ canPost()
+      ? 'A notice appears on every employee\'s dashboard and is emailed to them.'
+      : 'Company announcements will appear here.' }}</span>
   </div>
 
   <div class="nb-list" *ngIf="!loading() && notices().length > 0">
@@ -26,7 +30,7 @@
           <span class="nb-retired-tag" *ngIf="!n.isActive">Retired</span>
         </div>
 
-        <div class="nb-actions">
+        <div class="nb-actions" *ngIf="canPost()">
           <button type="button" class="nb-btn" (click)="openEdit(n)" title="Edit">
             <svg lucideEdit2 size="14"></svg>
           </button>

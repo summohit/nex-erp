@@ -33,6 +33,14 @@ export class NoticesComponent {
   private uploads = inject(UploadService);
 
   notices = signal<Notice[]>([]);
+  /**
+   * Whether this person may post, as the server reports it.
+   *
+   * Taken from the response rather than inferred from a role string here:
+   * the server decides who may announce things, and a second opinion in the
+   * client is a second thing to keep in step with it.
+   */
+  canPost = signal(false);
   loading = signal(true);
   saving = signal(false);
   formOpen = signal(false);
@@ -119,7 +127,11 @@ export class NoticesComponent {
   load() {
     this.loading.set(true);
     this.api.list().subscribe({
-      next: (rows) => { this.notices.set(rows || []); this.loading.set(false); },
+      next: (res) => {
+        this.notices.set(res?.notices || []);
+        this.canPost.set(!!res?.canPost);
+        this.loading.set(false);
+      },
       error: (err) => {
         this.loading.set(false);
         this.toast.error(err?.error?.message || 'Could not load the notice board');

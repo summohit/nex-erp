@@ -132,3 +132,37 @@ describe('marking one read', () => {
     );
   });
 });
+
+/**
+ * Reading the board is the point of it existing; posting is the restricted
+ * part. An announcement only its authors can open is not an announcement.
+ */
+describe('who may read the board', () => {
+  it('lets an employee read it', async () => {
+    const { service } = make();
+    await expect(service.list(1, 'EMPLOYEE')).resolves.toBeDefined();
+  });
+
+  it('shows an employee only what is live', async () => {
+    const { service, prisma } = make();
+    await service.list(1, 'EMPLOYEE');
+    const where = prisma.notice.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ isActive: true });
+    expect(where.publishedAt.lte).toBeInstanceOf(Date);
+  });
+
+  // Whoever manages the board needs to see what they have scheduled and
+  // retired, not only what is currently showing.
+  it('shows an administrator everything, including retired and scheduled', async () => {
+    const { service, prisma } = make();
+    await service.list(1, 'ADMIN');
+    expect(prisma.notice.findMany.mock.calls[0][0].where).toEqual({ companyId: 1 });
+  });
+
+  it('reports who may post', () => {
+    const { service } = make();
+    expect(service.canPost('ADMIN')).toBe(true);
+    expect(service.canPost('HR')).toBe(true);
+    expect(service.canPost('EMPLOYEE')).toBe(false);
+  });
+});

@@ -30,7 +30,11 @@ export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot) =>
     // Self-service routes every role reaches regardless of RolePermission rows.
     // 'settings/security' is each user's own two-factor setup — gating it on a
     // settings permission would lock most roles out of protecting their account.
-    const universalModules = ['employees/me/profile', 'attendance', 'attendance/my-attendance', 'settings/security'];
+    // 'notices' is the company notice board. Reading it is the point of it
+    // existing: an announcement a role can be locked out of is not an
+    // announcement. Posting stays restricted to administrators and HR on the
+    // server, which is the restriction that actually matters here.
+    const universalModules = ['employees/me/profile', 'attendance', 'attendance/my-attendance', 'settings/security', 'notices'];
     if (universalModules.includes(targetModule)) {
       return of(true);
     }
