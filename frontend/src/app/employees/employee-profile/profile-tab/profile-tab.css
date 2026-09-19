@@ -857,9 +857,25 @@ select.form-control:disabled {
 }
 
 /* Actions */
+/**
+ * The save bar stays on screen while the form is scrolled.
+ *
+ * `position: sticky` is defeated by any ancestor between this element and the
+ * scrolling page that clips its overflow -- and the failure is silent, which
+ * is what makes it hard to find. Nothing in this component's own stylesheet
+ * sets it, so the two wrappers this sits inside are pinned open explicitly
+ * rather than left to whatever a later rule might introduce.
+ */
+.profile-tab-container,
+.profile-tab-container > .form-section {
+  overflow: visible;
+}
+
 .form-actions {
   position: sticky;
   bottom: 0;
+  /* Enough room that the last field is never hidden behind the bar. */
+  margin-bottom: 0;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
