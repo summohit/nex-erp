@@ -527,4 +527,24 @@ export class SecurityComponent implements OnInit {
     link.click();
     URL.revokeObjectURL(url);
   }
+
+  getInitials(name: string): string {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  getAvatarBg(name: string): string {
+    const colors = [
+      '#4F46E5', '#2563EB', '#0D9488', '#059669',
+      '#D97706', '#E11D48', '#7C3AED', '#DB2777'
+    ];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % colors.length;
+    return colors[idx];
+  }
 }

@@ -5,9 +5,16 @@
 @import 'ag-grid-community/styles/ag-theme-quartz.css';
 @import '@angular/material/prebuilt-themes/azure-blue.css';
 
-body {
+html, body {
   margin: 0;
   padding: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-main);
   color: var(--text-dark);
@@ -151,16 +158,10 @@ h1, h2, h3, h4, h5, h6 {
   transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-app-header {
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-body.sidebar-collapsed .dashboard-layout {
-  padding-left: 80px !important;
-}
-
-body.sidebar-collapsed app-header {
-  left: 80px !important;
+@media (min-width: 1025px) {
+  body.sidebar-collapsed .dashboard-layout {
+    padding-left: 80px !important;
+  }
 }
 
 /* Form Styles */

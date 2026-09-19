@@ -682,7 +682,7 @@
                  [disabled]="adminSelectable().length === 0"
                  (change)="toggleSelectAllVisible()" />
         </label>
-        <span class="tfa-col-user">User</span>
+        <span class="tfa-col-user-header">User</span>
         <span class="tfa-col-role">Role</span>
         <span class="tfa-col-state">Two-factor</span>
       </div>
@@ -699,10 +699,18 @@
                  [disabled]="!u.enabled || isMe(u.userId)"
                  (change)="toggleAdminSelect(u)" />
         </label>
-        <span class="tfa-col-user">
-          <strong>{{ u.name || u.email }}</strong>
-          <small *ngIf="u.name">{{ u.email }}</small>
-        </span>
+        <div class="tfa-user-cell">
+          <div class="tfa-avatar-wrap">
+            <img *ngIf="u.avatarUrl" [src]="u.avatarUrl" (error)="u.avatarUrl = null" class="tfa-avatar-img" [alt]="u.name || u.email" />
+            <div *ngIf="!u.avatarUrl" class="tfa-avatar-fallback" [style.background-color]="getAvatarBg(u.name || u.email)">
+              {{ getInitials(u.name || u.email) }}
+            </div>
+          </div>
+          <div class="tfa-col-user">
+            <strong>{{ u.name || u.email }}</strong>
+            <small *ngIf="u.name">{{ u.email }}</small>
+          </div>
+        </div>
         <span class="tfa-col-role">{{ u.role }}</span>
         <span class="tfa-col-state">
           <span class="tfa-pill" [class.on]="u.enabled">{{ u.enabled ? 'Enrolled' : 'Not enrolled' }}</span>

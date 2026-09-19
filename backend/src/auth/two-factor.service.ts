@@ -731,7 +731,7 @@ export class TwoFactorService {
         email: true,
         role: true,
         status: true,
-        employee: { select: { firstName: true, lastName: true } },
+        employee: { select: { firstName: true, lastName: true, avatarUrl: true } },
         twoFactor: { select: { confirmedAt: true } },
       },
       orderBy: { email: 'asc' },
@@ -745,6 +745,7 @@ export class TwoFactorService {
       name: u.employee
         ? `${u.employee.firstName} ${u.employee.lastName}`.trim()
         : null,
+      avatarUrl: u.employee?.avatarUrl || null,
       enabled: !!u.twoFactor?.confirmedAt,
       confirmedAt: u.twoFactor?.confirmedAt ?? null,
     }));
