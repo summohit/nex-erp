@@ -103,6 +103,22 @@ export class NoticesComponent {
 
   activeCount = computed(() => this.notices().filter((n) => n.isActive).length);
 
+  /**
+   * Whether a notice has stopped showing to everybody else.
+   *
+   * Only whoever may post sees expired notices at all, and without this the
+   * board showed them looking perfectly ordinary -- so an expired notice read
+   * as a live one to the only person able to notice it had lapsed.
+   */
+  hasExpired(n: Notice): boolean {
+    return !!n.expiresAt && new Date(n.expiresAt).getTime() < Date.now();
+  }
+
+  /** Not yet showing: written today for next week. */
+  isScheduled(n: Notice): boolean {
+    return !!n.publishedAt && new Date(n.publishedAt).getTime() > Date.now();
+  }
+
   readonly priorities = [
     { value: 'NORMAL', label: 'Normal — appears on the notice board' },
     { value: 'HIGH', label: 'Important — opens on everyone’s dashboard' },

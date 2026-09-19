@@ -28,6 +28,14 @@
           <span class="nb-badge" [class]="'nb-' + n.priority.toLowerCase()">{{ n.priority }}</span>
           <h3>{{ n.title }}</h3>
           <span class="nb-retired-tag" *ngIf="!n.isActive">Retired</span>
+          <!-- These two only ever render for somebody who may post: nobody
+               else is sent an expired or scheduled notice in the first place. -->
+          <span class="nb-state-tag expired" *ngIf="n.isActive && hasExpired(n)">
+            Expired — no longer showing
+          </span>
+          <span class="nb-state-tag scheduled" *ngIf="n.isActive && isScheduled(n)">
+            Scheduled — not showing yet
+          </span>
         </div>
 
         <div class="nb-actions" *ngIf="canPost()">

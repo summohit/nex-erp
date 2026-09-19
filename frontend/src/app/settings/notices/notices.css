@@ -154,3 +154,15 @@
 }
 .nb-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nb-attachment:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+
+/* Why a notice is not being seen. Only whoever may post sees expired or
+   scheduled ones at all, so these tags speak to the person who can act on it. */
+.nb-state-tag {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.nb-state-tag.expired { background: #fef2f2; color: #b91c1c; }
+.nb-state-tag.scheduled { background: #fffbeb; color: #b45309; }

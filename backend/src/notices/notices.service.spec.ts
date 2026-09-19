@@ -166,3 +166,44 @@ describe('who may read the board', () => {
     expect(service.canPost('EMPLOYEE')).toBe(false);
   });
 });
+
+/**
+ * A date picker yields midnight. "Stop showing on the 18th" has to mean
+ * through the 18th, or a notice posted on the 18th to run until the 18th is
+ * invisible the moment it is posted -- while still listed to whoever posted
+ * it, which is exactly how it goes unnoticed.
+ */
+describe('when a notice stops showing', () => {
+  const expiryOf = (prisma: any) => prisma.notice.create.mock.calls[0][0].data.expiresAt as Date;
+
+  it('runs to the end of the chosen day, not its start', async () => {
+    const { service, prisma } = make();
+    await service.create(1, 9, 'ADMIN', {
+      title: 'T', body: 'B', publishedAt: '2026-09-18', expiresAt: '2026-09-18',
+    });
+    const e = expiryOf(prisma);
+    expect(e.getHours()).toBe(23);
+    expect(e.getMinutes()).toBe(59);
+  });
+
+  it('so a notice published and expiring the same day is still live that day', async () => {
+    const { service, prisma } = make();
+    await service.create(1, 9, 'ADMIN', {
+      title: 'T', body: 'B', publishedAt: '2026-09-18', expiresAt: '2026-09-18',
+    });
+    const published = prisma.notice.create.mock.calls[0][0].data.publishedAt as Date;
+    expect(expiryOf(prisma).getTime()).toBeGreaterThan(published.getTime());
+  });
+
+  // A caller sending a real timestamp means it; only a bare date is nudged.
+  it('leaves an explicit time alone', async () => {
+    const { service, prisma } = make();
+    await service.create(1, 9, 'ADMIN', {
+      title: 'T', body: 'B',
+      // A publish date is needed, or it defaults to today and the expiry is
+      // legitimately in the past.
+      publishedAt: '2026-09-01', expiresAt: '2026-09-18T09:30:00.000Z',
+    });
+    expect(expiryOf(prisma).toISOString()).toBe('2026-09-18T09:30:00.000Z');
+  });
+});

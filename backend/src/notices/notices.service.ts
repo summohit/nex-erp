@@ -12,6 +12,25 @@ import { MailService } from '../mail/mail.service';
  * happened to you and are read once in a feed, while a notice stays in front
  * of every person until that person has seen it.
  */
+/**
+ * The instant a notice stops showing, from the date somebody picked.
+ *
+ * A date input yields midnight, so "stop showing on the 18th" stored as-is
+ * means the notice dies the moment the 18th begins -- posting one on the 18th
+ * to run until the 18th made it invisible to everybody immediately, while the
+ * board still listed it to whoever posted it.
+ *
+ * A person choosing a date means the end of that day. A caller sending a full
+ * timestamp means exactly that, and is left alone.
+ */
+function endOfDayIfDateOnly(value: string): Date {
+  const parsed = new Date(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    parsed.setHours(23, 59, 59, 999);
+  }
+  return parsed;
+}
+
 @Injectable()
 export class NoticesService {
   private readonly logger = new Logger(NoticesService.name);
@@ -121,7 +140,7 @@ export class NoticesService {
     if (!body) throw new BadRequestException('A notice needs something to say');
 
     const publishedAt = data.publishedAt ? new Date(data.publishedAt) : new Date();
-    const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    const expiresAt = data.expiresAt ? endOfDayIfDateOnly(data.expiresAt) : null;
     if (expiresAt && expiresAt < publishedAt) {
       throw new BadRequestException('A notice cannot expire before it is published');
     }
@@ -213,7 +232,7 @@ export class NoticesService {
     }
     if (data.priority !== undefined) patch.priority = data.priority.toUpperCase();
     if (data.publishedAt !== undefined) patch.publishedAt = new Date(data.publishedAt);
-    if (data.expiresAt !== undefined) patch.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    if (data.expiresAt !== undefined) patch.expiresAt = data.expiresAt ? endOfDayIfDateOnly(data.expiresAt) : null;
     if (data.isActive !== undefined) patch.isActive = data.isActive;
 
     return this.prisma.notice.update({
