@@ -1,0 +1,33 @@
+{
+  "_source": "Workway (cestech.workway.pro) /account/appreciations DataTables response, exported 2026-09-19.",
+  "_notes": [
+    "summary is plain text: the NEX UI renders it with {{ }} interpolation and composes it in a plain textarea, so Workway's HTML would show as literal tags.",
+    "The source summaries opened with a heading line repeating the award name. Dropped — the award title is its own field here.",
+    "Workway spells the second award 'Best Attendence of the Year'. Corrected to 'Attendance', which is also how NEX spells it in the controller's default award types.",
+    "workwayId / workwayEmployeeId are kept only so a row can be traced back to its source record. Nothing reads them."
+  ],
+  "awardTypes": [
+    { "title": "Employee of the Year", "icon": "trophy", "color": "red" },
+    { "title": "Best Attendance of the Year", "icon": "trophy", "color": "red" }
+  ],
+  "appreciations": [
+    {
+      "workwayId": 36,
+      "workwayEmployeeId": 1569,
+      "employee": { "firstName": "Karan", "lastName": "Virmani" },
+      "awardTitle": "Employee of the Year",
+      "givenDate": "2025-12-31",
+      "summary": "We are pleased to announce that Karan Virmani has been awarded Employee of the Year in recognition of his exceptional dedication, professionalism, and consistently high performance throughout the year. This achievement reflects his strong work ethic, positive attitude, and valuable contributions to the organization. We congratulate Karan Virmani on this well-deserved honor and sincerely appreciate his continued commitment to excellence.",
+      "sourceImageUrl": "https://d2dhoseq8bqrlf.cloudfront.net/appreciation/d2538b08837ae78d48a41d752b65a299.jpg"
+    },
+    {
+      "workwayId": 37,
+      "workwayEmployeeId": 1568,
+      "employee": { "firstName": "Afnan", "lastName": "Ali" },
+      "awardTitle": "Best Attendance of the Year",
+      "givenDate": "2025-12-31",
+      "summary": "We are proud to recognize Afnan Ali with the Best Attendance of the Year award. This recognition honors his outstanding punctuality, reliability, and commitment to maintaining an excellent attendance record throughout the year. His consistency and sense of responsibility set a strong example for the team. We congratulate Afnan Ali on this achievement and thank him for his dedication.",
+      "sourceImageUrl": "https://d2dhoseq8bqrlf.cloudfront.net/appreciation/ca41673f2e7b043b29e87408dedec1ee.jpeg"
+    }
+  ]
+}
