@@ -26,6 +26,7 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { DialogService } from '../shared/services/dialog.service';
 import { ProjectStarCellRendererComponent } from '../shared/components/project-star-cell-renderer.component';
 import { ProjectActionCellRendererComponent } from '../shared/components/project-action-cell-renderer.component';
+import { getAccessToken } from '../core/token-storage';
 import {
   TasksService, MyTask, TaskCapabilities, TaskType, LeadOption, TaskScope,
   PreSalesInfo, PreSalesTaskHistoryEntry,
@@ -221,7 +222,7 @@ export class ProjectsComponent implements OnInit {
       return true;
     }
     try {
-      const token = localStorage.getItem('access_token');
+      const token = getAccessToken();
       if (token) {
         const parts = token.split('.');
         if (parts.length > 1) {
@@ -244,7 +245,7 @@ export class ProjectsComponent implements OnInit {
   myTasksScope = signal<TaskScope>(
     (() => {
       try {
-        const token = localStorage.getItem('access_token');
+        const token = getAccessToken();
         if (token) {
           const parts = token.split('.');
           if (parts.length > 1) {

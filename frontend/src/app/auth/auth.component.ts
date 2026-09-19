@@ -89,7 +89,11 @@ export class AuthComponent implements OnInit {
       this.apiError = '';
       this.showPassword = false;
       this.registerForm.reset();
-      this.loginForm.reset();
+      // Reset to the declared defaults, not to null. A bare reset() blanked
+      // rememberMe too, so the box rendered unchecked however it was declared
+      // -- invisible while nothing read it, and a silent opt-out once the
+      // value started deciding where the session is stored.
+      this.loginForm.reset({ email: '', password: '', rememberMe: true });
     });
   }
 
@@ -140,8 +144,8 @@ export class AuthComponent implements OnInit {
     this.isSubmitting.set(true);
     this.apiError = '';
 
-    const { email, password } = this.loginForm.value;
-    this.authService.login({ email, password }).subscribe({
+    const { email, password, rememberMe } = this.loginForm.value;
+    this.authService.login({ email, password }, !!rememberMe).subscribe({
       next: (res: any) => {
         // A two-factor challenge comes back as a 200 carrying no tokens, so
         // AuthService stored nothing and the user is not signed in yet. This has

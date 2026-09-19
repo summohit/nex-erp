@@ -4,9 +4,10 @@ import { catchError, switchMap, throwError, from, EMPTY } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { SessionModalService } from '../services/session-modal.service';
 import { Router } from '@angular/router';
+import { getAccessToken } from '../core/token-storage';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const token = localStorage.getItem('access_token');
+  const token = getAccessToken();
   
   // Skip interceptor for refresh endpoint to prevent infinite loop
   if (req.url.includes('/auth/refresh')) {

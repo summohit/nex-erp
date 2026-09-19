@@ -7,6 +7,7 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import { ActionCellRendererComponent } from '../../../shared/components/action-cell-renderer.component';
+import { getAccessToken } from '../../../core/token-storage';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -28,7 +29,7 @@ export class EmergencyContactsTabComponent implements OnInit {
    */
   get canManageContacts(): boolean {
     if (this.isOwner) return true;
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     if (!token) return false;
     try {
       const role = JSON.parse(atob(token.split('.')[1])).role;

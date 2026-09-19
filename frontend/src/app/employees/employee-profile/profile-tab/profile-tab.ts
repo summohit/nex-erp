@@ -18,6 +18,7 @@ import { Shift } from '../../../services/attendance';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../../services/auth.service';
 import { Country, State, City } from 'country-state-city';
+import { getAccessToken } from '../../../core/token-storage';
 
 export interface ResumeLine {
   id: number;
@@ -122,7 +123,7 @@ export class ProfileTabComponent implements OnInit {
   dynamicLocationOptions: string[] = ['Unspecified', 'Home', 'Other'];
 
   get canEditWorkDetails(): boolean {
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     let role = '';
     if (token) {
       try {
@@ -795,7 +796,7 @@ export class ProfileTabComponent implements OnInit {
   }
 
   goBack() {
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     let role = '';
     if (token) {
       try {

@@ -7,6 +7,7 @@ import { AuthService } from '../../../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { ProjectsService } from '../../../services/projects';
 import { MenusService } from '../../../services/menus.service';
+import { getAccessToken } from '../../../core/token-storage';
 import {
   LucideSearch, LucideArrowRight
 } from '@lucide/angular';
@@ -226,7 +227,7 @@ export class SpotlightSearchComponent {
    * still gets the row itself, which opens the profile.
    */
   private get canManageEmployees(): boolean {
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     if (!token) return false;
     try {
       const role = JSON.parse(atob(token.split('.')[1])).role;

@@ -1,11 +1,12 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
+import { getAccessToken } from '../core/token-storage';
 
 export const authGuard: CanActivateFn = (route, state) => {
   const router = inject(Router);
   const toast = inject(HotToastService);
-  const token = localStorage.getItem('access_token');
+  const token = getAccessToken();
 
   if (token) {
     return true;

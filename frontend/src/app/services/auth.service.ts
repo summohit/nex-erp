@@ -6,6 +6,7 @@ import { signal } from '@angular/core';
 import { environment } from '../../environments/environment';
 import { PermissionsService } from './permissions.service';
 import { PushNotificationsService } from './push-notifications.service';
+import { getAccessToken, getRefreshToken, setTokens, clearTokens, setRememberMe } from '../core/token-storage';
 
 @Injectable({
   providedIn: 'root'
@@ -19,31 +20,24 @@ export class AuthService {
   currentUser = signal<any>(null);
 
   getToken(): string | null {
-    return localStorage.getItem('access_token');
+    return getAccessToken();
   }
 
   signup(data: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/signup`, data).pipe(
       tap((response: any) => {
-        if (response?.access_token) {
-          localStorage.setItem('access_token', response.access_token);
-        }
-        if (response?.refresh_token) {
-          localStorage.setItem('refresh_token', response.refresh_token);
-        }
+        setTokens(response?.access_token, response?.refresh_token);
       })
     );
   }
 
-  login(data: any): Observable<any> {
+  login(data: any, rememberMe = true): Observable<any> {
+    // Recorded before the request so the two-factor path, which stores tokens
+    // on a later call, still honours the box ticked on the login form.
+    setRememberMe(rememberMe);
     return this.http.post(`${this.apiUrl}/login`, data).pipe(
       tap((response: any) => {
-        if (response?.access_token) {
-          localStorage.setItem('access_token', response.access_token);
-        }
-        if (response?.refresh_token) {
-          localStorage.setItem('refresh_token', response.refresh_token);
-        }
+        setTokens(response?.access_token, response?.refresh_token);
       })
     );
   }
@@ -54,12 +48,7 @@ export class AuthService {
   // here rather than at the password step.
 
   private storeTokens = (response: any) => {
-    if (response?.access_token) {
-      localStorage.setItem('access_token', response.access_token);
-    }
-    if (response?.refresh_token) {
-      localStorage.setItem('refresh_token', response.refresh_token);
-    }
+    setTokens(response?.access_token, response?.refresh_token);
   };
 
   /** Complete sign-in with a TOTP code or a one-time backup code. */
@@ -171,22 +160,16 @@ export class AuthService {
     // signing out must never hang on, or fail because of, a cleanup call.
     void this.push.disable();
 
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    clearTokens();
     this.currentUser.set(null);
     this.permissionsService.clearCache();
   }
 
   refreshToken(): Observable<any> {
-    const refresh_token = localStorage.getItem('refresh_token');
+    const refresh_token = getRefreshToken();
     return this.http.post(`${this.apiUrl}/refresh`, { refreshToken: refresh_token }).pipe(
       tap((response: any) => {
-        if (response?.access_token) {
-          localStorage.setItem('access_token', response.access_token);
-        }
-        if (response?.refresh_token) {
-          localStorage.setItem('refresh_token', response.refresh_token);
-        }
+        setTokens(response?.access_token, response?.refresh_token);
       })
     );
   }
