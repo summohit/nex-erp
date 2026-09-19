@@ -10,7 +10,11 @@ set -o pipefail
 # Server config
 SERVER_IP="94.136.188.176"
 SERVER_USER="root"
-SERVER_PASS="gN6V5aLNdI69"
+# Never hardcode this. The previous value sat in this file, in a public repo, for
+# every commit since it was added -- rotate the server password, not this line,
+# if it ever leaks again. Export it for the shell that runs the deploy:
+#   export NEX_DEPLOY_PASS='...'      (better: set up an SSH key and drop sshpass)
+SERVER_PASS="${NEX_DEPLOY_PASS:?NEX_DEPLOY_PASS is not set - export the deploy password before running}"
 REMOTE_DIR="/var/www/nex-erp"
 
 # Local paths

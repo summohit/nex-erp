@@ -4,7 +4,12 @@
 set timeout -1
 set IP "94.136.188.176"
 set USER "root"
-set PASSWORD "gN6V5aLNdI69"
+# Read from the environment; never hardcode it here. See deploy.sh.
+if {![info exists env(NEX_DEPLOY_PASS)]} {
+    puts "NEX_DEPLOY_PASS is not set - export the server password before running."
+    exit 1
+}
+set PASSWORD $env(NEX_DEPLOY_PASS)
 
 spawn ssh -o StrictHostKeyChecking=no $USER@$IP "pm2 logs nex-erp-backend"
 
