@@ -123,7 +123,9 @@
 
         <div class="dash-notice-card-footer">
           <div class="dash-notice-author">
-            <div class="dash-notice-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
+            <img *ngIf="n.createdBy?.avatarUrl" [src]="n.createdBy?.avatarUrl"
+                 [alt]="n.createdBy?.firstName" class="dash-notice-avatar-img">
+            <div *ngIf="!n.createdBy?.avatarUrl" class="dash-notice-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
               {{ getInitials(n.createdBy?.firstName, n.createdBy?.lastName) }}
             </div>
             <span class="dash-author-name">
@@ -329,16 +331,18 @@
           </a>
         </div>
         <div class="card-body p-0" *ngIf="(dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) > 0">
-          <table class="dashboard-table">
-            <thead><tr><th>Employee</th><th>Category</th><th>Amount</th></tr></thead>
-            <tbody>
-              <tr *ngFor="let claim of (dashboard()?.finance?.pendingExpenseClaims?.recent || []).slice(0, 5)">
-                <td><span class="font-semibold">{{ claim.employee?.firstName }} {{ claim.employee?.lastName }}</span></td>
-                <td><span class="badge-subtle">{{ claim.category }}</span></td>
-                <td><span class="font-bold text-slate-900">{{ claim.amount | currency:'INR':'symbol-narrow':'1.0-0' }}</span></td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="dashboard-table-container">
+            <table class="dashboard-table">
+              <thead><tr><th>Employee</th><th>Category</th><th>Amount</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let claim of (dashboard()?.finance?.pendingExpenseClaims?.recent || []).slice(0, 5)">
+                  <td><span class="font-semibold">{{ claim.employee?.firstName }} {{ claim.employee?.lastName }}</span></td>
+                  <td><span class="badge-subtle">{{ claim.category }}</span></td>
+                  <td><span class="font-bold text-slate-900">{{ claim.amount | currency:'INR':'symbol-narrow':'1.0-0' }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
         <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) === 0">
           <svg lucideCheckCircle2 size="32" class="text-emerald-500 mb-2"></svg>
@@ -365,17 +369,19 @@
           </a>
         </div>
         <div class="card-body p-0">
-          <table class="dashboard-table">
-            <thead><tr><th>Order #</th><th>Client</th><th>Value</th><th>Status</th></tr></thead>
-            <tbody>
-              <tr *ngFor="let order of (dashboard()?.sales?.recentOrders || []).slice(0, 5)">
-                <td><span class="font-semibold">{{ order.orderNumber }}</span></td>
-                <td>{{ order.client?.name || '—' }}</td>
-                <td><span class="font-bold">{{ order.total | currency:'INR':'symbol-narrow':'1.0-0' }}</span></td>
-                <td><span class="status-pill" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span></td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="dashboard-table-container">
+            <table class="dashboard-table">
+              <thead><tr><th>Order #</th><th>Client</th><th>Value</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let order of (dashboard()?.sales?.recentOrders || []).slice(0, 5)">
+                  <td><span class="font-semibold">{{ order.orderNumber }}</span></td>
+                  <td>{{ order.client?.name || '—' }}</td>
+                  <td><span class="font-bold">{{ order.total | currency:'INR':'symbol-narrow':'1.0-0' }}</span></td>
+                  <td><span class="status-pill" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -394,33 +400,35 @@
           <span class="count-badge-amber">{{ pendingApprovals().length }} pending</span>
         </div>
         <div class="card-body p-0">
-          <table class="dashboard-table">
-            <thead>
-              <tr><th>Employee</th><th>Leave Type</th><th>Dates</th><th>Status</th><th style="text-align: right;">Actions</th></tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let req of pendingApprovals().slice(0, 5)">
-                <td>
-                  <span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span>
-                </td>
-                <td><span class="badge-subtle">{{ req.leaveType?.name }}</span></td>
-                <td>{{ req.startDate | date:'shortDate' }} – {{ req.endDate | date:'shortDate' }}</td>
-                <td><span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span></td>
-                <td style="text-align: right;">
-                  <div class="action-btn-group">
-                    <button class="btn-approve-sm" (click)="approveLeave(req.id)" title="Approve Request">
-                      <svg lucideCheck size="13"></svg>
-                      <span>Approve</span>
-                    </button>
-                    <button class="btn-reject-sm" (click)="rejectLeave(req.id)" title="Reject Request">
-                      <svg lucideX size="13"></svg>
-                      <span>Reject</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="dashboard-table-container">
+            <table class="dashboard-table">
+              <thead>
+                <tr><th>Employee</th><th>Leave Type</th><th>Dates</th><th>Status</th><th style="text-align: right;">Actions</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let req of pendingApprovals().slice(0, 5)">
+                  <td>
+                    <span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span>
+                  </td>
+                  <td><span class="badge-subtle">{{ req.leaveType?.name }}</span></td>
+                  <td>{{ req.startDate | date:'shortDate' }} – {{ req.endDate | date:'shortDate' }}</td>
+                  <td><span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span></td>
+                  <td style="text-align: right;">
+                    <div class="action-btn-group">
+                      <button class="btn-approve-sm" (click)="approveLeave(req.id)" title="Approve Request">
+                        <svg lucideCheck size="13"></svg>
+                        <span>Approve</span>
+                      </button>
+                      <button class="btn-reject-sm" (click)="rejectLeave(req.id)" title="Reject Request">
+                        <svg lucideX size="13"></svg>
+                        <span>Reject</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -438,26 +446,28 @@
           </div>
         </div>
         <div class="card-body p-0">
-          <table class="dashboard-table" *ngIf="(dashboard()?.common?.myTasks?.length || 0) > 0">
-            <thead>
-              <tr><th>Task#</th><th>Task</th><th>Priority</th><th>Status</th><th>Due Date</th><th>Action</th></tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let t of (dashboard()?.common?.myTasks || []).slice(0, 5)">
-                <td><span class="task-key-badge">{{ t.key }}</span></td>
-                <td class="font-medium">{{ t.title }}</td>
-                <td><span class="priority-pill" [ngClass]="t.priority.toLowerCase()">{{ t.priority }}</span></td>
-                <td><span class="status-pill" [ngClass]="t.status.toLowerCase()">{{ t.status }}</span></td>
-                <td><span class="due-date" [class.overdue]="isOverdue(t.dueDate)">{{ t.dueDate ? (t.dueDate | date:'dd-MM-yyyy') : '—' }}</span></td>
-                <td>
-                  <a [routerLink]="['/projects', t.project?.id || 1]" class="btn-table-action">
-                    <span>Board</span>
-                    <svg lucideArrowRight size="12"></svg>
-                  </a>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="dashboard-table-container" *ngIf="(dashboard()?.common?.myTasks?.length || 0) > 0">
+            <table class="dashboard-table tasks-table">
+              <thead>
+                <tr><th>Task#</th><th>Task</th><th>Priority</th><th>Status</th><th>Due Date</th><th>Action</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let t of (dashboard()?.common?.myTasks || []).slice(0, 5)">
+                  <td><span class="task-key-badge">{{ t.key }}</span></td>
+                  <td class="font-medium table-title-cell">{{ t.title }}</td>
+                  <td><span class="priority-pill" [ngClass]="t.priority.toLowerCase()">{{ t.priority }}</span></td>
+                  <td><span class="status-pill" [ngClass]="t.status.toLowerCase()">{{ t.status }}</span></td>
+                  <td><span class="due-date" [class.overdue]="isOverdue(t.dueDate)">{{ t.dueDate ? (t.dueDate | date:'dd-MM-yyyy') : '—' }}</span></td>
+                  <td>
+                    <a [routerLink]="['/projects', t.project?.id || 1]" class="btn-table-action">
+                      <span>Board</span>
+                      <svg lucideArrowRight size="12"></svg>
+                    </a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.common?.myTasks?.length || 0) === 0">
             <svg lucideCheckCircle2 size="36" class="text-emerald-500 mb-2"></svg>
             <p style="font-size: 14px; font-weight: 700; color: #1e293b;">You are all caught up!</p>
@@ -576,19 +586,21 @@
           <span class="count-badge-pink" *ngIf="(dashboard()?.common?.myTickets?.length || 0) > 0">{{ dashboard()?.common?.myTickets?.length }}</span>
         </div>
         <div class="card-body p-0">
-          <table class="dashboard-table" *ngIf="(dashboard()?.common?.myTickets?.length || 0) > 0">
-            <thead>
-              <tr><th>Ticket#</th><th>Subject</th><th>Status</th><th>Requested On</th></tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let t of (dashboard()?.common?.myTickets || []).slice(0, 5)">
-                <td><span class="task-key-badge">{{ t.ticketNumber }}</span></td>
-                <td class="font-medium" style="max-width: 280px;">{{ t.title }}</td>
-                <td><span class="status-pill" [ngClass]="t.status.toLowerCase()">{{ t.status }}</span></td>
-                <td>{{ t.createdAt | date:'dd-MM-yyyy' }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="dashboard-table-container" *ngIf="(dashboard()?.common?.myTickets?.length || 0) > 0">
+            <table class="dashboard-table tickets-table">
+              <thead>
+                <tr><th>Ticket#</th><th>Subject</th><th>Status</th><th>Requested On</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let t of (dashboard()?.common?.myTickets || []).slice(0, 5)">
+                  <td><span class="task-key-badge">{{ t.ticketNumber }}</span></td>
+                  <td class="font-medium table-title-cell" style="max-width: 280px;">{{ t.title }}</td>
+                  <td><span class="status-pill" [ngClass]="t.status.toLowerCase()">{{ t.status }}</span></td>
+                  <td>{{ t.createdAt | date:'dd-MM-yyyy' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.common?.myTickets?.length || 0) === 0">
             <svg lucideTicket size="32" class="text-slate-400 mb-2"></svg>
             <p style="font-size: 13px; font-weight: 600; color: #64748b;">No record found</p>
@@ -1165,7 +1177,9 @@
       <h2>{{ n.title }}</h2>
 
       <div class="notice-modal-author-row">
-        <div class="dash-notice-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
+        <img *ngIf="n.createdBy?.avatarUrl" [src]="n.createdBy?.avatarUrl"
+             [alt]="n.createdBy?.firstName" class="dash-notice-avatar-img">
+        <div *ngIf="!n.createdBy?.avatarUrl" class="dash-notice-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
           {{ getInitials(n.createdBy?.firstName, n.createdBy?.lastName) }}
         </div>
         <div class="notice-modal-author-meta">

@@ -20,7 +20,7 @@ export interface Notice {
   emailSentAt: string | null;
   createdAt: string;
   updatedAt: string;
-  createdBy: { id: number; firstName: string; lastName: string } | null;
+  createdBy: { id: number; firstName: string; lastName: string; avatarUrl: string | null } | null;
   attachments?: NoticeAttachment[];
   /** Only on the dashboard feed: whether this reader has dismissed it. */
   isRead?: boolean;

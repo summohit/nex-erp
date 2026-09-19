@@ -357,7 +357,9 @@
       <!-- Card Footer: Author Profile & Timeline -->
       <div class="nb-card-footer">
         <div class="nb-author-row">
-          <div class="nb-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
+          <img *ngIf="n.createdBy?.avatarUrl" [src]="n.createdBy?.avatarUrl"
+               [alt]="n.createdBy?.firstName" class="nb-avatar-img">
+          <div *ngIf="!n.createdBy?.avatarUrl" class="nb-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
             {{ getInitials(n.createdBy?.firstName, n.createdBy?.lastName) }}
           </div>
           <div class="nb-author-meta">

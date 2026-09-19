@@ -2,13 +2,22 @@
    NEX ERP WEB DASHBOARD - EXECUTIVE BENTO GRID STYLING
    ========================================================================== */
 
+:host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .dashboard-container {
   position: relative;
-  max-width: 1400px;
+  width: 100%;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px 28px 48px 28px;
+  padding: 0 0 48px 0;
   box-sizing: border-box;
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  overflow-x: clip;
 }
 
 /* -------------------- Ambient Canvas Glows -------------------- */
@@ -349,6 +358,8 @@
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 6px 20px -4px rgba(15, 23, 42, 0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .dashboard-card:hover {
@@ -395,6 +406,9 @@
 
 .card-body.p-0 {
   padding: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Two column chart rows */
@@ -895,10 +909,44 @@
 /* ==========================================================================
    6. TABLES & QUEUES (Pending Approvals, Tasks, Orders)
    ========================================================================== */
+.dashboard-table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+.dashboard-table-container::-webkit-scrollbar {
+  height: 5px;
+}
+
+.dashboard-table-container::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.dashboard-table-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.dashboard-table-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 .dashboard-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  min-width: 480px;
+}
+
+.dashboard-table.tasks-table {
+  min-width: 580px;
+}
+
+.dashboard-table.tickets-table {
+  min-width: 480px;
 }
 
 .dashboard-table th {
@@ -911,6 +959,7 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
 }
 
 .dashboard-table td {
@@ -918,6 +967,13 @@
   border-bottom: 1px solid #f1f5f9;
   color: #1e293b;
   vertical-align: middle;
+  white-space: nowrap;
+}
+
+.dashboard-table td.table-title-cell {
+  white-space: normal;
+  max-width: 260px;
+  line-height: 1.35;
 }
 
 .dashboard-table tr:hover td {
@@ -2238,6 +2294,16 @@
   min-width: 0;
 }
 
+/* The author's own photo, where they have one. Same box as the initials
+   circle below so a notice with a photo and one without line up. */
+.dash-notice-avatar-img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 .dash-notice-avatar {
   width: 22px;
   height: 22px;
@@ -2525,7 +2591,286 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard-container {
+    padding: 12px 2px 32px 2px;
+  }
+
+  .dash-ambient-glow {
+    display: none !important;
+  }
+
+  /* Hero Command Center */
+  .hero-bento-card {
+    padding: 16px;
+    border-radius: 14px;
+    margin-bottom: 16px;
+  }
+
+  .hero-main-row {
+    gap: 14px;
+    margin-bottom: 12px;
+  }
+
+  .hero-profile-block {
+    gap: 12px;
+  }
+
+  .hero-avatar-wrap {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    font-size: 17px;
+  }
+
+  .hero-greeting-line h2 {
+    font-size: 18px;
+  }
+
+  .hero-subtitle {
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .hero-role-pill {
+    padding: 6px 12px;
+    font-size: 11.5px;
+  }
+
+  /* Notice Board */
+  .dash-notice-board {
+    padding: 14px 16px;
+    border-radius: 14px;
+    margin-bottom: 16px;
+  }
+
+  .dash-notice-header {
+    gap: 10px;
+  }
+
   .dash-notice-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .dash-notice-card {
+    padding: 12px 14px;
+  }
+
+  /* Cards & Layout */
+  .dashboard-main-grid {
+    gap: 16px;
+  }
+
+  .main-left-col,
+  .main-right-col {
+    gap: 16px;
+  }
+
+  .dashboard-card {
+    border-radius: 14px;
+  }
+
+  .card-header {
+    padding: 14px 16px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .card-header h3 {
+    font-size: 14px;
+  }
+
+  .card-header-sub {
+    font-size: 11px;
+  }
+
+  .card-body {
+    padding: 14px 16px;
+  }
+
+  .card-body.p-0 {
+    padding: 0;
+  }
+
+  /* Tables */
+  .dashboard-table th {
+    padding: 10px 14px;
+    font-size: 11px;
+  }
+
+  .dashboard-table td {
+    padding: 11px 14px;
+    font-size: 12px;
+  }
+
+  .action-btn-group {
+    gap: 4px;
+  }
+
+  .btn-approve-sm,
+  .btn-reject-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .btn-table-action {
+    font-size: 11.5px;
+  }
+
+  /* Two Column Charts */
+  .chart-row-2 {
+    gap: 14px;
+  }
+
+  /* Daily Shift Hub */
+  .live-clock-banner {
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+
+  .clock-digits {
+    font-size: 22px;
+  }
+
+  .shift-metrics-bento {
+    gap: 6px;
+  }
+
+  .shift-metric-tile {
+    padding: 8px 10px;
+  }
+
+  .sm-value {
+    font-size: 13.5px;
+  }
+
+  .btn-punch-hero {
+    height: 42px;
+    font-size: 13px;
+  }
+
+  /* Mini Stats */
+  .mini-stat-row {
+    gap: 6px;
+  }
+
+  .mini-stat {
+    padding: 8px 4px;
+    border-radius: 10px;
+  }
+
+  .mini-stat-value {
+    font-size: 18px;
+  }
+
+  .mini-stat-label {
+    font-size: 10px;
+  }
+
+  /* Calendar */
+  .cal-week-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .cal-day-col {
+    min-height: auto;
+  }
+
+  .cal-day-head {
+    padding: 6px 10px;
+  }
+
+  .cal-day-events {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  /* Timelogs */
+  .tl-total-row {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .tl-total {
+    padding: 10px 12px;
+  }
+
+  .tl-total-value {
+    font-size: 17px;
+  }
+
+  .tl-bars {
+    height: 120px;
+    gap: 6px;
+  }
+
+  /* Shift Schedule */
+  .shift-row {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  /* People Rows */
+  .people-row {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .people-list.compact .people-row {
+    padding: 8px 12px;
+  }
+
+  /* Bottom Widgets */
+  .bottom-widget-grid {
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  /* Onboarding */
+  .onboarding-widget {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .header-titles h3 {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-bento-card {
+    padding: 14px 12px;
+  }
+
+  .hero-main-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .hero-greeting-line h2 {
+    font-size: 17px;
+  }
+
+  .card-header {
+    padding: 12px 14px;
+  }
+
+  .card-body {
+    padding: 12px 14px;
+  }
+
+  .dashboard-table th,
+  .dashboard-table td {
+    padding: 8px 12px;
+    font-size: 11.5px;
+  }
+
+  .notice-modal {
+    padding: 16px;
+    border-radius: 14px;
+    max-height: 90vh;
   }
 }

@@ -794,6 +794,17 @@
   gap: 10px;
 }
 
+/* The author's own photo, where they have one. Same box and shadow as the
+   initials circle below so cards line up either way. */
+.nb-avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
 .nb-avatar {
   width: 32px;
   height: 32px;
