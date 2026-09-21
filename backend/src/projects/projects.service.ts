@@ -356,17 +356,31 @@ export class ProjectsService {
     data: any,
   ) {
     const copy = {
+      // Project identity: the board layout, the content built on it. All
+      // default true — the blueprint keeps its structure.
+      summary: data?.copy?.summary ?? true,
+      boards: data?.copy?.boards ?? true,
       members: data?.copy?.members ?? true,
       milestones: data?.copy?.milestones ?? true,
       tasks: data?.copy?.tasks ?? true,
       taskAssignments: data?.copy?.taskAssignments ?? true,
       taskDependencies: data?.copy?.taskDependencies ?? true,
-      projectFiles: data?.copy?.projectFiles ?? true,
-      taskFiles: data?.copy?.taskFiles ?? true,
+      // Attachments are the project-level documents, evidence the files on the
+      // tasks. Older callers used projectFiles/taskFiles for the same things.
+      projectFiles: data?.copy?.projectFiles ?? data?.copy?.attachments ?? true,
+      evidence: data?.copy?.evidence ?? data?.copy?.taskFiles ?? true,
+      taskFiles: data?.copy?.taskFiles ?? data?.copy?.evidence ?? true,
       labels: data?.copy?.labels ?? true,
+      // Historical or operational records stay behind by default: the copy is
+      // a fresh blueprint, and each of these carries approvals, timestamps or
+      // attachments from a project that already happened.
       comments: data?.copy?.comments ?? false,
       activity: data?.copy?.activity ?? false,
       timeLogs: data?.copy?.timeLogs ?? false,
+      clientVisits: data?.copy?.clientVisits ?? false,
+      tickets: data?.copy?.tickets ?? false,
+      discussions: data?.copy?.discussions ?? false,
+      budgetRequests: data?.copy?.budgetRequests ?? false,
     };
 
     const name = data?.name?.trim();
@@ -392,6 +406,10 @@ export class ProjectsService {
         labels: { orderBy: { id: 'asc' } },
         milestones: { orderBy: { position: 'asc' } },
         documents: true,
+        fieldVisits: { include: { photos: true } },
+        discussions: { include: { comments: true, attachments: true } },
+        projectTickets: true,
+        budgetRequests: true,
         issues: {
           where: { isArchived: false },
           include: {
@@ -422,6 +440,12 @@ export class ProjectsService {
     // rather than copied into a project they can no longer see.
     const candidateIds = new Set<number>([actorEmployeeId]);
     if (source.leadId) candidateIds.add(source.leadId);
+    // The duplicate modal lets the supervisor rework the team, so ids picked
+    // there must be admitted even when they were not on the source project.
+    for (const id of [...(data?.pmIds ?? []), ...(data?.memberIds ?? [])]) {
+      const n = Number(id);
+      if (Number.isInteger(n) && n > 0) candidateIds.add(n);
+    }
     for (const m of source.members) candidateIds.add(m.employeeId);
     for (const i of source.issues) {
       if (i.assigneeId) candidateIds.add(i.assigneeId);
@@ -434,6 +458,20 @@ export class ProjectsService {
     }
     for (const d of source.documents) candidateIds.add(d.uploadedBy);
     for (const m of source.milestones) if (m.ownerId) candidateIds.add(m.ownerId);
+    for (const v of source.fieldVisits) candidateIds.add(v.employeeId);
+    for (const disc of source.discussions) {
+      candidateIds.add(disc.authorId);
+      for (const c of disc.comments) candidateIds.add(c.authorId);
+      for (const a of disc.attachments) candidateIds.add(a.uploadedById);
+    }
+    for (const t of source.projectTickets) {
+      candidateIds.add(t.raisedById);
+      if (t.proposedAssigneeId) candidateIds.add(t.proposedAssigneeId);
+    }
+    for (const r of source.budgetRequests) {
+      candidateIds.add(r.requestedById);
+      if (r.reviewedById) candidateIds.add(r.reviewedById);
+    }
 
     const activeEmployees = await this.prisma.employee.findMany({
       where: {
@@ -447,11 +485,19 @@ export class ProjectsService {
 
     // Dates: KEEP copies them, SHIFT moves everything by the same amount so
     // the duplicate starts on the requested date, RESET blanks all of them.
+    // The modal edits the start/end date fields directly and sends those as
+    // `startDate`/`endDate`; dateMode then only decides what happens to the
+    // date-carrying content (issues, milestones). `shiftStartDate` is kept for
+    // older callers that still express a shift as a single target date.
     let dateOffsetMs = 0;
-    const requestedStart = dateMode === 'SHIFT' && data.shiftStartDate
-      ? new Date(data.shiftStartDate)
-      : null;
-    if (dateMode === 'SHIFT' && requestedStart && source.startDate) {
+    const rawStart =
+      data?.startDate != null && data?.startDate !== '' ? new Date(data.startDate) : null;
+    const rawEnd =
+      data?.endDate != null && data?.endDate !== '' ? new Date(data.endDate) : null;
+    const requestedStart =
+      rawStart ??
+      (dateMode === 'SHIFT' && data.shiftStartDate ? new Date(data.shiftStartDate) : null);
+    if ((dateMode === 'SHIFT' || rawStart) && requestedStart && source.startDate) {
       dateOffsetMs = requestedStart.getTime() - source.startDate.getTime();
     }
     const applyDate = (value: Date | null): Date | null => {
@@ -460,10 +506,16 @@ export class ProjectsService {
       if (dateMode === 'KEEP') return new Date(value);
       return new Date(value.getTime() + dateOffsetMs);
     };
-    const projectStart = dateMode === 'SHIFT'
-      ? (requestedStart ?? applyDate(source.startDate))
-      : applyDate(source.startDate);
-    const projectEnd = applyDate(source.endDate);
+    const projectStart = rawStart
+      ?? (dateMode === 'SHIFT'
+        ? (requestedStart ?? applyDate(source.startDate))
+        : applyDate(source.startDate));
+    const projectEnd = rawEnd ?? applyDate(source.endDate);
+
+    // Editable identity fields. Every create-form field is optional here;
+    // anything absent is taken straight from the source project.
+    const ov = data?.overrides ?? {};
+    const pick = <T>(key: string, fallback: T): T => (ov[key] !== undefined ? ov[key] : fallback);
 
     const key = await this.nextProjectKey(companyId);
 
@@ -472,46 +524,59 @@ export class ProjectsService {
         data: {
           name,
           key,
-          description: source.description,
-          summary: source.summary,
-          color: source.color,
+          description: copy.summary ? pick('description', source.description) : null,
+          summary: copy.summary ? pick('summary', source.summary) : null,
+          color: pick('color', source.color),
           icon: source.icon,
-          address: source.address,
+          address: pick('address', source.address),
           startDate: projectStart,
           endDate: projectEnd,
-          billingType: source.billingType,
-          budgetAmount: source.budgetAmount,
-          hourlyRate: source.hourlyRate,
+          billingType: pick('billingType', source.billingType),
+          budgetAmount: pick('budgetAmount', source.budgetAmount),
+          hourlyRate: pick('hourlyRate', source.hourlyRate),
           clientId: source.clientId,
-          leadContactId: source.leadContactId,
-          category: source.category,
-          priority: source.priority,
-          departmentId: source.departmentId,
+          leadContactId: pick('leadContactId', source.leadContactId),
+          category: pick('category', source.category),
+          priority: pick('priority', source.priority),
+          departmentId: pick('departmentId', source.departmentId),
           // Reset to the app's default active lifecycle state — a blueprint
           // of a completed project must not come into existence completed.
-          workStatus: 'ACTIVE',
+          // The duplicate modal can still choose a different status.
+          workStatus: pick('workStatus', 'ACTIVE'),
           closureStatus: 'WORK_PENDING',
           onboardingStatus: 'DRAFT',
           progress: null,
           issueSeq: 0,
-          currency: source.currency,
-          budgetNotes: source.budgetNotes,
-          estimatedHours: source.estimatedHours,
-          allowManualTimeLogging: source.allowManualTimeLogging,
+          currency: pick('currency', source.currency),
+          budgetNotes: pick('budgetNotes', source.budgetNotes),
+          estimatedHours: pick('estimatedHours', source.estimatedHours),
+          allowManualTimeLogging: pick('allowManualTimeLogging', source.allowManualTimeLogging),
           companyId,
           leadId: source.leadId && activeIds.has(source.leadId) ? source.leadId : actorEmployeeId,
         },
       });
 
       // ── Members ────────────────────────────────────────────────────────
+      // Without pmIds/memberIds the blueprint's team is copied as-is (the
+      // original behaviour). When the modal provides them they replace the
+      // team entirely, exactly like the create form: PMs take PROJECT_MANAGER,
+      // everyone else MEMBER, and whoever leads is always ADMIN.
       if (copy.members) {
         const roleByEmployee = new Map<number, string>();
-        for (const m of source.members) {
-          if (activeIds.has(m.employeeId)) roleByEmployee.set(m.employeeId, m.role);
+        if (data?.pmIds != null && data?.memberIds != null) {
+          // leadId is always a number here: it falls back to actorEmployeeId
+          // when the source lead is gone.
+          for (const row of buildInitialMembers(project.leadId!, data.pmIds, data.memberIds)) {
+            if (activeIds.has(row.employeeId)) roleByEmployee.set(row.employeeId, row.role);
+          }
+        } else {
+          for (const m of source.members) {
+            if (activeIds.has(m.employeeId)) roleByEmployee.set(m.employeeId, m.role);
+          }
+          // Whoever leads the duplicate is always an ADMIN on it, mirroring how
+          // buildInitialMembers treats the lead of a fresh project.
+          if (project.leadId) roleByEmployee.set(project.leadId, 'ADMIN');
         }
-        // Whoever leads the duplicate is always an ADMIN on it, mirroring how
-        // buildInitialMembers treats the lead of a fresh project.
-        if (project.leadId) roleByEmployee.set(project.leadId, 'ADMIN');
         await tx.projectMember.createMany({
           data: Array.from(roleByEmployee, ([employeeId, mRole]) => ({
             projectId: project.id,
@@ -521,31 +586,33 @@ export class ProjectsService {
         });
       }
 
-      // ── Boards & columns (kept) ─────────────────────────────────────────
+      // ── Boards & columns (Board / List layout) ─────────────────────────────
       const columnMap = new Map<number, number>();
       let firstColumnId: number | null = null;
-      for (const board of source.boards) {
-        const created = await tx.board.create({
-          data: {
-            name: board.name,
-            projectId: project.id,
-            columns: {
-              create: board.columns.map((c) => ({
-                name: c.name,
-                type: c.type,
-                color: c.color,
-                position: c.position,
-                isSystem: c.isSystem,
-                isArchived: c.isArchived,
-              })),
+      if (copy.boards) {
+        for (const board of source.boards) {
+          const created = await tx.board.create({
+            data: {
+              name: board.name,
+              projectId: project.id,
+              columns: {
+                create: board.columns.map((c) => ({
+                  name: c.name,
+                  type: c.type,
+                  color: c.color,
+                  position: c.position,
+                  isSystem: c.isSystem,
+                  isArchived: c.isArchived,
+                })),
+              },
             },
-          },
-          include: { columns: true },
-        });
-        board.columns.forEach((c, i) => {
-          columnMap.set(c.id, created.columns[i].id);
-          if (firstColumnId === null) firstColumnId = created.columns[i].id;
-        });
+            include: { columns: true },
+          });
+          board.columns.forEach((c, i) => {
+            columnMap.set(c.id, created.columns[i].id);
+            if (firstColumnId === null) firstColumnId = created.columns[i].id;
+          });
+        }
       }
 
       // ── Labels (project tags) ───────────────────────────────────────────
@@ -586,6 +653,8 @@ export class ProjectsService {
 
       // ── Tasks & subtasks (Issues) ───────────────────────────────────────
       let seq = 0;
+      // Kept in scope beyond the tasks block so a converted project ticket can
+      // point its convertedIssueId at the duplicated task it became.
       const issueMap = new Map<number, number>();
       const createdIssues: { source: any; created: any }[] = [];
 
@@ -705,8 +774,9 @@ export class ProjectsService {
           if (rows.length) await tx.issueDependency.createMany({ data: rows, skipDuplicates: true });
         }
 
-        // Task files — the storage reference (ImageKit URL) is reusable.
-        if (copy.taskFiles) {
+        // Task files — the Evidence tab: files attached to tasks. The storage
+        // reference (ImageKit URL) is reusable.
+        if (copy.evidence) {
           const rows: any[] = [];
           for (const { source: issue, created } of createdIssues) {
             for (const attachment of issue.attachments) {
@@ -794,6 +864,136 @@ export class ProjectsService {
             uploadedBy: doc.uploadedBy && activeIds.has(doc.uploadedBy) ? doc.uploadedBy : actorEmployeeId,
           })),
         });
+      }
+
+      // ── Client visits (FieldVisit + photos) — opt-in ────────────────────
+      if (copy.clientVisits && source.fieldVisits.length) {
+        for (const visit of source.fieldVisits) {
+          await tx.fieldVisit.create({
+            data: {
+              projectId: project.id,
+              companyId,
+              employeeId: activeIds.has(visit.employeeId) ? visit.employeeId : actorEmployeeId,
+              startTime: visit.startTime,
+              startLat: visit.startLat,
+              startLng: visit.startLng,
+              startAddress: visit.startAddress,
+              endTime: visit.endTime,
+              endLat: visit.endLat,
+              endLng: visit.endLng,
+              endAddress: visit.endAddress,
+              distanceKm: visit.distanceKm,
+              durationMins: visit.durationMins,
+              routePoints: visit.routePoints as any,
+              status: visit.status,
+              purpose: visit.purpose,
+              notes: visit.notes,
+              photos: {
+                create: visit.photos.map((p: any) => ({
+                  url: p.url,
+                  takenAt: p.takenAt,
+                  caption: p.caption,
+                })),
+              },
+            },
+          });
+        }
+      }
+
+      // ── Discussions (threads, comments, attachments) — opt-in ───────────
+      if (copy.discussions && source.discussions.length) {
+        for (const discussion of source.discussions) {
+          await tx.projectDiscussion.create({
+            data: {
+              title: discussion.title,
+              content: discussion.content,
+              projectId: project.id,
+              authorId:
+                discussion.authorId && activeIds.has(discussion.authorId)
+                  ? discussion.authorId
+                  : actorEmployeeId,
+              comments: {
+                create: discussion.comments.map((c: any) => ({
+                  content: c.content,
+                  authorId: activeIds.has(c.authorId) ? c.authorId : actorEmployeeId,
+                })),
+              },
+              attachments: {
+                create: discussion.attachments.map((a: any) => ({
+                  fileName: a.fileName,
+                  fileUrl: a.fileUrl,
+                  fileSize: a.fileSize,
+                  uploadedById: activeIds.has(a.uploadedById) ? a.uploadedById : actorEmployeeId,
+                })),
+              },
+            },
+          });
+        }
+      }
+
+      // ── Project tickets — opt-in ────────────────────────────────────────
+      // ticketNumber is unique per company, so every duplicated ticket needs a
+      // fresh number, sequenced past everything already in the workspace.
+      if (copy.tickets && source.projectTickets.length) {
+        let tktSeq = await tx.projectTicket.count({ where: { companyId } });
+        for (const ticket of source.projectTickets) {
+          await tx.projectTicket.create({
+            data: {
+              ticketNumber: `TKT-${String(++tktSeq).padStart(4, '0')}`,
+              title: ticket.title,
+              description: ticket.description,
+              projectId: project.id,
+              companyId,
+              raisedById: activeIds.has(ticket.raisedById) ? ticket.raisedById : actorEmployeeId,
+              proposedAssigneeId:
+                ticket.proposedAssigneeId && activeIds.has(ticket.proposedAssigneeId)
+                  ? ticket.proposedAssigneeId
+                  : null,
+              priority: ticket.priority,
+              startDate: applyDate(ticket.startDate),
+              dueDate: applyDate(ticket.dueDate),
+              estimatedHours: ticket.estimatedHours,
+              status: ticket.status,
+              reviewedById:
+                ticket.reviewedById && activeIds.has(ticket.reviewedById) ? ticket.reviewedById : null,
+              reviewedAt: ticket.reviewedAt,
+              rejectionReason: ticket.rejectionReason,
+              convertedIssueId:
+                ticket.convertedIssueId != null ? (issueMap.get(ticket.convertedIssueId) ?? null) : null,
+              convertedAt: ticket.convertedAt,
+            },
+          });
+        }
+      }
+
+      // ── Budget requests — opt-in ────────────────────────────────────────
+      if (copy.budgetRequests && source.budgetRequests.length) {
+        for (const request of source.budgetRequests) {
+          await tx.projectBudgetRequest.create({
+            data: {
+              projectId: project.id,
+              companyId,
+              requestedById:
+                request.requestedById && activeIds.has(request.requestedById)
+                  ? request.requestedById
+                  : actorEmployeeId,
+              additionalHours: request.additionalHours,
+              hoursBefore: request.hoursBefore,
+              hoursAfter: request.hoursAfter,
+              budgetBefore: request.budgetBefore,
+              budgetAfter: request.budgetAfter,
+              additionalBudget: request.additionalBudget,
+              reason: request.reason,
+              attachmentUrl: request.attachmentUrl,
+              attachmentName: request.attachmentName,
+              status: request.status,
+              reviewedById:
+                request.reviewedById && activeIds.has(request.reviewedById) ? request.reviewedById : null,
+              reviewedAt: request.reviewedAt,
+              rejectionReason: request.rejectionReason,
+            },
+          });
+        }
       }
 
       // issueSeq must know how many keys were consumed, or the first task

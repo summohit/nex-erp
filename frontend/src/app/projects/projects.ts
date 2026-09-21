@@ -120,33 +120,41 @@ export class ProjectsComponent implements OnInit {
 
   // ── Duplicate Project modal ────────────────────────────────────────────
   duplicateModalProject = signal<any | null>(null);
-  duplicateName = signal<string>('');
-  duplicateDateMode = signal<'KEEP' | 'SHIFT' | 'RESET'>('KEEP');
-  duplicateShiftStartDate = signal<string>('');
   duplicateCopy = signal<Record<string, boolean>>({
+    summary: true,
+    boards: true,
     members: true,
     milestones: true,
     tasks: true,
     taskAssignments: true,
     taskDependencies: true,
-    projectFiles: true,
-    taskFiles: true,
     labels: true,
+    attachments: true,
+    evidence: true,
+    // Historical or operational records stay behind by default.
     comments: false,
     activity: false,
     timeLogs: false,
+    clientVisits: false,
+    tickets: false,
+    discussions: false,
+    budgetRequests: false,
   });
   duplicateSubmitting = signal<boolean>(false);
 
   duplicateCopyOptions: { key: string; label: string }[] = [
+    { key: 'summary', label: 'Summary' },
+    { key: 'boards', label: 'Board' },
     { key: 'members', label: 'Team members' },
+    { key: 'tasks', label: 'List (tasks & subtasks)' },
     { key: 'milestones', label: 'Milestones' },
-    { key: 'tasks', label: 'Tasks & subtasks' },
-    { key: 'taskAssignments', label: 'Task assignments' },
-    { key: 'taskDependencies', label: 'Task dependencies' },
     { key: 'labels', label: 'Labels' },
-    { key: 'projectFiles', label: 'Project files' },
-    { key: 'taskFiles', label: 'Task files' },
+    { key: 'attachments', label: 'Attachments' },
+    { key: 'evidence', label: 'Evidence' },
+    { key: 'clientVisits', label: 'Client Visits' },
+    { key: 'tickets', label: 'Tickets' },
+    { key: 'discussions', label: 'Discussions' },
+    { key: 'budgetRequests', label: 'Budget requests' },
     { key: 'comments', label: 'Comments' },
     { key: 'activity', label: 'Activity history' },
     { key: 'timeLogs', label: 'Time logs' },
@@ -3331,50 +3339,151 @@ export class ProjectsComponent implements OnInit {
     if (event) event.stopPropagation();
     const base = project.name || 'Project';
     this.duplicateModalProject.set(project);
-    this.duplicateName.set(`${base} - Copy`);
-    this.duplicateDateMode.set('KEEP');
-    this.duplicateShiftStartDate.set(this.todayString());
+    // The duplicate modal mirrors the Add New Board form. Every editable
+    // field is pre-filled from the source project (so department, category,
+    // dates, team, budget and tracking settings are all "copied") but can be
+    // changed before the project is created.
+    this.projectForm = {
+      ...this.emptyProjectForm(),
+      name: `${base} - Copy`,
+      description: project.description || '',
+      startDate: project.startDate ? project.startDate.split('T')[0] : '',
+      endDate: project.endDate ? project.endDate.split('T')[0] : '',
+      billingType: project.billingType || 'NON_BILLABLE',
+      summary: project.summary || '',
+      budgetAmount: project.budgetAmount,
+      hourlyRate: project.hourlyRate,
+      clientId: project.clientId,
+      leadContactId: project.leadContactId ?? project.leadContact?.id ?? null,
+      pmIds: project.members
+        ?.filter((m: any) => m.role === 'PROJECT_MANAGER' || m.role === 'ADMIN')
+        .map((m: any) => m.employeeId) || [],
+      memberIds: project.members
+        ?.filter((m: any) => m.role === 'MEMBER')
+        .map((m: any) => m.employeeId) || [],
+      address: project.address || '',
+      category: project.category || '',
+      priority: project.priority || 'MEDIUM',
+      departmentId: project.department?.id ?? project.departmentId ?? null,
+      // A blueprint starts fresh: the field stays editable, but the default is
+      // the app's active lifecycle state rather than the source's own status.
+      workStatus: 'ACTIVE',
+      currency: project.currency || 'INR',
+      budgetNotes: project.budgetNotes || '',
+      estimatedHours: project.estimatedHours ?? null,
+      allowManualTimeLogging: project.allowManualTimeLogging !== false
+    };
+
+    let color = project.color;
+    if (color && color.startsWith('url(')) {
+      color = color.substring(4, color.length - 1);
+    }
+    this.selectedBg.set(color || this.colorBackgrounds[1]);
+
+    this.closeAllModalDropdowns();
+    this.clientSearchQuery.set('');
+    this.categorySearchQuery.set('');
+    this.departmentSearchQuery.set('');
+    this.pmSearchQuery.set('');
+    this.memberSearchQuery.set('');
+
     this.duplicateCopy.set({
+      summary: true,
+      boards: true,
       members: true,
       milestones: true,
       tasks: true,
       taskAssignments: true,
       taskDependencies: true,
-      projectFiles: true,
-      taskFiles: true,
       labels: true,
+      attachments: true,
+      evidence: true,
       comments: false,
       activity: false,
       timeLogs: false,
+      clientVisits: false,
+      tickets: false,
+      discussions: false,
+      budgetRequests: false,
     });
     this.duplicateSubmitting.set(false);
+    this.isSubmitted.set(false);
   }
 
   closeDuplicateModal() {
     this.duplicateModalProject.set(null);
+    this.closeAllModalDropdowns();
   }
 
   duplicateProject() {
     const project = this.duplicateModalProject();
-    const name = this.duplicateName().trim();
-    if (!project) {
-      return;
-    }
+    if (!project) return;
+
+    const name = this.projectForm.name.trim();
     if (!name) {
-      this.toast.error('Project name is required');
+      this.toast.error('Board title is required');
       return;
     }
-    const dateMode = this.duplicateDateMode();
-    if (dateMode === 'SHIFT' && !this.duplicateShiftStartDate()) {
-      this.toast.error('Pick a start date for the shifted copy');
+    if (this.isDateRangeInvalid()) {
+      this.toast.error('Deadline must be equal to or after Start Date');
       return;
     }
+    const missing = this.missingRequiredFields();
+    if (missing.length) {
+      this.toast.error(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required`);
+      this.focusFirstInvalidField();
+      return;
+    }
+
+    // Date fields drive the ledger: unchanged start/end keep the content
+    // dates, clearing both blanks them, and a moved start shifts issues and
+    // milestones by the same offset as the project start.
+    const srcStart = project.startDate ? project.startDate.split('T')[0] : '';
+    const newStart = (this.projectForm.startDate || '').trim();
+    const newEnd = (this.projectForm.endDate || '').trim();
+    let dateMode: 'KEEP' | 'SHIFT' | 'RESET' = 'KEEP';
+    if (!newStart && !newEnd) {
+      dateMode = 'RESET';
+    } else if (newStart && srcStart && newStart !== srcStart) {
+      dateMode = 'SHIFT';
+    }
+
+    const bgValue = this.selectedBg().startsWith('http')
+      ? `url(${this.selectedBg()})`
+      : this.selectedBg();
+
     this.duplicateSubmitting.set(true);
     const payload = {
       name,
       dateMode,
-      shiftStartDate: dateMode === 'SHIFT' ? this.duplicateShiftStartDate() : null,
-      copy: { ...this.duplicateCopy() },
+      startDate: this.projectForm.startDate || null,
+      endDate: this.projectForm.endDate || null,
+      pmIds: this.projectForm.pmIds,
+      memberIds: this.projectForm.memberIds,
+      overrides: {
+        summary: this.projectForm.summary || null,
+        color: bgValue,
+        address: this.projectForm.address || null,
+        billingType: this.projectForm.billingType,
+        budgetAmount: this.projectForm.budgetAmount || null,
+        hourlyRate: this.projectForm.hourlyRate || null,
+        leadContactId: this.projectForm.leadContactId || null,
+        category: this.projectForm.category || null,
+        priority: this.projectForm.priority,
+        departmentId: this.projectForm.departmentId || null,
+        workStatus: this.projectForm.workStatus,
+        currency: this.projectForm.currency,
+        budgetNotes: this.projectForm.budgetNotes || null,
+        estimatedHours: this.projectForm.estimatedHours || null,
+        allowManualTimeLogging: this.projectForm.allowManualTimeLogging,
+      },
+      copy: {
+        ...this.duplicateCopy(),
+        // One "Attachments" checkbox: it covers the project-level documents,
+        // while "Evidence" (below) covers the files attached to tasks.
+        projectFiles: this.duplicateCopy()['attachments'],
+        taskFiles: this.duplicateCopy()['evidence'],
+      },
     };
     this.projectsService.duplicateProject(project.id, payload).subscribe({
       next: (res) => {

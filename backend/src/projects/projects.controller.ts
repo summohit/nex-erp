@@ -150,7 +150,9 @@ export class ProjectsController {
   /**
    * Create a new project using `id` as a blueprint. Historical data (activity,
    * time logs, financials, comments) is excluded by default — the payload's
-   * `copy` flags decide what is duplicated and `dateMode` how dates move.
+   * `copy` flags decide what is duplicated, `dateMode` how content dates move,
+   * `pmIds`/`memberIds` replace the team, and `overrides` edits any of the
+   * copied identity, scheduled, budget or tracking fields.
    */
   @Post(':id/duplicate')
   duplicateProject(
