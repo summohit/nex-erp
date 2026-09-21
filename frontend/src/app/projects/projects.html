@@ -208,6 +208,14 @@
             </button>
             <button 
               type="button" 
+              class="dup-btn" 
+              (click)="openDuplicateModal(p, $event)" 
+              title="Duplicate project"
+              *ngIf="isSuperAdmin">
+              <svg lucideCopy size="14"></svg>
+            </button>
+            <button 
+              type="button" 
               class="star-btn" 
               [class.active]="isStarred(p.id)"
               (click)="toggleStar(p.id, $event)" 
@@ -262,6 +270,14 @@
               title="Edit board"
               *ngIf="isManagementAdmin">
               <svg lucideEdit2 size="14"></svg>
+            </button>
+            <button 
+              type="button" 
+              class="dup-btn" 
+              (click)="openDuplicateModal(p, $event)" 
+              title="Duplicate project"
+              *ngIf="isSuperAdmin">
+              <svg lucideCopy size="14"></svg>
             </button>
             <button 
               type="button" 
@@ -491,6 +507,14 @@
                   title="Edit board"
                   *ngIf="isManagementAdmin">
                   <svg lucideEdit2 size="14"></svg>
+                </button>
+                <button
+                  type="button"
+                  class="dup-btn"
+                  (click)="openDuplicateModal(p, $event)"
+                  title="Duplicate project"
+                  *ngIf="isSuperAdmin">
+                  <svg lucideCopy size="14"></svg>
                 </button>
                 <button
                   type="button"
@@ -2744,6 +2768,116 @@
         <svg *ngIf="!stagedUploading()" lucideCheck size="16"></svg>
         <svg *ngIf="stagedUploading()" lucideLoader2 size="16" class="cbm-upload-spinner"></svg>
         <span>{{ stagedUploading() ? 'Uploading…' : (editingProjectId() ? 'Save Changes' : 'Create Board') }}</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Duplicate Project Modal -->
+<div class="cbm-overlay" *ngIf="duplicateModalProject()" (click)="closeDuplicateModal()">
+  <div class="cbm-card" (click)="$event.stopPropagation()">
+
+    <!-- Modal Header -->
+    <div class="cbm-header">
+      <div class="cbm-header-left">
+        <div class="cbm-icon-box">
+          <svg lucideCopy size="20" class="cbm-header-icon"></svg>
+        </div>
+        <div class="cbm-header-text">
+          <h2 class="cbm-title">Duplicate Project</h2>
+          <p class="cbm-subtitle">Create a new project using "{{ duplicateModalProject()?.name }}" as a blueprint</p>
+        </div>
+      </div>
+      <button type="button" class="cbm-close-btn" (click)="closeDuplicateModal()" aria-label="Close modal">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="cbm-body">
+
+      <!-- Project Name -->
+      <div class="cbm-field-group">
+        <label class="cbm-field-label" data-field="name">Project Name <span class="cbm-required">*</span></label>
+        <div class="cbm-input-wrapper">
+          <input
+            type="text"
+            class="cbm-input"
+            [class.error]="duplicateSubmitting() && !duplicateName().trim()"
+            [(ngModel)]="duplicateName"
+            placeholder="e.g. Cloud Infrastructure Migration - Copy">
+        </div>
+      </div>
+
+      <!-- Project Dates -->
+      <div class="cbm-field-group">
+        <label class="cbm-field-label">Project Dates</label>
+        <div class="cbm-dupe-radio-row">
+          <label class="cbm-dupe-radio">
+            <input type="radio" name="dupeDateMode" [value]="'KEEP'" [(ngModel)]="duplicateDateMode">
+            <span>Keep original dates</span>
+          </label>
+          <label class="cbm-dupe-radio">
+            <input type="radio" name="dupeDateMode" [value]="'SHIFT'" [(ngModel)]="duplicateDateMode">
+            <span>Shift dates</span>
+          </label>
+          <label class="cbm-dupe-radio">
+            <input type="radio" name="dupeDateMode" [value]="'RESET'" [(ngModel)]="duplicateDateMode">
+            <span>No dates</span>
+          </label>
+        </div>
+        <div class="cbm-field-group cbm-dupe-shift" *ngIf="duplicateDateMode() === 'SHIFT'">
+          <label class="cbm-field-label">New Start Date <span class="cbm-required">*</span></label>
+          <div class="cbm-input-wrapper">
+            <input type="date" class="cbm-input" [(ngModel)]="duplicateShiftStartDate">
+          </div>
+        </div>
+      </div>
+
+      <!-- What to Copy -->
+      <div class="cbm-form-section">
+        <div class="cbm-section-title">
+          <span class="cbm-section-number">*</span>
+          <span>What to copy</span>
+        </div>
+        <div class="cbm-dupe-checks">
+          <label class="cbm-dupe-check" *ngFor="let opt of duplicateCopyOptions">
+            <input
+              type="checkbox"
+              [ngModel]="duplicateCopy()[opt.key]"
+              (ngModelChange)="setDuplicateCopy(opt.key, $event)">
+            <span>{{ opt.label }}</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Never Copied -->
+      <div class="cbm-form-section cbm-dupe-never">
+        <div class="cbm-section-title">
+          <span class="cbm-section-number">—</span>
+          <span>Never copied</span>
+        </div>
+        <p class="cbm-dupe-note">
+          Financial transactions (invoices, payments, expense claims), notifications,
+          reminders, audit logs, discussions and created-updated timestamps are never
+          duplicated. Statuses are reset to a fresh project, task completion is cleared,
+          and a new project key is generated automatically.
+        </p>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="cbm-footer">
+      <button type="button" class="cbm-btn-cancel" [disabled]="duplicateSubmitting()" (click)="closeDuplicateModal()">Cancel</button>
+      <button
+        type="button"
+        class="cbm-btn-submit"
+        [disabled]="duplicateSubmitting() || !duplicateName().trim()"
+        (click)="duplicateProject()">
+        <svg *ngIf="!duplicateSubmitting()" lucideCopy size="16"></svg>
+        <svg *ngIf="duplicateSubmitting()" lucideLoader2 size="16" class="cbm-upload-spinner"></svg>
+        <span>{{ duplicateSubmitting() ? 'Duplicating…' : 'Duplicate Project' }}</span>
       </button>
     </div>
 

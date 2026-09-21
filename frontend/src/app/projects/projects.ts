@@ -13,7 +13,8 @@ import {
   LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
   LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
   LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
-  LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity
+  LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity,
+  LucideCopy
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
@@ -93,6 +94,7 @@ function getStatusColors(status: string): { bg: string; color: string } {
     LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
     LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
     LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity,
+    LucideCopy,
     AgGridModule
   ],
   templateUrl: './projects.html',
@@ -115,6 +117,44 @@ export class ProjectsComponent implements OnInit {
   showArchiveWarningModal = false;
   pendingArchiveProjectId: number | null = null;
   archiveWarningMessage = '';
+
+  // ── Duplicate Project modal ────────────────────────────────────────────
+  duplicateModalProject = signal<any | null>(null);
+  duplicateName = signal<string>('');
+  duplicateDateMode = signal<'KEEP' | 'SHIFT' | 'RESET'>('KEEP');
+  duplicateShiftStartDate = signal<string>('');
+  duplicateCopy = signal<Record<string, boolean>>({
+    members: true,
+    milestones: true,
+    tasks: true,
+    taskAssignments: true,
+    taskDependencies: true,
+    projectFiles: true,
+    taskFiles: true,
+    labels: true,
+    comments: false,
+    activity: false,
+    timeLogs: false,
+  });
+  duplicateSubmitting = signal<boolean>(false);
+
+  duplicateCopyOptions: { key: string; label: string }[] = [
+    { key: 'members', label: 'Team members' },
+    { key: 'milestones', label: 'Milestones' },
+    { key: 'tasks', label: 'Tasks & subtasks' },
+    { key: 'taskAssignments', label: 'Task assignments' },
+    { key: 'taskDependencies', label: 'Task dependencies' },
+    { key: 'labels', label: 'Labels' },
+    { key: 'projectFiles', label: 'Project files' },
+    { key: 'taskFiles', label: 'Task files' },
+    { key: 'comments', label: 'Comments' },
+    { key: 'activity', label: 'Activity history' },
+    { key: 'timeLogs', label: 'Time logs' },
+  ];
+
+  setDuplicateCopy(key: string, value: boolean) {
+    this.duplicateCopy.update((c) => ({ ...c, [key]: value }));
+  }
 
   currentUser = this.authService.currentUser;
 
@@ -818,7 +858,9 @@ export class ProjectsComponent implements OnInit {
         cellRendererParams: {
           showActions: () => this.isManagementAdmin,
           onEdit: (data: any) => this.openEditModal(data, new Event('click')),
-          onArchive: (data: any) => this.archiveBoard(data, false, new Event('click'))
+          onArchive: (data: any) => this.archiveBoard(data, false, new Event('click')),
+          onDuplicate: (data: any) => this.openDuplicateModal(data, new Event('click')),
+          canDuplicate: () => this.isSuperAdmin
         }
       }
     );
@@ -902,6 +944,11 @@ export class ProjectsComponent implements OnInit {
   get isAdmin(): boolean {
     const user = this.currentUser();
     return user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
+  }
+
+  // Duplicating a project is a super-admin-only action.
+  get isSuperAdmin(): boolean {
+    return this.currentUser()?.role === 'SUPERADMIN';
   }
 
   // Management-level administrator: system admin role, or CEO/CTO by designation.
@@ -3273,6 +3320,74 @@ export class ProjectsComponent implements OnInit {
     
     this.isSubmitted.set(false);
     this.isCreateModalOpen.set(true);
+  }
+
+  private todayString(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
+  openDuplicateModal(project: any, event?: Event) {
+    if (event) event.stopPropagation();
+    const base = project.name || 'Project';
+    this.duplicateModalProject.set(project);
+    this.duplicateName.set(`${base} - Copy`);
+    this.duplicateDateMode.set('KEEP');
+    this.duplicateShiftStartDate.set(this.todayString());
+    this.duplicateCopy.set({
+      members: true,
+      milestones: true,
+      tasks: true,
+      taskAssignments: true,
+      taskDependencies: true,
+      projectFiles: true,
+      taskFiles: true,
+      labels: true,
+      comments: false,
+      activity: false,
+      timeLogs: false,
+    });
+    this.duplicateSubmitting.set(false);
+  }
+
+  closeDuplicateModal() {
+    this.duplicateModalProject.set(null);
+  }
+
+  duplicateProject() {
+    const project = this.duplicateModalProject();
+    const name = this.duplicateName().trim();
+    if (!project) {
+      return;
+    }
+    if (!name) {
+      this.toast.error('Project name is required');
+      return;
+    }
+    const dateMode = this.duplicateDateMode();
+    if (dateMode === 'SHIFT' && !this.duplicateShiftStartDate()) {
+      this.toast.error('Pick a start date for the shifted copy');
+      return;
+    }
+    this.duplicateSubmitting.set(true);
+    const payload = {
+      name,
+      dateMode,
+      shiftStartDate: dateMode === 'SHIFT' ? this.duplicateShiftStartDate() : null,
+      copy: { ...this.duplicateCopy() },
+    };
+    this.projectsService.duplicateProject(project.id, payload).subscribe({
+      next: (res) => {
+        this.duplicateSubmitting.set(false);
+        this.closeDuplicateModal();
+        this.toast.success(`Project "${res?.name || name}" duplicated`);
+        this.loadProjects();
+      },
+      error: (err) => {
+        this.duplicateSubmitting.set(false);
+        this.toast.error(err?.error?.message || 'Failed to duplicate project');
+      },
+    });
   }
 
   closeCreateModal() {

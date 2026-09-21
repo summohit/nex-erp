@@ -1800,6 +1800,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
    * that, opening the page would request both twice.
    */
   setProjectTab(tab: string, refetch = true) {
+    // The money tabs are role-gated: a PM-less viewer who lands with one of
+    // them restored from localStorage (or pasted via the URL) falls back to
+    // the board rather than seeing an empty, privileged panel.
+    const restrictedTabs = ['milestones', 'budget-requests', 'reports'];
+    if (restrictedTabs.includes(tab) && !this.canSeeFinancialTabs) {
+      tab = 'board';
+    }
     this.activeProjectTab.set(tab);
     localStorage.setItem('project_active_tab', tab);
     if (!refetch) return;
@@ -3753,6 +3760,27 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (myMember && myMember.role === 'ADMIN') return true;
 
     return false;
+  }
+
+  /**
+   * The Milestones, Budget requests and Reports tabs carry the project's
+   * money story — scope, spend and cost. Only finance/accounts, the super
+   * admin and the project's own manager (PROJECT_MANAGER role) may see them.
+   */
+  get canSeeFinancialTabs(): boolean {
+    const user = this.currentUser();
+    if (!user) return false;
+    if (user.role === 'SUPERADMIN' || user.role === 'FINANCE') return true;
+
+    const p = this.project();
+    if (!p?.members) return false;
+
+    const empId = user.employeeId ?? user.employee?.id ?? user.id;
+    return p.members.some(
+      (m: any) =>
+        (m.employeeId === empId || m.employee?.id === empId) &&
+        m.role === 'PROJECT_MANAGER'
+    );
   }
 
   isProjectMember(employeeId: number): boolean {

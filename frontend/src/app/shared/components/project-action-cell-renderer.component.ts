@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { ICellRendererAngularComp } from 'ag-grid-angular';
 import { ICellRendererParams } from 'ag-grid-community';
-import { LucideMoreHorizontal } from '@lucide/angular';
+import { LucideMoreHorizontal, LucideCopy } from '@lucide/angular';
 import { CommonModule } from '@angular/common';
 import { MatMenuModule } from '@angular/material/menu';
 
@@ -9,12 +9,14 @@ export interface ProjectActionCellParams extends ICellRendererParams {
   showActions: () => boolean;
   onEdit: (data: any) => void;
   onArchive: (data: any) => void;
+  onDuplicate: (data: any) => void;
+  canDuplicate: () => boolean;
 }
 
 @Component({
   selector: 'app-project-action-cell-renderer',
   standalone: true,
-  imports: [CommonModule, LucideMoreHorizontal, MatMenuModule],
+  imports: [CommonModule, LucideMoreHorizontal, LucideCopy, MatMenuModule],
   template: `
     <div class="action-container" (click)="$event.stopPropagation()" *ngIf="params.showActions()">
       <button class="btn-icon" [matMenuTriggerFor]="menu" title="Actions">
@@ -24,6 +26,9 @@ export interface ProjectActionCellParams extends ICellRendererParams {
       <mat-menu #menu="matMenu" panelClass="custom-action-menu">
         <button mat-menu-item class="menu-item" (click)="edit()">
           <span class="menu-text">Edit board</span>
+        </button>
+        <button mat-menu-item class="menu-item" (click)="duplicate()" *ngIf="isDuplicateVisible()">
+          <span class="menu-text">Duplicate project</span>
         </button>
         <button mat-menu-item class="menu-item text-danger" (click)="archive()">
           <span class="menu-text">Archive board</span>
@@ -83,5 +88,10 @@ export class ProjectActionCellRendererComponent implements ICellRendererAngularC
   }
 
   edit() { this.params.onEdit(this.params.data); }
+  duplicate() { this.params.onDuplicate(this.params.data); }
   archive() { this.params.onArchive(this.params.data); }
+
+  isDuplicateVisible(): boolean {
+    return typeof this.params.canDuplicate === 'function' && this.params.canDuplicate();
+  }
 }

@@ -300,6 +300,512 @@ export class ProjectsService {
     }
   }
 
+  /**
+   * Next company project code: CES/MMYY/SEQ (e.g., CES/0626/01).
+   *
+   * Same sequence rule as createProject / createAiProject — highest sequence
+   * for the current month plus one, zero-padded to two digits — shared so a
+   * duplicate can never collide with the @@unique([key, companyId]) on the
+   * source project, and so every writer agrees on what "next" means.
+   */
+  private async nextProjectKey(companyId: number): Promise<string> {
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(-2);
+    const baseKey = `CES/${mm}${yy}/`;
+
+    const existingProjects = await this.prisma.project.findMany({
+      where: { companyId, key: { startsWith: baseKey } },
+      select: { key: true },
+    });
+
+    let maxSeq = 0;
+    for (const proj of existingProjects) {
+      const parts = proj.key.split('/');
+      if (parts.length === 3) {
+        const seqNum = parseInt(parts[2], 10);
+        if (!isNaN(seqNum) && seqNum > maxSeq) {
+          maxSeq = seqNum;
+        }
+      }
+    }
+
+    return `${baseKey}${String(maxSeq + 1).padStart(2, '0')}`;
+  }
+
+  /**
+   * Duplicate a project — "create a new project using the existing one as a
+   * blueprint", not "clone every row".
+   *
+   * Copies blueprint data (details, members, milestone structure, task
+   * structure, assignments, dependencies, project and task files) while
+   * deliberately NOT copying anything that is evidence of past work:
+   * timestamps, IDs, activity, comments, time logs, timesheets, tickets,
+   * budget requests, notifications/reminders, financial records or the
+   * AI analysis runs. Task/milestone/project status and progress are reset.
+   *
+   * Every id on the copy is freshly generated and every relationship is
+   * remapped to the new rows (milestones, columns, parents, dependencies,
+   * labels), never pointing at the source project.
+   */
+  async duplicateProject(
+    companyId: number,
+    actorEmployeeId: number,
+    role: string,
+    sourceProjectId: number,
+    data: any,
+  ) {
+    const copy = {
+      members: data?.copy?.members ?? true,
+      milestones: data?.copy?.milestones ?? true,
+      tasks: data?.copy?.tasks ?? true,
+      taskAssignments: data?.copy?.taskAssignments ?? true,
+      taskDependencies: data?.copy?.taskDependencies ?? true,
+      projectFiles: data?.copy?.projectFiles ?? true,
+      taskFiles: data?.copy?.taskFiles ?? true,
+      labels: data?.copy?.labels ?? true,
+      comments: data?.copy?.comments ?? false,
+      activity: data?.copy?.activity ?? false,
+      timeLogs: data?.copy?.timeLogs ?? false,
+    };
+
+    const name = data?.name?.trim();
+    if (!name) throw new BadRequestException('Project name is required');
+
+    const dateMode = data?.dateMode || 'KEEP';
+    if (!['KEEP', 'SHIFT', 'RESET'].includes(dateMode)) {
+      throw new BadRequestException('Invalid date mode');
+    }
+
+    const existing = await this.prisma.project.findFirst({
+      where: { companyId, name: { equals: name, mode: 'insensitive' } },
+    });
+    if (existing) {
+      throw new BadRequestException(`Project with name "${name}" already exists`);
+    }
+
+    const source = await this.prisma.project.findUnique({
+      where: { id: sourceProjectId },
+      include: {
+        members: true,
+        boards: { include: { columns: { orderBy: { position: 'asc' } } } },
+        labels: { orderBy: { id: 'asc' } },
+        milestones: { orderBy: { position: 'asc' } },
+        documents: true,
+        issues: {
+          where: { isArchived: false },
+          include: {
+            comments: true,
+            attachments: true,
+            labels: true,
+            members: true,
+            activities: true,
+            timeLogs: true,
+            blockedBy: true,
+            checklists: { include: { items: true } },
+          },
+        },
+      },
+    });
+    if (!source || source.companyId !== companyId) {
+      throw new NotFoundException('Project not found');
+    }
+
+    // Duplicating a project is a super-admin-only action — it effectively
+    // forks the workspace, so the capability must not leak down to admins.
+    if (role !== 'SUPERADMIN') {
+      throw new ForbiddenException('Only a super administrator can duplicate a project');
+    }
+
+    // Members, assignees and authors must still be active and in the same
+    // workspace. Anyone separated or belonging to another company is dropped
+    // rather than copied into a project they can no longer see.
+    const candidateIds = new Set<number>([actorEmployeeId]);
+    if (source.leadId) candidateIds.add(source.leadId);
+    for (const m of source.members) candidateIds.add(m.employeeId);
+    for (const i of source.issues) {
+      if (i.assigneeId) candidateIds.add(i.assigneeId);
+      if (i.reporterId) candidateIds.add(i.reporterId);
+      for (const t of i.timeLogs) candidateIds.add(t.employeeId);
+      for (const a of i.activities) candidateIds.add(a.actorId);
+      for (const c of i.comments) candidateIds.add(c.authorId);
+      for (const at of i.attachments) candidateIds.add(at.uploadedBy);
+      for (const m of i.members) candidateIds.add(m.employeeId);
+    }
+    for (const d of source.documents) candidateIds.add(d.uploadedBy);
+    for (const m of source.milestones) if (m.ownerId) candidateIds.add(m.ownerId);
+
+    const activeEmployees = await this.prisma.employee.findMany({
+      where: {
+        companyId,
+        id: { in: Array.from(candidateIds) },
+        offboardingStatus: { not: 'SEPARATED' },
+      },
+      select: { id: true },
+    });
+    const activeIds = new Set(activeEmployees.map((e) => e.id));
+
+    // Dates: KEEP copies them, SHIFT moves everything by the same amount so
+    // the duplicate starts on the requested date, RESET blanks all of them.
+    let dateOffsetMs = 0;
+    const requestedStart = dateMode === 'SHIFT' && data.shiftStartDate
+      ? new Date(data.shiftStartDate)
+      : null;
+    if (dateMode === 'SHIFT' && requestedStart && source.startDate) {
+      dateOffsetMs = requestedStart.getTime() - source.startDate.getTime();
+    }
+    const applyDate = (value: Date | null): Date | null => {
+      if (!value) return null;
+      if (dateMode === 'RESET') return null;
+      if (dateMode === 'KEEP') return new Date(value);
+      return new Date(value.getTime() + dateOffsetMs);
+    };
+    const projectStart = dateMode === 'SHIFT'
+      ? (requestedStart ?? applyDate(source.startDate))
+      : applyDate(source.startDate);
+    const projectEnd = applyDate(source.endDate);
+
+    const key = await this.nextProjectKey(companyId);
+
+    const duplicated = await this.prisma.$transaction(async (tx) => {
+      const project = await tx.project.create({
+        data: {
+          name,
+          key,
+          description: source.description,
+          summary: source.summary,
+          color: source.color,
+          icon: source.icon,
+          address: source.address,
+          startDate: projectStart,
+          endDate: projectEnd,
+          billingType: source.billingType,
+          budgetAmount: source.budgetAmount,
+          hourlyRate: source.hourlyRate,
+          clientId: source.clientId,
+          leadContactId: source.leadContactId,
+          category: source.category,
+          priority: source.priority,
+          departmentId: source.departmentId,
+          // Reset to the app's default active lifecycle state — a blueprint
+          // of a completed project must not come into existence completed.
+          workStatus: 'ACTIVE',
+          closureStatus: 'WORK_PENDING',
+          onboardingStatus: 'DRAFT',
+          progress: null,
+          issueSeq: 0,
+          currency: source.currency,
+          budgetNotes: source.budgetNotes,
+          estimatedHours: source.estimatedHours,
+          allowManualTimeLogging: source.allowManualTimeLogging,
+          companyId,
+          leadId: source.leadId && activeIds.has(source.leadId) ? source.leadId : actorEmployeeId,
+        },
+      });
+
+      // ── Members ────────────────────────────────────────────────────────
+      if (copy.members) {
+        const roleByEmployee = new Map<number, string>();
+        for (const m of source.members) {
+          if (activeIds.has(m.employeeId)) roleByEmployee.set(m.employeeId, m.role);
+        }
+        // Whoever leads the duplicate is always an ADMIN on it, mirroring how
+        // buildInitialMembers treats the lead of a fresh project.
+        if (project.leadId) roleByEmployee.set(project.leadId, 'ADMIN');
+        await tx.projectMember.createMany({
+          data: Array.from(roleByEmployee, ([employeeId, mRole]) => ({
+            projectId: project.id,
+            employeeId,
+            role: mRole,
+          })),
+        });
+      }
+
+      // ── Boards & columns (kept) ─────────────────────────────────────────
+      const columnMap = new Map<number, number>();
+      let firstColumnId: number | null = null;
+      for (const board of source.boards) {
+        const created = await tx.board.create({
+          data: {
+            name: board.name,
+            projectId: project.id,
+            columns: {
+              create: board.columns.map((c) => ({
+                name: c.name,
+                type: c.type,
+                color: c.color,
+                position: c.position,
+                isSystem: c.isSystem,
+                isArchived: c.isArchived,
+              })),
+            },
+          },
+          include: { columns: true },
+        });
+        board.columns.forEach((c, i) => {
+          columnMap.set(c.id, created.columns[i].id);
+          if (firstColumnId === null) firstColumnId = created.columns[i].id;
+        });
+      }
+
+      // ── Labels (project tags) ───────────────────────────────────────────
+      const labelMap = new Map<number, number>();
+      if (copy.labels) {
+        for (const label of source.labels) {
+          const created = await tx.label.create({
+            data: { name: label.name, color: label.color, projectId: project.id },
+          });
+          labelMap.set(label.id, created.id);
+        }
+      }
+
+      // ── Milestones ──────────────────────────────────────────────────────
+      const milestoneMap = new Map<number, number>();
+      if (copy.milestones) {
+        for (const m of source.milestones) {
+          const created = await tx.projectMilestone.create({
+            data: {
+              projectId: project.id,
+              companyId,
+              name: m.name,
+              description: m.description,
+              startDate: applyDate(m.startDate),
+              dueDate: applyDate(m.dueDate),
+              percentage: m.percentage,
+              amount: m.amount,
+              // Structure is blueprint; completion is history.
+              status: 'PENDING',
+              completedAt: null,
+              ownerId: m.ownerId && activeIds.has(m.ownerId) ? m.ownerId : null,
+              position: m.position,
+            },
+          });
+          milestoneMap.set(m.id, created.id);
+        }
+      }
+
+      // ── Tasks & subtasks (Issues) ───────────────────────────────────────
+      let seq = 0;
+      const issueMap = new Map<number, number>();
+      const createdIssues: { source: any; created: any }[] = [];
+
+      if (copy.tasks) {
+        for (const issue of [...source.issues].sort((a, b) => a.id - b.id)) {
+          const created = await tx.issue.create({
+            data: {
+              key: `${project.key}-${++seq}`,
+              title: issue.title,
+              description: issue.description,
+              type: issue.type,
+              // Prefer resetting to the initial status: the copy is a fresh
+              // project, work is not already finished on it.
+              status: 'TODO',
+              priority: issue.priority,
+              storyPoints: issue.storyPoints,
+              startDate: applyDate(issue.startDate),
+              dueDate: applyDate(issue.dueDate),
+              estimatedHours: issue.estimatedHours,
+              recurring: issue.recurring,
+              coverUrl: issue.coverUrl,
+              position: issue.position,
+              projectId: project.id,
+              companyId,
+              leadId: issue.leadId,
+              taskTypeId: issue.taskTypeId,
+              phaseId: issue.phaseId,
+              milestoneId:
+                copy.milestones && issue.milestoneId != null
+                  ? (milestoneMap.get(issue.milestoneId) ?? null)
+                  : null,
+              columnId: issue.columnId != null ? (columnMap.get(issue.columnId) ?? firstColumnId) : firstColumnId,
+              assigneeId:
+                copy.taskAssignments && issue.assigneeId && activeIds.has(issue.assigneeId)
+                  ? issue.assigneeId
+                  : null,
+              reporterId: issue.reporterId && activeIds.has(issue.reporterId) ? issue.reporterId : actorEmployeeId,
+              additionalHours: 0,
+            },
+          });
+          issueMap.set(issue.id, created.id);
+          createdIssues.push({ source: issue, created });
+        }
+
+        // Subtasks & epic hierarchy (parents first, remapped to the new rows).
+        for (const { source: issue, created } of createdIssues) {
+          if (issue.parentId != null && issueMap.has(issue.parentId)) {
+            await tx.issue.update({
+              where: { id: created.id },
+              data: { parentId: issueMap.get(issue.parentId)! },
+            });
+          }
+        }
+
+        // Checklists — items copied but completion reset, so the duplicate
+        // reads as fresh work rather than work already done.
+        for (const { source: issue, created } of createdIssues) {
+          for (const checklist of issue.checklists) {
+            await tx.checklist.create({
+              data: {
+                title: checklist.title,
+                issueId: created.id,
+                items: {
+                  create: checklist.items.map((item: any) => ({
+                    title: item.title,
+                    isCompleted: false,
+                  })),
+                },
+              },
+            });
+          }
+        }
+
+        // Task members (assignments).
+        if (copy.taskAssignments) {
+          const rows: { issueId: number; employeeId: number }[] = [];
+          for (const { source: issue, created } of createdIssues) {
+            for (const member of issue.members) {
+              if (activeIds.has(member.employeeId)) {
+                rows.push({ issueId: created.id, employeeId: member.employeeId });
+              }
+            }
+          }
+          if (rows.length) await tx.issueMember.createMany({ data: rows, skipDuplicates: true });
+        }
+
+        // Task labels, remapped to the duplicate's own labels.
+        if (copy.labels) {
+          const rows: { issueId: number; labelId: number }[] = [];
+          for (const { source: issue, created } of createdIssues) {
+            for (const issueLabel of issue.labels) {
+              const labelId = labelMap.get(issueLabel.labelId);
+              if (labelId != null) rows.push({ issueId: created.id, labelId });
+            }
+          }
+          if (rows.length) await tx.issueLabel.createMany({ data: rows, skipDuplicates: true });
+        }
+
+        // Dependencies — both ends remapped to the duplicated tasks.
+        if (copy.taskDependencies) {
+          const rows: any[] = [];
+          for (const { source: issue } of createdIssues) {
+            const newIssueId = issueMap.get(issue.id)!;
+            for (const dependency of issue.blockedBy) {
+              const dependsOnNewId = issueMap.get(dependency.dependsOnIssueId);
+              if (dependsOnNewId != null) {
+                rows.push({
+                  issueId: newIssueId,
+                  dependsOnIssueId: dependsOnNewId,
+                  type: dependency.type || 'BLOCKS',
+                  companyId,
+                  createdById: actorEmployeeId,
+                });
+              }
+            }
+          }
+          if (rows.length) await tx.issueDependency.createMany({ data: rows, skipDuplicates: true });
+        }
+
+        // Task files — the storage reference (ImageKit URL) is reusable.
+        if (copy.taskFiles) {
+          const rows: any[] = [];
+          for (const { source: issue, created } of createdIssues) {
+            for (const attachment of issue.attachments) {
+              rows.push({
+                issueId: created.id,
+                fileName: attachment.fileName,
+                fileUrl: attachment.fileUrl,
+                fileSize: attachment.fileSize,
+                fileType: attachment.fileType,
+                isCover: attachment.isCover,
+                uploadedBy:
+                  attachment.uploadedBy && activeIds.has(attachment.uploadedBy)
+                    ? attachment.uploadedBy
+                    : actorEmployeeId,
+              });
+            }
+          }
+          if (rows.length) await tx.issueAttachment.createMany({ data: rows });
+        }
+
+        // Historical conversation — opt-in only.
+        if (copy.comments) {
+          const rows: { issueId: number; body: string; authorId: number }[] = [];
+          for (const { source: issue, created } of createdIssues) {
+            for (const comment of issue.comments) {
+              rows.push({
+                issueId: created.id,
+                body: comment.body,
+                authorId: comment.authorId && activeIds.has(comment.authorId) ? comment.authorId : actorEmployeeId,
+              });
+            }
+          }
+          if (rows.length) await tx.issueComment.createMany({ data: rows });
+        }
+
+        // Activity history — opt-in only.
+        if (copy.activity) {
+          const rows: any[] = [];
+          for (const { source: issue, created } of createdIssues) {
+            for (const activity of issue.activities) {
+              rows.push({
+                issueId: created.id,
+                action: activity.action,
+                field: activity.field,
+                oldValue: activity.oldValue,
+                newValue: activity.newValue,
+                actorId: activity.actorId && activeIds.has(activity.actorId) ? activity.actorId : actorEmployeeId,
+              });
+            }
+          }
+          if (rows.length) await tx.issueActivity.createMany({ data: rows });
+        }
+
+        // Time logs — opt-in only; the duplicate starts at zero hours by default.
+        if (copy.timeLogs) {
+          const rows: any[] = [];
+          for (const { source: issue, created } of createdIssues) {
+            for (const log of issue.timeLogs) {
+              rows.push({
+                issueId: created.id,
+                employeeId: log.employeeId && activeIds.has(log.employeeId) ? log.employeeId : actorEmployeeId,
+                startedAt: log.startedAt,
+                endedAt: log.endedAt,
+                durationMin: log.durationMin,
+                source: log.source,
+                note: log.note,
+              });
+            }
+          }
+          if (rows.length) await tx.issueTimeLog.createMany({ data: rows });
+        }
+      }
+
+      // ── Project-level files ─────────────────────────────────────────────
+      if (copy.projectFiles && source.documents.length) {
+        await tx.projectDocument.createMany({
+          data: source.documents.map((doc: any) => ({
+            projectId: project.id,
+            name: doc.name,
+            url: doc.url,
+            fileId: doc.fileId,
+            type: doc.type,
+            rawText: doc.rawText,
+            status: doc.status,
+            uploadedBy: doc.uploadedBy && activeIds.has(doc.uploadedBy) ? doc.uploadedBy : actorEmployeeId,
+          })),
+        });
+      }
+
+      // issueSeq must know how many keys were consumed, or the first task
+      // raised by hand would collide on @@unique([key, companyId]).
+      await tx.project.update({ where: { id: project.id }, data: { issueSeq: seq } });
+
+      return project;
+    });
+
+    return duplicated;
+  }
+
   async createAiProject(companyId: number, leadId: number, data: any) {
     const now = new Date();
     const mm = String(now.getMonth() + 1).padStart(2, '0');

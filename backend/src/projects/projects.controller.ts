@@ -147,6 +147,27 @@ export class ProjectsController {
     return this.projectsService.updateProject(req.user.companyId, id, data);
   }
 
+  /**
+   * Create a new project using `id` as a blueprint. Historical data (activity,
+   * time logs, financials, comments) is excluded by default — the payload's
+   * `copy` flags decide what is duplicated and `dateMode` how dates move.
+   */
+  @Post(':id/duplicate')
+  duplicateProject(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: any,
+  ) {
+    const actorEmployeeId = req.user.employeeId ?? req.user.sub;
+    return this.projectsService.duplicateProject(
+      req.user.companyId,
+      actorEmployeeId,
+      req.user.role,
+      id,
+      data,
+    );
+  }
+
   @Get(':id/members')
   getProjectMembers(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.projectsService.getProjectMembers(req.user.companyId, id);

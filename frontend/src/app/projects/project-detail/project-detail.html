@@ -501,7 +501,7 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'summary'" (click)="setProjectTab('summary')"><svg lucideGlobe size="14"></svg> Summary</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'board'" (click)="setProjectTab('board')"><svg lucideKanban size="14"></svg> Board</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'list'" (click)="setProjectTab('list')"><svg lucideList size="14"></svg> List</button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'milestones'" (click)="setProjectTab('milestones')"><svg lucideFlag size="14"></svg> Milestones<span class="tab-count" *ngIf="projectMilestones().length > 0">{{ projectMilestones().length }}</span></button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'milestones'" (click)="setProjectTab('milestones')" *ngIf="canSeeFinancialTabs"><svg lucideFlag size="14"></svg> Milestones<span class="tab-count" *ngIf="projectMilestones().length > 0">{{ projectMilestones().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'roadmap'" (click)="setProjectTab('roadmap')"><svg lucideGanttChart size="14"></svg> Roadmap</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'attachments'" (click)="setProjectTab('attachments')"><svg lucidePaperclip size="14"></svg> Attachments<span class="tab-count" *ngIf="projectDocuments().length > 0">{{ projectDocuments().length }}</span></button>
@@ -511,8 +511,8 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Client Visits<span class="tab-count" *ngIf="fieldVisits().length > 0">{{ fieldVisits().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'tickets'" (click)="setProjectTab('tickets')"><svg lucideTicket size="14"></svg> Tickets<span class="tab-count" *ngIf="tabCounts().tickets > 0">{{ tabCounts().tickets }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'discussions'" (click)="setProjectTab('discussions')"><svg lucideMessageSquare size="14"></svg> Discussions<span class="tab-count" *ngIf="tabCounts().discussions > 0">{{ tabCounts().discussions }}</span></button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'budget-requests'" (click)="setProjectTab('budget-requests')"><svg lucideTrendingUp size="14"></svg> Budget requests<span class="tab-count" *ngIf="tabCounts().budgetRequests > 0">{{ tabCounts().budgetRequests }}</span></button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'reports'" (click)="setProjectTab('reports')"><svg lucideBarChart size="14"></svg> Reports</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'budget-requests'" (click)="setProjectTab('budget-requests')" *ngIf="canSeeFinancialTabs"><svg lucideTrendingUp size="14"></svg> Budget requests<span class="tab-count" *ngIf="tabCounts().budgetRequests > 0">{{ tabCounts().budgetRequests }}</span></button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'reports'" (click)="setProjectTab('reports')" *ngIf="canSeeFinancialTabs"><svg lucideBarChart size="14"></svg> Reports</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'archived'" (click)="setProjectTab('archived')"><svg lucideArchive size="14"></svg> Archived work items<span class="tab-count" *ngIf="archivedIssues().length > 0">{{ archivedIssues().length }}</span></button>
   </div>
 
@@ -1370,7 +1370,7 @@
        of "may this person see money". -->
   <!-- projectId is set from the route, so the guard keeps the required input
        from ever being bound undefined on a direct load of this tab. -->
-  <div class="milestones-panel" *ngIf="activeProjectTab() === 'milestones' && projectId">
+  <div class="milestones-panel" *ngIf="canSeeFinancialTabs && activeProjectTab() === 'milestones' && projectId">
     <app-milestones-tab [projectId]="projectId" />
   </div>
 
@@ -1382,7 +1382,7 @@
     <app-tickets-tab [projectId]="projectId" />
   </div>
 
-  <div class="budget-requests-panel" *ngIf="activeProjectTab() === 'budget-requests' && projectId">
+  <div class="budget-requests-panel" *ngIf="canSeeFinancialTabs && activeProjectTab() === 'budget-requests' && projectId">
     <app-budget-requests-tab [projectId]="projectId" />
   </div>
 
@@ -1979,7 +1979,7 @@
   </div>
 
   <!-- Reports Tab Container -->
-  <div class="reports-tab-container" *ngIf="activeProjectTab() === 'reports'" style="display: flex; flex-direction: column; flex: 1; padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto;">
+  <div class="reports-tab-container" *ngIf="canSeeFinancialTabs && activeProjectTab() === 'reports'" style="display: flex; flex-direction: column; flex: 1; padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto;">
     <div style="max-width: 1400px; width: 100%; margin: 0 auto; display: flex; gap: 32px;">
       
       <div style="flex: 1; min-width: 0;">

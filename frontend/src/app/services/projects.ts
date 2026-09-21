@@ -41,6 +41,14 @@ export class ProjectsService {
     return this.http.post<any>(this.apiUrl, data);
   }
 
+  /**
+   * Create a new project using `id` as a blueprint.
+   * @param payload { name, dateMode: 'KEEP'|'SHIFT'|'RESET', shiftStartDate?, copy? }
+   */
+  duplicateProject(id: number, payload: any) {
+    return this.http.post<any>(`${this.apiUrl}/${id}/duplicate`, payload);
+  }
+
   updateProject(id: number, data: any) {
     return this.http.put<any>(`${this.apiUrl}/${id}`, data);
   }

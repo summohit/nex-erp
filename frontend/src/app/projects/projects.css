@@ -735,7 +735,7 @@
 }
 
 /* Base button style for actions */
-.star-btn, .edit-btn, .archive-btn {
+.star-btn, .edit-btn, .archive-btn, .dup-btn {
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   border: none;
@@ -5912,4 +5912,75 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── Duplicate Project modal ──────────────────────────────────────────── */
+.cbm-dupe-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.cbm-dupe-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #44546f;
+  transition: all 0.15s ease;
+}
+.cbm-dupe-radio:hover {
+  border-color: #c7d2fe;
+  background: #f8fafc;
+}
+.cbm-dupe-radio input[type='radio'] {
+  accent-color: #6366f1;
+  margin: 0;
+}
+.cbm-dupe-shift {
+  margin-top: 12px;
+}
+.cbm-dupe-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+.cbm-dupe-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #44546f;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.cbm-dupe-check:hover {
+  background: #f8fafc;
+}
+.cbm-dupe-check input[type='checkbox'] {
+  accent-color: #6366f1;
+  margin: 0;
+}
+.cbm-dupe-never {
+  margin-top: 16px;
+}
+.cbm-dupe-never .cbm-section-number {
+  background: #e2e8f0;
+  color: #64748b;
+}
+.cbm-dupe-note {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #64748b;
+  margin: 8px 2px 0;
 }
