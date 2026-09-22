@@ -792,6 +792,11 @@
 }
 
 .board-title {
+  /* Project names are typed however the person who created the board typed
+     them, so "internal testing board" and "NES WEBSITE Redesgin" sat side by
+     side. Capitalize evens out the lowercase ones; names already in caps are
+     left alone, since capitalize only touches the first letter of each word. */
+  text-transform: capitalize;
   font-size: 13px;
   font-weight: 600;
   color: #172b4d;
@@ -888,6 +893,270 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ==========================================================================
+   ARCHIVE WARNING MODAL (AWM)
+   ========================================================================== */
+
+.awm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: awmFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+}
+
+@keyframes awmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.awm-card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: awmSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+
+@keyframes awmSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.awm-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 2;
+  padding: 0;
+}
+
+.awm-close-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.awm-close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.awm-body {
+  padding: 32px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.awm-icon-wrapper {
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.awm-icon-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 8px rgba(254, 242, 242, 0.7);
+}
+
+.awm-alert-svg {
+  stroke-width: 2.2px;
+}
+
+.awm-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+
+.awm-subtitle {
+  font-size: 13.5px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.awm-warning-box {
+  width: 100%;
+  margin: 20px 0 16px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.awm-warning-icon {
+  color: #ea580c;
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+}
+
+.awm-warning-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.awm-warning-message {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #9a3412;
+  line-height: 1.4;
+}
+
+.awm-warning-detail {
+  font-size: 12.5px;
+  color: #c2410c;
+  line-height: 1.4;
+  opacity: 0.95;
+}
+
+.awm-confirm-text {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #334155;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.awm-confirm-text strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.awm-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+}
+
+.awm-btn-cancel {
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.awm-btn-cancel:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.awm-btn-confirm {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.awm-btn-confirm:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
+  transform: translateY(-1px);
+}
+
+.awm-btn-confirm:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.awm-btn-cancel:disabled,
+.awm-btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.awm-btn-spinner {
+  animation: awmSpin 1s linear infinite;
+}
+
+@keyframes awmSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .awm-card {
+    max-width: 95vw;
+  }
+  .awm-body {
+    padding: 24px 18px 18px;
+  }
+  .awm-footer {
+    padding: 14px 18px;
+  }
 }
 
 /* ==========================================================================

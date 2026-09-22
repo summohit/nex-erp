@@ -3653,14 +3653,21 @@
 
         <div class="description-body">
           <!-- State 1: Collapsed / Preview Box (1st Screenshot) -->
-          <div class="description-preview-box" *ngIf="!isEditingDescription()" [style.cursor]="canManageTask ? 'pointer' : 'default'" (click)="isProjectOwner && startDescriptionEdit()">
+          <!-- Click-to-edit is gated on canManageTask, like the cursor above and
+               the editor below. It used to be gated on isProjectOwner, which is
+               the narrower of the two: a project manager who is not the owner
+               got the pointer cursor and no response. That mattered most on an
+               empty description, where the Edit button is not rendered at all
+               and clicking this box is the only way in -- so a PM could not
+               write a first description. -->
+          <div class="description-preview-box" *ngIf="!isEditingDescription()" [style.cursor]="canManageTask ? 'pointer' : 'default'" (click)="canManageTask && startDescriptionEdit()">
             <div *ngIf="issueForm.description" [innerHTML]="getSafeHtml(issueForm.description)" class="desc-content-html"></div>
             <div *ngIf="!issueForm.description" class="desc-placeholder-text">
               Add a more detailed description...
             </div>
           </div>
 
-          <!-- State 2: Expanded Quill Rich Text Editor (2nd Screenshot) — Owner only -->
+          <!-- State 2: Expanded Quill Rich Text Editor (2nd Screenshot) — management only -->
           <div class="description-editor-container" *ngIf="isEditingDescription() && canManageTask">
             <div class="quill-wrapper focus-blue-border">
               <div class="quill-container" #quillContainer></div>

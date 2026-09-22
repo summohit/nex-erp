@@ -117,7 +117,9 @@ export class ProjectsComponent implements OnInit {
 
   showArchiveWarningModal = false;
   pendingArchiveProjectId: number | null = null;
+  pendingArchiveProject: any | null = null;
   archiveWarningMessage = '';
+  isArchiving = false;
 
   // ── Duplicate Project modal ────────────────────────────────────────────
   duplicateModalProject = signal<any | null>(null);
@@ -3487,13 +3489,13 @@ export class ProjectsComponent implements OnInit {
       },
     };
     this.projectsService.duplicateProject(project.id, payload).subscribe({
-      next: (res) => {
+      next: (res: any) => {
         this.duplicateSubmitting.set(false);
         this.closeDuplicateModal();
         this.toast.success(`Project "${res?.name || name}" duplicated`);
         this.loadProjects();
       },
-      error: (err) => {
+      error: (err: any) => {
         this.duplicateSubmitting.set(false);
         this.toast.error(err?.error?.message || 'Failed to duplicate project');
       },
@@ -3591,19 +3593,27 @@ export class ProjectsComponent implements OnInit {
 
   archiveBoard(project: any, force: boolean, event: Event) {
     event.stopPropagation();
+    if (force) {
+      this.isArchiving = true;
+    }
     this.projectsService.archiveProject(project.id, force).subscribe({
       next: () => {
+        this.isArchiving = false;
         this.loadProjects();
         this.loadArchivedProjects();
         this.closeArchiveModal();
+        this.toast.success(`Board archived`);
       },
       error: (err) => {
+        this.isArchiving = false;
         if (err.status === 409) {
           this.pendingArchiveProjectId = project.id;
+          this.pendingArchiveProject = project;
           this.archiveWarningMessage = err.error?.message || 'There are active tasks remaining in this board.';
           this.showArchiveWarningModal = true;
         } else {
           console.error('Failed to archive board', err);
+          this.toast.error(err?.error?.message || 'Failed to archive board');
         }
       }
     });
@@ -3632,12 +3642,15 @@ export class ProjectsComponent implements OnInit {
   closeArchiveModal() {
     this.showArchiveWarningModal = false;
     this.pendingArchiveProjectId = null;
+    this.pendingArchiveProject = null;
     this.archiveWarningMessage = '';
+    this.isArchiving = false;
   }
 
   confirmArchiveBoard() {
     if (this.pendingArchiveProjectId) {
-      this.archiveBoard({ id: this.pendingArchiveProjectId }, true, new Event('click'));
+      const target = this.pendingArchiveProject || { id: this.pendingArchiveProjectId };
+      this.archiveBoard(target, true, new Event('click'));
     }
   }
 

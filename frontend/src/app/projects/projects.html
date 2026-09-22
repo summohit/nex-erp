@@ -1246,26 +1246,59 @@
 </div>
 
 <!-- Archive Warning Modal -->
-<div class="modal-overlay" *ngIf="showArchiveWarningModal">
-  <div class="modal-content" style="max-width: 450px;">
-    <div class="modal-header" style="border-bottom: 0; padding-bottom: 0;">
-      <h2 style="display: flex; align-items: center; gap: 8px; color: #dc2626;">
-        <svg lucideAlertTriangle size="24"></svg> Active Tasks Remaining
-      </h2>
-      <button class="btn-icon-tiny" (click)="closeArchiveModal()"><svg lucideX size="20"></svg></button>
-    </div>
-    <div class="modal-body" style="padding-top: 12px; padding-bottom: 24px;">
-      <p style="font-size: 15px; color: #44546f; margin-bottom: 16px;">
-        {{ archiveWarningMessage }}
+<div class="awm-overlay" *ngIf="showArchiveWarningModal" (click)="closeArchiveModal()">
+  <div class="awm-card" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="awm-modal-title">
+
+    <!-- Close button -->
+    <button type="button" class="awm-close-btn" (click)="closeArchiveModal()" aria-label="Close dialog" [disabled]="isArchiving">
+      <svg lucideX size="18"></svg>
+    </button>
+
+    <div class="awm-body">
+      <!-- Icon Badge with glowing effect -->
+      <div class="awm-icon-wrapper">
+        <div class="awm-icon-badge">
+          <svg lucideAlertTriangle size="26" class="awm-alert-svg"></svg>
+        </div>
+      </div>
+
+      <!-- Title & Subtitle -->
+      <h3 id="awm-modal-title" class="awm-title">Active Tasks Remaining</h3>
+      <p class="awm-subtitle">
+        This board still contains unresolved tasks. Archiving will hide them from the active workspace.
       </p>
-      <p style="font-size: 14px; color: #172b4d; font-weight: 500;">
-        Are you sure you want to archive this board anyway? All active tasks will be hidden from the active workspace.
+
+      <!-- Warning Callout Card -->
+      <div class="awm-warning-box">
+        <div class="awm-warning-icon">
+          <svg lucideAlertTriangle size="18"></svg>
+        </div>
+        <div class="awm-warning-content">
+          <div class="awm-warning-message">{{ archiveWarningMessage }}</div>
+          <div class="awm-warning-detail">
+            All active tasks will be hidden from task lists, boards, and member workloads until this board is restored.
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirmation prompt -->
+      <p class="awm-confirm-text">
+        Are you sure you want to archive <strong *ngIf="pendingArchiveProject?.name">"{{ pendingArchiveProject.name }}"</strong><span *ngIf="!pendingArchiveProject?.name">this board</span> anyway?
       </p>
     </div>
-    <div class="modal-footer" style="background: #f8f9fa; border-top: 1px solid #dfe1e6;">
-      <button class="btn-default" (click)="closeArchiveModal()">Cancel</button>
-      <button class="btn-primary" style="background: #dc2626; border-color: #dc2626;" (click)="confirmArchiveBoard()">Yes, Archive Board</button>
+
+    <!-- Actions Footer -->
+    <div class="awm-footer">
+      <button type="button" class="awm-btn-cancel" (click)="closeArchiveModal()" [disabled]="isArchiving">
+        Cancel
+      </button>
+      <button type="button" class="awm-btn-confirm" (click)="confirmArchiveBoard()" [disabled]="isArchiving">
+        <svg *ngIf="!isArchiving" lucideArchive size="16"></svg>
+        <svg *ngIf="isArchiving" lucideLoader2 size="16" class="awm-btn-spinner"></svg>
+        <span>{{ isArchiving ? 'Archiving...' : 'Yes, Archive Board' }}</span>
+      </button>
     </div>
+
   </div>
 </div>
 

@@ -50,6 +50,7 @@
 }
 
 .board-name-title {
+  text-transform: capitalize;
   margin: 0;
   font-size: 18px;
   font-weight: 700;
@@ -4703,6 +4704,7 @@ input[type=text], input[type=email], input[type=password] {
 }
 
 .summary-project-title {
+  text-transform: capitalize;
   margin: 0;
   font-size: 22px;
   font-weight: 700;
