@@ -41,3 +41,6 @@ backend/config/firebase.json
 scraper/out_hr/timelogs-*.json
 scraper/out_hr/timelogs-*.csv
 scraper/out_hr/profiles-*.json
+scraper/out_hr/
+scraper/out_finance/
+scraper/out_*/
