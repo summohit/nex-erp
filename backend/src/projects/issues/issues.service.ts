@@ -284,6 +284,21 @@ export class IssuesService {
     return userIds;
   }
 
+  /**
+   * The column a completed task belongs in.
+   *
+   * Two seeded columns carry type DONE -- "Done" at position 3 and "Archived"
+   * at position 4 -- so `columns.find(c => c.type === 'DONE')` returns whichever
+   * the array happens to yield first. That is how 1,046 finished tasks came to
+   * be filed as Archived. Lowest position wins, and a column named Archived is
+   * never chosen: finishing a task is not archiving it.
+   */
+  private doneColumn(columns: any[]): any | undefined {
+    return (columns || [])
+      .filter((c) => c.type === 'DONE' && !/archiv/i.test(c.name || ''))
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[0];
+  }
+
   private isRestrictedColumn(col: any): boolean {
     if (col.type === 'DONE') return true;
     const n = col.name.toLowerCase();
@@ -1620,7 +1635,7 @@ export class IssuesService {
     let newStatus = '';
     
     if (data.action === 'APPROVE') {
-      targetColumn = board.columns.find((c: any) => c.type === 'DONE');
+      targetColumn = this.doneColumn(board.columns);
       newStatus = 'DONE';
     } else {
       targetColumn = board.columns.find((c: any) => c.type === 'IN_PROGRESS');
