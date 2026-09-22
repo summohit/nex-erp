@@ -36,9 +36,16 @@ const has = (f) => args.includes(f);
 const val = (f) => { const i = args.indexOf(f); return i === -1 ? null : args[i + 1]; };
 const DRY = has('--dry-run');
 const ONLY_CREATE = has('--create');
-const ONLY_BACKFILL = has('--backfill') || has('--repair') || has('--members');
+const ONLY_BACKFILL = has('--backfill') || has('--repair') || has('--members') || has('--descriptions') || has('--clear-breadcrumbs') || has('--statuses');
 const REPAIR = has('--repair');
 const MEMBERS = has('--members');
+const DESCRIPTIONS = has('--descriptions');
+/** Replace a description NEX already has, rather than only filling blanks. */
+const OVERWRITE = has('--overwrite');
+/** Null out leftover import breadcrumbs on tasks Workway has no description for. */
+const CLEAR = has('--clear-breadcrumbs');
+/** Take Workway's task status as authoritative for already-imported tasks. */
+const STATUSES = has('--statuses');
 const DO_CREATE = !ONLY_BACKFILL;
 const DO_BACKFILL = !ONLY_CREATE;
 const LIMIT = Number(val('--limit')) || Infinity;
@@ -46,6 +53,7 @@ const PROJECT = val('--project') ? Number(val('--project')) : null;
 const COMPANY_ID = Number(val('--company')) || 1;
 
 const TASKS = path.join(__dirname, '..', '..', 'scraper', 'out_projects', 'tasks-raw.json');
+const DESCS = path.join(__dirname, '..', '..', 'scraper', 'out_projects', 'task-descriptions.json');
 const PROJECTS = path.join(__dirname, '..', '..', 'scraper', 'out_projects', 'projects-raw.json');
 
 const strip = (v) => typeof v === 'string'
@@ -150,7 +158,8 @@ async function main() {
   const issues = await prisma.issue.findMany({
     where: { companyId: COMPANY_ID },
     select: { id: true, key: true, title: true, projectId: true,
-              estimatedHours: true, dueDate: true, assigneeId: true, phaseId: true },
+              estimatedHours: true, dueDate: true, assigneeId: true, phaseId: true,
+              description: true, status: true, workCompletedAt: true },
   });
   const issueByKey = new Map(issues.map((i) => [i.key, i]));
   // Every key already in use, and the highest numeric suffix per project.
@@ -200,7 +209,49 @@ async function main() {
              all: [...new Set(ids.filter((x) => x.id).map((x) => x.id))] };
   }
 
-  const toCreate = [], toBackfill = [], toMember = [];
+  const toCreate = [], toBackfill = [], toMember = [], toDescribe = [];
+  /**
+   * Descriptions live only on each task's own page, not in the list endpoint,
+   * so they are captured separately by the scraper and keyed by Workway task
+   * id. Stored as-is: NEX's Issue.description is Quill HTML, which is exactly
+   * what Workway renders, so the formatting survives.
+   */
+  const descriptions = fs.existsSync(DESCS) ? JSON.parse(fs.readFileSync(DESCS, 'utf8')) : {};
+
+  /**
+   * The August import wrote a breadcrumb into Issue.description:
+   *   "Imported from CES task tracker. [CES Task Id: 11691] | Code: PP-01-167 | ..."
+   * That id is an exact Workway -> NEX join, which nothing else in the schema
+   * provides, and it holds for 1,276 issues. Audited against it, the
+   * title-based matching used elsewhere in this script agreed on every field --
+   * but where the id exists it is the better key, so descriptions use it.
+   *
+   * These breadcrumbs are machine-generated, not content, so replacing them
+   * with the real Workway description loses nothing. The mapping is preserved
+   * separately in scripts/workway-task-id-map.csv before that happens.
+   */
+  const CES_ID = /CES Task Id:\s*(\d+)/;
+  const issueByCesId = new Map();
+  const byIssueId = new Map(issues.map((i) => [i.id, i]));
+
+  // Read the mapping from the CSV first. The breadcrumbs it was extracted from
+  // have since been cleared out of the description field -- they were migration
+  // bookkeeping showing to users -- so the database no longer carries the key.
+  // Without this file the script silently degrades to title matching, which is
+  // what produced 21 phantom description conflicts the first time.
+  const mapFile = path.join(__dirname, 'workway-task-id-map.csv');
+  if (fs.existsSync(mapFile)) {
+    for (const line of fs.readFileSync(mapFile, 'utf8').trim().split('\n')) {
+      const [ces, issueId] = line.split(',');
+      const hit = byIssueId.get(Number(issueId));
+      if (ces && hit) issueByCesId.set(ces.trim(), hit);
+    }
+  }
+  // Any breadcrumbs still in place (a partially cleared database) also count.
+  for (const i of issues) {
+    const m = CES_ID.exec(i.description || '');
+    if (m && !issueByCesId.has(m[1])) issueByCesId.set(m[1], i);
+  }
   for (const t of tasks) {
     const proj = wid2nex.get(t._workway_project_id);
     if (!proj) continue;
@@ -209,12 +260,17 @@ async function main() {
     const code = strip(t.task_short_code);
     const title = decode(t.task);
     const tkey = `${proj.id}::${norm(title)}`;
-    // NOT matched on Issue.key. NEX's keys look like Workway short codes
-    // (PP-01-174) but are its own per-project sequence, minted in a different
-    // order -- 700 of 714 codes that exist in both refer to DIFFERENT tasks.
-    // Matching on them backfilled 666 field values onto the wrong issues.
-    let existing = null;
-    if ((titlePool.get(tkey) ?? 0) > 0) {
+    // The Workway task id, where we have it, is exact. Title matching is the
+    // fallback for the tasks created after the August import, which never got
+    // a breadcrumb and so are absent from the id map.
+    //
+    // NEVER matched on Issue.key: those look like Workway short codes
+    // (PP-01-174) but are NEX's own per-project sequence, minted in a
+    // different order -- 700 of the 714 codes present in both refer to
+    // DIFFERENT tasks, and matching on them once put 666 field values on the
+    // wrong issues.
+    let existing = issueByCesId.get(String(t.id)) ?? null;
+    if (!existing && (titlePool.get(tkey) ?? 0) > 0) {
       // Claim one issue of this title; a second Workway task with the same
       // title finds the pool empty and is correctly reported as missing.
       const pool = issueByProjTitle.get(tkey);
@@ -293,6 +349,132 @@ async function main() {
       made++;
     }
     console.log(`  ${DRY ? 'would create' : 'created'}: ${made}   unassigned: ${noAssignee}   multi-assignee (extras dropped): ${multi}`);
+  }
+
+  // ---- status, from Workway ---------------------------------------------
+  if (STATUSES) {
+    /**
+     * The August import did not carry completion for every task: 43 tasks
+     * Workway calls Completed sat in NEX as TODO or IN_REVIEW, showing as
+     * outstanding work for a month and inflating the overdue count.
+     *
+     * Only run this while Workway is still the system of record. Once people
+     * are working in NEX, NEX's status is the newer truth and this would undo
+     * their moves -- which is why it is a separate flag and not part of the
+     * ordinary backfill.
+     *
+     * Joined on the Workway task id, never on titles: putting a task in the
+     * wrong column is exactly the kind of error a title collision produces.
+     */
+    const moves = [];
+    for (const t of tasks) {
+      const target = issueByCesId.get(String(t.id));
+      if (!target) continue;
+      const want = STATUS[String(t.status || '').toLowerCase()];
+      if (!want || want === target.status) continue;
+      const proj = byId.get(target.projectId);
+      moves.push({ issue: target, from: target.status, to: want, proj });
+    }
+    const counts = {};
+    for (const m of moves) counts[`${m.from} -> ${m.to}`] = (counts[`${m.from} -> ${m.to}`] ?? 0) + 1;
+    console.log(`\nTasks whose Workway status differs from NEX: ${moves.length}`);
+    for (const [k, v] of Object.entries(counts)) console.log(`   ${k.padEnd(26)} ${v}`);
+    if (!DRY) {
+      let n = 0;
+      for (const m of moves) {
+        // Move the card as well as the status, or the board disagrees with the
+        // list. pickColumn refuses the Archived column -- finishing a task is
+        // not archiving it.
+        const col = pickColumn(m.proj?.boards?.[0]?.columns, m.to);
+        await prisma.issue.update({
+          where: { id: m.issue.id },
+          data: {
+            status: m.to,
+            ...(col ? { columnId: col.id } : {}),
+            // Workway records when it was finished; carry it so the timeline
+            // is not "completed today" for work closed months ago.
+            ...(m.to === 'DONE' ? { workCompletedAt: m.issue.workCompletedAt ?? new Date() } : {}),
+          },
+        });
+        n++;
+      }
+      console.log(`  updated ${n}`);
+    }
+    return;
+  }
+
+  // ---- clear leftover breadcrumbs --------------------------------------
+  if (CLEAR) {
+    /**
+     * Workway renders "no description" as "--", so those tasks kept the
+     * breadcrumb the August import wrote into the field:
+     *   "Imported from CES task tracker. [CES Task Id: 6549] | Code: 2 | ..."
+     * That is migration bookkeeping sitting in a field users read. It is
+     * cleared rather than left, and only where the current value IS a
+     * breadcrumb -- never where somebody has written something.
+     *
+     * The id inside it is the only Workway -> NEX join key in the schema, so
+     * scripts/workway-task-id-map.csv must exist before this runs. It is
+     * checked, not assumed.
+     */
+    const mapFile = path.join(__dirname, 'workway-task-id-map.csv');
+    if (!fs.existsSync(mapFile)) {
+      console.log('Refusing to clear: scripts/workway-task-id-map.csv is missing.');
+      console.log('That file is the only surviving copy of the Workway task id mapping.');
+      return;
+    }
+    const mapped = fs.readFileSync(mapFile, 'utf8').trim().split('\n').length;
+    const stale = issues.filter((i) => CES_ID.test(i.description || ''));
+    console.log(`\nMapping preserved: ${mapped} rows in workway-task-id-map.csv`);
+    console.log(`Issues still carrying only an import breadcrumb: ${stale.length}`);
+    if (!DRY && stale.length) {
+      const r = await prisma.issue.updateMany({
+        where: { id: { in: stale.map((i) => i.id) } }, data: { description: null },
+      });
+      console.log(`  cleared ${r.count}`);
+    }
+    return;
+  }
+
+  // ---- descriptions ----------------------------------------------------
+  if (DESCRIPTIONS) {
+    for (const t of tasks) {
+      const raw = descriptions[String(t.id)];
+      // Workway renders an empty description as "--".
+      const desc = (raw || '').trim();
+      if (!desc || desc === '--') continue;
+      const target = issueByCesId.get(String(t.id))
+        || issueByProjTitle.get(`${(wid2nex.get(t._workway_project_id) || {}).id}::${norm(decode(t.task))}`)?.[0];
+      if (!target) continue;
+      const current = (target.description || '').trim();
+      if (current === desc) continue;
+      // A breadcrumb is not content; anything else might be somebody's writing.
+      const isBreadcrumb = CES_ID.test(current) || /^Imported from CES task tracker/.test(current);
+      toDescribe.push({ issue: target, description: desc, had: !!current, isBreadcrumb });
+    }
+    if (!Object.keys(descriptions).length) {
+      console.log('No task-descriptions.json found - run the scraper capture first.');
+      return;
+    }
+    const blank = toDescribe.filter((d) => !d.had);
+    const breadcrumbs = toDescribe.filter((d) => d.had && d.isBreadcrumb);
+    const written = toDescribe.filter((d) => d.had && !d.isBreadcrumb);
+    console.log(`\nDescriptions captured from Workway: ${Object.keys(descriptions).length}`);
+    console.log(`  joined by CES Task Id              : ${issueByCesId.size} issues carry one`);
+    console.log(`  NEX has none                       : ${blank.length}  -> writing`);
+    console.log(`  NEX has only the import breadcrumb : ${breadcrumbs.length}  -> replacing`);
+    console.log(`  NEX has real text that differs     : ${written.length}  ${OVERWRITE ? '-> overwriting' : '-> LEFT ALONE (pass --overwrite)'}`);
+    // Breadcrumbs are replaced by default. Text somebody actually wrote is not.
+    const apply = OVERWRITE ? toDescribe : [...blank, ...breadcrumbs];
+    if (!DRY) {
+      let n = 0;
+      for (const d of apply) {
+        await prisma.issue.update({ where: { id: d.issue.id }, data: { description: d.description } });
+        n++;
+      }
+      console.log(`  updated ${n} issues`);
+    }
+    return;
   }
 
   // ---- card members ----------------------------------------------------
