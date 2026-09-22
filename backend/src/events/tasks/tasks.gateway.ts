@@ -23,7 +23,12 @@ export class TasksGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.split(' ')[1];
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key-change-in-production');
+        // The same fallback every other verifier uses. This one said
+        // 'super-secret-key-change-in-production', and with JWT_SECRET unset
+        // both sides fell back to different strings -- so every socket
+        // connection failed signature verification and the logs filled with
+        // "Socket authentication failed: invalid signature".
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret');
         client.data.user = decoded;
       } catch (err) {
         // Just log or disconnect

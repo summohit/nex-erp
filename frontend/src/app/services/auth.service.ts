@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs/operators';
-import { Observable } from 'rxjs';
+import { Observable, finalize, shareReplay, throwError } from 'rxjs';
 import { signal } from '@angular/core';
 import { environment } from '../../environments/environment';
 import { PermissionsService } from './permissions.service';
@@ -172,5 +172,31 @@ export class AuthService {
         setTokens(response?.access_token, response?.refresh_token);
       })
     );
+  }
+
+  /** In flight refresh, so a screen that fires six requests at once refreshes once. */
+  private refreshInFlight: Observable<any> | null = null;
+
+  /**
+   * Renew the session without involving the user.
+   *
+   * The access token lasts an hour and the refresh token a week, so somebody
+   * returning to the tab after lunch has a dead access token and a perfectly
+   * good refresh token. This is the path that uses it.
+   *
+   * Fails fast when there is no refresh token at all: that is a real signed out
+   * state, not something a round trip can fix.
+   */
+  refreshSession(): Observable<any> {
+    if (!getRefreshToken()) {
+      return throwError(() => new Error('No refresh token'));
+    }
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.refreshToken().pipe(
+        finalize(() => { this.refreshInFlight = null; }),
+        shareReplay(1),
+      );
+    }
+    return this.refreshInFlight;
   }
 }

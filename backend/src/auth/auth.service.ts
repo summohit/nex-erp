@@ -252,7 +252,12 @@ export class AuthService {
       employeeId: user.employee?.id ?? null
     };
 
-    const access_token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
+    // Eight hours covers a working day, so the ordinary case is one renewal
+    // rather than eight. The refresh token below still bounds the session at a
+    // week, and a suspended account is caught on the next refresh -- so the
+    // window in which a revoked user keeps working is the access token's life,
+    // which is the tradeoff being made here.
+    const access_token = await this.jwtService.signAsync(payload, { expiresIn: '8h' });
     const refresh_token = await this.jwtService.signAsync(payload, {
       expiresIn: '7d',
       secret: (process.env.JWT_SECRET || 'super-secret') + '_refresh'
