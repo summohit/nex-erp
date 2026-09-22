@@ -5129,6 +5129,7 @@
 
 /* Project code, Rule 10: its own column, read as an identifier rather than
    as part of the project name it used to be appended to. */
+.boards-grid-table ::ng-deep .project-code-chip,
 .boards-grid-table .project-code-chip {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11.5px;
@@ -5143,39 +5144,83 @@
 
 /* "Not set" and "not yours to see" both render as a dash. The difference is
    carried by whether the column is present at all, which the server decides. */
+.boards-grid-table ::ng-deep .cell-muted,
 .boards-grid-table .cell-muted {
   color: #94a3b8;
   font-size: 12px;
 }
 
+.boards-grid-table ::ng-deep .progress-cell,
 .boards-grid-table .progress-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
   height: 100%;
+  box-sizing: border-box;
 }
 
+.boards-grid-table ::ng-deep .progress-track,
 .boards-grid-table .progress-track {
   flex: 1;
-  min-width: 48px;
-  height: 6px;
+  min-width: 55px;
+  height: 7px;
   border-radius: 999px;
   background: #e2e8f0;
   overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
+.boards-grid-table ::ng-deep .progress-fill,
 .boards-grid-table .progress-fill {
   height: 100%;
   border-radius: 999px;
-  transition: width 0.2s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.boards-grid-table ::ng-deep .progress-label-wrap,
+.boards-grid-table .progress-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 44px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.boards-grid-table ::ng-deep .progress-label,
 .boards-grid-table .progress-label {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
-  color: #475569;
-  min-width: 32px;
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.boards-grid-table ::ng-deep .table-name-cell,
+.table-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.boards-grid-table ::ng-deep .table-color-dot,
+.table-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.boards-grid-table ::ng-deep .pstatus-pill,
+.pstatus-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
 }
 
 /* ── §3 Project filters ───────────────────────────────────────────────── */

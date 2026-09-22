@@ -647,6 +647,81 @@ export class ProjectsComponent implements OnInit {
         }
       },
       {
+        headerName: 'Progress',
+        field: 'progress',
+        width: 155,
+        minWidth: 135,
+        valueGetter: (params: any) => params.data?.progress ?? 0,
+        cellRenderer: (params: any) => {
+          const pct = Math.max(0, Math.min(100, Math.round(Number(params.value ?? 0))));
+          const status = params.data?.workStatus;
+          const total = params.data?.totalIssues ?? params.data?._count?.issues ?? 0;
+          const remaining = params.data?.remainingIssues ?? 0;
+          const done = Math.max(0, total - remaining);
+
+          // Tooltip description
+          let title = `${pct}% complete`;
+          if (total > 0) {
+            title += ` (${done} of ${total} tasks done)`;
+          }
+          if (status) {
+            title += ` • Status: ${status.replace(/_/g, ' ')}`;
+          }
+
+          // State-specific palette & accents
+          let gradient = 'linear-gradient(90deg, #6366f1 0%, #3b82f6 100%)';
+          let textColor = '#2563eb';
+          let glow = '0 1px 3px rgba(59, 130, 246, 0.25)';
+          let iconHtml = '';
+
+          if (pct === 100 || status === 'COMPLETED' || status === 'FINISHED' || status === 'CLOSED') {
+            gradient = 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
+            textColor = '#059669';
+            glow = '0 1px 3px rgba(16, 185, 129, 0.35)';
+            iconHtml = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`;
+          } else if (status === 'AT_RISK') {
+            gradient = 'linear-gradient(90deg, #f97316 0%, #ef4444 100%)';
+            textColor = '#dc2626';
+            glow = '0 1px 3px rgba(239, 68, 68, 0.25)';
+          } else if (status === 'ON_HOLD') {
+            gradient = 'linear-gradient(90deg, #fbbf24 0%, #d97706 100%)';
+            textColor = '#b45309';
+            glow = '0 1px 3px rgba(217, 119, 6, 0.2)';
+          } else if (pct >= 70) {
+            gradient = 'linear-gradient(90deg, #0ea5e9 0%, #10b981 100%)';
+            textColor = '#0d9488';
+            glow = '0 1px 3px rgba(14, 165, 233, 0.25)';
+          } else if (pct >= 30) {
+            gradient = 'linear-gradient(90deg, #6366f1 0%, #3b82f6 100%)';
+            textColor = '#2563eb';
+            glow = '0 1px 3px rgba(59, 130, 246, 0.25)';
+          } else if (pct > 0) {
+            gradient = 'linear-gradient(90deg, #818cf8 0%, #6366f1 100%)';
+            textColor = '#4f46e5';
+            glow = '0 1px 3px rgba(99, 102, 241, 0.2)';
+          } else {
+            textColor = '#94a3b8';
+            glow = 'none';
+          }
+
+          const fillStyle = pct > 0
+            ? `width:${pct}%;height:100%;background:${gradient};border-radius:999px;box-shadow:${glow};transition:width 0.3s cubic-bezier(0.4, 0, 0.2, 1);`
+            : `width:0%;height:100%;border-radius:999px;`;
+
+          return `
+            <div class="progress-cell" title="${title}" style="display:flex;align-items:center;gap:10px;width:100%;height:100%;box-sizing:border-box;">
+              <div class="progress-track" style="flex:1;min-width:55px;height:7px;border-radius:999px;background:#e2e8f0;overflow:hidden;position:relative;box-shadow:inset 0 1px 2px rgba(15,23,42,0.06);">
+                <div class="progress-fill" style="${fillStyle}"></div>
+              </div>
+              <div class="progress-label-wrap" style="display:flex;align-items:center;gap:3px;min-width:44px;justify-content:flex-end;flex-shrink:0;">
+                ${iconHtml}
+                <span class="progress-label" style="font-size:12px;font-weight:700;color:${textColor};font-variant-numeric:tabular-nums;line-height:1;">${pct}%</span>
+              </div>
+            </div>
+          `;
+        }
+      },
+      {
         headerName: 'Client',
         field: 'client.name',
         width: 170,
@@ -710,22 +785,6 @@ export class ProjectsComponent implements OnInit {
           const v = (params.value || 'MEDIUM').toUpperCase();
           const { bg, color } = PRIORITY_COLORS[v] || PRIORITY_COLORS['MEDIUM'];
           return `<span class="pstatus-pill" style="background:${bg};color:${color}">${v}</span>`;
-        }
-      },
-      {
-        headerName: 'Progress',
-        field: 'progress',
-        width: 140,
-        valueGetter: (params: any) => params.data?.progress ?? 0,
-        cellRenderer: (params: any) => {
-          const pct = Math.max(0, Math.min(100, Number(params.value ?? 0)));
-          const color = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
-          return `
-            <div class="progress-cell">
-              <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
-              <span class="progress-label">${pct}%</span>
-            </div>
-          `;
         }
       },
       {
