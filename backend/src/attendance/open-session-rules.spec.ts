@@ -33,6 +33,45 @@ describe('an unclosed session from a previous day', () => {
     logs: [{ id: 100, clockIn: ist(14, 9, 30), clockOut: null }],
   });
 
+  /**
+   * Monday as the Workway import writes it: a clock-in, no clock-out, and no
+   * logs at all, because the import writes the parent row only. An approved
+   * regularization produces the same shape.
+   */
+  const mondayImported = () => ({
+    id: 8, date: MONDAY, clockIn: ist(14, 9, 30), clockOut: null,
+    status: 'PRESENT', isEarlyLeave: false, missedClockOut: true,
+    logs: [],
+  });
+
+  /** Monday opened and closed twice — nothing is running. */
+  const mondayClosed = () => ({
+    id: 9, date: MONDAY, clockIn: ist(14, 9, 30), clockOut: ist(14, 18, 30),
+    status: 'PRESENT', isEarlyLeave: false, missedClockOut: false,
+    logs: [{ id: 102, clockIn: ist(14, 9, 30), clockOut: ist(14, 18, 30) }],
+  });
+
+  /**
+   * Answers findFirst by actually applying the where clause, rather than
+   * returning a fixed row whatever is asked.
+   *
+   * The deadlock this file now guards against lived entirely in the where
+   * clause — clock-in asked the parent row, clock-out asked the logs — so a
+   * mock that ignores it cannot see the bug at all.
+   */
+  const findFirstOver = (rows: any[]) => jest.fn(async ({ where }: any) => {
+    const matches = rows.filter((r) => {
+      if (where.date?.lt && !(r.date.getTime() < where.date.lt.getTime())) return false;
+      if (where.clockIn?.not === null && r.clockIn == null) return false;
+      if ('clockOut' in where && where.clockOut === null && r.clockOut != null) return false;
+      if (where.logs?.some && 'clockOut' in where.logs.some && where.logs.some.clockOut === null) {
+        if (!r.logs.some((l: any) => l.clockOut == null)) return false;
+      }
+      return true;
+    });
+    return matches.sort((a, b) => b.date.getTime() - a.date.getTime())[0] ?? null;
+  });
+
   let prisma: any;
   let roster: any;
   let service: AttendanceService;
@@ -146,6 +185,70 @@ describe('an unclosed session from a previous day', () => {
       const data = prisma.attendance.update.mock.calls[0][0].data;
       expect(data.isEarlyLeave).toBe(false);
       expect(data.status).toBe('PRESENT');
+    });
+  });
+
+  /**
+   * The production deadlock, in one property.
+   *
+   * Clock-in refused with "session still open from 21 Sept 2026"; the dialog's
+   * "Clock out from that shift" then answered "Already clocked out"; and there
+   * was no third button. The two questions had different answers for the same
+   * day, so anybody holding such a day could never clock in again.
+   *
+   * Both paths go through findOpenSessionBefore, but sharing the function was
+   * never the guarantee — sharing the MEANING is. So these tests assert the
+   * pairing directly: a day that blocks a clock-in must be a day a clock-out
+   * can close, and a day a clock-out cannot close must not block anything.
+   */
+  describe('a previous day with no clock-out but nothing running', () => {
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(ist(15, 9, 25));
+      prisma.attendance.findUnique.mockResolvedValue(null);
+      prisma.attendance.findFirst = findFirstOver([mondayImported()]);
+    });
+
+    // Previously: refused, and the clock-out it sent them to refused as well.
+    it('does not block tomorrow\'s clock-in', async () => {
+      await expect(service.clockIn(99, {})).resolves.toBeDefined();
+      expect(prisma.attendance.create).toHaveBeenCalled();
+    });
+
+    it('is not offered as something to clock out of', async () => {
+      const err: any = await service.clockOut(99, {}).catch((e) => e);
+      // Nothing to close, and it says so plainly rather than naming a day and
+      // then refusing to act on it.
+      expect(err.message).toMatch(/must clock in first/i);
+    });
+
+    // The flag stays; the day really is missing a clock-out, and that belongs
+    // in the timesheet. What it must not do is stop the next shift.
+    it('is still a day that needs regularization', () => {
+      expect(mondayImported().clockOut).toBeNull();
+    });
+  });
+
+  describe('whichever day the two paths pick', () => {
+    const days = [
+      ['a session left running', mondayOpen, true],
+      ['an imported day with no logs', mondayImported, false],
+      ['a day already closed', mondayClosed, false],
+    ] as const;
+
+    it.each(days)('%s: blocks clock-in exactly when clock-out can close it', async (_label, row, blocks) => {
+      jest.useFakeTimers().setSystemTime(ist(15, 9, 25));
+      prisma.attendance.findUnique.mockResolvedValue(null);
+      prisma.attendance.findFirst = findFirstOver([row()]);
+
+      const clockInErr = await service.clockIn(99, {}).then(() => null, (e) => e);
+      const refusedClockIn = clockInErr instanceof OpenSessionError;
+
+      prisma.attendance.findFirst = findFirstOver([row()]);
+      const clockOutErr = await service.clockOut(99, { reason: 'Forgot' }).then(() => null, (e) => e);
+      const closable = clockOutErr === null || clockOutErr instanceof LateClockOutError;
+
+      expect(refusedClockIn).toBe(blocks);
+      expect(closable).toBe(blocks);
     });
   });
 

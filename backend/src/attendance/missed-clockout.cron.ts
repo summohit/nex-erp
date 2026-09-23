@@ -86,8 +86,14 @@ export class MissedClockOutCron implements OnModuleInit, OnModuleDestroy {
       const open = await this.prisma.attendance.findMany({
         where: {
           date: { lte: today },
-          clockIn: { not: null },
-          clockOut: null,
+          // An open LOG, the same thing AttendanceService means by "still
+          // open". A parent row with no clockOut and no open log -- what the
+          // Workway import and approved regularizations write -- is a day
+          // missing a clock-out, not a session anybody can close, and this
+          // used to promise them otherwise every night: "you cannot start a
+          // new shift until it is closed", for a shift that had not blocked
+          // anything and had no clock-out button that would work.
+          logs: { some: { clockOut: null } },
           // Only those not already flagged, so the notification goes out once
           // rather than every night for as long as the session stays open.
           missedClockOut: false,

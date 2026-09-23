@@ -290,10 +290,28 @@ export class AttendanceService {
    *
    * Shared by clock-in (which refuses while one exists) and clock-out (which
    * closes it), so the two can never disagree about what "still open" means.
+   *
+   * "Open" is an open LOG, not a parent row with no clockOut, and the
+   * difference is the whole reason this comment is longer than the query.
+   * Sharing a function was not enough: this asked the parent row and clockOut
+   * asked the logs, so a row the two disagreed about trapped its owner
+   * permanently. Clock-in refused -- "session still open from 21 Sept" -- and
+   * the clock-out it sent them to found no open log and answered "Already
+   * clocked out". No sequence of clicks got out of that, because the day the
+   * dialog named was not a running session at all.
+   *
+   * Rows like that are ordinary: the Workway import and an approved
+   * regularization both write clockIn and clockOut straight onto the parent
+   * and create no logs, so any imported day Workway had no clock-out for
+   * arrived pre-deadlocked. A session NEX itself opened always has its log.
+   *
+   * What such a row means is "this day is missing a clock-out" -- a record to
+   * correct through regularization, not a shift still running. It no longer
+   * blocks tomorrow, because there is nothing running to block it with.
    */
   private async findOpenSessionBefore(employeeId: number, beforeDate: Date) {
     return this.prisma.attendance.findFirst({
-      where: { employeeId, date: { lt: beforeDate }, clockIn: { not: null }, clockOut: null },
+      where: { employeeId, date: { lt: beforeDate }, logs: { some: { clockOut: null } } },
       orderBy: { date: 'desc' },
       include: { logs: true },
     });
