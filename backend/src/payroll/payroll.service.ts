@@ -764,10 +764,18 @@ export class PayrollService {
       orderBy: { employee: { firstName: 'asc' } }
     });
 
-    if (existing.length === 0 && month && year) {
-      return this.generatePayslips(companyId, Number(month), Number(year));
-    }
-
+    // Deliberately does NOT generate when the period is empty.
+    //
+    // It used to: a GET that found nothing created a full month of drafts as a
+    // side effect. That made an empty period impossible — September 2026 was
+    // deleted three times and came back within seconds each time, because
+    // opening the Payslips tab regenerated it.
+    //
+    // Worse, it generated without the pre-flight check. September's attendance
+    // is about 60% complete, so those drafts carried ₹15.1 lakh of loss of pay
+    // for days people had worked, and they appeared on screen with nobody
+    // having asked for them. Generating payroll is a decision; a page load is
+    // not. The empty state has a button for it.
     return existing;
   }
 

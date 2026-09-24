@@ -14,9 +14,12 @@ So the point of this export is not only to fill gaps. It is to have a second
 opinion on the salaries already imported into NEX, from a system that issued
 real payslips rather than one that described an intent.
 
-Output: out_finance/payslip-history.json and payslip-history.csv, one row per
-payslip: employee, code, email, period, slip number, annual CTC, gross
-earnings, total deductions, net salary, status.
+Reads /api/payslips, not the rendered table. The table showed four totals; the
+API carries the whole payslip -- basic, HRA, travel, medical, special, any
+custom lines, and EPF/ESI/TDS/advance/unpaid-days on the other side -- which is
+what NEX needs to store line items rather than a single number per side.
+
+Output: out_finance/payslip-history.json and payslip-history.csv.
 
 THIS WRITES PAY DATA TO DISK. out_finance/ and auth/ are gitignored; keep them
 that way.
@@ -113,50 +116,96 @@ def main(argv=None) -> int:
     rows: list[dict] = []
     reported_total = None
 
+    # Each earning/deduction field, and the label NEX should store it under.
+    EARNINGS = [
+        ("basic", "Basic Salary"),
+        ("hra", "House Rent Allowance (HRA)"),
+        ("travelAllowance", "Travel Allowance"),
+        ("medicalAllowance", "Medical Allowance"),
+        ("specialAllowance", "Special Allowance"),
+    ]
+    DEDUCTIONS = [
+        ("epf", "Provident Fund (EPF)"),
+        ("esi", "Employee State Insurance (ESI)"),
+        ("tds", "Tax Deducted at Source (TDS)"),
+        ("advanceSalary", "Advance Salary"),
+        # The proration for days not worked. It is already inside
+        # totalDeductions, so it travels as a line rather than as a separate
+        # loss-of-pay figure that would be counted twice.
+        ("unpaidDaysAmount", "Unpaid Days Deduction"),
+    ]
+
+    def flatten(rec: dict) -> dict:
+        emp = rec.get("employee") or {}
+        money = lambda k: float(rec.get(k) or 0)
+        items = []
+        for key, label in EARNINGS:
+            if money(key):
+                items.append({"name": label, "type": "EARNING", "amount": money(key)})
+        for c in rec.get("customEarnings") or []:
+            amt = float(c.get("amount") or 0)
+            if amt:
+                items.append({"name": c.get("name") or "Other Earning", "type": "EARNING", "amount": amt})
+        for key, label in DEDUCTIONS:
+            if money(key):
+                items.append({"name": label, "type": "DEDUCTION", "amount": money(key)})
+        for c in rec.get("customDeductions") or []:
+            amt = float(c.get("amount") or 0)
+            if amt:
+                items.append({"name": c.get("name") or "Other Deduction", "type": "DEDUCTION", "amount": amt})
+
+        return {
+            "employee": emp.get("name") or "",
+            "employee_code": str(rec.get("employeeId") or "").strip(),
+            "email": emp.get("email") or "",
+            "designation": emp.get("designation") or "",
+            "period": f"{rec.get('month')} {rec.get('year')}".strip(),
+            "month_name": rec.get("month"),
+            "year": rec.get("year"),
+            "slip_no": rec.get("salarySlipNo") or "",
+            "annual_ctc": money("ctc"),
+            "gross_earnings": money("grossEarnings"),
+            "total_deductions": money("totalDeductions"),
+            "net_salary": money("netPay"),
+            "no_of_days": rec.get("noOfDays"),
+            "status": rec.get("emailStatus") or "",
+            "source_id": rec.get("_id"),
+            "items": items,
+        }
+
     with sync_playwright() as pw:
         b = pw.chromium.launch(headless=True)
         ctx = b.new_context(storage_state=str(state))
         page = ctx.new_page()
         page.goto(f"{BASE}/history", wait_until="networkidle", timeout=60000)
-        page.wait_for_timeout(2000)
-
+        page.wait_for_timeout(1500)
         if "login" in page.url.lower():
             log.error("redirected to a login page — the saved session has expired")
             b.close()
             return 4
 
-        # Page through until Next stops advancing. The pager reports "1 / 3",
-        # but trusting a disabled-button attribute across a framework's
-        # re-render is less reliable than checking the rows actually changed.
-        seen_signatures: set[str] = set()
-        for page_no in range(1, args.max_pages + 1):
-            page.wait_for_timeout(600)
-            batch = page.evaluate(ROWS_JS)
+        # Paged rather than one huge request: the server decides the ceiling on
+        # `limit`, and asking for everything at once tends to be the thing that
+        # quietly returns a truncated page.
+        page_no = 1
+        while page_no <= args.max_pages:
+            r = ctx.request.get(f"{BASE}/api/payslips?page={page_no}&limit=100",
+                                headers={"Accept": "application/json"}, timeout=60000)
+            if r.status != 200:
+                log.error("api/payslips page %d returned HTTP %s", page_no, r.status)
+                break
+            payload = r.json()
+            batch = payload.get("items") or []
+            if reported_total is None:
+                reported_total = payload.get("total")
+                log.info("the API reports %s payslip(s) in all", reported_total)
             if not batch:
                 break
-
-            sig = "|".join(r["slip_no"] for r in batch)
-            if sig in seen_signatures:
-                log.debug("page %d repeats an earlier page — stopping", page_no)
+            rows.extend(flatten(x) for x in batch)
+            log.info("page %d: %d record(s)  (total so far %d)", page_no, len(batch), len(rows))
+            if reported_total is not None and len(rows) >= reported_total:
                 break
-            seen_signatures.add(sig)
-            rows.extend(batch)
-            log.info("page %d: %d row(s)  (total so far %d)", page_no, len(batch), len(rows))
-
-            if reported_total is None:
-                m = TOTAL_RE.search(page.inner_text("body"))
-                if m:
-                    reported_total = int(m.group(1).replace(",", ""))
-                    log.info("the page reports %d record(s) in all", reported_total)
-
-            nxt = page.query_selector("button:has-text('Next'), a:has-text('Next')")
-            if not nxt or not nxt.is_enabled():
-                break
-            try:
-                nxt.click()
-            except Exception as exc:
-                log.debug("could not click Next: %s", exc)
-                break
+            page_no += 1
 
         b.close()
 

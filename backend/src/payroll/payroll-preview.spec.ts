@@ -146,6 +146,25 @@ describe('PayrollService — the preview agrees with the run', () => {
     expect(summary.noAttendance).toBe(1);
   });
 
+  /**
+   * Reading a period must not create one.
+   *
+   * getPayslips used to generate a whole month when it found none, so an empty
+   * period could not exist: September 2026 was deleted three times and was
+   * back within seconds each time, because opening the tab regenerated it. It
+   * also skipped the pre-flight entirely — drafts carrying ₹15.1 lakh of loss
+   * of pay appeared without anybody pressing a button.
+   */
+  it('does not generate payslips just because a period is empty', async () => {
+    prisma.payslip.findMany = jest.fn(async () => []);
+    prisma.payslip.upsert.mockClear();
+
+    const out = await service.getPayslips(COMPANY, 9, 2026);
+
+    expect(out).toEqual([]);
+    expect(prisma.payslip.upsert).not.toHaveBeenCalled();
+  });
+
   it('reports the share of gross that would be lost', async () => {
     attendance = presentOn([1, 2, 3]);
     const { summary } = await previewed();

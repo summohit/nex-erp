@@ -26,9 +26,24 @@
  * of what was paid; they change nothing about what will be paid.
  *
  * Status is PAID: these slips were issued and marked Sent in the source system.
- * Loss of pay is not recorded there, so it is left at zero rather than being
- * inferred from the gap between CTC and gross — that gap is mostly proration,
- * and inventing a deduction to explain it would be a guess written as a fact.
+ *
+ * LINE ITEMS, AND WHY lossOfPay STAYS ZERO
+ *
+ * The first version of this read the rendered table, which showed four totals,
+ * so a payslip imported into NEX had correct figures and nothing to explain
+ * them: "Present Days 0, Absent Days 26" and a single Total Earnings line.
+ * /api/payslips carries the whole slip, so each component now lands as a
+ * PayslipItem and the detail view reads like the original.
+ *
+ * "Unpaid Days Deduction" is the proration for days not worked — NEX's
+ * lossOfPay by another name. It is imported as a DEDUCTION line rather than as
+ * lossOfPay because the source already counts it inside totalDeductions, and
+ * NEX's detail view adds the two together: setting both would deduct it twice
+ * on screen. The figure is present and labelled; only the field differs.
+ *
+ * Days: the source records noOfDays (days paid) and nothing else, so that is
+ * written to workingDays and presentDays, and absentDays is left at zero. The
+ * days not worked are in the unpaid-days line, not in a count the source kept.
  */
 const fs = require('fs');
 const path = require('path');
@@ -116,13 +131,54 @@ const parsePeriod = (p) => {
     const mismatch = Math.abs(implied - net) > 1;
 
     const existing = emp.payslips[0];
+    let items = (s.items || []).filter((i) => Number(i.amount) > 0);
+    let excluded = [];
+
+    /*
+     * Some deduction lines are shown on the source payslip but are not in its
+     * totalDeductions and do not reduce its netPay: an Advance Salary of
+     * ₹10,000 on one July slip, an "Other Deduction" of ₹3,200 on another.
+     * In both, net came to gross minus the OTHER deductions exactly.
+     *
+     * Importing them would put a breakdown in NEX that contradicts the total
+     * printed beside it. So a line is dropped when doing so is what makes the
+     * arithmetic close, and it is named in the output — because a deduction
+     * that appears on somebody's payslip and does not reduce their pay is
+     * worth somebody looking at, in the system that produced it.
+     */
+    const sumOf = (list, type) =>
+      list.filter((i) => i.type === type).reduce((t, i) => t + Number(i.amount), 0);
+
+    if (Math.abs(sumOf(items, 'DEDUCTION') - deductions) > 1) {
+      const UNCOUNTED = /^(advance salary|other deduction)$/i;
+      const kept = items.filter((i) => !(i.type === 'DEDUCTION' && UNCOUNTED.test(i.name)));
+      if (Math.abs(sumOf(kept, 'DEDUCTION') - deductions) <= 1) {
+        excluded = items.filter((i) => i.type === 'DEDUCTION' && UNCOUNTED.test(i.name));
+        items = kept;
+      }
+    }
+    // Items that do not add up to the totals mean the export missed a
+    // component. Better to say so than to show a breakdown that disagrees
+    // with the figure beside it.
+    const itemEarn = items.filter((i) => i.type === 'EARNING').reduce((t, i) => t + Number(i.amount), 0);
+    const itemDed = items.filter((i) => i.type === 'DEDUCTION').reduce((t, i) => t + Number(i.amount), 0);
+    const itemsOff = Math.abs(itemEarn - gross) > 1 || Math.abs(itemDed - deductions) > 1;
+
     plan.push({
       action: existing ? 'REPLACE' : 'CREATE',
       who: `${emp.firstName} ${emp.lastName}`, code,
       employeeId: emp.id, companyId: emp.companyId,
       gross, deductions, net, slipNo: s.slip_no, status: s.status,
+      items, excluded, days: Number(s.no_of_days) || 0,
       existingStatus: existing?.status, existingNet: existing?.netPay,
-      detail: mismatch ? `net ${inr(net)} != gross-deductions ${inr(implied)}` : '',
+      detail: [
+        mismatch ? `net ${inr(net)} != gross-deductions ${inr(implied)}` : '',
+        itemsOff ? `items sum to ${inr(itemEarn)}/${inr(itemDed)} not ${inr(gross)}/${inr(deductions)}` : '',
+        !items.length ? 'no line items' : '',
+        excluded.length
+          ? `excluded ${excluded.map((e) => `${e.name} ${inr(e.amount)}`).join(', ')} — shown on the payslip but not deducted from it`
+          : '',
+      ].filter(Boolean).join('; '),
     });
   }
 
@@ -145,6 +201,16 @@ const parsePeriod = (p) => {
   console.log(`  conflicts : ${plan.filter((p) => p.action === 'CONFLICT').length}   (code matches a different person)`);
   console.log(`  no match  : ${plan.filter((p) => p.action === 'NO MATCH').length}`);
   console.log(`  total net : ${inr(writable.reduce((t, p) => t + p.net, 0))}`);
+  console.log(`  line items: ${writable.reduce((t, p) => t + p.items.length, 0)}`);
+  const withExcluded = writable.filter((p) => p.excluded.length);
+  if (withExcluded.length) {
+    console.log(`\n  LINES ON THE PAYSLIP THAT DO NOT REDUCE ITS NET PAY (not imported):`);
+    for (const p of withExcluded) {
+      for (const e of p.excluded) console.log(`     ${p.who.padEnd(26)} ${e.name.padEnd(22)} ${inr(e.amount)}`);
+    }
+  }
+  const noItems = writable.filter((p) => !p.items.length);
+  if (noItems.length) console.log(`  WITHOUT a breakdown: ${noItems.length}  (${noItems.map((p) => p.who).join(', ')})`);
 
   if (finalised.length) {
     console.log(`\n  WARNING: ${finalised.length} of these would overwrite a payslip already`
@@ -154,20 +220,40 @@ const parsePeriod = (p) => {
   if (!APPLY) { console.log('\nRe-run with --apply to write.'); return; }
 
   for (const p of writable) {
-    await prisma.payslip.upsert({
+    const figures = {
+      totalEarnings: p.gross,
+      totalDeductions: p.deductions,
+      netPay: p.net,
+      lossOfPay: 0,
+      status: 'PAID',
+      // Days paid. The old rows carried "present 0 of 26" left over from a
+      // generation that ran before anybody had a salary, which read as though
+      // the person had not turned up all month.
+      ...(p.days ? { workingDays: p.days, presentDays: p.days, absentDays: 0 } : {}),
+    };
+    const slip = await prisma.payslip.upsert({
       where: { employeeId_month_year: { employeeId: p.employeeId, month: period.month, year: period.year } },
-      update: {
-        totalEarnings: p.gross, totalDeductions: p.deductions, netPay: p.net,
-        lossOfPay: 0, status: 'PAID',
-      },
+      update: figures,
       create: {
         employeeId: p.employeeId, companyId: p.companyId,
-        month: period.month, year: period.year,
-        totalEarnings: p.gross, totalDeductions: p.deductions, netPay: p.net,
-        lossOfPay: 0, status: 'PAID',
+        month: period.month, year: period.year, ...figures,
       },
     });
-    console.log(`  ${p.who}: ${inr(p.net)}`);
+
+    // Replaced wholesale: a leftover line from an earlier generation would sit
+    // alongside the imported ones and silently change what the slip says.
+    await prisma.payslipItem.deleteMany({ where: { payslipId: slip.id } });
+    if (p.items.length) {
+      await prisma.payslipItem.createMany({
+        data: p.items.map((i) => ({
+          payslipId: slip.id,
+          componentName: i.name,
+          type: i.type,
+          amount: Number(i.amount),
+        })),
+      });
+    }
+    console.log(`  ${p.who}: ${inr(p.net)}  (${p.items.length} line${p.items.length === 1 ? '' : 's'})`);
   }
   console.log(`\nDone. ${writable.length} payslip(s) recorded for ${PERIOD}.`);
   console.log('Salary structures were not touched.');
