@@ -2909,12 +2909,10 @@ section[id] {
   box-sizing: border-box;
   border-radius: 28px;
   overflow: hidden;
-  text-align: center;
-  padding: 96px 32px 88px;
+  text-align: left;
+  padding: 56px 32px 48px;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  background:
-    radial-gradient(1100px 520px at 50% -10%, rgba(56, 189, 248, 0.16), transparent 62%),
-    linear-gradient(135deg, #0a1a30 0%, #0d2b4f 55%, #123e72 100%);
+  background: url('/cta-blue-bg.png') center / cover no-repeat;
   box-shadow: 0 32px 70px -32px rgba(10, 35, 70, 0.55);
 }
 
@@ -2930,7 +2928,7 @@ section[id] {
   height: 480px;
   top: -190px;
   left: -130px;
-  background: radial-gradient(circle, rgba(19, 115, 229, 0.42) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(19, 115, 229, 0.3) 0%, transparent 70%);
 }
 
 .lp-cta-aurora-b {
@@ -2938,7 +2936,7 @@ section[id] {
   height: 540px;
   bottom: -240px;
   right: -150px;
-  background: radial-gradient(circle, rgba(13, 148, 136, 0.38) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(13, 148, 136, 0.26) 0%, transparent 70%);
 }
 
 .lp-cta-grid-pattern {
@@ -2952,8 +2950,8 @@ section[id] {
 }
 
 .lp-cta-inner {
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: 640px;
+  margin: 0;
   position: relative;
   z-index: 2;
 }
@@ -3005,7 +3003,7 @@ section[id] {
 .lp-cta-buttons {
   display: flex;
   gap: 16px;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   margin-bottom: 28px;
 }
@@ -3057,7 +3055,7 @@ section[id] {
 
 .lp-cta-footer-note {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
   flex-wrap: wrap;
 }
@@ -3827,7 +3825,7 @@ section[id] {
   .lp-cta {
     border-radius: 24px;
     margin: 0 24px;
-    padding: 80px 28px 72px;
+    padding: 48px 28px 40px;
   }
 }
 
@@ -3857,7 +3855,7 @@ section[id] {
   .lp-cta {
     border-radius: 20px;
     margin: 0 16px;
-    padding: 56px 18px 48px;
+    padding: 40px 18px 32px;
   }
 
   .lp-cta h2 {
