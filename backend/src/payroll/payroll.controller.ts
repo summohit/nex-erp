@@ -109,6 +109,19 @@ export class PayrollController {
     return this.payrollService.getPayslipDetail(req.user.companyId, id);
   }
 
+  @Put('payslips/:id/items')
+  updatePayslipItems(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: {
+      items: { componentName: string; type: string; amount: number }[];
+      workingDays?: number;
+      presentDays?: number;
+    },
+  ) {
+    return this.payrollService.updatePayslipItems(req.user.companyId, id, body);
+  }
+
   @Get('payslips/:id/pdf')
   async downloadPayslip(@Request() req, @Param('id', ParseIntPipe) id: number, @Res() res) {
     const { buffer, isPdf, filename } =

@@ -103,6 +103,14 @@ export class PayrollComponent implements OnInit {
   processingSortColumn = signal<string>('name');
   processingSortDirection = signal<'asc' | 'desc'>('asc');
 
+  // Payslips (Tab 2) Admin Filter & Search State
+  payslipSearchQuery = signal<string>('');
+  payslipDeptFilter = signal<string>('ALL');
+  payslipDesigFilter = signal<string>('ALL');
+  payslipStatusFilter = signal<string>('ALL');
+  payslipSortColumn = signal<string>('name');
+  payslipSortDirection = signal<'asc' | 'desc'>('asc');
+
   private uploadService = inject(UploadService);
 
   // Drawer / Modal states
@@ -795,6 +803,155 @@ export class PayrollComponent implements OnInit {
     }];
   });
 
+  // ==========================================
+  // TAB 2: PAYSLIPS ADMIN FILTER & SORT COMPUTED
+  // ==========================================
+  payslipDepartmentOptions = computed<SearchableSelectOption[]>(() => [
+    { id: 'ALL', name: 'All Departments' },
+    ...this.processingAvailableDepartments().map(d => ({ id: d, name: d }))
+  ]);
+
+  payslipDesignationOptions = computed<SearchableSelectOption[]>(() => [
+    { id: 'ALL', name: 'All Designations' },
+    ...this.processingAvailableDesignations().map(d => ({ id: d, name: d }))
+  ]);
+
+  payslipStatusOptions: SearchableSelectOption[] = [
+    { id: 'ALL', name: 'All Status' },
+    { id: 'PAID', name: 'Paid' },
+    { id: 'FINALIZED', name: 'Finalized' },
+    { id: 'DRAFT', name: 'Draft' }
+  ];
+
+  hasActivePayslipFilters = computed(() => {
+    return this.payslipSearchQuery().trim() !== '' ||
+      this.payslipDeptFilter() !== 'ALL' ||
+      this.payslipDesigFilter() !== 'ALL' ||
+      this.payslipStatusFilter() !== 'ALL';
+  });
+
+  clearPayslipFilters() {
+    this.payslipSearchQuery.set('');
+    this.payslipDeptFilter.set('ALL');
+    this.payslipDesigFilter.set('ALL');
+    this.payslipStatusFilter.set('ALL');
+  }
+
+  togglePayslipSort(col: string) {
+    if (this.payslipSortColumn() === col) {
+      this.payslipSortDirection.set(this.payslipSortDirection() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.payslipSortColumn.set(col);
+      this.payslipSortDirection.set('asc');
+    }
+  }
+
+  filteredPayslipsList = computed(() => {
+    let list = [...this.payslips()];
+    const query = this.payslipSearchQuery().toLowerCase().trim();
+    const dept = this.payslipDeptFilter();
+    const desig = this.payslipDesigFilter();
+    const status = this.payslipStatusFilter();
+
+    if (query) {
+      list = list.filter(p => {
+        const emp = p.employee;
+        const name = `${emp?.firstName || ''} ${emp?.lastName || ''}`.toLowerCase();
+        const dName = (emp?.department?.name || '').toLowerCase();
+        const desName = (emp?.designation?.name || '').toLowerCase();
+        return name.includes(query) || dName.includes(query) || desName.includes(query);
+      });
+    }
+
+    if (dept !== 'ALL') {
+      list = list.filter(p => p.employee?.department?.name === dept);
+    }
+
+    if (desig !== 'ALL') {
+      list = list.filter(p => p.employee?.designation?.name === desig);
+    }
+
+    if (status !== 'ALL') {
+      list = list.filter(p => (p.status || 'DRAFT') === status);
+    }
+
+    const col = this.payslipSortColumn();
+    const dir = this.payslipSortDirection() === 'asc' ? 1 : -1;
+
+    list.sort((a, b) => {
+      const ia = a.employee?.user?.status === 'SUSPENDED' ? 1 : 0;
+      const ib = b.employee?.user?.status === 'SUSPENDED' ? 1 : 0;
+      if (ia !== ib && col === 'name') return ia - ib;
+
+      let valA: any = 0;
+      let valB: any = 0;
+
+      if (col === 'name') {
+        valA = `${a.employee?.firstName || ''} ${a.employee?.lastName || ''}`.toLowerCase();
+        valB = `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.toLowerCase();
+        return valA.localeCompare(valB) * dir;
+      } else if (col === 'workingDays') {
+        valA = a.workingDays || 0;
+        valB = b.workingDays || 0;
+      } else if (col === 'present') {
+        valA = a.presentDays || 0;
+        valB = b.presentDays || 0;
+      } else if (col === 'absent') {
+        valA = a.absentDays || 0;
+        valB = b.absentDays || 0;
+      } else if (col === 'gross') {
+        valA = a.totalEarnings || 0;
+        valB = b.totalEarnings || 0;
+      } else if (col === 'lop') {
+        valA = a.lossOfPay || 0;
+        valB = b.lossOfPay || 0;
+      } else if (col === 'expenses') {
+        valA = a.expenseAmount || 0;
+        valB = b.expenseAmount || 0;
+      } else if (col === 'net') {
+        valA = a.netPay || 0;
+        valB = b.netPay || 0;
+      } else if (col === 'status') {
+        valA = a.status || 'DRAFT';
+        valB = b.status || 'DRAFT';
+        return valA.localeCompare(valB) * dir;
+      }
+
+      return (valA - valB) * dir;
+    });
+
+    return list;
+  });
+
+  payslipsTabTotals = computed(() => {
+    const list = this.filteredPayslipsList();
+    let totalGross = 0;
+    let totalLop = 0;
+    let totalExpenses = 0;
+    let totalNet = 0;
+
+    for (const p of list) {
+      totalGross += p.totalEarnings || 0;
+      totalLop += p.lossOfPay || 0;
+      totalExpenses += p.expenseAmount || 0;
+      totalNet += p.netPay || 0;
+    }
+
+    return { totalGross, totalLop, totalExpenses, totalNet };
+  });
+
+  payslipsTabCounts = computed(() => {
+    const all = this.payslips();
+    let draft = 0, finalized = 0, paid = 0;
+    for (const p of all) {
+      const st = p.status || 'DRAFT';
+      if (st === 'DRAFT') draft++;
+      else if (st === 'FINALIZED') finalized++;
+      else if (st === 'PAID') paid++;
+    }
+    return { total: all.length, draft, finalized, paid };
+  });
+
   // AG Grid columns for Salary Processing
   processingColDefs: ColDef[] = [
     {
@@ -1347,6 +1504,141 @@ export class PayrollComponent implements OnInit {
         if (this.selectedPayslipDetail()?.id === full.id) this.selectedPayslipDetail.set(full);
       },
       error: () => { /* keep the summary; it is not wrong, only thinner */ },
+    });
+  }
+
+  // ─── Editing a payslip by its components ──────────────────────────────────
+  //
+  // The old adjust dialog edited three totals — earnings, deductions, loss of
+  // pay — which is enough to change what somebody is paid and not enough to
+  // say why. This edits the lines, the way the payslip is written, and lets
+  // the server derive the totals from them.
+  isPayslipEditOpen = signal(false);
+  editingPayslip = signal<Payslip | null>(null);
+  editDays = signal<number>(0);
+  editItems = signal<{ componentName: string; type: string; amount: number; fixed: boolean }[]>([]);
+
+  /** The lines every payslip has a slot for, in the order the slip prints them. */
+  private static readonly STANDARD: { name: string; type: string }[] = [
+    { name: 'Basic Salary', type: 'EARNING' },
+    { name: 'House Rent Allowance (HRA)', type: 'EARNING' },
+    { name: 'Travel Allowance', type: 'EARNING' },
+    { name: 'Medical Allowance', type: 'EARNING' },
+    { name: 'Special Allowance', type: 'EARNING' },
+    { name: 'Provident Fund (EPF)', type: 'DEDUCTION' },
+    { name: 'Employee State Insurance (ESI)', type: 'DEDUCTION' },
+    { name: 'Tax Deducted at Source (TDS)', type: 'DEDUCTION' },
+    { name: 'Advance Salary', type: 'DEDUCTION' },
+    { name: 'Unpaid Days Deduction', type: 'DEDUCTION' },
+  ];
+
+  openPayslipEdit(p: Payslip) {
+    const existing = (p.items || []).map((i) => ({
+      componentName: i.componentName,
+      type: i.type,
+      amount: i.amount,
+      fixed: false,
+    }));
+
+    // A generated payslip carries loss of pay in its own field, and the server
+    // folds it into a line on save. Surfacing it here means the editor shows
+    // every rupee being deducted rather than silently carrying one.
+    if ((p.lossOfPay || 0) > 0 && !existing.some((i) => /unpaid days/i.test(i.componentName))) {
+      existing.push({
+        componentName: 'Unpaid Days Deduction', type: 'DEDUCTION',
+        amount: p.lossOfPay, fixed: false,
+      });
+    }
+
+    const rows = PayrollComponent.STANDARD.map((std) => {
+      const found = existing.find((i) => i.componentName === std.name);
+      return {
+        componentName: std.name,
+        type: std.type,
+        amount: found ? found.amount : 0,
+        fixed: true,
+      };
+    });
+    // Anything the slip has that is not one of the standard ten — a custom
+    // line — is kept and stays removable.
+    for (const i of existing) {
+      if (!PayrollComponent.STANDARD.some((s) => s.name === i.componentName)) rows.push(i);
+    }
+
+    this.editingPayslip.set(p);
+    this.editItems.set(rows);
+    this.editDays.set(p.workingDays || 0);
+    this.isPayslipEditOpen.set(true);
+  }
+
+  closePayslipEdit() {
+    this.isPayslipEditOpen.set(false);
+    this.editingPayslip.set(null);
+    this.editItems.set([]);
+  }
+
+  addEditRow(type: 'EARNING' | 'DEDUCTION') {
+    this.editItems.update((rows) => [...rows, { componentName: '', type, amount: 0, fixed: false }]);
+  }
+
+  removeEditRow(row: any) {
+    this.editItems.update((rows) => rows.filter((r) => r !== row));
+  }
+
+  editRowsOf(type: 'EARNING' | 'DEDUCTION') {
+    return this.editItems().filter((r) => r.type === type);
+  }
+
+  editTotal(type: 'EARNING' | 'DEDUCTION'): number {
+    return this.editItems()
+      .filter((r) => r.type === type)
+      .reduce((t, r) => t + (Number(r.amount) || 0), 0);
+  }
+
+  get editNet(): number {
+    return Math.max(0, this.editTotal('EARNING') - this.editTotal('DEDUCTION'));
+  }
+
+  /**
+   * Derived, not stored: NEX has no slip-number column, and inventing one that
+   * looked like the payslip app's would imply the two were the same sequence.
+   */
+  slipNumber(p: Payslip | null): string {
+    if (!p) return '—';
+    return `${p.year}/${String(p.month).padStart(2, '0')}/${p.employee?.id ?? p.id}`;
+  }
+
+  savePayslipEdit() {
+    const p = this.editingPayslip();
+    if (!p) return;
+
+    const items = this.editItems()
+      .filter((r) => r.componentName.trim() && Number(r.amount) > 0)
+      .map((r) => ({ componentName: r.componentName.trim(), type: r.type, amount: Number(r.amount) }));
+
+    if (!items.length) { this.toast.error('A payslip needs at least one line'); return; }
+    if (p.status === 'PAID' &&
+        !confirm(`This payslip is marked PAID — ${p.employee?.firstName ?? 'the employee'} may already have it.\n\nSave changes anyway?`)) {
+      return;
+    }
+
+    this.isPayslipBusy.set(true);
+    this.payrollService.updatePayslipItems(p.id, {
+      items,
+      workingDays: this.editDays() || undefined,
+      presentDays: this.editDays() || undefined,
+    }).subscribe({
+      next: (updated) => {
+        this.isPayslipBusy.set(false);
+        this.toast.success('Payslip updated');
+        this.selectedPayslipDetail.set(updated);
+        this.payslips.update((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+        this.closePayslipEdit();
+      },
+      error: (err) => {
+        this.isPayslipBusy.set(false);
+        this.toast.error(err.error?.message || 'Could not save that payslip');
+      },
     });
   }
 

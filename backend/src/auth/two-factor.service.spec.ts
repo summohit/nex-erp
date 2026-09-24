@@ -523,4 +523,62 @@ describe('TwoFactorService', () => {
       );
     });
   });
+
+  /**
+   * An enrolment that started and stopped is a third state.
+   *
+   * A row exists from the moment enrolment begins, so "has 2FA" must test
+   * confirmedAt — the schema says so. But the admin screen took the same
+   * boolean and drew two states from it, which meant somebody who lost their
+   * phone halfway through enrolling read as "Not enrolled" and could not be
+   * reset. Their row was the thing keeping them on the setup screen, and the
+   * one tool built for that situation could not see it.
+   */
+  describe('the admin list distinguishes half-finished enrolments', () => {
+    const listOf = async (twoFactor: any) => {
+      build();
+      prisma.user.findMany = jest.fn(async () => [
+        { id: USER_ID, email: 'a@b.com', role: 'EMPLOYEE', status: 'ACTIVE', employee: null, twoFactor },
+      ]);
+      const [row] = await service.listForCompany(COMPANY_ID);
+      return row;
+    };
+
+    it('calls a confirmed enrolment enabled', async () => {
+      const row = await listOf({ confirmedAt: new Date(), createdAt: new Date(), pendingStartedAt: null });
+      expect(row.enabled).toBe(true);
+      expect(row.setupStarted).toBe(false);
+    });
+
+    it('reports a started-but-unconfirmed enrolment as setupStarted, not enabled', async () => {
+      const row = await listOf({ confirmedAt: null, createdAt: new Date(), pendingStartedAt: null });
+      expect(row.enabled).toBe(false);
+      // The whole point: not enabled, but there IS something to clear.
+      expect(row.setupStarted).toBe(true);
+    });
+
+    it('reports somebody with no row at all as neither', async () => {
+      const row = await listOf(null);
+      expect(row.enabled).toBe(false);
+      expect(row.setupStarted).toBe(false);
+    });
+
+    it('flags a confirmed user part-way through moving device', async () => {
+      const row = await listOf({
+        confirmedAt: new Date(), createdAt: new Date(), pendingStartedAt: new Date(),
+      });
+      expect(row.enabled).toBe(true);
+      expect(row.movingDevice).toBe(true);
+    });
+  });
+
+  /** The reset itself never depended on confirmation — only the UI did. */
+  describe('adminReset', () => {
+    it('clears a half-finished enrolment', async () => {
+      build({ confirmedAt: null });
+      const out = await service.adminReset({ sub: 99, companyId: COMPANY_ID }, USER_ID);
+      expect(prisma.userTwoFactor.deleteMany).toHaveBeenCalledWith({ where: { userId: USER_ID } });
+      expect(out.message).toContain('reset');
+    });
+  });
 });

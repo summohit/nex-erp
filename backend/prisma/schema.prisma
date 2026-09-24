@@ -979,8 +979,17 @@ model PayslipItem {
 
 model ExpenseClaim {
   id              Int       @id @default(autoincrement())
-  employeeId      Int
-  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// Optional, because not every cost belongs to a person.
+  ///
+  /// This model was written as an employee reimbursement claim, and most rows
+  /// are. But the Workway import brought 188 company overheads with it -- rent
+  /// for units 901-902, electricity, recurring building costs, ₹84.7 lakh in
+  /// all -- and there is nobody to attach them to. Requiring an employee would
+  /// have meant either dropping them or recording the office rent as somebody's
+  /// personal claim, and a reimbursement report is worth less once it contains
+  /// things nobody claimed.
+  employeeId      Int?
+  employee        Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   title           String
   description     String?
   amount          Float

@@ -732,7 +732,7 @@ export class TwoFactorService {
         role: true,
         status: true,
         employee: { select: { firstName: true, lastName: true, avatarUrl: true } },
-        twoFactor: { select: { confirmedAt: true } },
+        twoFactor: { select: { confirmedAt: true, createdAt: true, pendingStartedAt: true } },
       },
       orderBy: { email: 'asc' },
     });
@@ -748,6 +748,20 @@ export class TwoFactorService {
       avatarUrl: u.employee?.avatarUrl || null,
       enabled: !!u.twoFactor?.confirmedAt,
       confirmedAt: u.twoFactor?.confirmedAt ?? null,
+      /**
+       * A row with no confirmedAt: enrolment was started and never finished.
+       *
+       * Reported separately because the screen used to fold it into "not
+       * enrolled" and refuse to reset it — "the rest have nothing to clear" —
+       * when in fact there is a row, it is the thing holding the account in
+       * setup, and clearing it is the only way out. Somebody who lost their
+       * phone halfway through enrolling was unreachable by the one tool built
+       * for exactly that.
+       */
+      setupStarted: !!u.twoFactor && !u.twoFactor.confirmedAt,
+      /** A confirmed user part-way through moving to a new device. */
+      movingDevice: !!u.twoFactor?.confirmedAt && !!u.twoFactor?.pendingStartedAt,
+      startedAt: u.twoFactor?.createdAt ?? null,
     }));
   }
 

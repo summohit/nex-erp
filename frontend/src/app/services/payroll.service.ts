@@ -204,6 +204,18 @@ export class PayrollService {
     return this.http.put<Payslip>(`${this.apiUrl}/payslips/${id}`, data);
   }
 
+  /** Rewrite a payslip from its component lines; totals are derived server-side. */
+  updatePayslipItems(
+    id: number,
+    body: {
+      items: { componentName: string; type: string; amount: number }[];
+      workingDays?: number;
+      presentDays?: number;
+    },
+  ): Observable<Payslip> {
+    return this.http.put<Payslip>(`${this.apiUrl}/payslips/${id}/items`, body);
+  }
+
   getPayslipDetail(id: number): Observable<Payslip> {
     return this.http.get<Payslip>(`${this.apiUrl}/payslips/${id}/detail`);
   }

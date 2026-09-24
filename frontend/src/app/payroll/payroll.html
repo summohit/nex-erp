@@ -779,48 +779,444 @@
 
     <!-- Admin View: All Finalized Payslips -->
     <div class="widget-card" *ngIf="isAdmin()">
-      <div class="toolbar-banner">
-        <div class="period-selectors">
-          <span class="selector-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>
-          </span>
-          <label>Filter Period:</label>
-          <select class="form-control inline-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event); loadPayslips()">
-            <option *ngFor="let m of months" [value]="m.id">{{ m.name }}</option>
-          </select>
-          <select class="form-control inline-select" [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event); loadPayslips()">
-            <option *ngFor="let y of years" [value]="y">{{ y }}</option>
-          </select>
+      <!-- Period Selector & Header Banner -->
+      <div class="payroll-section-header">
+        <div>
+          <h3 class="section-title">All Employee Payslips</h3>
+          <p class="section-subtitle">Search, filter, inspect, edit, and export monthly finalized payslips.</p>
+        </div>
+        
+        <div class="period-selectors-cluster">
+          <div class="period-selectors">
+            <span class="selector-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>
+            </span>
+            <label class="period-label">Period:</label>
+            <select class="form-control inline-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set(+$event); loadPayslips()">
+              <option *ngFor="let m of months" [value]="m.id">{{ m.name }}</option>
+            </select>
+            <select class="form-control inline-select" [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set(+$event); loadPayslips()">
+              <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+            </select>
+          </div>
+
+          <button class="btn btn-outline btn-sm email-all-btn" (click)="sendBulkPayslipEmails()" title="Email all payslips for this period">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <span>Email All</span>
+          </button>
         </div>
       </div>
 
-      <div class="payslips-grid mt-4" *ngIf="payslips().length > 0; else noPayslips">
-        <div class="payslip-card" *ngFor="let p of payslips()" (click)="openPayslipDetail(p)">
-          <div class="card-header">
-            <h4>{{ p.employee.firstName }} {{ p.employee.lastName }}</h4>
-            <span class="badge" [ngClass]="p.status === 'PAID' ? 'badge-success' : (p.status === 'FINALIZED' ? 'badge-info' : 'badge-warning')">{{ p.status }}</span>
-          </div>
-          <div class="card-body">
-            <div class="department-tag">{{ p.employee.department?.name || 'General' }}</div>
-            <div class="net-pay mt-2">
-              <span class="label">Net Pay</span>
-              <span class="amount">₹{{ p.netPay.toLocaleString('en-IN') }}</span>
+      <!-- Filter & Search Toolbar (Designation, Department, Status, Search) -->
+      <div class="salary-filter-toolbar mt-3">
+        <div class="filter-left-group">
+          <!-- Designation Filter -->
+          <div class="filter-item">
+            <label>Designation</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="payslipDesignationOptions()"
+                [value]="payslipDesigFilter()"
+                [clearable]="payslipDesigFilter() !== 'ALL'"
+                placeholder="All Designations"
+                (valueChange)="payslipDesigFilter.set($event || 'ALL')">
+              </app-searchable-select>
             </div>
           </div>
-          <div class="card-footer">
-            <button class="btn-text">
-              Inspect Details
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+
+          <!-- Department Filter -->
+          <div class="filter-item">
+            <label>Department</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="payslipDepartmentOptions()"
+                [value]="payslipDeptFilter()"
+                [clearable]="payslipDeptFilter() !== 'ALL'"
+                placeholder="All Departments"
+                (valueChange)="payslipDeptFilter.set($event || 'ALL')">
+              </app-searchable-select>
+            </div>
+          </div>
+
+          <!-- Status Filter -->
+          <div class="filter-item">
+            <label>Status</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="payslipStatusOptions"
+                [value]="payslipStatusFilter()"
+                [clearable]="payslipStatusFilter() !== 'ALL'"
+                placeholder="All Status"
+                (valueChange)="payslipStatusFilter.set($event || 'ALL')">
+              </app-searchable-select>
+            </div>
+          </div>
+
+          <!-- Search Input Field -->
+          <div class="search-box-wrapper">
+            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input 
+              type="text" 
+              class="search-input-field" 
+              placeholder="Search employee, designation, dept..."
+              [ngModel]="payslipSearchQuery()"
+              (ngModelChange)="payslipSearchQuery.set($event)">
+            <button 
+              *ngIf="payslipSearchQuery()" 
+              class="clear-search-btn" 
+              (click)="payslipSearchQuery.set('')"
+              title="Clear Search">✕</button>
+          </div>
+
+          <!-- Quick Status Filter Pills -->
+          <div class="filter-pills-cluster">
+            <button 
+              type="button" 
+              class="filter-pill-tab" 
+              [class.active]="payslipStatusFilter() === 'ALL'" 
+              (click)="payslipStatusFilter.set('ALL')">
+              All ({{ payslips().length }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab pill-paid" 
+              [class.active]="payslipStatusFilter() === 'PAID'" 
+              (click)="payslipStatusFilter.set('PAID')"
+              *ngIf="payslipsTabCounts().paid > 0">
+              Paid ({{ payslipsTabCounts().paid }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab pill-finalized" 
+              [class.active]="payslipStatusFilter() === 'FINALIZED'" 
+              (click)="payslipStatusFilter.set('FINALIZED')"
+              *ngIf="payslipsTabCounts().finalized > 0">
+              Finalized ({{ payslipsTabCounts().finalized }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab pill-draft" 
+              [class.active]="payslipStatusFilter() === 'DRAFT'" 
+              (click)="payslipStatusFilter.set('DRAFT')"
+              *ngIf="payslipsTabCounts().draft > 0">
+              Draft ({{ payslipsTabCounts().draft }})
             </button>
           </div>
+
+          <!-- Clear Filters Button -->
+          <button 
+            type="button" 
+            class="btn-clear-inline" 
+            *ngIf="hasActivePayslipFilters()" 
+            (click)="clearPayslipFilters()">
+            Clear Filters
+          </button>
         </div>
       </div>
-      <ng-template #noPayslips>
-        <div class="empty-state">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-          <p>No payslips found for this period. Go to Salary Processing to generate them.</p>
-        </div>
-      </ng-template>
+
+      <!-- Enhanced Employee Payslips Table -->
+      <div class="table-responsive salary-table-wrapper mt-3">
+        <table class="table salary-data-table processing-table payslips-table">
+          <thead>
+            <tr>
+              <!-- 1. Employee Name & Department -->
+              <th class="th-sortable th-emp" (click)="togglePayslipSort('name')">
+                <div class="th-content">
+                  <span>Employee</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'name'">
+                    {{ payslipSortColumn() === 'name' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 2. Working Days -->
+              <th class="th-sortable text-center" (click)="togglePayslipSort('workingDays')">
+                <div class="th-content justify-content-center">
+                  <span>Working Days</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'workingDays'">
+                    {{ payslipSortColumn() === 'workingDays' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 3. Present -->
+              <th class="th-sortable text-center" (click)="togglePayslipSort('present')">
+                <div class="th-content justify-content-center">
+                  <span>Present</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'present'">
+                    {{ payslipSortColumn() === 'present' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 4. Absent -->
+              <th class="th-sortable text-center" (click)="togglePayslipSort('absent')">
+                <div class="th-content justify-content-center">
+                  <span>Absent</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'absent'">
+                    {{ payslipSortColumn() === 'absent' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 5. Gross Pay -->
+              <th class="th-sortable th-amount text-right" (click)="togglePayslipSort('gross')">
+                <div class="th-content th-right">
+                  <span>Gross Pay</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'gross'">
+                    {{ payslipSortColumn() === 'gross' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 6. LOP / Deductions -->
+              <th class="th-sortable th-amount text-right" (click)="togglePayslipSort('lop')">
+                <div class="th-content th-right">
+                  <span>LOP / Deductions</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'lop'">
+                    {{ payslipSortColumn() === 'lop' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 7. Expenses Reimbursed -->
+              <th class="th-sortable th-amount text-right" (click)="togglePayslipSort('expenses')">
+                <div class="th-content th-right">
+                  <span>Expenses</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'expenses'">
+                    {{ payslipSortColumn() === 'expenses' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 8. Net Pay -->
+              <th class="th-sortable th-amount text-right" (click)="togglePayslipSort('net')">
+                <div class="th-content th-right">
+                  <span>Net Pay</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'net'">
+                    {{ payslipSortColumn() === 'net' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 9. Status -->
+              <th class="th-sortable text-center" (click)="togglePayslipSort('status')">
+                <div class="th-content justify-content-center">
+                  <span>Status</span>
+                  <span class="sort-arrows" [class.active]="payslipSortColumn() === 'status'">
+                    {{ payslipSortColumn() === 'status' ? (payslipSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 10. Actions -->
+              <th class="th-action text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Skeleton Loading State -->
+            <ng-container *ngIf="isLoadingPayslips()">
+              <tr *ngFor="let s of [1, 2, 3, 4, 5, 6]" class="salary-skeleton-row">
+                <td class="td-employee">
+                  <div class="emp-profile-cell">
+                    <div class="skeleton-avatar-circle skeleton-shimmer"></div>
+                    <div class="emp-name-stack">
+                      <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '130px' : '110px')" style="height: 14px;"></div>
+                      <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '85px' : '95px')" style="height: 11px;"></div>
+                      <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '70px' : '60px')" style="height: 10px;"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="text-center"><div class="skeleton-line skeleton-shimmer mx-auto" style="width: 32px; height: 16px;"></div></td>
+                <td class="text-center"><div class="skeleton-line skeleton-shimmer mx-auto" style="width: 32px; height: 16px;"></div></td>
+                <td class="text-center"><div class="skeleton-line skeleton-shimmer mx-auto" style="width: 32px; height: 16px;"></div></td>
+                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 75px; height: 16px;"></div></td>
+                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 75px; height: 16px;"></div></td>
+                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 50px; height: 16px;"></div></td>
+                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 85px; height: 16px;"></div></td>
+                <td class="text-center"><div class="skeleton-pill skeleton-shimmer mx-auto" style="width: 70px; height: 24px; border-radius: 12px;"></div></td>
+                <td class="text-center"><div class="skeleton-circle-btn skeleton-shimmer mx-auto"></div></td>
+              </tr>
+            </ng-container>
+
+            <!-- Loaded Data State -->
+            <ng-container *ngIf="!isLoadingPayslips()">
+              <!-- Empty state -->
+              <tr *ngIf="filteredPayslipsList().length === 0">
+                <td colspan="10" class="text-center py-5">
+                  <div class="empty-table-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <p class="mt-2 text-secondary font-medium">
+                      {{ payslips().length === 0 ? 'No payslips found for this period. Go to Salary Processing to generate them.' : 'No employee payslips found matching current filters.' }}
+                    </p>
+                    <div class="mt-3" *ngIf="payslips().length === 0">
+                      <button class="btn btn-primary btn-sm" (click)="setTab('processing')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        Go to Salary Processing
+                      </button>
+                    </div>
+                    <div class="mt-2" *ngIf="payslips().length > 0 && hasActivePayslipFilters()">
+                      <button class="btn btn-outline btn-sm" (click)="clearPayslipFilters()">Clear All Filters</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Payslip Rows -->
+              <tr 
+                *ngFor="let p of filteredPayslipsList()" 
+                class="salary-row processing-row"
+                [class.payroll-row-inactive]="p.employee?.user?.status === 'SUSPENDED'">
+                
+                <!-- 1. Employee Profile (Avatar, Name, Designation, Department below) -->
+                <td class="td-employee">
+                  <div class="emp-profile-cell" (click)="openPayslipDetail(p)">
+                    <img [src]="p.employee?.avatarUrl" alt="" class="row-avatar-img" *ngIf="p.employee?.avatarUrl">
+                    <div class="row-avatar-circle" *ngIf="!p.employee?.avatarUrl">
+                      {{ (p.employee?.firstName || 'E').charAt(0) }}{{ (p.employee?.lastName || '').charAt(0) }}
+                    </div>
+                    <div class="emp-name-stack">
+                      <div class="emp-display-name">
+                        {{ p.employee?.firstName }} {{ p.employee?.lastName }}
+                        <span class="inactive-pill" *ngIf="p.employee?.user?.status === 'SUSPENDED'">Suspended</span>
+                      </div>
+                      <div class="emp-sub-designation">
+                        {{ p.employee?.designation?.name || 'Staff' }}
+                      </div>
+                      <div class="emp-sub-department" *ngIf="p.employee?.department?.name">
+                        {{ p.employee?.department?.name }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- 2. Working Days -->
+                <td class="text-center font-medium td-num">
+                  {{ p.workingDays || 0 }}
+                </td>
+
+                <!-- 3. Present -->
+                <td class="text-center font-semibold text-slate-700 td-num">
+                  {{ p.presentDays || 0 }}
+                </td>
+
+                <!-- 4. Absent -->
+                <td class="text-center font-bold td-num" [ngClass]="(p.absentDays || 0) > 0 ? 'text-rose' : 'text-slate-400'">
+                  {{ p.absentDays || 0 }}
+                </td>
+
+                <!-- 5. Gross Pay -->
+                <td class="text-right font-medium td-num">
+                  ₹{{ (p.totalEarnings || 0).toLocaleString('en-IN') }}
+                </td>
+
+                <!-- 6. LOP (Deducted) -->
+                <td class="text-right td-num" [ngClass]="(p.lossOfPay || 0) > 0 ? 'text-amber font-bold' : 'text-slate-400'">
+                  ₹{{ (p.lossOfPay || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                </td>
+
+                <!-- 7. Expenses Reimbursed -->
+                <td class="text-right font-medium td-num text-slate-600">
+                  ₹{{ (p.expenseAmount || 0).toLocaleString('en-IN') }}
+                </td>
+
+                <!-- 8. Net Pay -->
+                <td class="text-right td-num" (click)="openPayslipDetail(p)" style="cursor: pointer;">
+                  <span class="net-pay-amount">
+                    ₹{{ (p.netPay || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  </span>
+                </td>
+
+                <!-- 9. Status -->
+                <td class="text-center">
+                  <span class="status-pill status-{{ (p.status || 'DRAFT').toLowerCase() }}">
+                    <span class="status-dot"></span>
+                    {{ p.status || 'DRAFT' }}
+                  </span>
+                </td>
+
+                <!-- 10. Actions Dropdown & Quick Actions -->
+                <td class="td-action text-center">
+                  <div class="row-actions-group">
+                    <button class="btn-table-action" (click)="openPayslipDetail(p)" title="Inspect Details">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                    <button class="btn-table-action" (click)="openPayslipEdit(p)" title="Edit Payslip">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                    <button class="btn-table-action" (click)="downloadPayslip(p)" title="Download PDF">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    </button>
+                    <button 
+                      class="btn-action-more" 
+                      [matMenuTriggerFor]="payslipRowActionMenu" 
+                      [matMenuTriggerData]="{ payslip: p }" 
+                      title="More actions">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Summary Footer -->
+      <div class="table-summary-footer">
+        <ng-container *ngIf="!isLoadingPayslips(); else footerLoadingTpl">
+          <div class="footer-count">
+            Showing <strong>{{ filteredPayslipsList().length }}</strong> of <strong>{{ payslips().length }}</strong> employees
+          </div>
+          <div class="footer-totals">
+            <span class="tot-item">Total Gross: <strong>₹{{ payslipsTabTotals().totalGross.toLocaleString('en-IN') }}</strong></span>
+            <span class="tot-sep">•</span>
+            <span class="tot-item">Loss of Pay: <strong class="text-amber">₹{{ payslipsTabTotals().totalLop.toLocaleString('en-IN') }}</strong></span>
+            <span class="tot-sep">•</span>
+            <span class="tot-item">Expenses: <strong>₹{{ payslipsTabTotals().totalExpenses.toLocaleString('en-IN') }}</strong></span>
+            <span class="tot-sep">•</span>
+            <span class="tot-item">Net Payout: <strong class="text-emerald">₹{{ payslipsTabTotals().totalNet.toLocaleString('en-IN') }}</strong></span>
+          </div>
+        </ng-container>
+        <ng-template #footerLoadingTpl>
+          <div class="footer-count">
+            <div class="skeleton-line skeleton-shimmer" style="width: 140px; height: 14px;"></div>
+          </div>
+          <div class="footer-totals">
+            <div class="skeleton-line skeleton-shimmer" style="width: 280px; height: 14px;"></div>
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- MatMenu for Tab 2 Row Actions -->
+      <mat-menu #payslipRowActionMenu="matMenu" class="custom-action-menu">
+        <ng-template matMenuContent let-payslip="payslip">
+          <button mat-menu-item (click)="openPayslipDetail(payslip)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <span class="menu-text">View / Print Payslip</span>
+          </button>
+          <button mat-menu-item (click)="openPayslipEdit(payslip)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <span class="menu-text">Edit Payslip Items</span>
+          </button>
+          <button mat-menu-item (click)="downloadPayslip(payslip)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span class="menu-text">Download PDF</span>
+          </button>
+          <button mat-menu-item (click)="resendPayslip(payslip)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <span class="menu-text">Send Email to Employee</span>
+          </button>
+          <button mat-menu-item (click)="finalizeIndividual(payslip)" *ngIf="payslip.status === 'DRAFT'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon text-primary"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <span class="menu-text">Finalize Payslip</span>
+          </button>
+          <button mat-menu-item (click)="markIndividualPaid(payslip)" *ngIf="payslip.status !== 'PAID'" class="text-success">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon text-emerald"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span class="menu-text">Mark as Paid</span>
+          </button>
+        </ng-template>
+      </mat-menu>
     </div>
   </div>
 
@@ -1786,21 +2182,27 @@
   <div class="drawer-overlay" *ngIf="isPayslipDetailModalOpen()" (click)="closePayslipDetail()">
     <div class="drawer-content payslip-modal-content" (click)="$event.stopPropagation()">
       <div class="drawer-header">
-        <h2>Payslip for {{ getMonthName(selectedPayslipDetail()?.month || 1) }} {{ selectedPayslipDetail()?.year }}</h2>
+        <div>
+          <h2>Payslip for {{ getMonthName(selectedPayslipDetail()?.month || 1) }} {{ selectedPayslipDetail()?.year }}</h2>
+          <p class="edit-sub" *ngIf="selectedPayslipDetail() as pd">
+            {{ pd.employee.firstName }} {{ pd.employee.lastName }} · {{ pd.employee.designation?.name || 'Staff' }}
+            <span class="status-chip" [class.chip-paid]="pd.status === 'PAID'">{{ pd.status }}</span>
+          </p>
+        </div>
         <button class="btn-icon" (click)="closePayslipDetail()">✕</button>
       </div>
       <div class="drawer-body printable-payslip" *ngIf="selectedPayslipDetail() as pd">
         <img [src]="companyLogoUrl()" class="payslip-watermark" alt="Watermark">
         <div class="company-brand mb-3">
-          <img [src]="companyLogoUrl()" alt="Company Logo" style="height: 36px; max-width: 160px; object-fit: contain;">
+          <img [src]="companyLogoUrl()" alt="Company Logo" style="height: 38px; max-width: 170px; object-fit: contain;">
         </div>
         <div class="employee-meta-grid mb-3">
-          <div><span class="meta-label">Employee Name:</span> <span class="meta-val">{{ pd.employee.firstName }} {{ pd.employee.lastName }}</span></div>
-          <div><span class="meta-label">Department:</span> <span class="meta-val">{{ pd.employee.department?.name || 'General' }}</span></div>
-          <div><span class="meta-label">Designation:</span> <span class="meta-val">{{ pd.employee.designation?.name || 'N/A' }}</span></div>
-          <div><span class="meta-label">Working Days:</span> <span class="meta-val">{{ pd.workingDays }}</span></div>
-          <div><span class="meta-label">Present Days:</span> <span class="meta-val">{{ pd.presentDays }}</span></div>
-          <div><span class="meta-label">Absent Days:</span> <span class="meta-val">{{ pd.absentDays }}</span></div>
+          <div class="meta-item"><span class="meta-label">Employee Name:</span> <span class="meta-val">{{ pd.employee.firstName }} {{ pd.employee.lastName }}</span></div>
+          <div class="meta-item"><span class="meta-label">Department:</span> <span class="meta-val">{{ pd.employee.department?.name || 'General' }}</span></div>
+          <div class="meta-item"><span class="meta-label">Designation:</span> <span class="meta-val">{{ pd.employee.designation?.name || 'N/A' }}</span></div>
+          <div class="meta-item"><span class="meta-label">Working Days:</span> <span class="meta-val">{{ pd.workingDays }}</span></div>
+          <div class="meta-item"><span class="meta-label">Present Days:</span> <span class="meta-val">{{ pd.presentDays }}</span></div>
+          <div class="meta-item"><span class="meta-label">Absent Days:</span> <span class="meta-val" [class.text-rose]="pd.absentDays > 0">{{ pd.absentDays }}</span></div>
         </div>
 
         <table class="payslip-table mb-3">
@@ -1852,42 +2254,252 @@
             </tr>
           </tfoot>
         </table>
+      </div>
 
+      <!-- Sticky Bottom Footer: Net Salary Payable Banner + Action Buttons -->
+      <div class="payslip-sticky-footer" *ngIf="selectedPayslipDetail() as pd">
         <div class="net-pay-banner">
           <div class="net-pay-left">
-            <span>Net Salary Payable (Take Home):</span>
-            <!-- Spelled out, as a payslip does: a figure alone is easy to
-                 misread by a factor of ten, and the words are what makes a
-                 transposed digit obvious. -->
+            <span class="net-pay-title">Net Salary Payable (Take Home):</span>
             <em class="net-in-words">{{ amountInWords(pd.netPay) }}</em>
           </div>
-          <h2>₹{{ pd.netPay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</h2>
+          <h2 class="net-pay-val">₹{{ pd.netPay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</h2>
+        </div>
+
+        <div class="payslip-actions">
+          <button class="btn btn-outline" (click)="closePayslipDetail()">Close</button>
+
+          <!-- A finalized or paid slip is a record; adjusting it should be a
+               deliberate act, not the first button under the cursor. -->
+          <button class="btn btn-outline" (click)="openPayslipEdit(pd)"
+                  [disabled]="isPayslipBusy()"
+                  [title]="pd.status === 'DRAFT' ? 'Edit this payslip' : 'This payslip is ' + pd.status.toLowerCase()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <span>Edit</span>
+          </button>
+
+          <button class="btn btn-outline" (click)="resendPayslip(pd)" [disabled]="isPayslipBusy()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <span>{{ isPayslipBusy() ? 'Working…' : 'Send Again' }}</span>
+          </button>
+
+          <button class="btn btn-primary" (click)="downloadPayslip(pd)" [disabled]="isPayslipBusy()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Download PDF</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PAYSLIP EDITOR ====================
+       Stacked ABOVE the detail view rather than replacing it: the numbers you
+       are checking stay on screen behind the ones you are changing, and
+       cancelling puts you back where you were instead of nowhere. -->
+  <div class="drawer-overlay payslip-edit-overlay" *ngIf="isPayslipEditOpen()"
+       (click)="closePayslipEdit()">
+    <div class="drawer-content payslip-edit-content" (click)="$event.stopPropagation()"
+         *ngIf="editingPayslip() as ep">
+      <div class="drawer-header edit-payslip-header">
+        <div class="edit-header-left">
+          <div class="edit-header-title-row">
+            <h2>Edit Payslip</h2>
+            <span class="status-chip" [class.chip-paid]="ep.status !== 'DRAFT'">
+              <span class="status-dot"></span>
+              {{ ep.status }}
+            </span>
+          </div>
+          <p class="edit-sub">
+            <span class="period-pill">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              {{ getMonthName(ep.month) }} {{ ep.year }}
+            </span>
+            <span class="divider-dot">·</span>
+            <span class="emp-name-sub">{{ ep.employee?.firstName }} {{ ep.employee?.lastName }}</span>
+          </p>
+        </div>
+        <button class="btn-icon" (click)="closePayslipEdit()" title="Close editor">✕</button>
+      </div>
+
+      <div class="drawer-body edit-payslip-body">
+        <!-- Employee Profile & Config Card -->
+        <div class="edit-employee-card">
+          <div class="emp-card-left">
+            <div class="emp-card-avatar">
+              {{ (ep.employee?.firstName?.[0] || 'E') + (ep.employee?.lastName?.[0] || '') }}
+            </div>
+            <div class="emp-card-info">
+              <h3 class="emp-card-name">{{ ep.employee?.firstName }} {{ ep.employee?.lastName }}</h3>
+              <div class="emp-card-tags">
+                <span class="emp-tag designation-tag">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                  {{ ep.employee?.designation?.name || 'Staff' }}
+                </span>
+                <span class="emp-tag dept-tag" *ngIf="ep.employee?.department?.name">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M9 8h1"></path><path d="M9 12h1"></path><path d="M9 16h1"></path><path d="M14 8h1"></path><path d="M14 12h1"></path><path d="M14 16h1"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path></svg>
+                  {{ ep.employee?.department?.name }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="emp-card-right">
+            <div class="emp-meta-item">
+              <span class="emp-meta-label">Salary Slip No.</span>
+              <span class="emp-slip-badge">
+                <code>#{{ slipNumber(ep) }}</code>
+              </span>
+            </div>
+            <div class="emp-meta-item emp-meta-days">
+              <label class="emp-meta-label" for="editDaysInput">Payable Days</label>
+              <div class="days-input-wrapper">
+                <input id="editDaysInput" type="number" class="days-input" min="0" max="31"
+                       [ngModel]="editDays()" (ngModelChange)="editDays.set(+$event)" placeholder="0">
+                <span class="days-addon">Days</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="edit-columns">
+          <!-- EARNINGS COLUMN -->
+          <div class="edit-card edit-card-earnings">
+            <div class="edit-card-header">
+              <div class="card-header-title">
+                <span class="card-icon-pill icon-earnings">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                </span>
+                <div>
+                  <h4>Earnings &amp; Allowances</h4>
+                  <span class="card-subtitle">{{ editRowsOf('EARNING').length }} components</span>
+                </div>
+              </div>
+              <button type="button" class="btn-add-item btn-add-earning" (click)="addEditRow('EARNING')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Add Item
+              </button>
+            </div>
+
+            <div class="edit-card-body">
+              <div class="edit-table-header">
+                <span class="col-name">Component</span>
+                <span class="col-amount">Amount (₹)</span>
+                <span class="col-action"></span>
+              </div>
+
+              <div class="edit-item-row" *ngFor="let r of editRowsOf('EARNING')">
+                <div class="item-name-cell">
+                  <span *ngIf="r.fixed" class="fixed-name-label" [title]="r.componentName">{{ r.componentName }}</span>
+                  <input *ngIf="!r.fixed" class="form-control custom-name-input" [(ngModel)]="r.componentName" placeholder="Component Name...">
+                </div>
+                <div class="item-amount-cell">
+                  <div class="amount-input-group">
+                    <span class="currency-addon">₹</span>
+                    <input type="number" class="amount-input" min="0" step="0.01"
+                           [(ngModel)]="r.amount" placeholder="0.00">
+                  </div>
+                </div>
+                <div class="item-action-cell">
+                  <button type="button" class="btn-row-remove" *ngIf="!r.fixed"
+                          (click)="removeEditRow(r)" title="Remove this line">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="edit-card-footer footer-earnings">
+              <span class="total-label">Total Gross Earnings</span>
+              <span class="total-val">₹{{ editTotal('EARNING') | number:'1.2-2' }}</span>
+            </div>
+          </div>
+
+          <!-- DEDUCTIONS COLUMN -->
+          <div class="edit-card edit-card-deductions">
+            <div class="edit-card-header">
+              <div class="card-header-title">
+                <span class="card-icon-pill icon-deductions">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+                </span>
+                <div>
+                  <h4>Deductions &amp; Withholdings</h4>
+                  <span class="card-subtitle">{{ editRowsOf('DEDUCTION').length }} components</span>
+                </div>
+              </div>
+              <button type="button" class="btn-add-item btn-add-deduction" (click)="addEditRow('DEDUCTION')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Add Item
+              </button>
+            </div>
+
+            <div class="edit-card-body">
+              <div class="edit-table-header">
+                <span class="col-name">Component</span>
+                <span class="col-amount">Amount (₹)</span>
+                <span class="col-action"></span>
+              </div>
+
+              <div class="edit-item-row" *ngFor="let r of editRowsOf('DEDUCTION')">
+                <div class="item-name-cell">
+                  <span *ngIf="r.fixed" class="fixed-name-label" [title]="r.componentName">
+                    {{ r.componentName }}
+                    <span *ngIf="isStatutory(r.componentName)" class="statutory-pill">Statutory</span>
+                  </span>
+                  <input *ngIf="!r.fixed" class="form-control custom-name-input" [(ngModel)]="r.componentName" placeholder="Component Name...">
+                </div>
+                <div class="item-amount-cell">
+                  <div class="amount-input-group">
+                    <span class="currency-addon">₹</span>
+                    <input type="number" class="amount-input" min="0" step="0.01"
+                           [(ngModel)]="r.amount" placeholder="0.00">
+                  </div>
+                </div>
+                <div class="item-action-cell">
+                  <button type="button" class="btn-row-remove" *ngIf="!r.fixed"
+                          (click)="removeEditRow(r)" title="Remove this line">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="edit-card-footer footer-deductions">
+              <span class="total-label">Total Deductions</span>
+              <span class="total-val text-rose">₹{{ editTotal('DEDUCTION') | number:'1.2-2' }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- `pd` is bound by the *ngIf on .drawer-body above and does not reach
-           here, so the footer binds it again rather than reading the signal
-           four more times. -->
-      <div class="drawer-footer payslip-actions" *ngIf="selectedPayslipDetail() as pd">
-        <button class="btn btn-outline" (click)="closePayslipDetail()">Close</button>
+      <!-- Sticky Bottom Footer for Payslip Editor -->
+      <div class="payslip-edit-footer">
+        <div class="edit-net-banner">
+          <div class="edit-net-left">
+            <div class="edit-net-top">
+              <span class="edit-net-label">Net Salary Payable (Take Home)</span>
+              <span class="edit-equation-badge">
+                ₹{{ editTotal('EARNING') | number:'1.0-0' }} − ₹{{ editTotal('DEDUCTION') | number:'1.0-0' }}
+              </span>
+            </div>
+            <em class="edit-net-words">{{ amountInWords(editNet) }}</em>
+          </div>
+          <div class="edit-net-right">
+            <h2>₹{{ editNet | number:'1.2-2' }}</h2>
+          </div>
+        </div>
 
-        <!-- A finalized or paid slip is a record; adjusting it should be a
-             deliberate act, not the first button under the cursor. -->
-        <button class="btn btn-outline" (click)="openAdjustModal(pd)"
-                [disabled]="isPayslipBusy()"
-                [title]="pd.status === 'DRAFT' ? 'Adjust this payslip' : 'This payslip is ' + pd.status.toLowerCase()">
-          Edit
-        </button>
+        <div class="edit-note-banner">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          <span>Totals and net payable calculate live across lines to preserve payroll accounting accuracy.</span>
+        </div>
 
-        <button class="btn btn-outline" (click)="resendPayslip(pd)" [disabled]="isPayslipBusy()">
-          {{ isPayslipBusy() ? 'Working…' : 'Send Again' }}
-        </button>
-
-        <button class="btn btn-outline" onclick="window.print()">Print</button>
-
-        <button class="btn btn-primary" (click)="downloadPayslip(pd)" [disabled]="isPayslipBusy()">
-          Download PDF
-        </button>
+        <div class="edit-footer-actions">
+          <button type="button" class="btn btn-outline" (click)="closePayslipEdit()">Cancel</button>
+          <button type="button" class="btn btn-primary btn-save-payslip" (click)="savePayslipEdit()" [disabled]="isPayslipBusy()">
+            <svg *ngIf="!isPayslipBusy()" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>{{ isPayslipBusy() ? 'Saving…' : 'Save Changes' }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

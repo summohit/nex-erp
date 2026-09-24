@@ -689,14 +689,17 @@
 
       <div class="tfa-admin-row" *ngFor="let u of adminFiltered()"
            [class.tfa-selected]="isAdminSelected(u.userId)"
-           [class.tfa-disabled]="!u.enabled">
+           [class.tfa-disabled]="!hasStoredFactor(u)">
         <label class="tfa-check">
-          <!-- Only an enrolled user can be reset, and never yourself: the
-               server refuses a self-reset, and doing it here would be a
-               self-service bypass of your own second factor. -->
+          <!-- Anyone with a stored second factor can be reset, finished or
+               not: a half-completed enrolment is the thing keeping somebody
+               stuck on the setup screen, and it is exactly what an admin needs
+               to clear. Never yourself — the server refuses a self-reset, and
+               doing it here would be a self-service bypass of your own second
+               factor. -->
           <input type="checkbox"
                  [checked]="isAdminSelected(u.userId)"
-                 [disabled]="!u.enabled || isMe(u.userId)"
+                 [disabled]="!hasStoredFactor(u) || isMe(u.userId)"
                  (change)="toggleAdminSelect(u)" />
         </label>
         <div class="tfa-user-cell">
@@ -713,7 +716,12 @@
         </div>
         <span class="tfa-col-role">{{ u.role }}</span>
         <span class="tfa-col-state">
-          <span class="tfa-pill" [class.on]="u.enabled">{{ u.enabled ? 'Enrolled' : 'Not enrolled' }}</span>
+          <span class="tfa-pill"
+                [class.on]="u.enabled"
+                [class.pending]="!u.enabled && u.setupStarted"
+                [title]="u.setupStarted && !u.enabled
+                          ? 'Enrolment was started and never confirmed — reset it to let them begin again'
+                          : ''">{{ tfaStateLabel(u) }}</span>
           <small *ngIf="isMe(u.userId)">you</small>
         </span>
       </div>

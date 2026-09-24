@@ -1136,6 +1136,75 @@ export class PayrollService {
     return payslip;
   }
 
+  /**
+   * Rewrite a payslip from its components.
+   *
+   * The existing adjust dialog edits three totals — earnings, deductions, loss
+   * of pay — which is enough to change what somebody is paid and not enough to
+   * say why. This takes the lines instead, the way the payslip itself is
+   * written, and derives the totals from them. A payslip whose parts do not
+   * add up to its total is not a document anybody should be handed.
+   *
+   * Loss of pay is folded in as an "Unpaid Days Deduction" line and the field
+   * is zeroed, because the view adds the field to the deduction total: leaving
+   * both would show the same money twice. The editor is given the line, so
+   * nothing is lost — only moved somewhere it can be seen and changed.
+   */
+  async updatePayslipItems(
+    companyId: number,
+    id: number,
+    data: {
+      items: { componentName: string; type: string; amount: number }[];
+      workingDays?: number;
+      presentDays?: number;
+    },
+  ) {
+    const payslip = await this.prisma.payslip.findFirst({ where: { id, companyId } });
+    if (!payslip) throw new NotFoundException('Payslip not found');
+    // A PAID payslip is not refused — correcting a genuine error on an issued
+    // slip is legitimate — but it is a record the person has already been
+    // given, so the edit is noted rather than made silently.
+    if (payslip.status === 'PAID') {
+      console.warn(`[payroll] editing a PAID payslip (id ${id}, ${payslip.month}/${payslip.year})`);
+    }
+
+    const clean = (data.items || [])
+      .map((i) => ({
+        componentName: String(i.componentName || '').trim(),
+        type: i.type === 'DEDUCTION' ? 'DEDUCTION' : 'EARNING',
+        amount: Math.round((Number(i.amount) || 0) * 100) / 100,
+      }))
+      .filter((i) => i.componentName && i.amount > 0);
+
+    const totalEarnings = clean.filter((i) => i.type === 'EARNING')
+      .reduce((t, i) => t + i.amount, 0);
+    const totalDeductions = clean.filter((i) => i.type === 'DEDUCTION')
+      .reduce((t, i) => t + i.amount, 0);
+    const netPay = Math.max(0, Math.round((totalEarnings - totalDeductions) * 100) / 100);
+
+    await this.prisma.payslipItem.deleteMany({ where: { payslipId: id } });
+    if (clean.length) {
+      await this.prisma.payslipItem.createMany({
+        data: clean.map((i) => ({ payslipId: id, ...i })),
+      });
+    }
+
+    await this.prisma.payslip.update({
+      where: { id },
+      data: {
+        totalEarnings,
+        totalDeductions,
+        netPay,
+        // Now carried as a line, so the field must not double it.
+        lossOfPay: 0,
+        ...(data.workingDays ? { workingDays: Math.round(data.workingDays) } : {}),
+        ...(data.presentDays != null ? { presentDays: Number(data.presentDays) } : {}),
+      },
+    });
+
+    return this.getPayslipDetail(companyId, id);
+  }
+
   /** The PDF for one payslip, as bytes for the caller to stream. */
   async getPayslipPdf(companyId: number, id: number) {
     const payslip = await this.getPayslipDetail(companyId, id);

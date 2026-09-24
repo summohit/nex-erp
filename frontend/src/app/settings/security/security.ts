@@ -143,10 +143,28 @@ export class SecurityComponent implements OnInit {
     );
   });
 
-  /** Only an enrolled user can be reset; the rest have nothing to clear. */
+  /**
+   * Anyone with a stored second factor — finished or not.
+   *
+   * This used to be `u.enabled`, meaning confirmed enrolments only, on the
+   * reasoning that "the rest have nothing to clear". That is true of someone
+   * who never started, and false of someone who started and stopped: their row
+   * is what holds the account in setup, and clearing it is the only way out.
+   * Somebody who lost their phone halfway through enrolling was invisible to
+   * the one tool built for exactly that situation.
+   */
+  hasStoredFactor = (u: any) => !!u?.enabled || !!u?.setupStarted;
+
   adminSelectable = computed(() =>
-    this.adminFiltered().filter((u) => u.enabled && u.userId !== this.myUserId),
+    this.adminFiltered().filter((u) => this.hasStoredFactor(u) && u.userId !== this.myUserId),
   );
+
+  /** Enrolled / half-enrolled / nothing — three states, not two. */
+  tfaStateLabel(u: any): string {
+    if (u?.enabled) return u?.movingDevice ? 'Moving device' : 'Enrolled';
+    if (u?.setupStarted) return 'Setup unfinished';
+    return 'Not enrolled';
+  }
 
   adminSelectedCount = computed(() => this.adminSelected().size);
 
@@ -175,7 +193,7 @@ export class SecurityComponent implements OnInit {
   isAdminSelected(userId: number) { return this.adminSelected().has(userId); }
 
   toggleAdminSelect(user: any) {
-    if (!user?.enabled || user.userId === this.myUserId) return;
+    if (!this.hasStoredFactor(user) || user.userId === this.myUserId) return;
     const next = new Set(this.adminSelected());
     next.has(user.userId) ? next.delete(user.userId) : next.add(user.userId);
     this.adminSelected.set(next);

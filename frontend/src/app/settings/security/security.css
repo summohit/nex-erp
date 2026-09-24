@@ -1935,3 +1935,12 @@
   .tfa-admin-row { grid-template-columns: 36px 1fr; row-gap: 6px; }
   .tfa-col-role, .tfa-col-state { grid-column: 2; }
 }
+
+/* An enrolment that started and stopped. Not "enrolled" — the second factor is
+   not protecting anything yet — but not nothing either: the row is what keeps
+   the account on the setup screen, and an admin can clear it. */
+.tfa-pill.pending {
+  background: #FEF3C7;
+  color: #92400E;
+  border-color: #FDE68A;
+}
