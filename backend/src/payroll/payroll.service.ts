@@ -1022,6 +1022,11 @@ export class PayrollService {
             id: true,
             firstName: true,
             lastName: true,
+            // The grid renders a photo when there is one and falls back to an
+            // initial. It was always falling back, because neither field was
+            // being sent.
+            avatarUrl: true,
+            user: { select: { status: true } },
             department: { select: { name: true } }
           }
         },
@@ -1029,7 +1034,10 @@ export class PayrollService {
           select: { employee: { select: { firstName: true, lastName: true } } }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      // When the money was spent, not when the row reached NEX. 795 of these
+      // arrived in one import, so createdAt orders them all identically and
+      // tells you nothing.
+      orderBy: [{ purchaseDate: 'desc' }, { createdAt: 'desc' }]
     });
   }
 
@@ -1038,6 +1046,13 @@ export class PayrollService {
     const privilegedRoles = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE'];
     if (!userRole || !privilegedRoles.includes(userRole)) {
       throw new BadRequestException('You do not have permission to approve or reject expense claims');
+    }
+
+    // Free text in the database, so a typo would otherwise become a status
+    // nothing filters on and no screen knows how to colour.
+    const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'PAID'];
+    if (!STATUSES.includes(String(data.status || '').toUpperCase())) {
+      throw new BadRequestException(`Status must be one of ${STATUSES.join(', ')}`);
     }
 
     const claim = await this.prisma.expenseClaim.findFirst({ where: { id, companyId }, include: { employee: true } });
@@ -1054,7 +1069,7 @@ export class PayrollService {
     return this.prisma.expenseClaim.update({
       where: { id },
       data: {
-        status: data.status,
+        status: String(data.status).toUpperCase(),
         rejectionReason: data.rejectionReason,
         approvedById: userId
       }
@@ -1145,10 +1160,13 @@ export class PayrollService {
    * written, and derives the totals from them. A payslip whose parts do not
    * add up to its total is not a document anybody should be handed.
    *
-   * Loss of pay is folded in as an "Unpaid Days Deduction" line and the field
-   * is zeroed, because the view adds the field to the deduction total: leaving
-   * both would show the same money twice. The editor is given the line, so
-   * nothing is lost — only moved somewhere it can be seen and changed.
+   * An "Unpaid Days Deduction" line is written back to the lossOfPay FIELD
+   * rather than stored as an item. NEX has a dedicated concept for it and
+   * screens built on it — the employee's payslip card reads that field, and an
+   * import that left it at zero had everybody seeing "LOP Penalty: ₹0" beside
+   * a payslip that had deducted ₹9,677 for unpaid days. The editor still shows
+   * it as a line, because a figure you cannot see is a figure you cannot fix;
+   * only its resting place differs.
    */
   async updatePayslipItems(
     companyId: number,
@@ -1176,16 +1194,24 @@ export class PayrollService {
       }))
       .filter((i) => i.componentName && i.amount > 0);
 
-    const totalEarnings = clean.filter((i) => i.type === 'EARNING')
+    const UNPAID = /^unpaid days deduction$/i;
+    const lossOfPay = clean
+      .filter((i) => i.type === 'DEDUCTION' && UNPAID.test(i.componentName))
       .reduce((t, i) => t + i.amount, 0);
-    const totalDeductions = clean.filter((i) => i.type === 'DEDUCTION')
+    const lines = clean.filter(
+      (i) => !(i.type === 'DEDUCTION' && UNPAID.test(i.componentName)));
+
+    const totalEarnings = lines.filter((i) => i.type === 'EARNING')
       .reduce((t, i) => t + i.amount, 0);
-    const netPay = Math.max(0, Math.round((totalEarnings - totalDeductions) * 100) / 100);
+    const totalDeductions = lines.filter((i) => i.type === 'DEDUCTION')
+      .reduce((t, i) => t + i.amount, 0);
+    const netPay = Math.max(
+      0, Math.round((totalEarnings - totalDeductions - lossOfPay) * 100) / 100);
 
     await this.prisma.payslipItem.deleteMany({ where: { payslipId: id } });
-    if (clean.length) {
+    if (lines.length) {
       await this.prisma.payslipItem.createMany({
-        data: clean.map((i) => ({ payslipId: id, ...i })),
+        data: lines.map((i) => ({ payslipId: id, ...i })),
       });
     }
 
@@ -1195,8 +1221,7 @@ export class PayrollService {
         totalEarnings,
         totalDeductions,
         netPay,
-        // Now carried as a line, so the field must not double it.
-        lossOfPay: 0,
+        lossOfPay,
         ...(data.workingDays ? { workingDays: Math.round(data.workingDays) } : {}),
         ...(data.presentDays != null ? { presentDays: Number(data.presentDays) } : {}),
       },

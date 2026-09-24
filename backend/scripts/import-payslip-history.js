@@ -36,10 +36,19 @@
  * PayslipItem and the detail view reads like the original.
  *
  * "Unpaid Days Deduction" is the proration for days not worked — NEX's
- * lossOfPay by another name. It is imported as a DEDUCTION line rather than as
- * lossOfPay because the source already counts it inside totalDeductions, and
- * NEX's detail view adds the two together: setting both would deduct it twice
- * on screen. The figure is present and labelled; only the field differs.
+ * lossOfPay by another name, and it goes in that field.
+ *
+ * The first version kept it as a DEDUCTION line and left lossOfPay at zero, on
+ * the reasoning that the source already counts it inside totalDeductions and
+ * the detail view adds the two together. That avoided double-counting but paid
+ * for it elsewhere: the employee's payslip card reads lossOfPay, so everybody
+ * saw "LOP Penalty: ₹0" beside a payslip that had deducted ₹9,677 for unpaid
+ * days. NEX has a field for this concept and screens built on it.
+ *
+ * So the amount is lifted OUT of totalDeductions and into lossOfPay, and does
+ * not appear as a line. Total Deductions on screen is totalDeductions +
+ * lossOfPay, which comes back to the source's own figure; the card reads the
+ * field and is right; and the detail view has a Loss of Pay row of its own.
  *
  * Days: the source records noOfDays (days paid) and nothing else, so that is
  * written to workingDays and presentDays, and absentDays is left at zero. The
@@ -134,6 +143,13 @@ const parsePeriod = (p) => {
     let items = (s.items || []).filter((i) => Number(i.amount) > 0);
     let excluded = [];
 
+    // Pulled out of the lines and into its own field — see the note above.
+    const UNPAID = /^unpaid days deduction$/i;
+    const lossOfPay = items
+      .filter((i) => i.type === 'DEDUCTION' && UNPAID.test(i.name))
+      .reduce((t, i) => t + Number(i.amount), 0);
+    items = items.filter((i) => !(i.type === 'DEDUCTION' && UNPAID.test(i.name)));
+
     /*
      * Some deduction lines are shown on the source payslip but are not in its
      * totalDeductions and do not reduce its netPay: an Advance Salary of
@@ -149,10 +165,12 @@ const parsePeriod = (p) => {
     const sumOf = (list, type) =>
       list.filter((i) => i.type === type).reduce((t, i) => t + Number(i.amount), 0);
 
-    if (Math.abs(sumOf(items, 'DEDUCTION') - deductions) > 1) {
+    const deductionsExLop = Math.round((deductions - lossOfPay) * 100) / 100;
+
+    if (Math.abs(sumOf(items, 'DEDUCTION') - deductionsExLop) > 1) {
       const UNCOUNTED = /^(advance salary|other deduction)$/i;
       const kept = items.filter((i) => !(i.type === 'DEDUCTION' && UNCOUNTED.test(i.name)));
-      if (Math.abs(sumOf(kept, 'DEDUCTION') - deductions) <= 1) {
+      if (Math.abs(sumOf(kept, 'DEDUCTION') - deductionsExLop) <= 1) {
         excluded = items.filter((i) => i.type === 'DEDUCTION' && UNCOUNTED.test(i.name));
         items = kept;
       }
@@ -162,14 +180,14 @@ const parsePeriod = (p) => {
     // with the figure beside it.
     const itemEarn = items.filter((i) => i.type === 'EARNING').reduce((t, i) => t + Number(i.amount), 0);
     const itemDed = items.filter((i) => i.type === 'DEDUCTION').reduce((t, i) => t + Number(i.amount), 0);
-    const itemsOff = Math.abs(itemEarn - gross) > 1 || Math.abs(itemDed - deductions) > 1;
+    const itemsOff = Math.abs(itemEarn - gross) > 1 || Math.abs(itemDed - deductionsExLop) > 1;
 
     plan.push({
       action: existing ? 'REPLACE' : 'CREATE',
       who: `${emp.firstName} ${emp.lastName}`, code,
       employeeId: emp.id, companyId: emp.companyId,
       gross, deductions, net, slipNo: s.slip_no, status: s.status,
-      items, excluded, days: Number(s.no_of_days) || 0,
+      items, excluded, lossOfPay, deductionsExLop, days: Number(s.no_of_days) || 0,
       existingStatus: existing?.status, existingNet: existing?.netPay,
       detail: [
         mismatch ? `net ${inr(net)} != gross-deductions ${inr(implied)}` : '',
@@ -202,6 +220,8 @@ const parsePeriod = (p) => {
   console.log(`  no match  : ${plan.filter((p) => p.action === 'NO MATCH').length}`);
   console.log(`  total net : ${inr(writable.reduce((t, p) => t + p.net, 0))}`);
   console.log(`  line items: ${writable.reduce((t, p) => t + p.items.length, 0)}`);
+  const withLop = writable.filter((p) => p.lossOfPay > 0);
+  console.log(`  loss of pay : ${inr(withLop.reduce((t, p) => t + p.lossOfPay, 0))} across ${withLop.length} payslip(s)`);
   const withExcluded = writable.filter((p) => p.excluded.length);
   if (withExcluded.length) {
     console.log(`\n  LINES ON THE PAYSLIP THAT DO NOT REDUCE ITS NET PAY (not imported):`);
@@ -222,9 +242,11 @@ const parsePeriod = (p) => {
   for (const p of writable) {
     const figures = {
       totalEarnings: p.gross,
-      totalDeductions: p.deductions,
+      // Excludes the unpaid-days amount, which rides in lossOfPay. The screens
+      // add the two back together.
+      totalDeductions: p.deductionsExLop,
       netPay: p.net,
-      lossOfPay: 0,
+      lossOfPay: p.lossOfPay,
       status: 'PAID',
       // Days paid. The old rows carried "present 0 of 26" left over from a
       // generation that ran before anybody had a salary, which read as though

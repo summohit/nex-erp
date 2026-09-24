@@ -1257,21 +1257,44 @@
               <option *ngFor="let y of [2024, 2025, 2026]" [value]="y">{{ y }}</option>
             </select>
           </div>
+          <div>
+            <select class="form-control inline-select"
+                    [ngModel]="expenseStatusFilter()"
+                    (ngModelChange)="expenseStatusFilter.set($event)">
+              <option value="ALL">All statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="PAID">Paid</option>
+            </select>
+          </div>
+          <span class="expense-filter-count">
+            {{ filteredExpenseClaims().length }} of {{ expenseClaims().length }}
+            · ₹{{ filteredExpenseTotal() | number:'1.0-0' }}
+          </span>
         </div>
       </div>
 
-      <!-- AG Grid for Admin Expense Claims -->
-      <div style="width: 100%; height: 500px;" class="mt-3 grid-wrapper">
+      <!-- AG Grid for Admin Expense Claims.
+           Bound to the FILTERED rows: it used to read expenseClaims() directly,
+           so the month and year selects above changed nothing and September
+           2025 still listed all 797 claims. -->
+      <div style="width: 100%; height: 640px;" class="mt-3 grid-wrapper">
         <ag-grid-angular
           class="ag-theme-quartz"
           [theme]="'legacy'"
           style="width: 100%; height: 100%;"
-          [rowData]="expenseClaims()"
+          [rowData]="filteredExpenseClaims()"
           [pinnedBottomRowData]="expensePinnedBottomRow()"
           [columnDefs]="expenseColDefs"
           [defaultColDef]="defaultColDef"
           [rowHeight]="64"
-          [headerHeight]="48">
+          [headerHeight]="48"
+          [pagination]="true"
+          [paginationPageSize]="20"
+          [paginationPageSizeSelector]="[20, 50, 100, 200]"
+          (cellValueChanged)="onExpenseStatusChanged($event)"
+          (cellClicked)="onExpenseRowClicked($event)">
         </ag-grid-angular>
       </div>
     </div>
@@ -2288,6 +2311,116 @@
             <span>Download PDF</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== EXPENSE DETAIL ====================
+       The grid shows six of the fifteen things a claim records. Category,
+       vendor, project, description, the receipt and who approved it were
+       reachable only by guessing from a truncated cell. -->
+  <div class="drawer-overlay" *ngIf="isExpenseDetailOpen()" (click)="closeExpenseDetail()">
+    <div class="drawer-content expense-detail-content" (click)="$event.stopPropagation()"
+         *ngIf="selectedExpense() as ex">
+      <div class="drawer-header">
+        <div>
+          <h2>{{ ex.title || 'Expense Claim' }}</h2>
+          <p class="edit-sub">
+            <span class="cat-badge cat-laptop">{{ ex.category || 'OTHER' }}</span>
+            <span class="status-round"
+                  [class.status-approved]="ex.status === 'APPROVED'"
+                  [class.status-pending]="ex.status === 'PENDING'"
+                  [class.status-rejected]="ex.status === 'REJECTED'"
+                  [class.status-paid]="ex.status === 'PAID'">
+              <span class="status-dot"></span>{{ ex.status || 'PENDING' }}
+            </span>
+          </p>
+        </div>
+        <button class="btn-icon" (click)="closeExpenseDetail()">✕</button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="expense-amount-banner">
+          <span>Amount</span>
+          <h2>₹{{ ex.amount | number:'1.2-2' }}</h2>
+        </div>
+
+        <div class="edit-meta-grid mt-3">
+          <div class="edit-field">
+            <label>Claimed by</label>
+            <!-- A company cost has no claimant, and saying so is better than an
+                 empty box: 188 of these are rent and electricity. -->
+            <input class="form-control"
+                   [value]="ex.employee ? (ex.employee.firstName + ' ' + (ex.employee.lastName || '')) : 'Company expense — no claimant'"
+                   readonly>
+          </div>
+          <div class="edit-field">
+            <label>Department</label>
+            <input class="form-control" [value]="ex.employee?.department?.name || '—'" readonly>
+          </div>
+          <div class="edit-field">
+            <label>Purchase date</label>
+            <input class="form-control"
+                   [value]="ex.purchaseDate ? (ex.purchaseDate | date:'dd MMM yyyy') : '—'" readonly>
+          </div>
+          <div class="edit-field">
+            <label>Vendor</label>
+            <input class="form-control" [value]="ex.purchasedFrom || '—'" readonly>
+          </div>
+          <div class="edit-field">
+            <label>Project</label>
+            <input class="form-control" [value]="ex.projectName || ex.projectCode || '—'" readonly>
+          </div>
+          <div class="edit-field">
+            <label>Approved by</label>
+            <input class="form-control"
+                   [value]="ex.approvedBy?.employee
+                              ? (ex.approvedBy.employee.firstName + ' ' + (ex.approvedBy.employee.lastName || ''))
+                              : '—'" readonly>
+          </div>
+        </div>
+
+        <div class="edit-section mt-3" *ngIf="ex.description">
+          <h4 class="edit-section-title">Description</h4>
+          <p class="expense-description">{{ ex.description }}</p>
+        </div>
+
+        <div class="edit-section mt-3" *ngIf="ex.status === 'REJECTED' && ex.rejectionReason">
+          <h4 class="edit-section-title">Why it was rejected</h4>
+          <p class="expense-description text-rose">{{ ex.rejectionReason }}</p>
+        </div>
+
+        <div class="edit-section mt-3">
+          <h4 class="edit-section-title">Receipts</h4>
+          <!-- Half of these are PDFs. A thumbnail for the pictures, a
+               document tile for everything else — an <img> pointed at a tax
+               invoice draws a broken icon and nothing else. -->
+          <div class="expense-receipts" *ngIf="expenseReceipts(ex).length; else noReceipt">
+            <ng-container *ngFor="let r of expenseReceipts(ex); let i = index">
+              <img *ngIf="isImageUrl(r)" [src]="r" class="expense-receipt-thumb" alt="Receipt"
+                   (click)="openReceipt(expenseReceipts(ex), i)" />
+              <button *ngIf="!isImageUrl(r)" type="button" class="expense-receipt-doc"
+                      (click)="openReceipt(expenseReceipts(ex), i)"
+                      [title]="r">
+                <span class="doc-kind">{{ isPdfUrl(r) ? 'PDF' : 'FILE' }}</span>
+                <span class="doc-open">Open ↗</span>
+              </button>
+            </ng-container>
+          </div>
+          <ng-template #noReceipt>
+            <p class="expense-description text-secondary">No receipt attached.</p>
+          </ng-template>
+        </div>
+      </div>
+
+      <div class="drawer-footer payslip-actions">
+        <button class="btn btn-outline" (click)="closeExpenseDetail()">Close</button>
+        <button class="btn btn-outline" *ngIf="ex.status !== 'APPROVED' && ex.status !== 'PAID'"
+                (click)="updateExpenseStatus(ex.id, 'APPROVED'); closeExpenseDetail()">Approve</button>
+        <button class="btn btn-outline" *ngIf="ex.status !== 'REJECTED'"
+                (click)="openRejectModal(ex.id); closeExpenseDetail()">Reject</button>
+        <button class="btn btn-primary" *ngIf="ex.status === 'APPROVED'"
+                (click)="markExpensePaid(ex); closeExpenseDetail()">Mark Paid</button>
       </div>
     </div>
   </div>

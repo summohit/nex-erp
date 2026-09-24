@@ -4042,3 +4042,88 @@
   .payslip-sticky-footer .payslip-actions { flex-wrap: wrap; gap: 8px; }
   .payslip-sticky-footer .payslip-actions .btn { flex: 1 1 auto; justify-content: center; }
 }
+
+/* ─── Expense detail ──────────────────────────────────────────────────── */
+.expense-detail-content { max-width: 760px; width: min(760px, 94vw); }
+
+.expense-amount-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: #0F172A;
+  color: #fff;
+}
+.expense-amount-banner h2 { margin: 0; font-size: 26px; }
+
+.expense-description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.expense-receipts { display: flex; gap: 10px; flex-wrap: wrap; }
+.expense-receipt-thumb {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  cursor: zoom-in;
+}
+
+/* Beside the period selects, so it is obvious the filter did something. */
+.expense-filter-count {
+  font-size: 12px;
+  color: #64748B;
+  white-space: nowrap;
+}
+
+/* Receipts that are not pictures.
+   Half the attachments are PDFs — tax invoices, vendor bills — and an <img>
+   pointed at one draws a broken icon. These get a tile that says what they
+   are and opens in a tab. */
+.receipt-thumb-sm {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid #CBD5E1;
+}
+.receipt-doc-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid #FCA5A5;
+  background: #FEF2F2;
+  color: #B91C1C;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.expense-receipt-doc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  cursor: pointer;
+}
+.expense-receipt-doc:hover { border-color: var(--color-primary); }
+.expense-receipt-doc .doc-kind {
+  font-size: 13px;
+  font-weight: 800;
+  color: #B91C1C;
+}
+.expense-receipt-doc .doc-open { font-size: 11px; color: #2563EB; }

@@ -207,6 +207,47 @@ export class PayrollComponent implements OnInit {
   expenseFilterYear = signal<number | ''>(new Date().getFullYear());
   expandedEmployeeIds = signal<number[]>([]);
 
+  /** All Company Expense Claims: status filter, alongside the period ones. */
+  expenseStatusFilter = signal<string>('ALL');
+
+  /**
+   * The rows the company grid actually shows.
+   *
+   * The grid was bound straight to expenseClaims(), so the month and year
+   * selects above it did nothing at all: picking September 2025 left all 797
+   * rows on screen, including May and June. The signals existed and only the
+   * other, grouped view read them.
+   *
+   * Filtered on purchaseDate, not createdAt. Every imported row was created on
+   * the same day, so createdAt would put 795 expenses in one month and empty
+   * every other.
+   */
+  filteredExpenseClaims = computed(() => {
+    const month = this.expenseFilterMonth();
+    const year = this.expenseFilterYear();
+    const status = this.expenseStatusFilter();
+
+    return this.expenseClaims().filter((c) => {
+      if (status !== 'ALL' && (c.status || 'PENDING') !== status) return false;
+      if (month === '' && year === '') return true;
+
+      // A claim with no purchase date cannot be placed in a period. Hiding it
+      // whenever a filter is set would make it unreachable, so it stays.
+      const raw = c.purchaseDate || c.createdAt;
+      if (!raw) return true;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return true;
+
+      if (month !== '' && d.getMonth() + 1 !== Number(month)) return false;
+      if (year !== '' && d.getFullYear() !== Number(year)) return false;
+      return true;
+    });
+  });
+
+  /** Totals for what is on screen, not for everything ever claimed. */
+  filteredExpenseTotal = computed(() =>
+    this.filteredExpenseClaims().reduce((t, c) => t + (c.amount || 0), 0));
+
   groupedExpenseClaims = computed(() => {
     const claims = this.expenseClaims();
     const filterMonth = this.expenseFilterMonth();
@@ -1155,10 +1196,19 @@ export class PayrollComponent implements OnInit {
           } catch (e) { imgs = [params.value]; }
         }
         if (!imgs || imgs.length === 0 || !imgs[0]) return '<span style="color: #94A3B8; font-size: 12px;">No receipt</span>';
+        const first = imgs[0];
+        // A thumbnail only where there is something to thumbnail; a document
+        // badge otherwise, instead of the broken image this used to draw.
+        const thumb = this.isImageUrl(first)
+          ? `<img src="${first}" class="receipt-thumb-sm" alt="" />`
+          : `<span class="receipt-doc-badge">${this.isPdfUrl(first) ? 'PDF' : 'FILE'}</span>`;
+        const label = imgs.length > 1
+          ? `${imgs.length} receipts`
+          : (this.isImageUrl(first) ? 'View receipt' : 'Open document');
         return `
-          <div class="cell-user-avatar-row" style="cursor: pointer;" title="Click to view receipt">
-            <img src="${imgs[0]}" style="width: 30px; height: 30px; border-radius: 6px; object-fit: cover; border: 1px solid #CBD5E1;" />
-            <span style="font-size: 11px; font-weight: 600; color: #2563EB;">${imgs.length} receipt(s)</span>
+          <div class="cell-user-avatar-row" style="cursor: pointer;" title="${first}">
+            ${thumb}
+            <span style="font-size: 11px; font-weight: 600; color: #2563EB;">${label}</span>
           </div>
         `;
       },
@@ -1170,7 +1220,8 @@ export class PayrollComponent implements OnInit {
           } catch (e) { imgs = [params.value]; }
         }
         if (imgs && imgs.length > 0 && imgs[0]) {
-          this.openImageViewer(imgs, 0);
+          // Routes by type: the lightbox cannot render a PDF.
+          this.openReceipt(imgs, 0);
         }
       }
     },
@@ -1178,7 +1229,13 @@ export class PayrollComponent implements OnInit {
       field: 'status',
       headerName: 'Status',
       flex: 1.2,
-      minWidth: 130,
+      minWidth: 150,
+      // Editable in place: the four states a claim can be in, including PAID,
+      // which previously existed only as a "Mark Paid" item buried in the row
+      // menu. Changing it here saves immediately — see onExpenseStatusChanged.
+      editable: (p: any) => !p.data?.isSummaryRow,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: { values: ['PENDING', 'APPROVED', 'REJECTED', 'PAID'] },
       cellRenderer: (params: any) => {
         if (params.data?.isSummaryRow) return '';
         const s = params.value || 'PENDING';
@@ -2057,6 +2114,105 @@ export class PayrollComponent implements OnInit {
       },
       error: (err) => this.toast.error(err.error?.message || 'Failed to update expense claim')
     });
+  }
+
+  /**
+   * Save a status changed straight in the grid.
+   *
+   * Reverts the cell if the server refuses — a rejection needs a reason, and
+   * nobody may approve their own claim, so this can legitimately fail. A cell
+   * left showing APPROVED after the server said no is the kind of thing an
+   * approval report is later built on.
+   */
+  onExpenseStatusChanged(event: any) {
+    const next = String(event?.newValue || '').toUpperCase();
+    const previous = event?.oldValue;
+    const row = event?.data;
+    if (!row?.id || next === previous) return;
+
+    if (next === 'REJECTED') {
+      // Rejection carries a reason, which the modal collects.
+      row.status = previous;
+      event.api?.refreshCells?.({ rowNodes: [event.node], force: true });
+      this.openRejectModal(row.id);
+      return;
+    }
+
+    this.payrollService.updateExpenseClaimStatus(row.id, { status: next }).subscribe({
+      next: () => this.toast.success(`Marked ${next.toLowerCase()}`),
+      error: (err) => {
+        row.status = previous;
+        event.api?.refreshCells?.({ rowNodes: [event.node], force: true });
+        this.toast.error(err.error?.message || 'Could not change that status');
+      },
+    });
+  }
+
+  // ─── Expense detail ───────────────────────────────────────────────────────
+  //
+  // The grid shows six columns of a record that has fifteen: category, vendor,
+  // project, description, who approved it and the receipt were all only
+  // reachable by guessing from a truncated cell.
+  isExpenseDetailOpen = signal(false);
+  selectedExpense = signal<any | null>(null);
+
+  openExpenseDetail(claim: any) {
+    if (!claim || claim.isSummaryRow) return;
+    this.selectedExpense.set(claim);
+    this.isExpenseDetailOpen.set(true);
+  }
+
+  closeExpenseDetail() {
+    this.isExpenseDetailOpen.set(false);
+    this.selectedExpense.set(null);
+  }
+
+  /** Opened from a row click; the editable status cell must not trigger it. */
+  onExpenseRowClicked(event: any) {
+    if (event?.colDef?.field === 'status') return;
+    if (event?.colDef?.headerName === 'Actions') return;
+    this.openExpenseDetail(event?.data);
+  }
+
+  /**
+   * A receipt is not always a picture.
+   *
+   * 181 of 353 attachments are PDFs — a MakeMyTrip tax invoice, a bill from a
+   * vendor — and the grid rendered every one of them in an <img>, so the
+   * column filled with broken-image icons and clicking opened an image viewer
+   * that could not show them either. Extension is the only thing the URL tells
+   * us, so anything not clearly an image is treated as a document and opened
+   * in a tab, which is the one behaviour that works for both.
+   */
+  isImageUrl(url: string): boolean {
+    return /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(String(url || ''));
+  }
+
+  isPdfUrl(url: string): boolean {
+    return /\.pdf(\?|#|$)/i.test(String(url || ''));
+  }
+
+  /** Images go to the lightbox; everything else opens in a new tab. */
+  openReceipt(urls: string[], index = 0) {
+    const url = urls?.[index];
+    if (!url) return;
+    if (this.isImageUrl(url)) {
+      const images = urls.filter((u) => this.isImageUrl(u));
+      this.openImageViewer(images, Math.max(0, images.indexOf(url)));
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
+  }
+
+  expenseReceipts(claim: any): string[] {
+    const raw = claim?.receiptUrl;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+    } catch { /* a plain URL, which is the usual case */ }
+    return [raw];
   }
 
   markExpensePaid(data: any) {
