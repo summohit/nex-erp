@@ -95,6 +95,8 @@ model Company {
   quotations            Quotation[]
   salesOrders           SalesOrder[]
   fieldVisits           FieldVisit[]                @relation("CompanyFieldVisits")
+  fieldVisitRequests    FieldVisitRequest[]         @relation("CompanyFieldVisitRequests")
+  fieldVisitAttendances FieldVisitAttendance[]      @relation("CompanyFieldVisitAttendances")
   leadFollowUps         LeadFollowUp[]
   leadContacts          LeadContact[]
   leadFiles             LeadFile[]
@@ -479,52 +481,58 @@ model Employee {
   shiftRotations      ShiftRotation[]
   shiftRosterEntries  ShiftRosterEntry[]
 
-  preSalesRequestsRaised    PreSalesRequest[]           @relation("PreSalesRequestRequester")
-  preSalesRequestedOn       PreSalesRequestItem[]       @relation("PreSalesRequestedEmployee")
-  preSalesRequestsApproved  PreSalesRequest[]           @relation("PreSalesRequestApprover")
-  preSalesTeamMemberships   PreSalesTeamMember[]
-  preSalesAssignedByMe      PreSalesTeamMember[]        @relation("PreSalesAssigner")
-  preSalesTaskStatusChanges PreSalesTaskStatusHistory[] @relation("PreSalesTaskStatusActor")
-  preSalesTaskAttachments   PreSalesTaskAttachment[]    @relation("PreSalesTaskAttachmentUploader")
-  preSalesTasksAssignedTo   PreSalesTask[]              @relation("PreSalesTaskAssignee")
-  preSalesTasksAssignedBy   PreSalesTask[]              @relation("PreSalesTaskAssigner")
-  preSalesMomUploads        PreSalesMoM[]
-  generatedLetters          GeneratedLetter[]
-  uploadedProjectDocuments  ProjectDocument[]
-  assignedLeads             Lead[]                      @relation("LeadAssignee")
-  createdLeads              Lead[]                      @relation("LeadCreator")
-  peerReviewsGiven          PeerFeedback[]              @relation("PeerReviewer")
-  peerReviewsReceived       PeerFeedback[]              @relation("PeerReviewee")
-  fieldVisits               FieldVisit[]                @relation("EmployeeFieldVisits")
-  followUpsAssigned         LeadFollowUp[]              @relation("FollowUpAssignee")
-  leadContactsAdded         LeadContact[]               @relation("LeadContactAddedBy")
-  leadFilesUploaded         LeadFile[]                  @relation("LeadFileUploader")
-  leadNotesCreated          LeadNote[]                  @relation("LeadNoteCreator")
-  leadActivities            LeadActivity[]              @relation("LeadActivityActor")
-  leadContactNotesCreated   LeadContactNote[]           @relation("LeadContactNoteCreator")
-  leadFormsCreated          LeadForm[]                  @relation("LeadFormCreator")
-  reportedTickets           Ticket[]                    @relation("TicketReporter")
-  assignedTickets           Ticket[]                    @relation("TicketAssignee")
-  ticketComments            TicketComment[]             @relation("TicketCommentAuthor")
-  ticketAttachments         TicketAttachment[]          @relation("TicketAttachmentUploader")
-  ticketActivities          TicketActivity[]            @relation("TicketActivityActor")
-  ticketTimeEntries         TicketTimeEntry[]
-  timesheetDays             TimesheetDay[]
-  reviewedTimesheets        TimesheetDay[]              @relation("TimesheetReviewer")
+  preSalesRequestsRaised       PreSalesRequest[]             @relation("PreSalesRequestRequester")
+  preSalesRequestedOn          PreSalesRequestItem[]         @relation("PreSalesRequestedEmployee")
+  preSalesRequestsApproved     PreSalesRequest[]             @relation("PreSalesRequestApprover")
+  preSalesTeamMemberships      PreSalesTeamMember[]
+  preSalesAssignedByMe         PreSalesTeamMember[]          @relation("PreSalesAssigner")
+  preSalesTaskStatusChanges    PreSalesTaskStatusHistory[]   @relation("PreSalesTaskStatusActor")
+  preSalesTaskAttachments      PreSalesTaskAttachment[]      @relation("PreSalesTaskAttachmentUploader")
+  preSalesTasksAssignedTo      PreSalesTask[]                @relation("PreSalesTaskAssignee")
+  preSalesTasksAssignedBy      PreSalesTask[]                @relation("PreSalesTaskAssigner")
+  preSalesMomUploads           PreSalesMoM[]
+  generatedLetters             GeneratedLetter[]
+  uploadedProjectDocuments     ProjectDocument[]
+  assignedLeads                Lead[]                        @relation("LeadAssignee")
+  createdLeads                 Lead[]                        @relation("LeadCreator")
+  peerReviewsGiven             PeerFeedback[]                @relation("PeerReviewer")
+  peerReviewsReceived          PeerFeedback[]                @relation("PeerReviewee")
+  fieldVisits                  FieldVisit[]                  @relation("EmployeeFieldVisits")
+  fieldVisitRequestsRaised     FieldVisitRequest[]           @relation("FieldVisitRequestsRaised")
+  fieldVisitRequestsReviewed   FieldVisitRequest[]           @relation("FieldVisitRequestsReviewed")
+  fieldVisitRequestMemberships FieldVisitRequestMember[]     @relation("EmployeeFieldVisitRequestMemberships")
+  fieldVisitRequestAttachments FieldVisitRequestAttachment[] @relation("EmployeeFieldVisitRequestAttachments")
+  fieldVisitRequestActivities  FieldVisitRequestActivity[]   @relation("EmployeeFieldVisitRequestActivities")
+  fieldVisitAttendances        FieldVisitAttendance[]        @relation("EmployeeFieldVisitAttendances")
+  followUpsAssigned            LeadFollowUp[]                @relation("FollowUpAssignee")
+  leadContactsAdded            LeadContact[]                 @relation("LeadContactAddedBy")
+  leadFilesUploaded            LeadFile[]                    @relation("LeadFileUploader")
+  leadNotesCreated             LeadNote[]                    @relation("LeadNoteCreator")
+  leadActivities               LeadActivity[]                @relation("LeadActivityActor")
+  leadContactNotesCreated      LeadContactNote[]             @relation("LeadContactNoteCreator")
+  leadFormsCreated             LeadForm[]                    @relation("LeadFormCreator")
+  reportedTickets              Ticket[]                      @relation("TicketReporter")
+  assignedTickets              Ticket[]                      @relation("TicketAssignee")
+  ticketComments               TicketComment[]               @relation("TicketCommentAuthor")
+  ticketAttachments            TicketAttachment[]            @relation("TicketAttachmentUploader")
+  ticketActivities             TicketActivity[]              @relation("TicketActivityActor")
+  ticketTimeEntries            TicketTimeEntry[]
+  timesheetDays                TimesheetDay[]
+  reviewedTimesheets           TimesheetDay[]                @relation("TimesheetReviewer")
 
   discussionsAuthored   ProjectDiscussion[]           @relation("DiscussionAuthor")
   discussionComments    ProjectDiscussionComment[]    @relation("DiscussionCommentAuthor")
   discussionAttachments ProjectDiscussionAttachment[] @relation("DiscussionAttachmentUploader")
 
-  projectTicketsRaised   ProjectTicket[]        @relation("TicketRaisedBy")
-  projectTicketsProposed ProjectTicket[]        @relation("TicketProposedAssignee")
-  projectTicketsReviewed ProjectTicket[]        @relation("TicketReviewedBy")
-  budgetRequests         ProjectBudgetRequest[] @relation("BudgetRequestedBy")
-  budgetRequestsReviewed ProjectBudgetRequest[] @relation("BudgetReviewedBy")
-  taskHoursRequested     TaskHoursRequest[]     @relation("TaskHoursRequestedBy")
-  taskHoursReviewed      TaskHoursRequest[]     @relation("TaskHoursReviewedBy")
+  projectTicketsRaised   ProjectTicket[]            @relation("TicketRaisedBy")
+  projectTicketsProposed ProjectTicket[]            @relation("TicketProposedAssignee")
+  projectTicketsReviewed ProjectTicket[]            @relation("TicketReviewedBy")
+  budgetRequests         ProjectBudgetRequest[]     @relation("BudgetRequestedBy")
+  budgetRequestsReviewed ProjectBudgetRequest[]     @relation("BudgetReviewedBy")
+  taskHoursRequested     TaskHoursRequest[]         @relation("TaskHoursRequestedBy")
+  taskHoursReviewed      TaskHoursRequest[]         @relation("TaskHoursReviewedBy")
   taskHoursActivities    TaskHoursRequestActivity[]
-  noticesAuthored        Notice[]                  @relation("NoticeAuthor")
+  noticesAuthored        Notice[]                   @relation("NoticeAuthor")
 
   @@unique([companyId, employeeCode])
 }
@@ -1499,13 +1507,14 @@ model Project {
   // AI Onboarding
   onboardingStatus String @default("DRAFT") // DRAFT, DOCUMENTS_UPLOADED, ANALYZING, ANALYZED, UNDER_REVIEW, CHANGES_REQUIRED, APPROVED, READY_FOR_KICKOFF, IN_PROGRESS, COMPLETED, ERROR
 
-  documents     ProjectDocument[]
-  milestones    ProjectMilestone[]
-  analysisRuns  ProjectAnalysisRun[]
-  fieldVisits   FieldVisit[]         @relation("ProjectFieldVisits")
-  expenseClaims ExpenseClaim[]
-  rosterEntries ShiftRosterEntry[]
-  attendances   Attendance[]         @relation("ProjectAttendance")
+  documents          ProjectDocument[]
+  milestones         ProjectMilestone[]
+  analysisRuns       ProjectAnalysisRun[]
+  fieldVisits        FieldVisit[]         @relation("ProjectFieldVisits")
+  fieldVisitRequests FieldVisitRequest[]  @relation("ProjectFieldVisitRequests")
+  expenseClaims      ExpenseClaim[]
+  rosterEntries      ShiftRosterEntry[]
+  attendances        Attendance[]         @relation("ProjectAttendance")
 
   discussions ProjectDiscussion[]
 
@@ -2062,8 +2071,8 @@ model Issue {
 
   /// The delivery phase this task belongs to (§8). SetNull, not Cascade: a
   /// phase being retired must not delete the work done in it.
-  phaseId     Int?
-  phase       ProjectPhase?     @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  phaseId Int?
+  phase   ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
 
   /// Extra hours granted on top of `estimatedHours` by approved requests (§3).
   ///
@@ -2073,10 +2082,14 @@ model Issue {
   /// by the approval, inside the same transaction that marks it approved.
   additionalHours Float @default(0)
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
   projectTicket ProjectTicket?
   hoursRequests TaskHoursRequest[]
+
+  /// Raised from a site visit, when it was.
+  fieldVisitRequestId Int?
+  fieldVisitRequest   FieldVisitRequest? @relation(fields: [fieldVisitRequestId], references: [id])
 
   @@unique([key, companyId])
   /// "What is assigned to me, soonest first" — the My Tasks query.
@@ -3329,6 +3342,12 @@ model FieldVisit {
 
   photos FieldVisitPhoto[]
 
+  /// The approved trip this visit belongs to, when it came from one. Null for
+  /// a visit somebody started directly, which is how they all began.
+  fieldVisitRequestId Int?
+  fieldVisitRequest   FieldVisitRequest?     @relation(fields: [fieldVisitRequestId], references: [id])
+  visitAttendances    FieldVisitAttendance[] @relation("FieldVisitAttendanceVisit")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -3562,7 +3581,7 @@ model ProjectTicket {
   reviewedAt       DateTime?
   rejectionReason  String?   @db.Text
   convertedIssueId Int?      @unique
-  convertedAt DateTime?
+  convertedAt      DateTime?
   convertedIssue   Issue?    @relation(fields: [convertedIssueId], references: [id])
 
   createdAt DateTime @default(now())
@@ -3672,7 +3691,6 @@ model TaskHoursRequestActivity {
   @@index([requestId, createdAt])
 }
 
-
 /// A delivery phase — "Phase 1", "Deployment", "UAT" (§8).
 ///
 /// Company-wide master data rather than a per-project list, and modelled on
@@ -3681,8 +3699,8 @@ model TaskHoursRequestActivity {
 /// seeding six rows per project and filtering across a union of them wherever
 /// phases are listed.
 model ProjectPhase {
-  id   Int    @id @default(autoincrement())
-  name String
+  id        Int      @id @default(autoincrement())
+  name      String
   /// Soft-disable rather than delete, exactly as TaskType does: a phase that
   /// tasks already carry is the truth about those tasks, so it is hidden from
   /// new ones instead of being removed from old ones.
@@ -3696,7 +3714,6 @@ model ProjectPhase {
 
   @@unique([companyId, name])
 }
-
 
 /// A task created automatically on every new project and assigned to its
 /// project manager (§1).
@@ -3723,7 +3740,6 @@ model DefaultProjectTask {
   @@unique([companyId, name])
 }
 
-
 /// A company announcement, shown on everyone's dashboard until they dismiss it.
 ///
 /// Deliberately not a notification: a notification is about something that
@@ -3731,9 +3747,9 @@ model DefaultProjectTask {
 /// company talking to everybody at once, and it stays in front of people until
 /// each of them has actually seen it -- which is what NoticeRead below records.
 model Notice {
-  id      Int     @id @default(autoincrement())
-  title   String
-  body    String  @db.Text
+  id       Int    @id @default(autoincrement())
+  title    String
+  body     String @db.Text
   /// LOW, NORMAL, HIGH -- HIGH is what makes the dashboard popup open by
   /// itself rather than waiting to be noticed in the list.
   priority String @default("NORMAL")
@@ -3781,7 +3797,6 @@ model NoticeRead {
   @@index([userId])
 }
 
-
 /// A file attached to a notice -- the policy PDF, the floor plan, the form
 /// people are being asked to fill in.
 ///
@@ -3800,4 +3815,166 @@ model NoticeAttachment {
   createdAt DateTime @default(now())
 
   @@index([noticeId])
+}
+
+// ─── Field Visit Requests ────────────────────────────────────────────────────
+//
+// These six models were built and deployed straight to the production database
+// from somewhere that was not this repository: the tables exist and hold real
+// records, but no branch here had ever described them. That left `prisma db
+// push` comparing a live database against a schema that did not know about a
+// working feature, so every backend deploy stopped and offered to drop six
+// populated tables — eleven `Issue` rows and twelve attendances among them.
+// Declaring them here is what makes the schema true again and lets a deploy
+// finish; the shapes are introspected from production, not invented.
+//
+// The feature itself: somebody raises a request to visit a client site for a
+// project, naming who goes, which days, and what the work is. It is reviewed,
+// and once it runs each person's day is clocked in and out against the site's
+// coordinates — which is why attendance here is separate from the office
+// Attendance model and carries its own distance-from-site figures.
+
+/// One approved (or pending) trip to a client site.
+model FieldVisitRequest {
+  id            Int      @id @default(autoincrement())
+  requestNumber String
+  projectId     Int
+  project       Project  @relation("ProjectFieldVisitRequests", fields: [projectId], references: [id], onDelete: Cascade)
+  companyId     Int
+  company       Company  @relation("CompanyFieldVisitRequests", fields: [companyId], references: [id], onDelete: Cascade)
+  raisedById    Int
+  raisedBy      Employee @relation("FieldVisitRequestsRaised", fields: [raisedById], references: [id])
+
+  /// Where the work is. The coordinates are what each day's clock-in is
+  /// measured against, so they are required rather than a nicety.
+  location  String
+  latitude  Float
+  longitude Float
+
+  startDate DateTime
+  endDate   DateTime
+  visitDays Int
+  /// Wall-clock strings ("09:00"), like Shift — not instants.
+  startTime String
+  endTime   String
+  remarks   String?
+
+  status          String    @default("DRAFT")
+  reviewedById    Int?
+  reviewedBy      Employee? @relation("FieldVisitRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?
+  submittedAt     DateTime?
+
+  members     FieldVisitRequestMember[]
+  tasks       FieldVisitRequestTask[]
+  attachments FieldVisitRequestAttachment[]
+  activities  FieldVisitRequestActivity[]
+  attendances FieldVisitAttendance[]
+  visits      FieldVisit[]
+  issues      Issue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, requestNumber])
+  @@index([companyId, status])
+  @@index([projectId])
+}
+
+/// Who is going on the trip.
+model FieldVisitRequestMember {
+  id         Int               @id @default(autoincrement())
+  requestId  Int
+  request    FieldVisitRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  employeeId Int
+  employee   Employee          @relation("EmployeeFieldVisitRequestMemberships", fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime          @default(now())
+
+  @@unique([requestId, employeeId])
+  @@index([employeeId])
+}
+
+/// What the trip is for, as a list rather than one prose field.
+model FieldVisitRequestTask {
+  id          Int               @id @default(autoincrement())
+  requestId   Int
+  request     FieldVisitRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  position    Int               @default(0)
+  createdAt   DateTime          @default(now())
+
+  @@index([requestId])
+}
+
+model FieldVisitRequestAttachment {
+  id           Int               @id @default(autoincrement())
+  requestId    Int
+  request      FieldVisitRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  uploadedById Int
+  uploadedBy   Employee          @relation("EmployeeFieldVisitRequestAttachments", fields: [uploadedById], references: [id])
+  createdAt    DateTime          @default(now())
+
+  @@index([requestId])
+}
+
+/// The audit trail: who changed what, and from what to what.
+model FieldVisitRequestActivity {
+  id        Int               @id @default(autoincrement())
+  requestId Int
+  request   FieldVisitRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  action    String
+  detail    String?
+  oldValue  String?
+  newValue  String?
+  actorId   Int
+  actor     Employee          @relation("EmployeeFieldVisitRequestActivities", fields: [actorId], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+
+  @@index([requestId, createdAt])
+}
+
+/// One person, one day of a trip.
+///
+/// Separate from Attendance because the question is different: not "were they
+/// at the office" but "were they at THIS site, and how far off were they". The
+/// distance figures are kept as recorded rather than reduced to a pass/fail,
+/// so a marginal clock-in stays arguable after the fact.
+model FieldVisitAttendance {
+  id         Int               @id @default(autoincrement())
+  requestId  Int
+  request    FieldVisitRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  employeeId Int
+  employee   Employee          @relation("EmployeeFieldVisitAttendances", fields: [employeeId], references: [id], onDelete: Cascade)
+  companyId  Int
+  company    Company           @relation("CompanyFieldVisitAttendances", fields: [companyId], references: [id], onDelete: Cascade)
+
+  visitDate DateTime
+  isHoliday Boolean  @default(false)
+  status    String   @default("SCHEDULED")
+
+  clockInTime       DateTime?
+  clockInLat        Float?
+  clockInLng        Float?
+  clockInDistanceKm Float?
+
+  clockOutTime       DateTime?
+  clockOutLat        Float?
+  clockOutLng        Float?
+  clockOutDistanceKm Float?
+
+  /// The tracked visit this day produced, once one is started.
+  fieldVisitId Int?
+  fieldVisit   FieldVisit? @relation("FieldVisitAttendanceVisit", fields: [fieldVisitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([requestId, employeeId, visitDate])
+  @@index([companyId, visitDate])
+  @@index([employeeId, visitDate])
 }
