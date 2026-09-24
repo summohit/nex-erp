@@ -147,13 +147,13 @@
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(255, 82, 0, 0.25);
+  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.25);
 }
 
 .resend-btn:hover:not(:disabled) {
-  background-color: var(--color-primary-hover, #E64A00);
+  background-color: var(--color-primary-hover, #0f5fbe);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(255, 82, 0, 0.35);
+  box-shadow: 0 6px 16px rgba(19, 115, 229, 0.35);
 }
 
 .resend-btn:active:not(:disabled) {

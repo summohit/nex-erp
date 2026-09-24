@@ -116,8 +116,8 @@
 }
 
 .stat-amber {
-  background: #fffbeb;
-  color: #d97706;
+  background: #f3efff;
+  color: #6b3fd6;
 }
 
 .stat-data {
@@ -568,9 +568,9 @@
   gap: 4px;
   font-size: 10px;
   font-weight: 800;
-  color: #b45309;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
+  color: #4f2aa7;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
   padding: 2px 7px;
   border-radius: 6px;
   text-transform: uppercase;
@@ -991,7 +991,7 @@
 }
 
 .drawer-crown {
-  color: #f59e0b;
+  color: #6b3fd6;
 }
 
 .drawer-designation {
@@ -1177,9 +1177,9 @@
   gap: 8px;
   font-size: 12px;
   font-weight: 600;
-  color: #92400e;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
+  color: #504f51;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
   border-radius: 8px;
   padding: 10px 12px;
 }

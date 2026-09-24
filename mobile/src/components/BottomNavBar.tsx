@@ -192,8 +192,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   iconSquircleActive: {
-    backgroundColor: '#E25E3E',
-    shadowColor: '#E25E3E',
+    backgroundColor: '#1373e5',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   tabLabelActive: {
-    color: '#E25E3E',
+    color: '#1373e5',
     fontWeight: '700',
   },
   tabLabelInactive: {
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 3.5,
     borderRadius: 2,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     marginTop: 3,
   },
   indicatorPlaceholder: {

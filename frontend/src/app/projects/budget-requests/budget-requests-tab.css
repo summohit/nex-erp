@@ -48,9 +48,9 @@
 .br-awaiting {
   padding: 5px 11px;
   border-radius: 999px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #b45309;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
+  color: #4f2aa7;
   font-size: 12px; font-weight: 700;
 }
 
@@ -116,8 +116,8 @@
 .br-btn-approve { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
 .br-btn-approve:hover:not(:disabled) { background: #d1fae5; }
 
-.br-btn-reject { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
-.br-btn-reject:hover:not(:disabled) { background: #fee2e2; }
+.br-btn-reject { background: #eff6ff; border-color: #dbeafe; color: #0f4f9c; }
+.br-btn-reject:hover:not(:disabled) { background: #dbeafe; }
 
 .sm { padding: 6px 11px; font-size: 12px; }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -163,14 +163,14 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .br-req {
-  color: #ef4444;
+  color: #1373e5;
   font-size: 13px;
   line-height: 1;
 }
 
 .br-error-msg {
   font-size: 11.5px;
-  color: #dc2626;
+  color: #1373e5;
   font-weight: 500;
   line-height: 1.3;
 }
@@ -200,9 +200,9 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .br-field input.invalid,
 .br-field textarea.invalid {
-  border-color: #ef4444 !important;
-  background-color: #fffbfb !important;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+  border-color: #1373e5 !important;
+  background-color: #fdfdfd !important;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1) !important;
 }
 
 .br-form-actions {
@@ -271,9 +271,9 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   white-space: nowrap;
 }
 
-.br-status.pending { background: #fffbeb; color: #b45309; }
+.br-status.pending { background: #f3efff; color: #4f2aa7; }
 .br-status.approved { background: #ecfdf5; color: #047857; }
-.br-status.rejected { background: #fef2f2; color: #b91c1c; }
+.br-status.rejected { background: #eff6ff; color: #0f4f9c; }
 .br-status.cancelled { background: #f1f5f9; color: #64748b; }
 
 .br-reason {
@@ -325,10 +325,10 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .br-rejected {
   display: flex; align-items: flex-start; gap: 8px;
   padding: 9px 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
   border-radius: 8px;
-  font-size: 12.5px; color: #b91c1c; line-height: 1.5;
+  font-size: 12.5px; color: #0f4f9c; line-height: 1.5;
 }
 
 .br-rejected svg { flex-shrink: 0; margin-top: 2px; }

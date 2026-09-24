@@ -790,10 +790,10 @@ export class CandidatesComponent implements OnInit {
     const stages = [
       { label: 'New', count: data.pipeline.NEW || 0, color: '#2563eb' },
       { label: 'Reviewing', count: data.pipeline.REVIEWING || 0, color: '#8b5cf6' },
-      { label: 'Shortlisted', count: data.pipeline.SHORTLISTED || 0, color: '#ea580c' },
-      { label: 'Interviewing', count: data.pipeline.INTERVIEWING || 0, color: '#d97706' },
+      { label: 'Shortlisted', count: data.pipeline.SHORTLISTED || 0, color: '#1373e5' },
+      { label: 'Interviewing', count: data.pipeline.INTERVIEWING || 0, color: '#6b3fd6' },
       { label: 'Offered / Hired', count: (data.pipeline.OFFERED || 0) + (data.pipeline.HIRED || 0), color: '#10b981' },
-      { label: 'Rejected', count: data.pipeline.REJECTED || 0, color: '#ef4444' },
+      { label: 'Rejected', count: data.pipeline.REJECTED || 0, color: '#1373e5' },
     ];
 
     const circumference = 251.32; // 2 * PI * 40
@@ -1418,9 +1418,9 @@ export class CandidatesComponent implements OnInit {
       'linear-gradient(135deg, #4f46e5, #3730a3)', // Indigo
       'linear-gradient(135deg, #0284c7, #0369a1)', // Sky
       'linear-gradient(135deg, #059669, #047857)', // Emerald
-      'linear-gradient(135deg, #d97706, #b45309)', // Amber
+      'linear-gradient(135deg, #6b3fd6, #4f2aa7)', // Amber
       'linear-gradient(135deg, #7c3aed, #5b21b6)', // Violet
-      'linear-gradient(135deg, #e11d48, #be123c)', // Rose
+      'linear-gradient(135deg, #7e7f80, #676869)', // Rose
       'linear-gradient(135deg, #0d9488, #0f766e)', // Teal
     ];
     if (!name) return gradients[0];
@@ -1610,7 +1610,7 @@ export class CandidatesComponent implements OnInit {
 
   getRatingColor(rating: number): string {
     if (rating >= 4) return '#10b981'; // Emerald Green
-    if (rating === 3) return '#f59e0b'; // Amber
-    return '#ef4444'; // Red
+    if (rating === 3) return '#6b3fd6'; // Amber
+    return '#1373e5'; // Red
   }
 }

@@ -137,7 +137,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
           if (s.status === 'IN_PROGRESS') return '#3b82f6'; // Blue 500
           if (s.status === 'IN_REVIEW') return '#8b5cf6'; // Violet 500
           if (s.status === 'DONE') return '#10b981'; // Emerald 500
-          if (s.status === 'CANCELLED') return '#ef4444'; // Red 500
+          if (s.status === 'CANCELLED') return '#1373e5'; // Red 500
           return '#cbd5e1';
         }),
         hoverOffset: 4
@@ -155,9 +155,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         label: 'Tasks',
         data: summary.priorityBreakdown.map(p => p.count),
         backgroundColor: summary.priorityBreakdown.map(p => {
-          if (p.priority === 'CRITICAL') return '#ef4444'; // Red 500
-          if (p.priority === 'HIGH') return '#f97316'; // Orange 500
-          if (p.priority === 'MEDIUM') return '#eab308'; // Yellow 500
+          if (p.priority === 'CRITICAL') return '#1373e5'; // Red 500
+          if (p.priority === 'HIGH') return '#1373e5'; // Orange 500
+          if (p.priority === 'MEDIUM') return '#0f4f9c'; // Yellow 500
           if (p.priority === 'LOW') return '#3b82f6'; // Blue 500
           return '#cbd5e1';
         }),
@@ -193,7 +193,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       datasets: [{
         data: summary.typeDistribution.map((t: any) => t.count),
         backgroundColor: summary.typeDistribution.map((t: any) => {
-          if (t.type === 'BUG') return '#ef4444'; // Red
+          if (t.type === 'BUG') return '#1373e5'; // Red
           if (t.type === 'TASK') return '#3b82f6'; // Blue
           if (t.type === 'STORY') return '#10b981'; // Green
           if (t.type === 'EPIC') return '#8b5cf6'; // Purple
@@ -420,11 +420,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   getAttachmentIconColor(filename: string): string {
     const ext = filename?.split('.').pop()?.toLowerCase() || '';
-    if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return '#db2777';
-    if (['pdf'].includes(ext)) return '#dc2626';
+    if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return '#6b3fd6';
+    if (['pdf'].includes(ext)) return '#1373e5';
     if (['doc', 'docx', 'txt'].includes(ext)) return '#2563eb';
     if (['xls', 'xlsx', 'csv'].includes(ext)) return '#16a34a';
-    if (['ppt', 'pptx'].includes(ext)) return '#ea580c';
+    if (['ppt', 'pptx'].includes(ext)) return '#1373e5';
     if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return '#0284c7';
     if (['mp3', 'wav', 'ogg'].includes(ext)) return '#9333ea';
     return '#b3bac5';
@@ -433,10 +433,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   getAttachmentBadge(filename: string): { bg: string; color: string; label: string; iconBg: string } {
     const ext = filename?.split('.').pop()?.toLowerCase() || '';
     if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) {
-      return { bg: '#fdf2f8', color: '#db2777', label: ext.toUpperCase(), iconBg: '#fce7f3' };
+      return { bg: '#fdf2f8', color: '#6b3fd6', label: ext.toUpperCase(), iconBg: '#fce7f3' };
     }
     if (ext === 'pdf') {
-      return { bg: '#fef2f2', color: '#dc2626', label: 'PDF', iconBg: '#fee2e2' };
+      return { bg: '#eff6ff', color: '#1373e5', label: 'PDF', iconBg: '#dbeafe' };
     }
     if (['xls', 'xlsx', 'csv'].includes(ext)) {
       return { bg: '#ecfdf5', color: '#059669', label: ext.toUpperCase(), iconBg: '#d1fae5' };
@@ -448,7 +448,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       return { bg: '#faf5ff', color: '#7c3aed', label: ext.toUpperCase(), iconBg: '#f3e8ff' };
     }
     if (['zip', 'rar', 'tar', 'gz', '7z'].includes(ext)) {
-      return { bg: '#fffbeb', color: '#d97706', label: ext.toUpperCase(), iconBg: '#fef3c7' };
+      return { bg: '#f3efff', color: '#6b3fd6', label: ext.toUpperCase(), iconBg: '#f3efff' };
     }
     return { bg: '#f8fafc', color: '#475569', label: (ext || 'FILE').toUpperCase(), iconBg: '#f1f5f9' };
   }
@@ -551,8 +551,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   fieldVisitStatusColor(status: string) {
     if (status === 'COMPLETED') return { bg: '#dcfce7', text: '#166534' };
-    if (status === 'CANCELLED') return { bg: '#fee2e2', text: '#991b1b' };
-    return { bg: '#fef9c3', text: '#854d0e' };
+    if (status === 'CANCELLED') return { bg: '#dbeafe', text: '#595a5b' };
+    return { bg: '#f3efff', text: '#49494a' };
   }
 
   fieldVisitPointCount(visit: FieldVisit): number {
@@ -1141,7 +1141,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     let bgColor = '#0c66e4';
     if (issue.status === 'DONE') bgColor = '#16a34a';
     else if (issue.type === 'EPIC') bgColor = '#8b5cf6';
-    else if (issue.status === 'IN_PROGRESS') bgColor = '#f59e0b';
+    else if (issue.status === 'IN_PROGRESS') bgColor = '#6b3fd6';
     
     return {
       left: leftPx + 'px',
@@ -1852,16 +1852,16 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       'IN_PROGRESS': '#60a5fa',
       'IN_REVIEW': '#c084fc',
       'DONE': '#4ade80',
-      'CANCELLED': '#f87171'
+      'CANCELLED': '#b4b4b5'
     };
     return colors[status] || '#94a3b8';
   }
 
   getPriorityColor(priority: string): string {
     const colors: any = {
-      'CRITICAL': '#ef4444',
-      'HIGH': '#f97316',
-      'MEDIUM': '#eab308',
+      'CRITICAL': '#1373e5',
+      'HIGH': '#1373e5',
+      'MEDIUM': '#0f4f9c',
       'LOW': '#22c55e'
     };
     return colors[priority] || '#94a3b8';
@@ -1873,7 +1873,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   getAssigneeColor(index: number): string {
-    const palette = ['#3b82f6', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4'];
+    const palette = ['#3b82f6', '#8b5cf6', '#6b3fd6', '#6b3fd6', '#6b3fd6', '#10b981', '#06b6d4'];
     return palette[index % palette.length];
   }
 
@@ -3160,9 +3160,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       cellRenderer: (params: any) => {
         const val = params.value || '';
         let color = '#94a3b8';
-        if (val === 'CRITICAL') color = '#dc2626';
-        else if (val === 'HIGH') color = '#ea580c';
-        else if (val === 'MEDIUM') color = '#ca8a04';
+        if (val === 'CRITICAL') color = '#1373e5';
+        else if (val === 'HIGH') color = '#1373e5';
+        else if (val === 'MEDIUM') color = '#4f2aa7';
         else if (val === 'LOW') color = '#16a34a';
         
         return `<div style="display: flex; align-items: center; gap: 6px;">
@@ -3284,9 +3284,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       cellRenderer: (params: any) => {
         const val = params.value || '';
         let color = '#94a3b8';
-        if (val === 'CRITICAL') color = '#dc2626';
-        else if (val === 'HIGH') color = '#ea580c';
-        else if (val === 'MEDIUM') color = '#ca8a04';
+        if (val === 'CRITICAL') color = '#1373e5';
+        else if (val === 'HIGH') color = '#1373e5';
+        else if (val === 'MEDIUM') color = '#4f2aa7';
         else if (val === 'LOW') color = '#16a34a';
         return `<div style="display: flex; align-items: center; gap: 6px;">
                   <div style="width: 8px; height: 8px; border-radius: 50%; background-color: ${color};"></div>
@@ -3346,7 +3346,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         const tkt = params.data?.projectTicket;
         if (!tkt) return '<span style="color:#cbd5e1;">—</span>';
         const title = String(tkt.title || '').replace(/"/g, '&quot;');
-        return `<span title="From ticket ${tkt.ticketNumber}: ${title}" style="display:inline-block;padding:2px 7px;background:#fff7ed;color:#b45309;border:1px solid #fed7aa;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.02em;line-height:16px;">${tkt.ticketNumber}</span>`;
+        return `<span title="From ticket ${tkt.ticketNumber}: ${title}" style="display:inline-block;padding:2px 7px;background:#eff6ff;color:#4f2aa7;border:1px solid #dbeafe;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.02em;line-height:16px;">${tkt.ticketNumber}</span>`;
       },
     },
 
@@ -3394,7 +3394,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         if (v == null) return this.hoursCell(null, '');
         // Red at zero: the task cannot take more time without an approved
         // additional-hours request (§3).
-        return this.hoursCell(v, v <= 0 ? '#b91c1c' : '#047857');
+        return this.hoursCell(v, v <= 0 ? '#0f4f9c' : '#047857');
       },
     },
 
@@ -4186,7 +4186,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   isMenuOpen = signal(false);
   backgroundColors = [
-    '#0079bf', '#d29034', '#519839', '#b04632', '#89609e', '#cd5a91', '#4bbf6b', '#00aecc', '#838c91'
+    '#0079bf', '#838284', '#519839', '#707172', '#89609e', '#939394', '#4bbf6b', '#00aecc', '#838c91'
   ];
 
   toggleMenu() {
@@ -4229,27 +4229,27 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   labelColorPalette = [
     // Row 1 (subtle green, yellow, orange, red, purple)
     { fill: '#baf3db', border: '#216e4e' },
-    { fill: '#fef3c7', border: '#946f00' },
-    { fill: '#fed7aa', border: '#c25100' },
-    { fill: '#ffd6d6', border: '#c9372c' },
+    { fill: '#f3efff', border: '#4a494b' },
+    { fill: '#dbeafe', border: '#616062' },
+    { fill: '#eaeaeb', border: '#7a7a7b' },
     { fill: '#e9d5ff', border: '#6e5dc6' },
     // Row 2 (standard green, yellow, orange, red, purple)
     { fill: '#4bce97' },
-    { fill: '#f5cd47' },
-    { fill: '#fea362' },
-    { fill: '#f87462' },
+    { fill: '#9e9d9f' },
+    { fill: '#b0afb1' },
+    { fill: '#acadae' },
     { fill: '#9f8fef' },
     // Row 3 (dark green, olive, dark orange, dark red, dark purple)
     { fill: '#1f845a' },
-    { fill: '#946f00' },
-    { fill: '#c25100' },
-    { fill: '#c9372c' },
+    { fill: '#4a494b' },
+    { fill: '#616062' },
+    { fill: '#7a7a7b' },
     { fill: '#6e5dc6' },
     // Row 4 (subtle blue, sky, lime, pink, grey)
     { fill: '#cce0ff', border: '#0c66e4' },
     { fill: '#c6edfb', border: '#206a83' },
     { fill: '#d3f1a7', border: '#4c6b1f' },
-    { fill: '#fdd8e5', border: '#943d73' },
+    { fill: '#eaeaeb', border: '#943d73' },
     { fill: '#dcdfe4', border: '#505f79' },
     // Row 5 (standard blue, sky, lime, pink, grey)
     { fill: '#579dff' },
@@ -4280,7 +4280,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   getLabelTextColor(bgColor: string): string {
     if (!bgColor) return '#172b4d';
-    const darkColors = ['#1f845a', '#946f00', '#c25100', '#c9372c', '#6e5dc6', '#0c66e4', '#206a83', '#4c6b1f', '#943d73', '#505f79'];
+    const darkColors = ['#1f845a', '#4a494b', '#616062', '#7a7a7b', '#6e5dc6', '#0c66e4', '#206a83', '#4c6b1f', '#943d73', '#505f79'];
     return darkColors.includes(bgColor.toLowerCase()) ? '#ffffff' : '#172b4d';
   }
 
@@ -4891,7 +4891,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   getMemberColor(m: any): string {
     const emp = m?.employee || m;
-    const colors = ['#0c66e4', '#1f845a', '#c25100', '#c9372c', '#6e5dc6', '#943d73', '#206a83', '#505f79'];
+    const colors = ['#0c66e4', '#1f845a', '#616062', '#7a7a7b', '#6e5dc6', '#943d73', '#206a83', '#505f79'];
     const id = emp?.id || 0;
     return colors[id % colors.length];
   }

@@ -55,7 +55,7 @@
 
 .search-group input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1);
 }
 
 .filter-card {
@@ -95,7 +95,7 @@
 
 .filter-group select.form-control:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
 }
 
@@ -137,9 +137,9 @@
 }
 
 .btn-icon:hover {
-  background: #fee2e2;
-  color: #ef4444;
-  border-color: #fca5a5;
+  background: #dbeafe;
+  color: #1373e5;
+  border-color: #dbeafe;
 }
 
 .btn-primary {
@@ -348,8 +348,8 @@
 }
 
 .role-admin, .role-superadmin { background: #f1f5f9; color: #475569; }
-.role-hr { background: #fce7f3; color: #db2777; }
-.role-finance { background: #fef9c3; color: #ca8a04; }
+.role-hr { background: #fce7f3; color: #6b3fd6; }
+.role-finance { background: #f3efff; color: #4f2aa7; }
 .role-employee { background: #eff6ff; color: #2563eb; }
 
 .emp-status-dot {
@@ -417,7 +417,7 @@
   letter-spacing: 0.2px;
 }
 .status-completed, .status-active { background: #ecfdf5; color: #059669; }
-.status-pending { background: #fffbeb; color: #d97706; }
+.status-pending { background: #f3efff; color: #6b3fd6; }
 .status-in_progress { background: #eff6ff; color: #2563eb; }
 
 .btn-card-edit {
@@ -708,23 +708,23 @@
 }
 
 .cmd-k-action.tone-primary {
-  color: #ea580c;
-  border-color: #fed7aa;
+  color: #1373e5;
+  border-color: #dbeafe;
 }
 
 .cmd-k-action.tone-primary:hover {
-  background: #fff7ed;
-  border-color: #fdba74;
+  background: #eff6ff;
+  border-color: #b8b8b9;
 }
 
 .cmd-k-action.tone-danger {
-  color: #dc2626;
-  border-color: #fecaca;
+  color: #1373e5;
+  border-color: #dbeafe;
 }
 
 .cmd-k-action.tone-danger:hover {
-  background: #fef2f2;
-  border-color: #fca5a5;
+  background: #eff6ff;
+  border-color: #dbeafe;
 }
 
 @media (max-width: 720px) {

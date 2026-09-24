@@ -43,8 +43,8 @@
 }
 
 .dlg-icon.success { background: #ecfdf5; color: #059669; }
-.dlg-icon.error { background: #fef2f2; color: #dc2626; }
-.dlg-icon.confirm { background: #fffbeb; color: #d97706; }
+.dlg-icon.error { background: #eff6ff; color: #1373e5; }
+.dlg-icon.confirm { background: #f3efff; color: #6b3fd6; }
 
 .dlg-title {
   margin: 0 0 6px 0;
@@ -85,11 +85,11 @@
 .dlg-btn-secondary:hover { background: #e2e8f0; }
 
 .dlg-btn-primary {
-  background: linear-gradient(135deg, #ff5500 0%, #e04400 100%);
+  background: linear-gradient(135deg, #1373e5 0%, #0f5fbe 100%);
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(255, 85, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(19, 115, 229, 0.25);
 }
-.dlg-btn-primary:hover { box-shadow: 0 4px 12px rgba(255, 85, 0, 0.35); }
+.dlg-btn-primary:hover { box-shadow: 0 4px 12px rgba(19, 115, 229, 0.35); }
 
 .dlg-btn-success {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -99,11 +99,11 @@
 .dlg-btn-success:hover { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); }
 
 .dlg-btn-error {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: linear-gradient(135deg, #1373e5 0%, #1373e5 100%);
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
+  box-shadow: 0 2px 6px rgba(19, 115, 229, 0.25);
 }
-.dlg-btn-error:hover { box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35); }
+.dlg-btn-error:hover { box-shadow: 0 4px 12px rgba(19, 115, 229, 0.35); }
 
 /* Prompt variant — a reason the server will not accept the action without. */
 .dlg-textarea {
@@ -122,15 +122,15 @@
 
 .dlg-textarea:focus {
   outline: none;
-  border-color: #ea580c;
-  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12);
 }
 
 .dlg-textarea::placeholder { color: #94a3b8; }
 
 .dlg-icon.prompt {
-  background: #fff7ed;
-  color: #ea580c;
+  background: #eff6ff;
+  color: #1373e5;
 }
 
 /* Submit stays out of reach until the required text is there. */

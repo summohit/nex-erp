@@ -110,8 +110,8 @@
 }
 
 .badge-pending {
-  background: #fef3c7;
-  color: #b45309;
+  background: #f3efff;
+  color: #4f2aa7;
 }
 
 .badge-cleared, .badge-approved {
@@ -120,8 +120,8 @@
 }
 
 .badge-rejected, .badge-withdrawn {
-  background: #fee2e2;
-  color: #991b1b;
+  background: #dbeafe;
+  color: #595a5b;
 }
 
 /* Empty State */
@@ -246,7 +246,7 @@
 }
 
 .btn-danger {
-  background: #ef4444;
+  background: #1373e5;
   color: white;
   border: none;
   padding: 10px 16px;
@@ -256,7 +256,7 @@
 }
 
 .btn-danger:hover {
-  background: #dc2626;
+  background: #1373e5;
 }
 
 .btn-outline {

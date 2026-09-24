@@ -29,9 +29,9 @@ export default function FeedbackModal({
   const getColors = () => {
     switch (type) {
       case 'success': return { bg: '#10B981', shadow: '#10B981' };
-      case 'warning': return { bg: '#F59E0B', shadow: '#F59E0B' };
+      case 'warning': return { bg: '#6b3fd6', shadow: '#6b3fd6' };
       case 'error':
-      default: return { bg: '#EF4444', shadow: '#EF4444' };
+      default: return { bg: '#1373e5', shadow: '#1373e5' };
     }
   };
 

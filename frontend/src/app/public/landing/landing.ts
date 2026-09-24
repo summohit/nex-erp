@@ -424,7 +424,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       name: 'Rohan Deshmukh',
       role: 'Head of People Operations',
       company: 'Apex Logistics & Freight (450+ Staff)',
-      avatarBg: '#ff5500',
+      avatarBg: '#1373e5',
       rating: 5,
       highlight: 'Saved 18 hrs/cycle on Payroll'
     },

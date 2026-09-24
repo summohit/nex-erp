@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     width: LOGO_SIZE * 1.35,
     height: LOGO_SIZE * 1.35,
     borderWidth: 1.5,
-    borderColor: '#E25E3E',
+    borderColor: '#1373e5',
   },
   logo: {
     width: LOGO_SIZE,
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 2.5,
     borderRadius: 2,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     marginTop: 12,
     marginBottom: 12,
   },
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
   },
   company: {
     fontSize: 11,

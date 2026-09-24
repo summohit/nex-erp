@@ -179,8 +179,8 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   const [editingLabel, setEditingLabel] = useState<any | null>(null);
   const [isSavingLabel, setIsSavingLabel] = useState(false);
   const [newLabelName, setNewLabelName] = useState('');
-  const [newLabelColor, setNewLabelColor] = useState('#EF4444');
-  const PRESET_COLORS = ['#EF4444', '#DC2626', '#F97316', '#EAB308', '#22C55E', '#10B981', '#3B82F6', '#6366F1', '#A855F7', '#EC4899', '#64748B'];
+  const [newLabelColor, setNewLabelColor] = useState('#1373e5');
+  const PRESET_COLORS = ['#1373e5', '#1373e5', '#1373e5', '#0f4f9c', '#22C55E', '#10B981', '#3B82F6', '#6366F1', '#A855F7', '#6b3fd6', '#64748B'];
 
   const SkeletonPulse = ({ width, height, borderRadius = 8, style }: any) => {
     const opacity = useRef(new Animated.Value(0.35)).current;
@@ -578,7 +578,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   const openEditLabel = (label: any) => {
     setEditingLabel(label);
     setNewLabelName(label.name || '');
-    setNewLabelColor(label.color || '#EF4444');
+    setNewLabelColor(label.color || '#1373e5');
     setIsCreatingLabel(true);
   };
 
@@ -822,20 +822,20 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
     {
       id: 'HIGH',
       label: 'High',
-      color: '#D97706',
-      bg: '#FFFBEB',
-      iconBg: '#FEF3C7',
-      borderColor: '#FCD34D',
+      color: '#6b3fd6',
+      bg: '#f3efff',
+      iconBg: '#f3efff',
+      borderColor: '#a4a4a5',
       desc: 'Important, requires attention',
       icon: ArrowUp,
     },
     {
       id: 'CRITICAL',
       label: 'Critical',
-      color: '#DC2626',
-      bg: '#FEF2F2',
-      iconBg: '#FEE2E2',
-      borderColor: '#FCA5A5',
+      color: '#1373e5',
+      bg: '#eff6ff',
+      iconBg: '#dbeafe',
+      borderColor: '#dbeafe',
       desc: 'Urgent blocker, fix immediately',
       icon: Flame,
     },
@@ -916,7 +916,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                     onPress={() => setRejectModalVisible(true)}
                     disabled={reviewSubmitting}
                   >
-                    <ThumbsDown size={14} color="#DC2626" />
+                    <ThumbsDown size={14} color="#1373e5" />
                     <Text style={styles.rejectBtnText}>Reject</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1874,7 +1874,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                         onPress={() => handleDeleteLabel(editingLabel.id)}
                         activeOpacity={0.8}
                       >
-                        <Trash2 size={16} color="#EF4444" strokeWidth={2} />
+                        <Trash2 size={16} color="#1373e5" strokeWidth={2} />
                         <Text style={styles.deleteLabelText}>Delete Label</Text>
                       </TouchableOpacity>
                     )}
@@ -1935,7 +1935,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                           .filter(l => (l.name || '').toLowerCase().includes(labelSearchQuery.toLowerCase()))
                           .map((l: any, idx: number) => {
                             const isAssigned = issue.labels?.some((il: any) => il.labelId === l.id || il.label?.id === l.id);
-                            const labelColor = l.color || '#EF4444';
+                            const labelColor = l.color || '#1373e5';
                             return (
                               <View key={l.id || `pl-${idx}`} style={styles.crmLabelRow}>
                                 {/* Checkbox */}
@@ -1988,7 +1988,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                     onPress={() => {
                       setEditingLabel(null);
                       setNewLabelName(labelSearchQuery.trim());
-                      setNewLabelColor('#EF4444');
+                      setNewLabelColor('#1373e5');
                       setIsCreatingLabel(true);
                     }}
                     activeOpacity={0.8}
@@ -2024,7 +2024,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
       {statusChanging && (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', zIndex: 9998 }]}>
           <View style={{ backgroundColor: '#fff', paddingVertical: 20, paddingHorizontal: 28, borderRadius: 16, alignItems: 'center', width: '72%' }}>
-            <ActivityIndicator size="large" color="#E25E3E" />
+            <ActivityIndicator size="large" color="#1373e5" />
             <Text style={{ marginTop: 14, fontSize: 15, fontWeight: '600', color: '#0F172A' }}>Updating Status...</Text>
           </View>
         </View>
@@ -2109,7 +2109,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   actionSheetOptionDestructive: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
   },
   actionSheetOptionText: {
     fontSize: 16,
@@ -2117,7 +2117,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   actionSheetOptionTextDestructive: {
-    color: '#DC2626',
+    color: '#1373e5',
   },
   actionSheetDivider: {
     height: 1,
@@ -2336,7 +2336,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   timerBtnActive: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#1373e5',
   },
   timerBtnText: {
     color: '#FFFFFF',
@@ -3068,15 +3068,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#dbeafe',
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 10,
   },
   deleteLabelText: {
-    color: '#EF4444',
+    color: '#1373e5',
     fontWeight: '700',
     fontSize: 14,
   },
@@ -3205,11 +3205,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
+    borderColor: '#dbeafe',
+    backgroundColor: '#eff6ff',
   },
   archiveBtnText: {
-    color: '#DC2626',
+    color: '#1373e5',
     fontWeight: '700',
     fontSize: 14,
   },
@@ -3300,14 +3300,14 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#dbeafe',
     paddingVertical: 10,
     borderRadius: 10,
   },
   rejectBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#DC2626',
+    color: '#1373e5',
   },
 
   // Proof upload modal
@@ -3355,11 +3355,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     alignItems: 'center',
   },
   proofMoveBtnDisabled: {
-    backgroundColor: '#FCA5A5',
+    backgroundColor: '#dbeafe',
     opacity: 0.6,
   },
   proofMoveBtnText: {
@@ -3385,7 +3385,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: '#DC2626',
+    backgroundColor: '#1373e5',
     alignItems: 'center',
   },
   rejectConfirmBtnText: {

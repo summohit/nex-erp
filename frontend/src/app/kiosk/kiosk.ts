@@ -93,7 +93,7 @@ import { HotToastService } from '@ngneat/hot-toast';
     .numpad button.action {
       font-size: 1rem;
       background: rgba(239, 68, 68, 0.1);
-      color: #ef4444;
+      color: #1373e5;
     }
     .numpad button.action:hover {
       background: rgba(239, 68, 68, 0.2);
@@ -127,7 +127,7 @@ import { HotToastService } from '@ngneat/hot-toast';
       transform: translateY(-2px);
     }
     .btn-out {
-      background: linear-gradient(135deg, #f59e0b, #d97706);
+      background: linear-gradient(135deg, #6b3fd6, #6b3fd6);
     }
     .btn-out:hover:not(:disabled) {
       box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);

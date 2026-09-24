@@ -9,11 +9,11 @@ import DayDetailModal from '../modals/DayDetailModal';
 
 const LEGEND = [
   { label: 'Present', color: '#10B981', bg: '#ECFDF5', border: '#A7F3D0', icon: CheckCircle },
-  { label: 'Half Day', color: '#F97316', bg: '#FFF7ED', border: '#FED7AA', icon: Clock },
-  { label: 'Late', color: '#EAB308', bg: '#FEF9C3', border: '#FDE047', icon: AlertCircle },
-  { label: 'Absent', color: '#EF4444', bg: '#FEF2F2', border: '#FECACA', icon: XCircle },
+  { label: 'Half Day', color: '#1373e5', bg: '#eff6ff', border: '#dbeafe', icon: Clock },
+  { label: 'Late', color: '#0f4f9c', bg: '#f3efff', border: '#e0d7ff', icon: AlertCircle },
+  { label: 'Absent', color: '#1373e5', bg: '#eff6ff', border: '#dbeafe', icon: XCircle },
   { label: 'On Leave', color: '#3B82F6', bg: '#EFF6FF', border: '#BFDBFE', icon: Plane },
-  { label: 'Holiday', color: '#F59E0B', bg: '#FEF3C7', border: '#FDE68A', icon: Star },
+  { label: 'Holiday', color: '#6b3fd6', bg: '#f3efff', border: '#e0d7ff', icon: Star },
   { label: 'Day Off', color: '#94A3B8', bg: '#F1F5F9', border: '#E2E8F0', icon: Calendar },
 ];
 
@@ -180,7 +180,7 @@ export default function TimesheetTab() {
     <ScrollView 
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={isLoading} onRefresh={fetchData} colors={['#E25E3E']} />
+        <RefreshControl refreshing={isLoading} onRefresh={fetchData} colors={['#1373e5']} />
       }
     >
       {/* Month Selector */}
@@ -290,7 +290,7 @@ export default function TimesheetTab() {
             <View key={reg.id} style={styles.regCard}>
               <View style={styles.regRow}>
                 <Text style={styles.regDate}>{new Date(reg.date).toLocaleDateString()}</Text>
-                <Text style={[styles.regStatus, reg.status === 'APPROVED' ? {color: '#10B981'} : {color: '#F59E0B'}]}>
+                <Text style={[styles.regStatus, reg.status === 'APPROVED' ? {color: '#10B981'} : {color: '#6b3fd6'}]}>
                   {reg.status}
                 </Text>
               </View>

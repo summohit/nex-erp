@@ -212,7 +212,7 @@ export class AttendanceLeaveComponent implements OnInit {
       flex: 1,
       cellRenderer: (params: any) => {
         const val = params.value;
-        const color = val === 'PRESENT' ? '#10B981' : (val === 'ABSENT' ? '#EF4444' : '#F59E0B');
+        const color = val === 'PRESENT' ? '#10B981' : (val === 'ABSENT' ? '#1373e5' : '#6b3fd6');
         return `<span style="color: ${color}; font-weight: 500;">${val || '-'}</span>`;
       }
     },
@@ -245,7 +245,7 @@ export class AttendanceLeaveComponent implements OnInit {
       cellRenderer: (params: any) => {
         if (!params.value) return '';
         const attachmentLink = params.data.attachmentUrl 
-          ? `<a href="${params.data.attachmentUrl}" target="_blank" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #f97316; text-decoration: underline; margin-top: 2px;">View Attachment <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg></a>`
+          ? `<a href="${params.data.attachmentUrl}" target="_blank" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #1373e5; text-decoration: underline; margin-top: 2px;">View Attachment <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg></a>`
           : '';
         return `<div style="display: flex; flex-direction: column; justify-content: center; padding: 6px 0; line-height: 1.2;">
                   <span style="font-weight: 500;">${params.value}</span>
@@ -265,7 +265,7 @@ export class AttendanceLeaveComponent implements OnInit {
         const start = this.datePipe.transform(params.data.startDate, 'MMM d');
         const end = this.datePipe.transform(params.data.endDate, 'MMM d');
         const halfBadge = params.data.isHalfDay
-          ? `<span class="status-badge status-half-day" style="background: rgba(236, 95, 42, 0.12); color: #EC5F2A; font-size: 10px; margin-left: 6px; padding: 2px 6px; border-radius: 10px;">Half Day (${params.data.halfDayPeriod || 'AM'})</span>`
+          ? `<span class="status-badge status-half-day" style="background: rgba(236, 95, 42, 0.12); color: #1373e5; font-size: 10px; margin-left: 6px; padding: 2px 6px; border-radius: 10px;">Half Day (${params.data.halfDayPeriod || 'AM'})</span>`
           : '';
         return `<div style="display: flex; align-items: center;">${start} - ${end}${halfBadge}</div>`;
       }
@@ -279,7 +279,7 @@ export class AttendanceLeaveComponent implements OnInit {
         const statusClass = params.value ? params.value.toLowerCase() : '';
         let badgeHtml = `<span class="status-badge ${statusClass}">${params.value}</span>`;
         let reasonLink = params.value === 'REJECTED' && params.data.rejectionReason 
-          ? `<div class="view-reason-link" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #ef4444; text-decoration: underline; margin-top: 4px; cursor: pointer;">View Reason <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>` 
+          ? `<div class="view-reason-link" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #1373e5; text-decoration: underline; margin-top: 4px; cursor: pointer;">View Reason <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>`
           : '';
         return `<div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 6px 0; line-height: 1.2;">
                   ${badgeHtml}
@@ -365,7 +365,7 @@ export class AttendanceLeaveComponent implements OnInit {
     { field: 'reason', headerName: 'Reason', flex: 1.5 },
     { field: 'status', headerName: 'Status', flex: 1, cellRenderer: (params: any) => {
         const val = params.value;
-        const color = val === 'APPROVED' ? '#10B981' : (val === 'REJECTED' ? '#EF4444' : '#F59E0B');
+        const color = val === 'APPROVED' ? '#10B981' : (val === 'REJECTED' ? '#1373e5' : '#6b3fd6');
         return `<span style="color: ${color}; font-weight: 500;">${val}</span>`;
       }
     }
@@ -398,7 +398,7 @@ export class AttendanceLeaveComponent implements OnInit {
           return `
             <div style="display: flex; gap: 8px; align-items: center; height: 100%;">
               <button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px;" onclick="window.dispatchEvent(new CustomEvent('resolve-reg', {detail: {id: ${params.data.id}, status: 'APPROVED'}}))">Approve</button>
-              <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; color: #ef4444; border-color: #ef4444;" onclick="window.dispatchEvent(new CustomEvent('resolve-reg', {detail: {id: ${params.data.id}, status: 'REJECTED'}}))">Reject</button>
+              <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; color: #1373e5; border-color: #1373e5;" onclick="window.dispatchEvent(new CustomEvent('resolve-reg', {detail: {id: ${params.data.id}, status: 'REJECTED'}}))">Reject</button>
             </div>
           `;
         }
@@ -503,7 +503,7 @@ export class AttendanceLeaveComponent implements OnInit {
         if (s === 'REJECTED') statusClass = 'status-rejected';
         
         const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason 
-          ? `<div class="view-reason-link" style="font-size: 10px; color: #DC2626; font-weight: 500; margin-top: 3px; cursor: pointer;">Reason: ${params.data.rejectionReason}</div>` 
+          ? `<div class="view-reason-link" style="font-size: 10px; color: #1373e5; font-weight: 500; margin-top: 3px; cursor: pointer;">Reason: ${params.data.rejectionReason}</div>`
           : '';
         return `
           <div class="cell-stacked">

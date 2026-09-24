@@ -40,16 +40,16 @@ const STATUS_FILTERS = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as c
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   OPEN:        { bg: '#DBEAFE', text: '#1E40AF' },
-  IN_PROGRESS: { bg: '#FEF3C7', text: '#92400E' },
+  IN_PROGRESS: { bg: '#f3efff', text: '#504f51' },
   RESOLVED:    { bg: '#DCFCE7', text: '#166534' },
   CLOSED:      { bg: '#F1F5F9', text: '#475569' },
-  REJECTED:    { bg: '#FEE2E2', text: '#991B1B' },
+  REJECTED:    { bg: '#dbeafe', text: '#595a5b' },
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  CRITICAL: '#DC2626',
-  HIGH:     '#EA580C',
-  MEDIUM:   '#D97706',
+  CRITICAL: '#1373e5',
+  HIGH:     '#1373e5',
+  MEDIUM:   '#6b3fd6',
   LOW:      '#64748B',
 };
 
@@ -474,7 +474,7 @@ export default function TicketsScreen() {
   const statCards = [
     { key: 'ALL', label: 'Total', value: stats?.total ?? 0, Icon: TicketIcon, color: '#6366F1' },
     { key: 'OPEN', label: 'Open', value: stats?.open ?? 0, Icon: AlertCircle, color: '#2563EB' },
-    { key: 'IN_PROGRESS', label: 'Active', value: stats?.inProgress ?? 0, Icon: Timer, color: '#D97706' },
+    { key: 'IN_PROGRESS', label: 'Active', value: stats?.inProgress ?? 0, Icon: Timer, color: '#6b3fd6' },
     { key: 'RESOLVED', label: 'Resolved', value: stats?.resolved ?? 0, Icon: CheckCircle2, color: '#16A34A' },
   ];
 
@@ -484,14 +484,14 @@ export default function TicketsScreen() {
       subtitle="Support & requests"
       right={
         <TouchableOpacity style={styles.headerAction} onPress={openCreate}>
-          <Plus size={20} color="#E25E3E" />
+          <Plus size={20} color="#1373e5" />
         </TouchableOpacity>
       }
     >
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#E25E3E" />
+          <ActivityIndicator size="large" color="#1373e5" />
         </View>
       ) : (
         <FlatList
@@ -499,7 +499,7 @@ export default function TicketsScreen() {
           keyExtractor={t => String(t.id)}
           renderItem={renderTicket}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E25E3E" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1373e5" />}
           ListHeaderComponent={
             <View>
               {/* Stats — tapping one filters the list */}
@@ -617,8 +617,8 @@ export default function TicketsScreen() {
 
               <TouchableOpacity style={styles.attachBtn} onPress={showAttachmentPicker} disabled={uploading}>
                 {uploading
-                  ? <ActivityIndicator size="small" color="#E25E3E" />
-                  : <Paperclip size={16} color="#E25E3E" />}
+                  ? <ActivityIndicator size="small" color="#1373e5" />
+                  : <Paperclip size={16} color="#1373e5" />}
                 <Text style={styles.attachBtnText}>
                   {uploading ? 'Uploading…' : 'Add screenshot or document'}
                 </Text>
@@ -688,7 +688,7 @@ export default function TicketsScreen() {
             </View>
 
             {detailLoading || !detail ? (
-              <View style={styles.center}><ActivityIndicator color="#E25E3E" /></View>
+              <View style={styles.center}><ActivityIndicator color="#1373e5" /></View>
             ) : (
               <>
                 <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
@@ -895,7 +895,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#FFF', borderRadius: 12, padding: 10,
     borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'flex-start', gap: 2,
   },
-  statCardActive: { borderColor: '#E25E3E', backgroundColor: '#FFF7F5' },
+  statCardActive: { borderColor: '#1373e5', backgroundColor: '#fafafa' },
   statValue: { fontSize: 19, fontWeight: '800', color: '#0F172A' },
   statLabel: { fontSize: 10.5, color: '#64748B', fontWeight: '600' },
 
@@ -978,10 +978,10 @@ const styles = StyleSheet.create({
   attachCount: { fontSize: 11.5, color: '#94A3B8', marginTop: 12 },
   attachBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderWidth: 1.5, borderColor: '#FBD5CA', borderStyle: 'dashed',
-    borderRadius: 10, paddingVertical: 13, backgroundColor: '#FFF7F5',
+    borderWidth: 1.5, borderColor: '#e2e2e3', borderStyle: 'dashed',
+    borderRadius: 10, paddingVertical: 13, backgroundColor: '#fafafa',
   },
-  attachBtnText: { fontSize: 13, fontWeight: '600', color: '#E25E3E' },
+  attachBtnText: { fontSize: 13, fontWeight: '600', color: '#1373e5' },
 
   thumbRow: { marginTop: 10, flexDirection: 'row' },
   thumbWrap: { marginRight: 9, position: 'relative' },
@@ -1003,7 +1003,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#E2E8F0',
   },
   btnGhostText: { fontSize: 14, fontWeight: '600', color: '#475569' },
-  btnPrimary: { flex: 2, paddingVertical: 13, borderRadius: 10, alignItems: 'center', backgroundColor: '#E25E3E' },
+  btnPrimary: { flex: 2, paddingVertical: 13, borderRadius: 10, alignItems: 'center', backgroundColor: '#1373e5' },
   btnPrimaryText: { fontSize: 14, fontWeight: '700', color: '#FFF' },
   btnDisabled: { opacity: 0.5 },
 
@@ -1066,7 +1066,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 9, fontSize: 13.5, color: '#0F172A',
   },
   sendBtn: {
-    width: 42, height: 42, borderRadius: 10, backgroundColor: '#E25E3E',
+    width: 42, height: 42, borderRadius: 10, backgroundColor: '#1373e5',
     alignItems: 'center', justifyContent: 'center',
   },
 

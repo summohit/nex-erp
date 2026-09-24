@@ -2250,7 +2250,7 @@
                 <td>-</td>
                 <td>
                   {{ cleanComponentName(item.componentName) }}
-                  <span *ngIf="isStatutory(item.componentName)" class="badge-tag statutory-badge" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: #fee2e2; color: #991b1b; margin-left: 6px; display: inline-block;">Statutory</span>
+                  <span *ngIf="isStatutory(item.componentName)" class="badge-tag statutory-badge" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: #dbeafe; color: #595a5b; margin-left: 6px; display: inline-block;">Statutory</span>
                 </td>
                 <td>₹{{ item.amount.toLocaleString('en-IN') }}</td>
               </ng-container>
@@ -2258,7 +2258,7 @@
             <tr *ngIf="pd.lossOfPay > 0">
               <td>-</td>
               <td>-</td>
-              <td title="{{ pd.absentDays }} unexcused absences">Loss of Pay (LOP) <span class="badge-tag" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: #fef3c7; color: #92400e; margin-left: 6px;">{{ pd.absentDays }} Days</span></td>
+              <td title="{{ pd.absentDays }} unexcused absences">Loss of Pay (LOP) <span class="badge-tag" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: #f3efff; color: #504f51; margin-left: 6px;">{{ pd.absentDays }} Days</span></td>
               <td>₹{{ pd.lossOfPay.toLocaleString('en-IN') }}</td>
             </tr>
             <tr *ngIf="pd.expenseAmount > 0">

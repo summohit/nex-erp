@@ -6,19 +6,19 @@
 
 /* Validation Error Styles */
 .is-invalid {
-  border-color: #EF4444 !important;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+  border-color: #1373e5 !important;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.15) !important;
 }
 
 .error-msg {
-  color: #EF4444;
+  color: #1373e5;
   font-size: 11.5px;
   font-weight: 600;
   margin-top: 4px;
 }
 
 .text-danger {
-  color: #EF4444;
+  color: #1373e5;
 }
 
 /* Page Header Card */
@@ -80,8 +80,8 @@
 }
 
 .kpi-icon.bg-orange {
-  background: #FFF7ED;
-  color: #F97316;
+  background: #eff6ff;
+  color: #1373e5;
 }
 
 .kpi-icon.bg-purple {
@@ -282,9 +282,9 @@
 }
 
 .award-icon-box.color-orange {
-  background: #FFF7ED;
+  background: #eff6ff;
   color: var(--color-primary);
-  border: 1px solid #FFEDD5;
+  border: 1px solid #dbeafe;
 }
 
 .award-icon-box.color-blue {
@@ -306,15 +306,15 @@
 }
 
 .award-icon-box.color-red {
-  background: #FEF2F2;
-  color: #EF4444;
-  border: 1px solid #FEE2E2;
+  background: #eff6ff;
+  color: #1373e5;
+  border: 1px solid #dbeafe;
 }
 
 .award-icon-box.color-yellow {
-  background: #FEFCE8;
-  color: #CA8A04;
-  border: 1px solid #FEF08A;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
 
 .award-title-text {
@@ -365,9 +365,9 @@
 }
 
 .status-badge-tag.red {
-  background: #FEF2F2;
-  color: #DC2626;
-  border: 1px solid #FECACA;
+  background: #eff6ff;
+  color: #1373e5;
+  border: 1px solid #dbeafe;
 }
 
 .status-badge-tag .dot {
@@ -382,7 +382,7 @@
 }
 
 .status-badge-tag .dot.red {
-  background: #EF4444;
+  background: #1373e5;
 }
 
 /* Detail Drawer Styles */
@@ -473,7 +473,7 @@
 
 /* Compact Primary Button */
 .btn-primary-sm {
-  background: linear-gradient(135deg, var(--color-primary, var(--color-primary)) 0%, #FF7332 100%);
+  background: linear-gradient(135deg, var(--color-primary, var(--color-primary)) 0%, #989899 100%);
   color: white;
   border: none;
   padding: 0 18px;
@@ -485,14 +485,14 @@
   align-items: center;
   gap: 6px;
   white-space: nowrap;
-  box-shadow: 0 3px 10px rgba(255, 82, 0, 0.25);
+  box-shadow: 0 3px 10px rgba(19, 115, 229, 0.25);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-primary-sm:hover {
   transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(255, 82, 0, 0.35);
+  box-shadow: 0 5px 14px rgba(19, 115, 229, 0.35);
 }
 
 /* Sleek AG Grid Action Buttons */
@@ -524,7 +524,7 @@
   background: var(--color-primary, var(--color-primary));
   color: #FFFFFF;
   border-color: var(--color-primary, var(--color-primary));
-  box-shadow: 0 3px 8px rgba(255, 82, 0, 0.25);
+  box-shadow: 0 3px 8px rgba(19, 115, 229, 0.25);
 }
 
 .action-icon-btn {
@@ -548,9 +548,9 @@
 }
 
 .action-icon-btn.danger:hover {
-  background: #FEF2F2;
-  color: #EF4444;
-  border-color: #FEE2E2;
+  background: #eff6ff;
+  color: #1373e5;
+  border-color: #dbeafe;
 }
 
 .action-menu-dropdown {
@@ -593,11 +593,11 @@
 }
 
 .action-menu-dropdown button.danger {
-  color: #EF4444;
+  color: #1373e5;
 }
 
 .action-menu-dropdown button.danger:hover {
-  background: #FEF2F2;
+  background: #eff6ff;
 }
 
 /* Modern Centered Modal Dialog Cards */
@@ -648,7 +648,7 @@
 }
 
 .modal-header-icon.bg-orange {
-  background: #FFF7ED;
+  background: #eff6ff;
   color: var(--color-primary);
 }
 
@@ -719,7 +719,7 @@
 .styled-select:focus,
 .styled-textarea:focus {
   border-color: var(--color-primary, var(--color-primary));
-  box-shadow: 0 0 0 3px rgba(255, 82, 0, 0.12);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12);
   outline: none;
 }
 
@@ -735,7 +735,7 @@
 
 .file-upload-dropzone:hover {
   border-color: var(--color-primary, var(--color-primary));
-  background: #FFF7ED;
+  background: #eff6ff;
 }
 
 .file-upload-dropzone input {

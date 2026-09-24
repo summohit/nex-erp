@@ -106,7 +106,7 @@
 }
 
 .brand-logo {
-  height: 46px;
+  height: 56px;
   width: auto;
   object-fit: contain;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.04));
@@ -151,7 +151,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, var(--color-primary) 0%, #ff8a4c 45%, #6366f1 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, #60a5fa 45%, #6366f1 100%);
 }
 
 .form-panel {
@@ -210,7 +210,7 @@
 .input-wrapper.has-focus {
   background: #ffffff;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3.5px rgba(255, 90, 31, 0.12);
+  box-shadow: 0 0 0 3.5px rgba(19, 115, 229, 0.12);
 }
 
 .input-icon-left {
@@ -290,7 +290,7 @@
 }
 
 .toggle-link:hover {
-  color: #e63200;
+  color: #727374;
   text-decoration: underline;
 }
 
@@ -298,7 +298,7 @@
 .auth-submit-btn {
   width: 100% !important;
   height: 46px !important;
-  background: linear-gradient(135deg, var(--color-primary) 0%, #FF3800 100%) !important;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #0f4f9c 100%) !important;
   color: #ffffff !important;
   border: none !important;
   border-radius: 12px !important;
@@ -310,20 +310,20 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  box-shadow: 0 4px 14px rgba(255, 90, 31, 0.35) !important;
+  box-shadow: 0 4px 14px rgba(19, 115, 229, 0.35) !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   padding: 0 !important;
 }
 
 .auth-submit-btn:hover:not(:disabled) {
   transform: translateY(-1.5px) !important;
-  background: linear-gradient(135deg, #FF6933 0%, #E63200 100%) !important;
-  box-shadow: 0 7px 20px rgba(255, 90, 31, 0.45) !important;
+  background: linear-gradient(135deg, #98999a 0%, #727374 100%) !important;
+  box-shadow: 0 7px 20px rgba(19, 115, 229, 0.45) !important;
 }
 
 .auth-submit-btn:active:not(:disabled) {
   transform: translateY(0) !important;
-  box-shadow: 0 2px 8px rgba(255, 90, 31, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(19, 115, 229, 0.25) !important;
 }
 
 .auth-submit-btn:disabled {
@@ -402,7 +402,7 @@
 }
 
 .signup-link:hover {
-  color: #e63200;
+  color: #727374;
   text-decoration: underline;
 }
 
@@ -523,16 +523,16 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  background: #fffbeb;
-  border: 1px solid #fef3c7;
-  border-left: 3.5px solid #f59e0b;
+  background: #f3efff;
+  border: 1px solid #f3efff;
+  border-left: 3.5px solid #6b3fd6;
   border-radius: 10px;
   margin-bottom: 14px;
   text-align: left;
 }
 
 .warn-icon {
-  color: #d97706;
+  color: #6b3fd6;
   margin-top: 1px;
   flex-shrink: 0;
 }
@@ -540,7 +540,7 @@
 .vault-warning-box p {
   margin: 0;
   font-size: 12px;
-  color: #92400e;
+  color: #504f51;
   line-height: 1.45;
 }
 

@@ -86,7 +86,7 @@ export interface AssetActionCellParams extends ICellRendererParams {
     }
     .text-primary { color: var(--color-primary) !important; font-weight: 600; }
     .text-success { color: #059669 !important; font-weight: 600; }
-    .text-danger { color: #DC2626 !important; font-weight: 600; }
+    .text-danger { color: #1373e5 !important; font-weight: 600; }
   `]
 })
 export class AssetActionCellRendererComponent implements ICellRendererAngularComp {

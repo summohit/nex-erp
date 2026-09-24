@@ -47,27 +47,27 @@ function getStatusTheme(status: string) {
     case 'Half Day':
       return {
         label: 'Half Day',
-        color: '#EA580C',
-        bg: '#FFF7ED',
-        border: '#FDBA74',
+        color: '#1373e5',
+        bg: '#eff6ff',
+        border: '#b8b8b9',
         Icon: Clock,
         desc: 'Partial working shift recorded.',
       };
     case 'Late':
       return {
         label: 'Late In',
-        color: '#D97706',
-        bg: '#FEF3C7',
-        border: '#FDE68A',
+        color: '#6b3fd6',
+        bg: '#f3efff',
+        border: '#e0d7ff',
         Icon: AlertCircle,
         desc: 'Clocked in past regular shift start time.',
       };
     case 'Absent':
       return {
         label: 'Absent',
-        color: '#EF4444',
-        bg: '#FEF2F2',
-        border: '#FECACA',
+        color: '#1373e5',
+        bg: '#eff6ff',
+        border: '#dbeafe',
         Icon: XCircle,
         desc: 'No punch activity recorded for this working day.',
       };
@@ -198,7 +198,7 @@ export default function DayDetailModal({
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
               <View style={styles.headerIconBadge}>
-                <CalendarClock size={20} color="#E25E3E" strokeWidth={2.2} />
+                <CalendarClock size={20} color="#1373e5" strokeWidth={2.2} />
               </View>
               <View>
                 <Text style={styles.modalTitle}>Attendance Details</Text>
@@ -304,7 +304,7 @@ export default function DayDetailModal({
                           <View style={styles.tileHeaderRow}>
                             <View style={[styles.outIconBadge, isOngoing && styles.ongoingIconBadge]}>
                               {isOngoing ? (
-                                <Clock size={12} color="#EA580C" strokeWidth={2.5} />
+                                <Clock size={12} color="#1373e5" strokeWidth={2.5} />
                               ) : (
                                 <ArrowUpRight size={12} color="#64748B" strokeWidth={2.5} />
                               )}
@@ -343,7 +343,7 @@ export default function DayDetailModal({
                 <View style={styles.durationHub}>
                   <View style={styles.durationHubLeft}>
                     <View style={styles.durationIconBox}>
-                      <Timer size={22} color="#E25E3E" strokeWidth={2.2} />
+                      <Timer size={22} color="#1373e5" strokeWidth={2.2} />
                     </View>
                     <View>
                       <Text style={styles.durationHubOverline}>TOTAL WORKED DURATION</Text>
@@ -414,14 +414,14 @@ export default function DayDetailModal({
                 ) : (
                   <View style={styles.absentStateCard}>
                     <View style={styles.absentIconCircle}>
-                      <AlertTriangle size={26} color="#DC2626" strokeWidth={2.2} />
+                      <AlertTriangle size={26} color="#1373e5" strokeWidth={2.2} />
                     </View>
                     <Text style={styles.stateCardTitleRed}>No Attendance Recorded</Text>
                     <Text style={styles.stateCardSubtitleRed}>
                       No clock-in was recorded for this scheduled working day.
                     </Text>
                     <View style={styles.absentMetaBadge}>
-                      <AlertCircle size={12} color="#DC2626" strokeWidth={2.2} />
+                      <AlertCircle size={12} color="#1373e5" strokeWidth={2.2} />
                       <Text style={styles.absentMetaText}>Marked as Absent</Text>
                     </View>
                   </View>
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 13,
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
   activePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#eff6ff',
     paddingHorizontal: 7,
     paddingVertical: 2.5,
     borderRadius: 10,
@@ -644,12 +644,12 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#EA580C',
+    backgroundColor: '#1373e5',
   },
   activePillText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#C2410C',
+    color: '#0f4f9c',
     letterSpacing: 0.4,
   },
 
@@ -675,8 +675,8 @@ const styles = StyleSheet.create({
     padding: 11,
   },
   clockOutTileOngoing: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#FED7AA',
+    backgroundColor: '#eff6ff',
+    borderColor: '#dbeafe',
   },
   tileHeaderRow: {
     flexDirection: 'row',
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ongoingIconBadge: {
-    backgroundColor: '#FED7AA',
+    backgroundColor: '#dbeafe',
   },
   clockInLabel: {
     fontSize: 10,
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   ongoingLabel: {
-    color: '#C2410C',
+    color: '#0f4f9c',
   },
   punchTimeText: {
     fontSize: 16,
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
   },
   ongoingTimeText: {
     fontSize: 14,
-    color: '#EA580C',
+    color: '#1373e5',
   },
   mapLinkBtn: {
     flexDirection: 'row',
@@ -753,9 +753,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#FFEDD5',
+    borderColor: '#dbeafe',
     borderRadius: 16,
     padding: 13,
     marginTop: 2,
@@ -769,21 +769,21 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: '#FFEDD5',
+    backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
   },
   durationHubOverline: {
     fontSize: 9.5,
     fontWeight: '800',
-    color: '#9A3412',
+    color: '#555657',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   durationHubValue: {
     fontSize: 17,
     fontWeight: '900',
-    color: '#431407',
+    color: '#252525',
     fontVariant: ['tabular-nums'],
   },
   targetBadge: {
@@ -952,9 +952,9 @@ const styles = StyleSheet.create({
   },
 
   absentStateCard: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#dbeafe',
     borderRadius: 20,
     padding: 22,
     alignItems: 'center',
@@ -963,7 +963,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
@@ -971,14 +971,14 @@ const styles = StyleSheet.create({
   stateCardTitleRed: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#991B1B',
+    color: '#595a5b',
     letterSpacing: -0.2,
     textAlign: 'center',
   },
   stateCardSubtitleRed: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#DC2626',
+    color: '#1373e5',
     textAlign: 'center',
     lineHeight: 18,
     marginTop: 4,
@@ -988,7 +988,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#dbeafe',
     paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: 12,
@@ -996,7 +996,7 @@ const styles = StyleSheet.create({
   absentMetaText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#DC2626',
+    color: '#1373e5',
   },
 
   /* --- Modal Footer --- */

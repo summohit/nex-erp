@@ -1,13 +1,19 @@
 /* variables.css */
 
 :root {
-  /* Brand Colors (Updated to ces-work palette) */
-  --color-primary: #FF5200;       /* Orange */
-  --color-primary-hover: #E64A00; 
-  --color-primary-light: rgba(255, 82, 0, 0.1);
+  /* Brand colours sampled from the MIRA reference. */
+  --color-primary: #1373E5;       /* MIRA blue */
+  --color-primary-hover: #0F5FBE;
+  --color-primary-light: rgba(19, 115, 229, 0.1);
+  --color-positive: #20B486;      /* MIRA logo green — affirmative actions */
+  --color-positive-hover: #108C63;
+  --color-positive-light: #E8F8F1;
   
-  --color-secondary: #7000FF;     /* Purple */
-  --color-accent: #FF2D55;        /* Pinkish Red */
+  --color-secondary: #6B3FD6;     /* MIRA purple */
+  --color-accent: #19A98F;        /* MIRA teal */
+  --color-utility: #F28C28;       /* MIRA automation orange — non-primary accents */
+  --color-utility-light: #FFF3E6;
+  --color-utility-border: #FFD5AD;
   
   /* Status colours — TWO ROLES PER HUE, and they are not interchangeable.
    *
@@ -20,22 +26,21 @@
    * to type or an icon that has to be identified.
    *
    * Hues match mobile's theme.ts so a status chip is the same colour on both
-   * platforms. They replace the old #27c93f / #ffbd2e / #ff5f56, which were
+   * platforms.
    * picked for the decorative macOS window mock on the login page and then
    * reused as app-wide semantics. */
-  --color-success: #10B981;
-  --color-success-text: #047857;   /* 5.48:1 on white */
-  --color-warning: #F59E0B;
-  --color-warning-text: #B45309;   /* 5.02:1 on white */
-  --color-danger: #EF4444;
-  --color-danger-text: #B91C1C;    /* 6.47:1 on white */
+  --color-success: #19A98F;
+  --color-success-text: #107565;
+  --color-warning: #6B3FD6;
+  --color-warning-text: #4F2AA7;
+  --color-danger: #1373E5;
+  --color-danger-text: #0F4F9C;
 
-  /* The brand orange is 3.25:1 on white — fine as a fill or for large text,
-   * but not for body copy. Use this when the brand colour has to be read. */
-  --color-primary-text: #C2410C;   /* 5.18:1 on white */
+  /* Use this for readable MIRA-blue text on light surfaces. */
+  --color-primary-text: #0F4F9C;
   
   /* Logo Gradients (Mock fallback) */
-  --gradient-logo: linear-gradient(45deg, #FF5200, #FF2D55, #7000FF);
+  --gradient-logo: linear-gradient(45deg, #1373E5, #19A98F, #6B3FD6);
   
   /* Backgrounds */
   --bg-main: #ffffff;
@@ -49,7 +54,7 @@
   --text-secondary: #475569;
   --text-muted: #64748b;
   --text-light: #FFFFFF;
-  --text-error: #FF2D55; /* Using the brand red for errors */
+  --text-error: #1373E5;
 
   /* Surfaces */
   --surface-hover: #F1F5F9;

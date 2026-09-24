@@ -311,8 +311,8 @@ export class JobDetailComponent implements OnInit {
 
   getAvatarColor(name: string): string {
     const colors = [
-      '#4f46e5', '#2563eb', '#0891b2', '#059669', '#d97706',
-      '#dc2626', '#7c3aed', '#db2777', '#0284c7', '#16a34a'
+      '#4f46e5', '#2563eb', '#0891b2', '#059669', '#6b3fd6',
+      '#1373e5', '#7c3aed', '#6b3fd6', '#0284c7', '#16a34a'
     ];
     let hash = 0;
     for (let i = 0; i < (name || '').length; i++) {

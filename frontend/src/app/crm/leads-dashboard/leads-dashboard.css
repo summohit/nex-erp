@@ -121,7 +121,7 @@
 
 .timeframe-selector button.active {
   background: #ffffff;
-  color: #ff5500;
+  color: #1373e5;
   font-weight: 700;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
@@ -170,8 +170,8 @@
 
 .date-input-group input[type="date"]:focus {
   outline: none;
-  border-color: #ff5500;
-  box-shadow: 0 0 0 3px rgba(255, 85, 0, 0.12);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12);
 }
 
 .range-arrow {
@@ -185,18 +185,18 @@
   padding: 0 16px;
   border-radius: 8px;
   border: none;
-  background: linear-gradient(135deg, #ff5500 0%, #e04400 100%);
+  background: linear-gradient(135deg, #1373e5 0%, #0f5fbe 100%);
   color: #ffffff;
   font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 2px 6px rgba(255, 85, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(19, 115, 229, 0.25);
 }
 
 .btn-apply-range:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 85, 0, 0.35);
+  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.35);
 }
 
 .btn-apply-range:disabled {
@@ -225,7 +225,7 @@
 }
 
 .text-orange {
-  color: #ff5500;
+  color: #1373e5;
 }
 
 @keyframes lda-spin {
@@ -238,10 +238,10 @@
   align-items: center;
   gap: 12px;
   padding: 16px 20px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
   border-radius: 12px;
-  color: #b91c1c;
+  color: #0f4f9c;
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 20px;
@@ -305,7 +305,7 @@
 .kpi-modern-card.bg-indigo .kpi-icon-wrap { background: #eef2ff; color: #4f46e5; }
 .kpi-modern-card.bg-purple .kpi-icon-wrap { background: #faf5ff; color: #9333ea; }
 .kpi-modern-card.bg-emerald .kpi-icon-wrap { background: #ecfdf5; color: #059669; }
-.kpi-modern-card.bg-amber .kpi-icon-wrap { background: #fffbeb; color: #d97706; }
+.kpi-modern-card.bg-amber .kpi-icon-wrap { background: #f3efff; color: #6b3fd6; }
 .kpi-modern-card.bg-teal .kpi-icon-wrap { background: #f0fdfa; color: #0d9488; }
 
 .kpi-content {
@@ -358,9 +358,9 @@
 }
 
 .trend-banner.trend-down {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #595a5b;
 }
 
 .trend-icon-badge {
@@ -406,9 +406,9 @@
 .bg-blue-light { background: #eff6ff; color: #2563eb; }
 .bg-emerald-light { background: #ecfdf5; color: #059669; }
 .bg-indigo-light { background: #eef2ff; color: #4f46e5; }
-.bg-amber-light { background: #fffbeb; color: #d97706; }
-.bg-gold-light { background: #fef3c7; color: #b45309; }
-.bg-rose-light { background: #fff1f2; color: #e11d48; }
+.bg-amber-light { background: #f3efff; color: #6b3fd6; }
+.bg-gold-light { background: #f3efff; color: #4f2aa7; }
+.bg-rose-light { background: #f8f8f8; color: #7e7f80; }
 .bg-purple-light { background: #faf5ff; color: #9333ea; }
 
 .card-header h3 {
@@ -428,7 +428,7 @@
 .stale-hint {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #e11d48;
+  color: #7e7f80;
 }
 
 .card-body {
@@ -513,7 +513,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #ff5500;
+  background: #1373e5;
 }
 
 .category-tag-pill {
@@ -559,8 +559,8 @@
 }
 
 .winrate-badge.rate-low {
-  background: #fef2f2;
-  color: #dc2626;
+  background: #eff6ff;
+  color: #1373e5;
 }
 
 .text-value {
@@ -603,7 +603,7 @@
 }
 
 .rep-avatar {
-  background: linear-gradient(135deg, #ff5500 0%, #ea580c 100%);
+  background: linear-gradient(135deg, #1373e5 0%, #1373e5 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -672,9 +672,9 @@
   display: inline-flex;
   padding: 3px 8px;
   border-radius: 6px;
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  color: #e11d48;
+  background: #f8f8f8;
+  border: 1px solid #e5e5e6;
+  color: #7e7f80;
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -718,7 +718,7 @@
   border-radius: 50%;
 }
 .company-logo {
-  background: linear-gradient(135deg, #ff5500 0%, #ea580c 100%);
+  background: linear-gradient(135deg, #1373e5 0%, #1373e5 100%);
   color: #ffffff;
 }
 .person-info-col {
@@ -734,7 +734,7 @@
   text-overflow: ellipsis;
 }
 .rank-badge.rank-1 {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  background: linear-gradient(135deg, #8f8f90 0%, #6b3fd6 100%);
   color: #ffffff;
 }
 .rank-badge.rank-2 {
@@ -742,7 +742,7 @@
   color: #ffffff;
 }
 .rank-badge.rank-3 {
-  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  background: linear-gradient(135deg, #6b3fd6 0%, #4f2aa7 100%);
   color: #ffffff;
 }
 

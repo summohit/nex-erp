@@ -72,7 +72,7 @@ export interface ProjectActionCellParams extends ICellRendererParams {
       font-size: 14px;
       font-weight: 500;
     }
-    .text-danger { color: #DC2626 !important; font-weight: 600; }
+    .text-danger { color: #1373e5 !important; font-weight: 600; }
   `]
 })
 export class ProjectActionCellRendererComponent implements ICellRendererAngularComp {

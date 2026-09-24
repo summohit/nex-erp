@@ -60,7 +60,7 @@ const DropdownPicker = ({
         <Text style={[styles.dropdownText, (!selectedOption || selectedOption.label === 'Unspecified') && styles.dropdownPlaceholder]}>
           {selectedOption && selectedOption.label !== 'Unspecified' ? selectedOption.label : placeholder}
         </Text>
-        <ChevronDown size={18} color={selectedOption && selectedOption.label !== 'Unspecified' ? "#E25E3E" : "#94A3B8"} />
+        <ChevronDown size={18} color={selectedOption && selectedOption.label !== 'Unspecified' ? "#1373e5" : "#94A3B8"} />
       </TouchableOpacity>
       
       {modalVisible && (
@@ -100,7 +100,7 @@ const DropdownPicker = ({
                         {item.label}
                       </Text>
                       {isSelected && (
-                        <CheckCircle2 size={18} color="#E25E3E" strokeWidth={2.5} />
+                        <CheckCircle2 size={18} color="#1373e5" strokeWidth={2.5} />
                       )}
                     </TouchableOpacity>
                   );
@@ -189,8 +189,8 @@ export default function WorkTab({ profileData, onFormChange, masterData, refresh
       {/* --- Section 1: Employment Details --- */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <View style={[styles.iconBox, { backgroundColor: '#FFF7ED' }]}>
-            <Briefcase size={18} color="#EA580C" />
+          <View style={[styles.iconBox, { backgroundColor: '#eff6ff' }]}>
+            <Briefcase size={18} color="#1373e5" />
           </View>
           <View style={styles.headerTitles}>
             <Text style={styles.cardTitle}>JOB & POSITION</Text>
@@ -414,8 +414,8 @@ export default function WorkTab({ profileData, onFormChange, masterData, refresh
       {/* --- Section 6: Organization Tree --- */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <View style={[styles.iconBox, { backgroundColor: '#FFF7ED' }]}>
-            <Users size={18} color="#EA580C" />
+          <View style={[styles.iconBox, { backgroundColor: '#eff6ff' }]}>
+            <Users size={18} color="#1373e5" />
           </View>
           <View style={styles.headerTitles}>
             <Text style={styles.cardTitle}>TEAM HIERARCHY</Text>
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   dayChipActive: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
   },
   dayText: {
     fontSize: 13,
@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   optionItemSelected: {
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#eff6ff',
   },
   optionText: {
     fontSize: 15,
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   selectedOptionText: {
-    color: '#EA580C',
+    color: '#1373e5',
     fontWeight: '800',
   },
 });

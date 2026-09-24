@@ -137,12 +137,12 @@
 }
 
 .delete-btn {
-  color: #ef4444;
+  color: #1373e5;
 }
 
 .delete-btn:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
+  background: #dbeafe;
+  border-color: #dbeafe;
 }
 
 .empty-state {
@@ -247,7 +247,7 @@
 }
 
 .required {
-  color: #ef4444;
+  color: #1373e5;
 }
 
 .help-icon {
@@ -397,7 +397,7 @@
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.15);
+  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.15);
 }
 
 .btn-primary:disabled {
@@ -449,4 +449,4 @@
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .1);
 }
-.preview-clear-btn:hover { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.preview-clear-btn:hover { background: #eff6ff; border-color: #dbeafe; color: #0f4f9c; }

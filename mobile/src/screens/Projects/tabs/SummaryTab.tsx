@@ -26,8 +26,8 @@ import { PulseSkeleton } from '../../../components/SharedUI';
 import FeedbackModal, { ModalType } from '../../../components/FeedbackModal';
 
 const PRIORITY_COLORS: Record<string, string> = {
-  CRITICAL: '#EF4444',
-  HIGH: '#F97316',
+  CRITICAL: '#1373e5',
+  HIGH: '#1373e5',
   MEDIUM: '#3B82F6',
   LOW: '#94A3B8',
 };
@@ -37,7 +37,7 @@ const STATUS_COLORS: Record<string, string> = {
   IN_PROGRESS: '#3B82F6',
   IN_REVIEW: '#A855F7',
   DONE: '#10B981',
-  CANCELLED: '#EF4444',
+  CANCELLED: '#1373e5',
 };
 
 const MetricCard = ({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) => (
@@ -146,7 +146,7 @@ export default function SummaryTab() {
     return (
       <ScrollView
         contentContainerStyle={styles.emptyContainer}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
       >
         <Activity size={40} color="#CBD5E1" />
         <Text style={styles.emptyText}>No summary data available</Text>
@@ -163,7 +163,7 @@ export default function SummaryTab() {
         style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
     >
 
       {/* Project Info Card */}
@@ -180,9 +180,9 @@ export default function SummaryTab() {
               disabled={isUpdatingStatus}
             >
               {isUpdatingStatus ? (
-                <ActivityIndicator size="small" color="#E25E3E" />
+                <ActivityIndicator size="small" color="#1373e5" />
               ) : (
-                <Text style={[styles.statusPillText, { color: '#E25E3E' }]}>{currentProject.status}</Text>
+                <Text style={[styles.statusPillText, { color: '#1373e5' }]}>{currentProject.status}</Text>
               )}
             </TouchableOpacity>
           ) : null}
@@ -216,10 +216,10 @@ export default function SummaryTab() {
           color="#8B5CF6"
         />
         <MetricCard
-          icon={<AlertCircle size={18} color="#F97316" />}
+          icon={<AlertCircle size={18} color="#1373e5" />}
           label="Due Soon"
           value={metrics.dueSoonNext7Days}
-          color="#F97316"
+          color="#1373e5"
         />
       </View>
 
@@ -296,7 +296,7 @@ export default function SummaryTab() {
                     styles.progressFill,
                     {
                       width: `${Math.min((timeTracking.loggedHours / timeTracking.estimatedHours) * 100, 100)}%`,
-                      backgroundColor: timeTracking.loggedHours > timeTracking.estimatedHours ? '#EF4444' : '#10B981',
+                      backgroundColor: timeTracking.loggedHours > timeTracking.estimatedHours ? '#1373e5' : '#10B981',
                     },
                   ]}
                 />
@@ -507,14 +507,14 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   memberAvatarText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
   memberName: { flex: 1, fontSize: 12, color: '#334155', fontWeight: '500' },
   workloadBarContainer: { flex: 1, height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' },
-  workloadBar: { height: 8, backgroundColor: '#E25E3E', borderRadius: 4 },
+  workloadBar: { height: 8, backgroundColor: '#1373e5', borderRadius: 4 },
   workloadCount: { width: 24, fontSize: 12, fontWeight: '700', color: '#0F172A', textAlign: 'right' },
 
   activityItem: {
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     marginTop: 4,
   },
   activityContent: { flex: 1 },

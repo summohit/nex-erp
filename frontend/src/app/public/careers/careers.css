@@ -21,7 +21,7 @@
 }
 
 .brand-logo-img {
-  height: 38px;
+  height: 46px;
   width: auto;
   object-fit: contain;
   display: block;
@@ -51,7 +51,7 @@
 
 .hero-pill {
   background: rgba(255, 90, 31, 0.2);
-  color: #ffb088;
+  color: #c3c3c4;
   border: 1px solid rgba(255, 90, 31, 0.4);
   padding: 6px 18px;
   border-radius: 999px;
@@ -120,7 +120,7 @@
 }
 
 .btn-search:hover {
-  background: #ea4a0f;
+  background: #7b7c7e;
 }
 
 /* Careers Body */
@@ -475,11 +475,11 @@
 }
 
 .required {
-  color: #ef4444;
+  color: #1373e5;
 }
 
 .error-text {
-  color: #ef4444;
+  color: #1373e5;
   font-size: 12px;
   font-weight: 500;
   margin-top: 4px;
@@ -517,17 +517,17 @@
 }
 
 .input-error {
-  border-color: #ef4444 !important;
-  background-color: #fef2f2 !important;
+  border-color: #1373e5 !important;
+  background-color: #eff6ff !important;
 }
 
 .input-error:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.15) !important;
 }
 
 .dropzone-error {
-  border-color: #ef4444 !important;
-  background-color: #fef2f2 !important;
+  border-color: #1373e5 !important;
+  background-color: #eff6ff !important;
 }
 
 .form-group input,
@@ -565,7 +565,7 @@
 .form-group textarea:focus,
 .sq-textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.15);
 }
 
 .form-group textarea,
@@ -602,7 +602,7 @@
 
 .file-dropzone:hover {
   border-color: var(--color-primary);
-  background: #fff7ed;
+  background: #eff6ff;
 }
 
 .upload-icon {
@@ -682,8 +682,8 @@
   gap: 10px;
   padding: 14px 16px;
   margin-bottom: 16px;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
   border-radius: 8px;
 }
 
@@ -694,13 +694,13 @@
 
 .error-banner p {
   font-size: 14px;
-  color: #991b1b;
+  color: #595a5b;
   line-height: 1.5;
   margin: 0;
 }
 
 .text-red {
-  color: #dc2626;
+  color: #1373e5;
 }
 
 .text-green {
@@ -743,7 +743,7 @@
   }
 
   .brand-logo-img {
-    height: 32px;
+    height: 40px;
   }
 
   .hero-banner {

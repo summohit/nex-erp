@@ -44,9 +44,9 @@ const statusColor = (status: string) => {
     return { bg: '#ECFDF5', border: '#A7F3D0', text: '#065F46', dot: '#10B981', label: 'COMPLETED' };
   }
   if (status === 'CANCELLED') {
-    return { bg: '#FEF2F2', border: '#FECACA', text: '#991B1B', dot: '#EF4444', label: 'CANCELLED' };
+    return { bg: '#eff6ff', border: '#dbeafe', text: '#595a5b', dot: '#1373e5', label: 'CANCELLED' };
   }
-  return { bg: '#FFF7ED', border: '#FFEDD5', text: '#C2410C', dot: '#F97316', label: 'IN PROGRESS' };
+  return { bg: '#eff6ff', border: '#dbeafe', text: '#0f4f9c', dot: '#1373e5', label: 'IN PROGRESS' };
 };
 
 /* ────────────────────────────────────────────────────────── */
@@ -315,8 +315,8 @@ export default function FieldVisitScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#E25E3E']}
-            tintColor="#E25E3E"
+            colors={['#1373e5']}
+            tintColor="#1373e5"
           />
         }
       >
@@ -351,7 +351,7 @@ export default function FieldVisitScreen() {
             <View style={styles.metricsRow}>
               <View style={styles.metricBox}>
                 <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(226, 94, 62, 0.18)' }]}>
-                  <Clock size={16} color="#E25E3E" />
+                  <Clock size={16} color="#1373e5" />
                 </View>
                 <Text style={styles.metricValue}>{formatElapsed(elapsedSeconds)}</Text>
                 <Text style={styles.metricLabel}>Elapsed</Text>
@@ -385,7 +385,7 @@ export default function FieldVisitScreen() {
                 <Text style={styles.endBtnText}>End Visit</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.7} onPress={handleCancel}>
-                <X size={18} color="#EF4444" strokeWidth={2.5} />
+                <X size={18} color="#1373e5" strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
           </View>
@@ -400,7 +400,7 @@ export default function FieldVisitScreen() {
             </View>
             <View style={styles.kpiDivider} />
             <View style={styles.kpiItem}>
-              <Text style={[styles.kpiVal, { color: '#E25E3E' }]}>{kpiStats.distance} <Text style={styles.kpiUnit}>km</Text></Text>
+              <Text style={[styles.kpiVal, { color: '#1373e5' }]}>{kpiStats.distance} <Text style={styles.kpiUnit}>km</Text></Text>
               <Text style={styles.kpiLbl}>Distance</Text>
             </View>
             <View style={styles.kpiDivider} />
@@ -425,7 +425,7 @@ export default function FieldVisitScreen() {
         {historyVisits.length === 0 ? (
           <View style={styles.emptyBox}>
             <View style={styles.emptyIconCircle}>
-              <MapPin size={32} color="#E25E3E" />
+              <MapPin size={32} color="#1373e5" />
             </View>
             <Text style={styles.emptyTitle}>No visits yet</Text>
             <Text style={styles.emptySub}>Start your first field visit to track your route and capture site logs.</Text>
@@ -447,7 +447,7 @@ export default function FieldVisitScreen() {
                 {/* Header row: Project & Status Badge */}
                 <View style={styles.historyHeader}>
                   <View style={styles.projectTitleRow}>
-                    <View style={[styles.projectDot, { backgroundColor: v.project?.color || '#E25E3E' }]} />
+                    <View style={[styles.projectDot, { backgroundColor: v.project?.color || '#1373e5' }]} />
                     <Text style={styles.historyProject} numberOfLines={1}>
                       {v.project?.name || 'General Visit'}
                     </Text>
@@ -484,9 +484,9 @@ export default function FieldVisitScreen() {
                     </View>
                   )}
                   {v.durationMins !== undefined && v.durationMins !== null && (
-                    <View style={[styles.historyMetricChip, { backgroundColor: '#FFF1EC' }]}>
-                      <Clock size={13} color="#E25E3E" />
-                      <Text style={[styles.historyMetricChipText, { color: '#E25E3E' }]}>{formatDuration(v.durationMins)}</Text>
+                    <View style={[styles.historyMetricChip, { backgroundColor: '#eff6ff' }]}>
+                      <Clock size={13} color="#1373e5" />
+                      <Text style={[styles.historyMetricChipText, { color: '#1373e5' }]}>{formatDuration(v.durationMins)}</Text>
                     </View>
                   )}
                   {v.photos && v.photos.length > 0 && (
@@ -523,7 +523,7 @@ export default function FieldVisitScreen() {
                 {/* Footer: View Details CTA */}
                 <View style={styles.viewDetailsRow}>
                   <Text style={styles.viewDetailsText}>View details</Text>
-                  <ArrowRight size={14} color="#E25E3E" strokeWidth={2.5} />
+                  <ArrowRight size={14} color="#1373e5" strokeWidth={2.5} />
                 </View>
               </TouchableOpacity>
             );
@@ -540,7 +540,7 @@ export default function FieldVisitScreen() {
             <View style={styles.modalHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={styles.modalIconWrap}>
-                  <Play size={16} color="#E25E3E" fill="#E25E3E" />
+                  <Play size={16} color="#1373e5" fill="#1373e5" />
                 </View>
                 <Text style={styles.modalTitle}>Start Field Visit</Text>
               </View>
@@ -561,7 +561,7 @@ export default function FieldVisitScreen() {
               >
                 {selectedProject ? (
                   <View style={styles.selectedProjectRow}>
-                    <View style={[styles.projectDot, { backgroundColor: selectedProject.color || '#E25E3E' }]} />
+                    <View style={[styles.projectDot, { backgroundColor: selectedProject.color || '#1373e5' }]} />
                     <Text style={styles.selectedProjectName} numberOfLines={1}>{selectedProject.name}</Text>
                     {selectedProject.key ? (
                       <View style={styles.projectKeyBadge}>
@@ -592,7 +592,7 @@ export default function FieldVisitScreen() {
               {/* GPS Info Banner */}
               <View style={styles.gpsInfo}>
                 <View style={styles.gpsIconCircle}>
-                  <MapPin size={16} color="#E25E3E" />
+                  <MapPin size={16} color="#1373e5" />
                 </View>
                 <Text style={styles.gpsInfoText}>
                   Your current GPS coordinates will be captured as the trip starting point.
@@ -668,15 +668,15 @@ export default function FieldVisitScreen() {
                     style={[styles.projectOption, isSelected && styles.projectOptionSelected]}
                     activeOpacity={0.7}
                     onPress={() => {
-                      setSelectedProject({ id: p.id, name: p.name, key: p.key || '', color: p.color || '#E25E3E' });
+                      setSelectedProject({ id: p.id, name: p.name, key: p.key || '', color: p.color || '#1373e5' });
                       setShowProjectPicker(false);
                     }}
                   >
-                    <View style={[styles.projectOptionAvatar, { backgroundColor: (p.color || '#E25E3E') + '1A' }]}>
-                      <Briefcase size={16} color={p.color || '#E25E3E'} />
+                    <View style={[styles.projectOptionAvatar, { backgroundColor: (p.color || '#1373e5') + '1A' }]}>
+                      <Briefcase size={16} color={p.color || '#1373e5'} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.projectOptionName, isSelected && { color: '#E25E3E' }]}>{p.name}</Text>
+                      <Text style={[styles.projectOptionName, isSelected && { color: '#1373e5' }]}>{p.name}</Text>
                       {p.key ? <Text style={styles.projectOptionKey}>{p.key}</Text> : null}
                     </View>
                     {isSelected && (
@@ -700,8 +700,8 @@ export default function FieldVisitScreen() {
             <View style={styles.dragHandle} />
             <View style={styles.modalHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={[styles.modalIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                  <Square size={14} color="#DC2626" fill="#DC2626" />
+                <View style={[styles.modalIconWrap, { backgroundColor: '#dbeafe' }]}>
+                  <Square size={14} color="#1373e5" fill="#1373e5" />
                 </View>
                 <Text style={styles.modalTitle}>End Field Visit</Text>
               </View>
@@ -716,13 +716,13 @@ export default function FieldVisitScreen() {
                 <View style={styles.endSummaryHeader}>
                   <Text style={styles.endSummaryTitle}>Trip Summary</Text>
                   <View style={styles.endSummaryBadge}>
-                    <Activity size={12} color="#E25E3E" />
+                    <Activity size={12} color="#1373e5" />
                     <Text style={styles.endSummaryBadgeText}>Logged Route</Text>
                   </View>
                 </View>
                 <View style={styles.endSummaryMetrics}>
                   <View style={styles.endMetricItem}>
-                    <Clock size={16} color="#E25E3E" />
+                    <Clock size={16} color="#1373e5" />
                     <Text style={styles.endMetricVal}>{formatElapsed(elapsedSeconds)}</Text>
                     <Text style={styles.endMetricLbl}>Duration</Text>
                   </View>
@@ -754,7 +754,7 @@ export default function FieldVisitScreen() {
               <Text style={styles.fieldLabel}>Photos & Proof <Text style={styles.optional}>(Optional)</Text></Text>
               <View style={styles.photoActions}>
                 <TouchableOpacity style={styles.photoBtn} activeOpacity={0.8} onPress={() => pickPhoto('camera')}>
-                  <Camera size={18} color="#E25E3E" />
+                  <Camera size={18} color="#1373e5" />
                   <Text style={styles.photoBtnText}>Camera</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.photoBtn, { borderColor: '#DBEAFE', backgroundColor: '#EFF6FF' }]} activeOpacity={0.8} onPress={() => pickPhoto('gallery')}>
@@ -828,7 +828,7 @@ export default function FieldVisitScreen() {
                 {/* Project + status banner */}
                 <View style={styles.detailProjectCard}>
                   <View style={styles.detailProjectRow}>
-                    <View style={[styles.projectDotLarge, { backgroundColor: detailVisit.project?.color || '#E25E3E' }]} />
+                    <View style={[styles.projectDotLarge, { backgroundColor: detailVisit.project?.color || '#1373e5' }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.detailProjectName} numberOfLines={2}>
                         {detailVisit.project?.name || 'Project Visit'}
@@ -869,7 +869,7 @@ export default function FieldVisitScreen() {
                   </View>
                   <View style={styles.detailMetricDivider} />
                   <View style={styles.detailMetricBox}>
-                    <Clock size={16} color="#E25E3E" />
+                    <Clock size={16} color="#1373e5" />
                     <Text style={styles.detailMetricValue}>
                       {detailVisit.durationMins != null ? formatDuration(detailVisit.durationMins) : '0m'}
                     </Text>
@@ -907,7 +907,7 @@ export default function FieldVisitScreen() {
 
                   <View style={styles.timelineRow}>
                     <View style={styles.timelineGutter}>
-                      <View style={[styles.timelineDot, { backgroundColor: detailVisit.endTime ? '#E25E3E' : '#CBD5E1' }]} />
+                      <View style={[styles.timelineDot, { backgroundColor: detailVisit.endTime ? '#1373e5' : '#CBD5E1' }]} />
                     </View>
                     <View style={styles.timelineContent}>
                       <Text style={styles.timelineTime}>
@@ -1032,11 +1032,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 12,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 5,
@@ -1054,7 +1054,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(226, 94, 62, 0.4)',
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -1123,10 +1123,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderRadius: 14,
     paddingVertical: 13,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -1263,23 +1263,23 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F8FAFC',
   },
-  viewDetailsText: { fontSize: 12.5, fontWeight: '700', color: '#E25E3E' },
+  viewDetailsText: { fontSize: 12.5, fontWeight: '700', color: '#1373e5' },
 
   // Empty Box
   emptyBox: { alignItems: 'center', paddingVertical: 40, gap: 10, backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#F1F5F9', paddingHorizontal: 20 },
-  emptyIconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF1EC', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyIconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
   emptyTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
   emptySub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19 },
   emptyActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 18,
     paddingVertical: 11,
     borderRadius: 12,
     marginTop: 6,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -1312,13 +1312,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  modalIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF1EC', justifyContent: 'center', alignItems: 'center' },
+  modalIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' },
   modalTitle: { fontSize: 17.5, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 },
   modalClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center' },
   modalBody: { padding: 20 },
 
   fieldLabel: { fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
-  required: { color: '#E25E3E' },
+  required: { color: '#1373e5' },
   optional: { color: '#94A3B8', fontWeight: '400' },
   textInput: {
     backgroundColor: '#F8FAFC',
@@ -1344,7 +1344,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     marginBottom: 16,
   },
-  projectSelectorActive: { borderColor: '#E25E3E', backgroundColor: '#FFFDFD' },
+  projectSelectorActive: { borderColor: '#1373e5', backgroundColor: '#fefefe' },
   selectedProjectRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   selectedProjectName: { fontSize: 14, fontWeight: '700', color: '#0F172A', flexShrink: 1 },
   projectKeyBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
@@ -1356,26 +1356,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
     borderRadius: 12,
     padding: 13,
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: '#FFE2D9',
+    borderColor: '#ececec',
   },
   gpsIconCircle: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
-  gpsInfoText: { flex: 1, fontSize: 12.5, color: '#C2410C', fontWeight: '600', lineHeight: 18 },
+  gpsInfoText: { flex: 1, fontSize: 12.5, color: '#0f4f9c', fontWeight: '600', lineHeight: 18 },
 
   confirmBtn: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderRadius: 14,
     paddingVertical: 15,
     marginTop: 4,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius: 8,
@@ -1409,11 +1409,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
   },
-  projectOptionSelected: { backgroundColor: '#FFF1EC' },
+  projectOptionSelected: { backgroundColor: '#eff6ff' },
   projectOptionAvatar: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   projectOptionName: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
   projectOptionKey: { fontSize: 11, fontWeight: '600', color: '#94A3B8', marginTop: 1 },
-  selectedCheckCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#E25E3E', justifyContent: 'center', alignItems: 'center' },
+  selectedCheckCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#1373e5', justifyContent: 'center', alignItems: 'center' },
 
   // End Modal Summary
   endSummaryBox: {
@@ -1426,8 +1426,8 @@ const styles = StyleSheet.create({
   },
   endSummaryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   endSummaryTitle: { fontSize: 13, fontWeight: '800', color: '#0F172A', textTransform: 'uppercase', letterSpacing: 0.5 },
-  endSummaryBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF1EC', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 8 },
-  endSummaryBadgeText: { fontSize: 10.5, fontWeight: '700', color: '#E25E3E' },
+  endSummaryBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#eff6ff', paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 8 },
+  endSummaryBadgeText: { fontSize: 10.5, fontWeight: '700', color: '#1373e5' },
   endSummaryMetrics: { flexDirection: 'row', alignItems: 'center' },
   endMetricItem: { flex: 1, alignItems: 'center', gap: 3 },
   endMetricVal: { fontSize: 15.5, fontWeight: '800', color: '#0F172A' },
@@ -1441,13 +1441,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#FFE2D9',
+    borderColor: '#ececec',
     borderRadius: 12,
     paddingVertical: 12,
   },
-  photoBtnText: { fontSize: 13.5, fontWeight: '700', color: '#E25E3E' },
+  photoBtnText: { fontSize: 13.5, fontWeight: '700', color: '#1373e5' },
 
   pendingPhotoWrap: { marginRight: 10, alignItems: 'center', position: 'relative' },
   pendingPhotoImg: { width: 78, height: 78, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' },
@@ -1455,7 +1455,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: '#DC2626',
+    backgroundColor: '#1373e5',
     width: 20,
     height: 20,
     borderRadius: 10,

@@ -123,7 +123,7 @@ function getNotificationIcon(title?: string, message?: string) {
     return { Icon: CalendarDays, bg: '#ECFDF5', color: '#059669' };
   }
   if (text.includes('project') || text.includes('task') || text.includes('board')) {
-    return { Icon: FolderKanban, bg: '#FEF3C7', color: '#D97706' };
+    return { Icon: FolderKanban, bg: '#f3efff', color: '#6b3fd6' };
   }
   if (text.includes('payroll') || text.includes('payslip') || text.includes('expense')) {
     return { Icon: Receipt, bg: '#F0FDF4', color: '#16A34A' };
@@ -402,8 +402,8 @@ export default function DashboardScreen() {
   const workedTodayHours = todayAttendance?.totalHours || (liveWorkedTime.hours + liveWorkedTime.minutes / 60);
   const progressRatio = Math.min(workedTodayHours / targetHours, 1);
   const trendVsAvg = avgHours > 0 ? ((workedTodayHours - avgHours) / avgHours) * 100 : 0;
-  const trendColor = trendVsAvg >= 0 ? '#10B981' : '#EF4444';
-  const trendBg = trendVsAvg >= 0 ? '#ECFDF5' : '#FEF2F2';
+  const trendColor = trendVsAvg >= 0 ? '#10B981' : '#1373e5';
+  const trendBg = trendVsAvg >= 0 ? '#ECFDF5' : '#eff6ff';
 
   return (
     <AppScreen
@@ -415,13 +415,13 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E25E3E']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1373e5']} />
         }
       >
         {error ? (
           <View style={styles.errorContainer}>
             <View style={styles.errorIconBox}>
-              <X color="#DC2626" size={32} strokeWidth={2.5} />
+              <X color="#1373e5" size={32} strokeWidth={2.5} />
             </View>
             <Text style={styles.errorTitle}>Connection Issue</Text>
             <Text style={styles.errorMessage}>
@@ -489,7 +489,7 @@ export default function DashboardScreen() {
                     />
                     <Circle
                       cx="34" cy="34" r="28"
-                      stroke={isCheckedIn ? '#10B981' : '#E25E3E'} strokeWidth="6" fill="none"
+                      stroke={isCheckedIn ? '#10B981' : '#1373e5'} strokeWidth="6" fill="none"
                       strokeDasharray={`${2 * Math.PI * 28}`}
                       strokeDashoffset={`${2 * Math.PI * 28 * (1 - progressRatio)}`}
                       strokeLinecap="round"
@@ -542,8 +542,8 @@ export default function DashboardScreen() {
                 activeOpacity={0.75}
                 onPress={() => safeNavigate('Leaves')}
               >
-                <View style={[styles.quickTileIcon, { backgroundColor: '#FFF7ED' }]}>
-                  <CalendarDays size={22} color="#EA580C" strokeWidth={2.2} />
+                <View style={[styles.quickTileIcon, { backgroundColor: '#eff6ff' }]}>
+                  <CalendarDays size={22} color="#1373e5" strokeWidth={2.2} />
                 </View>
                 <Text style={styles.quickTileLabel}>Leaves</Text>
               </TouchableOpacity>
@@ -612,7 +612,7 @@ export default function DashboardScreen() {
                     style={[
                       styles.bentoProgressFill,
                       { width: `${Math.min(leaveProgress, 100)}%` },
-                      leaveProgress >= 90 && { backgroundColor: '#EF4444' },
+                      leaveProgress >= 90 && { backgroundColor: '#1373e5' },
                     ]}
                   />
                 </View>
@@ -626,8 +626,8 @@ export default function DashboardScreen() {
                 onPress={() => safeNavigate('Projects')}
               >
                 <View style={styles.bentoHeader}>
-                  <View style={[styles.bentoIconBadge, { backgroundColor: '#FEF3C7' }]}>
-                    <FolderKanban size={18} color="#D97706" strokeWidth={2.2} />
+                  <View style={[styles.bentoIconBadge, { backgroundColor: '#f3efff' }]}>
+                    <FolderKanban size={18} color="#6b3fd6" strokeWidth={2.2} />
                   </View>
                   <View style={styles.bentoPill}>
                     <Text style={styles.bentoPillText}>{activeProjectsCount} Active</Text>
@@ -771,7 +771,7 @@ export default function DashboardScreen() {
                   )}
                   <View style={styles.fieldLiveMetricsRow}>
                     <View style={styles.fieldLiveMetricItem}>
-                      <Clock size={15} color="#E25E3E" strokeWidth={2.2} />
+                      <Clock size={15} color="#1373e5" strokeWidth={2.2} />
                       <VisitElapsed startTime={activeVisit.startTime} style={styles.fieldLiveValue} />
                       <Text style={styles.fieldLiveLabel}>Duration</Text>
                     </View>
@@ -900,8 +900,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#FFF1EC',
-    shadowColor: '#E25E3E',
+    borderColor: '#eff6ff',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.07,
     shadowRadius: 18,
@@ -914,7 +914,7 @@ const styles = StyleSheet.create({
     width: 170,
     height: 170,
     borderRadius: 85,
-    backgroundColor: '#FFF7F5',
+    backgroundColor: '#fafafa',
   },
   heroHeaderRow: {
     flexDirection: 'row',
@@ -1034,12 +1034,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   heroPunchBtnIn: {
-    backgroundColor: '#E25E3E',
-    shadowColor: '#E25E3E',
+    backgroundColor: '#1373e5',
+    shadowColor: '#1373e5',
   },
   heroPunchBtnOut: {
-    backgroundColor: '#EF4444',
-    shadowColor: '#EF4444',
+    backgroundColor: '#1373e5',
+    shadowColor: '#1373e5',
   },
   heroPunchBtnText: {
     color: '#FFFFFF',
@@ -1065,7 +1065,7 @@ const styles = StyleSheet.create({
   viewAllBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#E25E3E',
+    color: '#1373e5',
   },
   quickGrid: {
     flexDirection: 'row',
@@ -1133,7 +1133,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bentoPill: {
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#eff6ff',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
@@ -1141,7 +1141,7 @@ const styles = StyleSheet.create({
   bentoPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#EA580C',
+    color: '#1373e5',
   },
   bentoValueRow: {
     flexDirection: 'row',
@@ -1287,7 +1287,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   barFillToday: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
   },
   barFillOther: {
     backgroundColor: '#CBD5E1',
@@ -1299,7 +1299,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   barLabelToday: {
-    color: '#E25E3E',
+    color: '#1373e5',
     fontWeight: '800',
   },
   chartFooterRow: {
@@ -1459,10 +1459,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#EF4444',
+    backgroundColor: '#1373e5',
     paddingVertical: 11,
     borderRadius: 14,
-    shadowColor: '#EF4444',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
@@ -1489,11 +1489,11 @@ const styles = StyleSheet.create({
   fieldStartBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 16,
     paddingVertical: 8.5,
     borderRadius: 12,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -1526,7 +1526,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   activityItemUnread: {
-    backgroundColor: '#FFFBF9',
+    backgroundColor: '#fcfcfc',
     marginHorizontal: -8,
     paddingHorizontal: 8,
     borderRadius: 12,
@@ -1547,7 +1547,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
@@ -1605,7 +1605,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -1624,7 +1624,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryBtn: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 22,
     paddingVertical: 10,
     borderRadius: 14,

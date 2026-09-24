@@ -315,7 +315,7 @@ export class LeaveQuotaComponent implements OnInit {
         if (!p.value || p.value === 0) {
           return '<span style="color: #94A3B8; font-weight: 500;">—</span>';
         }
-        return `<span style="color: #7000FF; font-weight: 700; font-variant-numeric: tabular-nums;" title="Paid out with the December salary">${this.days(p.value)}</span>`;
+        return `<span style="color: #6b3fd6; font-weight: 700; font-variant-numeric: tabular-nums;" title="Paid out with the December salary">${this.days(p.value)}</span>`;
       }
     },
     {
@@ -330,11 +330,11 @@ export class LeaveQuotaComponent implements OnInit {
         let barColor = '#10B981';
         let textColor = '#047857';
         if (pct >= 80) {
-          barColor = '#EF4444';
-          textColor = '#B91C1C';
+          barColor = '#1373e5';
+          textColor = '#0f4f9c';
         } else if (pct >= 50) {
-          barColor = '#F59E0B';
-          textColor = '#B45309';
+          barColor = '#6b3fd6';
+          textColor = '#4f2aa7';
         }
 
         return `

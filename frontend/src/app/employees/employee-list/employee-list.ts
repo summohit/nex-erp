@@ -224,9 +224,9 @@ export class EmployeeListComponent implements OnInit {
           const roleStr = params.value;
           let bg = '#F1F5F9'; let color = '#64748B';
           if (roleStr === 'EMPLOYEE') { bg = '#EFF6FF'; color = '#3B82F6'; }
-          else if (roleStr === 'HR') { bg = '#FCE7F3'; color = '#EC4899'; }
+          else if (roleStr === 'HR') { bg = '#FCE7F3'; color = '#6b3fd6'; }
           else if (roleStr === 'SUPERADMIN' || roleStr === 'ADMIN') { bg = '#F1F5F9'; color = '#64748B'; }
-          else if (roleStr === 'FINANCE') { bg = '#FEF9C3'; color = '#CA8A04'; }
+          else if (roleStr === 'FINANCE') { bg = '#f3efff'; color = '#4f2aa7'; }
           badges += `<span style="background: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.2px;">${roleStr}</span>`;
         }
         if (params.data?.isProjectManager) {
@@ -246,9 +246,9 @@ export class EmployeeListComponent implements OnInit {
         if (statusStr === 'ACTIVE') {
           color = '#16A34A'; bg = '#DCFCE7'; label = 'Active';
         } else if (statusStr === 'PENDING_VERIFICATION') {
-          color = '#CA8A04'; bg = '#FEF9C3'; label = 'Pending Verification';
+          color = '#4f2aa7'; bg = '#f3efff'; label = 'Pending Verification';
         } else if (statusStr === 'SUSPENDED' || statusStr === 'INACTIVE' || statusStr === 'BLOCKED') {
-          color = '#DC2626'; bg = '#FEE2E2'; label = 'Deactivated';
+          color = '#1373e5'; bg = '#dbeafe'; label = 'Deactivated';
         }
 
         return `<span style="background: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;">${label}</span>`;

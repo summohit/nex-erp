@@ -21,15 +21,15 @@
 .thrp-fig strong { font-size: 13px; color: #172b4d; font-weight: 700; }
 .thrp-extra { color: #047857 !important; }
 .thrp-left strong { color: #047857; }
-.thrp-left.thrp-none strong { color: #b91c1c; }
+.thrp-left.thrp-none strong { color: #0f4f9c; }
 .thrp-unbounded { font-size: 12px; color: #97a0af; font-style: italic; }
 
 .thrp-warn, .thrp-pending {
   display: flex; align-items: center; gap: 7px;
   padding: 8px 10px; border-radius: 4px; font-size: 12px;
 }
-.thrp-warn { background: #fef2f2; color: #b91c1c; }
-.thrp-pending { background: #fff7ed; color: #b45309; }
+.thrp-warn { background: #eff6ff; color: #0f4f9c; }
+.thrp-pending { background: #eff6ff; color: #4f2aa7; }
 
 .thrp-ask {
   align-self: flex-start;
@@ -72,13 +72,13 @@
 .thrp-hist-hours { color: #172b4d; font-weight: 600; }
 .thrp-hist-when { color: #97a0af; }
 .thrp-hist-reason {
-  color: #b91c1c; overflow: hidden; text-overflow: ellipsis;
+  color: #0f4f9c; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; max-width: 260px;
 }
 
 .thrp-chip {
   padding: 2px 7px; border-radius: 9px; font-size: 10px; font-weight: 700; letter-spacing: .02em;
 }
-.thrp-chip-requested { background: #fff7ed; color: #b45309; }
+.thrp-chip-requested { background: #eff6ff; color: #4f2aa7; }
 .thrp-chip-approved  { background: #ecfdf5; color: #047857; }
-.thrp-chip-rejected  { background: #fef2f2; color: #b91c1c; }
+.thrp-chip-rejected  { background: #eff6ff; color: #0f4f9c; }

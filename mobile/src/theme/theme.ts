@@ -1,12 +1,15 @@
 export const theme = {
   colors: {
-    // Brand Colors — must match frontend/src/variables.css exactly. These used
-    // to be #FF5722/#E64A19, a slightly different orange from the web's, which
-    // read as a rendering fault when the two were seen side by side.
-    primary: '#FF5200',
-    primaryHover: '#E64A00',
-    /** Brand orange is 3.25:1 on white — use this wherever it becomes text. */
-    primaryText: '#C2410C',
+    // Brand colours — must match frontend/src/variables.css exactly.
+    primary: '#1373e5',
+    primaryHover: '#0f5fbe',
+    positive: '#20b486',
+    positiveHover: '#108c63',
+    /** Use this wherever the brand colour becomes readable text. */
+    primaryText: '#0f4f9c',
+    secondary: '#6b3fd6', // MIRA intelligence purple
+    accent: '#19a98f', // MIRA resources teal
+    utility: '#f28c28', // MIRA automation orange; decorative only
     
     // Backgrounds
     background: '#F9FAFB', // Gray 50
@@ -22,12 +25,12 @@ export const theme = {
     // The plain value is a FILL: chips, dots, bars, badge backgrounds.
     // The *Text value is for anything that becomes a WORD, where the fills
     // measure only 2.1–3.8:1 against white and cannot be read at body size.
-    success: '#10B981', // Emerald 500
-    successText: '#047857', // 5.48:1 on white
-    danger: '#EF4444', // Red 500
-    dangerText: '#B91C1C', // 6.47:1 on white
-    warning: '#F59E0B', // Amber 500
-    warningText: '#B45309', // 5.02:1 on white
+    success: '#19a98f', // MIRA teal
+    successText: '#107565',
+    danger: '#1373e5', // MIRA blue
+    dangerText: '#0f4f9c',
+    warning: '#6b3fd6', // MIRA purple
+    warningText: '#4f2aa7',
     
     // Borders
     border: '#E5E7EB', // Gray 200

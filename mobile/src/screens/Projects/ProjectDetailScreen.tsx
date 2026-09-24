@@ -52,7 +52,7 @@ function AccessDeniedView({ onBack }: { onBack: () => void }) {
       <View style={styles.accessDeniedContainer}>
         <View style={styles.accessDeniedCard}>
           <View style={styles.accessDeniedIconWrap}>
-            <Lock size={28} color="#E25E3E" />
+            <Lock size={28} color="#1373e5" />
           </View>
           <Text style={styles.accessDeniedTitle}>Access Denied</Text>
           <Text style={styles.accessDeniedMessage}>
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     gap: 5,
   },
-  tabBtnActive: { backgroundColor: '#E25E3E' },
+  tabBtnActive: { backgroundColor: '#1373e5' },
   tabLabel: { fontSize: 12, fontWeight: '600', color: '#64748B' },
   tabLabelActive: { color: '#FFFFFF' },
   tabBadge: {
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   accessDeniedBtn: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,

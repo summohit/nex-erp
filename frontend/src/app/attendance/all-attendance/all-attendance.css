@@ -225,21 +225,21 @@
 }
 
 .stat-amber .stat-icon-wrapper {
-  background: #fef3c7;
-  color: #d97706;
+  background: #f3efff;
+  color: #6b3fd6;
 }
 .stat-amber.active-card {
-  border-color: #f59e0b;
-  background: #fffdf5;
+  border-color: #6b3fd6;
+  background: #fafafa;
 }
 
 .stat-rose .stat-icon-wrapper {
-  background: #ffe4e6;
-  color: #e11d48;
+  background: #f1f1f2;
+  color: #7e7f80;
 }
 .stat-rose.active-card {
-  border-color: #f43f5e;
-  background: #fff1f2;
+  border-color: #6b3fd6;
+  background: #f8f8f8;
 }
 
 /* --------------------------------------------------------------------------
@@ -560,9 +560,9 @@
   align-items: center;
   gap: 5px;
   padding: 6px 12px;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: #dbeafe;
+  border: 1px solid #dbeafe;
+  color: #0f4f9c;
   border-radius: 8px;
   font-size: 12.5px;
   font-weight: 600;
@@ -571,8 +571,8 @@
 }
 
 .btn-reset-filters:hover {
-  background: #fca5a5;
-  color: #7f1d1d;
+  background: #dbeafe;
+  color: #4e4e4e;
 }
 
 /* Active Chips */
@@ -628,13 +628,13 @@
 }
 
 .chip-remove-btn:hover {
-  color: #ef4444;
+  color: #1373e5;
 }
 
 .btn-clear-all-chips {
   background: none;
   border: none;
-  color: #ef4444;
+  color: #1373e5;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -815,18 +815,18 @@
 .status-approved .status-indicator-dot { background: #10b981; }
 
 .status-pending {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
-.status-pending .status-indicator-dot { background: #f59e0b; }
+.status-pending .status-indicator-dot { background: #6b3fd6; }
 
 .status-rejected {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
 }
-.status-rejected .status-indicator-dot { background: #ef4444; }
+.status-rejected .status-indicator-dot { background: #1373e5; }
 
 .time-cell {
   display: flex;
@@ -844,9 +844,9 @@
 .time-tag-late {
   font-size: 10px;
   font-weight: 700;
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
   padding: 1px 5px;
   border-radius: 4px;
 }
@@ -900,15 +900,15 @@
 }
 
 .flag-badge.late {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
 
 .flag-badge.early {
-  background: #ffe4e6;
-  color: #be123c;
-  border: 1px solid #fecdd3;
+  background: #f1f1f2;
+  color: #676869;
+  border: 1px solid #e5e5e6;
 }
 
 .flag-badge.on-time {
@@ -1176,7 +1176,7 @@
 
 .metric-sub {
   font-size: 11px;
-  color: #e11d48;
+  color: #7e7f80;
   font-weight: 600;
 }
 
@@ -1185,7 +1185,7 @@
 }
 
 .text-amber {
-  color: #d97706 !important;
+  color: #6b3fd6 !important;
 }
 
 .geo-info-card {
@@ -1346,25 +1346,25 @@
 .status-present { color: #22a06b; }
 .bg-present { background-color: rgba(34, 160, 107, 0.15); }
 
-.status-half-day { color: #ec5f2a; }
+.status-half-day { color: #1373e5; }
 .bg-half-day { background-color: rgba(236, 95, 42, 0.15); }
 
-.status-late { color: #c99a2e; }
+.status-late { color: #7b7b7c; }
 .bg-late { background-color: rgba(201, 154, 46, 0.15); }
 
-.status-absent { color: #e14b42; }
+.status-absent { color: #919192; }
 .bg-absent { background-color: rgba(225, 75, 66, 0.15); }
 
 .status-leave { color: #3b82f6; }
 .bg-leave { background-color: rgba(59, 130, 246, 0.15); }
 
-.status-holiday { fill: #f0c543; color: #f0c543; }
+.status-holiday { fill: #6b3fd6; color: #6b3fd6; }
 .bg-holiday { background-color: rgba(240, 197, 67, 0.15); }
 
 .status-day-off { color: #94a3b8; }
 .bg-day-off { background-color: rgba(148, 163, 184, 0.15); }
 
-.status-overtime { color: #d97706; }
+.status-overtime { color: #6b3fd6; }
 .bg-overtime { background-color: rgba(217, 119, 6, 0.15); }
 
 .status-clockoff { color: #8b5cf6; }
@@ -1849,15 +1849,15 @@
 }
 
 .status-round.status-pending {
-  background: #fffbeb;
-  color: #d97706;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #6b3fd6;
+  border: 1px solid #e0d7ff;
 }
 
 .status-round.status-rejected {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  color: #1373e5;
+  border: 1px solid #dbeafe;
 }
 
 .status-round.status-leave-badge {
@@ -1867,9 +1867,9 @@
 }
 
 .status-round.status-holiday-badge {
-  background: #fefce8;
-  color: #ca8a04;
-  border: 1px solid #fef08a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
 
 .status-round.status-dayoff-badge {
@@ -1988,8 +1988,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
   padding: 11px 16px;
   border-radius: 10px;
 }
@@ -1997,13 +1997,13 @@
 .session-duration-summary .duration-title {
   font-size: 12.5px;
   font-weight: 600;
-  color: #92400e;
+  color: #504f51;
 }
 
 .session-duration-summary .duration-highlight {
   font-size: 14px;
   font-weight: 800;
-  color: #78350f;
+  color: #434344;
 }
 
 .session-modal-footer {
@@ -2047,24 +2047,24 @@
   gap: 9px;
   margin: 0 0 14px;
   padding: 10px 12px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-left: 3px solid #f59e0b;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
+  border-left: 3px solid #6b3fd6;
   border-radius: 8px;
   font-size: 11.5px;
   line-height: 1.5;
-  color: #78350f;
+  color: #434344;
 }
 
 .auto-closed-note svg {
-  color: #d97706;
+  color: #6b3fd6;
   flex-shrink: 0;
   margin-top: 1px;
 }
 
 .auto-closed-note strong {
   font-weight: 700;
-  color: #92400e;
+  color: #504f51;
 }
 
 .auto-closed-chip {
@@ -2072,9 +2072,9 @@
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 9999px;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
-  color: #92400e;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
+  color: #504f51;
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -2120,14 +2120,14 @@
 }
 
 .session-geo-meta.is-inferred {
-  background: #fffbeb;
-  border-color: #fde68a;
+  background: #f3efff;
+  border-color: #e0d7ff;
 }
 
 .session-geo-meta.is-inferred .geo-coords em {
   display: block;
   margin-bottom: 3px;
-  color: #92400e;
+  color: #504f51;
   font-weight: 700;
   font-style: normal;
   font-size: 9.5px;

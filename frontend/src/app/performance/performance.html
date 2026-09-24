@@ -112,7 +112,7 @@
             <td>{{ rev.reviewer?.firstName }} {{ rev.reviewer?.lastName }}</td>
             <td>
               <span *ngIf="rev.rating" style="display: flex; gap: 2px;">
-                <svg lucideAward size="16" style="color: #EAB308;" *ngFor="let _ of [].constructor(rev.rating)"></svg>
+                <svg lucideAward size="16" style="color: #0f4f9c;" *ngFor="let _ of [].constructor(rev.rating)"></svg>
               </span>
               <span *ngIf="!rev.rating">-</span>
             </td>

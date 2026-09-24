@@ -27,8 +27,8 @@ import { useProjectStore } from '../../../store/projectStore';
 import IssueDetailModal from '../modals/IssueDetailModal';
 
 const PRIORITY_CONFIG: Record<string, { color: string; bg: string; icon: React.ComponentType<any> }> = {
-  CRITICAL: { color: '#EF4444', bg: '#FEF2F2', icon: Flame },
-  HIGH:     { color: '#F97316', bg: '#FFF7ED', icon: ArrowUp },
+  CRITICAL: { color: '#1373e5', bg: '#eff6ff', icon: Flame },
+  HIGH:     { color: '#1373e5', bg: '#eff6ff', icon: ArrowUp },
   MEDIUM:   { color: '#3B82F6', bg: '#EFF6FF', icon: Minus },
   LOW:      { color: '#94A3B8', bg: '#F8FAFC', icon: ArrowDown },
 };
@@ -38,7 +38,7 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.Com
   IN_PROGRESS: { color: '#3B82F6', bg: '#EFF6FF', icon: RotateCcw,   label: 'In Progress' },
   IN_REVIEW:   { color: '#A855F7', bg: '#FAF5FF', icon: Clock,        label: 'In Review' },
   DONE:        { color: '#10B981', bg: '#ECFDF5', icon: CheckCircle,  label: 'Done' },
-  CANCELLED:   { color: '#EF4444', bg: '#FEF2F2', icon: XCircle,     label: 'Cancelled' },
+  CANCELLED:   { color: '#1373e5', bg: '#eff6ff', icon: XCircle,     label: 'Cancelled' },
 };
 
 const STATUS_FILTERS = ['ALL', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED'];
@@ -194,7 +194,7 @@ export default function ListTab() {
         showsVerticalScrollIndicator={false}
         removeClippedSubviews
         maxToRenderPerBatch={20}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <AlertCircle size={36} color="#CBD5E1" />
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#F1F5F9',
   },
-  filterChipActive: { backgroundColor: '#E25E3E' },
+  filterChipActive: { backgroundColor: '#1373e5' },
   filterChipText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
   filterChipTextActive: { color: '#FFFFFF' },
 
@@ -291,14 +291,14 @@ const styles = StyleSheet.create({
   },
   priorityChipText: { fontSize: 10, fontWeight: '700' },
   dueDate: { fontSize: 11, color: '#64748B', fontWeight: '500' },
-  dueDateOverdue: { color: '#EF4444' },
+  dueDateOverdue: { color: '#1373e5' },
   spacer: { flex: 1 },
   assigneeAvatar: { width: 22, height: 22, borderRadius: 11 },
   assigneeAvatarFallback: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -20,7 +20,7 @@ const HORIZONTAL_CARD_WIDTH = (width - 48) / 2; // 2 column width for horizontal
 const VERTICAL_CARD_WIDTH = '100%'; // 1 column list
 const MAX_STACK_AVATARS = 4;
 
-const MEMBER_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
+const MEMBER_COLORS = ['#6366f1', '#8b5cf6', '#6b3fd6', '#1373e5', '#1373e5', '#0f4f9c', '#22c55e', '#06b6d4', '#3b82f6'];
 const getMemberColor = (id: number) => MEMBER_COLORS[id % MEMBER_COLORS.length];
 
 // Shared components imported above
@@ -173,8 +173,8 @@ export default function ProjectsScreen() {
             >
               <Star
                 size={14}
-                color={isStarred ? "#EAB308" : "#FFFFFF"}
-                fill={isStarred ? "#EAB308" : "none"}
+                color={isStarred ? "#0f4f9c" : "#FFFFFF"}
+                fill={isStarred ? "#0f4f9c" : "none"}
               />
             </TouchableOpacity>
           </View>
@@ -316,7 +316,7 @@ export default function ProjectsScreen() {
         {(activeTab === 'all' || activeTab === 'starred') && starredProjects.length > 0 && (
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-              <Star size={18} color="#EAB308" fill="#EAB308" />
+              <Star size={18} color="#0f4f9c" fill="#0f4f9c" />
               <Text style={styles.sectionTitle}>Starred boards</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalGrid}>

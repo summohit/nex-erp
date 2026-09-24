@@ -2736,15 +2736,15 @@ csvImporting = false;
     'interested': '#7c3aed',
     'schedule-meeting': '#0891b2',
     'proposal-sent': '#6d28d9',
-    'negotiation': '#b45309',
+    'negotiation': '#4f2aa7',
     'on-hold': '#64748b',
     'win': '#059669',
-    'lost': '#dc2626',
+    'lost': '#1373e5',
     'new-lead': '#2563eb',
     'requirement-gathering': '#0891b2',
     'solutioning-demo': '#7c3aed',
-    'proposal-technical-validation': '#d97706',
-    'poc': '#ea580c',
+    'proposal-technical-validation': '#6b3fd6',
+    'poc': '#1373e5',
     'converted-won': '#059669',
   };
 
@@ -3137,9 +3137,9 @@ csvImporting = false;
     switch (type) {
       case 'CALL': return { label: 'Phone Call', color: '#0284c7', bg: '#e0f2fe' };
       case 'MEETING': return { label: 'Meeting', color: '#7c3aed', bg: '#f5f3ff' };
-      case 'DEMO': return { label: 'Product Demo', color: '#ea580c', bg: '#fff7ed' };
+      case 'DEMO': return { label: 'Product Demo', color: '#1373e5', bg: '#eff6ff' };
       case 'EMAIL': return { label: 'Email', color: '#059669', bg: '#ecfdf5' };
-      case 'FIELD_VISIT': return { label: 'Field Visit', color: '#d97706', bg: '#fffbeb' };
+      case 'FIELD_VISIT': return { label: 'Field Visit', color: '#6b3fd6', bg: '#f3efff' };
       case 'NOTE': return { label: 'Note / Task', color: '#475569', bg: '#f1f5f9' };
       default: return { label: type, color: '#64748b', bg: '#f8fafc' };
     }

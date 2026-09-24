@@ -126,8 +126,8 @@ export default function ContactsTab({ profileData, onRefresh }: ContactsTabProps
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
-            <View style={[styles.iconBox, { backgroundColor: '#FEF2F2' }]}>
-              <ShieldAlert size={18} color="#DC2626" />
+            <View style={[styles.iconBox, { backgroundColor: '#eff6ff' }]}>
+              <ShieldAlert size={18} color="#1373e5" />
             </View>
             <View style={styles.headerTitles}>
               <Text style={styles.cardTitle}>EMERGENCY CONTACTS</Text>
@@ -199,7 +199,7 @@ export default function ContactsTab({ profileData, onRefresh }: ContactsTabProps
                     onPress={() => handleDeleteContact(item.id)}
                     disabled={loading}
                   >
-                    <Trash2 size={15} color="#DC2626" />
+                    <Trash2 size={15} color="#1373e5" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 10,
@@ -423,17 +423,17 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#eff6ff',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#FED7AA',
+    borderColor: '#dbeafe',
   },
   contactAvatarText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#EA580C',
+    color: '#1373e5',
   },
   contactInfo: {
     flex: 1,
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#dbeafe',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -578,8 +578,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   relChipActive: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#EA580C',
+    backgroundColor: '#eff6ff',
+    borderColor: '#1373e5',
   },
   relChipText: {
     fontSize: 12,
@@ -587,17 +587,17 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   relChipTextActive: {
-    color: '#EA580C',
+    color: '#1373e5',
     fontWeight: '800',
   },
   submitBtn: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 10,
     marginBottom: 20,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 6,

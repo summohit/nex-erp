@@ -34,7 +34,7 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #ff5500 0%, #e04400 100%);
+  background: linear-gradient(135deg, #1373e5 0%, #0f5fbe 100%);
   color: #ffffff;
   border: none;
   padding: 8px 16px;
@@ -45,13 +45,13 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(255, 85, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(19, 115, 229, 0.25);
   transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #e04400 0%, #c83b00 100%);
-  box-shadow: 0 4px 12px rgba(255, 85, 0, 0.35);
+  background: linear-gradient(135deg, #0f5fbe 0%, #636465 100%);
+  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.35);
   transform: translateY(-1px);
 }
 
@@ -109,7 +109,7 @@
 .text-center { text-align: center !important; }
 .text-muted { color: #94a3b8; }
 .text-success { color: #059669; }
-.text-danger { color: #dc2626; }
+.text-danger { color: #1373e5; }
 
 .badge {
   display: inline-block;
@@ -120,9 +120,9 @@
   text-transform: uppercase;
 }
 
-.badge-warning { background: #fffbeb; color: #d97706; }
+.badge-warning { background: #f3efff; color: #6b3fd6; }
 .badge-success { background: #ecfdf5; color: #059669; }
-.badge-danger { background: #fef2f2; color: #dc2626; }
+.badge-danger { background: #eff6ff; color: #1373e5; }
 .badge-secondary { background: #f1f5f9; color: #64748b; }
 .badge-info { background: #eff6ff; color: #2563eb; }
 
@@ -213,12 +213,12 @@
 .modal-header-icon {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #fff3ee, #ffe8d9);
+  background: linear-gradient(135deg, #f6f6f7, #ececec);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ff5500;
+  color: #1373e5;
   flex-shrink: 0;
 }
 
@@ -300,7 +300,7 @@
   letter-spacing: 0;
 }
 
-.required-asterisk { color: #dc2626; font-weight: 700; margin-left: 2px; }
+.required-asterisk { color: #1373e5; font-weight: 700; margin-left: 2px; }
 
 /* Select wrapper with custom arrow */
 .select-wrapper {
@@ -346,20 +346,20 @@
 .form-group select:focus,
 .select-wrapper select:focus {
   outline: none;
-  border-color: #ff5500;
-  box-shadow: 0 0 0 3px rgba(255, 85, 0, 0.1);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1);
   background: #ffffff;
 }
 
 .form-group.has-error input,
 .form-group.has-error select,
 .form-group.has-error .select-wrapper select {
-  border-color: #dc2626 !important;
-  background-color: #fef9f9 !important;
+  border-color: #1373e5 !important;
+  background-color: #fbfbfc !important;
 }
 
 .error-msg {
-  color: #dc2626;
+  color: #1373e5;
   font-size: 0.7rem;
   font-weight: 500;
   margin-top: 4px;
@@ -367,7 +367,7 @@
 }
 
 .hint-msg {
-  color: #f59e0b;
+  color: #6b3fd6;
   font-size: 0.7rem;
   font-weight: 500;
   margin-top: 4px;
@@ -439,8 +439,8 @@
 
 .li-input:focus {
   outline: none;
-  border-color: #ff5500;
-  box-shadow: 0 0 0 2px rgba(255, 85, 0, 0.08);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 2px rgba(19, 115, 229, 0.08);
 }
 
 .li-input-num { text-align: center; }
@@ -465,8 +465,8 @@
 
 .li-select:focus {
   outline: none;
-  border-color: #ff5500;
-  box-shadow: 0 0 0 2px rgba(255, 85, 0, 0.08);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 2px rgba(19, 115, 229, 0.08);
 }
 
 .price-input-wrap {
@@ -505,8 +505,8 @@
 }
 
 .btn-del-row:hover {
-  background: #fef2f2;
-  color: #dc2626;
+  background: #eff6ff;
+  color: #1373e5;
 }
 
 .btn-add-item {
@@ -569,7 +569,7 @@
 .summary-total-val {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #ff5500;
+  color: #1373e5;
 }
 
 /* Modal Footer */
@@ -625,11 +625,11 @@
   transition: border-color 0.2s, background 0.2s;
 }
 .att-dropzone:hover {
-  border-color: #ff5500;
-  background: #fff7f0;
+  border-color: #1373e5;
+  background: #f7f7f8;
 }
 .att-dropzone svg {
-  color: #ff5500;
+  color: #1373e5;
   flex-shrink: 0;
 }
 .att-dropzone em {
@@ -670,10 +670,10 @@
   color: #475569;
   background: #f1f5f9;
 }
-.att-file-badge.file-pdf { background: #fee2e2; color: #b91c1c; }
+.att-file-badge.file-pdf { background: #dbeafe; color: #0f4f9c; }
 .att-file-badge.file-doc { background: #dbeafe; color: #1d4ed8; }
 .att-file-badge.file-sheet { background: #dcfce7; color: #15803d; }
-.att-file-badge.file-slide { background: #fef3c7; color: #b45309; }
+.att-file-badge.file-slide { background: #f3efff; color: #4f2aa7; }
 .att-file-badge.file-archive { background: #ede9fe; color: #6d28d9; }
 .att-meta {
   display: flex;
@@ -692,7 +692,7 @@
 .att-remove {
   border: none;
   background: transparent;
-  color: #b91c1c;
+  color: #0f4f9c;
   cursor: pointer;
   padding: 2px;
   display: inline-flex;
@@ -700,7 +700,7 @@
   flex-shrink: 0;
 }
 .att-remove:hover {
-  background: #fee2e2;
+  background: #dbeafe;
 }
 .att-uploading {
   width: 150px;
@@ -720,7 +720,7 @@
   width: 20px;
   height: 20px;
   border: 2.5px solid #e2e8f0;
-  border-top-color: #ff5500;
+  border-top-color: #1373e5;
   border-radius: 50%;
   animation: att-spin 0.7s linear infinite;
 }
@@ -751,13 +751,13 @@
 }
 
 .btn-quote-move.is-reject {
-  color: #dc2626;
-  border-color: #fecaca;
+  color: #1373e5;
+  border-color: #dbeafe;
 }
 
 .btn-quote-move.is-reject:hover:not(:disabled) {
-  background: #fef2f2;
-  border-color: #fca5a5;
+  background: #eff6ff;
+  border-color: #dbeafe;
 }
 
 .btn-quote-move:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -556,7 +556,7 @@ export class SecurityComponent implements OnInit {
   getAvatarBg(name: string): string {
     const colors = [
       '#4F46E5', '#2563EB', '#0D9488', '#059669',
-      '#D97706', '#E11D48', '#7C3AED', '#DB2777'
+      '#6b3fd6', '#7e7f80', '#7C3AED', '#6b3fd6'
     ];
     let hash = 0;
     for (let i = 0; i < (name || '').length; i++) {

@@ -135,10 +135,10 @@ const styles = StyleSheet.create({
     minWidth: '85%',
   },
   nodeCardYou: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#FED7AA',
+    backgroundColor: '#eff6ff',
+    borderColor: '#dbeafe',
     borderWidth: 1.5,
-    shadowColor: '#EA580C',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   avatarYou: {
-    backgroundColor: '#EA580C',
+    backgroundColor: '#1373e5',
   },
   avatar: {
     width: 36,
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   placeholderYou: {
-    backgroundColor: '#EA580C',
+    backgroundColor: '#1373e5',
   },
   initials: {
     fontSize: 13,
@@ -190,11 +190,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   nodeNameYou: {
-    color: '#9A3412',
+    color: '#555657',
     fontWeight: '800',
   },
   youBadge: {
-    backgroundColor: '#EA580C',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,

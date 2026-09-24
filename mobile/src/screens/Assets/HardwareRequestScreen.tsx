@@ -27,10 +27,10 @@ const CATEGORIES = ['Laptop', 'Desktop', 'Monitor', 'Keyboard/Mouse', 'Phone', '
 const URGENCY_LEVELS = ['Low', 'Medium', 'High', 'Critical'];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  PENDING:   { bg: '#FEF9C3', text: '#854D0E' },
+  PENDING:   { bg: '#f3efff', text: '#49494a' },
   APPROVED:  { bg: '#DCFCE7', text: '#166534' },
   FULFILLED: { bg: '#DBEAFE', text: '#1E40AF' },
-  REJECTED:  { bg: '#FEE2E2', text: '#991B1B' },
+  REJECTED:  { bg: '#dbeafe', text: '#595a5b' },
   CANCELLED: { bg: '#F1F5F9', text: '#64748B' },
 };
 
@@ -241,7 +241,7 @@ export default function HardwareRequestScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#E25E3E" />
+          <ActivityIndicator size="large" color="#1373e5" />
         </View>
       ) : (
         <FlatList
@@ -251,7 +251,7 @@ export default function HardwareRequestScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1373e5']} tintColor="#1373e5" />
           }
           ListEmptyComponent={
             <View style={styles.emptyBox}>
@@ -342,8 +342,8 @@ export default function HardwareRequestScreen() {
                   disabled={uploadingImage}
                 >
                   {uploadingImage
-                    ? <ActivityIndicator size="small" color="#E25E3E" />
-                    : <><ImageIcon size={16} color="#E25E3E" /><Text style={styles.addImageText}>Add</Text></>
+                    ? <ActivityIndicator size="small" color="#1373e5" />
+                    : <><ImageIcon size={16} color="#1373e5" /><Text style={styles.addImageText}>Add</Text></>
                   }
                 </TouchableOpacity>
               </View>
@@ -436,18 +436,18 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: '800' },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   urgencyBadge: {
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#eff6ff',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: '#FED7AA',
+    borderColor: '#dbeafe',
   },
-  urgencyText: { fontSize: 11, fontWeight: '700', color: '#C2410C' },
+  urgencyText: { fontSize: 11, fontWeight: '700', color: '#0f4f9c' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateText: { fontSize: 12, color: '#94A3B8' },
   reason: { fontSize: 13, color: '#475569', lineHeight: 20 },
-  rejection: { fontSize: 12, color: '#DC2626', marginTop: 6, fontStyle: 'italic' },
+  rejection: { fontSize: 12, color: '#1373e5', marginTop: 6, fontStyle: 'italic' },
   imageRow: { marginTop: 10 },
   thumbWrap: { marginRight: 8, borderRadius: 10, overflow: 'hidden', width: 80, height: 60 },
   thumb: { width: 80, height: 60 },
@@ -481,11 +481,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 10,
-    backgroundColor: '#FFF1F2',
+    backgroundColor: '#f8f8f8',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#dbeafe',
   },
-  cancelBtnText: { color: '#DC2626', fontSize: 13, fontWeight: '600' },
+  cancelBtnText: { color: '#1373e5', fontSize: 13, fontWeight: '600' },
 
   fab: {
     position: 'absolute',
@@ -494,10 +494,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -539,9 +539,9 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     marginRight: 8,
   },
-  chipActive: { backgroundColor: '#FFF1EC', borderColor: '#E25E3E' },
+  chipActive: { backgroundColor: '#eff6ff', borderColor: '#1373e5' },
   chipText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
-  chipTextActive: { color: '#E25E3E', fontWeight: '700' },
+  chipTextActive: { color: '#1373e5', fontWeight: '700' },
 
   urgencyRow: { flexDirection: 'row', gap: 8 },
   urgencyOpt: {
@@ -553,9 +553,9 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     alignItems: 'center',
   },
-  urgencyOptActive: { backgroundColor: '#FFF1EC', borderColor: '#E25E3E' },
+  urgencyOptActive: { backgroundColor: '#eff6ff', borderColor: '#1373e5' },
   urgencyOptText: { fontSize: 12, color: '#64748B', fontWeight: '600' },
-  urgencyOptTextActive: { color: '#E25E3E', fontWeight: '700' },
+  urgencyOptTextActive: { color: '#1373e5', fontWeight: '700' },
 
   textarea: {
     borderWidth: 1,
@@ -570,8 +570,8 @@ const styles = StyleSheet.create({
   },
 
   imageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 8 },
-  addImageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: '#E25E3E', backgroundColor: '#FFF1EC' },
-  addImageText: { fontSize: 13, color: '#E25E3E', fontWeight: '600' },
+  addImageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: '#1373e5', backgroundColor: '#eff6ff' },
+  addImageText: { fontSize: 13, color: '#1373e5', fontWeight: '600' },
   removeImg: {
     position: 'absolute',
     top: 4,
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
 
   submitBtn: {
     marginTop: 24,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',

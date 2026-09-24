@@ -43,16 +43,16 @@ function getHeaderIcon(title: string): React.ComponentType<any> {
 
 function getHeaderIconTheme(title: string): { bg: string; color: string } {
   const t = title.toLowerCase();
-  if (t.includes('attendance') || t.includes('time') || t.includes('leave')) return { bg: '#FFF1EC', color: '#E25E3E' };
-  if (t.includes('project') || t.includes('board')) return { bg: '#FEF3C7', color: '#D97706' };
+  if (t.includes('attendance') || t.includes('time') || t.includes('leave')) return { bg: '#eff6ff', color: '#1373e5' };
+  if (t.includes('project') || t.includes('board')) return { bg: '#f3efff', color: '#6b3fd6' };
   if (t.includes('ticket') || t.includes('helpdesk')) return { bg: '#FAF5FF', color: '#9333EA' };
-  if (t.includes('hardware') || t.includes('asset')) return { bg: '#FEF2F2', color: '#DC2626' };
+  if (t.includes('hardware') || t.includes('asset')) return { bg: '#eff6ff', color: '#1373e5' };
   if (t.includes('lead') || t.includes('crm')) return { bg: '#F0F9FF', color: '#0284C7' };
   if (t.includes('payslip') || t.includes('payroll')) return { bg: '#F0FDF4', color: '#16A34A' };
   if (t.includes('visit')) return { bg: '#F0F9FF', color: '#0284C7' };
   if (t.includes('profile')) return { bg: '#EEF2FF', color: '#4F46E5' };
   if (t.includes('notification')) return { bg: '#EFF6FF', color: '#2563EB' };
-  return { bg: '#FFF1EC', color: '#E25E3E' };
+  return { bg: '#eff6ff', color: '#1373e5' };
 }
 
 /**
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderWidth: 2,
     borderColor: '#BAE6FD',
     alignItems: 'center',

@@ -1035,7 +1035,7 @@ export class PayrollComponent implements OnInit {
       flex: 0.8,
       valueFormatter: (params) => params.data?.isSummaryRow ? '' : params.value,
       cellStyle: (params) => {
-        if (!params.data?.isSummaryRow && params.value > 0) return { color: '#DC2626', fontWeight: 'bold' };
+        if (!params.data?.isSummaryRow && params.value > 0) return { color: '#1373e5', fontWeight: 'bold' };
         return null;
       }
     },
@@ -1052,7 +1052,7 @@ export class PayrollComponent implements OnInit {
       minWidth: 140,
       flex: 1.1,
       cellStyle: (params) => {
-        if (!params.data?.isSummaryRow && params.value > 0) return { color: '#D97706', fontWeight: 'bold' };
+        if (!params.data?.isSummaryRow && params.value > 0) return { color: '#6b3fd6', fontWeight: 'bold' };
         return null;
       },
       valueFormatter: (params: ValueFormatterParams) => `₹${(params.value || 0).toLocaleString('en-IN')}`
@@ -1244,7 +1244,7 @@ export class PayrollComponent implements OnInit {
         if (s === 'REJECTED') statusClass = 'status-rejected';
         if (s === 'PAID') statusClass = 'status-paid';
         const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason
-          ? `<div style="font-size: 10px; color: #DC2626; font-weight: 500; line-height: 1.2; margin-top: 3px;">Reason: ${params.data.rejectionReason}</div>`
+          ? `<div style="font-size: 10px; color: #1373e5; font-weight: 500; line-height: 1.2; margin-top: 3px;">Reason: ${params.data.rejectionReason}</div>`
           : '';
         return `
           <div class="cell-stacked">

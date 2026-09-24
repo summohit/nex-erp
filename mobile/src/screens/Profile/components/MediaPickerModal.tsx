@@ -121,8 +121,8 @@ const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
           <View style={styles.optionsContainer}>
             <TouchableOpacity activeOpacity={0.8} style={styles.optionCard} onPress={handleTakeAction}>
-              <View style={[styles.iconContainer, { backgroundColor: '#FFF7ED' }]}>
-                <Camera size={22} color="#EA580C" strokeWidth={2.5} />
+              <View style={[styles.iconContainer, { backgroundColor: '#eff6ff' }]}>
+                <Camera size={22} color="#1373e5" strokeWidth={2.5} />
               </View>
               <View style={styles.optionTextWrap}>
                 <Text style={styles.optionTitle}>Take Photo</Text>

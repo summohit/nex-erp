@@ -38,8 +38,8 @@ const PERMS = [
   },
   {
     id: 'camera',
-    color: '#E25E3E',
-    lightColor: '#FFEDE8',
+    color: '#1373e5',
+    lightColor: '#f3f3f4',
     ringColor: 'rgba(226,94,62,0.10)',
     Icon: Camera,
     title: 'Camera',
@@ -61,8 +61,8 @@ const PERMS = [
 
   {
     id: 'notifications',
-    color: '#D97706',
-    lightColor: '#FEF3C7',
+    color: '#6b3fd6',
+    lightColor: '#f3efff',
     ringColor: 'rgba(217,119,6,0.10)',
     Icon: Bell,
     title: 'Notifications',

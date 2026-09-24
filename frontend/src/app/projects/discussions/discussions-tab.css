@@ -1782,9 +1782,9 @@
 }
 
 .role-badge-owner {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
 
 .role-badge-pm {
@@ -1794,9 +1794,9 @@
 }
 
 .role-badge-admin {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: #dbeafe;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
 }
 
 .role-badge-member {

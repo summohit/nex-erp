@@ -13,8 +13,8 @@ import { useProjectStore } from '../../../store/projectStore';
 import IssueDetailModal from '../modals/IssueDetailModal';
 
 const PRIORITY_COLORS: Record<string, string> = {
-  CRITICAL: '#EF4444',
-  HIGH: '#F97316',
+  CRITICAL: '#1373e5',
+  HIGH: '#1373e5',
   MEDIUM: '#3B82F6',
   LOW: '#94A3B8',
 };
@@ -24,7 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
   IN_PROGRESS: '#3B82F6',
   IN_REVIEW: '#A855F7',
   DONE: '#10B981',
-  CANCELLED: '#EF4444',
+  CANCELLED: '#1373e5',
 };
 
 function toYMD(date: Date) {
@@ -60,7 +60,7 @@ export default function CalendarTab() {
         byDate[dateStr].push(issue);
 
         const isOverdue = new Date(issue.dueDate) < new Date() && issue.status !== 'DONE';
-        const dotColor = isOverdue ? '#EF4444' : PRIORITY_COLORS[issue.priority] || '#3B82F6';
+        const dotColor = isOverdue ? '#1373e5' : PRIORITY_COLORS[issue.priority] || '#3B82F6';
 
         if (!marks[dateStr]) {
           marks[dateStr] = { dots: [] };
@@ -75,10 +75,10 @@ export default function CalendarTab() {
       marks[selectedDay] = {
         ...marks[selectedDay],
         selected: true,
-        selectedColor: '#E25E3E',
+        selectedColor: '#1373e5',
       };
     } else {
-      marks[selectedDay] = { selected: true, selectedColor: '#E25E3E' };
+      marks[selectedDay] = { selected: true, selectedColor: '#1373e5' };
     }
 
     return { markedDates: marks, issuesByDate: byDate };
@@ -110,7 +110,7 @@ export default function CalendarTab() {
             <Text style={styles.issueKey}>{item.key}</Text>
             {isOverdue && (
               <View style={styles.overdueBadge}>
-                <AlertCircle size={11} color="#EF4444" />
+                <AlertCircle size={11} color="#1373e5" />
                 <Text style={styles.overdueText}>Overdue</Text>
               </View>
             )}
@@ -155,8 +155,8 @@ export default function CalendarTab() {
         </View>
         {overdueTotal > 0 && (
           <View style={styles.summaryItem}>
-            <AlertCircle size={13} color="#EF4444" />
-            <Text style={[styles.summaryText, { color: '#EF4444' }]}>{overdueTotal} overdue</Text>
+            <AlertCircle size={13} color="#1373e5" />
+            <Text style={[styles.summaryText, { color: '#1373e5' }]}>{overdueTotal} overdue</Text>
           </View>
         )}
       </View>
@@ -167,10 +167,10 @@ export default function CalendarTab() {
         onDayPress={handleDayPress}
         theme={{
           calendarBackground: '#FFFFFF',
-          selectedDayBackgroundColor: '#E25E3E',
+          selectedDayBackgroundColor: '#1373e5',
           selectedDayTextColor: '#FFFFFF',
-          todayTextColor: '#E25E3E',
-          arrowColor: '#E25E3E',
+          todayTextColor: '#1373e5',
+          arrowColor: '#1373e5',
           monthTextColor: '#0F172A',
           textMonthFontWeight: '700',
           textDayFontSize: 13,
@@ -178,7 +178,7 @@ export default function CalendarTab() {
           textDayHeaderFontSize: 12,
           dayTextColor: '#0F172A',
           textSectionTitleColor: '#94A3B8',
-          dotColor: '#E25E3E',
+          dotColor: '#1373e5',
           selectedDotColor: '#FFFFFF',
         }}
         style={styles.calendar}
@@ -196,7 +196,7 @@ export default function CalendarTab() {
           renderItem={renderIssue}
           contentContainerStyle={issuesForDay.length === 0 ? styles.emptyDayContent : styles.issueList}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
           ListEmptyComponent={
             <View style={styles.emptyDay}>
               <CheckCircle size={28} color="#CBD5E1" />
@@ -273,12 +273,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  overdueText: { fontSize: 10, fontWeight: '700', color: '#EF4444' },
+  overdueText: { fontSize: 10, fontWeight: '700', color: '#1373e5' },
   issueTitle: { fontSize: 14, fontWeight: '600', color: '#0F172A', lineHeight: 20, marginBottom: 8 },
   issueFooter: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   statusChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },

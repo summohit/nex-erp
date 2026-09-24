@@ -15,9 +15,9 @@ const statusColor = (status: string) => {
     return { bg: '#ECFDF5', border: '#A7F3D0', text: '#065F46', dot: '#10B981', label: 'COMPLETED' };
   }
   if (status === 'CANCELLED') {
-    return { bg: '#FEF2F2', border: '#FECACA', text: '#991B1B', dot: '#EF4444', label: 'CANCELLED' };
+    return { bg: '#eff6ff', border: '#dbeafe', text: '#595a5b', dot: '#1373e5', label: 'CANCELLED' };
   }
-  return { bg: '#FFF7ED', border: '#FFEDD5', text: '#C2410C', dot: '#F97316', label: 'IN PROGRESS' };
+  return { bg: '#eff6ff', border: '#dbeafe', text: '#0f4f9c', dot: '#1373e5', label: 'IN PROGRESS' };
 };
 
 export default function FieldVisitsTab({ projectId }: Props) {
@@ -31,7 +31,7 @@ export default function FieldVisitsTab({ projectId }: Props) {
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#E25E3E" />
+        <ActivityIndicator size="large" color="#1373e5" />
       </View>
     );
   }
@@ -40,7 +40,7 @@ export default function FieldVisitsTab({ projectId }: Props) {
     return (
       <View style={styles.emptyBox}>
         <View style={styles.emptyIconCircle}>
-          <MapPin size={32} color="#E25E3E" />
+          <MapPin size={32} color="#1373e5" />
         </View>
         <Text style={styles.emptyTitle}>No field visits yet</Text>
         <Text style={styles.emptySub}>Team members' site visits for this project will appear here.</Text>
@@ -64,7 +64,7 @@ export default function FieldVisitsTab({ projectId }: Props) {
                 <Image source={{ uri: v.employee.avatarUrl }} style={styles.avatar} />
               ) : (
                 <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <User size={18} color="#E25E3E" />
+                  <User size={18} color="#1373e5" />
                 </View>
               )}
               <View style={styles.employeeInfo}>
@@ -97,9 +97,9 @@ export default function FieldVisitsTab({ projectId }: Props) {
                 </View>
               )}
               {v.durationMins != null && (
-                <View style={[styles.metricChip, { backgroundColor: '#FFF1EC' }]}>
-                  <Clock size={13} color="#E25E3E" />
-                  <Text style={[styles.metricText, { color: '#E25E3E' }]}>{formatDuration(v.durationMins)}</Text>
+                <View style={[styles.metricChip, { backgroundColor: '#eff6ff' }]}>
+                  <Clock size={13} color="#1373e5" />
+                  <Text style={[styles.metricText, { color: '#1373e5' }]}>{formatDuration(v.durationMins)}</Text>
                 </View>
               )}
               {v.photos && v.photos.length > 0 && (
@@ -120,7 +120,7 @@ export default function FieldVisitsTab({ projectId }: Props) {
               </View>
               {v.endLat && (
                 <View style={styles.routePoint}>
-                  <View style={[styles.routeDot, { backgroundColor: '#E25E3E' }]} />
+                  <View style={[styles.routeDot, { backgroundColor: '#1373e5' }]} />
                   <Text style={styles.routeText} numberOfLines={1}>
                     End: {v.endAddress || (v.endLat.toFixed(4) + ', ' + (v.endLng ?? 0).toFixed(4))}
                   </Text>
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 14, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60, gap: 10 },
-  emptyIconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF1EC', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyIconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
   emptyTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
   emptySub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
 
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
 
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 42, height: 42, borderRadius: 21 },
-  avatarPlaceholder: { backgroundColor: '#FFF1EC', justifyContent: 'center', alignItems: 'center' },
+  avatarPlaceholder: { backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' },
   employeeInfo: { flex: 1 },
   employeeName: { fontSize: 14.5, fontWeight: '800', color: '#0F172A' },
   visitDate: { fontSize: 11.5, color: '#64748B', marginTop: 1, fontWeight: '500' },
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 11,
     borderLeftWidth: 3,
-    borderLeftColor: '#E25E3E',
+    borderLeftColor: '#1373e5',
   },
   notesLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', marginBottom: 3, letterSpacing: 0.5 },
   notesText: { fontSize: 12.5, color: '#334155', lineHeight: 18 },

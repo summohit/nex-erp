@@ -608,9 +608,9 @@
 }
 
 .btn-card-action.danger:hover {
-  background: #fef2f2;
-  color: #ef4444;
-  border-color: #fecaca;
+  background: #eff6ff;
+  color: #1373e5;
+  border-color: #dbeafe;
 }
 
 /* ==========================================================================
@@ -1052,7 +1052,7 @@
 }
 
 ::ng-deep .letter-action-menu .menu-item-icon.text-danger {
-  color: #ef4444 !important;
+  color: #1373e5 !important;
 }
 
 ::ng-deep .letter-action-menu .menu-item-divider {
@@ -1063,13 +1063,13 @@
 
 ::ng-deep .letter-action-menu .mat-mdc-menu-item.danger,
 ::ng-deep .letter-action-menu .menu-action-item.danger {
-  color: #ef4444 !important;
+  color: #1373e5 !important;
 }
 
 ::ng-deep .letter-action-menu .mat-mdc-menu-item.danger:hover,
 ::ng-deep .letter-action-menu .menu-action-item.danger:hover {
-  background: #fef2f2 !important;
-  color: #dc2626 !important;
+  background: #eff6ff !important;
+  color: #1373e5 !important;
 }
 
 .table-empty-row {
@@ -1248,8 +1248,8 @@
 }
 
 .modal-icon-badge.edit {
-  background: #fef3c7;
-  color: #d97706;
+  background: #f3efff;
+  color: #6b3fd6;
 }
 
 .modal-header h2 {
@@ -1636,7 +1636,7 @@
 }
 
 .required-star {
-  color: #ef4444;
+  color: #1373e5;
   font-weight: 700;
 }
 
@@ -2337,9 +2337,9 @@
 }
 
 .sig-badge.awaiting {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
 
 .template-pill-badge.recruitment {
@@ -2400,9 +2400,9 @@
 }
 
 .signature-box.awaiting {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #92400e;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
+  color: #504f51;
 }
 
 .signature-box .sig-head {

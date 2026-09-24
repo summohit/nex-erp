@@ -206,7 +206,7 @@
 .bg-indigo-soft { background: #e0e7ff; color: #4338ca; }
 .bg-blue-soft { background: #dbeafe; color: #1d4ed8; }
 .bg-emerald-soft { background: #dcfce7; color: #15803d; }
-.bg-amber-soft { background: #fef3c7; color: #b45309; }
+.bg-amber-soft { background: #f3efff; color: #4f2aa7; }
 
 .kpi-data {
   flex: 1;
@@ -239,7 +239,7 @@
 .text-indigo { color: #4338ca; }
 .text-blue { color: #1d4ed8; }
 .text-emerald { color: #15803d; }
-.text-amber { color: #b45309; }
+.text-amber { color: #4f2aa7; }
 
 .kpi-sub {
   font-size: 12px;
@@ -380,9 +380,9 @@
 }
 
 .btn-reset-filters:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #b91c1c;
+  background: #dbeafe;
+  border-color: #dbeafe;
+  color: #0f4f9c;
 }
 
 .filters-bottom-row {
@@ -586,12 +586,12 @@
 
 .pill-new { background: #e0f2fe; color: #0284c7; }
 .pill-reviewing { background: #f3e8ff; color: #7e22ce; }
-.pill-shortlisted { background: #ffedd5; color: #c2410c; }
-.pill-interviewing { background: #fef3c7; color: #b45309; }
+.pill-shortlisted { background: #dbeafe; color: #0f4f9c; }
+.pill-interviewing { background: #f3efff; color: #4f2aa7; }
 .pill-offered { background: #ccfbf1; color: #0f766e; }
 .pill-hired { background: #dcfce7; color: #15803d; }
 .pill-onboarded { background: #dcfce7; color: #166534; }
-.pill-rejected { background: #ffe4e6; color: #be123c; }
+.pill-rejected { background: #f1f1f2; color: #676869; }
 
 /* MICRO FUNNEL DISTRIBUTION BAR */
 .cell-distribution {
@@ -613,12 +613,12 @@
 
 .seg-new { background: #38bdf8; }
 .seg-reviewing { background: #a855f7; }
-.seg-shortlisted { background: #fb923c; }
-.seg-interviewing { background: #fbbf24; }
+.seg-shortlisted { background: #0f4f9c; }
+.seg-interviewing { background: #8f8f90; }
 .seg-offered { background: #2dd4bf; }
 .seg-hired { background: #22c55e; }
 .seg-onboarded { background: #16a34a; }
-.seg-rejected { background: #f43f5e; }
+.seg-rejected { background: #6b3fd6; }
 
 /* ACTION BUTTONS */
 .action-btn-pair {

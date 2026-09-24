@@ -59,8 +59,8 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
   const PRIORITIES = [
     { id: 'LOW', label: 'Low', color: '#64748B', bg: '#F8FAFC', borderColor: '#CBD5E1', icon: ArrowDown },
     { id: 'MEDIUM', label: 'Medium', color: '#2563EB', bg: '#EFF6FF', borderColor: '#93C5FD', icon: Minus },
-    { id: 'HIGH', label: 'High', color: '#D97706', bg: '#FFFBEB', borderColor: '#FCD34D', icon: ArrowUp },
-    { id: 'CRITICAL', label: 'Critical', color: '#DC2626', bg: '#FEF2F2', borderColor: '#FCA5A5', icon: Flame }
+    { id: 'HIGH', label: 'High', color: '#6b3fd6', bg: '#f3efff', borderColor: '#a4a4a5', icon: ArrowUp },
+    { id: 'CRITICAL', label: 'Critical', color: '#1373e5', bg: '#eff6ff', borderColor: '#dbeafe', icon: Flame }
   ];
 
   const targetColumn = currentBoard?.columns?.find((c: any) => c.id === initialColumnId);
@@ -91,7 +91,7 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
           {error && (
             <View style={styles.errorBannerWrapper}>
               <View style={styles.errorBanner}>
-                <AlertCircle size={16} color="#EF4444" />
+                <AlertCircle size={16} color="#1373e5" />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             </View>
@@ -232,15 +232,15 @@ const styles = StyleSheet.create({
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#dbeafe',
   },
   errorText: {
-    color: '#EF4444',
+    color: '#1373e5',
     fontSize: 14,
     fontWeight: '500',
     marginLeft: 8,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   required: {
-    color: '#EF4444',
+    color: '#1373e5',
   },
   input: {
     backgroundColor: '#F8FAFC',
@@ -346,11 +346,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     alignItems: 'center',
   },
   submitBtnDisabled: {
-    backgroundColor: '#FCA5A5',
+    backgroundColor: '#dbeafe',
     opacity: 0.7,
   },
   submitBtnText: {

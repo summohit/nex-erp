@@ -118,7 +118,7 @@
 }
 
 .btn-primary:hover {
-  background: #E0480F;
+  background: #0f5fbe;
 }
 
 .btn-outline {
@@ -276,18 +276,18 @@
 }
 
 .text-danger {
-  color: #EF4444;
+  color: #1373e5;
 }
 
 .form-control.is-invalid {
-  border-color: #EF4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1);
 }
 
 .form-control.is-invalid:focus {
-  border-color: #EF4444;
+  border-color: #1373e5;
   outline: none;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.15);
 }
 
 .form-control {
@@ -321,7 +321,7 @@ select.form-control {
 .form-control:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.15);
 }
 
 .form-control::placeholder {
@@ -350,7 +350,7 @@ select.form-control {
 
 .logo-dropzone:hover, .logo-dropzone.dragging {
   border-color: var(--color-primary);
-  background: #FFF5F2;
+  background: #f8f8f9;
 }
 
 .dropzone-empty {
@@ -372,7 +372,7 @@ select.form-control {
 }
 
 .logo-dropzone:hover .upload-icon-circle {
-  background: #FFEBE5;
+  background: #f2f2f2;
   color: var(--color-primary);
 }
 
@@ -430,9 +430,9 @@ select.form-control {
 }
 
 .btn-remove-logo {
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
-  color: #DC2626;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1373e5;
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 12px;
@@ -441,7 +441,7 @@ select.form-control {
 }
 
 .btn-remove-logo:hover {
-  background: #FEE2E2;
+  background: #dbeafe;
 }
 
 /* Custom Modern Toggle Switch */

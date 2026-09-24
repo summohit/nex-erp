@@ -34,7 +34,7 @@ function getFileIcon(url: string) {
   const ext = url?.split('?')[0].toLowerCase().slice(-5) || '';
   if (IMAGE_EXTS.some(e => ext.includes(e))) return { Icon: ImageIcon, color: '#10B981' };
   if (VIDEO_EXTS.some(e => ext.includes(e))) return { Icon: Film, color: '#8B5CF6' };
-  if (ZIP_EXTS.some(e => ext.includes(e))) return { Icon: FileArchive, color: '#F97316' };
+  if (ZIP_EXTS.some(e => ext.includes(e))) return { Icon: FileArchive, color: '#1373e5' };
   return { Icon: FileText, color: '#3B82F6' };
 }
 
@@ -193,7 +193,7 @@ export default function AttachmentsTab() {
               style={styles.actionBtn}
               onPress={() => handleDelete(att)}
             >
-              <Trash2 size={16} color="#EF4444" />
+              <Trash2 size={16} color="#1373e5" />
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -205,12 +205,12 @@ export default function AttachmentsTab() {
     return (
       <ScrollView
         contentContainerStyle={styles.emptyContainer}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
       >
         <Paperclip size={44} color="#CBD5E1" />
         <Text style={styles.emptyTitle}>No attachments yet</Text>
         <Text style={styles.emptySubtitle}>Upload files to the project or inside any issue to see them here.</Text>
-        <TouchableOpacity style={{ marginTop: 20, padding: 12, backgroundColor: '#E25E3E', borderRadius: 8 }} onPress={handleUpload} disabled={isUploading}>
+        <TouchableOpacity style={{ marginTop: 20, padding: 12, backgroundColor: '#1373e5', borderRadius: 8 }} onPress={handleUpload} disabled={isUploading}>
           {isUploading ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Upload File</Text>}
         </TouchableOpacity>
       </ScrollView>
@@ -229,7 +229,7 @@ export default function AttachmentsTab() {
         renderItem={renderItem}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
       />
           <TouchableOpacity 
         style={styles.fab} 
@@ -275,8 +275,8 @@ const styles = StyleSheet.create({
   issueRef: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#E25E3E',
-    backgroundColor: '#FFF1EC',
+    color: '#1373e5',
+    backgroundColor: '#eff6ff',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -307,13 +307,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     bottom: 20,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     width: 56,
     height: 56,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,

@@ -17,8 +17,8 @@ import IssueDetailModal from '../modals/IssueDetailModal';
 import { useProjectPermissions } from '../../../hooks/useProjectPermissions';
 
 const PRIORITY_COLORS: Record<string, string> = {
-  CRITICAL: '#EF4444',
-  HIGH: '#F97316',
+  CRITICAL: '#1373e5',
+  HIGH: '#1373e5',
   MEDIUM: '#3B82F6',
   LOW: '#94A3B8',
 };
@@ -27,8 +27,8 @@ const TYPE_COLORS: Record<string, string> = {
   EPIC: '#8B5CF6',
   STORY: '#10B981',
   TASK: '#3B82F6',
-  BUG: '#EF4444',
-  SUBTASK: '#F97316',
+  BUG: '#1373e5',
+  SUBTASK: '#1373e5',
 };
 
 export default function ArchivedTab() {
@@ -153,7 +153,7 @@ export default function ArchivedTab() {
     return (
       <ScrollView
         contentContainerStyle={styles.emptyContainer}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
       >
         <Archive size={44} color="#CBD5E1" />
         <Text style={styles.emptyTitle}>No archived issues</Text>
@@ -176,7 +176,7 @@ export default function ArchivedTab() {
         renderItem={renderItem}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
       />
 
       {selectedIssue && (

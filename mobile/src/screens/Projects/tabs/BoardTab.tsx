@@ -11,7 +11,7 @@ const COLUMN_WIDTH = width * 0.85;
 const MAX_CARD_AVATARS = 3;
 
 // Matches web's getMemberColor() palette exactly (project-detail.ts)
-const MEMBER_COLORS = ['#0c66e4', '#1f845a', '#c25100', '#c9372c', '#6e5dc6', '#943d73', '#206a83', '#505f79'];
+const MEMBER_COLORS = ['#0c66e4', '#1f845a', '#616062', '#7a7a7b', '#6e5dc6', '#943d73', '#206a83', '#505f79'];
 const getMemberColor = (employeeId: number) => MEMBER_COLORS[employeeId % MEMBER_COLORS.length];
 const getMemberInitials = (emp: any) => {
   const fn = (emp?.firstName || '').charAt(0).toUpperCase();
@@ -163,9 +163,9 @@ export default function BoardTab() {
       case 'LOW':
         return { icon: ArrowDown, color: '#64748B', bg: '#F1F5F9' };
       case 'HIGH':
-        return { icon: ArrowUp, color: '#D97706', bg: '#FFFBEB' };
+        return { icon: ArrowUp, color: '#6b3fd6', bg: '#f3efff' };
       case 'CRITICAL':
-        return { icon: Flame, color: '#DC2626', bg: '#FEF2F2' };
+        return { icon: Flame, color: '#1373e5', bg: '#eff6ff' };
       case 'MEDIUM':
       default:
         return { icon: Minus, color: '#2563EB', bg: '#EFF6FF' };
@@ -251,8 +251,8 @@ export default function BoardTab() {
               {timeSummary && (
                 <View style={[styles.timeBadge, timeSummary.isRunning && styles.timeBadgeRunning, timeSummary.isOver && styles.timeBadgeOver]}>
                   {timeSummary.isRunning && <View style={styles.pulseDot} />}
-                  <Clock size={11} color={timeSummary.isRunning ? '#16A34A' : timeSummary.isOver ? '#DC2626' : '#64748B'} />
-                  <Text style={[styles.timeBadgeText, timeSummary.isRunning && { color: '#16A34A' }, timeSummary.isOver && { color: '#DC2626' }]}>
+                  <Clock size={11} color={timeSummary.isRunning ? '#16A34A' : timeSummary.isOver ? '#1373e5' : '#64748B'} />
+                  <Text style={[styles.timeBadgeText, timeSummary.isRunning && { color: '#16A34A' }, timeSummary.isOver && { color: '#1373e5' }]}>
                     {timeSummary.display}
                   </Text>
                 </View>
@@ -364,8 +364,8 @@ export default function BoardTab() {
                       <RefreshControl
                         refreshing={isRefreshing}
                         onRefresh={handleRefresh}
-                        colors={['#E25E3E']}
-                        tintColor="#E25E3E"
+                        colors={['#1373e5']}
+                        tintColor="#1373e5"
                       />
                     }
                   />
@@ -552,9 +552,9 @@ const styles = StyleSheet.create({
   },
   rejectedPill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#dbeafe',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#dbeafe',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   rejectedPillText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#DC2626',
+    color: '#1373e5',
     letterSpacing: 0.3,
   },
   cardMetaRow: {
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECFDF5',
   },
   timeBadgeOver: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
   },
   timeBadgeText: {
     fontSize: 10,
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,

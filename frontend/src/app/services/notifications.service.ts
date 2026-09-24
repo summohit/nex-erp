@@ -99,7 +99,7 @@ export class NotificationsService {
         duration: 5000,
         position: 'top-right',
         style: {
-          border: '1px solid #FF5200',
+          border: '1px solid #1373e5',
           padding: '12px',
           color: '#0F172A',
           background: '#FFFFFF',

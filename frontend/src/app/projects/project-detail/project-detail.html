@@ -334,9 +334,9 @@
       <div class="star-btn-container">
         <button class="top-bar-icon-btn" [class.starred]="isProjectStarred" (click)="toggleStar()">
           <svg lucideStar size="16" 
-               [style.fill]="isProjectStarred ? '#ffc619' : 'none'" 
-               [style.stroke]="isProjectStarred ? '#ffc619' : 'currentColor'" 
-               [style.outline]="isProjectStarred ? '#ffc619' : 'none'">
+               [style.fill]="isProjectStarred ? '#6b3fd6' : 'none'"
+               [style.stroke]="isProjectStarred ? '#6b3fd6' : 'currentColor'"
+               [style.outline]="isProjectStarred ? '#6b3fd6' : 'none'">
           </svg>
         </button>
         <div class="star-tooltip">
@@ -912,7 +912,7 @@
            <div style="display: flex; flex-direction: column; gap: 4px;">
              <label *ngFor="let p of ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']" style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 6px 8px; border-radius: 6px;" class="hover:bg-gray-50 transition-colors">
                <input type="checkbox" [checked]="listFilterPriorities().includes(p)" (change)="toggleListFilterPriority(p)"> 
-               <div [style.background-color]="p === 'CRITICAL' ? '#dc2626' : p === 'HIGH' ? '#ea580c' : p === 'MEDIUM' ? '#ca8a04' : '#16a34a'" style="width: 8px; height: 8px; border-radius: 50%;"></div>
+               <div [style.background-color]="p === 'CRITICAL' ? '#1373e5' : p === 'HIGH' ? '#1373e5' : p === 'MEDIUM' ? '#4f2aa7' : '#16a34a'" style="width: 8px; height: 8px; border-radius: 50%;"></div>
                <span style="color: #334155; font-weight: 500;">{{ p }}</span>
              </label>
            </div>
@@ -935,7 +935,7 @@
       <!-- Clear filters -->
       <button *ngIf="listSearchQuery() || listFilterAssigneeIds().length > 0 || listFilterColumnIds().length > 0 || listFilterPriorities().length > 0 || listFilterMyIssues()" 
               (click)="clearListFilters()" 
-              style="display: flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #dc2626; background: #fff0f0; border: 1px solid #ffd7d7; border-radius: 4px; cursor: pointer;"
+              style="display: flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #1373e5; background: #f7f7f8; border: 1px solid #ebebeb; border-radius: 4px; cursor: pointer;"
               class="hover:bg-red-100 hover:text-red-700 transition-all">
         <svg lucideX size="13"></svg> Clear filters
       </button>
@@ -943,13 +943,13 @@
       <!-- Filter Pipeline Drawer Toggle -->
       <button (click)="toggleFilterDrawer()" 
               style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; font-size: 13px; font-weight: 600; color: #334155; cursor: pointer;"
-              [style.background-color]="fdActiveFilterCount() > 0 ? '#fffbeb' : 'white'"
-              [style.border-color]="fdActiveFilterCount() > 0 ? '#fde68a' : '#e2e8f0'"
+              [style.background-color]="fdActiveFilterCount() > 0 ? '#f3efff' : 'white'"
+              [style.border-color]="fdActiveFilterCount() > 0 ? '#e0d7ff' : '#e2e8f0'"
               class="hover:bg-gray-50 transition-colors"
               title="Open advanced filter pipeline">
-        <svg lucideFilter size="14" style="width: 14px; height: 14px; flex-shrink: 0;" [style.color]="fdActiveFilterCount() > 0 ? '#d97706' : '#64748b'"></svg>
+        <svg lucideFilter size="14" style="width: 14px; height: 14px; flex-shrink: 0;" [style.color]="fdActiveFilterCount() > 0 ? '#6b3fd6' : '#64748b'"></svg>
         <span>Filter pipeline</span>
-        <span *ngIf="fdActiveFilterCount() > 0" style="background: #d97706; color: white; border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: 700;">{{ fdActiveFilterCount() }}</span>
+        <span *ngIf="fdActiveFilterCount() > 0" style="background: #6b3fd6; color: white; border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: 700;">{{ fdActiveFilterCount() }}</span>
       </button>
 
       <!-- Export Dropdown -->
@@ -1275,7 +1275,7 @@
                   <svg lucideCheck *ngIf="!fdPriority()" size="14"></svg>
                 </button>
                 <button *ngFor="let pri of ['CRITICAL','HIGH','MEDIUM','LOW']" class="fd-select-option" [class.selected]="fdPriority() === pri" (click)="fdSetSingle(fdPriority, pri); fdDropdownOpen.set(null)">
-                  <span class="fd-priority-dot" [style.background-color]="pri === 'CRITICAL' ? '#dc2626' : pri === 'HIGH' ? '#ea580c' : pri === 'MEDIUM' ? '#ca8a04' : '#16a34a'"></span>
+                  <span class="fd-priority-dot" [style.background-color]="pri === 'CRITICAL' ? '#1373e5' : pri === 'HIGH' ? '#1373e5' : pri === 'MEDIUM' ? '#4f2aa7' : '#16a34a'"></span>
                   <span>{{ pri }}</span>
                   <svg lucideCheck *ngIf="fdPriority() === pri" size="14"></svg>
                 </button>
@@ -1619,7 +1619,7 @@
             <!-- Clear filters -->
             <button *ngIf="calendarSearchQuery() || calendarFilterAssignedToMe() || calendarFilterDueThisWeek() || calendarFilterDoneItems() || calendarFilterAssigneeIds().length > 0 || calendarFilterStartDate() || calendarFilterDueDate()"
                     (click)="clearCalendarFilters()"
-                    style="width: 100%; text-align: center; padding: 6px; font-size: 12px; font-weight: 700; color: #dc2626; background: transparent; border: none; cursor: pointer; margin-top: 12px;"
+                    style="width: 100%; text-align: center; padding: 6px; font-size: 12px; font-weight: 700; color: #1373e5; background: transparent; border: none; cursor: pointer; margin-top: 12px;"
                     class="hover:underline">
               Clear all filters
             </button>
@@ -1769,7 +1769,7 @@
 
       <button *ngIf="attSearchQuery() || attFilterAddedBy().length > 0 || attFilterTypes().length > 0 || attFilterDate()"
               (click)="attSearchQuery.set(''); attFilterAddedBy.set([]); attFilterTypes.set([]); attFilterDate.set('')"
-              style="display: flex; align-items: center; gap: 4px; padding: 8px 12px; border: 1px solid #ffd7d7; background: #fff0f0; color: #dc2626; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-left: 4px; border-radius: 4px;" class="hover:bg-red-100 hover:text-red-700">
+              style="display: flex; align-items: center; gap: 4px; padding: 8px 12px; border: 1px solid #ebebeb; background: #f7f7f8; color: #1373e5; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-left: 4px; border-radius: 4px;" class="hover:bg-red-100 hover:text-red-700">
         <svg lucideX size="14"></svg> Clear filters
       </button>
 
@@ -1959,7 +1959,7 @@
             {{ visit.distanceKm != null ? (visit.distanceKm | number:'1.1-2') + ' km' : '—' }}
           </div>
           <div style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #5e6c84;">
-            <svg lucideClock size="13" style="color: #E25E3E;"></svg>
+            <svg lucideClock size="13" style="color: #1373e5;"></svg>
             {{ visit.durationMins != null ? visit.durationMins + ' min' : '—' }}
           </div>
           <div *ngIf="visit.photos && visit.photos.length > 0" style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #5e6c84;">
@@ -2030,7 +2030,7 @@
         </div>
         <!-- Due Soon -->
         <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 3px rgba(9,30,66,0.05);">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: #dbeafe; color: #1373e5; display: flex; align-items: center; justify-content: center;">
             <svg lucideClock size="24"></svg>
           </div>
           <div>
@@ -2040,7 +2040,7 @@
         </div>
         <!-- Time Tracking -->
         <div style="background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 3px rgba(9,30,66,0.05);">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef9c3; color: #ca8a04; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: #f3efff; color: #4f2aa7; display: flex; align-items: center; justify-content: center;">
             <svg lucideTimer size="24"></svg>
           </div>
           <div style="flex: 1;">
@@ -2049,7 +2049,7 @@
               <div style="font-size: 13px; font-weight: 500; color: #5e6c84;">/ {{ timeTrackingData().estimatedHours | number:'1.0-1' }}h est</div>
             </div>
             <div style="height: 6px; background: #f4f5f7; border-radius: 3px; margin-top: 6px; overflow: hidden; display: flex;">
-              <div [style.width]="(timeTrackingData().estimatedHours ? (timeTrackingData().loggedHours / timeTrackingData().estimatedHours * 100) : 0) + '%'" style="background: #ca8a04; height: 100%; border-radius: 3px;"></div>
+              <div [style.width]="(timeTrackingData().estimatedHours ? (timeTrackingData().loggedHours / timeTrackingData().estimatedHours * 100) : 0) + '%'" style="background: #4f2aa7; height: 100%; border-radius: 3px;"></div>
             </div>
           </div>
         </div>
@@ -2367,14 +2367,14 @@
                   <button class="color-swatch swatch-green" title="Green" (click)="changeColumnColor(col.id, '#4bce97')">
                      <svg *ngIf="col.color === '#4bce97'" lucideCheck size="16" class="swatch-check"></svg>
                   </button>
-                  <button class="color-swatch swatch-yellow" title="Yellow" (click)="changeColumnColor(col.id, '#e2b203')">
-                     <svg *ngIf="col.color === '#e2b203'" lucideCheck size="16" class="swatch-check"></svg>
+                  <button class="color-swatch swatch-yellow" title="Yellow" (click)="changeColumnColor(col.id, '#727273')">
+                     <svg *ngIf="col.color === '#727273'" lucideCheck size="16" class="swatch-check"></svg>
                   </button>
-                  <button class="color-swatch swatch-orange" title="Orange" (click)="changeColumnColor(col.id, '#faa53d')">
-                     <svg *ngIf="col.color === '#faa53d'" lucideCheck size="16" class="swatch-check"></svg>
+                  <button class="color-swatch swatch-orange" title="Orange" (click)="changeColumnColor(col.id, '#0f4f9c')">
+                     <svg *ngIf="col.color === '#0f4f9c'" lucideCheck size="16" class="swatch-check"></svg>
                   </button>
-                  <button class="color-swatch swatch-red" title="Red" (click)="changeColumnColor(col.id, '#f87462')">
-                     <svg *ngIf="col.color === '#f87462'" lucideCheck size="16" class="swatch-check"></svg>
+                  <button class="color-swatch swatch-red" title="Red" (click)="changeColumnColor(col.id, '#acadae')">
+                     <svg *ngIf="col.color === '#acadae'" lucideCheck size="16" class="swatch-check"></svg>
                   </button>
                   <button class="color-swatch swatch-purple" title="Purple" (click)="changeColumnColor(col.id, '#9f8fef')">
                      <svg *ngIf="col.color === '#9f8fef'" lucideCheck size="16" class="swatch-check"></svg>
@@ -2466,7 +2466,7 @@
                   {{ issue.projectTicket.ticketNumber }}
                 </span>
                 <span class="type-pill" *ngIf="issue.type && issue.type !== 'TASK'" [ngClass]="issue.type.toLowerCase()">{{ issue.type }}</span>
-                <span class="type-pill" *ngIf="issue.rejectionReason" style="background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5;" [title]="issue.rejectionReason">
+                <span class="type-pill" *ngIf="issue.rejectionReason" style="background-color: #dbeafe; color: #1373e5; border: 1px solid #dbeafe;" [title]="issue.rejectionReason">
                   Rejected
                 </span>
               </div>
@@ -2493,7 +2493,7 @@
                   <div *ngIf="issue._count?.comments > 0" title="{{ issue._count.comments }} comment(s)" style="display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #5e6c84; background: #f4f5f7; padding: 2px 6px; border-radius: 4px;">
                     <svg lucideMessageSquare size="11"></svg>
                     <span>{{ issue._count.comments }}</span>
-                    <span style="width: 6px; height: 6px; background: #ef4444; border-radius: 50%; margin-left: 2px; box-shadow: 0 0 0 2px #f4f5f7;" title="New unread comments"></span>
+                    <span style="width: 6px; height: 6px; background: #1373e5; border-radius: 50%; margin-left: 2px; box-shadow: 0 0 0 2px #f4f5f7;" title="New unread comments"></span>
                   </div>
                 </div>
 
@@ -2837,7 +2837,7 @@
             <span>Approve Task</span>
           </button>
           
-          <button class="modal-action-btn" style="background-color: #fef2f2; color: #ef4444; border: 1px solid #ef4444;" (click)="openRejectModal(selectedIssue()?.id)">
+          <button class="modal-action-btn" style="background-color: #eff6ff; color: #1373e5; border: 1px solid #1373e5;" (click)="openRejectModal(selectedIssue()?.id)">
             <svg lucideX size="14" class="btn-icon-svg"></svg>
             <span>Reject Task</span>
           </button>
@@ -2862,17 +2862,17 @@
                 <svg *ngIf="issueForm.priority === 'LOW'" lucideCheck size="14"></svg>
               </button>
               <button class="popover-item" [class.selected]="issueForm.priority === 'MEDIUM'" (click)="updatePriority('MEDIUM')">
-                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #ca8a04;"></span>
+                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #4f2aa7;"></span>
                 <span class="flex-1 text-left">Medium</span>
                 <svg *ngIf="issueForm.priority === 'MEDIUM'" lucideCheck size="14"></svg>
               </button>
               <button class="popover-item" [class.selected]="issueForm.priority === 'HIGH'" (click)="updatePriority('HIGH')">
-                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #ea580c;"></span>
+                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #1373e5;"></span>
                 <span class="flex-1 text-left">High</span>
                 <svg *ngIf="issueForm.priority === 'HIGH'" lucideCheck size="14"></svg>
               </button>
               <button class="popover-item" [class.selected]="issueForm.priority === 'CRITICAL'" (click)="updatePriority('CRITICAL')">
-                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #dc2626;"></span>
+                <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #1373e5;"></span>
                 <span class="flex-1 text-left">Critical</span>
                 <svg *ngIf="issueForm.priority === 'CRITICAL'" lucideCheck size="14"></svg>
               </button>
@@ -3209,17 +3209,17 @@
                   <svg *ngIf="issueForm.priority === 'LOW'" lucideCheck size="14"></svg>
                 </button>
                 <button class="popover-item" [class.selected]="issueForm.priority === 'MEDIUM'" (click)="updatePriority('MEDIUM')">
-                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #ca8a04;"></span>
+                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #4f2aa7;"></span>
                   <span class="flex-1 text-left">Medium</span>
                   <svg *ngIf="issueForm.priority === 'MEDIUM'" lucideCheck size="14"></svg>
                 </button>
                 <button class="popover-item" [class.selected]="issueForm.priority === 'HIGH'" (click)="updatePriority('HIGH')">
-                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #ea580c;"></span>
+                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #1373e5;"></span>
                   <span class="flex-1 text-left">High</span>
                   <svg *ngIf="issueForm.priority === 'HIGH'" lucideCheck size="14"></svg>
                 </button>
                 <button class="popover-item" [class.selected]="issueForm.priority === 'CRITICAL'" (click)="updatePriority('CRITICAL')">
-                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #dc2626;"></span>
+                  <span class="w-2 h-2 rounded-full mr-2 inline-block" style="background: #1373e5;"></span>
                   <span class="flex-1 text-left">Critical</span>
                   <svg *ngIf="issueForm.priority === 'CRITICAL'" lucideCheck size="14"></svg>
                 </button>
@@ -4219,7 +4219,7 @@
      [style.position]="'fixed'" [style.left.px]="popoverPosition()?.x" [style.top.px]="popoverPosition()?.y" [style.max-height.px]="popoverPosition()?.maxHeight"
      style="z-index: 10000; width: 220px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: 1px solid #dfe1e6; display: flex; flex-direction: column;">
   <div style="padding: 8px 0; max-height: 300px; overflow-y: auto;">
-    <ng-container *ngFor="let t of [{name: 'Images', icon: 'lucideImage', color: '#db2777'}, {name: 'Documents', icon: 'lucideFileText', color: '#2563eb'}, {name: 'PDFs', icon: 'lucideFile', color: '#dc2626'}, {name: 'Presentations', icon: 'lucideBarChart', color: '#ea580c'}, {name: 'Spreadsheets', icon: 'lucideLayoutGrid', color: '#16a34a'}, {name: 'Videos', icon: 'lucideVideo', color: '#0284c7'}, {name: 'Audio', icon: 'lucideMusic', color: '#9333ea'}]">
+    <ng-container *ngFor="let t of [{name: 'Images', icon: 'lucideImage', color: '#6b3fd6'}, {name: 'Documents', icon: 'lucideFileText', color: '#2563eb'}, {name: 'PDFs', icon: 'lucideFile', color: '#1373e5'}, {name: 'Presentations', icon: 'lucideBarChart', color: '#1373e5'}, {name: 'Spreadsheets', icon: 'lucideLayoutGrid', color: '#16a34a'}, {name: 'Videos', icon: 'lucideVideo', color: '#0284c7'}, {name: 'Audio', icon: 'lucideMusic', color: '#9333ea'}]">
       <label style="display: flex; align-items: center; gap: 12px; padding: 8px 16px; cursor: pointer; transition: background 0.15s;" class="hover:bg-gray-50">
         <input type="checkbox" [checked]="attFilterTypes().includes(t.name)" (change)="toggleAttFilterType(t.name)" style="width: 16px; height: 16px; border-radius: 4px; border: 2px solid #6b7280; accent-color: #2563eb;">
         <ng-container [ngSwitch]="t.name">
@@ -4291,7 +4291,7 @@
 <div class="trello-modal" *ngIf="isRejectModalOpen()" style="width: 500px; max-width: 92vw; min-height: 0;">
   <div class="trello-modal-header" style="background: white; border-bottom: none; padding-bottom: 0;">
     <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #172b4d; display: flex; align-items: center; gap: 8px;">
-      <svg lucideX size="20" style="color: #dc2626;"></svg> Reject Task
+      <svg lucideX size="20" style="color: #1373e5;"></svg> Reject Task
     </h3>
     <button class="modal-icon-btn" (click)="closeRejectModal()"><svg lucideX size="18"></svg></button>
   </div>
@@ -4302,7 +4302,7 @@
 
       <div style="display: flex; justify-content: flex-end; gap: 12px;">
         <button class="trello-btn-secondary" (click)="closeRejectModal()">Cancel</button>
-        <button class="trello-btn-primary" style="background: #dc2626;" (click)="confirmRejectIssue()" [disabled]="!rejectReason().trim()">Confirm Reject</button>
+        <button class="trello-btn-primary" style="background: #1373e5;" (click)="confirmRejectIssue()" [disabled]="!rejectReason().trim()">Confirm Reject</button>
       </div>
     </div>
   </div>
@@ -4419,7 +4419,7 @@
 <div class="trello-modal" *ngIf="selectedFieldVisit() as visit" style="width: 600px; max-width: 92vw; max-height: 86vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
 
   <!-- Status accent bar -->
-  <div [style.background]="visit.status === 'IN_PROGRESS' ? '#22c55e' : (visit.status === 'CANCELLED' ? '#ef4444' : '#0f172a')" style="height: 4px; flex-shrink: 0;"></div>
+  <div [style.background]="visit.status === 'IN_PROGRESS' ? '#22c55e' : (visit.status === 'CANCELLED' ? '#1373e5' : '#0f172a')" style="height: 4px; flex-shrink: 0;"></div>
 
   <div class="trello-modal-header" style="margin: 0; padding: 20px 24px 16px;">
     <div style="display: flex; align-items: center; gap: 9px;">
@@ -4449,7 +4449,7 @@
         </div>
       </div>
       <span [style.background]="fieldVisitStatusColor(visit.status).bg" [style.color]="fieldVisitStatusColor(visit.status).text" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">
-        <span *ngIf="visit.status === 'IN_PROGRESS'" style="width: 6px; height: 6px; border-radius: 50%; background: #ca8a04; display: inline-block;"></span>
+        <span *ngIf="visit.status === 'IN_PROGRESS'" style="width: 6px; height: 6px; border-radius: 50%; background: #4f2aa7; display: inline-block;"></span>
         <svg *ngIf="visit.status === 'COMPLETED'" lucideCheckCircle size="12"></svg>
         <svg *ngIf="visit.status === 'CANCELLED'" lucideXCircle size="12"></svg>
         {{ visit.status.replace('_', ' ') }}
@@ -4470,7 +4470,7 @@
         <div style="font-size: 10.5px; font-weight: 600; color: #94a3b8; margin-top: 1px;">Kilometers</div>
       </div>
       <div style="flex: 1; text-align: center; border-right: 1px solid #e2e8f0;">
-        <svg lucideClock size="16" style="color: #E25E3E;"></svg>
+        <svg lucideClock size="16" style="color: #1373e5;"></svg>
         <div style="font-size: 16px; font-weight: 800; color: #172b4d; margin-top: 5px;">{{ visit.durationMins != null ? visit.durationMins : '—' }}</div>
         <div style="font-size: 10.5px; font-weight: 600; color: #94a3b8; margin-top: 1px;">Minutes</div>
       </div>
@@ -4503,7 +4503,7 @@
       </div>
       <div style="display: flex; gap: 12px;">
         <div style="width: 12px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0;">
-          <div [style.background]="visit.endTime ? '#E25E3E' : '#cbd5e1'" style="width: 11px; height: 11px; border-radius: 50%; margin-top: 3px; flex-shrink: 0;"></div>
+          <div [style.background]="visit.endTime ? '#1373e5' : '#cbd5e1'" style="width: 11px; height: 11px; border-radius: 50%; margin-top: 3px; flex-shrink: 0;"></div>
         </div>
         <div style="flex: 1; min-width: 0;">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">

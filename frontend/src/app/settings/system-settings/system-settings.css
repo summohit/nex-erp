@@ -39,9 +39,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  color: #1373e5;
+  border: 1px solid #dbeafe;
   padding: 3px 10px;
   border-radius: 9999px;
   font-size: 11.5px;
@@ -111,9 +111,9 @@
 }
 
 .card-icon-wrap.docx-icon {
-  background: #fff7ed;
-  color: #ea580c;
-  border: 1px solid #ffedd5;
+  background: #eff6ff;
+  color: #1373e5;
+  border: 1px solid #dbeafe;
 }
 
 .card-icon-wrap.html-icon {
@@ -166,8 +166,8 @@
 
 .template-source-editor:focus {
   outline: none;
-  border-color: #ea580c;
-  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.14);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.14);
 }
 
 .editor-hint {
@@ -379,8 +379,8 @@
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background-color: #ea580c;
-  border-color: #c2410c;
+  background-color: #1373e5;
+  border-color: #0f4f9c;
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
@@ -428,7 +428,7 @@
 }
 
 .section-label svg {
-  color: #ea580c;
+  color: #1373e5;
 }
 
 .chips-container {
@@ -452,8 +452,8 @@
 
 .placeholder-chip:hover {
   background: #ffffff;
-  border-color: #ea580c;
-  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.08);
+  border-color: #1373e5;
+  box-shadow: 0 2px 6px rgba(19, 115, 229, 0.08);
   transform: translateY(-1px);
 }
 
@@ -466,8 +466,8 @@
   font-family: 'SF Mono', Monaco, 'Courier New', monospace;
   font-size: 12px;
   font-weight: 600;
-  color: #ea580c;
-  background: #fff7ed;
+  color: #1373e5;
+  background: #eff6ff;
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -489,7 +489,7 @@
 }
 
 .placeholder-chip:hover .copy-icon {
-  color: #ea580c;
+  color: #1373e5;
 }
 
 .check-icon {
@@ -606,10 +606,10 @@
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  background: #fef2f2;
-  border: 1.5px solid #fecaca;
+  background: #eff6ff;
+  border: 1.5px solid #dbeafe;
   border-radius: 8px;
-  color: #dc2626;
+  color: #1373e5;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -617,8 +617,8 @@
 }
 
 .btn-action-danger:hover {
-  background: #fee2e2;
-  border-color: #f87171;
+  background: #dbeafe;
+  border-color: #b4b4b5;
 }
 
 /* --------------------------------------------------------------------------
@@ -636,9 +636,9 @@
 }
 
 .upload-dropzone:hover, .upload-dropzone.dragging {
-  border-color: #ea580c;
-  background: #fffaf5;
-  box-shadow: 0 4px 16px rgba(234, 88, 12, 0.06);
+  border-color: #1373e5;
+  background: #fafafa;
+  box-shadow: 0 4px 16px rgba(19, 115, 229, 0.06);
 }
 
 .dropzone-content {
@@ -656,7 +656,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ea580c;
+  color: #1373e5;
   margin-bottom: 12px;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
 }
@@ -691,8 +691,8 @@
 }
 
 .btn-browse:hover {
-  border-color: #ea580c;
-  color: #ea580c;
+  border-color: #1373e5;
+  color: #1373e5;
   background: #ffffff;
 }
 
@@ -716,7 +716,7 @@
   flex-direction: column;
   align-items: center;
   padding: 20px 0;
-  color: #ea580c;
+  color: #1373e5;
 }
 
 .dropzone-uploading h4 {
@@ -771,17 +771,17 @@
   padding: 10px 22px;
   border: none;
   border-radius: 9px;
-  background: #ea580c;
+  background: #1373e5;
   color: #ffffff;
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, transform 0.1s;
-  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
+  box-shadow: 0 2px 8px rgba(19, 115, 229, 0.25);
 }
 
 .btn-save:hover:not(:disabled) {
-  background: #c2410c;
+  background: #0f4f9c;
   transform: translateY(-1px);
 }
 
@@ -833,7 +833,7 @@
 }
 
 .spinner-wrap {
-  color: #ea580c;
+  color: #1373e5;
   margin-bottom: 14px;
 }
 
@@ -1105,7 +1105,7 @@
 .sig-input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12);
 }
 /* Fixed height so the card does not jump between the empty and uploaded
    states, and the image is contained rather than cropped. */
@@ -1145,9 +1145,9 @@
 .btn-sig-remove {
   border: 1px solid #e2e8f0;
   background: #fff;
-  color: #b91c1c;
+  color: #0f4f9c;
 }
-.btn-sig-remove:hover:not(:disabled) { background: #fef2f2; border-color: #fecaca; }
+.btn-sig-remove:hover:not(:disabled) { background: #eff6ff; border-color: #dbeafe; }
 .btn-sig-upload:disabled,
 .btn-sig-remove:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-sig-upload .spin { animation: spin 1s linear infinite; }
@@ -1155,9 +1155,9 @@
 
 /* A footer note that states a consequence rather than a reassurance. */
 .card-footer-note.warning-note {
-  background: #fffbeb;
-  border-color: #fde68a;
-  color: #92400e;
+  background: #f3efff;
+  border-color: #e0d7ff;
+  color: #504f51;
 }
 
-.card-footer-note.warning-note svg { color: #d97706; }
+.card-footer-note.warning-note svg { color: #6b3fd6; }

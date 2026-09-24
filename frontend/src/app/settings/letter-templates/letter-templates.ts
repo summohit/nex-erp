@@ -197,7 +197,7 @@ export class LetterTemplatesComponent implements OnInit {
 
   getAvatarBg(name?: string): string {
     if (!name) return '#6366F1';
-    const colors = ['#2A97D8', '#6366F1', '#EC4899', '#8B5CF6', '#10B981', '#F59E0B', '#06B6D4', '#3B82F6'];
+    const colors = ['#2A97D8', '#6366F1', '#6b3fd6', '#8B5CF6', '#10B981', '#6b3fd6', '#06B6D4', '#3B82F6'];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);

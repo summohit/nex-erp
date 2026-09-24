@@ -16,7 +16,7 @@ export interface ProjectStarCellParams extends ICellRendererParams {
   template: `
     <div class="star-cell" (click)="$event.stopPropagation()">
       <button type="button" class="star-cell-btn" [class.active]="starred" (click)="toggle()" title="Toggle star">
-        <svg lucideStar size="16" [style.fill]="starred ? '#eab308' : 'none'" [style.stroke]="starred ? '#eab308' : '#94a3b8'"></svg>
+        <svg lucideStar size="16" [style.fill]="starred ? '#0f4f9c' : 'none'" [style.stroke]="starred ? '#0f4f9c' : '#94a3b8'"></svg>
       </button>
     </div>
   `,

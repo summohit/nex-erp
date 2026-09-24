@@ -164,7 +164,7 @@ export default function DocumentsTab({
     if (type?.includes('Payslip') || type?.includes('Tax')) {
       return { bg: '#F0FDF4', text: '#16A34A', icon: FileCode };
     }
-    return { bg: '#FFF7ED', text: '#EA580C', icon: FileText };
+    return { bg: '#eff6ff', text: '#1373e5', icon: FileText };
   };
 
   return (
@@ -243,7 +243,7 @@ export default function DocumentsTab({
                       onPress={() => handleDeleteDocument(item.id)}
                       disabled={loading}
                     >
-                      <Trash2 size={15} color="#DC2626" />
+                      <Trash2 size={15} color="#1373e5" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -273,7 +273,7 @@ export default function DocumentsTab({
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {pendingFile && (
                 <View style={styles.fileSelectedBox}>
-                  <Paperclip size={16} color="#E25E3E" />
+                  <Paperclip size={16} color="#1373e5" />
                   <Text style={styles.fileSelectedName} numberOfLines={1}>
                     {pendingFile.fileName}
                   </Text>
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 10,
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#dbeafe',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -559,9 +559,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#FED7AA',
+    borderColor: '#dbeafe',
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
   fileSelectedName: {
     flex: 1,
     fontSize: 13,
-    color: '#EA580C',
+    color: '#1373e5',
     fontWeight: '700',
   },
   inputContainer: {
@@ -605,8 +605,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   typeChipActive: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#EA580C',
+    backgroundColor: '#eff6ff',
+    borderColor: '#1373e5',
   },
   typeChipText: {
     fontSize: 12,
@@ -614,17 +614,17 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   typeChipTextActive: {
-    color: '#EA580C',
+    color: '#1373e5',
     fontWeight: '800',
   },
   submitBtn: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 10,
     marginBottom: 20,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 6,

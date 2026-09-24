@@ -184,7 +184,7 @@ export default function SecurityScreen() {
                 <View style={[styles.iconWrap, status?.enabled && styles.iconWrapOn]}>
                   {status?.enabled
                     ? <ShieldCheck size={20} color="#059669" />
-                    : <ShieldAlert size={20} color="#D97706" />}
+                    : <ShieldAlert size={20} color="#6b3fd6" />}
                 </View>
                 <View style={styles.cardTitleGroup}>
                   <Text style={styles.cardTitle}>
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   iconWrap: {
     width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+    backgroundColor: '#f3efff', borderWidth: 1, borderColor: '#e0d7ff',
   },
   iconWrapOn: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   cardTitleGroup: { flex: 1 },
@@ -530,10 +530,10 @@ const styles = StyleSheet.create({
   secondaryBtnText: { fontSize: 13, fontWeight: '600', color: '#334155' },
 
   dangerBtn: {
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FECACA',
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#dbeafe',
     borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10,
   },
-  dangerBtnText: { fontSize: 13, fontWeight: '600', color: '#B91C1C' },
+  dangerBtnText: { fontSize: 13, fontWeight: '600', color: '#0f4f9c' },
 
   ghostBtn: { paddingHorizontal: 10, paddingVertical: 10 },
   ghostBtnText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC', paddingHorizontal: 14, fontSize: 14.5, color: '#0F172A',
   },
   codeInput: { textAlign: 'center', fontSize: 19, fontWeight: '700', letterSpacing: 6 },
-  error: { fontSize: 12.5, color: '#DC2626', marginTop: 10 },
+  error: { fontSize: 12.5, color: '#1373e5', marginTop: 10 },
 
   qrWrap: { alignItems: 'center', marginTop: 16 },
   qr: { width: 170, height: 170, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF' },

@@ -251,8 +251,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   chipActive: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#EA580C',
+    backgroundColor: '#eff6ff',
+    borderColor: '#1373e5',
   },
   chipText: {
     fontSize: 13,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   chipTextActive: {
-    color: '#EA580C',
+    color: '#1373e5',
     fontWeight: '800',
   },
   skillsGrid: {
@@ -278,8 +278,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   skillChipActive: {
-    backgroundColor: '#E25E3E',
-    borderColor: '#E25E3E',
+    backgroundColor: '#1373e5',
+    borderColor: '#1373e5',
   },
   skillChipText: {
     fontSize: 13,
@@ -349,10 +349,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,

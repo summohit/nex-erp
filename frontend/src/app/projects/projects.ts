@@ -40,17 +40,17 @@ import {
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   DRAFT: { bg: '#f1f2f4', color: '#6b7280' },
   ACTIVE: { bg: '#dbeafe', color: '#1d4ed8' },
-  ON_HOLD: { bg: '#fef3c7', color: '#b45309' },
-  AT_RISK: { bg: '#ffedd5', color: '#c2410c' },
+  ON_HOLD: { bg: '#f3efff', color: '#4f2aa7' },
+  AT_RISK: { bg: '#dbeafe', color: '#0f4f9c' },
   COMPLETED: { bg: '#dcfce7', color: '#15803d' },
   CLOSED: { bg: '#e0e7ff', color: '#4338ca' },
-  CANCELLED: { bg: '#fee2e2', color: '#b91c1c' },
+  CANCELLED: { bg: '#dbeafe', color: '#0f4f9c' },
   // Retired vocabulary, still possible on unmigrated rows.
   FINISHED: { bg: '#dcfce7', color: '#15803d' },
   IN_PROGRESS: { bg: '#dbeafe', color: '#1d4ed8' },
   NOT_STARTED: { bg: '#f1f2f4', color: '#6b7280' },
-  ARCHIVED: { bg: '#fee2e2', color: '#b91c1c' },
-  BLOCKED: { bg: '#fee2e2', color: '#b91c1c' }
+  ARCHIVED: { bg: '#dbeafe', color: '#0f4f9c' },
+  BLOCKED: { bg: '#dbeafe', color: '#0f4f9c' }
 };
 
 /**
@@ -74,9 +74,9 @@ export const PROJECT_STATUSES = [
 export const PROJECT_PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const;
 
 const PRIORITY_COLORS: Record<string, { bg: string; color: string }> = {
-  CRITICAL: { bg: '#fee2e2', color: '#b91c1c' },
-  HIGH: { bg: '#ffedd5', color: '#c2410c' },
-  MEDIUM: { bg: '#fef3c7', color: '#b45309' },
+  CRITICAL: { bg: '#dbeafe', color: '#0f4f9c' },
+  HIGH: { bg: '#dbeafe', color: '#0f4f9c' },
+  MEDIUM: { bg: '#f3efff', color: '#4f2aa7' },
   LOW: { bg: '#f1f5f9', color: '#475569' }
 };
 
@@ -313,7 +313,7 @@ export class ProjectsComponent implements OnInit {
   }
 
   getPmColor(id: number): string {
-    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
+    const colors = ['#6366f1', '#8b5cf6', '#6b3fd6', '#1373e5', '#1373e5', '#0f4f9c', '#22c55e', '#06b6d4', '#3b82f6'];
     return colors[id % colors.length];
   }
 
@@ -680,12 +680,12 @@ export class ProjectsComponent implements OnInit {
             glow = '0 1px 3px rgba(16, 185, 129, 0.35)';
             iconHtml = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`;
           } else if (status === 'AT_RISK') {
-            gradient = 'linear-gradient(90deg, #f97316 0%, #ef4444 100%)';
-            textColor = '#dc2626';
+            gradient = 'linear-gradient(90deg, #1373e5 0%, #1373e5 100%)';
+            textColor = '#1373e5';
             glow = '0 1px 3px rgba(239, 68, 68, 0.25)';
           } else if (status === 'ON_HOLD') {
-            gradient = 'linear-gradient(90deg, #fbbf24 0%, #d97706 100%)';
-            textColor = '#b45309';
+            gradient = 'linear-gradient(90deg, #8f8f90 0%, #6b3fd6 100%)';
+            textColor = '#4f2aa7';
             glow = '0 1px 3px rgba(217, 119, 6, 0.2)';
           } else if (pct >= 70) {
             gradient = 'linear-gradient(90deg, #0ea5e9 0%, #10b981 100%)';
@@ -810,8 +810,8 @@ export class ProjectsComponent implements OnInit {
           const done = total - remaining;
           if (total === 0) return '<span class="cell-muted">—</span>';
           const pct = Math.round((done / total) * 100);
-          const color = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
-          const bg = pct === 100 ? '#dcfce7' : pct >= 50 ? '#fef3c7' : '#fee2e2';
+          const color = pct === 100 ? '#16a34a' : pct >= 50 ? '#6b3fd6' : '#1373e5';
+          const bg = pct === 100 ? '#dcfce7' : pct >= 50 ? '#f3efff' : '#dbeafe';
           return `
             <div style="display:flex;align-items:center;gap:6px;height:100%;">
               <span style="background:${bg};color:${color};font-weight:700;font-size:11.5px;padding:3px 8px;border-radius:10px;white-space:nowrap;">${remaining} left</span>
@@ -844,7 +844,7 @@ export class ProjectsComponent implements OnInit {
         cellRenderer: (params: any) => {
           if (params.value == null) return '<span class="cell-muted">—</span>';
           const over = Number(params.value) < 0;
-          return `<span style="color:${over ? '#b91c1c' : 'inherit'};font-weight:${over ? 700 : 400}">${this.hours(params.value)}</span>`;
+          return `<span style="color:${over ? '#0f4f9c' : 'inherit'};font-weight:${over ? 700 : 400}">${this.hours(params.value)}</span>`;
         }
       }
     ];
@@ -895,7 +895,7 @@ export class ProjectsComponent implements OnInit {
               return '<span class="cell-muted">—</span>';
             }
             const over = Number(params.value) < 0;
-            return `<span style="color:${over ? '#b91c1c' : 'inherit'};font-weight:${over ? 700 : 400}">${this.money(params.value, params.data)}</span>`;
+            return `<span style="color:${over ? '#0f4f9c' : 'inherit'};font-weight:${over ? 700 : 400}">${this.money(params.value, params.data)}</span>`;
           }
         }
       );
@@ -954,11 +954,11 @@ export class ProjectsComponent implements OnInit {
   ];
 
   colorBackgrounds = [
-    'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+    'linear-gradient(135deg, #8b5cf6 0%, #6b3fd6 100%)',
     'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)',
     'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-    'linear-gradient(135deg, #ef4444 0%, #f43f5e 100%)',
+    'linear-gradient(135deg, #6b3fd6 0%, #6b3fd6 100%)',
+    'linear-gradient(135deg, #1373e5 0%, #6b3fd6 100%)',
     'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
   ];
 
@@ -1003,11 +1003,11 @@ export class ProjectsComponent implements OnInit {
   projectForm = this.emptyProjectForm();
 
   gradients = [
-    'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+    'linear-gradient(135deg, #8b5cf6 0%, #6b3fd6 100%)',
     'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)',
     'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-    'linear-gradient(135deg, #ef4444 0%, #f43f5e 100%)',
+    'linear-gradient(135deg, #6b3fd6 0%, #6b3fd6 100%)',
+    'linear-gradient(135deg, #1373e5 0%, #6b3fd6 100%)',
     'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
   ];
 
@@ -1100,7 +1100,7 @@ export class ProjectsComponent implements OnInit {
       return { bg: '#eff6ff', color: '#2563eb', label: ext.toUpperCase() };
     }
     if (ext === 'pdf') {
-      return { bg: '#fef2f2', color: '#dc2626', label: 'PDF' };
+      return { bg: '#eff6ff', color: '#1373e5', label: 'PDF' };
     }
     if (['csv', 'xls', 'xlsx'].includes(ext)) {
       return { bg: '#ecfdf5', color: '#059669', label: ext.toUpperCase() };
@@ -3148,9 +3148,9 @@ export class ProjectsComponent implements OnInit {
       cellRenderer: (p: any) => {
         const raw = String(p.value || 'LOW').toUpperCase();
         const dotColors: Record<string, string> = {
-          CRITICAL: '#dc2626',
-          HIGH: '#ea580c',
-          MEDIUM: '#d97706',
+          CRITICAL: '#1373e5',
+          HIGH: '#1373e5',
+          MEDIUM: '#6b3fd6',
           LOW: '#94a3b8',
         };
         const dotColor = dotColors[raw] || '#94a3b8';
@@ -3191,7 +3191,7 @@ export class ProjectsComponent implements OnInit {
         const d = new Date(p.value);
         const str = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
         if (p.data?.isOverdue && p.data?.status !== 'DONE' && p.data?.status !== 'CANCELLED') {
-          return `<span style="color: #dc2626; font-weight: 700; font-size: 12px;">${str}</span>`;
+          return `<span style="color: #1373e5; font-weight: 700; font-size: 12px;">${str}</span>`;
         }
         return `<span style="color: #475569; font-size: 12.5px; font-weight: 500;">${str}</span>`;
       },

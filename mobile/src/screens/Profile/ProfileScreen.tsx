@@ -204,8 +204,8 @@ export default function ProfileScreen() {
           <RefreshControl 
             refreshing={isLoading} 
             onRefresh={onRefresh} 
-            tintColor="#E25E3E" 
-            colors={['#E25E3E']} 
+            tintColor="#1373e5"
+            colors={['#1373e5']}
           />
         }
       >
@@ -301,7 +301,7 @@ export default function ProfileScreen() {
       {avatarUploading && (
         <View style={styles.uploadingOverlay}>
           <View style={styles.uploadingBox}>
-            <ActivityIndicator size="large" color="#E25E3E" />
+            <ActivityIndicator size="large" color="#1373e5" />
             <Text style={styles.uploadingText}>Updating photo...</Text>
           </View>
         </View>
@@ -355,11 +355,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 12,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -401,9 +401,9 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   tabChipActive: {
-    backgroundColor: '#E25E3E',
-    borderColor: '#E25E3E',
-    shadowColor: '#E25E3E',
+    backgroundColor: '#1373e5',
+    borderColor: '#1373e5',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 6,

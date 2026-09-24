@@ -1850,7 +1850,7 @@
   <div class="modal-card enhanced-modal" (click)="$event.stopPropagation()">    <div class="modal-header">
       <div class="modal-header-left">
         <div class="modal-icon-badge">
-          <svg lucideUser size="20" style="color: #ea580c;"></svg>
+          <svg lucideUser size="20" style="color: #1373e5;"></svg>
         </div>
         <div>
           <h3>{{ isEditing ? 'Edit Deal' : (boardFlow === 'PRE_SALES' ? 'Add Pre-Sales Deal' : 'Add New Lead') }}</h3>
@@ -1947,7 +1947,7 @@
         </div>
 
         <div *ngIf="newLeadData.contactName?.trim() && isContactEmailNew && !isEditing" style="display:flex;align-items:center;gap:8px;margin-top:4px;padding:10px 12px;background:var(--bg-subtle,#f8f9fc);border:1px solid var(--border-color,#e5e7eb);border-radius:8px;">
-          <input type="checkbox" id="saveContactFromLead" [checked]="contactCheckboxChecked" (change)="onContactCheckboxChange($any($event.target).checked)" [disabled]="isSaving" style="width:15px;height:15px;accent-color:var(--primary-color,#E25E3E);cursor:pointer;flex-shrink:0;" />
+          <input type="checkbox" id="saveContactFromLead" [checked]="contactCheckboxChecked" (change)="onContactCheckboxChange($any($event.target).checked)" [disabled]="isSaving" style="width:15px;height:15px;accent-color:var(--primary-color,#1373e5);cursor:pointer;flex-shrink:0;" />
           <label for="saveContactFromLead" style="font-size:13px;color:var(--text-secondary,#374151);cursor:pointer;margin:0;line-height:1.4;">
             Also save <strong style="color:var(--text-primary,#111827)">{{newLeadData.contactName}}</strong> as a Lead Contact
           </label>
@@ -2539,7 +2539,7 @@
         <!-- Whom to follow up with (Client Contact Card) -->
         <div class="fum-section-box">
           <div class="fum-section-header">
-            <svg lucideUser size="14" style="color: #ea580c;"></svg>
+            <svg lucideUser size="14" style="color: #1373e5;"></svg>
             <span>Whom to Follow Up With (Client Contact)</span>
           </div>
           <div class="form-row">
@@ -2669,7 +2669,7 @@
         <!-- Empty State -->
         <div *ngIf="!isLoadingFollowUps && leadFollowUps.length === 0" class="fum-empty-state">
           <div class="empty-icon-circle">
-            <svg lucideCalendar size="32" style="color: #ea580c;"></svg>
+            <svg lucideCalendar size="32" style="color: #1373e5;"></svg>
           </div>
           <h4>No Follow-Ups Scheduled Yet</h4>
           <p>Schedule your first follow-up to track client communications, calls, and product demos.</p>

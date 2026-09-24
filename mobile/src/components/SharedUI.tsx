@@ -28,11 +28,11 @@ export const GradientBanner = ({ colorStr, index = 0, style, children }: { color
       }
     }
     const fallbackGradients = [
-      ['#8b5cf6', '#ec4899'],
+      ['#8b5cf6', '#6b3fd6'],
       ['#3b82f6', '#06b6d4'],
       ['#10b981', '#059669'],
-      ['#f59e0b', '#d97706'],
-      ['#ef4444', '#f43f5e'],
+      ['#6b3fd6', '#6b3fd6'],
+      ['#1373e5', '#6b3fd6'],
       ['#6366f1', '#8b5cf6']
     ];
     return fallbackGradients[index % fallbackGradients.length];

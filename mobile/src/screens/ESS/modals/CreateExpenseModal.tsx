@@ -347,7 +347,7 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
                       style={styles.dropdownItem}
                       onPress={() => { setProjectId(null); setShowProjectDropdown(false); }}
                     >
-                      <Text style={[styles.dropdownItemText, { color: '#EF4444' }]}>Clear Selection</Text>
+                      <Text style={[styles.dropdownItemText, { color: '#1373e5' }]}>Clear Selection</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -399,7 +399,7 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
                   <View style={styles.previewMeta}>
                     <Text style={styles.previewFileName} numberOfLines={1}>{attachment!.name}</Text>
                     <TouchableOpacity onPress={() => setAttachment(null)}>
-                      <X size={18} color="#EF4444" />
+                      <X size={18} color="#1373e5" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -409,7 +409,7 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
                   <FileText size={16} color="#64748B" />
                   <Text style={styles.selectedFileName} numberOfLines={1}>{attachment.name}</Text>
                   <TouchableOpacity onPress={() => setAttachment(null)}>
-                    <X size={18} color="#EF4444" />
+                    <X size={18} color="#1373e5" />
                   </TouchableOpacity>
                 </View>
               ) : existingIsImage && existingReceiptUrl ? (
@@ -424,7 +424,7 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
                   <View style={styles.previewMeta}>
                     <Text style={styles.previewFileName} numberOfLines={1}>Current receipt</Text>
                     <TouchableOpacity onPress={() => setExistingReceiptUrl(null)}>
-                      <X size={18} color="#EF4444" />
+                      <X size={18} color="#1373e5" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -434,7 +434,7 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
                   <FileText size={16} color="#64748B" />
                   <Text style={styles.selectedFileName} numberOfLines={1}>Current receipt</Text>
                   <TouchableOpacity onPress={() => setExistingReceiptUrl(null)}>
-                    <X size={18} color="#EF4444" />
+                    <X size={18} color="#1373e5" />
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -553,12 +553,12 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   inputError: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FFF5F5',
+    borderColor: '#1373e5',
+    backgroundColor: '#eff6ff',
   },
   errorText: {
     fontSize: 12,
-    color: '#EF4444',
+    color: '#1373e5',
     marginTop: 4,
     marginLeft: 4,
   },
@@ -718,7 +718,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   submitBtn: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

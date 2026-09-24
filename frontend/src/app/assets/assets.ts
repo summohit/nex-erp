@@ -1023,7 +1023,7 @@ export class AssetsComponent implements OnInit {
         const s = params.value || 'PENDING';
         const statusClass = getStatusClass(s);
         const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason
-          ? `<div style="font-size: 10px; color: #DC2626; font-weight: 500; line-height: 1.2; margin-top: 3px;" title="${params.data.rejectionReason}">Reason: ${params.data.rejectionReason}</div>`
+          ? `<div style="font-size: 10px; color: #1373e5; font-weight: 500; line-height: 1.2; margin-top: 3px;" title="${params.data.rejectionReason}">Reason: ${params.data.rejectionReason}</div>`
           : '';
         return `
           <div class="cell-stacked">

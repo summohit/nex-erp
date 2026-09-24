@@ -95,10 +95,10 @@ export interface ActionCellParams extends ICellRendererParams {
       background: #ecfdf5 !important;
     }
     .text-danger {
-      color: #ef4444 !important;
+      color: #1373e5 !important;
     }
     .text-danger:hover {
-      background: #fee2e2 !important;
+      background: #dbeafe !important;
     }
   `]
 })

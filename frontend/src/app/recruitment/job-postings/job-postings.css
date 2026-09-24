@@ -68,13 +68,13 @@
   align-items: center;
   gap: 4px;
   padding: 8px 12px;
-  color: #ef4444;
-  border-color: #fee2e2;
-  background: #fef2f2;
+  color: #1373e5;
+  border-color: #dbeafe;
+  background: #eff6ff;
 }
 
 .btn-clear:hover {
-  background: #fee2e2;
+  background: #dbeafe;
 }
 
 .grid-container {
@@ -125,7 +125,7 @@ input.form-control:focus,
 select.form-control:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.15);
 }
 
 select.form-control:disabled {
@@ -262,7 +262,7 @@ select.form-control:disabled {
 }
 
 .btn-ai-sparkle {
-  background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+  background: linear-gradient(135deg, #6366f1, #a855f7, #6b3fd6);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -398,7 +398,7 @@ select.form-control:disabled {
 
 .rich-editor-content:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.15);
 }
 
 /* Screening Questions Section */
@@ -439,9 +439,9 @@ select.form-control:disabled {
 }
 
 .badge-amber {
-  background: #fff7ed;
-  color: #ea580c;
-  border: 1px solid #fed7aa;
+  background: #eff6ff;
+  color: #1373e5;
+  border: 1px solid #dbeafe;
 }
 
 .badge-indigo {
@@ -481,9 +481,9 @@ select.form-control:disabled {
 }
 
 .pill-amber {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
+  background: #eff6ff;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
 }
 
 .pill-indigo {
@@ -556,9 +556,9 @@ select.form-control:disabled {
 
 .q-num {
   font-weight: 700;
-  color: #ea580c;
+  color: #1373e5;
   font-size: 12px;
-  background: #fff7ed;
+  background: #eff6ff;
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -590,8 +590,8 @@ select.form-control:disabled {
 }
 
 .btn-item-delete:hover {
-  background: #fee2e2;
-  color: #ef4444;
+  background: #dbeafe;
+  color: #1373e5;
 }
 
 /* Skill Chips */
@@ -632,7 +632,7 @@ select.form-control:disabled {
 }
 
 .btn-chip-remove:hover {
-  color: #dc2626;
+  color: #1373e5;
 }
 
 /* Add Entry Row (Inputs & Add Button) */
@@ -657,8 +657,8 @@ select.form-control:disabled {
 
 .entry-input:focus {
   background: #ffffff;
-  border-color: #ea580c;
-  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12);
 }
 
 .btn-entry-add {
@@ -813,8 +813,8 @@ select.form-control:disabled {
 }
 
 .status-badge.open { background: #dcfce7; color: #166534; }
-.status-badge.draft { background: #fef9c3; color: #ca8a04; }
-.status-badge.closed { background: #fee2e2; color: #991b1b; }
+.status-badge.draft { background: #f3efff; color: #4f2aa7; }
+.status-badge.closed { background: #dbeafe; color: #595a5b; }
 
 .view-desc-section {
   background: #ffffff;
@@ -885,7 +885,7 @@ select.form-control:disabled {
 
 .custom-select-trigger.active {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.15);
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.15);
 }
 
 .selected-val {
@@ -1002,7 +1002,7 @@ select.form-control:disabled {
 }
 
 .dropdown-item.selected {
-  background: #fff7ed;
+  background: #eff6ff;
 }
 
 .dept-badge {
@@ -1112,7 +1112,7 @@ select.form-control:disabled {
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--color-primary);
-  background: #fff7ed;
+  background: #eff6ff;
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -1192,7 +1192,7 @@ select.form-control:disabled {
 
 .toggle-control-box.active {
   border-color: var(--color-primary);
-  background: #fffdfb;
+  background: #fdfdfd;
 }
 
 .toggle-info {
@@ -1218,7 +1218,7 @@ select.form-control:disabled {
 }
 
 .required-star {
-  color: #ef4444;
+  color: #1373e5;
 }
 
 /* "Never expires" toggle under the End Date field */

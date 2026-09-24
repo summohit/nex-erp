@@ -94,7 +94,7 @@
 }
 
 .required {
-  color: #ef4444;
+  color: #1373e5;
   margin-left: 2px;
 }
 
@@ -118,11 +118,11 @@
 }
 
 .form-control.error {
-  border-color: #ef4444;
+  border-color: #1373e5;
 }
 
 .error-text {
-  color: #ef4444;
+  color: #1373e5;
   font-size: 12px;
   margin-top: 4px;
   display: flex;
@@ -185,7 +185,7 @@
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.15);
+  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.15);
 }
 
 .btn-primary:disabled, .btn-outline:disabled {
@@ -267,9 +267,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #504f51;
+  border: 1px solid #e0d7ff;
   font-size: 11px;
   font-weight: 600;
   padding: 3px 8px;
@@ -381,7 +381,7 @@
 .preset-clear {
   background: none;
   border: none;
-  color: #ef4444;
+  color: #1373e5;
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;

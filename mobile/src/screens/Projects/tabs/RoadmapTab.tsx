@@ -13,8 +13,8 @@ import { useProjectStore } from '../../../store/projectStore';
 import IssueDetailModal from '../modals/IssueDetailModal';
 
 const PRIORITY_COLORS: Record<string, string> = {
-  CRITICAL: '#EF4444',
-  HIGH: '#F97316',
+  CRITICAL: '#1373e5',
+  HIGH: '#1373e5',
   MEDIUM: '#3B82F6',
   LOW: '#94A3B8',
 };
@@ -24,7 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
   IN_PROGRESS: '#3B82F6',
   IN_REVIEW: '#A855F7',
   DONE: '#10B981',
-  CANCELLED: '#EF4444',
+  CANCELLED: '#1373e5',
 };
 
 const TYPE_ICONS: Record<string, string> = {
@@ -199,14 +199,14 @@ export default function RoadmapTab() {
             </View>
             {isOverdue && (
               <View style={styles.overdueDot}>
-                <AlertCircle size={12} color="#EF4444" />
+                <AlertCircle size={12} color="#1373e5" />
               </View>
             )}
           </View>
           <Text style={styles.issueTitle} numberOfLines={2}>{item.title}</Text>
           <View style={styles.issueMeta}>
             <Clock size={11} color="#94A3B8" />
-            <Text style={[styles.issueDateText, isOverdue && { color: '#EF4444' }]}>
+            <Text style={[styles.issueDateText, isOverdue && { color: '#1373e5' }]}>
               {formatDateRange(item.startDate, item.dueDate)}
             </Text>
             {days && <Text style={styles.issueDuration}>{days}d</Text>}
@@ -229,7 +229,7 @@ export default function RoadmapTab() {
     return (
       <ScrollView
         contentContainerStyle={styles.emptyContainer}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
       >
         <GanttChart size={40} color="#CBD5E1" />
         <Text style={styles.emptyTitle}>No issues yet</Text>
@@ -252,7 +252,7 @@ export default function RoadmapTab() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
       />
       {selectedIssue && (
         <IssueDetailModal

@@ -69,14 +69,14 @@
 .bg-blue-tint { background: #EFF6FF; }
 .bg-purple-tint { background: #F3E8FF; }
 .bg-green-tint { background: #ECFDF5; }
-.bg-amber-tint { background: #FFFBEB; }
-.bg-rose-tint { background: #FEF2F2; }
+.bg-amber-tint { background: #f3efff; }
+.bg-rose-tint { background: #eff6ff; }
 
 .text-blue { color: #2563EB; }
 .text-purple { color: #9333EA; }
 .text-green { color: #059669; }
-.text-amber { color: #D97706; }
-.text-rose { color: #E11D48; }
+.text-amber { color: #6b3fd6; }
+.text-rose { color: #7e7f80; }
 
 .kpi-label {
   font-size: 0.75rem;
@@ -128,7 +128,7 @@
 }
 
 .tab-badge {
-  background: #E11D48;
+  background: #7e7f80;
   color: #FFFFFF;
   font-size: 11px;
   padding: 1px 7px;
@@ -272,11 +272,11 @@
 .status-assigned { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
 .status-assigned .status-dot { background: #2563EB; }
 
-.status-repair { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
-.status-repair .status-dot { background: #D97706; }
+.status-repair { background: #f3efff; color: #6b3fd6; border: 1px solid #e0d7ff; }
+.status-repair .status-dot { background: #6b3fd6; }
 
-.status-retired { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
-.status-retired .status-dot { background: #DC2626; }
+.status-retired { background: #eff6ff; color: #1373e5; border: 1px solid #dbeafe; }
+.status-retired .status-dot { background: #1373e5; }
 
 /* Urgency Pills */
 .urgency-pill {
@@ -286,8 +286,8 @@
   font-weight: 700;
 }
 
-.urgency-high { background: #FEF2F2; color: #DC2626; }
-.urgency-medium { background: #FFFBEB; color: #D97706; }
+.urgency-high { background: #eff6ff; color: #1373e5; }
+.urgency-medium { background: #f3efff; color: #6b3fd6; }
 .urgency-low { background: #F1F5F9; color: #64748B; }
 
 /* User Cell */
@@ -341,7 +341,7 @@
 }
 
 .btn-primary:hover {
-  background: #E0480F;
+  background: #0f5fbe;
 }
 
 .btn-outline {
@@ -355,7 +355,7 @@
 }
 
 .btn-success { background: #059669; color: #FFFFFF; border: none; }
-.btn-danger { background: #DC2626; color: #FFFFFF; border: none; }
+.btn-danger { background: #1373e5; color: #FFFFFF; border: none; }
 
 .btn-xs {
   padding: 0.35rem 0.65rem;
@@ -490,7 +490,7 @@
 
 .upload-dropzone:hover {
   border-color: var(--color-primary) !important;
-  background: #FFF5F2 !important;
+  background: #f8f8f9 !important;
   transform: translateY(-1px) !important;
 }
 
@@ -574,7 +574,7 @@
 }
 
 .btn-remove-img:hover {
-  background: #DC2626;
+  background: #1373e5;
   transform: scale(1.1);
 }
 
@@ -611,7 +611,7 @@
   border-color: var(--color-primary);
 }
 
-.text-danger { color: #DC2626; }
+.text-danger { color: #1373e5; }
 .text-muted { color: #94A3B8; }
 .font-mono { font-family: monospace; }
 
@@ -669,8 +669,8 @@
 .cat-laptop { background: #EFF6FF; color: #3B82F6; }
 .cat-desktop { background: #F3E8FF; color: #9333EA; }
 .cat-monitor { background: #ECFDF5; color: #059669; }
-.cat-software { background: #FEF9C3; color: #CA8A04; }
-.cat-mobile { background: #FCE7F3; color: #EC4899; }
+.cat-software { background: #f3efff; color: #4f2aa7; }
+.cat-mobile { background: #FCE7F3; color: #6b3fd6; }
 .cat-peripheral { background: #F1F5F9; color: #475569; }
 .cat-default { background: #F1F5F9; color: #64748B; }
 
@@ -712,11 +712,11 @@
 .status-assigned, .status-active { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
 .status-assigned .status-dot, .status-active .status-dot { background: #2563EB; }
 
-.status-in-repair { background: #FEF9C3; color: #CA8A04; border-color: #FDE047; }
-.status-in-repair .status-dot { background: #CA8A04; }
+.status-in-repair { background: #f3efff; color: #4f2aa7; border-color: #e0d7ff; }
+.status-in-repair .status-dot { background: #4f2aa7; }
 
-.status-retired { background: #FCE7F3; color: #EC4899; border-color: #F9A8D4; }
-.status-retired .status-dot { background: #EC4899; }
+.status-retired { background: #FCE7F3; color: #6b3fd6; border-color: #F9A8D4; }
+.status-retired .status-dot { background: #6b3fd6; }
 
 .status-returned { background: #F1F5F9; color: #64748B; border-color: #CBD5E1; }
 .status-returned .status-dot { background: #64748B; }
@@ -724,11 +724,11 @@
 .status-approved, .status-fulfilled { background: #ECFDF5; color: #059669; border-color: #A7F3D0; }
 .status-approved .status-dot, .status-fulfilled .status-dot { background: #059669; }
 
-.status-rejected { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
-.status-rejected .status-dot { background: #DC2626; }
+.status-rejected { background: #eff6ff; color: #1373e5; border-color: #dbeafe; }
+.status-rejected .status-dot { background: #1373e5; }
 
-.status-pending { background: #FFFBEB; color: #D97706; border-color: #FDE68A; }
-.status-pending .status-dot { background: #D97706; }
+.status-pending { background: #f3efff; color: #6b3fd6; border-color: #e0d7ff; }
+.status-pending .status-dot { background: #6b3fd6; }
 
 /* Urgency & Condition Classes */
 .badge-condition {
@@ -740,11 +740,11 @@
 }
 
 .cond-good, .cond-excellent, .cond-brand-new { background: #ECFDF5; color: #047857; }
-.cond-fair { background: #FEF9C3; color: #A16207; }
-.cond-needs-repair, .cond-poor { background: #FEF2F2; color: #B91C1C; }
+.cond-fair { background: #f3efff; color: #4f2aa7; }
+.cond-needs-repair, .cond-poor { background: #eff6ff; color: #0f4f9c; }
 
-.urgency-high { background: #FEF2F2; color: #DC2626; }
-.urgency-medium { background: #FFFBEB; color: #D97706; }
+.urgency-high { background: #eff6ff; color: #1373e5; }
+.urgency-medium { background: #f3efff; color: #6b3fd6; }
 .urgency-low { background: #ECFDF5; color: #059669; }
 
 .cell-user-avatar-row {
@@ -819,7 +819,7 @@
 }
 
 .btn-close-viewer:hover {
-  background: #DC2626;
+  background: #1373e5;
   transform: scale(1.1);
 }
 
@@ -1035,7 +1035,7 @@
   font-size: 13px;
 }
 .text-danger-cell {
-  color: #DC2626;
+  color: #1373e5;
 }
 .status-stack {
   display: flex;
@@ -1054,14 +1054,14 @@
   line-height: normal;
 }
 .flag-low {
-  background: #FEF3C7;
-  color: #B45309;
-  border: 1px solid #FDE68A;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
 .flag-expiring {
-  background: #FFEDD5;
-  color: #C2410C;
-  border: 1px solid #FED7AA;
+  background: #dbeafe;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
 }
 
 /* Inventory status badges */
@@ -1074,8 +1074,8 @@
 .status-fully-assigned { background: #F3E8FF; color: #9333EA; border-color: #E9D5FF; }
 .status-fully-assigned .status-dot { background: #9333EA; }
 
-.status-expired { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
-.status-expired .status-dot { background: #DC2626; }
+.status-expired { background: #eff6ff; color: #1373e5; border-color: #dbeafe; }
+.status-expired .status-dot { background: #1373e5; }
 
 .status-out-of-stock { background: #F1F5F9; color: #475569; border-color: #CBD5E1; }
 .status-out-of-stock .status-dot { background: #475569; }
@@ -1084,8 +1084,8 @@
 .cat-printer { background: #F1F5F9; color: #475569; }
 .cat-furniture { background: #FDF4FF; color: #A21CAF; }
 .cat-pantry { background: #ECFDF5; color: #047857; }
-.cat-stationery { background: #FEF9C3; color: #A16207; }
-.cat-housekeeping { background: #FFF7ED; color: #C2410C; }
+.cat-stationery { background: #f3efff; color: #4f2aa7; }
+.cat-housekeeping { background: #eff6ff; color: #0f4f9c; }
 
 /* ========================================== */
 /* CENTERED BLURRED MODALS                     */
@@ -1258,10 +1258,10 @@
 .sum-blue .sum-value { color: #1E40AF; }
 .sum-slate { background: #F8FAFC; }
 .sum-slate .sum-value { color: #334155; }
-.sum-amber { background: #FFFBEB; border-color: #FDE68A; }
-.sum-amber .sum-value { color: #92400E; }
-.sum-rose { background: #FEF2F2; border-color: #FECACA; }
-.sum-rose .sum-value { color: #991B1B; }
+.sum-amber { background: #f3efff; border-color: #e0d7ff; }
+.sum-amber .sum-value { color: #504f51; }
+.sum-rose { background: #eff6ff; border-color: #dbeafe; }
+.sum-rose .sum-value { color: #595a5b; }
 .sum-value-card { background: #0F172A; border-color: #0F172A; }
 .sum-value-card .sum-label { color: #94A3B8; }
 .sum-value-card .sum-value { color: #FFFFFF; }
@@ -1479,8 +1479,8 @@
 .txn-purchase { background: #ECFDF5; color: #047857; }
 .txn-assigned { background: #EFF6FF; color: #2563EB; }
 .txn-returned { background: #F1F5F9; color: #475569; }
-.txn-consumed { background: #FFFBEB; color: #B45309; }
-.txn-expired { background: #FEF2F2; color: #DC2626; }
+.txn-consumed { background: #f3efff; color: #4f2aa7; }
+.txn-expired { background: #eff6ff; color: #1373e5; }
 .txn-adjustment { background: #F3E8FF; color: #9333EA; }
 
 .empty-txns {
@@ -1622,9 +1622,9 @@
 }
 
 .field-error {
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
-  color: #B91C1C;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #0f4f9c;
   font-size: 0.8125rem;
   font-weight: 600;
   border-radius: 8px;
@@ -1867,9 +1867,9 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
-.status-overdue { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
+.status-overdue { background: #eff6ff; color: #1373e5; border-color: #dbeafe; }
 .status-overdue .status-dot {
-  background: #DC2626;
+  background: #1373e5;
   animation: overdue-pulse 1.6s ease-in-out infinite;
 }
 @keyframes overdue-pulse {
@@ -1881,9 +1881,9 @@
   margin-left: 6px;
   padding: 1px 7px;
   border-radius: 9999px;
-  background: #FEF2F2;
-  color: #DC2626;
-  border: 1px solid #FECACA;
+  background: #eff6ff;
+  color: #1373e5;
+  border: 1px solid #dbeafe;
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.04em;

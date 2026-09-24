@@ -976,7 +976,7 @@
     </div>
   </div>
 
-  <div class="reject-reason-banner" *ngIf="selectedApp() as app" [style.display]="app.status === 'REJECTED' && app.rejectionReason ? 'block' : 'none'" style="padding: 10px 20px; background: #fef2f2; border-top: 1px solid #fecaca; font-size: 13px; color: #991b1b;">
+  <div class="reject-reason-banner" *ngIf="selectedApp() as app" [style.display]="app.status === 'REJECTED' && app.rejectionReason ? 'block' : 'none'" style="padding: 10px 20px; background: #eff6ff; border-top: 1px solid #dbeafe; font-size: 13px; color: #595a5b;">
     <strong>Rejection reason:</strong> {{ app.rejectionReason }}
   </div>
 
@@ -1423,21 +1423,21 @@
 
             <div class="funnel-item">
               <div class="funnel-label-row">
-                <span class="stage-name"><span class="dot-indicator" style="background:#ea580c;"></span> Shortlisted</span>
+                <span class="stage-name"><span class="dot-indicator" style="background:#1373e5;"></span> Shortlisted</span>
                 <span class="stage-count"><strong>{{ data.pipeline.SHORTLISTED }}</strong> ({{ data.totalApplications > 0 ? Math.round((data.pipeline.SHORTLISTED / data.totalApplications) * 100) : 0 }}%)</span>
               </div>
               <div class="funnel-bar-bg">
-                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #f97316, #ea580c);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.SHORTLISTED / data.totalApplications * 100) : 0"></div>
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #1373e5, #1373e5);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.SHORTLISTED / data.totalApplications * 100) : 0"></div>
               </div>
             </div>
 
             <div class="funnel-item">
               <div class="funnel-label-row">
-                <span class="stage-name"><span class="dot-indicator" style="background:#d97706;"></span> Interviewing</span>
+                <span class="stage-name"><span class="dot-indicator" style="background:#6b3fd6;"></span> Interviewing</span>
                 <span class="stage-count"><strong>{{ data.pipeline.INTERVIEWING }}</strong> ({{ data.totalApplications > 0 ? Math.round((data.pipeline.INTERVIEWING / data.totalApplications) * 100) : 0 }}%)</span>
               </div>
               <div class="funnel-bar-bg">
-                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #f59e0b, #d97706);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.INTERVIEWING / data.totalApplications * 100) : 0"></div>
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #6b3fd6, #6b3fd6);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.INTERVIEWING / data.totalApplications * 100) : 0"></div>
               </div>
             </div>
 
@@ -1453,11 +1453,11 @@
 
             <div class="funnel-item">
               <div class="funnel-label-row">
-                <span class="stage-name"><span class="dot-indicator" style="background:#ef4444;"></span> Rejected</span>
+                <span class="stage-name"><span class="dot-indicator" style="background:#1373e5;"></span> Rejected</span>
                 <span class="stage-count"><strong>{{ data.pipeline.REJECTED }}</strong> ({{ data.totalApplications > 0 ? Math.round((data.pipeline.REJECTED / data.totalApplications) * 100) : 0 }}%)</span>
               </div>
               <div class="funnel-bar-bg">
-                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #f87171, #ef4444);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.REJECTED / data.totalApplications * 100) : 0"></div>
+                <div class="funnel-bar-fill" style="background: linear-gradient(90deg, #b4b4b5, #1373e5);" [style.width.%]="data.totalApplications > 0 ? (data.pipeline.REJECTED / data.totalApplications * 100) : 0"></div>
               </div>
             </div>
           </div>

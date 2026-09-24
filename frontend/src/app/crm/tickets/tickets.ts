@@ -206,9 +206,9 @@ export class TicketsComponent implements OnInit {
   };
 
   readonly priorityDotColors: Record<string, string> = {
-    CRITICAL: '#ef4444',
-    HIGH: '#f97316',
-    MEDIUM: '#f59e0b',
+    CRITICAL: '#1373e5',
+    HIGH: '#1373e5',
+    MEDIUM: '#6b3fd6',
     LOW: '#64748b',
   };
 
@@ -356,7 +356,7 @@ export class TicketsComponent implements OnInit {
         const today = new Date();
         const str = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         if (date < today && p.data?.status !== 'RESOLVED' && p.data?.status !== 'CLOSED') {
-          return `<span style="color: #dc2626; font-weight: 600;">${str}</span>`;
+          return `<span style="color: #1373e5; font-weight: 600;">${str}</span>`;
         }
         return str;
       }
@@ -585,22 +585,22 @@ export class TicketsComponent implements OnInit {
   // lightness band). Magnitude charts use one hue; identity charts use the
   // categorical order; state/severity charts use the reserved status colours.
 
-  readonly catPalette = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];
+  readonly catPalette = ['#2a78d6', '#8f8f90', '#1baf7a', '#767677', '#b1b1b2'];
   readonly singleHue = ['#2a78d6'];
   readonly trendPalette = ['#2a78d6', '#1baf7a'];
 
   private readonly statusPalette: Record<string, string> = {
     OPEN: '#2a78d6',
-    IN_PROGRESS: '#eda100',
+    IN_PROGRESS: '#767677',
     RESOLVED: '#0ca30c',
     CLOSED: '#64748b',
-    REJECTED: '#d03b3b',
+    REJECTED: '#858586',
   };
 
   private readonly priorityPalette: Record<string, string> = {
-    CRITICAL: '#d03b3b',
-    HIGH: '#ec835a',
-    MEDIUM: '#fab219',
+    CRITICAL: '#858586',
+    HIGH: '#a2a3a4',
+    MEDIUM: '#89898a',
     LOW: '#64748b',
   };
 

@@ -102,9 +102,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const colors = [
       'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
       'linear-gradient(135deg, #10B981 0%, #047857 100%)',
-      'linear-gradient(135deg, #F59E0B 0%, #B45309 100%)',
+      'linear-gradient(135deg, #6b3fd6 0%, #4f2aa7 100%)',
       'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
-      'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)',
+      'linear-gradient(135deg, #6b3fd6 0%, #6a6b6c 100%)',
       'linear-gradient(135deg, #06B6D4 0%, #0E7490 100%)',
     ];
     let hash = 0;
@@ -270,12 +270,12 @@ myLeaveBalanceDays = computed(() => {
 
   appreciationAwardColor(c: string) {
     const colors: Record<string, string> = {
-      orange: '#f97316',
+      orange: '#1373e5',
       purple: '#9333ea',
       blue: '#2563eb',
       green: '#059669',
-      red: '#dc2626',
-      yellow: '#d97706'
+      red: '#1373e5',
+      yellow: '#6b3fd6'
     };
     return colors[c] || '#94a3b8';
   }

@@ -93,9 +93,9 @@ export class TicketDetailComponent implements OnInit {
   };
 
   readonly priorityDotColors: Record<string, string> = {
-    CRITICAL: '#ef4444',
-    HIGH: '#f97316',
-    MEDIUM: '#f59e0b',
+    CRITICAL: '#1373e5',
+    HIGH: '#1373e5',
+    MEDIUM: '#6b3fd6',
     LOW: '#64748b',
   };
 

@@ -300,9 +300,9 @@
 }
 
 .badge-status.needs-review {
-  background: #fffbeb;
-  color: #d97706;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #6b3fd6;
+  border: 1px solid #e0d7ff;
 }
 
 .schedule-date-tag {
@@ -532,8 +532,8 @@
 }
 
 .stars-row svg.filled {
-  color: #f59e0b;
-  fill: #f59e0b;
+  color: #6b3fd6;
+  fill: #6b3fd6;
 }
 
 .rating-score-num {
@@ -566,7 +566,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #f59e0b;
+  background: #6b3fd6;
 }
 
 .btn-cta {
@@ -748,8 +748,8 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: #fef3c7;
-  color: #d97706;
+  background: #f3efff;
+  color: #6b3fd6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -897,7 +897,7 @@
 }
 
 .required-star {
-  color: #ef4444;
+  color: #1373e5;
   font-weight: 700;
 }
 
@@ -921,16 +921,16 @@
 
 .star-interactive-btn:hover {
   transform: scale(1.15);
-  color: #f59e0b;
+  color: #6b3fd6;
 }
 
 .star-interactive-btn.active {
-  color: #f59e0b;
+  color: #6b3fd6;
 }
 
 .star-interactive-btn.active svg {
-  fill: #f59e0b;
-  color: #f59e0b;
+  fill: #6b3fd6;
+  color: #6b3fd6;
 }
 
 .rating-legend-pill {
@@ -945,8 +945,8 @@
 }
 
 .rating-legend-pill.highlight {
-  background: #fef3c7;
-  color: #b45309;
+  background: #f3efff;
+  color: #4f2aa7;
 }
 
 .quick-tags-wrap {

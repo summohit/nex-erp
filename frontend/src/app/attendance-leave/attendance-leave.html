@@ -402,36 +402,36 @@
 
     <div class="drawer-body">
       <!-- HR Unassigned Leave Balances Warning Alert -->
-      <div *ngIf="myBalances().length === 0" style="background-color: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px;">
-        <svg lucideAlertCircle size="20" style="color: #DC2626; flex-shrink: 0; margin-top: 2px;"></svg>
+      <div *ngIf="myBalances().length === 0" style="background-color: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px;">
+        <svg lucideAlertCircle size="20" style="color: #1373e5; flex-shrink: 0; margin-top: 2px;"></svg>
         <div>
-          <strong style="color: #991B1B; font-size: 14px; display: block; margin-bottom: 2px;">No Leave Balances Assigned</strong>
-          <span style="color: #7F1D1D; font-size: 13px; line-height: 1.4; display: block;">You do not have any active leave types assigned to your profile. Please contact your HR administrator to allocate leave balances.</span>
+          <strong style="color: #595a5b; font-size: 14px; display: block; margin-bottom: 2px;">No Leave Balances Assigned</strong>
+          <span style="color: #4e4e4e; font-size: 13px; line-height: 1.4; display: block;">You do not have any active leave types assigned to your profile. Please contact your HR administrator to allocate leave balances.</span>
         </div>
       </div>
 
       <div class="form-group mb-4">
-        <label>Leave Type <span style="color: #E14B42;">*</span></label>
-        <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#E14B42' : ''" [disabled]="myBalances().length === 0">
+        <label>Leave Type <span style="color: #919192;">*</span></label>
+        <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#919192' : ''" [disabled]="myBalances().length === 0">
           <option value="">{{ myBalances().length === 0 ? 'No Leave Types Available' : 'Select Leave Type...' }}</option>
           <option *ngFor="let balance of myBalances()" [value]="balance.leaveType.id">
             {{ balance.leaveType.name }} ({{ balance.allocated - balance.used }} days available)
           </option>
         </select>
-        <div *ngIf="showFormErrors() && !requestForm.leaveTypeId && myBalances().length > 0" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Leave Type is required</div>
+        <div *ngIf="showFormErrors() && !requestForm.leaveTypeId && myBalances().length > 0" style="color: #919192; font-size: 12px; margin-top: 4px;">Leave Type is required</div>
       </div>
 
       <div class="grid-2-col mb-4">
         <div class="form-group">
-          <label>Start Date <span style="color: #E14B42;">*</span></label>
-          <input type="date" class="form-control" [(ngModel)]="requestForm.startDate" [style.border-color]="showFormErrors() && !requestForm.startDate ? '#E14B42' : ''">
-          <div *ngIf="showFormErrors() && !requestForm.startDate" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Start Date is required</div>
+          <label>Start Date <span style="color: #919192;">*</span></label>
+          <input type="date" class="form-control" [(ngModel)]="requestForm.startDate" [style.border-color]="showFormErrors() && !requestForm.startDate ? '#919192' : ''">
+          <div *ngIf="showFormErrors() && !requestForm.startDate" style="color: #919192; font-size: 12px; margin-top: 4px;">Start Date is required</div>
         </div>
         <div class="form-group">
-          <label>End Date <span style="color: #E14B42;">*</span></label>
-          <input type="date" class="form-control" [(ngModel)]="requestForm.endDate" [min]="requestForm.startDate" [style.border-color]="showFormErrors() && (!requestForm.endDate || requestForm.endDate < requestForm.startDate) ? '#E14B42' : ''">
-          <div *ngIf="showFormErrors() && !requestForm.endDate" style="color: #E14B42; font-size: 12px; margin-top: 4px;">End Date is required</div>
-          <div *ngIf="showFormErrors() && requestForm.endDate && requestForm.endDate < requestForm.startDate" style="color: #E14B42; font-size: 12px; margin-top: 4px;">Must be >= Start Date</div>
+          <label>End Date <span style="color: #919192;">*</span></label>
+          <input type="date" class="form-control" [(ngModel)]="requestForm.endDate" [min]="requestForm.startDate" [style.border-color]="showFormErrors() && (!requestForm.endDate || requestForm.endDate < requestForm.startDate) ? '#919192' : ''">
+          <div *ngIf="showFormErrors() && !requestForm.endDate" style="color: #919192; font-size: 12px; margin-top: 4px;">End Date is required</div>
+          <div *ngIf="showFormErrors() && requestForm.endDate && requestForm.endDate < requestForm.startDate" style="color: #919192; font-size: 12px; margin-top: 4px;">Must be >= Start Date</div>
         </div>
       </div>
 
@@ -674,7 +674,7 @@
             <div class="detail-label">Duration</div>
             <div class="detail-value">
               {{ leaveDuration(leave) }} day{{ leaveDuration(leave) === 1 ? '' : 's' }}
-              <span *ngIf="leave.isHalfDay" style="color: #EC5F2A;">· Half Day ({{ leave.halfDayPeriod || 'AM' }})</span>
+              <span *ngIf="leave.isHalfDay" style="color: #1373e5;">· Half Day ({{ leave.halfDayPeriod || 'AM' }})</span>
             </div>
           </div>
           <div>
@@ -690,7 +690,7 @@
 
         <div style="padding-top: 16px;" *ngIf="leave.status === 'REJECTED' && leave.rejectionReason">
           <div class="detail-label">Rejection Reason</div>
-          <div class="detail-value" style="white-space: pre-wrap; background: #FEF2F2; color: #B91C1C; padding: 10px 12px; border-radius: 6px; border: 1px solid #FECACA; margin-top: 4px;">{{ leave.rejectionReason }}</div>
+          <div class="detail-value" style="white-space: pre-wrap; background: #eff6ff; color: #0f4f9c; padding: 10px 12px; border-radius: 6px; border: 1px solid #dbeafe; margin-top: 4px;">{{ leave.rejectionReason }}</div>
         </div>
 
         <div style="padding-top: 16px;" *ngIf="leave.approvedBy || leave.approvedById">
@@ -1220,10 +1220,10 @@
 
         <!-- Never clocked out: the 23:00 sweep closed this day -->
         <div *ngIf="selectedDayDetails()?.log?.autoClockedOut"
-             style="display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; padding: 10px 12px; background: #FFFBEB; border: 1px solid #FDE68A; border-left: 3px solid #F59E0B; border-radius: 8px; font-size: 11.5px; line-height: 1.5; color: #78350F;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+             style="display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; padding: 10px 12px; background: #f3efff; border: 1px solid #e0d7ff; border-left: 3px solid #6b3fd6; border-radius: 8px; font-size: 11.5px; line-height: 1.5; color: #434344;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b3fd6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
           <span>
-            <strong style="font-weight: 700; color: #92400E;">Auto-closed at 11:00 PM.</strong>
+            <strong style="font-weight: 700; color: #504f51;">Auto-closed at 11:00 PM.</strong>
             No clock-out was recorded, so the system closed the day at its 11:00 PM cutoff and reused the
             clock-in location. The time and coordinates below are not a recorded departure.
           </span>
@@ -1265,11 +1265,11 @@
                     {{ punch.clockOut ? (punch.clockOut | date:'shortTime') : 'Ongoing...' }}
                     <span *ngIf="punch.autoClockedOut"
                           title="Closed by the system at its 11:00 PM cutoff — not a recorded clock-out"
-                          style="display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 9999px; background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle; cursor: help;">auto</span>
+                          style="display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 9999px; background: #f3efff; border: 1px solid #e0d7ff; color: #504f51; font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle; cursor: help;">auto</span>
                   </div>
-                  <div *ngIf="punch.clockOutLat" [style.background]="punch.autoClockedOut ? '#FFFBEB' : '#F8FAFC'" [style.border-color]="punch.autoClockedOut ? '#FDE68A' : '#E2E8F0'" style="margin-top: 8px; font-size: 10px; color: #475569; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 6px; border: 1px solid #E2E8F0;">
+                  <div *ngIf="punch.clockOutLat" [style.background]="punch.autoClockedOut ? '#f3efff' : '#F8FAFC'" [style.border-color]="punch.autoClockedOut ? '#e0d7ff' : '#E2E8F0'" style="margin-top: 8px; font-size: 10px; color: #475569; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 6px; border: 1px solid #E2E8F0;">
                     <span style="color: #64748B;">
-                      <em *ngIf="punch.autoClockedOut" style="display: block; margin-bottom: 3px; color: #92400E; font-weight: 700; font-style: normal; font-size: 9.5px;">clock-in location reused</em>
+                      <em *ngIf="punch.autoClockedOut" style="display: block; margin-bottom: 3px; color: #504f51; font-weight: 700; font-style: normal; font-size: 9.5px;">clock-in location reused</em>
                       Lat: {{ punch.clockOutLat | number:'1.4-4' }}<br>Lng: {{ punch.clockOutLng | number:'1.4-4' }}</span>
                     <a [href]="'https://www.google.com/maps?q=' + punch.clockOutLat + ',' + punch.clockOutLng" target="_blank" style="color: #2563EB; font-size: 10px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; margin-top: 2px;">
                       View on Map
@@ -1288,9 +1288,9 @@
         </div>
 
         <!-- Summary Duration -->
-        <div style="display: flex; align-items: center; justify-content: space-between; background: #FFFBEB; border: 1px solid #FDE68A; padding: 10px 14px; border-radius: 10px;">
-          <span style="font-size: 12px; font-weight: 600; color: #92400E;">⏱️ Total Duration Worked:</span>
-          <span style="font-size: 13px; font-weight: 800; color: #78350F;">{{ selectedDayDetails()?.durationStr }}</span>
+        <div style="display: flex; align-items: center; justify-content: space-between; background: #f3efff; border: 1px solid #e0d7ff; padding: 10px 14px; border-radius: 10px;">
+          <span style="font-size: 12px; font-weight: 600; color: #504f51;">⏱️ Total Duration Worked:</span>
+          <span style="font-size: 13px; font-weight: 800; color: #434344;">{{ selectedDayDetails()?.durationStr }}</span>
         </div>
       </div>
 
@@ -1322,8 +1322,8 @@
       </div>
       <div class="drawer-body">
         <div class="form-group mb-4">
-          <label>Date <span style="color: #E14B42;">*</span></label>
-          <input type="date" class="form-control" [(ngModel)]="regularizationForm.date" [style.border-color]="showFormErrors() && !regularizationForm.date ? '#E14B42' : ''">
+          <label>Date <span style="color: #919192;">*</span></label>
+          <input type="date" class="form-control" [(ngModel)]="regularizationForm.date" [style.border-color]="showFormErrors() && !regularizationForm.date ? '#919192' : ''">
         </div>
         <div class="grid-2-col mb-4">
           <div class="form-group">
@@ -1336,8 +1336,8 @@
           </div>
         </div>
         <div class="form-group mb-4">
-          <label>Reason <span style="color: #E14B42;">*</span></label>
-          <textarea class="form-control" [(ngModel)]="regularizationForm.reason" rows="3" placeholder="Why are you regularizing?" [style.border-color]="showFormErrors() && !regularizationForm.reason ? '#E14B42' : ''"></textarea>
+          <label>Reason <span style="color: #919192;">*</span></label>
+          <textarea class="form-control" [(ngModel)]="regularizationForm.reason" rows="3" placeholder="Why are you regularizing?" [style.border-color]="showFormErrors() && !regularizationForm.reason ? '#919192' : ''"></textarea>
         </div>
       </div>
       <div class="drawer-footer">

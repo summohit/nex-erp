@@ -219,7 +219,7 @@ export default function ResumeSkillsTab({ profileData, isOwner, onUploadAttachme
       case 'Education':
         return { bg: '#FAF5FF', text: '#9333EA', icon: GraduationCap };
       case 'Certification':
-        return { bg: '#FFFBEB', text: '#D97706', icon: Award };
+        return { bg: '#f3efff', text: '#6b3fd6', icon: Award };
       default:
         return { bg: '#EFF6FF', text: '#2563EB', icon: Building2 };
     }
@@ -232,8 +232,8 @@ export default function ResumeSkillsTab({ profileData, isOwner, onUploadAttachme
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
-            <View style={[styles.iconBox, { backgroundColor: '#FFF7ED' }]}>
-              <FileText size={18} color="#EA580C" />
+            <View style={[styles.iconBox, { backgroundColor: '#eff6ff' }]}>
+              <FileText size={18} color="#1373e5" />
             </View>
             <View style={styles.headerTitles}>
               <Text style={styles.cardTitle}>EXPERIENCE & EDUCATION</Text>
@@ -277,10 +277,10 @@ export default function ResumeSkillsTab({ profileData, isOwner, onUploadAttachme
                             <Edit2 size={14} color="#64748B" />
                           </TouchableOpacity>
                           <TouchableOpacity 
-                            style={[styles.iconActionBtn, { backgroundColor: '#FEE2E2' }]} 
+                            style={[styles.iconActionBtn, { backgroundColor: '#dbeafe' }]}
                             onPress={() => deleteResumeLine(index)}
                           >
-                            <Trash2 size={14} color="#DC2626" />
+                            <Trash2 size={14} color="#1373e5" />
                           </TouchableOpacity>
                         </View>
                       )}
@@ -469,7 +469,7 @@ export default function ResumeSkillsTab({ profileData, isOwner, onUploadAttachme
                        {currentResume.attachment?.fileName || currentResume.attachmentUrl?.split('/').pop()}
                      </Text>
                      <TouchableOpacity style={{ padding: 4 }} onPress={() => setCurrentResume({ ...currentResume, attachment: null, attachmentUrl: null })}>
-                       <X size={16} color="#DC2626" />
+                       <X size={16} color="#1373e5" />
                      </TouchableOpacity>
                    </View>
                 ) : (
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 10,
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DCFCE7',
   },
   levelIntermediate: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#f3efff',
   },
   levelText: {
     fontSize: 10,
@@ -851,8 +851,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typeOptionChipActive: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#EA580C',
+    backgroundColor: '#eff6ff',
+    borderColor: '#1373e5',
   },
   typeOptionText: {
     fontSize: 12,
@@ -860,7 +860,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   typeOptionTextActive: {
-    color: '#EA580C',
+    color: '#1373e5',
     fontWeight: '800',
   },
   textInput: {
@@ -904,13 +904,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   saveSubmitBtn: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 10,
     marginBottom: 20,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 6,

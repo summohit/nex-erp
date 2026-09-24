@@ -155,7 +155,7 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
         >
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
-        <ChevronDown size={17} color={selectedOption ? '#E25E3E' : '#94A3B8'} />
+        <ChevronDown size={17} color={selectedOption ? '#1373e5' : '#94A3B8'} />
       </TouchableOpacity>
 
       {modalVisible && (
@@ -213,7 +213,7 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
                         <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
                           {item.label}
                         </Text>
-                        {isSelected && <CheckCircle2 size={18} color="#E25E3E" strokeWidth={2.5} />}
+                        {isSelected && <CheckCircle2 size={18} color="#1373e5" strokeWidth={2.5} />}
                       </TouchableOpacity>
                     );
                   })
@@ -249,8 +249,8 @@ const CollapsibleSection = ({
     <View style={styles.card}>
       <TouchableOpacity activeOpacity={0.7} style={styles.cardHeader} onPress={toggle}>
         <View style={styles.headerLeft}>
-          <View style={[styles.iconBox, { backgroundColor: iconBg || '#FFF7ED' }]}>
-            <Icon size={18} color={iconColor || '#EA580C'} />
+          <View style={[styles.iconBox, { backgroundColor: iconBg || '#eff6ff' }]}>
+            <Icon size={18} color={iconColor || '#1373e5'} />
           </View>
           <View style={styles.headerTitles}>
             <Text style={styles.cardTitle}>{title}</Text>
@@ -429,8 +429,8 @@ export default function PersonalTab({ profileData, onFormChange, isOwner, refres
         title="CONTACT & BANKING"
         subtitle="Primary phone, email, and salary payout account"
         icon={Phone}
-        iconBg="#FFF7ED"
-        iconColor="#EA580C"
+        iconBg="#eff6ff"
+        iconColor="#1373e5"
         initiallyExpanded
       >
         <Field label="Official Email" field="email" value={officialEmail} isOwner={isOwner} onChangeValue={updateField} readOnly />
@@ -524,8 +524,8 @@ export default function PersonalTab({ profileData, onFormChange, isOwner, refres
         title="RESIDENTIAL ADDRESS"
         subtitle="Home address and daily commute details"
         icon={MapPin}
-        iconBg="#FEF2F2"
-        iconColor="#DC2626"
+        iconBg="#eff6ff"
+        iconColor="#1373e5"
       >
         {/* Country → searchable dropdown */}
         <DropdownPicker
@@ -583,8 +583,8 @@ export default function PersonalTab({ profileData, onFormChange, isOwner, refres
         title="ACADEMIC BACKGROUND"
         subtitle="Highest degree and field of study"
         icon={BookOpen}
-        iconBg="#FFFBEB"
-        iconColor="#D97706"
+        iconBg="#f3efff"
+        iconColor="#6b3fd6"
       >
         {/* Education Level → dropdown */}
         <DropdownPicker
@@ -811,8 +811,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginVertical: 2,
   },
-  optionItemSelected: { backgroundColor: '#FFF7ED' },
+  optionItemSelected: { backgroundColor: '#eff6ff' },
   optionText: { fontSize: 15, color: '#334155', fontWeight: '600' },
-  selectedOptionText: { color: '#EA580C', fontWeight: '800' },
+  selectedOptionText: { color: '#1373e5', fontWeight: '800' },
   emptyText: { textAlign: 'center', color: '#94A3B8', fontSize: 14, paddingVertical: 24 },
 });

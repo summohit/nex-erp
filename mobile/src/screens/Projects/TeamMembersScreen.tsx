@@ -19,7 +19,7 @@ import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
 
 function getRoleLabel(member: any, project: any): { label: string; color: string; Icon: any } {
   if (member.employeeId === project?.leadId) {
-    return { label: 'Owner', color: '#E25E3E', Icon: Crown };
+    return { label: 'Owner', color: '#1373e5', Icon: Crown };
   }
   if (member.role === 'PROJECT_MANAGER') {
     return { label: 'PM', color: '#7C3AED', Icon: ShieldCheck };
@@ -151,7 +151,7 @@ export default function TeamMembersScreen() {
         </View>
         {canRemove && (
           <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(item)} disabled={isBusy}>
-            {isBusy ? <ActivityIndicator size="small" color="#EF4444" /> : <UserMinus size={16} color="#EF4444" />}
+            {isBusy ? <ActivityIndicator size="small" color="#1373e5" /> : <UserMinus size={16} color="#1373e5" />}
           </TouchableOpacity>
         )}
       </View>
@@ -173,9 +173,9 @@ export default function TeamMembersScreen() {
           {item.firstName} {item.lastName}
         </Text>
         {isBusy ? (
-          <ActivityIndicator size="small" color="#E25E3E" />
+          <ActivityIndicator size="small" color="#1373e5" />
         ) : (
-          <UserPlus size={16} color="#E25E3E" />
+          <UserPlus size={16} color="#1373e5" />
         )}
       </TouchableOpacity>
     );
@@ -214,7 +214,7 @@ export default function TeamMembersScreen() {
                 )}
               </View>
               {loadingRoster ? (
-                <ActivityIndicator color="#E25E3E" style={{ marginTop: 20 }} />
+                <ActivityIndicator color="#1373e5" style={{ marginTop: 20 }} />
               ) : invitableMembers.length === 0 ? (
                 <Text style={styles.emptyInviteText}>No employees available to invite.</Text>
               ) : (
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -220,7 +220,7 @@
               [class.active]="isStarred(p.id)"
               (click)="toggleStar(p.id, $event)" 
               title="Toggle star">
-              <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
+              <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#0f4f9c' : 'none'" [style.stroke]="isStarred(p.id) ? '#0f4f9c' : 'currentColor'"></svg>
             </button>
             <button 
               type="button" 
@@ -293,7 +293,7 @@
               [class.active]="isStarred(p.id)" 
               (click)="toggleStar(p.id, $event)" 
               title="Toggle star">
-              <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
+              <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#0f4f9c' : 'none'" [style.stroke]="isStarred(p.id) ? '#0f4f9c' : 'currentColor'"></svg>
             </button>
           </div>
           <ng-container *ngTemplateOutlet="teamStack; context: {p: p}"></ng-container>
@@ -530,7 +530,7 @@
                   [class.active]="isStarred(p.id)"
                   (click)="toggleStar(p.id, $event)"
                   title="Toggle star">
-                  <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#eab308' : 'none'" [style.stroke]="isStarred(p.id) ? '#eab308' : 'currentColor'"></svg>
+                  <svg lucideStar size="16" [style.fill]="isStarred(p.id) ? '#0f4f9c' : 'none'" [style.stroke]="isStarred(p.id) ? '#0f4f9c' : 'currentColor'"></svg>
                 </button>
               </div>
               <!-- Avatar stack overlaid on banner -->
@@ -1471,7 +1471,7 @@
           </div>
         </div>
         <div class="context-hint" *ngIf="!isPreSalesTarget">
-          <svg lucideCheckCircle2 size="12" style="color: #ea580c; flex-shrink: 0;"></svg>
+          <svg lucideCheckCircle2 size="12" style="color: #1373e5; flex-shrink: 0;"></svg>
           <span>Links this task directly to the deal's tracking records in Pre-Sales.</span>
         </div>
 
@@ -1749,7 +1749,7 @@
     <div class="form-group task-attachments-section" *ngIf="!editingPreSalesTaskId()">
       <div class="assignee-header-row">
         <label class="form-label mb-0">
-          <svg lucidePaperclip size="14" style="color: #ea580c; display: inline-block; vertical-align: -2px; margin-right: 4px;"></svg>
+          <svg lucidePaperclip size="14" style="color: #1373e5; display: inline-block; vertical-align: -2px; margin-right: 4px;"></svg>
           Attachments <span class="optional">(optional)</span>
         </label>
         <span class="assignee-count-badge" *ngIf="taskForm.attachments.length > 0">
@@ -1870,7 +1870,7 @@
 
     <div class="form-group">
       <label class="form-label">
-        <svg lucidePaperclip size="14" style="color:#ea580c;display:inline-block;vertical-align:-2px;margin-right:4px;"></svg>
+        <svg lucidePaperclip size="14" style="color:#1373e5;display:inline-block;vertical-align:-2px;margin-right:4px;"></svg>
         Documents &amp; attachments <span class="optional">(optional)</span>
       </label>
       <input type="file" multiple hidden #psStatusFileInput (change)="onPreSalesStatusFilesSelected($event)" />

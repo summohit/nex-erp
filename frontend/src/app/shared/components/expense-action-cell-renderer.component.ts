@@ -87,7 +87,7 @@ export interface ExpenseActionCellParams extends ICellRendererParams {
       font-weight: 500;
     }
     .text-success { color: #10B981 !important; }
-    .text-danger { color: #EF4444 !important; }
+    .text-danger { color: #1373e5 !important; }
 
     .resolved-dash {
       color: #CBD5E1;

@@ -116,8 +116,8 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
                       setDate(day.dateString);
                       setShowCalendar(false);
                     }}
-                    markedDates={{ [date]: { selected: true, selectedColor: '#E25E3E' } }}
-                    theme={{ todayTextColor: '#E25E3E', arrowColor: '#E25E3E' }}
+                    markedDates={{ [date]: { selected: true, selectedColor: '#1373e5' } }}
+                    theme={{ todayTextColor: '#1373e5', arrowColor: '#1373e5' }}
                   />
                 </View>
               )}
@@ -196,8 +196,8 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
         is24Hour
         onConfirm={handleTimeConfirm}
         onCancel={() => setTimePickerTarget(null)}
-        accentColor="#E25E3E"
-        buttonTextColorIOS="#E25E3E"
+        accentColor="#1373e5"
+        buttonTextColorIOS="#1373e5"
       />
     </>
   );
@@ -233,10 +233,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   errorText: {
-    color: '#EF4444',
+    color: '#1373e5',
     fontSize: 13,
     marginBottom: 12,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     padding: 10,
     borderRadius: 8,
   },
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderRadius: 12,
   },
   submitBtnText: {

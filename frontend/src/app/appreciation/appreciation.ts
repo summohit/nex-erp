@@ -100,12 +100,12 @@ export class AppreciationComponent implements OnInit {
         if (!award) return 'N/A';
         const color = award.color || 'orange';
         const colorMap: Record<string, { bg: string; text: string; border: string }> = {
-          orange: { bg: '#FFF7ED', text: '#FF5200', border: '#FFEDD5' },
+          orange: { bg: '#eff6ff', text: '#1373e5', border: '#dbeafe' },
           blue: { bg: '#EFF6FF', text: '#2563EB', border: '#DBEAFE' },
           green: { bg: '#F0FDF4', text: '#16A34A', border: '#DCFCE7' },
           purple: { bg: '#F3E8FF', text: '#9333EA', border: '#E9D5FF' },
-          red: { bg: '#FEF2F2', text: '#EF4444', border: '#FEE2E2' },
-          yellow: { bg: '#FEFCE8', text: '#CA8A04', border: '#FEF08A' }
+          red: { bg: '#eff6ff', text: '#1373e5', border: '#dbeafe' },
+          yellow: { bg: '#f3efff', text: '#4f2aa7', border: '#e0d7ff' }
         };
         const theme = colorMap[color] || colorMap['orange'];
         return `
@@ -157,12 +157,12 @@ export class AppreciationComponent implements OnInit {
       cellRenderer: (params: any) => {
         const color = params.data?.color || 'orange';
         const colorMap: Record<string, { bg: string; text: string; border: string }> = {
-          orange: { bg: '#FFF7ED', text: '#FF5200', border: '#FFEDD5' },
+          orange: { bg: '#eff6ff', text: '#1373e5', border: '#dbeafe' },
           blue: { bg: '#EFF6FF', text: '#2563EB', border: '#DBEAFE' },
           green: { bg: '#F0FDF4', text: '#16A34A', border: '#DCFCE7' },
           purple: { bg: '#F3E8FF', text: '#9333EA', border: '#E9D5FF' },
-          red: { bg: '#FEF2F2', text: '#EF4444', border: '#FEE2E2' },
-          yellow: { bg: '#FEFCE8', text: '#CA8A04', border: '#FEF08A' }
+          red: { bg: '#eff6ff', text: '#1373e5', border: '#dbeafe' },
+          yellow: { bg: '#f3efff', text: '#4f2aa7', border: '#e0d7ff' }
         };
         const theme = colorMap[color] || colorMap['orange'];
         return `
@@ -200,8 +200,8 @@ export class AppreciationComponent implements OnInit {
         } else {
           return `
             <div style="display: flex; align-items: center; height: 100%;">
-              <span style="background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; line-height: 1;">
-                <span style="width: 6px; height: 6px; border-radius: 50%; background: #EF4444; display: inline-block;"></span>
+              <span style="background: #eff6ff; color: #1373e5; border: 1px solid #dbeafe; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; line-height: 1;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #1373e5; display: inline-block;"></span>
                 Inactive
               </span>
             </div>

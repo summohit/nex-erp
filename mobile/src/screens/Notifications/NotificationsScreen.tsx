@@ -70,7 +70,7 @@ function getTypeColor(type: string): string {
     case 'LEAVE_REQUEST': return '#8B5CF6';
     case 'ASSIGNMENT':    return '#3B82F6';
     case 'PAYROLL':       return '#10B981';
-    case 'WARNING':       return '#F59E0B';
+    case 'WARNING':       return '#6b3fd6';
     case 'SUCCESS':       return '#22C55E';
     case 'ATTENDANCE':    return '#6366F1';
     default:              return '#64748B';
@@ -204,7 +204,7 @@ export default function NotificationsScreen() {
       right={
         unreadCount > 0 ? (
           <TouchableOpacity style={styles.markAllBtn} onPress={handleMarkAllRead} activeOpacity={0.7}>
-            <CheckCheck size={16} color="#E25E3E" />
+            <CheckCheck size={16} color="#1373e5" />
             <Text style={styles.markAllText}>All read</Text>
           </TouchableOpacity>
         ) : null
@@ -236,8 +236,8 @@ export default function NotificationsScreen() {
             <RefreshControl
               refreshing={isLoading}
               onRefresh={fetchDashboardData}
-              colors={['#E25E3E']}
-              tintColor="#E25E3E"
+              colors={['#1373e5']}
+              tintColor="#1373e5"
             />
           }
         />
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   headerBadge: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderRadius: 10,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -303,12 +303,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
   },
   markAllText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#E25E3E',
+    color: '#1373e5',
   },
   list: {
     paddingBottom: 24,
@@ -338,8 +338,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   itemUnread: {
-    backgroundColor: '#FFFBF9',
-    borderColor: '#FED7C8',
+    backgroundColor: '#fcfcfc',
+    borderColor: '#e3e3e3',
   },
   iconWrap: {
     width: 40,
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     marginTop: 4,
     flexShrink: 0,
   },

@@ -57,15 +57,15 @@ export default function ExpensesTab() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'APPROVED': return { bg: '#DCFCE7', text: '#166534' };
-      case 'REJECTED': return { bg: '#FEE2E2', text: '#991B1B' };
-      default: return { bg: '#FEF9C3', text: '#854D0E' };
+      case 'REJECTED': return { bg: '#dbeafe', text: '#595a5b' };
+      default: return { bg: '#f3efff', text: '#49494a' };
     }
   };
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#E25E3E" />
+        <ActivityIndicator size="large" color="#1373e5" />
       </View>
     );
   }
@@ -125,7 +125,7 @@ export default function ExpensesTab() {
               <Text style={styles.editText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.delBtn} onPress={() => handleDelete(item.id)}>
-              <Trash2 size={16} color="#EF4444" />
+              <Trash2 size={16} color="#1373e5" />
               <Text style={styles.delText}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -143,7 +143,7 @@ export default function ExpensesTab() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1373e5']} tintColor="#1373e5" />
         }
         ListEmptyComponent={
           <View style={styles.emptyBox}>
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dateText: { fontSize: 12, color: '#64748B' },
   description: { fontSize: 13, color: '#475569', marginTop: 4 },
-  rejectionReason: { fontSize: 13, color: '#DC2626', marginTop: 4, fontStyle: 'italic' },
+  rejectionReason: { fontSize: 13, color: '#1373e5', marginTop: 4, fontStyle: 'italic' },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 6, marginRight: 8 },
   editText: { color: '#2563EB', fontSize: 13, fontWeight: '600' },
   delBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 6 },
-  delText: { color: '#EF4444', fontSize: 13, fontWeight: '600' },
+  delText: { color: '#1373e5', fontSize: 13, fontWeight: '600' },
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -249,10 +249,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

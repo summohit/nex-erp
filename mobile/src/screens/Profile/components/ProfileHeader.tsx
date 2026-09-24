@@ -25,9 +25,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({ profileData, onAvatarPres
         <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
           <Defs>
             <LinearGradient id="profileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#EA580C" />
-              <Stop offset="50%" stopColor="#E25E3E" />
-              <Stop offset="100%" stopColor="#C2410C" />
+              <Stop offset="0%" stopColor="#1373e5" />
+              <Stop offset="50%" stopColor="#1373e5" />
+              <Stop offset="100%" stopColor="#0f4f9c" />
             </LinearGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#profileGrad)" />
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   bannerContainer: {
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.22,
     shadowRadius: 12,
@@ -149,14 +149,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 40,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#eff6ff',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarInitials: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#EA580C',
+    color: '#1373e5',
     letterSpacing: 1,
   },
   cameraBadge: {

@@ -16,8 +16,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CHART_WIDTH = SCREEN_WIDTH - 64;
 
 const PRIORITY_COLORS: Record<string, string> = {
-  CRITICAL: '#EF4444',
-  HIGH:     '#F97316',
+  CRITICAL: '#1373e5',
+  HIGH:     '#1373e5',
   MEDIUM:   '#3B82F6',
   LOW:      '#94A3B8',
 };
@@ -27,7 +27,7 @@ const STATUS_COLORS: Record<string, string> = {
   IN_PROGRESS: '#3B82F6',
   IN_REVIEW:   '#A855F7',
   DONE:        '#10B981',
-  CANCELLED:   '#EF4444',
+  CANCELLED:   '#1373e5',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -107,7 +107,7 @@ export default function ReportsTab() {
     return currentSummary.teamWorkload.slice(0, 6).map(m => ({
       value: m.count,
       label: m.name.split(' ')[0],
-      frontColor: '#E25E3E',
+      frontColor: '#1373e5',
       topLabelComponent: () => (
         <Text style={styles.barTopLabel}>{m.count}</Text>
       ),
@@ -150,7 +150,7 @@ export default function ReportsTab() {
     return (
       <ScrollView
         contentContainerStyle={styles.emptyContainer}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
       >
         <BarChart2 size={40} color="#CBD5E1" />
         <Text style={styles.emptyText}>No report data available</Text>
@@ -167,7 +167,7 @@ export default function ReportsTab() {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#E25E3E']} tintColor="#E25E3E" />}
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#1373e5']} tintColor="#1373e5" />}
     >
 
       {/* KPI Row */}
@@ -177,7 +177,7 @@ export default function ReportsTab() {
           <Text style={styles.kpiLabel}>Completion</Text>
         </View>
         <View style={styles.kpiCard}>
-          <Text style={[styles.kpiValue, { color: '#EF4444' }]}>{overdueCount}</Text>
+          <Text style={[styles.kpiValue, { color: '#1373e5' }]}>{overdueCount}</Text>
           <Text style={styles.kpiLabel}>Overdue</Text>
         </View>
         <View style={styles.kpiCard}>
@@ -191,7 +191,7 @@ export default function ReportsTab() {
       </View>
 
       {/* Completion Progress */}
-      <SectionCard title="Overall Progress" icon={<Target size={16} color="#E25E3E" />}>
+      <SectionCard title="Overall Progress" icon={<Target size={16} color="#1373e5" />}>
         <View style={styles.progressRow}>
           <View style={styles.bigProgressBar}>
             <View style={[styles.bigProgressFill, { width: `${completionPct}%` }]} />
@@ -230,7 +230,7 @@ export default function ReportsTab() {
 
       {/* Priority Breakdown */}
       {priorityBarData.length > 0 && (
-        <SectionCard title="Priority Breakdown" icon={<TrendingUp size={16} color="#F97316" />}>
+        <SectionCard title="Priority Breakdown" icon={<TrendingUp size={16} color="#1373e5" />}>
           <BarChart
             data={priorityBarData}
             width={CHART_WIDTH}
@@ -322,7 +322,7 @@ export default function ReportsTab() {
             <View style={styles.timeDivider} />
             <View style={styles.timeStat}>
               <Text style={[styles.timeStatValue, {
-                color: timeTracking.loggedHours > timeTracking.estimatedHours ? '#EF4444' : '#3B82F6'
+                color: timeTracking.loggedHours > timeTracking.estimatedHours ? '#1373e5' : '#3B82F6'
               }]}>
                 {loggedPct.toFixed(0)}%
               </Text>
@@ -334,7 +334,7 @@ export default function ReportsTab() {
               styles.bigProgressFill,
               {
                 width: `${loggedPct}%`,
-                backgroundColor: loggedPct > 100 ? '#EF4444' : '#10B981',
+                backgroundColor: loggedPct > 100 ? '#1373e5' : '#10B981',
               }
             ]} />
           </View>
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  kpiValue: { fontSize: 20, fontWeight: '800', color: '#E25E3E', marginBottom: 2 },
+  kpiValue: { fontSize: 20, fontWeight: '800', color: '#1373e5', marginBottom: 2 },
   kpiLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', textAlign: 'center' },
 
   sectionCard: {
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
   },

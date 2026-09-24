@@ -49,9 +49,9 @@
 .tk-awaiting {
   padding: 5px 11px;
   border-radius: 999px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #b45309;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
+  color: #4f2aa7;
   font-size: 12px; font-weight: 700;
 }
 
@@ -77,8 +77,8 @@
 .tk-btn-approve { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
 .tk-btn-approve:hover:not(:disabled) { background: #d1fae5; }
 
-.tk-btn-reject { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
-.tk-btn-reject:hover:not(:disabled) { background: #fee2e2; }
+.tk-btn-reject { background: #eff6ff; border-color: #dbeafe; color: #0f4f9c; }
+.tk-btn-reject:hover:not(:disabled) { background: #dbeafe; }
 
 .sm { padding: 6px 11px; font-size: 12px; }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -141,14 +141,14 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .tk-req {
-  color: #ef4444;
+  color: #1373e5;
   font-size: 13px;
   line-height: 1;
 }
 
 .tk-error-msg {
   font-size: 11.5px;
-  color: #dc2626;
+  color: #1373e5;
   font-weight: 500;
   line-height: 1.3;
 }
@@ -180,9 +180,9 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .tk-field select.invalid,
 .tk-field textarea.invalid,
 .emp-select-trigger.invalid {
-  border-color: #ef4444 !important;
-  background-color: #fffbfb !important;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+  border-color: #1373e5 !important;
+  background-color: #fdfdfd !important;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1) !important;
 }
 
 /* ── Custom Searchable Employee Select ────────────────────────────────── */
@@ -519,8 +519,8 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   text-transform: uppercase; letter-spacing: 0.03em;
 }
 
-.tk-priority.critical { background: #fef2f2; color: #b91c1c; }
-.tk-priority.high { background: #fff7ed; color: #c2410c; }
+.tk-priority.critical { background: #eff6ff; color: #0f4f9c; }
+.tk-priority.high { background: #eff6ff; color: #0f4f9c; }
 .tk-priority.medium { background: #eff6ff; color: #1d4ed8; }
 .tk-priority.low { background: #f1f5f9; color: #64748b; }
 
@@ -531,10 +531,10 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   white-space: nowrap;
 }
 
-.tk-status.requested { background: #fffbeb; color: #b45309; }
+.tk-status.requested { background: #f3efff; color: #4f2aa7; }
 .tk-status.converted { background: #eff6ff; color: #1d4ed8; }
 .tk-status.completed { background: #ecfdf5; color: #047857; }
-.tk-status.rejected { background: #fef2f2; color: #b91c1c; }
+.tk-status.rejected { background: #eff6ff; color: #0f4f9c; }
 .tk-status.cancelled { background: #f1f5f9; color: #64748b; }
 .tk-status.approved { background: #ecfdf5; color: #047857; }
 
@@ -639,10 +639,10 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .tk-rejected {
   display: flex; align-items: flex-start; gap: 8px;
   padding: 9px 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
   border-radius: 8px;
-  font-size: 12.5px; color: #b91c1c; line-height: 1.5;
+  font-size: 12.5px; color: #0f4f9c; line-height: 1.5;
 }
 
 .tk-rejected svg { flex-shrink: 0; margin-top: 2px; }

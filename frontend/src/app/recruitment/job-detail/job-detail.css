@@ -196,13 +196,13 @@
 }
 
 .job-status-pill.status-closed {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #dbeafe;
+  color: #0f4f9c;
 }
 
 .job-status-pill.status-draft {
-  background: #fef3c7;
-  color: #b45309;
+  background: #f3efff;
+  color: #4f2aa7;
 }
 
 .hero-type-pill {
@@ -260,11 +260,11 @@
 }
 
 .hero-meta-item.text-amber {
-  color: #b45309;
+  color: #4f2aa7;
 }
 
 .hero-meta-item.text-amber svg {
-  color: #d97706;
+  color: #6b3fd6;
 }
 
 .hero-quick-cta {
@@ -350,7 +350,7 @@
 .bg-indigo-soft { background: #e0e7ff; color: #4338ca; }
 .bg-purple-soft { background: #f3e8ff; color: #7e22ce; }
 .bg-emerald-soft { background: #dcfce7; color: #15803d; }
-.bg-rose-soft { background: #ffe4e6; color: #be123c; }
+.bg-rose-soft { background: #f1f1f2; color: #676869; }
 
 .kpi-body {
   flex: 1;
@@ -387,7 +387,7 @@
 .text-indigo { color: #4338ca; }
 .text-purple { color: #7e22ce; }
 .text-emerald { color: #15803d; }
-.text-rose { color: #be123c; }
+.text-rose { color: #676869; }
 .text-slate-muted { color: #94a3b8; }
 
 .kpi-subtext {
@@ -503,12 +503,12 @@
 
 .stage-pill-btn.active.stage-blue { background: #2563eb; border-color: #2563eb; }
 .stage-pill-btn.active.stage-purple { background: #7c3aed; border-color: #7c3aed; }
-.stage-pill-btn.active.stage-orange { background: #ea580c; border-color: #ea580c; }
-.stage-pill-btn.active.stage-amber { background: #d97706; border-color: #d97706; }
+.stage-pill-btn.active.stage-orange { background: #1373e5; border-color: #1373e5; }
+.stage-pill-btn.active.stage-amber { background: #6b3fd6; border-color: #6b3fd6; }
 .stage-pill-btn.active.stage-teal { background: #0d9488; border-color: #0d9488; }
 .stage-pill-btn.active.stage-emerald { background: #059669; border-color: #059669; }
 .stage-pill-btn.active.stage-green { background: #16a34a; border-color: #16a34a; }
-.stage-pill-btn.active.stage-rose { background: #e11d48; border-color: #e11d48; }
+.stage-pill-btn.active.stage-rose { background: #7e7f80; border-color: #7e7f80; }
 
 /* APPLICANTS MAIN CARD */
 .applicants-main-card {
@@ -820,12 +820,12 @@
 
 .badge-stage-new { background: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
 .badge-stage-reviewing { background: #f3e8ff; color: #7e22ce; border-color: #e9d5ff; }
-.badge-stage-shortlisted { background: #ffedd5; color: #c2410c; border-color: #fed7aa; }
-.badge-stage-interviewing { background: #fef3c7; color: #b45309; border-color: #fde68a; }
+.badge-stage-shortlisted { background: #dbeafe; color: #0f4f9c; border-color: #dbeafe; }
+.badge-stage-interviewing { background: #f3efff; color: #4f2aa7; border-color: #e0d7ff; }
 .badge-stage-offered { background: #ccfbf1; color: #0f766e; border-color: #99f6e4; }
 .badge-stage-hired { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
 .badge-stage-onboarded { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
-.badge-stage-rejected { background: #ffe4e6; color: #be123c; border-color: #fecdd3; }
+.badge-stage-rejected { background: #f1f1f2; color: #676869; border-color: #e5e5e6; }
 .badge-stage-default { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
 
 /* STATUS POPOVER MENU */
@@ -899,12 +899,12 @@
 
 .dot-new { background: #0284c7; }
 .dot-reviewing { background: #7e22ce; }
-.dot-shortlisted { background: #c2410c; }
-.dot-interviewing { background: #b45309; }
+.dot-shortlisted { background: #0f4f9c; }
+.dot-interviewing { background: #4f2aa7; }
 .dot-offered { background: #0f766e; }
 .dot-hired { background: #15803d; }
 .dot-onboarded { background: #166534; }
-.dot-rejected { background: #be123c; }
+.dot-rejected { background: #676869; }
 
 .menu-check {
   margin-left: auto;
@@ -1367,9 +1367,9 @@
 }
 
 .btn-stage-quick.btn-stage-rejected:hover {
-  background: #ffe4e6;
-  border-color: #fecdd3;
-  color: #be123c;
+  background: #f1f1f2;
+  border-color: #e5e5e6;
+  color: #676869;
 }
 
 .drawer-info-list {

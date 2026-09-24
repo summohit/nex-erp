@@ -186,8 +186,8 @@
 }
 
 .btn-delete:hover {
-  color: #ef4444;
-  background: #fef2f2;
+  color: #1373e5;
+  background: #eff6ff;
 }
 
 .doc-name {
@@ -644,7 +644,7 @@ button.btn-view-doc {
 }
 
 .btn-reset-filters:hover {
-  background: #fef2f2;
-  border-color: #fca5a5;
-  color: #dc2626;
+  background: #eff6ff;
+  border-color: #dbeafe;
+  color: #1373e5;
 }

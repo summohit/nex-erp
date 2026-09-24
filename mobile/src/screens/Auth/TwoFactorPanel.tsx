@@ -315,7 +315,7 @@ export default function TwoFactorPanel({
 const styles = StyleSheet.create({
   container: { padding: 24, paddingTop: 40, alignItems: 'center', flexGrow: 1, justifyContent: 'center' },
   badge: {
-    width: 56, height: 56, borderRadius: 18, backgroundColor: '#FFF1EC',
+    width: 56, height: 56, borderRadius: 18, backgroundColor: '#eff6ff',
     alignItems: 'center', justifyContent: 'center', marginBottom: 18,
   },
   title: { fontSize: 22, fontWeight: '800', color: '#0F172A', textAlign: 'center', marginBottom: 8 },
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   otpBoxFilled: { borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' },
   otpBoxActive: { borderColor: theme.colors.primary, backgroundColor: '#FFFFFF' },
-  otpBoxError: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+  otpBoxError: { borderColor: '#dbeafe', backgroundColor: '#eff6ff' },
   otpChar: { fontSize: 24, fontWeight: '700', color: '#0F172A' },
   /* Off-screen rather than display:none — a hidden input keeps the keyboard,
      the caret and one-time-code autofill, none of which the boxes can provide. */
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   },
 
   hint: { fontSize: 12, color: '#94A3B8', marginTop: 12, textAlign: 'center' },
-  error: { fontSize: 13, color: '#DC2626', marginTop: 14, textAlign: 'center' },
+  error: { fontSize: 13, color: '#1373e5', marginTop: 14, textAlign: 'center' },
 
   primaryBtn: {
     height: 52, borderRadius: 14, backgroundColor: theme.colors.primary,

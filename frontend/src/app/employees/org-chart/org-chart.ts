@@ -447,9 +447,9 @@ export class OrgChart implements OnInit {
     if (lower.includes('tech') || lower.includes('eng') || lower.includes('dev') || lower.includes('soft') || lower.includes('it')) {
       return { bg: '#eef2ff', text: '#4338ca', border: '#c7d2fe', accent: '#6366f1', bar: '#4f46e5' };
     } else if (lower.includes('sales') || lower.includes('biz') || lower.includes('rev')) {
-      return { bg: '#fff7ed', text: '#c2410c', border: '#ffedd5', accent: '#f97316', bar: '#ea580c' };
+      return { bg: '#eff6ff', text: '#0f4f9c', border: '#dbeafe', accent: '#1373e5', bar: '#1373e5' };
     } else if (lower.includes('hr') || lower.includes('peop') || lower.includes('talent') || lower.includes('rec')) {
-      return { bg: '#fdf2f8', text: '#be185d', border: '#fce7f3', accent: '#ec4899', bar: '#db2777' };
+      return { bg: '#fdf2f8', text: '#6a6b6c', border: '#fce7f3', accent: '#6b3fd6', bar: '#6b3fd6' };
     } else if (lower.includes('fin') || lower.includes('acc') || lower.includes('tax') || lower.includes('audit')) {
       return { bg: '#ecfdf5', text: '#047857', border: '#d1fae5', accent: '#10b981', bar: '#059669' };
     } else if (lower.includes('mark') || lower.includes('brand') || lower.includes('growth')) {
@@ -459,7 +459,7 @@ export class OrgChart implements OnInit {
     } else if (lower.includes('exec') || lower.includes('manage') || lower.includes('lead') || lower.includes('board')) {
       return { bg: '#f8fafc', text: '#0f172a', border: '#cbd5e1', accent: '#3b82f6', bar: '#1e3a8a' };
     } else if (lower.includes('legal') || lower.includes('comp')) {
-      return { bg: '#fefce8', text: '#a16207', border: '#fef08a', accent: '#eab308', bar: '#ca8a04' };
+      return { bg: '#f3efff', text: '#4f2aa7', border: '#e0d7ff', accent: '#0f4f9c', bar: '#4f2aa7' };
     }
     return { bg: '#f1f5f9', text: '#334155', border: '#cbd5e1', accent: '#64748b', bar: '#64748b' };
   }

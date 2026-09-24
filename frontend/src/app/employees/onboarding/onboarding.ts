@@ -105,7 +105,7 @@ export class OnboardingComponent implements OnInit {
         return `
           <div style="width: 100%; display: flex; align-items: center; gap: 8px;">
             <div style="flex: 1; height: 6px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
-              <div style="width: ${percent}%; height: 100%; background: ${percent === 100 ? '#10b981' : '#f97316'};"></div>
+              <div style="width: ${percent}%; height: 100%; background: ${percent === 100 ? '#10b981' : '#1373e5'};"></div>
             </div>
             <span style="font-size: 12px; color: #6b7280;">${completed}/${total}</span>
           </div>

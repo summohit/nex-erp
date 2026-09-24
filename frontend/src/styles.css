@@ -233,7 +233,7 @@ button.btn-primary,
   align-items: center !important;
   justify-content: center !important;
   gap: 8px !important;
-  box-shadow: 0 4px 14px rgba(255, 90, 31, 0.35) !important;
+  box-shadow: 0 4px 14px rgba(19, 115, 229, 0.35) !important;
   cursor: pointer !important;
   transition: all 0.2s ease-in-out !important;
   width: auto;
@@ -243,15 +243,27 @@ button.btn-primary,
 button.btn-primary:hover,
 .btn-orange:hover,
 .btn.btn-primary:hover {
-  background: #E0480F !important;
+  background: #0f5fbe !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 6px 18px rgba(255, 90, 31, 0.45) !important;
+  box-shadow: 0 6px 18px rgba(19, 115, 229, 0.45) !important;
 }
 
 .btn-primary:active,
 button.btn-primary:active {
   transform: translateY(0) !important;
-  box-shadow: 0 2px 8px rgba(255, 90, 31, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(19, 115, 229, 0.3) !important;
+}
+
+/* MIRA's four lower-mark colours: orange is reserved for non-primary UI cues. */
+:where(.color-orange, .icon-orange, .chip-orange, .badge-orange, .status-orange) {
+  background-color: var(--color-utility-light) !important;
+  color: var(--color-utility) !important;
+  border-color: var(--color-utility-border) !important;
+}
+
+:where(.kpi-accent-amber, .accent-amber, .chart-accent-amber) {
+  border-color: var(--color-utility) !important;
+  border-top-color: var(--color-utility) !important;
 }
 
 .btn-outline,
@@ -500,7 +512,7 @@ button.btn-outline:hover,
 }
 
 .btn-close-viewer:hover {
-  background: #DC2626 !important;
+  background: #1373e5 !important;
   transform: scale(1.1) !important;
 }
 
@@ -705,7 +717,7 @@ button.btn-outline:hover,
 
 .ag-theme-quartz .ag-paging-button:hover:not(.ag-disabled) {
   opacity: 1;
-  color: var(--color-primary, #ea580c);
+  color: var(--color-primary, #1373e5);
 }
 
 .ag-theme-quartz .ag-paging-button.ag-disabled {
@@ -795,8 +807,8 @@ button.btn-outline:hover,
 .cat-laptop { background: #EFF6FF !important; color: #3B82F6 !important; }
 .cat-desktop { background: #F3E8FF !important; color: #9333EA !important; }
 .cat-monitor { background: #ECFDF5 !important; color: #059669 !important; }
-.cat-software { background: #FEF9C3 !important; color: #CA8A04 !important; }
-.cat-mobile { background: #FCE7F3 !important; color: #EC4899 !important; }
+.cat-software { background: #f3efff !important; color: #4f2aa7 !important; }
+.cat-mobile { background: #FCE7F3 !important; color: #6b3fd6 !important; }
 .cat-peripheral { background: #F1F5F9 !important; color: #475569 !important; }
 .cat-default { background: #F1F5F9 !important; color: #64748B !important; }
 
@@ -838,11 +850,11 @@ button.btn-outline:hover,
 .status-assigned, .status-active { background: #EFF6FF !important; color: #2563EB !important; border-color: #BFDBFE !important; }
 .status-assigned .status-dot, .status-active .status-dot { background: #2563EB !important; }
 
-.status-in-repair { background: #FEF9C3 !important; color: #CA8A04 !important; border-color: #FDE047 !important; }
-.status-in-repair .status-dot { background: #CA8A04 !important; }
+.status-in-repair { background: #f3efff !important; color: #4f2aa7 !important; border-color: #e0d7ff !important; }
+.status-in-repair .status-dot { background: #4f2aa7 !important; }
 
-.status-retired { background: #FCE7F3 !important; color: #EC4899 !important; border-color: #F9A8D4 !important; }
-.status-retired .status-dot { background: #EC4899 !important; }
+.status-retired { background: #FCE7F3 !important; color: #6b3fd6 !important; border-color: #F9A8D4 !important; }
+.status-retired .status-dot { background: #6b3fd6 !important; }
 
 .status-archived { background: #F1F5F9 !important; color: #64748B !important; border-color: #CBD5E1 !important; }
 .status-archived .status-dot { background: #64748B !important; }
@@ -853,17 +865,17 @@ button.btn-outline:hover,
 .status-approved, .status-fulfilled { background: #ECFDF5 !important; color: #059669 !important; border-color: #A7F3D0 !important; }
 .status-approved .status-dot, .status-fulfilled .status-dot { background: #059669 !important; }
 
-.status-rejected { background: #FEF2F2 !important; color: #DC2626 !important; border-color: #FECACA !important; }
-.status-rejected .status-dot { background: #DC2626 !important; }
+.status-rejected { background: #eff6ff !important; color: #1373e5 !important; border-color: #dbeafe !important; }
+.status-rejected .status-dot { background: #1373e5 !important; }
 
-.status-pending { background: #FFFBEB !important; color: #D97706 !important; border-color: #FDE68A !important; }
-.status-pending .status-dot { background: #D97706 !important; }
+.status-pending { background: #f3efff !important; color: #6b3fd6 !important; border-color: #e0d7ff !important; }
+.status-pending .status-dot { background: #6b3fd6 !important; }
 
 .status-paid { background: #ECFDF5 !important; color: #059669 !important; border-color: #A7F3D0 !important; }
 .status-paid .status-dot { background: #059669 !important; }
 
-.status-draft { background: #FEF9C3 !important; color: #CA8A04 !important; border-color: #FDE047 !important; }
-.status-draft .status-dot { background: #CA8A04 !important; }
+.status-draft { background: #f3efff !important; color: #4f2aa7 !important; border-color: #e0d7ff !important; }
+.status-draft .status-dot { background: #4f2aa7 !important; }
 
 /* Urgency & Condition Classes */
 .badge-condition {
@@ -875,11 +887,11 @@ button.btn-outline:hover,
 }
 
 .cond-good, .cond-excellent, .cond-brand-new { background: #ECFDF5 !important; color: #047857 !important; }
-.cond-fair { background: #FEF9C3 !important; color: #A16207 !important; }
-.cond-needs-repair, .cond-poor { background: #FEF2F2 !important; color: #B91C1C !important; }
+.cond-fair { background: #f3efff !important; color: #4f2aa7 !important; }
+.cond-needs-repair, .cond-poor { background: #eff6ff !important; color: #0f4f9c !important; }
 
-.urgency-high { background: #FEF2F2 !important; color: #DC2626 !important; }
-.urgency-medium { background: #FFFBEB !important; color: #D97706 !important; }
+.urgency-high { background: #eff6ff !important; color: #1373e5 !important; }
+.urgency-medium { background: #f3efff !important; color: #6b3fd6 !important; }
 .urgency-low { background: #ECFDF5 !important; color: #059669 !important; }
 
 .cell-user-avatar-row {
@@ -934,9 +946,9 @@ button.btn-outline:hover,
 }
 
 .toast-error {
-  background-color: #FEF2F2;
-  border: 1px solid #FECACA;
-  color: #991B1B;
+  background-color: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #595a5b;
 }
 
 /* Compact Custom Action Menu */
@@ -1031,10 +1043,10 @@ button.btn-outline:hover,
   background: #f8fafc !important;
 }
 .cdk-overlay-pane .mat-mdc-menu-panel .mat-mdc-menu-item.text-danger .mat-mdc-menu-item-text {
-  color: #ef4444 !important;
+  color: #1373e5 !important;
 }
 .cdk-overlay-pane .mat-mdc-menu-panel .mat-mdc-menu-item.text-danger:hover {
-  background: #fef2f2 !important;
+  background: #eff6ff !important;
 }
 .cdk-overlay-pane .mat-mdc-menu-panel .mat-mdc-menu-item .menu-icon {
   margin-right: 12px !important;
@@ -1131,8 +1143,8 @@ button.btn-outline:hover,
    traffic-light colours rather than the status tokens — this is a drawing of a
    window, not a status. (The markup writes .dot-red/.dot-yellow/.dot-green,
    which auth.component.css styles; these are kept for any other consumer.) */
-.mock-dot.red,    .mock-dot.dot-red    { background: #FF5F56; }
-.mock-dot.yellow, .mock-dot.dot-yellow { background: #FFBD2E; }
+.mock-dot.red,    .mock-dot.dot-red    { background: #1373e5; }
+.mock-dot.yellow, .mock-dot.dot-yellow { background: #6b3fd6; }
 .mock-dot.green,  .mock-dot.dot-green  { background: #27C93F; }
 
 .mock-browser-body {
@@ -1476,8 +1488,8 @@ body.nav-scroll-lock {
 }
 
 .ag-theme-quartz .ag-row.row-status-in-progress {
-  border-left-color: #f59e0b !important;
-  background-color: #fffbf2 !important;
+  border-left-color: #6b3fd6 !important;
+  background-color: #f8f8f9 !important;
 }
 
 .ag-theme-quartz .ag-row.row-status-resolved {
@@ -1491,8 +1503,8 @@ body.nav-scroll-lock {
 }
 
 .ag-theme-quartz .ag-row.row-status-rejected {
-  border-left-color: #ef4444 !important;
-  background-color: #fff6f6 !important;
+  border-left-color: #1373e5 !important;
+  background-color: #eff6ff !important;
 }
 
 .ag-theme-quartz .ag-row.ag-row-hover,
@@ -1589,8 +1601,8 @@ body.nav-scroll-lock {
 }
 
 .search-select-clear:hover {
-  color: #ef4444;
-  background: #fee2e2;
+  color: #1373e5;
+  background: #dbeafe;
 }
 
 .search-select-chevron {
@@ -1674,8 +1686,8 @@ body.nav-scroll-lock {
 }
 
 .dropdown-search-clear:hover {
-  color: #ef4444;
-  background: #fee2e2;
+  color: #1373e5;
+  background: #dbeafe;
 }
 
 .search-select-options {

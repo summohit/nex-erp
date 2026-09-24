@@ -23,7 +23,7 @@ export default function HolidaysTab() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator color="#E25E3E" style={{ marginTop: 40 }} />
+        <ActivityIndicator color="#1373e5" style={{ marginTop: 40 }} />
       ) : holidays.length === 0 ? (
         <View style={styles.emptyState}>
           <Calendar size={32} color="#94A3B8" />
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   monthText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#E25E3E',
+    color: '#1373e5',
   },
   dayText: {
     fontSize: 22,

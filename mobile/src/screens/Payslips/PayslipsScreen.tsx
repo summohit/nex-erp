@@ -36,7 +36,7 @@ function fmt(amount: number): string {
 function StatusBadge({ status }: { status: Payslip['status'] }) {
   const cfg = {
     PAID:      { bg: '#DCFCE7', text: '#15803D', label: 'Paid' },
-    FINALIZED: { bg: '#FEF9C3', text: '#A16207', label: 'Finalized' },
+    FINALIZED: { bg: '#f3efff', text: '#4f2aa7', label: 'Finalized' },
     DRAFT:     { bg: '#F1F5F9', text: '#64748B', label: 'Draft' },
   }[status] ?? { bg: '#F1F5F9', text: '#64748B', label: status };
 
@@ -108,7 +108,7 @@ function PayslipDetail({ payslip, onClose }: { payslip: Payslip; onClose: () => 
           {/* Attendance */}
           <View style={styles.card}>
             <View style={styles.cardTitleRow}>
-              <Briefcase size={15} color="#E25E3E" />
+              <Briefcase size={15} color="#1373e5" />
               <Text style={styles.cardTitle}>Attendance</Text>
             </View>
             <View style={styles.attGrid}>
@@ -143,14 +143,14 @@ function PayslipDetail({ payslip, onClose }: { payslip: Payslip; onClose: () => 
           {(deductions.length > 0 || payslip.lossOfPay > 0) && (
             <View style={styles.card}>
               <View style={styles.cardTitleRow}>
-                <TrendingDown size={15} color="#EF4444" />
+                <TrendingDown size={15} color="#1373e5" />
                 <Text style={styles.cardTitle}>Deductions</Text>
               </View>
               {deductions.map(renderItem)}
               {payslip.lossOfPay > 0 && (
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Loss of Pay</Text>
-                  <Text style={[styles.detailValue, { color: '#EF4444' }]}>{fmt(payslip.lossOfPay)}</Text>
+                  <Text style={[styles.detailValue, { color: '#1373e5' }]}>{fmt(payslip.lossOfPay)}</Text>
                 </View>
               )}
               <View style={styles.divider} />
@@ -197,7 +197,7 @@ function PayslipCard({ payslip, onPress }: { payslip: Payslip; onPress: () => vo
     <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.cardRow}>
         <View style={styles.cardIcon}>
-          <FileText size={20} color="#E25E3E" />
+          <FileText size={20} color="#1373e5" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.cardMonthText}>{MONTH_NAMES[payslip.month - 1]} {payslip.year}</Text>
@@ -254,7 +254,7 @@ export default function PayslipsScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#E25E3E" />
+          <ActivityIndicator size="large" color="#1373e5" />
         </View>
       ) : error ? (
         <View style={styles.center}>
@@ -373,8 +373,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   yearChipActive: {
-    backgroundColor: '#E25E3E',
-    borderColor: '#E25E3E',
+    backgroundColor: '#1373e5',
+    borderColor: '#1373e5',
   },
   yearChipText: {
     fontSize: 14,
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -432,12 +432,12 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#EF4444',
+    color: '#1373e5',
     textAlign: 'center',
     marginBottom: 16,
   },
   retryBtn: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 10,
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
     marginVertical: 6,
   },
   netPayCard: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

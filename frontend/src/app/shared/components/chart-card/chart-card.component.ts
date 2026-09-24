@@ -4,7 +4,7 @@ import { ChartComponent, ApexAxisChartSeries, ApexNonAxisChartSeries, ApexChart,
 
 export type ChartKind = 'area' | 'bar' | 'line' | 'donut' | 'radialBar';
 
-const PALETTE = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2', '#db2777'];
+const PALETTE = ['#1373e5', '#6b3fd6', '#19a98f', '#f28c28'];
 
 @Component({
   selector: 'app-chart-card',

@@ -381,8 +381,8 @@ export class TicketsTabComponent {
   getMemberColor(p: { firstName?: string; lastName?: string } | null): string {
     const name = this.fullName(p);
     const colors = [
-      '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4',
-      '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16'
+      '#3b82f6', '#10b981', '#8b5cf6', '#6b3fd6', '#06b6d4',
+      '#6b3fd6', '#6366f1', '#14b8a6', '#1373e5', '#84cc16'
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {

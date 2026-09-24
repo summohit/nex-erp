@@ -216,11 +216,11 @@ export default function ESSScreen({ route }: any) {
     const lower = typeName.toLowerCase();
     if (lower.includes('sick') || lower.includes('sl')) {
       return { 
-        accent: '#EF4444', 
-        bg: '#FEF2F2', 
-        badgeBg: '#FEE2E2', 
+        accent: '#1373e5',
+        bg: '#eff6ff',
+        badgeBg: '#dbeafe',
         icon: HeartPulse,
-        gradientStart: '#FFF5F5'
+        gradientStart: '#eff6ff'
       };
     } else if (lower.includes('earned') || lower.includes('el') || lower.includes('paid')) {
       return { 
@@ -246,11 +246,11 @@ export default function ESSScreen({ route }: any) {
       case 'APPROVED': 
         return { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0', icon: CheckCircle };
       case 'REJECTED': 
-        return { bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA', icon: XCircle };
+        return { bg: '#eff6ff', text: '#0f4f9c', border: '#dbeafe', icon: XCircle };
       case 'CANCELLED': 
         return { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1', icon: XCircle };
       default: 
-        return { bg: '#FFFBEB', text: '#B45309', border: '#FDE68A', icon: Clock };
+        return { bg: '#f3efff', text: '#4f2aa7', border: '#e0d7ff', icon: Clock };
     }
   };
 
@@ -329,7 +329,7 @@ export default function ESSScreen({ route }: any) {
             style={styles.tabScrollView}
             contentContainerStyle={styles.scrollContentContainer}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchLeaveData} colors={['#E25E3E']} />}
+            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchLeaveData} colors={['#1373e5']} />}
           >
             <View>
               {/* --- Leave Balances Section --- */}
@@ -401,7 +401,7 @@ export default function ESSScreen({ route }: any) {
               onPress={() => setActiveTab('requests')}
               activeOpacity={0.85}
             >
-              <FileText size={16} color={activeTab === 'requests' ? '#E25E3E' : '#64748B'} />
+              <FileText size={16} color={activeTab === 'requests' ? '#1373e5' : '#64748B'} />
               <Text style={[styles.segmentText, activeTab === 'requests' && styles.segmentTextActive]}>My Requests</Text>
             </TouchableOpacity>
             
@@ -410,7 +410,7 @@ export default function ESSScreen({ route }: any) {
               onPress={() => setActiveTab('apply')}
               activeOpacity={0.85}
             >
-              <Calendar size={16} color={activeTab === 'apply' ? '#E25E3E' : '#64748B'} />
+              <Calendar size={16} color={activeTab === 'apply' ? '#1373e5' : '#64748B'} />
               <Text style={[styles.segmentText, activeTab === 'apply' && styles.segmentTextActive]}>Apply for Leave</Text>
             </TouchableOpacity>
           </View>
@@ -484,7 +484,7 @@ export default function ESSScreen({ route }: any) {
                     {req.status === 'REJECTED' && (req.rejectionReason || (req as any).rejection_reason) && (
                       <View style={styles.rejectionBox}>
                         <View style={styles.rejectionHeaderRow}>
-                          <AlertCircle size={14} color="#B91C1C" />
+                          <AlertCircle size={14} color="#0f4f9c" />
                           <Text style={styles.rejectionTitle}>Rejection Reason:</Text>
                         </View>
                         <Text style={styles.rejectionText}>
@@ -509,7 +509,7 @@ export default function ESSScreen({ route }: any) {
                           onPress={() => handleCancel(req.id)}
                           activeOpacity={0.7}
                         >
-                          <Trash2 size={12} color="#EF4444" />
+                          <Trash2 size={12} color="#1373e5" />
                           <Text style={styles.cancelActionText}>Cancel</Text>
                         </TouchableOpacity>
                       )}
@@ -562,7 +562,7 @@ export default function ESSScreen({ route }: any) {
                 <Text style={styles.formSectionTitle}>2. Select Dates *</Text>
                 {calculatedDays && (
                   <View style={styles.calculatedDaysBadge}>
-                    <Sparkles size={12} color="#E25E3E" />
+                    <Sparkles size={12} color="#1373e5" />
                     <Text style={styles.calculatedDaysText}>{calculatedDays} {calculatedDays === 1 ? 'Day' : 'Days'} Selected</Text>
                   </View>
                 )}
@@ -576,7 +576,7 @@ export default function ESSScreen({ route }: any) {
                     onPress={() => setOpenStartPicker(true)}
                     activeOpacity={0.7}
                   >
-                    <Calendar size={16} color={isDateRangeInvalid ? "#EF4444" : "#94A3B8"} style={styles.inputIcon} />
+                    <Calendar size={16} color={isDateRangeInvalid ? "#1373e5" : "#94A3B8"} style={styles.inputIcon} />
                     <Text style={[styles.textInput, !startDate && { color: '#94A3B8' }]}>
                       {startDate || "YYYY-MM-DD"}
                     </Text>
@@ -600,9 +600,9 @@ export default function ESSScreen({ route }: any) {
                             setOpenStartPicker(false);
                           }}
                           theme={{
-                            todayTextColor: '#E25E3E',
-                            selectedDayBackgroundColor: '#E25E3E',
-                            arrowColor: '#E25E3E',
+                            todayTextColor: '#1373e5',
+                            selectedDayBackgroundColor: '#1373e5',
+                            arrowColor: '#1373e5',
                           }}
                         />
                       </View>
@@ -617,7 +617,7 @@ export default function ESSScreen({ route }: any) {
                     onPress={() => setOpenEndPicker(true)}
                     activeOpacity={0.7}
                   >
-                    <Calendar size={16} color={isDateRangeInvalid ? "#EF4444" : "#94A3B8"} style={styles.inputIcon} />
+                    <Calendar size={16} color={isDateRangeInvalid ? "#1373e5" : "#94A3B8"} style={styles.inputIcon} />
                     <Text style={[styles.textInput, !endDate && { color: '#94A3B8' }]}>
                       {endDate || "YYYY-MM-DD"}
                     </Text>
@@ -642,9 +642,9 @@ export default function ESSScreen({ route }: any) {
                             setOpenEndPicker(false);
                           }}
                           theme={{
-                            todayTextColor: '#E25E3E',
-                            selectedDayBackgroundColor: '#E25E3E',
-                            arrowColor: '#E25E3E',
+                            todayTextColor: '#1373e5',
+                            selectedDayBackgroundColor: '#1373e5',
+                            arrowColor: '#1373e5',
                           }}
                         />
                       </View>
@@ -656,7 +656,7 @@ export default function ESSScreen({ route }: any) {
               {/* Inline Date Validation Error */}
               {isDateRangeInvalid && (
                 <View style={styles.dateErrorBanner}>
-                  <AlertCircle size={14} color="#B91C1C" />
+                  <AlertCircle size={14} color="#0f4f9c" />
                   <Text style={styles.dateErrorText}>End Date cannot be earlier than Start Date</Text>
                 </View>
               )}
@@ -691,7 +691,7 @@ export default function ESSScreen({ route }: any) {
                   disabled={isUploading}
                 >
                   <View style={styles.dropzoneIconBox}>
-                    {isUploading ? <ActivityIndicator color="#E25E3E" /> : <UploadCloud size={24} color="#E25E3E" />}
+                    {isUploading ? <ActivityIndicator color="#1373e5" /> : <UploadCloud size={24} color="#1373e5" />}
                   </View>
                   <Text style={styles.dropzoneTitle}>{isUploading ? 'Uploading...' : 'Tap to upload image'}</Text>
                   <Text style={styles.dropzoneSub}>Supports JPG, PNG (Max 5MB)</Text>
@@ -699,7 +699,7 @@ export default function ESSScreen({ route }: any) {
               ) : (
                 <View style={styles.attachmentCard}>
                   <View style={styles.attachmentIconBox}>
-                    <Paperclip size={18} color="#E25E3E" />
+                    <Paperclip size={18} color="#1373e5" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.attachmentName} numberOfLines={1}>{attachedFile.name}</Text>
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   mainTabActive: {
-    borderBottomColor: '#E25E3E',
+    borderBottomColor: '#1373e5',
   },
   mainTabText: {
     fontSize: 15,
@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   mainTabTextActive: {
-    color: '#E25E3E',
+    color: '#1373e5',
     fontWeight: '700',
   },
 
@@ -1042,7 +1042,7 @@ const styles = StyleSheet.create({
   },
   reasonQuoteBox: {
     borderLeftWidth: 3,
-    borderLeftColor: '#E25E3E',
+    borderLeftColor: '#1373e5',
     paddingLeft: 10,
     marginVertical: 4,
   },
@@ -1073,9 +1073,9 @@ const styles = StyleSheet.create({
   },
   /* Rejection Reason Box */
   rejectionBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#dbeafe',
     borderRadius: 12,
     padding: 10,
     marginTop: 8,
@@ -1089,11 +1089,11 @@ const styles = StyleSheet.create({
   rejectionTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#B91C1C',
+    color: '#0f4f9c',
   },
   rejectionText: {
     fontSize: 12,
-    color: '#7F1D1D',
+    color: '#4e4e4e',
     lineHeight: 16,
     fontWeight: '500',
   },
@@ -1101,18 +1101,18 @@ const styles = StyleSheet.create({
   cancelActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#dbeafe',
     gap: 4,
   },
   cancelActionText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#EF4444',
+    color: '#1373e5',
   },
 
   /* Empty State */
@@ -1147,7 +1147,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   emptyStateButton: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 12,
@@ -1219,7 +1219,7 @@ const styles = StyleSheet.create({
   calculatedDaysBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
@@ -1229,7 +1229,7 @@ const styles = StyleSheet.create({
   calculatedDaysText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#E25E3E',
+    color: '#1373e5',
   },
   dateRow: {
     flexDirection: 'row',
@@ -1273,14 +1273,14 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   submitBtn: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 16,
     gap: 10,
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
@@ -1298,25 +1298,25 @@ const styles = StyleSheet.create({
   },
   /* Date Validation Error */
   inputWrapperError: {
-    borderColor: '#FCA5A5',
-    backgroundColor: '#FEF2F2',
+    borderColor: '#dbeafe',
+    backgroundColor: '#eff6ff',
   },
   dateErrorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#eff6ff',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
     marginTop: 10,
     gap: 6,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#dbeafe',
   },
   dateErrorText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#B91C1C',
+    color: '#0f4f9c',
   },
 
   modalOverlay: {
@@ -1354,7 +1354,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -1374,9 +1374,9 @@ const styles = StyleSheet.create({
   attachmentCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF1EC',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#FFD8CC',
+    borderColor: '#e5e5e6',
     borderRadius: 14,
     padding: 12,
     gap: 12,

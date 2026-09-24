@@ -1,6 +1,6 @@
 /* ==========================================================================
    Company Profile Component Styles
-   Theme: NEX ERP Modern Orange Accent (#ea580c / #ff5500)
+   Theme: NEX ERP Modern Orange Accent (#1373e5 / #1373e5)
    ========================================================================== */
 
 .company-page-wrapper {
@@ -32,7 +32,7 @@
 
 .spinner {
   animation: spin 1s linear infinite;
-  color: #ea580c;
+  color: #1373e5;
 }
 
 @keyframes spin {
@@ -197,7 +197,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  background: linear-gradient(135deg, #1373e5 0%, #0f4f9c 100%);
   color: #ffffff;
   border: none;
   font-size: 13.5px;
@@ -206,12 +206,12 @@
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
+  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.25);
 }
 
 .btn-save-changes:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.35);
+  box-shadow: 0 6px 16px rgba(19, 115, 229, 0.35);
 }
 
 .btn-save-changes:active {
@@ -266,9 +266,9 @@
 }
 
 .nav-pill-btn.active {
-  background: #ea580c;
+  background: #1373e5;
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
+  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.25);
 }
 
 /* ==========================================================================
@@ -314,11 +314,11 @@
   flex-shrink: 0;
 }
 
-.header-icon-box.bg-orange-light { background: #fff7ed; color: #ea580c; }
+.header-icon-box.bg-orange-light { background: #eff6ff; color: #1373e5; }
 .header-icon-box.bg-blue-light { background: #eff6ff; color: #2563eb; }
 .header-icon-box.bg-emerald-light { background: #ecfdf5; color: #059669; }
 .header-icon-box.bg-purple-light { background: #faf5ff; color: #9333ea; }
-.header-icon-box.bg-amber-light { background: #fffbeb; color: #d97706; }
+.header-icon-box.bg-amber-light { background: #f3efff; color: #6b3fd6; }
 
 .header-text-group h3 {
   font-size: 16px;
@@ -360,7 +360,7 @@
 }
 
 .required-star {
-  color: #ef4444;
+  color: #1373e5;
   margin-left: 2px;
 }
 
@@ -379,8 +379,8 @@
 
 .form-input:focus {
   outline: none;
-  border-color: #ea580c;
-  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12);
 }
 
 .form-input.form-select {
@@ -495,8 +495,8 @@ input[inputmode="numeric"].mono-input {
   gap: 12px;
   padding: 14px 18px;
   border-radius: 12px;
-  background: #fff7ed;
-  border: 1px solid #ffedd5;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
   margin-top: 22px;
 }
 
@@ -507,7 +507,7 @@ input[inputmode="numeric"].mono-input {
 }
 
 .info-banner-icon {
-  color: #ea580c;
+  color: #1373e5;
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -521,12 +521,12 @@ input[inputmode="numeric"].mono-input {
 .info-banner-title {
   font-size: 13px;
   font-weight: 700;
-  color: #9a3412;
+  color: #555657;
 }
 
 .info-banner-content p {
   font-size: 12px;
-  color: #7c2d12;
+  color: #464748;
   margin: 0;
   line-height: 1.5;
 }
@@ -570,7 +570,7 @@ input[inputmode="numeric"].mono-input {
 }
 
 .chip-prefix-value {
-  color: #ea580c;
+  color: #1373e5;
   font-weight: 700;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -622,9 +622,9 @@ input[inputmode="numeric"].mono-input {
 .gold-emv-chip {
   width: 42px;
   height: 32px;
-  background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+  background: linear-gradient(135deg, #8f8f90 0%, #6b3fd6 100%);
   border-radius: 6px;
-  border: 1px solid #b45309;
+  border: 1px solid #4f2aa7;
   position: relative;
   overflow: hidden;
 }
@@ -828,7 +828,7 @@ input[inputmode="numeric"].mono-input {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #ea580c;
+  background: #1373e5;
   color: #ffffff;
   border: none;
   font-size: 13px;
@@ -837,11 +837,11 @@ input[inputmode="numeric"].mono-input {
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.2);
+  box-shadow: 0 2px 8px rgba(19, 115, 229, 0.2);
 }
 
 .btn-logo-upload:hover {
-  background: #c2410c;
+  background: #0f4f9c;
 }
 
 .btn-logo-upload:disabled {
@@ -853,9 +853,9 @@ input[inputmode="numeric"].mono-input {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: #dbeafe;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
   font-size: 13px;
   font-weight: 600;
   padding: 9px 14px;
@@ -865,7 +865,7 @@ input[inputmode="numeric"].mono-input {
 }
 
 .btn-logo-remove:hover {
-  background: #fecaca;
+  background: #dbeafe;
 }
 
 .btn-logo-remove:disabled {
@@ -897,7 +897,7 @@ input[inputmode="numeric"].mono-input {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #ea580c;
+  background: #1373e5;
   flex-shrink: 0;
 }
 
@@ -936,8 +936,8 @@ input[inputmode="numeric"].mono-input {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: #fff7ed;
-  color: #ea580c;
+  background: #eff6ff;
+  color: #1373e5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -976,7 +976,7 @@ input[inputmode="numeric"].mono-input {
 .quote-no {
   font-size: 12.5px;
   font-weight: 700;
-  color: #ea580c;
+  color: #1373e5;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 

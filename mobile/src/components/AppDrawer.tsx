@@ -175,21 +175,21 @@ interface ItemTheme {
 
 const CATEGORY_THEMES: Record<string, ItemTheme> = {
   // Dashboard / Overview
-  overview: { iconBg: '#FFF1EC', iconColor: '#E25E3E' },
-  dashboard: { iconBg: '#FFF1EC', iconColor: '#E25E3E' },
-  home: { iconBg: '#FFF1EC', iconColor: '#E25E3E' },
+  overview: { iconBg: '#eff6ff', iconColor: '#1373e5' },
+  dashboard: { iconBg: '#eff6ff', iconColor: '#1373e5' },
+  home: { iconBg: '#eff6ff', iconColor: '#1373e5' },
   // People & Talent
   employees: { iconBg: '#EEF2FF', iconColor: '#4F46E5' },
   recruitment: { iconBg: '#F5F3FF', iconColor: '#7C3AED' },
   // Projects & Tasks
-  projects: { iconBg: '#FEF3C7', iconColor: '#D97706' },
+  projects: { iconBg: '#f3efff', iconColor: '#6b3fd6' },
   // Attendance & Time
   attendance: { iconBg: '#ECFDF5', iconColor: '#059669' },
   'attendance/timesheets': { iconBg: '#ECFDF5', iconColor: '#059669' },
   'attendance/leaves': { iconBg: '#ECFDF5', iconColor: '#059669' },
   leaves: { iconBg: '#ECFDF5', iconColor: '#059669' },
   // Appreciation & Culture
-  appreciation: { iconBg: '#FFF1F2', iconColor: '#E11D48' },
+  appreciation: { iconBg: '#f8f8f8', iconColor: '#7e7f80' },
   // Field Operations
   'field-visits': { iconBg: '#F0F9FF', iconColor: '#0284C7' },
   // Support & Issues
@@ -202,9 +202,9 @@ const CATEGORY_THEMES: Record<string, ItemTheme> = {
   'payroll/payslips': { iconBg: '#F0FDF4', iconColor: '#16A34A' },
   'payroll/expenses': { iconBg: '#F0FDF4', iconColor: '#16A34A' },
   expenses: { iconBg: '#F0FDF4', iconColor: '#16A34A' },
-  'assets/requests': { iconBg: '#FEF2F2', iconColor: '#DC2626' },
-  'hardware-requests': { iconBg: '#FEF2F2', iconColor: '#DC2626' },
-  assets: { iconBg: '#FEF2F2', iconColor: '#DC2626' },
+  'assets/requests': { iconBg: '#eff6ff', iconColor: '#1373e5' },
+  'hardware-requests': { iconBg: '#eff6ff', iconColor: '#1373e5' },
+  assets: { iconBg: '#eff6ff', iconColor: '#1373e5' },
   // Muted & Default
   performance: { iconBg: '#F1F5F9', iconColor: '#64748B' },
   offboarding: { iconBg: '#F1F5F9', iconColor: '#64748B' },
@@ -475,7 +475,7 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
               >
                 {isLoading ? (
                   <View style={styles.loadingBox}>
-                    <ActivityIndicator size="small" color="#E25E3E" />
+                    <ActivityIndicator size="small" color="#1373e5" />
                     <Text style={styles.loadingText}>Loading menu…</Text>
                   </View>
                 ) : allItems.length === 0 ? (
@@ -520,7 +520,7 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
                                 >
                                   <Icon
                                     size={18}
-                                    color={isActive ? '#E25E3E' : theme.iconColor}
+                                    color={isActive ? '#1373e5' : theme.iconColor}
                                     strokeWidth={isActive ? 2.2 : 2}
                                   />
                                 </View>
@@ -543,14 +543,14 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
                                 {hasSubItems ? (
                                   <ChevronDown
                                     size={16}
-                                    color={isActive ? '#E25E3E' : '#94A3B8'}
+                                    color={isActive ? '#1373e5' : '#94A3B8'}
                                     strokeWidth={2}
                                     style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }}
                                   />
                                 ) : (
                                   <ChevronRight
                                     size={16}
-                                    color={isActive ? '#E25E3E' : '#CBD5E1'}
+                                    color={isActive ? '#1373e5' : '#CBD5E1'}
                                     strokeWidth={2}
                                   />
                                 )}
@@ -576,7 +576,7 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
                                         {SubIconComponent ? (
                                           <SubIconComponent
                                             size={14}
-                                            color={subActive ? '#E25E3E' : '#64748B'}
+                                            color={subActive ? '#1373e5' : '#64748B'}
                                             strokeWidth={subActive ? 2.2 : 1.8}
                                           />
                                         ) : (
@@ -645,7 +645,7 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     onPress={handleLogout}
                   >
-                    <LogOut size={16} color="#EF4444" strokeWidth={2.2} />
+                    <LogOut size={16} color="#1373e5" strokeWidth={2.2} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -747,7 +747,7 @@ function StaticMenuFallback({
                   >
                     <Icon
                       size={18}
-                      color={isActive ? '#E25E3E' : theme.iconColor}
+                      color={isActive ? '#1373e5' : theme.iconColor}
                       strokeWidth={isActive ? 2.2 : 2}
                     />
                   </View>
@@ -769,7 +769,7 @@ function StaticMenuFallback({
                   )}
                   <ChevronRight
                     size={16}
-                    color={isActive ? '#E25E3E' : '#CBD5E1'}
+                    color={isActive ? '#1373e5' : '#CBD5E1'}
                     strokeWidth={2}
                   />
                 </View>
@@ -844,10 +844,10 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 11,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#E25E3E',
+    shadowColor: '#1373e5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -927,8 +927,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   itemActive: {
-    backgroundColor: '#FFF7F5',
-    borderColor: '#FED7AA',
+    backgroundColor: '#fafafa',
+    borderColor: '#dbeafe',
   },
   activeBar: {
     position: 'absolute',
@@ -936,7 +936,7 @@ const styles = StyleSheet.create({
     top: 8,
     bottom: 8,
     width: 3.5,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     borderTopRightRadius: 4,
     borderBottomRightRadius: 4,
   },
@@ -954,7 +954,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconBoxActive: {
-    backgroundColor: '#FFE8DF',
+    backgroundColor: '#efefef',
   },
   itemText: {
     fontSize: 14,
@@ -974,7 +974,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   badge: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#dbeafe',
     borderRadius: 10,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -982,7 +982,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgeText: {
-    color: '#DC2626',
+    color: '#1373e5',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -1018,7 +1018,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   subItemActive: {
-    backgroundColor: '#FFF7F5',
+    backgroundColor: '#fafafa',
   },
   subItemLeft: {
     flexDirection: 'row',
@@ -1033,7 +1033,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#CBD5E1',
   },
   subItemDotActive: {
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
   },
   subItemText: {
     fontSize: 13,
@@ -1041,7 +1041,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   subItemTextActive: {
-    color: '#E25E3E',
+    color: '#1373e5',
     fontWeight: '600',
   },
   footerWrapper: {
@@ -1079,7 +1079,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 11,
-    backgroundColor: '#E25E3E',
+    backgroundColor: '#1373e5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1124,7 +1124,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#dbeafe',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 6,

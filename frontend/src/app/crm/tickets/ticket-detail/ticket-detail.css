@@ -105,9 +105,9 @@
 }
 
 .btn-icon-close:hover {
-  background: #fee2e2;
-  border-color: #fecaca;
-  color: #ef4444;
+  background: #dbeafe;
+  border-color: #dbeafe;
+  color: #1373e5;
 }
 
 /* --------------------------------------------------------------------------
@@ -154,13 +154,13 @@
 }
 
 .btn-status-in-progress {
-  background: #fef3c7;
-  color: #b45309;
-  border-color: #fde68a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border-color: #e0d7ff;
 }
 .btn-status-in-progress:hover {
-  background: #fde68a;
-  color: #78350f;
+  background: #e0d7ff;
+  color: #434344;
 }
 
 .btn-status-resolved {
@@ -184,13 +184,13 @@
 }
 
 .btn-status-rejected {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fecaca;
+  background: #dbeafe;
+  color: #0f4f9c;
+  border-color: #dbeafe;
 }
 .btn-status-rejected:hover {
-  background: #fecaca;
-  color: #7f1d1d;
+  background: #dbeafe;
+  color: #4e4e4e;
 }
 
 .btn-status-open {
@@ -699,8 +699,8 @@
 }
 
 .btn-micro-danger:hover {
-  background: #fee2e2;
-  color: #ef4444;
+  background: #dbeafe;
+  color: #1373e5;
 }
 
 .comment-body-text {
@@ -833,9 +833,9 @@
 }
 
 .type-bug {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: #dbeafe;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
 }
 
 .type-feature {
@@ -851,9 +851,9 @@
 }
 
 .type-question {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
 
 .platform-tag {
@@ -906,21 +906,21 @@
 }
 
 .priority-critical {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
 }
 
 .priority-high {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #ffedd5;
+  background: #eff6ff;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
 }
 
 .priority-medium {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fef3c7;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #f3efff;
 }
 
 .priority-low {
@@ -959,11 +959,11 @@
 .status-open .status-indicator-dot { background: #3b82f6; }
 
 .status-in-progress {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: #f3efff;
+  color: #4f2aa7;
+  border: 1px solid #e0d7ff;
 }
-.status-in-progress .status-indicator-dot { background: #f59e0b; }
+.status-in-progress .status-indicator-dot { background: #6b3fd6; }
 
 .status-resolved {
   background: #f0fdf4;
@@ -980,11 +980,11 @@
 .status-closed .status-indicator-dot { background: #94a3b8; }
 
 .status-rejected {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  color: #0f4f9c;
+  border: 1px solid #dbeafe;
 }
-.status-rejected .status-indicator-dot { background: #ef4444; }
+.status-rejected .status-indicator-dot { background: #1373e5; }
 
 .avatar-circle {
   width: 26px;
@@ -1234,7 +1234,7 @@
 
 /* Time Tracker */
 .time-tracker-card {
-  border-left: 4px solid #f97316;
+  border-left: 4px solid #1373e5;
 }
 
 .time-tracker-content {
@@ -1286,20 +1286,20 @@
 }
 
 .btn-timer-active {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #b91c1c;
+  background: #dbeafe;
+  border-color: #dbeafe;
+  color: #0f4f9c;
   animation: pulse-red 2s infinite;
 }
 
 .btn-timer-active:hover {
-  background: #fecaca;
+  background: #dbeafe;
 }
 
 @keyframes pulse-red {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(19, 115, 229, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(19, 115, 229, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(19, 115, 229, 0); }
 }
 
 /* Attachment button */
@@ -1362,9 +1362,9 @@
   background: #64748b;
 }
 
-.file-badge.file-pdf     .file-badge-ext { background: #dc2626; }
+.file-badge.file-pdf     .file-badge-ext { background: #1373e5; }
 .file-badge.file-doc     .file-badge-ext { background: #2563eb; }
 .file-badge.file-sheet   .file-badge-ext { background: #16a34a; }
-.file-badge.file-slide   .file-badge-ext { background: #ea580c; }
+.file-badge.file-slide   .file-badge-ext { background: #1373e5; }
 .file-badge.file-archive .file-badge-ext { background: #7c3aed; }
 .file-badge.file-generic .file-badge-ext { background: #64748b; }

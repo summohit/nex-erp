@@ -728,10 +728,10 @@ export class MasterDataComponent implements OnInit {
     '#2A97D8', // Primary Sky Blue
     '#4F46E5', // Indigo
     '#10B981', // Emerald Green
-    '#F59E0B', // Amber
-    '#EF4444', // Rose Red
+    '#6b3fd6', // Amber
+    '#1373e5', // Rose Red
     '#8B5CF6', // Violet
-    '#EC4899', // Pink
+    '#6b3fd6', // Pink
     '#06B6D4', // Cyan
     '#64748B'  // Slate
   ];
@@ -862,7 +862,7 @@ export class MasterDataComponent implements OnInit {
 
   getAvatarBg(name?: string): string {
     if (!name) return '#64748B';
-    const colors = ['#2A97D8', '#6366F1', '#EC4899', '#8B5CF6', '#10B981', '#F59E0B', '#06B6D4', '#3B82F6'];
+    const colors = ['#2A97D8', '#6366F1', '#6b3fd6', '#8B5CF6', '#10B981', '#6b3fd6', '#06B6D4', '#3B82F6'];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);

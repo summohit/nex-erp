@@ -20,21 +20,21 @@
   font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
   transition: all 0.15s ease; white-space: nowrap;
 }
-.ol-btn-primary { background: #ff5500; color: #fff; box-shadow: 0 1px 3px rgba(255,85,0,.3); }
-.ol-btn-primary:hover:not(:disabled) { background: #e04400; transform: translateY(-1px); }
+.ol-btn-primary { background: #1373e5; color: #fff; box-shadow: 0 1px 3px rgba(19, 115, 229, .3); }
+.ol-btn-primary:hover:not(:disabled) { background: #0f5fbe; transform: translateY(-1px); }
 .ol-btn-primary:disabled { background: #d1d5db; color: #9ca3af; box-shadow: none; cursor: not-allowed; }
 .ol-btn-ghost { background: #fff; color: #374151; border-color: #d1d5db; }
 .ol-btn-ghost:hover { background: #f9fafb; border-color: #9ca3af; }
-.ol-btn-danger { background: #dc2626; color: #fff; }
-.ol-btn-danger:hover:not(:disabled) { background: #b91c1c; }
-.ol-btn-yellow { background: #fbbf24; color: #78350f; font-weight: 700; }
-.ol-btn-yellow:hover { background: #f59e0b; }
+.ol-btn-danger { background: #1373e5; color: #fff; }
+.ol-btn-danger:hover:not(:disabled) { background: #0f4f9c; }
+.ol-btn-yellow { background: #8f8f90; color: #434344; font-weight: 700; }
+.ol-btn-yellow:hover { background: #6b3fd6; }
 .ol-btn-text {
   background: none; border: none; color: #6b7280; font-family: inherit; font-size: 12.5px;
   font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
   margin-top: 8px; padding: 0;
 }
-.ol-btn-text:hover { color: #dc2626; }
+.ol-btn-text:hover { color: #1373e5; }
 .full { width: 100%; }
 .lg { padding: 12px 20px; font-size: 14.5px; }
 
@@ -49,7 +49,7 @@
   width: 54px; height: 54px; border-radius: 50%; display: flex;
   align-items: center; justify-content: center;
 }
-.ol-state-icon.err { background: #fee2e2; color: #dc2626; }
+.ol-state-icon.err { background: #dbeafe; color: #1373e5; }
 
 /* ---------- Password gate ---------- */
 .ol-lock-screen {
@@ -62,7 +62,7 @@
   box-shadow: 0 12px 40px rgba(15,23,42,.09); text-align: center;
 }
 .ol-lock-icon {
-  width: 54px; height: 54px; border-radius: 14px; background: #fff7ed; color: #ff5500;
+  width: 54px; height: 54px; border-radius: 14px; background: #eff6ff; color: #1373e5;
   display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;
 }
 .ol-lock-card h1 { margin: 0 0 8px; font-size: 20px; font-weight: 800; }
@@ -80,9 +80,9 @@
   transition: border-color .15s ease, box-shadow .15s ease; background: #fff;
 }
 .ol-pw-input:focus, .ol-text-input:focus {
-  outline: none; border-color: #ff5500; box-shadow: 0 0 0 3px rgba(255,85,0,.13);
+  outline: none; border-color: #1373e5; box-shadow: 0 0 0 3px rgba(19, 115, 229, .13);
 }
-.ol-pw-input.err { border-color: #dc2626; }
+.ol-pw-input.err { border-color: #1373e5; }
 .ol-text-input { resize: vertical; }
 
 .ol-hint {
@@ -93,7 +93,7 @@
 
 .ol-err-msg {
   display: flex; align-items: center; gap: 6px; margin: 12px 0 0;
-  font-size: 12.5px; color: #dc2626; font-weight: 600; text-align: left;
+  font-size: 12.5px; color: #1373e5; font-weight: 600; text-align: left;
 }
 .ol-err-msg.centre { justify-content: center; }
 .ol-lock-card .ol-btn-primary { margin-top: 20px; }
@@ -108,7 +108,7 @@
 }
 .ol-topbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .ol-doc-badge {
-  width: 38px; height: 38px; border-radius: 10px; background: #fff7ed; color: #ff5500;
+  width: 38px; height: 38px; border-radius: 10px; background: #eff6ff; color: #1373e5;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .ol-doc-meta { display: flex; flex-direction: column; min-width: 0; }
@@ -121,7 +121,7 @@
 
 .ol-progress { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
 .ol-progress-bar { height: 5px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
-.ol-progress-fill { height: 100%; background: #ff5500; border-radius: 3px; transition: width .3s ease; }
+.ol-progress-fill { height: 100%; background: #1373e5; border-radius: 3px; transition: width .3s ease; }
 .ol-progress-text { font-size: 11px; color: #6b7280; font-weight: 600; }
 
 .ol-status-chip {
@@ -129,16 +129,16 @@
   border-radius: 20px; font-size: 12px; font-weight: 700;
 }
 .ol-status-chip.done { background: #dcfce7; color: #166534; }
-.ol-status-chip.declined { background: #fee2e2; color: #991b1b; }
+.ol-status-chip.declined { background: #dbeafe; color: #595a5b; }
 
 /* ---------- Action strip ---------- */
 .ol-action-strip {
-  background: #fef3c7; border-bottom: 1px solid #fde68a; padding: 10px 22px;
-  display: flex; align-items: center; gap: 10px; font-size: 13px; color: #78350f;
+  background: #f3efff; border-bottom: 1px solid #e0d7ff; padding: 10px 22px;
+  display: flex; align-items: center; gap: 10px; font-size: 13px; color: #434344;
   position: sticky; top: 63px; z-index: 30;
 }
 .ol-strip-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; flex-shrink: 0;
+  width: 8px; height: 8px; border-radius: 50%; background: #6b3fd6; flex-shrink: 0;
   animation: ol-pulse 1.8s ease-in-out infinite;
 }
 .ol-strip-dot.done { background: #16a34a; animation: none; }
@@ -158,8 +158,8 @@
 }
 .ol-banner.done { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
 .ol-banner.done .ol-banner-icon { background: #dcfce7; }
-.ol-banner.declined { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
-.ol-banner.declined .ol-banner-icon { background: #fee2e2; }
+.ol-banner.declined { background: #eff6ff; border-color: #dbeafe; color: #595a5b; }
+.ol-banner.declined .ol-banner-icon { background: #dbeafe; }
 
 /* ---------- Document viewport ---------- */
 .ol-doc-scroll { flex: 1; overflow-y: auto; padding: 26px 20px 60px; }
@@ -180,27 +180,27 @@
 /* ---------- Signature zone ---------- */
 .ol-sign-zone { max-width: 850px; margin: 22px auto 0; }
 .ol-sign-card {
-  background: #fff; border: 2px solid #fbbf24; border-radius: 12px; padding: 22px 24px;
-  box-shadow: 0 6px 22px rgba(251,191,36,.16);
+  background: #fff; border: 2px solid #8f8f90; border-radius: 12px; padding: 22px 24px;
+  box-shadow: 0 6px 22px rgba(19, 115, 229, .16);
 }
 .ol-sign-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .ol-required-tag {
-  background: #fbbf24; color: #78350f; font-size: 10px; font-weight: 800;
+  background: #8f8f90; color: #434344; font-size: 10px; font-weight: 800;
   padding: 3px 9px; border-radius: 4px; text-transform: uppercase; letter-spacing: .05em;
 }
 .ol-sign-label { font-size: 13px; font-weight: 700; color: #374151; }
 
 .ol-sign-target {
   width: 100%; display: flex; align-items: center; gap: 14px; padding: 22px 18px;
-  border: 2px dashed #fbbf24; border-radius: 9px; background: #fffbeb;
+  border: 2px dashed #8f8f90; border-radius: 9px; background: #f3efff;
   cursor: pointer; font-family: inherit; transition: all .15s ease;
 }
-.ol-sign-target:hover { background: #fef3c7; border-color: #f59e0b; }
+.ol-sign-target:hover { background: #f3efff; border-color: #6b3fd6; }
 .ol-sign-tab {
-  display: inline-flex; align-items: center; gap: 5px; background: #fbbf24; color: #78350f;
+  display: inline-flex; align-items: center; gap: 5px; background: #8f8f90; color: #434344;
   font-size: 12px; font-weight: 800; padding: 6px 13px; border-radius: 4px; flex-shrink: 0;
 }
-.ol-sign-placeholder { color: #92400e; font-size: 13.5px; font-weight: 600; }
+.ol-sign-placeholder { color: #504f51; font-size: 13.5px; font-weight: 600; }
 
 .ol-sign-filled {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -214,13 +214,13 @@
   font-weight: 600; color: #374151; cursor: pointer;
 }
 .ol-sign-filled-actions button:hover { background: #f3f4f6; }
-.ol-sign-filled-actions button.danger:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+.ol-sign-filled-actions button.danger:hover { background: #dbeafe; color: #1373e5; border-color: #dbeafe; }
 
 .ol-consent {
   display: flex; align-items: flex-start; gap: 10px; margin: 18px 0;
   font-size: 12.5px; color: #4b5563; line-height: 1.6; cursor: pointer;
 }
-.ol-consent input { margin-top: 2px; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; accent-color: #ff5500; }
+.ol-consent input { margin-top: 2px; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; accent-color: #1373e5; }
 
 /* ---------- Modal ---------- */
 .ol-modal-backdrop {
@@ -252,7 +252,7 @@
   border-bottom: 2px solid transparent; padding: 9px 14px; font-family: inherit;
   font-size: 13px; font-weight: 600; color: #6b7280; cursor: pointer;
 }
-.ol-tabs button.active { color: #ff5500; border-bottom-color: #ff5500; }
+.ol-tabs button.active { color: #1373e5; border-bottom-color: #1373e5; }
 .ol-tabs button:hover:not(.active) { color: #374151; }
 
 .ol-modal-body { padding: 20px 22px; overflow-y: auto; }
@@ -264,7 +264,7 @@
   transition: all .15s ease; overflow: hidden;
 }
 .ol-font-option:hover { border-color: #d1d5db; background: #f9fafb; }
-.ol-font-option.active { border-color: #ff5500; background: #fff7ed; }
+.ol-font-option.active { border-color: #1373e5; background: #eff6ff; }
 .ol-font-preview {
   font-size: 24px; color: #1e3a8a; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; line-height: 1.35;
@@ -286,7 +286,7 @@
   padding: 34px 20px; border: 2px dashed #d1d5db; border-radius: 11px;
   background: #f9fafb; cursor: pointer; text-align: center; color: #6b7280;
 }
-.ol-upload-zone:hover { border-color: #ff5500; background: #fff7ed; }
+.ol-upload-zone:hover { border-color: #1373e5; background: #eff6ff; }
 .ol-upload-zone svg { color: #9ca3af; }
 .ol-upload-zone strong { font-size: 13.5px; color: #374151; }
 .ol-upload-zone span { font-size: 11.5px; }

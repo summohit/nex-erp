@@ -165,8 +165,8 @@ export class JobPostingsComponent implements OnInit {
     getRowStyle: (params: any) => {
       switch (params.data?.status) {
         case 'Open':   return { backgroundColor: '#F0FDF4' };  // green-50
-        case 'Closed': return { backgroundColor: '#FEF2F2' };  // red-50
-        case 'Draft':  return { backgroundColor: '#FEFCE8' };  // yellow-50
+        case 'Closed': return { backgroundColor: '#eff6ff' };  // red-50
+        case 'Draft':  return { backgroundColor: '#f3efff' };  // yellow-50
         default:       return undefined;
       }
     }
@@ -197,8 +197,8 @@ export class JobPostingsComponent implements OnInit {
         const val = params.value;
         let bg = '#F1F5F9', color = '#475569';
         if (val === 'Open') { bg = '#DCFCE7'; color = '#166534'; }
-        if (val === 'Closed') { bg = '#FEE2E2'; color = '#991B1B'; }
-        if (val === 'Draft') { bg = '#FEF9C3'; color = '#CA8A04'; }
+        if (val === 'Closed') { bg = '#dbeafe'; color = '#595a5b'; }
+        if (val === 'Draft') { bg = '#f3efff'; color = '#4f2aa7'; }
         return `<span style="background: ${bg}; color: ${color}; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase;">${val}</span>`;
       }
     },
@@ -212,7 +212,7 @@ export class JobPostingsComponent implements OnInit {
         if (!r) return '<span style="color:#94a3b8;font-size:13px;">Unassigned</span>';
         const name = `${r.firstName} ${r.lastName}`;
         const initials = (r.firstName?.[0] || '') + (r.lastName?.[0] || '');
-        const colors = ['#6366f1','#8b5cf6','#ec4899','#f43f5e','#10b981','#06b6d4','#3b82f6','#f59e0b'];
+        const colors = ['#6366f1','#8b5cf6','#6b3fd6','#6b3fd6','#10b981','#06b6d4','#3b82f6','#6b3fd6'];
         let hash = 0;
         for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
         const bg = colors[Math.abs(hash) % colors.length];
@@ -411,7 +411,7 @@ export class JobPostingsComponent implements OnInit {
 
   getAvatarColor(name: string): string {
     if (!name) return '#6366f1';
-    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#10b981', '#06b6d4', '#3b82f6', '#f59e0b'];
+    const colors = ['#6366f1', '#8b5cf6', '#6b3fd6', '#6b3fd6', '#10b981', '#06b6d4', '#3b82f6', '#6b3fd6'];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -745,7 +745,7 @@ export class JobPostingsComponent implements OnInit {
 
     } catch (err: any) {
       console.error('Groq AI Generation error:', err);
-      const errHtml = '<p style="color: #ef4444;">Failed to generate job description. Please ensure your Groq API key is set and backend is running.</p>';
+      const errHtml = '<p style="color: #1373e5;">Failed to generate job description. Please ensure your Groq API key is set and backend is running.</p>';
       this.jobForm.descriptionHtml = errHtml;
       if (this.quillInstance) {
         this.quillInstance.clipboard.dangerouslyPasteHTML(errHtml);

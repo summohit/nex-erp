@@ -413,8 +413,8 @@
 .template-name { margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #111827; }
 .template-desc { margin: 0; font-size: 12px; color: #6b7280; }
 
-.text-danger { color: #ef4444; }
-.text-danger:hover { color: #dc2626; }
+.text-danger { color: #1373e5; }
+.text-danger:hover { color: #1373e5; }
 
 /* Slide-over Panel */
 .slide-over-overlay {

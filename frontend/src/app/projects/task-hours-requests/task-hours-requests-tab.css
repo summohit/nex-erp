@@ -113,13 +113,13 @@
   width: 52px;
   height: 52px;
   border-radius: 13px;
-  background: linear-gradient(135deg, #FFF4ED 0%, #FFE6D5 100%);
-  color: #FF5200;
+  background: linear-gradient(135deg, #effcf7 0%, #d7f7e8 100%);
+  color: #1373e5;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(255, 82, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(19, 115, 229, 0.12);
 }
 
 .thr-hero-text {
@@ -162,9 +162,9 @@
 }
 
 .badge-pending {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #b45309;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
+  color: #4f2aa7;
 }
 
 .badge-settled {
@@ -177,15 +177,15 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #f59e0b;
-  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  background: #6b3fd6;
+  box-shadow: 0 0 0 0 rgba(19, 115, 229, 0.7);
   animation: thr-pulse 1.8s infinite;
 }
 
 @keyframes thr-pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(19, 115, 229, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(19, 115, 229, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(19, 115, 229, 0); }
 }
 
 .thr-hero-right {
@@ -252,8 +252,8 @@
 }
 
 .thr-kpi-card.kpi-amber.active {
-  box-shadow: 0 0 0 2px #f59e0b;
-  background: #fffdfa;
+  box-shadow: 0 0 0 2px #6b3fd6;
+  background: #fcfcfd;
 }
 
 .thr-kpi-card.kpi-emerald.active {
@@ -262,8 +262,8 @@
 }
 
 .thr-kpi-card.kpi-rose.active {
-  box-shadow: 0 0 0 2px #ef4444;
-  background: #fffafa;
+  box-shadow: 0 0 0 2px #1373e5;
+  background: #fcfcfd;
 }
 
 .thr-kpi-card.kpi-indigo.active {
@@ -281,9 +281,9 @@
   flex-shrink: 0;
 }
 
-.bg-amber-soft  { background: #fef3c7; color: #d97706; }
+.bg-amber-soft  { background: #f3efff; color: #6b3fd6; }
 .bg-emerald-soft{ background: #d1fae5; color: #059669; }
-.bg-rose-soft   { background: #fee2e2; color: #dc2626; }
+.bg-rose-soft   { background: #dbeafe; color: #1373e5; }
 .bg-indigo-soft { background: #e0e7ff; color: #4f46e5; }
 
 .thr-kpi-content {
@@ -315,11 +315,11 @@
   color: #0f172a;
 }
 
-.text-amber  { color: #d97706 !important; }
+.text-amber  { color: #6b3fd6 !important; }
 .text-emerald{ color: #059669 !important; }
-.text-rose   { color: #dc2626 !important; }
+.text-rose   { color: #1373e5 !important; }
 .text-indigo { color: #4f46e5 !important; }
-.text-primary{ color: #FF5200 !important; }
+.text-primary{ color: #1373e5 !important; }
 
 .thr-kpi-badge {
   font-size: 10px;
@@ -330,9 +330,9 @@
   letter-spacing: 0.03em;
 }
 
-.badge-amber  { background: #fef3c7; color: #b45309; }
+.badge-amber  { background: #f3efff; color: #4f2aa7; }
 .badge-emerald{ background: #d1fae5; color: #047857; }
-.badge-rose   { background: #fee2e2; color: #b91c1c; }
+.badge-rose   { background: #dbeafe; color: #0f4f9c; }
 .badge-indigo { background: #e0e7ff; color: #3730a3; }
 
 .thr-kpi-sub {
@@ -385,8 +385,8 @@
 }
 
 .thr-tab-btn.active {
-  color: #FF5200;
-  border-bottom-color: #FF5200;
+  color: #1373e5;
+  border-bottom-color: #1373e5;
   font-weight: 700;
 }
 
@@ -403,13 +403,13 @@
 }
 
 .thr-tab-btn.active .thr-tab-pill {
-  background: #FFF4ED;
-  color: #FF5200;
+  background: #effcf7;
+  color: #1373e5;
 }
 
 .pill-warn {
-  background: #fffbeb !important;
-  color: #b45309 !important;
+  background: #f3efff !important;
+  color: #4f2aa7 !important;
 }
 
 /* Secondary Filter Row */
@@ -451,8 +451,8 @@
 
 .thr-search-input:focus {
   background: #ffffff;
-  border-color: #FF5200;
-  box-shadow: 0 0 0 3px rgba(255, 82, 0, 0.1);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1);
 }
 
 .thr-search-clear {
@@ -507,8 +507,8 @@
 }
 
 .thr-select:focus {
-  border-color: #FF5200;
-  box-shadow: 0 0 0 2px rgba(255, 82, 0, 0.1);
+  border-color: #1373e5;
+  box-shadow: 0 0 0 2px rgba(19, 115, 229, 0.1);
 }
 
 .thr-btn-clear {
@@ -516,10 +516,10 @@
   align-items: center;
   gap: 5px;
   padding: 7.5px 12px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
   border-radius: 9px;
-  color: #dc2626;
+  color: #1373e5;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -527,8 +527,8 @@
 }
 
 .thr-btn-clear:hover {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #dbeafe;
+  color: #0f4f9c;
 }
 
 /* Active Chips Bar */
@@ -579,7 +579,7 @@
 }
 
 .thr-filter-chip button:hover {
-  color: #ef4444;
+  color: #1373e5;
 }
 
 .thr-results-count {
@@ -657,7 +657,7 @@
   align-items: center;
   gap: 7px;
   padding: 8px 16px;
-  background: #FF5200;
+  background: #1373e5;
   border: none;
   border-radius: 9px;
   color: #ffffff;
@@ -667,7 +667,7 @@
 }
 
 .thr-btn-reset-filters:hover {
-  background: #e64a00;
+  background: #0f5fbe;
 }
 
 /* ── Request Cards Feed ─────────────────────────────────────────────────── */
@@ -769,9 +769,9 @@
 }
 
 .badge-requested {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #b45309;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
+  color: #4f2aa7;
 }
 
 .badge-approved {
@@ -781,9 +781,9 @@
 }
 
 .badge-rejected {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #0f4f9c;
 }
 
 /* Card Body */
@@ -848,7 +848,7 @@
 }
 
 .box-requested .thr-hour-value strong {
-  color: #b45309;
+  color: #4f2aa7;
 }
 
 .box-approved .thr-hour-value strong {
@@ -864,7 +864,7 @@
 .thr-hour-declined {
   font-size: 14px;
   font-weight: 700;
-  color: #b91c1c;
+  color: #0f4f9c;
 }
 
 .thr-hour-hint {
@@ -922,9 +922,9 @@
 
 /* Rejection Explanation Card */
 .thr-rejection-card {
-  background: #fef2f2;
-  border: 1px solid #fee2e2;
-  border-left: 3px solid #ef4444;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-left: 3px solid #1373e5;
   border-radius: 8px;
   padding: 12px 16px;
   display: flex;
@@ -938,13 +938,13 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 700;
-  color: #b91c1c;
+  color: #0f4f9c;
 }
 
 .thr-rejection-text {
   margin: 0;
   font-size: 13px;
-  color: #991b1b;
+  color: #595a5b;
   line-height: 1.5;
 }
 
@@ -1067,25 +1067,25 @@
 }
 
 .btn-partial {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #b45309;
+  background: #f3efff;
+  border: 1px solid #e0d7ff;
+  color: #4f2aa7;
 }
 
 .btn-partial:hover:not(:disabled) {
-  background: #fef3c7;
-  border-color: #fcd34d;
+  background: #f3efff;
+  border-color: #a4a4a5;
 }
 
 .btn-reject {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #0f4f9c;
 }
 
 .btn-reject:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: #fca5a5;
+  background: #dbeafe;
+  border-color: #dbeafe;
 }
 
 /* ── Inline Drawers (Partial Approval & Rejection) ───────────────────────── */
@@ -1104,13 +1104,13 @@
 }
 
 .drawer-partial {
-  background: #fffdf7;
-  border-top-color: #fde68a;
+  background: #fbfbfb;
+  border-top-color: #e0d7ff;
 }
 
 .drawer-reject {
-  background: #fff8f8;
-  border-top-color: #fecaca;
+  background: #fbfbfc;
+  border-top-color: #dbeafe;
 }
 
 .thr-drawer-header {
@@ -1170,7 +1170,7 @@
 }
 
 .thr-custom-input:focus {
-  border-color: #f59e0b;
+  border-color: #6b3fd6;
 }
 
 .thr-input-unit {
@@ -1197,7 +1197,7 @@
 }
 
 .thr-reject-input:focus {
-  border-color: #ef4444;
+  border-color: #1373e5;
 }
 
 .thr-drawer-footer {
@@ -1230,7 +1230,7 @@
   align-items: center;
   gap: 6px;
   padding: 7px 16px;
-  background: #ef4444;
+  background: #1373e5;
   border: none;
   border-radius: 7px;
   color: #ffffff;
@@ -1241,7 +1241,7 @@
 }
 
 .thr-btn-confirm-reject:hover:not(:disabled) {
-  background: #dc2626;
+  background: #1373e5;
 }
 
 .thr-btn-cancel {
@@ -1355,11 +1355,11 @@
 .bullet-approved .thr-bullet-inner { background: #10b981; }
 .bullet-approved { border-color: #6ee7b7; }
 
-.bullet-rejected .thr-bullet-inner { background: #ef4444; }
-.bullet-rejected { border-color: #fca5a5; }
+.bullet-rejected .thr-bullet-inner { background: #1373e5; }
+.bullet-rejected { border-color: #dbeafe; }
 
-.bullet-hours_modified .thr-bullet-inner { background: #f59e0b; }
-.bullet-hours_modified { border-color: #fcd34d; }
+.bullet-hours_modified .thr-bullet-inner { background: #6b3fd6; }
+.bullet-hours_modified { border-color: #a4a4a5; }
 
 .thr-timeline-content {
   display: flex;
