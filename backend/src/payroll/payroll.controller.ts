@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, ParseIntPipe, Res } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -31,6 +31,22 @@ export class PayrollController {
 
   // ==================== 2. SALARY STRUCTURE ====================
 
+  @Get('structures')
+  getAllSalaryStructures(@Request() req) {
+    return this.payrollService.getAllSalaryStructures(req.user.companyId);
+  }
+
+  @Put('structure/:employeeId/allow-payroll')
+  setAllowPayrollGenerate(
+    @Request() req,
+    @Param('employeeId', ParseIntPipe) employeeId: number,
+    @Body() body: { allow: boolean },
+  ) {
+    return this.payrollService.setAllowPayrollGenerate(
+      req.user.companyId, employeeId, !!body.allow,
+    );
+  }
+
   @Get('structure/:employeeId')
   getSalaryStructure(@Request() req, @Param('employeeId', ParseIntPipe) employeeId: number) {
     return this.payrollService.getSalaryStructure(req.user.companyId, employeeId);
@@ -47,9 +63,20 @@ export class PayrollController {
 
   // ==================== 3. PAYSLIPS ====================
 
+  @Get('payslips/preview')
+  previewPayroll(@Request() req, @Query('month') month: string, @Query('year') year: string) {
+    return this.payrollService.previewPayroll(req.user.companyId, Number(month), Number(year));
+  }
+
   @Post('payslips/generate')
-  generatePayslips(@Request() req, @Body() body: { month: number; year: number }) {
-    return this.payrollService.generatePayslips(req.user.companyId, Number(body.month), Number(body.year));
+  generatePayslips(
+    @Request() req,
+    @Body() body: { month: number; year: number; skipLossOfPay?: boolean },
+  ) {
+    return this.payrollService.generatePayslips(
+      req.user.companyId, Number(body.month), Number(body.year),
+      { skipLossOfPay: !!body.skipLossOfPay },
+    );
   }
 
   @Post('payslips/send-emails')
@@ -75,6 +102,28 @@ export class PayrollController {
   @Put('payslips/mark-paid')
   markPayslipsPaid(@Request() req, @Body() body: { month: number; year: number }) {
     return this.payrollService.markPayslipsPaid(req.user.companyId, Number(body.month), Number(body.year));
+  }
+
+  @Get('payslips/:id/detail')
+  getPayslipDetail(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.payrollService.getPayslipDetail(req.user.companyId, id);
+  }
+
+  @Get('payslips/:id/pdf')
+  async downloadPayslip(@Request() req, @Param('id', ParseIntPipe) id: number, @Res() res) {
+    const { buffer, isPdf, filename } =
+      await this.payrollService.getPayslipPdf(req.user.companyId, id);
+    res.set({
+      'Content-Type': isPdf ? 'application/pdf' : 'text/html',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
+  @Post('payslips/:id/send-email')
+  sendOnePayslipEmail(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.payrollService.sendOnePayslipEmail(req.user.companyId, id);
   }
 
   @Put('payslips/:id')

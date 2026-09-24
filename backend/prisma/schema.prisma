@@ -336,26 +336,37 @@ model Designation {
 
 // Core Employee Profile
 model Employee {
-  id               Int          @id @default(autoincrement())
-  firstName        String
-  lastName         String
-  departmentId     Int?
-  department       Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  designationId    Int?
-  designation      Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
-  phone            String?
-  userId           Int          @unique
-  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyId        Int
-  company          Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  branchId         Int?
-  branch           Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  managerId        Int?
-  manager          Employee?    @relation("EmployeeToManager", fields: [managerId], references: [id], onDelete: SetNull)
-  subordinates     Employee[]   @relation("EmployeeToManager")
+  id                   Int          @id @default(autoincrement())
+  firstName            String
+  lastName             String
+  departmentId         Int?
+  department           Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designationId        Int?
+  designation          Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  phone                String?
+  userId               Int          @unique
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId            Int
+  company              Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branchId             Int?
+  branch               Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  managerId            Int?
+  manager              Employee?    @relation("EmployeeToManager", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates         Employee[]   @relation("EmployeeToManager")
+  /// Whether a payslip may be drafted for this person.
+  ///
+  /// Until now the screen showed this as Yes/No but derived it from whether
+  /// the account was suspended, and generation ignored it entirely — so the
+  /// only way to keep somebody off payroll was to suspend their login, which
+  /// also locks them out of the product. Stored so the two can be said
+  /// separately: a contractor invoicing outside payroll is not a suspension.
+  ///
+  /// Defaults true; suspended staff are still excluded regardless.
+  allowPayrollGenerate Boolean      @default(true)
+
   shiftId          Int?
-  shift            Shift?       @relation(fields: [shiftId], references: [id], onDelete: SetNull)
-  isProjectManager Boolean      @default(false)
+  shift            Shift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  isProjectManager Boolean @default(false)
 
   /// What an hour of this person's time costs the company internally (§23).
   ///

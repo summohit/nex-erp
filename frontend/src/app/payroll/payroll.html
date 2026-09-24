@@ -10,49 +10,159 @@
     
     <!-- Top Summary Metrics Grid -->
     <div class="kpi-summary-grid" *ngIf="isAdmin()">
-      <div class="kpi-card kpi-gross">
-        <div class="kpi-icon-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+      <!-- Salary Structure Tab KPI Strip: Company-wide figures -->
+      <!-- Payroll tabs show the PERIOD's totals. They used to fall through to
+           the structure strip below, which reports one selected employee under
+           headings that read like company figures — so August's 44 payslips
+           sat beneath a header showing ₹17,500. -->
+      <ng-container *ngIf="activeTab() === 'processing' || activeTab() === 'payslips'">
+        <div class="kpi-card kpi-gross">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Gross Payroll</span>
+            <span class="kpi-value">₹{{ periodGross() | number:'1.0-0' }}</span>
+            <span class="kpi-subtext">{{ periodLabel() }} · {{ payslips().length }} payslips</span>
+          </div>
         </div>
-        <div class="kpi-info">
-          <span class="kpi-label">Gross Payroll</span>
-          <span class="kpi-value">₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</span>
-          <span class="kpi-subtext">Selected Employee Structure</span>
-        </div>
-      </div>
 
-      <div class="kpi-card kpi-net">
-        <div class="kpi-icon-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        <div class="kpi-card kpi-net">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Net Payout</span>
+            <span class="kpi-value text-emerald">₹{{ periodNet() | number:'1.0-0' }}</span>
+            <span class="kpi-subtext">{{ periodLabel() }}</span>
+          </div>
         </div>
-        <div class="kpi-info">
-          <span class="kpi-label">Net Take-Home</span>
-          <span class="kpi-value text-emerald">₹{{ calculateNetPay(currentStructure()).toLocaleString('en-IN') }}</span>
-          <span class="kpi-subtext">Estimated Net Payout</span>
-        </div>
-      </div>
 
-      <div class="kpi-card kpi-deductions">
-        <div class="kpi-icon-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        <div class="kpi-card kpi-deductions">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Deductions</span>
+            <span class="kpi-value text-rose">₹{{ periodDeductions() | number:'1.0-0' }}</span>
+            <span class="kpi-subtext">PF, ESI &amp; statutory</span>
+          </div>
         </div>
-        <div class="kpi-info">
-          <span class="kpi-label">Statutory Deductions</span>
-          <span class="kpi-value text-rose">₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</span>
-          <span class="kpi-subtext">PF, ESI & Income Tax</span>
-        </div>
-      </div>
 
-      <div class="kpi-card kpi-claims">
-        <div class="kpi-icon-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        <!-- Loss of pay gets a tile of its own rather than hiding inside
+             deductions: it is the figure that says the attendance record, not
+             the salary, decided what somebody was paid. -->
+        <div class="kpi-card kpi-claims">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Loss of Pay</span>
+            <span class="kpi-value" [class.text-rose]="periodLossOfPay() > 0">₹{{ periodLossOfPay() | number:'1.0-0' }}</span>
+            <span class="kpi-subtext">
+              {{ periodGross() ? ((periodLossOfPay() / periodGross()) * 100 | number:'1.0-0') : 0 }}% of gross
+            </span>
+          </div>
         </div>
-        <div class="kpi-info">
-          <span class="kpi-label">Expense Claims</span>
-          <span class="kpi-value">{{ expenseClaims().length }}</span>
-          <span class="kpi-subtext">Total Submitted Claims</span>
+      </ng-container>
+
+      <!-- Gated as a pair: `else` fires on every tab where the condition is
+           false, so without this the structure strip's else-branch rendered
+           alongside the period strip above. -->
+      <ng-container *ngIf="activeTab() !== 'processing' && activeTab() !== 'payslips'">
+      <ng-container *ngIf="activeTab() === 'structure'; else defaultKpis">
+        <div class="kpi-card kpi-gross">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Gross Payroll</span>
+            <span class="kpi-value">₹{{ totalCompanyGross().toLocaleString('en-IN') }}</span>
+            <span class="kpi-subtext">Total Monthly Gross Payroll</span>
+          </div>
         </div>
-      </div>
+
+        <div class="kpi-card kpi-net">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Net Take-Home</span>
+            <span class="kpi-value text-emerald">₹{{ totalCompanyNet().toLocaleString('en-IN') }}</span>
+            <span class="kpi-subtext">Estimated Net Payout</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-deductions">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Statutory Deductions</span>
+            <span class="kpi-value text-rose">₹{{ totalCompanyDeductions().toLocaleString('en-IN') }}</span>
+            <span class="kpi-subtext">PF, ESI & Statutory Compliance</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-claims">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Configured Staff</span>
+            <span class="kpi-value">{{ configuredEmployeesCount() }} / {{ salaryTableData().length }}</span>
+            <span class="kpi-subtext">Active Salary Structures</span>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Standard KPI Strip for Processing / Payslips / Expenses -->
+      <ng-template #defaultKpis>
+        <div class="kpi-card kpi-gross">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Gross Payroll</span>
+            <span class="kpi-value">₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</span>
+            <span class="kpi-subtext">Selected Employee Structure</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-net">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Net Take-Home</span>
+            <span class="kpi-value text-emerald">₹{{ calculateNetPay(currentStructure()).toLocaleString('en-IN') }}</span>
+            <span class="kpi-subtext">Estimated Net Payout</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-deductions">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Statutory Deductions</span>
+            <span class="kpi-value text-rose">₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</span>
+            <span class="kpi-subtext">PF, ESI & Income Tax</span>
+          </div>
+        </div>
+
+        <div class="kpi-card kpi-claims">
+          <div class="kpi-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+          </div>
+          <div class="kpi-info">
+            <span class="kpi-label">Expense Claims</span>
+            <span class="kpi-value">{{ expenseClaims().length }}</span>
+            <span class="kpi-subtext">Total Submitted Claims</span>
+          </div>
+        </div>
+      </ng-template>
+      </ng-container>
     </div>
   </div>
 
@@ -93,48 +203,537 @@
 
   <!-- ==================== TAB 1: SALARY PROCESSING ==================== -->
   <div class="tab-content" *ngIf="activeTab() === 'processing' && isAdmin()">
-    <div class="widget-card">
-      <div class="toolbar-banner">
-        <div class="period-selectors">
-          <select class="form-control inline-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event); onPeriodChange()">
-            <option *ngFor="let m of months" [value]="m.id">{{ m.name }}</option>
-          </select>
-          <select class="form-control inline-select" [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event); onPeriodChange()">
-            <option *ngFor="let y of years" [value]="y">{{ y }}</option>
-          </select>
+    <div class="widget-card processing-widget">
+      <!-- Period Selector & Action Header Toolbar -->
+      <div class="processing-top-toolbar">
+        <div class="toolbar-left-cluster">
+          <div class="period-selectors">
+            <div class="period-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </div>
+            <select class="form-control inline-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event); onPeriodChange()">
+              <option *ngFor="let m of months" [value]="m.id">{{ m.name }}</option>
+            </select>
+            <select class="form-control inline-select" [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event); onPeriodChange()">
+              <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+            </select>
+          </div>
+
+          <!-- Live Status Summary Chips -->
+          <div class="period-status-chips" *ngIf="payslips().length > 0">
+            <span class="status-chip chip-total" title="Total Employees in Run">
+              {{ payslips().length }} Staff
+            </span>
+            <span class="status-chip chip-draft" *ngIf="processingCounts().draft > 0" title="Draft Payslips">
+              <span class="dot dot-draft"></span>{{ processingCounts().draft }} Draft
+            </span>
+            <span class="status-chip chip-finalized" *ngIf="processingCounts().finalized > 0" title="Finalized Payslips">
+              <span class="dot dot-finalized"></span>{{ processingCounts().finalized }} Finalized
+            </span>
+            <span class="status-chip chip-paid" *ngIf="processingCounts().paid > 0" title="Paid Payslips">
+              <span class="dot dot-paid"></span>{{ processingCounts().paid }} Paid
+            </span>
+          </div>
         </div>
 
         <div class="action-buttons">
           <button class="btn btn-primary" (click)="generatePayslips()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
             Generate Draft Payslips
           </button>
-          <button class="btn btn-navy" (click)="batchFinalize()">
+          <button class="btn btn-navy" (click)="batchFinalize()" [disabled]="processingCounts().draft === 0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
             Finalize Period
           </button>
-          <button class="btn btn-success" (click)="markPaid()">
+          <button class="btn btn-success" (click)="markPaid()" [disabled]="processingCounts().finalized === 0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             Mark as Paid
           </button>
-          <button class="btn btn-outline" (click)="sendBulkPayslipEmails()" title="Send email with PDF attached to employees">
+          <button class="btn btn-outline" (click)="sendBulkPayslipEmails()" [disabled]="payslips().length === 0" title="Send email with PDF attached to employees">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
             Send Email Payslips
           </button>
         </div>
       </div>
 
-      <!-- AG Grid for Payslip Processing -->
-      <div style="width: 100%; height: 520px;" class="mt-4 grid-wrapper">
-        <ag-grid-angular
-          class="ag-theme-quartz"
-          [theme]="'legacy'"
-          style="width: 100%; height: 100%;"
-          [rowData]="payslips()"
-          [pinnedBottomRowData]="processingPinnedBottomRow()"
-          [columnDefs]="processingColDefs"
-          [defaultColDef]="defaultColDef"
-          [rowClassRules]="payrollRowClassRules"
-          [rowHeight]="54"
-          [headerHeight]="48">
-        </ag-grid-angular>
+      <!-- Enhanced Pre-flight Attendance Alert Banner -->
+      <div class="preflight-banner" *ngIf="payrollPreview() as pre"
+           [class.is-alarming]="previewIsAlarming()">
+        
+        <!-- Header Strip with Icon & Status Pill -->
+        <div class="preflight-header">
+          <div class="preflight-icon-box" [ngClass]="previewIsAlarming() ? 'icon-box-danger' : 'icon-box-success'">
+            <svg *ngIf="previewIsAlarming()" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <svg *ngIf="!previewIsAlarming()" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+
+          <div class="preflight-title-stack">
+            <div class="preflight-headline-row">
+              <h4 class="preflight-title">
+                {{ previewIsAlarming() ? 'Check Attendance Before Generating' : 'Attendance Verified — Ready to Generate' }}
+              </h4>
+              <span class="preflight-pill-badge" *ngIf="previewIsAlarming()">
+                <span class="pulse-dot"></span> High Loss of Pay Alert
+              </span>
+              <span class="preflight-pill-badge badge-ok" *ngIf="!previewIsAlarming()">
+                <span class="pulse-dot dot-ok"></span> Normal Attendance
+              </span>
+            </div>
+            <p class="preflight-subtitle">
+              {{ pre.employees }} employees active on payroll this period • Pre-flight calculation preview
+            </p>
+          </div>
+        </div>
+
+        <!-- 3 KPI Figure Cards -->
+        <div class="preflight-kpi-row">
+          <!-- 1. Gross Card -->
+          <div class="preflight-stat-card">
+            <div class="stat-top">
+              <span class="stat-label">Estimated Gross</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </div>
+            <div class="stat-amount">₹{{ pre.totalGross | number:'1.0-0' }}</div>
+            <div class="stat-footer-text">{{ pre.employees }} staff members</div>
+          </div>
+
+          <!-- 2. Loss of Pay Card -->
+          <div class="preflight-stat-card card-lop" [class.is-danger]="pre.lossOfPayShare > 0.1">
+            <div class="stat-top">
+              <span class="stat-label text-danger">Attendance Loss of Pay</span>
+              <span class="lop-share-badge">{{ pre.lossOfPayShare * 100 | number:'1.0-0' }}% of gross</span>
+            </div>
+            <div class="stat-amount text-danger">₹{{ pre.totalLossOfPay | number:'1.0-0' }}</div>
+            <div class="stat-footer-text text-danger" *ngIf="pre.severelyAffected">
+              {{ pre.severelyAffected }} employees lose >50% pay
+            </div>
+            <div class="stat-footer-text" *ngIf="!pre.severelyAffected">
+              Based on unrecorded days
+            </div>
+          </div>
+
+          <!-- 3. Net Payout Card -->
+          <div class="preflight-stat-card">
+            <div class="stat-top">
+              <span class="stat-label">Net Take-Home Payout</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
+            <div class="stat-amount text-emerald">₹{{ pre.totalNet | number:'1.0-0' }}</div>
+            <div class="stat-footer-text">Estimated disbursement</div>
+          </div>
+        </div>
+
+        <!-- Warning Callout Note -->
+        <div class="preflight-callout" *ngIf="previewIsAlarming()">
+          <div class="callout-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          </div>
+          <div class="callout-text">
+            <ng-container *ngIf="pre.severelyAffected">
+              <strong>{{ pre.severelyAffected }} staff members</strong> would lose over half their salary due to attendance penalties.
+            </ng-container>
+            <ng-container *ngIf="pre.noAttendance">
+              <strong>{{ pre.noAttendance }} employees</strong> have no logs recorded at all.
+            </ng-container>
+            When missing attendance affects multiple employees across teams, the record is usually incomplete rather than actual absences.
+          </div>
+        </div>
+
+        <!-- Action Strip -->
+        <div class="preflight-actions-strip" *ngIf="previewIsAlarming()">
+          <button class="btn btn-override-lop" (click)="generatePayslips(true)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Generate Without Loss of Pay (Override)
+          </button>
+          <button class="btn btn-ghost-generate" (click)="generatePayslips(false)">
+            Generate Standard (With LOP)
+          </button>
+          <span class="actions-hint-text">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            Override pays everyone as though present for all working days. Biometric & attendance logs remain untouched.
+          </span>
+        </div>
       </div>
+
+      <!-- Filter & Search Toolbar (Designation, Department, Status, Search) -->
+      <div class="salary-filter-toolbar mt-3">
+        <div class="filter-left-group">
+          <!-- Designation Filter -->
+          <div class="filter-item">
+            <label>Designation</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="processingDesignationOptions()"
+                [value]="processingDesigFilter()"
+                [clearable]="processingDesigFilter() !== 'ALL'"
+                placeholder="All Designations"
+                (valueChange)="processingDesigFilter.set($event || 'ALL')">
+              </app-searchable-select>
+            </div>
+          </div>
+
+          <!-- Department Filter -->
+          <div class="filter-item">
+            <label>Department</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="processingDepartmentOptions()"
+                [value]="processingDeptFilter()"
+                [clearable]="processingDeptFilter() !== 'ALL'"
+                placeholder="All Departments"
+                (valueChange)="processingDeptFilter.set($event || 'ALL')">
+              </app-searchable-select>
+            </div>
+          </div>
+
+          <!-- Status Filter -->
+          <div class="filter-item">
+            <label>Status</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="processingStatusOptions"
+                [value]="processingStatusFilter()"
+                [clearable]="processingStatusFilter() !== 'ALL'"
+                placeholder="All Status"
+                (valueChange)="processingStatusFilter.set($event || 'ALL')">
+              </app-searchable-select>
+            </div>
+          </div>
+
+          <!-- Search Input Field -->
+          <div class="search-box-wrapper">
+            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input 
+              type="text" 
+              class="search-input-field" 
+              placeholder="Search employee, designation, dept..."
+              [ngModel]="processingSearchQuery()"
+              (ngModelChange)="processingSearchQuery.set($event)">
+            <button 
+              *ngIf="processingSearchQuery()" 
+              class="clear-search-btn" 
+              (click)="processingSearchQuery.set('')"
+              title="Clear Search">✕</button>
+          </div>
+
+          <!-- Quick LOP Filter Pills -->
+          <div class="filter-pills-cluster">
+            <button 
+              type="button" 
+              class="filter-pill-tab" 
+              [class.active]="processingLopFilter() === 'ALL'" 
+              (click)="processingLopFilter.set('ALL')">
+              All ({{ payslips().length }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab pill-lop" 
+              [class.active]="processingLopFilter() === 'WITH_LOP'" 
+              (click)="processingLopFilter.set('WITH_LOP')"
+              *ngIf="processingCounts().withLop > 0">
+              With LOP ({{ processingCounts().withLop }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab" 
+              [class.active]="processingLopFilter() === 'ZERO_LOP'" 
+              (click)="processingLopFilter.set('ZERO_LOP')"
+              *ngIf="processingCounts().withLop > 0">
+              Zero LOP ({{ processingCounts().zeroLop }})
+            </button>
+          </div>
+
+          <!-- Clear Filters Button -->
+          <button 
+            type="button" 
+            class="btn-clear-inline" 
+            *ngIf="hasActiveProcessingFilters()" 
+            (click)="clearProcessingFilters()">
+            Clear Filters
+          </button>
+        </div>
+      </div>
+
+      <!-- Enhanced Employee Salary Processing Table -->
+      <div class="table-responsive salary-table-wrapper mt-3">
+        <table class="table salary-data-table processing-table">
+          <thead>
+            <tr>
+              <!-- 1. Employee Name & Department -->
+              <th class="th-sortable th-emp" (click)="toggleProcessingSort('name')">
+                <div class="th-content">
+                  <span>Employee</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'name'">
+                    {{ processingSortColumn() === 'name' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 2. Working Days -->
+              <th class="th-sortable text-center" (click)="toggleProcessingSort('workingDays')">
+                <div class="th-content justify-content-center">
+                  <span>Working Days</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'workingDays'">
+                    {{ processingSortColumn() === 'workingDays' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 3. Present -->
+              <th class="th-sortable text-center" (click)="toggleProcessingSort('present')">
+                <div class="th-content justify-content-center">
+                  <span>Present</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'present'">
+                    {{ processingSortColumn() === 'present' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 4. Absent -->
+              <th class="th-sortable text-center" (click)="toggleProcessingSort('absent')">
+                <div class="th-content justify-content-center">
+                  <span>Absent</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'absent'">
+                    {{ processingSortColumn() === 'absent' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 5. Gross Pay -->
+              <th class="th-sortable th-amount text-right" (click)="toggleProcessingSort('gross')">
+                <div class="th-content th-right">
+                  <span>Gross Pay</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'gross'">
+                    {{ processingSortColumn() === 'gross' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 6. LOP (Deducted) -->
+              <th class="th-sortable th-amount text-right" (click)="toggleProcessingSort('lop')">
+                <div class="th-content th-right">
+                  <span>LOP (Deducted)</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'lop'">
+                    {{ processingSortColumn() === 'lop' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 7. Expenses Reimbursed -->
+              <th class="th-sortable th-amount text-right" (click)="toggleProcessingSort('expenses')">
+                <div class="th-content th-right">
+                  <span>Expenses Reimbursed</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'expenses'">
+                    {{ processingSortColumn() === 'expenses' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 8. Net Pay -->
+              <th class="th-sortable th-amount text-right" (click)="toggleProcessingSort('net')">
+                <div class="th-content th-right">
+                  <span>Net Pay</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'net'">
+                    {{ processingSortColumn() === 'net' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 9. Status -->
+              <th class="th-sortable text-center" (click)="toggleProcessingSort('status')">
+                <div class="th-content justify-content-center">
+                  <span>Status</span>
+                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'status'">
+                    {{ processingSortColumn() === 'status' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                  </span>
+                </div>
+              </th>
+
+              <!-- 10. Actions -->
+              <th class="th-action text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Skeleton Loading State -->
+            <ng-container *ngIf="isLoadingPayslips()">
+              <tr *ngFor="let s of [1, 2, 3, 4, 5, 6]" class="salary-skeleton-row">
+                <td class="td-employee">
+                  <div class="emp-profile-cell">
+                    <div class="skeleton-avatar-circle skeleton-shimmer"></div>
+                    <div class="emp-name-stack">
+                      <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '130px' : '110px')" style="height: 14px;"></div>
+                      <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '85px' : '95px')" style="height: 11px;"></div>
+                      <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '70px' : '60px')" style="height: 10px;"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="text-center"><div class="skeleton-line skeleton-shimmer mx-auto" style="width: 32px; height: 16px;"></div></td>
+                <td class="text-center"><div class="skeleton-line skeleton-shimmer mx-auto" style="width: 32px; height: 16px;"></div></td>
+                <td class="text-center"><div class="skeleton-line skeleton-shimmer mx-auto" style="width: 32px; height: 16px;"></div></td>
+                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 75px; height: 16px;"></div></td>
+                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 75px; height: 16px;"></div></td>
+                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 50px; height: 16px;"></div></td>
+                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 85px; height: 16px;"></div></td>
+                <td class="text-center"><div class="skeleton-pill skeleton-shimmer mx-auto" style="width: 70px; height: 24px; border-radius: 12px;"></div></td>
+                <td class="text-center"><div class="skeleton-circle-btn skeleton-shimmer mx-auto"></div></td>
+              </tr>
+            </ng-container>
+
+            <!-- Loaded Data State -->
+            <ng-container *ngIf="!isLoadingPayslips()">
+              <!-- Empty state -->
+              <tr *ngIf="filteredProcessingPayslips().length === 0">
+                <td colspan="10" class="text-center py-5">
+                  <div class="empty-table-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <p class="mt-2 text-secondary font-medium">
+                      {{ payslips().length === 0 ? 'No payslips generated for this period yet.' : 'No employee payslips found matching current filters.' }}
+                    </p>
+                    <div class="mt-3" *ngIf="payslips().length === 0">
+                      <button class="btn btn-primary btn-sm" (click)="generatePayslips()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                        Generate Draft Payslips
+                      </button>
+                    </div>
+                    <div class="mt-2" *ngIf="payslips().length > 0 && hasActiveProcessingFilters()">
+                      <button class="btn btn-outline btn-sm" (click)="clearProcessingFilters()">Clear All Filters</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Payslip Rows -->
+              <tr 
+                *ngFor="let p of filteredProcessingPayslips()" 
+                class="salary-row processing-row"
+                [class.payroll-row-inactive]="p.employee?.user?.status === 'SUSPENDED'">
+                
+                <!-- 1. Employee Profile (Avatar, Name, Designation, Department below) -->
+                <td class="td-employee">
+                  <div class="emp-profile-cell" (click)="openPayslipDetail(p)">
+                    <img [src]="p.employee?.avatarUrl" alt="" class="row-avatar-img" *ngIf="p.employee?.avatarUrl">
+                    <div class="row-avatar-circle" *ngIf="!p.employee?.avatarUrl">
+                      {{ (p.employee?.firstName || 'E').charAt(0) }}{{ (p.employee?.lastName || '').charAt(0) }}
+                    </div>
+                    <div class="emp-name-stack">
+                      <div class="emp-display-name">
+                        {{ p.employee?.firstName }} {{ p.employee?.lastName }}
+                        <span class="inactive-pill" *ngIf="p.employee?.user?.status === 'SUSPENDED'">Suspended</span>
+                      </div>
+                      <div class="emp-sub-designation">
+                        {{ p.employee?.designation?.name || 'Staff' }}
+                      </div>
+                      <div class="emp-sub-department" *ngIf="p.employee?.department?.name">
+                        {{ p.employee?.department?.name }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- 2. Working Days -->
+                <td class="text-center font-medium td-num">
+                  {{ p.workingDays || 0 }}
+                </td>
+
+                <!-- 3. Present -->
+                <td class="text-center font-semibold text-slate-700 td-num">
+                  {{ p.presentDays || 0 }}
+                </td>
+
+                <!-- 4. Absent -->
+                <td class="text-center font-bold td-num" [ngClass]="(p.absentDays || 0) > 0 ? 'text-rose' : 'text-slate-400'">
+                  {{ p.absentDays || 0 }}
+                </td>
+
+                <!-- 5. Gross Pay -->
+                <td class="text-right font-medium td-num">
+                  ₹{{ (p.totalEarnings || 0).toLocaleString('en-IN') }}
+                </td>
+
+                <!-- 6. LOP (Deducted) -->
+                <td class="text-right td-num" [ngClass]="(p.lossOfPay || 0) > 0 ? 'text-amber font-bold' : 'text-slate-400'">
+                  ₹{{ (p.lossOfPay || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                </td>
+
+                <!-- 7. Expenses Reimbursed -->
+                <td class="text-right font-medium td-num text-slate-600">
+                  ₹{{ (p.expenseAmount || 0).toLocaleString('en-IN') }}
+                </td>
+
+                <!-- 8. Net Pay -->
+                <td class="text-right td-num" (click)="openPayslipDetail(p)" style="cursor: pointer;">
+                  <span class="net-pay-amount">
+                    ₹{{ (p.netPay || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  </span>
+                </td>
+
+                <!-- 9. Status -->
+                <td class="text-center">
+                  <span class="status-pill status-{{ (p.status || 'DRAFT').toLowerCase() }}">
+                    <span class="status-dot"></span>
+                    {{ p.status || 'DRAFT' }}
+                  </span>
+                </td>
+
+                <!-- 10. Actions Dropdown -->
+                <td class="td-action text-center">
+                  <button 
+                    class="btn-action-more" 
+                    [matMenuTriggerFor]="payslipActionMenu" 
+                    [matMenuTriggerData]="{ payslip: p }" 
+                    title="More actions">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                  </button>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Summary Footer -->
+      <div class="table-summary-footer">
+        <ng-container *ngIf="!isLoadingPayslips(); else footerLoadingTpl">
+          <div class="footer-count">
+            Showing <strong>{{ filteredProcessingPayslips().length }}</strong> of <strong>{{ payslips().length }}</strong> employees
+          </div>
+          <div class="footer-totals">
+            <span class="tot-item">Total Gross: <strong>₹{{ processingTotals().totalGross.toLocaleString('en-IN') }}</strong></span>
+            <span class="tot-sep">•</span>
+            <span class="tot-item">Loss of Pay: <strong class="text-amber">₹{{ processingTotals().totalLop.toLocaleString('en-IN') }}</strong></span>
+            <span class="tot-sep">•</span>
+            <span class="tot-item">Expenses: <strong>₹{{ processingTotals().totalExpenses.toLocaleString('en-IN') }}</strong></span>
+            <span class="tot-sep">•</span>
+            <span class="tot-item">Net Payout: <strong class="text-emerald">₹{{ processingTotals().totalNet.toLocaleString('en-IN') }}</strong></span>
+          </div>
+        </ng-container>
+        <ng-template #footerLoadingTpl>
+          <div class="skeleton-line skeleton-shimmer" style="width: 180px; height: 15px;"></div>
+          <div class="skeleton-line skeleton-shimmer" style="width: 380px; height: 15px;"></div>
+        </ng-template>
+      </div>
+
+      <!-- MatMenu for Row Actions -->
+      <mat-menu #payslipActionMenu="matMenu" class="custom-action-menu">
+        <ng-template matMenuContent let-payslip="payslip">
+          <button mat-menu-item (click)="openPayslipDetail(payslip)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <span class="menu-text">View / Print Payslip</span>
+          </button>
+          <button mat-menu-item (click)="openAdjustModal(payslip)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <span class="menu-text">Adjust Salary</span>
+          </button>
+          <button mat-menu-item (click)="finalizeIndividual(payslip)" *ngIf="payslip.status === 'DRAFT'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon text-primary"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <span class="menu-text">Finalize Payslip</span>
+          </button>
+          <button mat-menu-item (click)="markIndividualPaid(payslip)" *ngIf="payslip.status !== 'PAID'" class="text-success">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon text-emerald"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span class="menu-text">Mark as Paid</span>
+          </button>
+        </ng-template>
+      </mat-menu>
     </div>
   </div>
 
@@ -313,212 +912,689 @@
   <!-- ==================== TAB 4: SALARY STRUCTURE ==================== -->
   <div class="tab-content" *ngIf="activeTab() === 'structure' && isAdmin()">
     <div class="widget-card structure-widget">
-      
-      <!-- Employee Selection Header Card -->
-      <div class="structure-toolbar-card">
-        <div class="emp-selector-block">
-          <div class="emp-select-details">
-            <label>Select Target Employee:</label>
-            
-            <!-- Searchable Custom Dropdown with User Avatar -->
-            <div class="custom-emp-dropdown-container">
-              <!-- Trigger Button -->
-              <button type="button" class="emp-dropdown-trigger" (click)="toggleEmpDropdown()">
-                <div class="trigger-emp-info" *ngIf="selectedEmployee() as emp; else selectPlaceholder">
-                  <img [src]="emp.avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="emp.avatarUrl">
-                  <div class="emp-avatar-circle" *ngIf="!emp.avatarUrl">
-                    {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
-                  </div>
-                  <div class="emp-text-details">
-                    <span class="emp-name">{{ emp.firstName }} {{ emp.lastName }}</span>
-                    <span class="emp-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }}</span>
-                  </div>
-                </div>
-                <ng-template #selectPlaceholder>
-                  <span class="placeholder-text">Select an Employee...</span>
-                </ng-template>
-                <svg class="chevron-icon" [class.open]="isEmpDropdownOpen()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button>
 
-              <!-- Dropdown Menu Box -->
-              <div class="emp-dropdown-menu" *ngIf="isEmpDropdownOpen()">
-                <!-- Live Search Input -->
-                <div class="search-input-wrapper">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                  <input 
-                    type="text" 
-                    class="search-input" 
-                    placeholder="Search by name, department, designation..." 
-                    [ngModel]="empSearchQuery()" 
-                    (ngModelChange)="empSearchQuery.set($event)"
-                    (click)="$event.stopPropagation()">
-                </div>
-
-                <!-- Options List -->
-                <div class="emp-options-list">
-                  <div 
-                    class="emp-option-item" 
-                    *ngFor="let e of filteredEmployees()" 
-                    [class.selected]="e.id === selectedEmployeeId()"
-                    (click)="selectEmpFromDropdown(e.id)">
-                    <img [src]="e.avatarUrl" alt="Avatar" class="option-avatar-img" *ngIf="e.avatarUrl">
-                    <div class="option-avatar-circle" *ngIf="!e.avatarUrl">
-                      {{ e.firstName ? e.firstName.charAt(0) : '' }}{{ e.lastName ? e.lastName.charAt(0) : '' }}
-                    </div>
-                    <div class="option-text-details">
-                      <span class="option-name">{{ e.firstName }} {{ e.lastName }}</span>
-                      <span class="option-dept">{{ e.department?.name || 'General' }} &bull; {{ e.designation?.name || 'Staff' }}</span>
-                    </div>
-                    <svg class="check-icon" *ngIf="e.id === selectedEmployeeId()" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  </div>
-                  <div class="no-results-item" *ngIf="filteredEmployees().length === 0">
-                    No employees found matching "{{ empSearchQuery() }}"
-                  </div>
-                </div>
-              </div>
-
-              <!-- Click Backdrop Overlay -->
-              <div class="dropdown-backdrop" *ngIf="isEmpDropdownOpen()" (click)="closeEmpDropdown()"></div>
-            </div>
-          </div>
+      <!-- View Switcher & Top Action Header -->
+      <div class="structure-page-header">
+        <div class="header-titles">
+          <h3>Employee Salary Management</h3>
+          <p class="text-secondary">View and configure employee salary structures, salary cycles, and payroll generation settings.</p>
         </div>
+        <div class="header-right-actions">
+          <div class="view-switch-pills">
+            <button 
+              type="button" 
+              class="view-pill-btn" 
+              [class.active]="salaryViewMode() === 'table'"
+              (click)="salaryViewMode.set('table')">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+              Table View
+            </button>
+            <button 
+              type="button" 
+              class="view-pill-btn" 
+              [class.active]="salaryViewMode() === 'grid'"
+              (click)="salaryViewMode.set('grid')">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              Direct Builder
+            </button>
+          </div>
 
-        <button class="btn btn-outline-primary" (click)="openComponentModal()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Create Custom Salary Component
-        </button>
+          <button class="btn btn-outline-primary" (click)="openComponentModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Create Custom Salary Component
+          </button>
+        </div>
       </div>
 
-      <!-- Dual Column Breakdown Builder Grid -->
-      <div class="structure-builder-grid" *ngIf="selectedEmployeeId()">
+      <!-- ==================== 1. TABLE VIEW (Default - like Image 1) ==================== -->
+      <div class="salary-table-view-container" *ngIf="salaryViewMode() === 'table'">
         
-        <!-- EARNINGS COLUMN -->
-        <div class="structure-column-card earning-column">
-          <div class="column-header-banner earning-banner">
-            <div class="banner-title-group">
-              <span class="banner-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-              </span>
-              <h4>Earnings Components</h4>
+        <!-- Filter Toolbar (Designation, Department, Status, Search) -->
+        <div class="salary-filter-toolbar">
+          <div class="filter-left-group">
+            <!-- Designation Filter -->
+            <div class="filter-item">
+              <label>Designation</label>
+              <div class="searchable-select-wrap">
+                <app-searchable-select
+                  [options]="designationOptions()"
+                  [value]="salaryTableDesigFilter()"
+                  [clearable]="salaryTableDesigFilter() !== 'ALL'"
+                  placeholder="All Designations"
+                  (valueChange)="salaryTableDesigFilter.set($event || 'ALL')">
+                </app-searchable-select>
+              </div>
             </div>
-            <div class="total-pill total-emerald">
-              <span>Total:</span>
-              <strong>₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</strong>
-            </div>
-          </div>
 
-          <div class="components-stack">
-            <div class="structure-comp-card earning-comp-card" *ngFor="let item of earningStructureItems()">
-              <div class="comp-meta">
-                <div class="comp-title-row">
-                  <span class="comp-title">{{ item.component.name }}</span>
-                  <span class="badge-tag" [ngClass]="item.component.isPreDefined ? 'badge-system' : 'badge-custom'">
-                    {{ item.component.isPreDefined ? 'System' : 'Custom' }}
-                  </span>
-                </div>
-                <p class="comp-desc">{{ item.component.description || 'Standard monthly earning component' }}</p>
+            <!-- Department Filter -->
+            <div class="filter-item">
+              <label>Department</label>
+              <div class="searchable-select-wrap">
+                <app-searchable-select
+                  [options]="departmentOptions()"
+                  [value]="salaryTableDeptFilter()"
+                  [clearable]="salaryTableDeptFilter() !== 'ALL'"
+                  placeholder="All Departments"
+                  (valueChange)="salaryTableDeptFilter.set($event || 'ALL')">
+                </app-searchable-select>
               </div>
-              
-              <div class="comp-input-group">
-                <span class="currency-prefix">₹</span>
-                <input 
-                  type="number" 
-                  class="form-control comp-amount-input" 
-                  [(ngModel)]="item.amount" 
-                  placeholder="0"
-                  min="0">
-                <button 
-                  *ngIf="!item.component.isPreDefined" 
-                  class="btn-delete-comp" 
-                  (click)="deleteComponent(item.component.id)" 
-                  title="Delete custom component">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="filter-item">
+              <label>Status</label>
+              <div class="searchable-select-wrap">
+                <app-searchable-select
+                  [options]="statusOptions"
+                  [value]="salaryTableStatusFilter()"
+                  [clearable]="salaryTableStatusFilter() !== 'ALL'"
+                  placeholder="All Status"
+                  (valueChange)="salaryTableStatusFilter.set($event || 'ALL')">
+                </app-searchable-select>
               </div>
+            </div>
+
+            <!-- Search Input Field -->
+            <div class="search-box-wrapper">
+              <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input 
+                type="text" 
+                class="search-input-field" 
+                placeholder="Start typing to search..."
+                [ngModel]="salaryTableSearchQuery()"
+                (ngModelChange)="salaryTableSearchQuery.set($event)">
+              <button 
+                *ngIf="salaryTableSearchQuery()" 
+                class="clear-search-btn" 
+                (click)="salaryTableSearchQuery.set('')"
+                title="Clear Search">✕</button>
             </div>
           </div>
         </div>
 
-        <!-- DEDUCTIONS COLUMN -->
-        <div class="structure-column-card deduction-column">
-          <div class="column-header-banner deduction-banner">
-            <div class="banner-title-group">
-              <span class="banner-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
-              </span>
-              <h4>Deductions Components</h4>
-            </div>
-            <div class="total-pill total-rose">
-              <span>Total:</span>
-              <strong>₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</strong>
-            </div>
-          </div>
+        <!-- Employee Salary Data Table -->
+        <div class="table-responsive salary-table-wrapper">
+          <table class="table salary-data-table">
+            <thead>
+              <tr>
+                <th class="th-sortable" (click)="toggleSalarySort('name')">
+                  <div class="th-content">
+                    <span>Name</span>
+                    <span class="sort-arrows" [class.active]="salaryTableSortColumn() === 'name'">
+                      {{ salaryTableSortColumn() === 'name' ? (salaryTableSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                    </span>
+                  </div>
+                </th>
+                <th class="th-sortable" (click)="toggleSalarySort('cycle')">
+                  <div class="th-content">
+                    <span>Employee Salary Cycle</span>
+                    <span class="sort-arrows" [class.active]="salaryTableSortColumn() === 'cycle'">
+                      {{ salaryTableSortColumn() === 'cycle' ? (salaryTableSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                    </span>
+                  </div>
+                </th>
+                <th class="th-sortable" (click)="toggleSalarySort('group')">
+                  <div class="th-content">
+                    <span>Salary Group</span>
+                    <span class="sort-arrows" [class.active]="salaryTableSortColumn() === 'group'">
+                      {{ salaryTableSortColumn() === 'group' ? (salaryTableSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                    </span>
+                  </div>
+                </th>
+                <th class="th-sortable" (click)="toggleSalarySort('allowPayroll')">
+                  <div class="th-content">
+                    <span>Allow Payroll Generate</span>
+                    <span class="sort-arrows" [class.active]="salaryTableSortColumn() === 'allowPayroll'">
+                      {{ salaryTableSortColumn() === 'allowPayroll' ? (salaryTableSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                    </span>
+                  </div>
+                </th>
+                <th class="th-sortable th-amount" (click)="toggleSalarySort('netSalary')">
+                  <div class="th-content th-right">
+                    <span>Net Salary (Monthly)</span>
+                    <span class="sort-arrows" [class.active]="salaryTableSortColumn() === 'netSalary'">
+                      {{ salaryTableSortColumn() === 'netSalary' ? (salaryTableSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                    </span>
+                  </div>
+                </th>
+                <th class="th-action text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 1. Skeleton Loading State (Until data is loaded) -->
+              <ng-container *ngIf="isLoadingSalaryTable()">
+                <tr *ngFor="let s of [1, 2, 3, 4, 5, 6]" class="salary-skeleton-row">
+                  <!-- Name & Avatar Skeleton -->
+                  <td class="td-employee">
+                    <div class="emp-profile-cell">
+                      <div class="skeleton-avatar-circle skeleton-shimmer"></div>
+                      <div class="emp-name-stack">
+                        <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '130px' : '110px')" style="height: 14px;"></div>
+                        <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '85px' : '95px')" style="height: 11px;"></div>
+                        <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '70px' : '60px')" style="height: 10px;"></div>
+                      </div>
+                    </div>
+                  </td>
 
-          <div class="components-stack">
-            <div class="structure-comp-card deduction-comp-card" *ngFor="let item of deductionStructureItems()">
-              <div class="comp-meta">
-                <div class="comp-title-row">
-                  <span class="comp-title">{{ cleanComponentName(item.component.name) }}</span>
-                  <span *ngIf="isStatutory(item.component.name)" class="badge-tag statutory-badge">Statutory</span>
-                  <span *ngIf="!isStatutory(item.component.name)" class="badge-tag" [ngClass]="item.component.isPreDefined ? 'badge-system' : 'badge-custom'">
-                    {{ item.component.isPreDefined ? 'System' : 'Custom' }}
-                  </span>
-                </div>
-                <p class="comp-desc">{{ item.component.description || (isStatutory(item.component.name) ? 'Auto-calculated compliance' : 'Standard monthly deduction') }}</p>
-              </div>
-              
-              <div class="comp-input-group">
-                <span class="currency-prefix">₹</span>
-                <input 
-                  type="number" 
-                  class="form-control comp-amount-input" 
-                  [(ngModel)]="item.amount" 
-                  [disabled]="isStatutory(item.component.name)"
-                  placeholder="0"
-                  min="0">
-                <button 
-                  *ngIf="!item.component.isPreDefined" 
-                  class="btn-delete-comp" 
-                  (click)="deleteComponent(item.component.id)" 
-                  title="Delete custom component">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
-              </div>
+                  <!-- Salary Cycle Skeleton -->
+                  <td class="td-cycle">
+                    <div class="skeleton-pill skeleton-shimmer" style="width: 88px; height: 32px; border-radius: 6px;"></div>
+                  </td>
+
+                  <!-- Salary Group Skeleton -->
+                  <td class="td-group">
+                    <div class="skeleton-pill skeleton-shimmer" [style.width]="(s % 2 === 0 ? '140px' : '115px')" style="height: 24px; border-radius: 12px;"></div>
+                  </td>
+
+                  <!-- Allow Payroll Generate Skeleton -->
+                  <td class="td-allow-payroll">
+                    <div class="skeleton-pill skeleton-shimmer" style="width: 68px; height: 32px; border-radius: 6px;"></div>
+                  </td>
+
+                  <!-- Net Salary Skeleton -->
+                  <td class="td-salary text-right">
+                    <div class="salary-skeleton-amount">
+                      <div class="skeleton-line skeleton-shimmer ms-auto" style="width: 90px; height: 14px;"></div>
+                      <div class="skeleton-line skeleton-shimmer ms-auto" style="width: 65px; height: 11px; margin-top: 5px;"></div>
+                    </div>
+                  </td>
+
+                  <!-- Action Skeleton -->
+                  <td class="td-action text-center">
+                    <div class="skeleton-circle-btn skeleton-shimmer mx-auto"></div>
+                  </td>
+                </tr>
+              </ng-container>
+
+              <!-- 2. Actual Data Loaded State -->
+              <ng-container *ngIf="!isLoadingSalaryTable()">
+                <!-- Empty state -->
+                <tr *ngIf="filteredSalaryRows().length === 0">
+                  <td colspan="6" class="text-center py-5">
+                    <div class="empty-table-state">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                      <p class="mt-2 text-secondary">No employees found matching current filters.</p>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Employee Data Rows -->
+                <tr 
+                  *ngFor="let emp of filteredSalaryRows()" 
+                  class="salary-row"
+                  [class.has-salary]="emp.hasStructure"
+                  [class.row-selected]="emp.id === selectedEmployeeId()">
+                  
+                  <!-- 1. Name & Avatar & Designation -->
+                  <td class="td-employee">
+                    <div class="emp-profile-cell" (click)="openSalaryDrawer(emp)">
+                      <img [src]="emp.avatarUrl" alt="" class="row-avatar-img" *ngIf="emp.avatarUrl">
+                      <div class="row-avatar-circle" *ngIf="!emp.avatarUrl">
+                        {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
+                      </div>
+                      <div class="emp-name-stack">
+                        <div class="emp-display-name">
+                          {{ emp.firstName }} {{ emp.lastName }}
+                          <span class="inactive-pill" *ngIf="emp.user?.status === 'SUSPENDED'">Suspended</span>
+                        </div>
+                        <div class="emp-sub-designation">
+                          {{ emp.designation?.name || 'Staff' }}
+                        </div>
+                        <div class="emp-sub-department" *ngIf="emp.department?.name">
+                          {{ emp.department?.name }}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- 2. Employee Salary Cycle -->
+                  <!-- A label rather than a dropdown: payroll generates one
+                       slip per calendar month and keys it on month+year, so
+                       Weekly and Bi-Weekly had nothing behind them. The menu
+                       offered all three, saved none, and reverted on refresh. -->
+                  <td class="td-cycle">
+                    <span class="cycle-fixed" title="Payroll runs monthly">Monthly</span>
+                  </td>
+
+                  <!-- 3. Salary Group -->
+                  <td class="td-group">
+                    <span class="salary-group-badge" [ngClass]="getSalaryGroupBadgeClass(emp.salaryGroup)">
+                      {{ emp.salaryGroup || 'Employee Salary Group' }}
+                    </span>
+                  </td>
+
+                  <!-- 4. Allow Payroll Generate -->
+                  <td class="td-allow-payroll">
+                    <div class="inline-select-container">
+                      <select
+                        class="table-inline-select"
+                        [disabled]="emp.user?.status === 'SUSPENDED'"
+                        [ngModel]="emp.allowPayrollGenerate"
+                        (ngModelChange)="setAllowPayroll(emp, $event)">
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                      <svg class="inline-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                  </td>
+
+                  <!-- 5. Net Salary (Monthly) -->
+                  <td class="td-salary text-right">
+                    <ng-container *ngIf="emp.hasStructure || emp.netSalary > 0; else noSalaryTpl">
+                      <div class="salary-amount-display" (click)="openSalaryDrawer(emp)">
+                        <span class="amount-val">₹{{ emp.netSalary.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                        <span class="amount-meta">Gross: ₹{{ emp.grossEarnings.toLocaleString('en-IN') }}</span>
+                      </div>
+                    </ng-container>
+                    <ng-template #noSalaryTpl>
+                      <div class="no-salary-cell">
+                        <span class="empty-dash">--</span>
+                        <button class="btn btn-add-salary-sm" (click)="openSalaryDrawer(emp)">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                          Add Salary
+                        </button>
+                      </div>
+                    </ng-template>
+                  </td>
+
+                  <!-- 6. Action Menu -->
+                  <td class="td-action text-center">
+                    <button class="btn-action-more" (click)="openSalaryDrawer(emp)" title="Edit Salary Structure">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                    </button>
+                  </td>
+                </tr>
+              </ng-container>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Table Pagination / Summary Footer -->
+        <div class="table-summary-footer">
+          <ng-container *ngIf="!isLoadingSalaryTable(); else footerSkeleton">
+            <div class="footer-count">
+              Showing <strong>{{ filteredSalaryRows().length }}</strong> of <strong>{{ salaryTableData().length }}</strong> employees
             </div>
-          </div>
+            <div class="footer-totals">
+              <span class="tot-item">Total Gross: <strong>₹{{ totalCompanyGross().toLocaleString('en-IN') }}</strong></span>
+              <span class="tot-sep">•</span>
+              <span class="tot-item">Total Net Take-Home: <strong class="text-emerald">₹{{ totalCompanyNet().toLocaleString('en-IN') }}</strong></span>
+            </div>
+          </ng-container>
+          <ng-template #footerSkeleton>
+            <div class="skeleton-line skeleton-shimmer" style="width: 180px; height: 15px;"></div>
+            <div class="skeleton-line skeleton-shimmer" style="width: 280px; height: 15px;"></div>
+          </ng-template>
         </div>
 
       </div>
 
-      <!-- Executive Sticky Summary Bar Footer -->
-      <div class="structure-summary-card mt-4" *ngIf="selectedEmployeeId()">
-        <div class="summary-breakdown-group">
-          <div class="summary-item">
-            <span class="sum-label">Gross Earnings</span>
-            <span class="sum-val">₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</span>
-          </div>
-          <div class="summary-divider">−</div>
-          <div class="summary-item">
-            <span class="sum-label">Total Deductions</span>
-            <span class="sum-val text-rose">₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</span>
-          </div>
-          <div class="summary-divider">=</div>
-          <div class="summary-item net-item">
-            <span class="sum-label">Net Take-Home Pay</span>
-            <span class="sum-val net-highlight">₹{{ calculateNetPay(currentStructure()).toLocaleString('en-IN') }}</span>
+      <!-- ==================== 2. DIRECT BUILDER VIEW (Fallback / Grid Mode) ==================== -->
+      <div class="salary-direct-builder-view" *ngIf="salaryViewMode() === 'grid'">
+        <!-- Employee Selection Header Card -->
+        <div class="structure-toolbar-card">
+          <div class="emp-selector-block">
+            <div class="emp-select-details">
+              <label>Select Target Employee:</label>
+              
+              <!-- Searchable Custom Dropdown with User Avatar -->
+              <div class="custom-emp-dropdown-container">
+                <!-- Trigger Button -->
+                <button type="button" class="emp-dropdown-trigger" (click)="toggleEmpDropdown()">
+                  <div class="trigger-emp-info" *ngIf="selectedEmployee() as emp; else selectPlaceholder">
+                    <img [src]="emp.avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="emp.avatarUrl">
+                    <div class="emp-avatar-circle" *ngIf="!emp.avatarUrl">
+                      {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
+                    </div>
+                    <div class="emp-text-details">
+                      <span class="emp-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                      <span class="emp-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }}</span>
+                    </div>
+                  </div>
+                  <ng-template #selectPlaceholder>
+                    <span class="placeholder-text">Select an Employee...</span>
+                  </ng-template>
+                  <svg class="chevron-icon" [class.open]="isEmpDropdownOpen()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+
+                <!-- Dropdown Menu Box -->
+                <div class="emp-dropdown-menu" *ngIf="isEmpDropdownOpen()">
+                  <!-- Live Search Input -->
+                  <div class="search-input-wrapper">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input 
+                      type="text" 
+                      class="search-input" 
+                      placeholder="Search by name, department, designation..." 
+                      [ngModel]="empSearchQuery()" 
+                      (ngModelChange)="empSearchQuery.set($event)"
+                      (click)="$event.stopPropagation()">
+                  </div>
+
+                  <!-- Options List -->
+                  <div class="emp-options-list">
+                    <div 
+                      class="emp-option-item" 
+                      *ngFor="let e of filteredEmployees()" 
+                      [class.selected]="e.id === selectedEmployeeId()"
+                      (click)="selectEmpFromDropdown(e.id)">
+                      <img [src]="e.avatarUrl" alt="Avatar" class="option-avatar-img" *ngIf="e.avatarUrl">
+                      <div class="option-avatar-circle" *ngIf="!e.avatarUrl">
+                        {{ e.firstName ? e.firstName.charAt(0) : '' }}{{ e.lastName ? e.lastName.charAt(0) : '' }}
+                      </div>
+                      <div class="option-text-details">
+                        <span class="option-name">{{ e.firstName }} {{ e.lastName }}</span>
+                        <span class="option-dept">{{ e.department?.name || 'General' }} &bull; {{ e.designation?.name || 'Staff' }}</span>
+                      </div>
+                      <svg class="check-icon" *ngIf="e.id === selectedEmployeeId()" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>
+                    <div class="no-results-item" *ngIf="filteredEmployees().length === 0">
+                      No employees found matching "{{ empSearchQuery() }}"
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Click Backdrop Overlay -->
+                <div class="dropdown-backdrop" *ngIf="isEmpDropdownOpen()" (click)="closeEmpDropdown()"></div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <button class="btn btn-save-structure" (click)="saveSalaryStructure()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-          Save Salary Structure
-        </button>
+        <!-- Dual Column Breakdown Builder Grid -->
+        <div class="structure-builder-grid" *ngIf="selectedEmployeeId()">
+          
+          <!-- EARNINGS COLUMN -->
+          <div class="structure-column-card earning-column">
+            <div class="column-header-banner earning-banner">
+              <div class="banner-title-group">
+                <span class="banner-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                </span>
+                <h4>Earnings Components</h4>
+              </div>
+              <div class="total-pill total-emerald">
+                <span>Total:</span>
+                <strong>₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</strong>
+              </div>
+            </div>
+
+            <div class="components-stack">
+              <div class="structure-comp-card earning-comp-card" *ngFor="let item of earningStructureItems()">
+                <div class="comp-meta">
+                  <div class="comp-title-row">
+                    <span class="comp-title">{{ item.component.name }}</span>
+                    <span class="badge-tag" [ngClass]="item.component.isPreDefined ? 'badge-system' : 'badge-custom'">
+                      {{ item.component.isPreDefined ? 'System' : 'Custom' }}
+                    </span>
+                  </div>
+                  <p class="comp-desc">{{ item.component.description || 'Standard monthly earning component' }}</p>
+                </div>
+                
+                <div class="comp-input-group">
+                  <span class="currency-prefix">₹</span>
+                  <input 
+                    type="number" 
+                    class="form-control comp-amount-input" 
+                    [(ngModel)]="item.amount" 
+                    placeholder="0"
+                    min="0">
+                  <button 
+                    *ngIf="!item.component.isPreDefined" 
+                    class="btn-delete-comp" 
+                    (click)="deleteComponent(item.component.id)" 
+                    title="Delete custom component">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DEDUCTIONS COLUMN -->
+          <div class="structure-column-card deduction-column">
+            <div class="column-header-banner deduction-banner">
+              <div class="banner-title-group">
+                <span class="banner-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+                </span>
+                <h4>Deductions Components</h4>
+              </div>
+              <div class="total-pill total-rose">
+                <span>Total:</span>
+                <strong>₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</strong>
+              </div>
+            </div>
+
+            <div class="components-stack">
+              <div class="structure-comp-card deduction-comp-card" *ngFor="let item of deductionStructureItems()">
+                <div class="comp-meta">
+                  <div class="comp-title-row">
+                    <span class="comp-title">{{ cleanComponentName(item.component.name) }}</span>
+                    <span *ngIf="isStatutory(item.component.name)" class="badge-tag statutory-badge">Statutory</span>
+                    <span *ngIf="!isStatutory(item.component.name)" class="badge-tag" [ngClass]="item.component.isPreDefined ? 'badge-system' : 'badge-custom'">
+                      {{ item.component.isPreDefined ? 'System' : 'Custom' }}
+                    </span>
+                  </div>
+                  <p class="comp-desc">{{ item.component.description || (isStatutory(item.component.name) ? 'Auto-calculated compliance' : 'Standard monthly deduction') }}</p>
+                </div>
+                
+                <div class="comp-input-group">
+                  <span class="currency-prefix">₹</span>
+                  <input 
+                    type="number" 
+                    class="form-control comp-amount-input" 
+                    [(ngModel)]="item.amount" 
+                    [disabled]="isStatutory(item.component.name)"
+                    placeholder="0"
+                    min="0">
+                  <button 
+                    *ngIf="!item.component.isPreDefined" 
+                    class="btn-delete-comp" 
+                    (click)="deleteComponent(item.component.id)" 
+                    title="Delete custom component">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Executive Sticky Summary Bar Footer -->
+        <div class="structure-summary-card mt-4" *ngIf="selectedEmployeeId()">
+          <div class="summary-breakdown-group">
+            <div class="summary-item">
+              <span class="sum-label">Gross Earnings</span>
+              <span class="sum-val">₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</span>
+            </div>
+            <div class="summary-divider">−</div>
+            <div class="summary-item">
+              <span class="sum-label">Total Deductions</span>
+              <span class="sum-val text-rose">₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</span>
+            </div>
+            <div class="summary-divider">=</div>
+            <div class="summary-item net-item">
+              <span class="sum-label">Net Take-Home Pay</span>
+              <span class="sum-val net-highlight">₹{{ calculateNetPay(currentStructure()).toLocaleString('en-IN') }}</span>
+            </div>
+          </div>
+
+          <button class="btn btn-save-structure" (click)="saveSalaryStructure()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            Save Salary Structure
+          </button>
+        </div>
       </div>
 
     </div>
   </div>
 
   <!-- ==================== MODALS & DRAWERS ==================== -->
+
+  <!-- Drawer: Employee Salary Structure Configuration -->
+  <div class="drawer-overlay" *ngIf="isSalaryDrawerOpen()" (click)="closeSalaryDrawer()">
+    <div class="drawer-content salary-drawer-content" (click)="$event.stopPropagation()">
+      
+      <!-- Drawer Header -->
+      <div class="drawer-header salary-drawer-header">
+        <div class="drawer-emp-profile" *ngIf="selectedSalaryEmployee() as emp">
+          <img [src]="emp.avatarUrl" alt="" class="drawer-avatar-img" *ngIf="emp.avatarUrl">
+          <div class="drawer-avatar-circle" *ngIf="!emp.avatarUrl">
+            {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
+          </div>
+          <div class="drawer-title-stack">
+            <div class="drawer-title-row">
+              <h2>{{ emp.firstName }} {{ emp.lastName }}</h2>
+              <span class="drawer-code-badge" *ngIf="emp.employeeCode">{{ emp.employeeCode }}</span>
+            </div>
+            <p class="drawer-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }} &bull; {{ emp.salaryGroup }}</p>
+          </div>
+        </div>
+        <button class="btn-icon" (click)="closeSalaryDrawer()" title="Close Drawer">✕</button>
+      </div>
+
+      <!-- Drawer Quick Stat Strip -->
+      <div class="drawer-kpi-strip">
+        <div class="drawer-kpi-item">
+          <span class="kpi-micro-label">Gross Earnings</span>
+          <span class="kpi-micro-val">₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</span>
+        </div>
+        <div class="drawer-kpi-item">
+          <span class="kpi-micro-label">Statutory / Deductions</span>
+          <span class="kpi-micro-val text-rose">₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</span>
+        </div>
+        <div class="drawer-kpi-item highlight-net">
+          <span class="kpi-micro-label">Net Take-Home Pay</span>
+          <span class="kpi-micro-val text-emerald">₹{{ calculateNetPay(currentStructure()).toLocaleString('en-IN') }}</span>
+        </div>
+      </div>
+
+      <!-- Drawer Body: Dual Columns -->
+      <div class="drawer-body salary-drawer-body">
+        <div class="structure-builder-grid">
+          
+          <!-- EARNINGS COLUMN -->
+          <div class="structure-column-card earning-column">
+            <div class="column-header-banner earning-banner">
+              <div class="banner-title-group">
+                <span class="banner-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                </span>
+                <h4>Earnings Components</h4>
+              </div>
+              <div class="total-pill total-emerald">
+                <span>Total:</span>
+                <strong>₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</strong>
+              </div>
+            </div>
+
+            <div class="components-stack">
+              <div class="structure-comp-card earning-comp-card" *ngFor="let item of earningStructureItems()">
+                <div class="comp-meta">
+                  <div class="comp-title-row">
+                    <span class="comp-title">{{ item.component.name }}</span>
+                    <span class="badge-tag" [ngClass]="item.component.isPreDefined ? 'badge-system' : 'badge-custom'">
+                      {{ item.component.isPreDefined ? 'System' : 'Custom' }}
+                    </span>
+                  </div>
+                  <p class="comp-desc">{{ item.component.description || 'Standard monthly earning component' }}</p>
+                </div>
+                
+                <div class="comp-input-group">
+                  <span class="currency-prefix">₹</span>
+                  <input 
+                    type="number" 
+                    class="form-control comp-amount-input" 
+                    [(ngModel)]="item.amount" 
+                    placeholder="0"
+                    min="0">
+                  <button 
+                    *ngIf="!item.component.isPreDefined" 
+                    class="btn-delete-comp" 
+                    (click)="deleteComponent(item.component.id)" 
+                    title="Delete custom component">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DEDUCTIONS COLUMN -->
+          <div class="structure-column-card deduction-column">
+            <div class="column-header-banner deduction-banner">
+              <div class="banner-title-group">
+                <span class="banner-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+                </span>
+                <h4>Deductions Components</h4>
+              </div>
+              <div class="total-pill total-rose">
+                <span>Total:</span>
+                <strong>₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</strong>
+              </div>
+            </div>
+
+            <div class="components-stack">
+              <div class="structure-comp-card deduction-comp-card" *ngFor="let item of deductionStructureItems()">
+                <div class="comp-meta">
+                  <div class="comp-title-row">
+                    <span class="comp-title">{{ cleanComponentName(item.component.name) }}</span>
+                    <span *ngIf="isStatutory(item.component.name)" class="badge-tag statutory-badge">Statutory</span>
+                    <span *ngIf="!isStatutory(item.component.name)" class="badge-tag" [ngClass]="item.component.isPreDefined ? 'badge-system' : 'badge-custom'">
+                      {{ item.component.isPreDefined ? 'System' : 'Custom' }}
+                    </span>
+                  </div>
+                  <p class="comp-desc">{{ item.component.description || (isStatutory(item.component.name) ? 'Auto-calculated compliance' : 'Standard monthly deduction') }}</p>
+                </div>
+                
+                <div class="comp-input-group">
+                  <span class="currency-prefix">₹</span>
+                  <input 
+                    type="number" 
+                    class="form-control comp-amount-input" 
+                    [(ngModel)]="item.amount" 
+                    [disabled]="isStatutory(item.component.name)"
+                    placeholder="0"
+                    min="0">
+                  <button 
+                    *ngIf="!item.component.isPreDefined" 
+                    class="btn-delete-comp" 
+                    (click)="deleteComponent(item.component.id)" 
+                    title="Delete custom component">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Drawer Sticky Footer -->
+      <div class="drawer-footer salary-drawer-footer">
+        <div class="drawer-footer-equation">
+          <span>Gross: <strong>₹{{ calculateTotalEarnings(currentStructure()).toLocaleString('en-IN') }}</strong></span>
+          <span class="eq-op">−</span>
+          <span>Deductions: <strong class="text-rose">₹{{ calculateTotalDeductions(currentStructure()).toLocaleString('en-IN') }}</strong></span>
+          <span class="eq-op">=</span>
+          <span class="eq-net">Net Take-Home: <strong>₹{{ calculateNetPay(currentStructure()).toLocaleString('en-IN') }}</strong></span>
+        </div>
+        <div class="drawer-footer-actions">
+          <button type="button" class="btn btn-secondary" (click)="closeSalaryDrawer()">Cancel</button>
+          <button type="button" class="btn btn-save-structure" [disabled]="isSavingStructure()" (click)="saveSalaryStructure()">
+            <svg *ngIf="!isSavingStructure()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span *ngIf="isSavingStructure()">Saving...</span>
+            <span *ngIf="!isSavingStructure()">Save Salary Structure</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <!-- Drawer: Adjust Draft Payslip -->
   <div class="drawer-overlay" *ngIf="isAdjustModalOpen()" (click)="closeAdjustModal()">
@@ -778,13 +1854,40 @@
         </table>
 
         <div class="net-pay-banner">
-          <span>Net Salary Payable:</span>
-          <h2>₹{{ pd.netPay.toLocaleString('en-IN') }}</h2>
+          <div class="net-pay-left">
+            <span>Net Salary Payable (Take Home):</span>
+            <!-- Spelled out, as a payslip does: a figure alone is easy to
+                 misread by a factor of ten, and the words are what makes a
+                 transposed digit obvious. -->
+            <em class="net-in-words">{{ amountInWords(pd.netPay) }}</em>
+          </div>
+          <h2>₹{{ pd.netPay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</h2>
         </div>
       </div>
-      <div class="drawer-footer">
+
+      <!-- `pd` is bound by the *ngIf on .drawer-body above and does not reach
+           here, so the footer binds it again rather than reading the signal
+           four more times. -->
+      <div class="drawer-footer payslip-actions" *ngIf="selectedPayslipDetail() as pd">
         <button class="btn btn-outline" (click)="closePayslipDetail()">Close</button>
-        <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
+
+        <!-- A finalized or paid slip is a record; adjusting it should be a
+             deliberate act, not the first button under the cursor. -->
+        <button class="btn btn-outline" (click)="openAdjustModal(pd)"
+                [disabled]="isPayslipBusy()"
+                [title]="pd.status === 'DRAFT' ? 'Adjust this payslip' : 'This payslip is ' + pd.status.toLowerCase()">
+          Edit
+        </button>
+
+        <button class="btn btn-outline" (click)="resendPayslip(pd)" [disabled]="isPayslipBusy()">
+          {{ isPayslipBusy() ? 'Working…' : 'Send Again' }}
+        </button>
+
+        <button class="btn btn-outline" onclick="window.print()">Print</button>
+
+        <button class="btn btn-primary" (click)="downloadPayslip(pd)" [disabled]="isPayslipBusy()">
+          Download PDF
+        </button>
       </div>
     </div>
   </div>

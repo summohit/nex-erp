@@ -101,6 +101,88 @@ export class PayrollService {
 
   // ==================== 2. SALARY STRUCTURE ====================
 
+  async getAllSalaryStructures(companyId: number) {
+    const employees = await this.prisma.employee.findMany({
+      where: { companyId },
+      include: {
+        department: { select: { id: true, name: true } },
+        designation: { select: { id: true, name: true } },
+        user: { select: { email: true, role: true, status: true } },
+        salaryStructures: {
+          include: { component: true }
+        }
+      },
+      orderBy: { firstName: 'asc' }
+    });
+
+    return employees.map((emp) => {
+      let grossEarnings = 0;
+      let totalDeductions = 0;
+
+      for (const s of emp.salaryStructures || []) {
+        if (s.component?.type === 'EARNING') {
+          grossEarnings += s.amount || 0;
+        } else if (s.component?.type === 'DEDUCTION') {
+          totalDeductions += s.amount || 0;
+        }
+      }
+
+      const netSalary = Math.max(0, grossEarnings - totalDeductions);
+      const hasStructure = (emp.salaryStructures?.length || 0) > 0 && grossEarnings > 0;
+
+      let salaryGroup = 'Employee Salary Group';
+      const desig = (emp.designation?.name || '').toLowerCase();
+      if (desig.includes('consultant')) {
+        salaryGroup = 'Technical Consultant';
+      } else if (desig.includes('trainee') || desig.includes('intern')) {
+        salaryGroup = 'Trainee Stipend';
+      } else if (desig.includes('operations') || desig.includes('manager')) {
+        salaryGroup = 'Non Technical Consultant Salary';
+      } else if (emp.department?.name) {
+        salaryGroup = emp.department.name;
+      }
+
+      return {
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        avatarUrl: emp.avatarUrl,
+        employeeCode: emp.employeeCode,
+        department: emp.department,
+        designation: emp.designation,
+        user: emp.user,
+        // Sent so the table can lead with the people who have been here
+        // longest. Sorting on it in the database would not survive the
+        // client's own re-sorts, and the column is wanted for display order
+        // rather than as the query's order.
+        joiningDate: emp.joiningDate,
+        salaryCycle: 'Monthly',
+        salaryGroup,
+        // Suspension still wins: somebody with no login is off payroll
+        // whatever this flag says, and the screen should agree with what
+        // generation will actually do.
+        allowPayrollGenerate:
+          emp.user?.status !== 'SUSPENDED' && emp.allowPayrollGenerate ? 'Yes' : 'No',
+        grossEarnings,
+        totalDeductions,
+        netSalary,
+        hasStructure,
+        salaryStructures: emp.salaryStructures
+      };
+    });
+  }
+
+  /** Take somebody off payroll, or put them back on, without touching their login. */
+  async setAllowPayrollGenerate(companyId: number, employeeId: number, allow: boolean) {
+    const employee = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId } });
+    if (!employee) throw new NotFoundException('Employee not found');
+    return this.prisma.employee.update({
+      where: { id: employeeId },
+      data: { allowPayrollGenerate: allow },
+      select: { id: true, allowPayrollGenerate: true },
+    });
+  }
+
   async getSalaryStructure(companyId: number, employeeId: number) {
     const employee = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId },
@@ -159,7 +241,137 @@ export class PayrollService {
     return false;
   }
 
-  async generatePayslips(companyId: number, month: number, year: number) {
+  /**
+   * What a run would pay, before anybody presses the button.
+   *
+   * Generation is close to irreversible in practice: it writes DRAFT slips,
+   * and once a period is finalised it refuses to regenerate. The damage that
+   * a thin attendance month does is therefore only visible afterwards, on
+   * payslips people have already been shown. This answers the same question
+   * beforehand, and writes nothing.
+   *
+   * Deliberately a second implementation of the loss-of-pay rule rather than a
+   * refactor of the first: generation is the code that pays people and is not
+   * worth destabilising for a preview. The two are checked against each other
+   * by payroll-preview.spec.ts, which is what stops them drifting apart.
+   */
+  async previewPayroll(companyId: number, month: number, year: number) {
+    const employees = await this.prisma.employee.findMany({
+      where: { companyId, user: { status: { not: 'SUSPENDED' } }, allowPayrollGenerate: true },
+      include: { salaryStructures: { include: { component: true } }, branch: true },
+    });
+
+    const totalDaysInMonth = new Date(year, month, 0).getDate();
+    const rows: any[] = [];
+
+    for (const emp of employees) {
+      let gross = 0;
+      let deductions = 0;
+      for (const st of emp.salaryStructures || []) {
+        const amt = st.amount || 0;
+        if (st.component?.type === 'EARNING') gross += amt;
+        else if (st.component?.type === 'DEDUCTION') deductions += amt;
+      }
+      if (gross <= 0) continue;
+
+      const offs = (emp.branch?.weeklyOffs || '0').split(',').map((n) => n.trim());
+      let workingDays = 0;
+      for (let d = 1; d <= totalDaysInMonth; d++) {
+        if (!offs.includes(String(new Date(year, month - 1, d).getDay()))) workingDays++;
+      }
+      if (workingDays === 0) workingDays = totalDaysInMonth;
+
+      const attendances = await this.prisma.attendance.findMany({
+        where: {
+          employeeId: emp.id,
+          date: { gte: new Date(year, month - 1, 1), lte: new Date(year, month, 0) },
+        },
+        select: { date: true, status: true },
+      });
+      const byDay = new Map<string, string>();
+      let present = 0;
+      let half = 0;
+      for (const a of attendances) {
+        byDay.set(a.date.toISOString().split('T')[0], a.status);
+        if (a.status === 'PRESENT') present++;
+        else if (a.status === 'HALF_DAY') half++;
+      }
+
+      const leaves = await this.prisma.leaveRequest.findMany({
+        where: { employeeId: emp.id, status: 'APPROVED' },
+        select: { startDate: true, endDate: true },
+      });
+
+      let absences = 0;
+      for (let d = 1; d <= totalDaysInMonth; d++) {
+        const date = new Date(year, month - 1, d);
+        if (offs.includes(String(date.getDay()))) continue;
+        const key = date.toISOString().split('T')[0];
+        const st = byDay.get(key);
+        if (st === 'PRESENT' || st === 'HALF_DAY') continue;
+        const covered = leaves.some(
+          (l) =>
+            key >= l.startDate.toISOString().split('T')[0] &&
+            key <= l.endDate.toISOString().split('T')[0],
+        );
+        if (!covered) absences++;
+      }
+      absences += half * 0.5;
+
+      const lossOfPay = Math.round((gross / workingDays) * absences * 100) / 100;
+      rows.push({
+        employeeId: emp.id,
+        name: `${emp.firstName} ${emp.lastName}`.trim(),
+        workingDays,
+        presentDays: present + half * 0.5,
+        absences,
+        gross,
+        deductions,
+        lossOfPay,
+        net: Math.max(0, gross - deductions - lossOfPay),
+        /// No attendance at all is a different problem from a patchy month:
+        /// it usually means nothing was ever recorded for them, not that they
+        /// never came in.
+        noAttendance: attendances.length === 0,
+      });
+    }
+
+    const totalGross = rows.reduce((t, r) => t + r.gross, 0);
+    const totalLossOfPay = rows.reduce((t, r) => t + r.lossOfPay, 0);
+
+    return {
+      month,
+      year,
+      employees: rows.length,
+      totalGross,
+      totalLossOfPay,
+      totalNet: rows.reduce((t, r) => t + r.net, 0),
+      lossOfPayShare: totalGross > 0 ? totalLossOfPay / totalGross : 0,
+      severelyAffected: rows.filter((r) => r.gross > 0 && r.lossOfPay / r.gross > 0.5).length,
+      noAttendance: rows.filter((r) => r.noAttendance).length,
+      rows: rows.sort((a, b) => b.lossOfPay / b.gross - a.lossOfPay / a.gross),
+    };
+  }
+
+  /**
+   * Draft this month's payslips.
+   *
+   * `skipLossOfPay` exists because the attendance record and the truth can come
+   * apart. September 2026 has roughly 60% of its working days recorded — the
+   * clock-in was broken for part of it and the Workway import stopped on the
+   * 21st — and generating from that would have deducted ₹15.1 lakh, 46% of
+   * gross, for days people worked. Ten people would have lost over half their
+   * pay and one, with no attendance at all, would have been paid nothing.
+   *
+   * The arithmetic was never wrong; the input was. So the waiver is a decision
+   * somebody makes for a named month, not a rule, and not a default.
+   */
+  async generatePayslips(
+    companyId: number,
+    month: number,
+    year: number,
+    opts: { skipLossOfPay?: boolean } = {},
+  ) {
     const existingPayslips = await this.prisma.payslip.findMany({
       where: { companyId, month: Number(month), year: Number(year) },
       select: { status: true }
@@ -174,7 +386,14 @@ export class PayrollService {
 
     const employees = await this.prisma.employee.findMany({
       // Deactivated staff are off payroll — no draft is created for them.
-      where: { companyId, user: { status: { not: 'SUSPENDED' } } },
+      // So is anyone switched off on the salary screen, which until now was a
+      // dropdown that changed nothing: it read Yes/No, saved neither, and
+      // generation drafted a payslip regardless.
+      where: {
+        companyId,
+        user: { status: { not: 'SUSPENDED' } },
+        allowPayrollGenerate: true,
+      },
       include: {
         salaryStructures: {
           include: { component: true }
@@ -351,7 +570,10 @@ export class PayrollService {
 
       // Loss of Pay (LOP) calculation based on actual unexcused working day absences
       const dailyRate = workingDaysInMonth > 0 ? (totalEarnings / workingDaysInMonth) : 0;
-      const lossOfPay = Math.round(dailyRate * unexcusedAbsences * 100) / 100;
+      // Waived for the whole run when asked — see the note on this method.
+      const lossOfPay = opts.skipLossOfPay
+        ? 0
+        : Math.round(dailyRate * unexcusedAbsences * 100) / 100;
 
       // Leave encashment, on the December slip only. Deliberately after the
       // statutory block and after dailyRate: a one-off payout must not inflate
@@ -888,6 +1110,57 @@ export class PayrollService {
         ...(data.projectId !== undefined && { projectId: data.projectId }),
       },
     });
+  }
+
+  /** One payslip, with everything a detail view or a PDF needs. */
+  async getPayslipDetail(companyId: number, id: number) {
+    const payslip = await this.prisma.payslip.findFirst({
+      where: { id, companyId },
+      include: {
+        employee: {
+          include: { user: { select: { email: true } }, department: true, designation: true },
+        },
+        items: { orderBy: { id: 'asc' } },
+        encashments: true,
+      },
+    });
+    if (!payslip) throw new NotFoundException('Payslip not found');
+    return payslip;
+  }
+
+  /** The PDF for one payslip, as bytes for the caller to stream. */
+  async getPayslipPdf(companyId: number, id: number) {
+    const payslip = await this.getPayslipDetail(companyId, id);
+    const { buffer, isPdf } = await this.pdfService.generatePayslipPdf(payslip);
+    const name = `${payslip.employee.firstName}-${payslip.month}-${payslip.year}`
+      .replace(/[^A-Za-z0-9-]/g, '');
+    return { buffer, isPdf, filename: `payslip-${name}.${isPdf ? 'pdf' : 'html'}` };
+  }
+
+  /**
+   * Send one payslip again.
+   *
+   * Separate from the batch send because re-sending to one person is the
+   * common case -- a wrong address, a deleted mail -- and doing it through the
+   * batch would mail the whole company a second time.
+   */
+  async sendOnePayslipEmail(companyId: number, id: number) {
+    const payslip = await this.getPayslipDetail(companyId, id);
+    const email = payslip.employee?.user?.email;
+    if (!email) throw new BadRequestException('That employee has no email address on file');
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    const empName = payslip.employee.lastName
+      ? `${payslip.employee.firstName} ${payslip.employee.lastName}`
+      : payslip.employee.firstName;
+
+    const { buffer } = await this.pdfService.generatePayslipPdf(payslip);
+    const sent = await this.emailService.sendPayslipEmail(
+      email, empName, monthNames[payslip.month - 1], payslip.year, buffer,
+    );
+    if (!sent) throw new BadRequestException(`Could not send to ${email}`);
+    return { sent: true, email };
   }
 
   async batchSendPayslipEmails(companyId: number, month: number, year: number) {

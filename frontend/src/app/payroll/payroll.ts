@@ -5,13 +5,13 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef, ValueFormatterParams } from 'ag-grid-community';
 import { HotToastService } from '@ngneat/hot-toast';
-import { PayrollService, Payslip, ExpenseClaim, SalaryComponent, SalaryStructureItem } from '../services/payroll.service';
+import { PayrollService, Payslip, ExpenseClaim, SalaryComponent, SalaryStructureItem, EmployeeSalaryRow, PayrollPreview } from '../services/payroll.service';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
 import { ProjectsService } from '../services/projects';
 import { ActionCellRendererComponent } from '../shared/components/action-cell-renderer.component';
 import { ExpenseActionCellRendererComponent } from '../shared/components/expense-action-cell-renderer.component';
-import { SearchableSelectComponent } from '../shared/components/searchable-select/searchable-select.component';
+import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
 import { UploadService } from '../services/upload.service';
 import { 
   LucideFilter, 
@@ -75,6 +75,33 @@ export class PayrollComponent implements OnInit {
   // Structure tab state
   selectedEmployeeId = signal<number | null>(null);
   currentStructure = signal<SalaryStructureItem[]>([]);
+  salaryTableData = signal<EmployeeSalaryRow[]>([]);
+  isLoadingSalaryTable = signal<boolean>(true);
+  salaryViewMode = signal<'table' | 'grid'>('table');
+  isSalaryDrawerOpen = signal<boolean>(false);
+  selectedSalaryEmployee = signal<EmployeeSalaryRow | null>(null);
+  isSavingStructure = signal<boolean>(false);
+
+  // Table filters & sorting
+  salaryTableSearchQuery = signal<string>('');
+  salaryTableDeptFilter = signal<string>('ALL');
+  salaryTableDesigFilter = signal<string>('ALL');
+  salaryTableStatusFilter = signal<string>('ALL');
+  // Joining date, not name: the table opens on the longest-serving staff
+  // rather than on whoever is alphabetically first. Clicking a column header
+  // still switches it as before.
+  salaryTableSortColumn = signal<string>('joined');
+  salaryTableSortDirection = signal<'asc' | 'desc'>('asc');
+
+  // Salary Processing (Tab 1) Filter & Search State
+  isLoadingPayslips = signal<boolean>(false);
+  processingSearchQuery = signal<string>('');
+  processingDeptFilter = signal<string>('ALL');
+  processingDesigFilter = signal<string>('ALL');
+  processingStatusFilter = signal<string>('ALL');
+  processingLopFilter = signal<'ALL' | 'WITH_LOP' | 'ZERO_LOP'>('ALL');
+  processingSortColumn = signal<string>('name');
+  processingSortDirection = signal<'asc' | 'desc'>('asc');
 
   private uploadService = inject(UploadService);
 
@@ -306,15 +333,428 @@ export class PayrollComponent implements OnInit {
     return this.currentStructure().filter(i => i.component?.type === 'DEDUCTION');
   });
 
+  // Salary Table View Filters & Sorting Computeds
+  availableDepartments = computed(() => {
+    const depts = new Set<string>();
+    for (const e of this.salaryTableData()) {
+      if (e.department?.name) depts.add(e.department.name);
+    }
+    return Array.from(depts).sort();
+  });
+
+  availableDesignations = computed(() => {
+    const desigs = new Set<string>();
+    for (const e of this.salaryTableData()) {
+      if (e.designation?.name) desigs.add(e.designation.name);
+    }
+    return Array.from(desigs).sort();
+  });
+
+  designationOptions = computed<SearchableSelectOption[]>(() => {
+    return [
+      { id: 'ALL', name: 'All Designations' },
+      ...this.availableDesignations().map(d => ({ id: d, name: d }))
+    ];
+  });
+
+  departmentOptions = computed<SearchableSelectOption[]>(() => {
+    return [
+      { id: 'ALL', name: 'All Departments' },
+      ...this.availableDepartments().map(d => ({ id: d, name: d }))
+    ];
+  });
+
+  statusOptions: SearchableSelectOption[] = [
+    { id: 'ALL', name: 'All Status' },
+    { id: 'CONFIGURED', name: 'Salary Set' },
+    { id: 'NOT_CONFIGURED', name: 'Needs Setup' }
+  ];
+
+  filteredSalaryRows = computed(() => {
+    let rows = [...this.salaryTableData()];
+    const query = this.salaryTableSearchQuery().toLowerCase().trim();
+    const dept = this.salaryTableDeptFilter();
+    const desig = this.salaryTableDesigFilter();
+    const status = this.salaryTableStatusFilter();
+
+    if (query) {
+      rows = rows.filter(e => {
+        const fullName = `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase();
+        const dName = (e.department?.name || '').toLowerCase();
+        const desName = (e.designation?.name || '').toLowerCase();
+        const code = (e.employeeCode || '').toLowerCase();
+        const group = (e.salaryGroup || '').toLowerCase();
+        return fullName.includes(query) || dName.includes(query) || desName.includes(query) || code.includes(query) || group.includes(query);
+      });
+    }
+
+    if (dept !== 'ALL') {
+      rows = rows.filter(e => e.department?.name === dept);
+    }
+
+    if (desig !== 'ALL') {
+      rows = rows.filter(e => e.designation?.name === desig);
+    }
+
+    if (status === 'CONFIGURED') {
+      rows = rows.filter(e => e.hasStructure || (e.netSalary > 0));
+    } else if (status === 'NOT_CONFIGURED') {
+      rows = rows.filter(e => !e.hasStructure && (!e.netSalary || e.netSalary === 0));
+    }
+
+    const sortCol = this.salaryTableSortColumn();
+    const dir = this.salaryTableSortDirection() === 'asc' ? 1 : -1;
+
+    /**
+     * Suspended people sink, whatever the table is sorted by.
+     *
+     * Forty of the ninety-seven have left, and alphabetical order scattered
+     * them through the list — three of the first four rows were ex-staff with
+     * nothing to configure. Sorting is for arranging the people you might act
+     * on; someone who has left is not one of them, so they go below the fold
+     * rather than being removed, since their history still needs reaching.
+     */
+    const gone = (e: any) => (e.user?.status === 'SUSPENDED' ? 1 : 0);
+
+    /** Epoch millis, with no joining date sorting last among the active. */
+    const joined = (e: any) => {
+      const t = e.joiningDate ? new Date(e.joiningDate).getTime() : NaN;
+      return Number.isNaN(t) ? Infinity : t;
+    };
+
+    rows.sort((a, b) => {
+      const away = gone(a) - gone(b);
+      if (away) return away;
+
+      let valA: any = '';
+      let valB: any = '';
+
+      if (sortCol === 'joined') {
+        // The default: earliest joiner first, so the people who built the
+        // company read from the top. Ties fall back to name so the order is
+        // stable rather than whatever the API happened to return.
+        const d = (joined(a) - joined(b)) * dir;
+        if (d) return d;
+        return `${a.firstName} ${a.lastName || ''}`.localeCompare(`${b.firstName} ${b.lastName || ''}`);
+      } else if (sortCol === 'name') {
+        valA = `${a.firstName} ${a.lastName || ''}`.toLowerCase();
+        valB = `${b.firstName} ${b.lastName || ''}`.toLowerCase();
+      } else if (sortCol === 'cycle') {
+        valA = (a.salaryCycle || '').toLowerCase();
+        valB = (b.salaryCycle || '').toLowerCase();
+      } else if (sortCol === 'group') {
+        valA = (a.salaryGroup || '').toLowerCase();
+        valB = (b.salaryGroup || '').toLowerCase();
+      } else if (sortCol === 'allowPayroll') {
+        valA = (a.allowPayrollGenerate || '').toLowerCase();
+        valB = (b.allowPayrollGenerate || '').toLowerCase();
+      } else if (sortCol === 'netSalary') {
+        valA = a.netSalary || 0;
+        valB = b.netSalary || 0;
+      }
+
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return (valA - valB) * dir;
+      }
+      return String(valA).localeCompare(String(valB)) * dir;
+    });
+
+    return rows;
+  });
+
+  /**
+   * What the period on screen actually adds up to.
+   *
+   * The KPI strip above the Payslips and Salary Processing tabs used to show
+   * `currentStructure()` — one selected employee's salary — under the headings
+   * "Gross Payroll" and "Net Take-Home". With August's payslips listed
+   * underneath it, the header read ₹17,500 while the cards below totalled
+   * ₹30 lakh, and the obvious reading was that the import had gone wrong. It
+   * had not: the header was answering a different question from the one its
+   * labels asked.
+   */
+  periodGross = computed(() =>
+    this.payslips().reduce((t, p) => t + (p.totalEarnings || 0), 0));
+  periodDeductions = computed(() =>
+    this.payslips().reduce((t, p) => t + (p.totalDeductions || 0), 0));
+  periodLossOfPay = computed(() =>
+    this.payslips().reduce((t, p) => t + (p.lossOfPay || 0), 0));
+  periodNet = computed(() =>
+    this.payslips().reduce((t, p) => t + (p.netPay || 0), 0));
+  periodLabel = computed(() => {
+    const m = this.months.find((x) => Number(x.id) === Number(this.selectedMonth()));
+    return `${m?.name ?? ''} ${this.selectedYear()}`.trim();
+  });
+
+  totalCompanyGross = computed(() => {
+    return this.salaryTableData().reduce((sum, e) => sum + (e.grossEarnings || 0), 0);
+  });
+
+  totalCompanyNet = computed(() => {
+    return this.salaryTableData().reduce((sum, e) => sum + (e.netSalary || 0), 0);
+  });
+
+  totalCompanyDeductions = computed(() => {
+    return this.salaryTableData().reduce((sum, e) => sum + (e.totalDeductions || 0), 0);
+  });
+
+  configuredEmployeesCount = computed(() => {
+    return this.salaryTableData().filter(e => e.hasStructure || (e.netSalary > 0)).length;
+  });
+
+  toggleSalarySort(col: string) {
+    if (this.salaryTableSortColumn() === col) {
+      this.salaryTableSortDirection.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.salaryTableSortColumn.set(col);
+      this.salaryTableSortDirection.set('asc');
+    }
+  }
+
+  getSalaryGroupBadgeClass(group: string | undefined): string {
+    const g = (group || '').toLowerCase();
+    if (g.includes('technical consultant')) return 'badge-group-tech';
+    if (g.includes('trainee')) return 'badge-group-trainee';
+    if (g.includes('non technical') || g.includes('operations')) return 'badge-group-ops';
+    return 'badge-group-default';
+  }
+
+  exportSalaryTableToCsv() {
+    const rows = this.filteredSalaryRows();
+    if (!rows || rows.length === 0) {
+      this.toast.info('No data available to export');
+      return;
+    }
+
+    const headers = [
+      'Employee Code',
+      'First Name',
+      'Last Name',
+      'Email',
+      'Department',
+      'Designation',
+      'Salary Cycle',
+      'Salary Group',
+      'Allow Payroll Generate',
+      'Gross Earnings (INR)',
+      'Total Deductions (INR)',
+      'Net Salary (INR)'
+    ];
+
+    const csvLines = [headers.join(',')];
+
+    for (const r of rows) {
+      const line = [
+        `"${r.employeeCode || ''}"`,
+        `"${r.firstName || ''}"`,
+        `"${r.lastName || ''}"`,
+        `"${r.user?.email || ''}"`,
+        `"${r.department?.name || ''}"`,
+        `"${r.designation?.name || ''}"`,
+        `"${r.salaryCycle || 'Monthly'}"`,
+        `"${r.salaryGroup || 'Employee Salary Group'}"`,
+        `"${r.allowPayrollGenerate || 'Yes'}"`,
+        r.grossEarnings || 0,
+        r.totalDeductions || 0,
+        r.netSalary || 0
+      ];
+      csvLines.push(line.join(','));
+    }
+
+    const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `employee-salary-structures-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    this.toast.success('Salary structures exported to CSV');
+  }
+
   // Deactivated staff are shown for history but visually stood down.
   payrollRowClassRules = {
     'payroll-row-inactive': (p: any) =>
       !p.data?.isSummaryRow && p.data?.employee?.user?.status === 'SUSPENDED',
   };
 
+  // Salary Processing (Tab 1) Options, Filtering & Totals
+  processingAvailableDepartments = computed(() => {
+    const depts = new Set<string>();
+    for (const p of this.payslips()) {
+      if (p.employee?.department?.name) depts.add(p.employee.department.name);
+    }
+    return Array.from(depts).sort();
+  });
+
+  processingDepartmentOptions = computed<SearchableSelectOption[]>(() => [
+    { id: 'ALL', name: 'All Departments' },
+    ...this.processingAvailableDepartments().map(d => ({ id: d, name: d }))
+  ]);
+
+  processingAvailableDesignations = computed(() => {
+    const desigs = new Set<string>();
+    for (const p of this.payslips()) {
+      if (p.employee?.designation?.name) desigs.add(p.employee.designation.name);
+    }
+    return Array.from(desigs).sort();
+  });
+
+  processingDesignationOptions = computed<SearchableSelectOption[]>(() => [
+    { id: 'ALL', name: 'All Designations' },
+    ...this.processingAvailableDesignations().map(d => ({ id: d, name: d }))
+  ]);
+
+  processingStatusOptions: SearchableSelectOption[] = [
+    { id: 'ALL', name: 'All Status' },
+    { id: 'DRAFT', name: 'Draft' },
+    { id: 'FINALIZED', name: 'Finalized' },
+    { id: 'PAID', name: 'Paid' }
+  ];
+
+  processingCounts = computed(() => {
+    const all = this.payslips();
+    let draft = 0, finalized = 0, paid = 0, withLop = 0, zeroLop = 0;
+    for (const p of all) {
+      const st = p.status || 'DRAFT';
+      if (st === 'DRAFT') draft++;
+      else if (st === 'FINALIZED') finalized++;
+      else if (st === 'PAID') paid++;
+      if ((p.lossOfPay || 0) > 0) withLop++;
+      else zeroLop++;
+    }
+    return { total: all.length, draft, finalized, paid, withLop, zeroLop };
+  });
+
+  hasActiveProcessingFilters = computed(() => {
+    return this.processingSearchQuery().trim() !== '' ||
+      this.processingDeptFilter() !== 'ALL' ||
+      this.processingDesigFilter() !== 'ALL' ||
+      this.processingStatusFilter() !== 'ALL' ||
+      this.processingLopFilter() !== 'ALL';
+  });
+
+  clearProcessingFilters() {
+    this.processingSearchQuery.set('');
+    this.processingDeptFilter.set('ALL');
+    this.processingDesigFilter.set('ALL');
+    this.processingStatusFilter.set('ALL');
+    this.processingLopFilter.set('ALL');
+  }
+
+  toggleProcessingSort(col: string) {
+    if (this.processingSortColumn() === col) {
+      this.processingSortDirection.set(this.processingSortDirection() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.processingSortColumn.set(col);
+      this.processingSortDirection.set('asc');
+    }
+  }
+
+  filteredProcessingPayslips = computed(() => {
+    let list = [...this.payslips()];
+    const query = this.processingSearchQuery().toLowerCase().trim();
+    const dept = this.processingDeptFilter();
+    const desig = this.processingDesigFilter();
+    const status = this.processingStatusFilter();
+    const lop = this.processingLopFilter();
+
+    if (query) {
+      list = list.filter(p => {
+        const emp = p.employee;
+        const name = `${emp?.firstName || ''} ${emp?.lastName || ''}`.toLowerCase();
+        const dName = (emp?.department?.name || '').toLowerCase();
+        const desName = (emp?.designation?.name || '').toLowerCase();
+        return name.includes(query) || dName.includes(query) || desName.includes(query);
+      });
+    }
+
+    if (dept !== 'ALL') {
+      list = list.filter(p => p.employee?.department?.name === dept);
+    }
+
+    if (desig !== 'ALL') {
+      list = list.filter(p => p.employee?.designation?.name === desig);
+    }
+
+    if (status !== 'ALL') {
+      list = list.filter(p => (p.status || 'DRAFT') === status);
+    }
+
+    if (lop === 'WITH_LOP') {
+      list = list.filter(p => (p.lossOfPay || 0) > 0);
+    } else if (lop === 'ZERO_LOP') {
+      list = list.filter(p => (p.lossOfPay || 0) === 0);
+    }
+
+    const col = this.processingSortColumn();
+    const dir = this.processingSortDirection() === 'asc' ? 1 : -1;
+
+    list.sort((a, b) => {
+      const ia = a.employee?.user?.status === 'SUSPENDED' ? 1 : 0;
+      const ib = b.employee?.user?.status === 'SUSPENDED' ? 1 : 0;
+      if (ia !== ib && col === 'name') return ia - ib;
+
+      let valA: any = 0;
+      let valB: any = 0;
+
+      if (col === 'name') {
+        valA = `${a.employee?.firstName || ''} ${a.employee?.lastName || ''}`.toLowerCase();
+        valB = `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.toLowerCase();
+        return valA.localeCompare(valB) * dir;
+      } else if (col === 'workingDays') {
+        valA = a.workingDays || 0;
+        valB = b.workingDays || 0;
+      } else if (col === 'present') {
+        valA = a.presentDays || 0;
+        valB = b.presentDays || 0;
+      } else if (col === 'absent') {
+        valA = a.absentDays || 0;
+        valB = b.absentDays || 0;
+      } else if (col === 'gross') {
+        valA = a.totalEarnings || 0;
+        valB = b.totalEarnings || 0;
+      } else if (col === 'lop') {
+        valA = a.lossOfPay || 0;
+        valB = b.lossOfPay || 0;
+      } else if (col === 'expenses') {
+        valA = a.expenseAmount || 0;
+        valB = b.expenseAmount || 0;
+      } else if (col === 'net') {
+        valA = a.netPay || 0;
+        valB = b.netPay || 0;
+      } else if (col === 'status') {
+        valA = a.status || 'DRAFT';
+        valB = b.status || 'DRAFT';
+        return valA.localeCompare(valB) * dir;
+      }
+
+      return (valA - valB) * dir;
+    });
+
+    return list;
+  });
+
+  processingTotals = computed(() => {
+    const list = this.filteredProcessingPayslips();
+    let totalGross = 0;
+    let totalLop = 0;
+    let totalExpenses = 0;
+    let totalNet = 0;
+
+    for (const p of list) {
+      totalGross += p.totalEarnings || 0;
+      totalLop += p.lossOfPay || 0;
+      totalExpenses += p.expenseAmount || 0;
+      totalNet += p.netPay || 0;
+    }
+
+    return { totalGross, totalLop, totalExpenses, totalNet };
+  });
+
   // Computed Pinned Bottom Total Rows
   processingPinnedBottomRow = computed(() => {
-    const list = this.payslips();
+    const list = this.filteredProcessingPayslips();
     if (!list || list.length === 0) return [];
     
     let totalGross = 0;
@@ -665,14 +1105,15 @@ export class PayrollComponent implements OnInit {
       this.loadTabContent();
     });
 
-    // Unconditionally fetch components and employees so structure & dropdown are ready immediately on page load
+    // Unconditionally fetch components, employees, and salary table so all views are ready immediately
     this.payrollService.getComponents().subscribe(res => this.components.set(res));
     this.employeeService.getEmployees().subscribe(res => {
       this.employees.set(res);
       if (res.length > 0 && !this.selectedEmployeeId()) {
-        this.selectEmployeeForStructure(res[0].id);
+        this.selectEmployeeForStructure(res[0].id, false);
       }
     });
+    this.loadSalaryStructuresTable();
     this.projectsService.getProjects().subscribe(res => {
       this.projects.set(res);
     });
@@ -688,6 +1129,7 @@ export class PayrollComponent implements OnInit {
     const tab = this.activeTab();
     if (tab === 'processing') {
       this.loadPayslips();
+      this.loadPayrollPreview();
     } else if (tab === 'payslips') {
       this.loadPayslips();
       this.loadMyPayslips();
@@ -696,20 +1138,20 @@ export class PayrollComponent implements OnInit {
       this.payrollService.getMyExpenseClaims().subscribe(res => this.myExpenseClaims.set(res));
     } else if (tab === 'structure') {
       this.payrollService.getComponents().subscribe(res => this.components.set(res));
-      if (this.employees().length === 0) {
-        this.employeeService.getEmployees().subscribe(res => {
-          this.employees.set(res);
-          if (res.length > 0 && !this.selectedEmployeeId()) {
-            this.selectEmployeeForStructure(res[0].id);
-          }
-        });
-      }
+      this.loadSalaryStructuresTable();
     }
   }
 
   loadPayslips() {
-    this.payrollService.getPayslips(this.selectedMonth(), this.selectedYear()).subscribe(res => {
-      this.payslips.set(this.sortPayrollRows(res));
+    this.isLoadingPayslips.set(true);
+    this.payrollService.getPayslips(this.selectedMonth(), this.selectedYear()).subscribe({
+      next: (res) => {
+        this.isLoadingPayslips.set(false);
+        this.payslips.set(this.sortPayrollRows(res));
+      },
+      error: () => {
+        this.isLoadingPayslips.set(false);
+      }
     });
   }
 
@@ -734,11 +1176,59 @@ export class PayrollComponent implements OnInit {
 
   onPeriodChange() {
     this.loadPayslips();
+    this.loadPayrollPreview();
   }
 
-  generatePayslips() {
+  // ─── Pre-flight ───────────────────────────────────────────────────────────
+  //
+  // Payroll reads attendance and deducts a day's pay for every working day it
+  // cannot account for. That is right when attendance is right. For September
+  // 2026 it was not: about 60% of working days were recorded, and generating
+  // would have taken ₹15.1 lakh — 46% of gross — off people who had worked.
+  // The arithmetic was never the problem, and it was only visible afterwards,
+  // on payslips that had already been shown to somebody.
+  //
+  // So the damage is now computed first and put on screen next to the button.
+  payrollPreview = signal<PayrollPreview | null>(null);
+  isPreviewing = signal(false);
+
+  loadPayrollPreview() {
+    this.isPreviewing.set(true);
+    this.payrollService.previewPayroll(Number(this.selectedMonth()), Number(this.selectedYear()))
+      .subscribe({
+        next: (p) => { this.payrollPreview.set(p); this.isPreviewing.set(false); },
+        // A preview that fails must not block the run, only stop reassuring.
+        error: () => { this.payrollPreview.set(null); this.isPreviewing.set(false); },
+      });
+  }
+
+  /** Loss of pay big enough that the attendance record is the likelier culprit. */
+  previewIsAlarming = computed(() => {
+    const p = this.payrollPreview();
+    return !!p && (p.lossOfPayShare > 0.1 || p.severelyAffected > 0 || p.noAttendance > 0);
+  });
+
+  generatePayslips(skipLossOfPay = false) {
+    const p = this.payrollPreview();
+    if (skipLossOfPay) {
+      const amount = p ? `₹${Math.round(p.totalLossOfPay).toLocaleString('en-IN')}` : 'the loss of pay';
+      if (!confirm(
+        `Generate without loss of pay?\n\n${amount} that would have been deducted for `
+        + `unrecorded days will not be. Everyone is paid as though present all month.\n\n`
+        + `Attendance itself is unchanged — this affects these payslips only.`,
+      )) return;
+    } else if (this.previewIsAlarming()) {
+      const pct = p ? Math.round(p.lossOfPayShare * 100) : 0;
+      if (!confirm(
+        `${pct}% of gross pay would be deducted as loss of pay, and `
+        + `${p?.severelyAffected ?? 0} people would lose over half their salary.\n\n`
+        + `That usually means attendance is incomplete rather than that people were away.\n\n`
+        + `Generate anyway?`,
+      )) return;
+    }
+
     const toastRef = this.toast.loading('Generating payslips based on attendance...');
-    this.payrollService.generatePayslips(this.selectedMonth(), this.selectedYear()).subscribe({
+    this.payrollService.generatePayslips(this.selectedMonth(), this.selectedYear(), skipLossOfPay).subscribe({
       next: (res) => {
         toastRef.close();
         this.payslips.set(this.sortPayrollRows(res));
@@ -843,9 +1333,92 @@ export class PayrollComponent implements OnInit {
     });
   }
 
+  isPayslipBusy = signal(false);
+
   openPayslipDetail(payslip: Payslip) {
+    // Show what the grid already has straight away, then replace it with the
+    // full record. The list query does not carry items, so opening from a card
+    // used to show a payslip with an empty breakdown for as long as it stayed
+    // open — the figures were right and the lines that explain them missing.
     this.selectedPayslipDetail.set(payslip);
     this.isPayslipDetailModalOpen.set(true);
+    this.payrollService.getPayslipDetail(payslip.id).subscribe({
+      next: (full) => {
+        if (this.selectedPayslipDetail()?.id === full.id) this.selectedPayslipDetail.set(full);
+      },
+      error: () => { /* keep the summary; it is not wrong, only thinner */ },
+    });
+  }
+
+  /** Save the PDF the server renders, rather than printing the browser's view. */
+  downloadPayslip(p: Payslip) {
+    this.isPayslipBusy.set(true);
+    this.payrollService.downloadPayslip(p.id).subscribe({
+      next: (blob) => {
+        this.isPayslipBusy.set(false);
+        const name = `${p.employee?.firstName ?? 'payslip'}-${this.getMonthName(p.month)}-${p.year}`
+          .replace(/[^A-Za-z0-9-]/g, '');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name}.pdf`;
+        a.click();
+        // Revoking immediately can cancel the download in some browsers.
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      },
+      error: () => { this.isPayslipBusy.set(false); this.toast.error('Could not download that payslip'); },
+    });
+  }
+
+  /** Re-send to one person. The bulk button would mail the whole company. */
+  resendPayslip(p: Payslip) {
+    const who = `${p.employee?.firstName ?? ''} ${p.employee?.lastName ?? ''}`.trim();
+    if (!confirm(`Email this payslip to ${who} again?`)) return;
+    this.isPayslipBusy.set(true);
+    this.payrollService.sendOnePayslipEmail(p.id).subscribe({
+      next: (r) => { this.isPayslipBusy.set(false); this.toast.success(`Sent to ${r.email}`); },
+      error: (err) => {
+        this.isPayslipBusy.set(false);
+        this.toast.error(err.error?.message || 'Could not send that payslip');
+      },
+    });
+  }
+
+  /**
+   * "One Lakh Twenty Nine Thousand Three Hundred and Sixty Eight Rupees Only".
+   *
+   * Indian grouping, not thousands: after the first thousand the groups are
+   * two digits — lakh, crore — so a Western converter renders 1,29,368 as
+   * "one hundred twenty nine thousand", which is not what a payslip says.
+   */
+  amountInWords(amount: number): string {
+    const n = Math.floor(Math.abs(amount || 0));
+    if (n === 0) return 'Zero Rupees Only';
+
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+      'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+      'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    const under100 = (v: number): string =>
+      v < 20 ? ones[v] : `${tens[Math.floor(v / 10)]}${v % 10 ? ' ' + ones[v % 10] : ''}`;
+    const under1000 = (v: number): string => {
+      const h = Math.floor(v / 100);
+      const r = v % 100;
+      return [h ? `${ones[h]} Hundred` : '', r ? (h ? 'and ' : '') + under100(r) : '']
+        .filter(Boolean).join(' ');
+    };
+
+    const parts: string[] = [];
+    const crore = Math.floor(n / 10000000);
+    const lakh = Math.floor((n % 10000000) / 100000);
+    const thousand = Math.floor((n % 100000) / 1000);
+    const rest = n % 1000;
+    if (crore) parts.push(`${under1000(crore)} Crore`);
+    if (lakh) parts.push(`${under100(lakh)} Lakh`);
+    if (thousand) parts.push(`${under100(thousand)} Thousand`);
+    if (rest) parts.push(under1000(rest));
+    return `${parts.join(' ')} Rupees Only`;
   }
 
   closePayslipDetail() {
@@ -853,36 +1426,177 @@ export class PayrollComponent implements OnInit {
     this.selectedPayslipDetail.set(null);
   }
 
-  // Salary Structure Tab
-  selectEmployeeForStructure(empId: number) {
-    this.selectedEmployeeId.set(empId);
-    this.payrollService.getSalaryStructure(empId).subscribe(res => {
-      // Map components with current amounts
-      const allComp = this.components();
-      const mapped: SalaryStructureItem[] = allComp.map(c => {
-        const found = res.find(r => r.componentId === c.id);
-        return {
-          componentId: c.id,
-          component: c,
-          amount: found ? found.amount : 0
-        };
-      });
-      this.currentStructure.set(mapped);
+  /**
+   * Switch someone on or off payroll, and save it.
+   *
+   * The dropdown used to be bound with [(ngModel)] and nothing else: it
+   * changed the row in memory, saved nothing, and was back to its old value on
+   * the next refresh. Worse, generation ignored the setting entirely, so even
+   * a value that had stuck would not have kept anybody off a payslip.
+   *
+   * The row is updated first so the select does not sit on the old value
+   * while the request is in flight, and put back if the request fails —
+   * a control that silently disagrees with the server is what this is
+   * replacing.
+   */
+  setAllowPayroll(emp: EmployeeSalaryRow, value: string) {
+    const previous = emp.allowPayrollGenerate;
+    if (previous === value) return;
+    emp.allowPayrollGenerate = value;
+
+    this.payrollService.setAllowPayrollGenerate(emp.id, value === 'Yes').subscribe({
+      next: () => {
+        this.toast.success(
+          value === 'Yes'
+            ? `${emp.firstName} will be included in payroll`
+            : `${emp.firstName} will be left out of payroll`,
+        );
+      },
+      error: () => {
+        emp.allowPayrollGenerate = previous;
+        this.toast.error('Could not save that — the setting is unchanged');
+      },
     });
+  }
+
+  // Salary Structure Tab
+  loadSalaryStructuresTable() {
+    this.isLoadingSalaryTable.set(true);
+    this.payrollService.getAllSalaryStructures().subscribe({
+      next: (res) => {
+        this.isLoadingSalaryTable.set(false);
+        this.salaryTableData.set(res);
+        // The row the drawer opens on has to be the row the eye lands on.
+        // Picking res[0] took the API's own order, which is alphabetical and
+        // includes people who have left — so the table showed the longest-
+        // serving employee at the top while the drawer was configuring a
+        // suspended Aaditya Sondhi.
+        const first = this.filteredSalaryRows()[0];
+        if (first && !this.selectedEmployeeId()) {
+          this.selectEmployeeForStructure(first.id, false);
+        }
+      },
+      error: () => {
+        this.isLoadingSalaryTable.set(false);
+        // Fallback from employees() if API call fails
+        const emps = this.employees();
+        if (emps && emps.length > 0) {
+          const mapped: EmployeeSalaryRow[] = emps.map(e => ({
+            id: e.id,
+            firstName: e.firstName,
+            lastName: e.lastName,
+            avatarUrl: e.avatarUrl,
+            employeeCode: e.employeeCode,
+            department: e.department,
+            designation: e.designation,
+            user: e.user,
+            salaryCycle: 'Monthly',
+            salaryGroup: e.designation?.name?.toLowerCase().includes('consultant')
+              ? 'Technical Consultant'
+              : (e.designation?.name?.toLowerCase().includes('trainee') ? 'Trainee Stipend' : (e.department?.name || 'Employee Salary Group')),
+            allowPayrollGenerate: e.user?.status !== 'SUSPENDED' ? 'Yes' : 'No',
+            grossEarnings: 0,
+            totalDeductions: 0,
+            netSalary: 0,
+            hasStructure: false
+          }));
+          this.salaryTableData.set(mapped);
+          if (mapped.length > 0 && !this.selectedEmployeeId()) {
+            this.selectEmployeeForStructure(mapped[0].id, false);
+          }
+        }
+      }
+    });
+  }
+
+  selectEmployeeForStructure(empId: number, openDrawer = false) {
+    this.selectedEmployeeId.set(empId);
+    const empRow = this.salaryTableData().find(e => e.id === empId);
+    if (empRow) {
+      this.selectedSalaryEmployee.set(empRow);
+    }
+    if (openDrawer) {
+      this.isSalaryDrawerOpen.set(true);
+    }
+
+    this.payrollService.getSalaryStructure(empId).subscribe({
+      next: (res) => {
+        const allComp = this.components();
+        const mapped: SalaryStructureItem[] = allComp.map(c => {
+          const found = res.find(r => r.componentId === c.id);
+          return {
+            componentId: c.id,
+            component: c,
+            amount: found ? found.amount : 0
+          };
+        });
+        this.currentStructure.set(mapped);
+      },
+      error: () => {
+        if (empRow?.salaryStructures && empRow.salaryStructures.length > 0) {
+          const allComp = this.components();
+          const mapped: SalaryStructureItem[] = allComp.map(c => {
+            const found = empRow.salaryStructures?.find(r => r.componentId === c.id);
+            return {
+              componentId: c.id,
+              component: c,
+              amount: found ? found.amount : 0
+            };
+          });
+          this.currentStructure.set(mapped);
+        }
+      }
+    });
+  }
+
+  openSalaryDrawer(emp: EmployeeSalaryRow) {
+    this.selectEmployeeForStructure(emp.id, true);
+  }
+
+  closeSalaryDrawer() {
+    this.isSalaryDrawerOpen.set(false);
   }
 
   saveSalaryStructure() {
     const empId = this.selectedEmployeeId();
     if (!empId) return;
 
+    this.isSavingStructure.set(true);
     const payload = this.currentStructure().map(s => ({
       componentId: s.componentId,
-      amount: s.amount
+      amount: Number(s.amount) || 0
     }));
 
     this.payrollService.updateSalaryStructure(empId, payload).subscribe({
-      next: () => this.toast.success('Salary structure saved successfully'),
-      error: (err) => this.toast.error(err.error?.message || 'Failed to save salary structure')
+      next: () => {
+        this.isSavingStructure.set(false);
+        this.toast.success('Salary structure saved successfully');
+
+        // Recalculate amounts
+        const gross = this.calculateTotalEarnings(this.currentStructure());
+        const ded = this.calculateTotalDeductions(this.currentStructure());
+        const net = Math.max(0, gross - ded);
+
+        // Update local salaryTableData row
+        this.salaryTableData.update(list => list.map(e => {
+          if (e.id === empId) {
+            return {
+              ...e,
+              grossEarnings: gross,
+              totalDeductions: ded,
+              netSalary: net,
+              hasStructure: gross > 0
+            };
+          }
+          return e;
+        }));
+
+        this.closeSalaryDrawer();
+      },
+      error: (err) => {
+        this.isSavingStructure.set(false);
+        this.toast.error(err.error?.message || 'Failed to save salary structure');
+      }
     });
   }
 

@@ -18,6 +18,54 @@ export interface SalaryStructureItem {
   amount: number;
 }
 
+export interface EmployeeSalaryRow {
+  id: number;
+  firstName: string;
+  lastName: string;
+  avatarUrl?: string;
+  employeeCode?: string;
+  department?: { id?: number; name: string };
+  designation?: { id?: number; name: string };
+  user?: { email: string; role: string; status?: string };
+  /** Drives the default order: longest-serving first. May be absent on older records. */
+  joiningDate?: string | Date | null;
+  salaryCycle: string;
+  salaryGroup: string;
+  allowPayrollGenerate: string;
+  grossEarnings: number;
+  totalDeductions: number;
+  netSalary: number;
+  hasStructure: boolean;
+  salaryStructures?: SalaryStructureItem[];
+}
+
+export interface PayrollPreviewRow {
+  employeeId: number;
+  name: string;
+  workingDays: number;
+  presentDays: number;
+  absences: number;
+  gross: number;
+  deductions: number;
+  lossOfPay: number;
+  net: number;
+  noAttendance: boolean;
+}
+
+export interface PayrollPreview {
+  month: number;
+  year: number;
+  employees: number;
+  totalGross: number;
+  totalLossOfPay: number;
+  totalNet: number;
+  /** 0–1. Anything material here means the attendance record, not the people. */
+  lossOfPayShare: number;
+  severelyAffected: number;
+  noAttendance: number;
+  rows: PayrollPreviewRow[];
+}
+
 export interface PayslipItem {
   id: number;
   componentName: string;
@@ -32,8 +80,10 @@ export interface Payslip {
     id: number;
     firstName: string;
     lastName: string;
+    avatarUrl?: string;
     department?: { name: string };
     designation?: { name: string };
+    user?: { email?: string; role?: string; status?: string };
   };
   month: number;
   year: number;
@@ -104,6 +154,15 @@ export class PayrollService {
   }
 
   // Salary Structure
+  getAllSalaryStructures(): Observable<EmployeeSalaryRow[]> {
+    return this.http.get<EmployeeSalaryRow[]>(`${this.apiUrl}/structures`);
+  }
+
+  /** Take an employee off payroll, or put them back on. */
+  setAllowPayrollGenerate(employeeId: number, allow: boolean): Observable<any> {
+    return this.http.put(`${this.apiUrl}/structure/${employeeId}/allow-payroll`, { allow });
+  }
+
   getSalaryStructure(employeeId: number): Observable<SalaryStructureItem[]> {
     return this.http.get<SalaryStructureItem[]>(`${this.apiUrl}/structure/${employeeId}`);
   }
@@ -113,8 +172,14 @@ export class PayrollService {
   }
 
   // Payslips
-  generatePayslips(month: number, year: number): Observable<Payslip[]> {
-    return this.http.post<Payslip[]>(`${this.apiUrl}/payslips/generate`, { month, year });
+  generatePayslips(month: number, year: number, skipLossOfPay = false): Observable<Payslip[]> {
+    return this.http.post<Payslip[]>(`${this.apiUrl}/payslips/generate`, { month, year, skipLossOfPay });
+  }
+
+  /** What a run would pay, before it is run. Writes nothing. */
+  previewPayroll(month: number, year: number): Observable<PayrollPreview> {
+    let params = new HttpParams().set('month', String(month)).set('year', String(year));
+    return this.http.get<PayrollPreview>(`${this.apiUrl}/payslips/preview`, { params });
   }
 
   sendPayslipEmails(month: number, year: number): Observable<{ message: string; sentCount: number; failedCount: number; totalCount: number }> {
@@ -137,6 +202,21 @@ export class PayrollService {
 
   updatePayslip(id: number, data: { lossOfPay?: number; totalEarnings?: number; totalDeductions?: number; expenseAmount?: number; status?: string }): Observable<Payslip> {
     return this.http.put<Payslip>(`${this.apiUrl}/payslips/${id}`, data);
+  }
+
+  getPayslipDetail(id: number): Observable<Payslip> {
+    return this.http.get<Payslip>(`${this.apiUrl}/payslips/${id}/detail`);
+  }
+
+  /** The PDF itself, so the caller can save it rather than open a tab. */
+  downloadPayslip(id: number): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/payslips/${id}/pdf`, { responseType: 'blob' });
+  }
+
+  /** Re-send one person's payslip, without mailing everybody again. */
+  sendOnePayslipEmail(id: number): Observable<{ sent: boolean; email: string }> {
+    return this.http.post<{ sent: boolean; email: string }>(
+      `${this.apiUrl}/payslips/${id}/send-email`, {});
   }
 
   batchFinalizePayslips(month: number, year: number): Observable<any> {

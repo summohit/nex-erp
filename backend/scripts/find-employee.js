@@ -23,7 +23,7 @@ if (!q) { console.error('usage: node scripts/find-employee.js <name-or-email fra
     where: { OR: [{ firstName: like }, { lastName: like }, { user: { email: like } }] },
     select: {
       id: true, firstName: true, lastName: true,
-      user: { select: { email: true, isActive: true } },
+      user: { select: { email: true, status: true } },
     },
     take: 25,
   });
