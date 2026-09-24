@@ -180,7 +180,7 @@ export default function FieldVisitScreen() {
         const userAgreed = await new Promise((resolve) => {
           Alert.alert(
             "Background Location Required",
-            "NEX ERP collects location data to enable route tracking for your field visits and to calculate travel distance for allowances, even when the app is closed or not in use.",
+            "MIRA collects location data to enable route tracking for your field visits and to calculate travel distance for allowances, even when the app is closed or not in use.",
             [
               { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
               { text: "Accept", onPress: () => resolve(true) }

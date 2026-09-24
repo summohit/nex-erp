@@ -690,7 +690,7 @@ export class TicketsComponent implements OnInit {
   }
 
   exportToCSV() {
-    this.gridApi?.exportDataAsCsv({ fileName: 'nex-erp-tickets.csv' });
+    this.gridApi?.exportDataAsCsv({ fileName: 'mira-erp-tickets.csv' });
   }
 
   loadStats() {

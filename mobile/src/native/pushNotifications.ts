@@ -154,7 +154,7 @@ export function initPushListeners(opts: {
     unsubscribers.push(
       onMessage(app, async (remote: RemoteMessage) => {
         opts.onForegroundMessage?.(
-          remote.notification?.title ?? 'NEX ERP',
+          remote.notification?.title ?? 'MIRA',
           remote.notification?.body ?? '',
           (remote.data ?? {}) as Record<string, string>,
         );

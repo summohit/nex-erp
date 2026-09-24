@@ -230,7 +230,7 @@ export class TwoFactorComponent implements OnInit {
   downloadBackupCodes() {
     const body = [
       '========================================',
-      'NEX ERP — Two-Factor Emergency Backup Codes',
+      'MIRA — Two-Factor Emergency Backup Codes',
       '========================================',
       'IMPORTANT: Keep these codes in a safe, offline location.',
       'Each code can only be used once.',
@@ -243,7 +243,7 @@ export class TwoFactorComponent implements OnInit {
     const url = URL.createObjectURL(new Blob([body], { type: 'text/plain' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'nex-erp-backup-codes.txt';
+    link.download = 'mira-erp-backup-codes.txt';
     link.click();
     URL.revokeObjectURL(url);
   }

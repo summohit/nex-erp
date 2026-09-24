@@ -87,7 +87,7 @@ export class NotificationsService {
     });
 
     this.socket.on('connect', () => {
-      console.log('⚡ Connected to NEX ERP Real-Time Notification Socket');
+      console.log('⚡ Connected to MIRA Real-Time Notification Socket');
     });
 
     this.socket.on('notification', (newNotif: NotificationItem) => {

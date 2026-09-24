@@ -3,8 +3,8 @@
   <!-- ================= NAVBAR ================= -->
   <header class="lp-nav" [class.is-scrolled]="isScrolled()">
     <div class="lp-nav-inner">
-      <a class="lp-brand" routerLink="/" title="NEX ERP Home">
-        <img src="/logo.png" alt="NEX ERP" class="lp-logo" />
+      <a class="lp-brand" routerLink="/" title="MIRA Home">
+        <img src="/logo.png" alt="MIRA" class="lp-logo" />
       </a>
 
       <nav class="lp-nav-links">
@@ -19,7 +19,7 @@
           <span class="nav-badge-pill">APK</span>
         </button>
         <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'why'" (click)="scrollTo('why')">
-          <span>Why NEX</span>
+          <span>Why MIRA</span>
         </button>
         <button type="button" class="lp-nav-link" [class.active]="activeSection() === 'faq'" (click)="scrollTo('faq')">
           <span>FAQ</span>
@@ -50,7 +50,7 @@
         <span>Mobile App</span>
         <span class="nav-badge-pill">APK</span>
       </button>
-      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'why'" (click)="scrollTo('why')">Why NEX</button>
+      <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'why'" (click)="scrollTo('why')">Why MIRA</button>
       <button type="button" class="lp-mobile-link" [class.active]="activeSection() === 'faq'" (click)="scrollTo('faq')">FAQ</button>
       <div class="lp-mobile-actions">
         <button type="button" class="lp-btn-login full" (click)="goToLogin()">Sign In</button>
@@ -76,7 +76,7 @@
         </h1>
 
         <p class="lp-hero-sub">
-          NEX ERP brings People, Biometric Attendance, 1-Click Payroll, Recruitment ATS,
+          MIRA brings People, Biometric Attendance, 1-Click Payroll, Recruitment ATS,
           CRM Deals, and Agile Projects into a single high-velocity platform.
         </p>
 
@@ -178,11 +178,11 @@
             </div>
             <div class="lp-mock-address-bar">
               <svg lucideShieldCheck size="12" class="shield-icon"></svg>
-              <span *ngIf="heroSelectedModule() === 'crm'">app.nexerp.io/crm/leads-board</span>
-              <span *ngIf="heroSelectedModule() === 'attendance'">app.nexerp.io/attendance/live-kiosk</span>
-              <span *ngIf="heroSelectedModule() === 'payroll'">app.nexerp.io/payroll/disbursals</span>
-              <span *ngIf="heroSelectedModule() === 'recruitment'">app.nexerp.io/recruitment/candidate-pipeline</span>
-              <span *ngIf="heroSelectedModule() === 'projects'">app.nexerp.io/projects/sprints</span>
+              <span *ngIf="heroSelectedModule() === 'crm'">app.miraerp.io/crm/leads-board</span>
+              <span *ngIf="heroSelectedModule() === 'attendance'">app.miraerp.io/attendance/live-kiosk</span>
+              <span *ngIf="heroSelectedModule() === 'payroll'">app.miraerp.io/payroll/disbursals</span>
+              <span *ngIf="heroSelectedModule() === 'recruitment'">app.miraerp.io/recruitment/candidate-pipeline</span>
+              <span *ngIf="heroSelectedModule() === 'projects'">app.miraerp.io/projects/sprints</span>
             </div>
             <div class="lp-mock-user-pill">
               <span class="live-pulse-dot"></span>
@@ -910,7 +910,7 @@
             <span class="pane-badge emerald">100% Tax & Compliance</span>
             <h3>Run company-wide payroll in under 3 minutes</h3>
             <p>
-              No more exporting Excel files. NEX ERP automatically reconciles biometric attendance, leaves, unpaid days (LOP), expense claims, and statutory taxes (PF, ESI, TDS) with one-click bank batch files.
+              No more exporting Excel files. MIRA automatically reconciles biometric attendance, leaves, unpaid days (LOP), expense claims, and statutory taxes (PF, ESI, TDS) with one-click bank batch files.
             </p>
             <ul class="pane-checklist">
               <li>
@@ -1204,7 +1204,7 @@
           </div>
           <div class="lp-install-step">
             <span class="lp-step-num">3</span>
-            <p>Install, then sign in with your NEX work credentials.</p>
+            <p>Install, then sign in with your MIRA work credentials.</p>
           </div>
           <p class="lp-install-foot">
             The unknown-apps prompt is normal for apps installed directly rather than
@@ -1301,12 +1301,12 @@
     </div>
   </section>
 
-  <!-- ================= WHY NEX ERP ================= -->
+  <!-- ================= WHY MIRA ================= -->
   <section class="lp-section lp-why-section" id="why">
     <div class="lp-section-head">
       <span class="lp-section-tag">Architecture</span>
       <h2>Built to eliminate the software patchwork</h2>
-      <p>Most companies run on 5 different tools that do not talk to each other. NEX ERP was built ground-up to be unified.</p>
+      <p>Most companies run on 5 different tools that do not talk to each other. MIRA was built ground-up to be unified.</p>
     </div>
 
     <div class="lp-why-grid">
@@ -1351,7 +1351,7 @@
     <div class="lp-section-head">
       <span class="lp-section-tag">Knowledge Base</span>
       <h2>Frequently Asked Questions</h2>
-      <p>Everything you need to know about setting up, migrating, and scaling with NEX ERP.</p>
+      <p>Everything you need to know about setting up, migrating, and scaling with MIRA.</p>
     </div>
 
     <div class="lp-faq-accordion">
@@ -1378,16 +1378,16 @@
 
   <!-- ================= FINAL HIGH-CONVERSION CTA ================= -->
   <section class="lp-cta">
-    <div class="lp-cta-glow glow-left"></div>
-    <div class="lp-cta-glow glow-right"></div>
+    <div class="lp-cta-aurora lp-cta-aurora-a"></div>
+    <div class="lp-cta-aurora lp-cta-aurora-b"></div>
     <div class="lp-cta-grid-pattern"></div>
     <div class="lp-cta-inner">
       <div class="lp-cta-badge">
-        <svg lucideSparkles size="13"></svg>
+        <span class="lp-cta-badge-dot"></span>
         <span>Instant Enterprise Setup</span>
       </div>
       <h2>Ready to unify your entire company?</h2>
-      <p>Join hundreds of forward-thinking teams streamlining their operations with NEX ERP today.</p>
+      <p>Join hundreds of forward-thinking teams streamlining their operations with MIRA today.</p>
       <div class="lp-cta-buttons">
         <button type="button" class="lp-btn-cta-primary" *ngIf="showSignup" (click)="goToSignup()">
           <span>Start Your Free Account</span>
@@ -1398,9 +1398,198 @@
         </button>
       </div>
       <div class="lp-cta-footer-note">
-        <span>✓ Instant Workspace Setup</span>
-        <span>✓ No credit card required</span>
-        <span>✓ Cancel anytime</span>
+        <span class="lp-cta-note">
+          <svg lucideCheck size="15"></svg>
+          Instant workspace setup
+        </span>
+        <span class="lp-cta-note">
+          <svg lucideCheck size="15"></svg>
+          No credit card required
+        </span>
+        <span class="lp-cta-note">
+          <svg lucideCheck size="15"></svg>
+          Cancel anytime
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= WHAT MIRA DOES ================= -->
+  <section class="lp-section lp-what-section">
+    <div class="lp-section-head">
+      <span class="lp-section-tag">What is MIRA</span>
+      <h2>What does your company actually run on?</h2>
+      <p>
+        One login. One shared database. MIRA replaces five disconnected tools and endless spreadsheet copying with a single operating system where real-time data — from a new hire to a payroll run, from a deal to a delivered project — flows automatically.
+      </p>
+    </div>
+
+    <div class="lp-what-flow">
+      <div class="lp-what-line" aria-hidden="true"></div>
+      <div class="lp-what-step">
+        <span class="lp-what-node what-node-blue">
+          <svg lucideUserPlus size="21"></svg>
+        </span>
+        <span class="lp-what-step-num">01</span>
+        <h3>Hire &amp; Manage People</h3>
+        <p>Branded careers page, visual candidate pipeline, digital onboarding and a live org chart for the whole team.</p>
+      </div>
+      <div class="lp-what-step">
+        <span class="lp-what-node what-node-violet">
+          <svg lucideCalendarClock size="21"></svg>
+        </span>
+        <span class="lp-what-step-num">02</span>
+        <h3>Track Attendance &amp; Time</h3>
+        <p>Geofenced web punches, kiosk selfie check-ins, shift rosters and fully automated leave approvals.</p>
+      </div>
+      <div class="lp-what-step">
+        <span class="lp-what-node what-node-green">
+          <svg lucideBanknote size="21"></svg>
+        </span>
+        <span class="lp-what-step-num">03</span>
+        <h3>Pay with One Click</h3>
+        <p>Attendance feeds payroll, LOP and taxes are auto-calculated, and bulk bank transfers finalize instantly.</p>
+      </div>
+      <div class="lp-what-step">
+        <span class="lp-what-node what-node-teal">
+          <svg lucideTrendingUp size="21"></svg>
+        </span>
+        <span class="lp-what-step-num">04</span>
+        <h3>Sell, Ship &amp; Scale</h3>
+        <p>CRM deals become projects, invoices and timesheets — with live dashboards and pipeline analytics.</p>
+      </div>
+    </div>
+
+    <div class="lp-what-band">
+      <div class="lp-what-band-item">
+        <span class="lp-what-band-ico">
+          <svg lucideCheckCircle2 size="18"></svg>
+        </span>
+        <div>
+          <strong>One shared database</strong>
+          <p>Every module reads the same live data, so nothing is ever out of sync.</p>
+        </div>
+      </div>
+      <div class="lp-what-band-item">
+        <span class="lp-what-band-ico">
+          <svg lucideZap size="18"></svg>
+        </span>
+        <div>
+          <strong>Real-time sync</strong>
+          <p>Hire today, payroll-ready tomorrow. No exports, no batches, no duplicates.</p>
+        </div>
+      </div>
+      <div class="lp-what-band-item">
+        <span class="lp-what-band-ico">
+          <svg lucideShieldCheck size="18"></svg>
+        </span>
+        <div>
+          <strong>Security built in</strong>
+          <p>256-bit SSL, granular role permissions and audit logs on every action.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PREMIUM PRODUCT SHOWCASE — ORBIT RING ================= -->
+  <section class="lp-section lp-show-section" id="showcase">
+    <div class="lp-show-grid">
+      <div class="lp-show-copy">
+        <span class="lp-show-eyebrow">
+          <svg lucideZap size="13"></svg>
+          ONE CONNECTED WORKSPACE
+        </span>
+        <h2>Everything your company needs, connected in one place.</h2>
+        <p class="lp-show-sub">
+          MIRA connects people, customers, projects, finance, and operations in one platform — a single shared database that keeps every team working from the same live data, without duplicate entry or disconnected tools.
+        </p>
+        <div class="lp-show-cta">
+          <button type="button" class="lp-show-btn-primary" *ngIf="showSignup" (click)="goToSignup()">
+            <span>Explore MIRA</span>
+            <svg lucideArrowRight size="17"></svg>
+          </button>
+          <button type="button" class="lp-show-btn-secondary" (click)="scrollTo('modules')">
+            <span>View Modules</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="lp-show-visual" aria-hidden="true">
+        <div class="lp-show-glow"></div>
+        <div class="lp-ring">
+          <div class="lp-ring-track lp-ring-track-outer"></div>
+          <div class="lp-ring-track lp-ring-track-path"></div>
+          <div class="lp-ring-core">
+            <img src="/mira-small-logo.png" alt="MIRA" class="lp-ring-core-img" />
+            <span class="lp-ring-core-text">12+ modules<br />one platform</span>
+          </div>
+          <div class="lp-ring-orbit">
+            <div class="lp-ring-item" style="--dx: 0px; --dy: -190px; --s: 0.96; z-index: 1">
+              <div class="lp-ring-item-spin">
+                <div class="lp-mod-chip" style="animation-delay: 0.4s">
+                  <span class="lp-mod-ico ico-blue"><svg lucideTrendingUp size="16"></svg></span>
+                  <span class="lp-mod-lbl">CRM &amp; Sales</span>
+                </div>
+              </div>
+            </div>
+            <div class="lp-ring-item" style="--dx: 134px; --dy: -134px; --s: 0.97; z-index: 2">
+              <div class="lp-ring-item-spin">
+                <div class="lp-mod-chip" style="animation-delay: 1.2s">
+                  <span class="lp-mod-ico ico-violet"><svg lucideUsers size="16"></svg></span>
+                  <span class="lp-mod-lbl">People &amp; HR</span>
+                </div>
+              </div>
+            </div>
+            <div class="lp-ring-item" style="--dx: 190px; --dy: 0px; --s: 1; z-index: 4">
+              <div class="lp-ring-item-spin">
+                <div class="lp-mod-chip" style="animation-delay: 2.1s">
+                  <span class="lp-mod-ico ico-indigo"><svg lucideFolderKanban size="16"></svg></span>
+                  <span class="lp-mod-lbl">Projects &amp; Tasks</span>
+                </div>
+              </div>
+            </div>
+            <div class="lp-ring-item" style="--dx: 134px; --dy: 134px; --s: 1.03; z-index: 6">
+              <div class="lp-ring-item-spin">
+                <div class="lp-mod-chip" style="animation-delay: 0.9s">
+                  <span class="lp-mod-ico ico-teal"><svg lucideCalendarClock size="16"></svg></span>
+                  <span class="lp-mod-lbl">Attendance</span>
+                </div>
+              </div>
+            </div>
+            <div class="lp-ring-item" style="--dx: 0px; --dy: 190px; --s: 1.05; z-index: 7">
+              <div class="lp-ring-item-spin">
+                <div class="lp-mod-chip" style="animation-delay: 1.7s">
+                  <span class="lp-mod-ico ico-green"><svg lucideBanknote size="16"></svg></span>
+                  <span class="lp-mod-lbl">Payroll &amp; Finance</span>
+                </div>
+              </div>
+            </div>
+            <div class="lp-ring-item" style="--dx: -134px; --dy: 134px; --s: 1.03; z-index: 6">
+              <div class="lp-ring-item-spin">
+                <div class="lp-mod-chip" style="animation-delay: 2.6s">
+                  <span class="lp-mod-ico ico-sky"><svg lucideBriefcase size="16"></svg></span>
+                  <span class="lp-mod-lbl">Recruitment</span>
+                </div>
+              </div>
+            </div>
+            <div class="lp-ring-item" style="--dx: -190px; --dy: 0px; --s: 1; z-index: 4">
+              <div class="lp-ring-item-spin">
+                <div class="lp-mod-chip" style="animation-delay: 3.1s">
+                  <span class="lp-mod-ico ico-cyan"><svg lucideLaptop size="16"></svg></span>
+                  <span class="lp-mod-lbl">Assets &amp; IT</span>
+                </div>
+              </div>
+            </div>
+            <div class="lp-ring-item" style="--dx: -134px; --dy: -134px; --s: 0.97; z-index: 2">
+              <div class="lp-ring-item-spin">
+                <div class="lp-mod-chip" style="animation-delay: 0.6s">
+                  <span class="lp-mod-ico ico-indigo-dark"><svg lucideBarChart3 size="16"></svg></span>
+                  <span class="lp-mod-lbl">Analytics / Dashboard</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -1409,7 +1598,7 @@
   <footer class="lp-footer">
     <div class="lp-footer-inner">
       <div class="lp-footer-brand">
-        <img src="/logo.png" alt="NEX ERP" class="lp-logo" />
+        <img src="/logo.png" alt="MIRA" class="lp-logo" />
         <p>The all-in-one business operating system for high-performance companies.</p>
         <div class="system-status-pill">
           <span class="status-dot-pulse"></span>
@@ -1429,7 +1618,7 @@
       <div class="lp-footer-col">
         <h4>Platform</h4>
         <button type="button" *ngIf="showMobileApp" (click)="scrollTo('mobile')">Android App (APK)</button>
-        <button type="button" (click)="scrollTo('why')">Why NEX ERP</button>
+        <button type="button" (click)="scrollTo('why')">Why MIRA</button>
         <button type="button" (click)="scrollTo('faq')">FAQ</button>
         <button type="button" (click)="scrollTo('modules')">All Modules</button>
       </div>
@@ -1443,7 +1632,7 @@
     </div>
 
     <div class="lp-footer-bottom">
-      <span>&copy; {{ currentYear }} NEX ERP &amp; CES Technologies. All rights reserved.</span>
+      <span>&copy; {{ currentYear }} MIRA &amp; CES Technologies. All rights reserved.</span>
       <div class="legal-links">
         <a routerLink="/privacy-policy">Privacy Policy</a>
         <a routerLink="/terms-of-service">Terms of Service</a>

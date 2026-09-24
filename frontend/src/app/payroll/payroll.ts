@@ -1657,7 +1657,7 @@ export class PayrollComponent implements OnInit {
   }
 
   /**
-   * Derived, not stored: NEX has no slip-number column, and inventing one that
+   * Derived, not stored: MIRA has no slip-number column, and inventing one that
    * looked like the payslip app's would imply the two were the same sequence.
    */
   slipNumber(p: Payslip | null): string {

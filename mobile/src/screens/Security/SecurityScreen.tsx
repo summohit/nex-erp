@@ -159,7 +159,7 @@ export default function SecurityScreen() {
 
   const groupedSecret = (enrolment?.secret.match(/.{1,4}/g) || []).join(' ');
   const shareCodes = () =>
-    Share.share({ message: `NEX ERP backup codes\nEach code works once.\n\n${backupCodes.join('\n')}` });
+    Share.share({ message: `MIRA backup codes\nEach code works once.\n\n${backupCodes.join('\n')}` });
 
   const openAuthenticator = async () => {
     if (!enrolment) return;

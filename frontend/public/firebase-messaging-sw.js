@@ -36,14 +36,14 @@ if (config.projectId && config.messagingSenderId) {
   const messaging = firebase.messaging();
 
   messaging.onBackgroundMessage((payload) => {
-    const title = payload.notification?.title || 'NEX ERP';
+    const title = payload.notification?.title || 'MIRA';
     self.registration.showNotification(title, {
       body: payload.notification?.body || '',
       icon: '/icon.png',
       badge: '/icon.png',
       // Collapse repeats of the same thing. Three shift reminders in ten
       // minutes should replace each other in the tray, not stack up.
-      tag: payload.data?.type || 'nex-erp',
+      tag: payload.data?.type || 'mira-erp',
       renotify: true,
       data: { linkUrl: payload.data?.linkUrl || '/' },
     });

@@ -420,7 +420,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   // Testimonials
   testimonials: Testimonial[] = [
     {
-      quote: 'Switching to NEX ERP eliminated 4 separate SaaS subscriptions and saved our HR team 18 hours per pay cycle. The attendance-to-payroll automation is flawless.',
+      quote: 'Switching to MIRA eliminated 4 separate SaaS subscriptions and saved our HR team 18 hours per pay cycle. The attendance-to-payroll automation is flawless.',
       name: 'Rohan Deshmukh',
       role: 'Head of People Operations',
       company: 'Apex Logistics & Freight (450+ Staff)',
@@ -451,7 +451,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   // FAQs
   faqs: FaqItem[] = [
     {
-      question: 'How fast can our company migrate to NEX ERP?',
+      question: 'How fast can our company migrate to MIRA?',
       answer: 'Most organizations are fully operational in under 48 hours. We provide bulk CSV import tools for employees, historical attendance, active CRM leads, and past payroll structures, plus guided onboarding.',
       category: 'Onboarding'
     },
@@ -462,7 +462,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     },
     {
       question: 'Can we configure custom role-based permissions for different staff?',
-      answer: 'Yes! NEX ERP features a granular role matrix. You can set permissions by role (Admin, HR Manager, Sales Rep, Team Lead, Employee) or per-module (View Only, Edit, Create, Delete, View All vs View Own).',
+      answer: 'Yes! MIRA features a granular role matrix. You can set permissions by role (Admin, HR Manager, Sales Rep, Team Lead, Employee) or per-module (View Only, Edit, Create, Delete, View All vs View Own).',
       category: 'Security & Access'
     },
     {
@@ -471,8 +471,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       category: 'Security'
     },
     {
-      question: 'Does NEX ERP support multiple branches or project codes?',
-      answer: 'Yes, NEX ERP supports multi-branch setups, multi-department rosters, and standardized sequential project issue codes (e.g. CES/0826/01) for precise cross-department tracking.',
+      question: 'Does MIRA support multiple branches or project codes?',
+      answer: 'Yes, MIRA supports multi-branch setups, multi-department rosters, and standardized sequential project issue codes (e.g. CES/0826/01) for precise cross-department tracking.',
       category: 'Architecture'
     }
   ];

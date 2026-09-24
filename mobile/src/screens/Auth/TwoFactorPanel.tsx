@@ -138,7 +138,7 @@ export default function TwoFactorPanel({
   // path. Share.share puts the value on the system sheet, which includes Copy.
   const shareSecret = () => enrolment && Share.share({ message: enrolment.secret });
   const shareCodes = () =>
-    Share.share({ message: `NEX ERP backup codes\nEach code works once.\n\n${backupCodes.join('\n')}` });
+    Share.share({ message: `MIRA backup codes\nEach code works once.\n\n${backupCodes.join('\n')}` });
 
   // ── Backup codes, shown exactly once after enrolment ───────────────────────
   if (step === 'codes') {
@@ -182,7 +182,7 @@ export default function TwoFactorPanel({
       <Text style={styles.subtitle}>
         {step === 'enrol'
           ? 'Your company requires an authenticator app. Scan this with Google Authenticator, Authy or 1Password.'
-          : 'Open your authenticator app and enter the 6-digit code for NEX ERP.'}
+          : 'Open your authenticator app and enter the 6-digit code for MIRA.'}
       </Text>
 
       {step === 'enrol' && (

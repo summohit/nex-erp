@@ -185,15 +185,15 @@
 }
 
 .btn-clock-action.btn-clock-out {
-  background: linear-gradient(135deg, #1373e5 0%, #1373e5 100%);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(19, 115, 229, 0.3);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
 }
 
 .btn-clock-action.btn-clock-out:hover {
-  background: linear-gradient(135deg, #1373e5 0%, #0f4f9c 100%);
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.4);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 }
 
 .btn-clock-action:active {

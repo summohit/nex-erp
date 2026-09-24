@@ -532,7 +532,7 @@ export class SecurityComponent implements OnInit {
 
   downloadCodes() {
     const body = [
-      'NEX ERP — two-factor backup codes',
+      'MIRA — two-factor backup codes',
       'Each code works once. Keep them somewhere safe and private.',
       '',
       ...this.backupCodes(),
@@ -541,7 +541,7 @@ export class SecurityComponent implements OnInit {
     const url = URL.createObjectURL(new Blob([body], { type: 'text/plain' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'nex-erp-backup-codes.txt';
+    link.download = 'mira-erp-backup-codes.txt';
     link.click();
     URL.revokeObjectURL(url);
   }
