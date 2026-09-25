@@ -1,86 +1,190 @@
 <div class="mfv-page">
+  <!-- Header Card -->
   <div class="page-header-card">
-    <div class="header-title-row">
-      <svg lucideMapPin [size]="22"></svg>
+    <div class="header-left">
+      <div class="header-icon-box">
+        <svg lucideRoute [size]="22"></svg>
+      </div>
       <div>
-        <h1>My Field Visit</h1>
+        <div class="title-with-pill">
+          <h1>My Field Visit</h1>
+          <span class="date-chip">
+            <svg lucideCalendar [size]="13"></svg>
+            {{ today | date:'EEEE, d MMM y' }}
+          </span>
+        </div>
         <p>Clock in and out from the site. You must be within the approved radius.</p>
       </div>
     </div>
-    <button class="ghost-btn" type="button" (click)="load()" [disabled]="isLoading()">
-      <svg lucideRefreshCw [size]="15"></svg>
-      Refresh
-    </button>
+
+    <div class="header-actions">
+      <!-- GPS Status Pill -->
+      <div class="gps-status-pill" [class]="'gps-' + gpsStatus().state">
+        <span class="gps-dot"></span>
+        <span class="gps-text">{{ gpsStatus().label }}</span>
+      </div>
+
+      <button class="ghost-btn refresh-btn" type="button" (click)="load()" [disabled]="isLoading()" title="Refresh status">
+        <svg lucideRefreshCw [size]="14" [class.spin-anim]="isLoading()"></svg>
+        <span>Refresh</span>
+      </button>
+    </div>
   </div>
 
   @if (isLoading()) {
-    <div class="card muted-card">Loading today's field visit…</div>
+    <div class="card loading-card">
+      <svg lucideRefreshCw [size]="20" class="spin-anim"></svg>
+      <span>Loading today's field visit schedule…</span>
+    </div>
   } @else if (!day()) {
-    <div class="card empty-card">
-      <svg lucideCalendarDays [size]="28"></svg>
-      <h2>Nothing scheduled today</h2>
-      <p>You are not on an approved field visit today. Your project manager raises one, and it appears here once it is approved.</p>
+    <!-- Empty State: No visit today -->
+    <div class="card empty-state-card">
+      <div class="empty-icon-glow-ring">
+        <div class="empty-icon-box">
+          <svg lucideCompass [size]="34"></svg>
+        </div>
+      </div>
+      <h2>No Field Visit Scheduled for Today</h2>
+      <p class="empty-desc">
+        You are not scheduled on an approved field trip today. When your project manager raises a request
+        and it gets approved by an administrator, your site location, tasks, and clock-in actions will appear here.
+      </p>
+
+      <div class="empty-actions">
+        <a [routerLink]="['/field-visits/requests']" class="primary-btn view-requests-btn">
+          <svg lucideRoute [size]="16"></svg>
+          <span>View Field Visit Requests</span>
+        </a>
+      </div>
+
+      <!-- Informational Feature Cards -->
+      <div class="empty-info-grid">
+        <div class="info-feature-card">
+          <div class="feature-icon ic-emerald">
+            <svg lucideTarget [size]="18"></svg>
+          </div>
+          <div class="feature-content">
+            <h4>GPS Geofencing</h4>
+            <p>Clock-in is verified against the site's approved radius coordinates automatically.</p>
+          </div>
+        </div>
+
+        <div class="info-feature-card">
+          <div class="feature-icon ic-purple">
+            <svg lucideSparkles [size]="18"></svg>
+          </div>
+          <div class="feature-content">
+            <h4>Site Tasks</h4>
+            <p>Assigned tasks and deliverables unlock for tracking when you arrive within site range.</p>
+          </div>
+        </div>
+
+        <div class="info-feature-card">
+          <div class="feature-icon ic-blue">
+            <svg lucideClock [size]="18"></svg>
+          </div>
+          <div class="feature-content">
+            <h4>Daily Attendance</h4>
+            <p>Your on-site hours and distance metrics are logged directly into company attendance.</p>
+          </div>
+        </div>
+      </div>
     </div>
   } @else {
+    <!-- Active Field Visit Card -->
     <div class="card site-card">
       <div class="site-head">
-        <div>
-          <span class="request-number">{{ day()!.request.requestNumber }}</span>
-          <h2>{{ day()!.request.location }}</h2>
-          <p class="project-line">
-            {{ day()!.request.project?.name }}
-            · {{ day()!.request.startTime }}–{{ day()!.request.endTime }}
+        <div class="site-title-col">
+          <div class="site-meta-tags">
+            <span class="request-number-pill">
+              <svg lucideRoute [size]="12"></svg>
+              {{ day()!.request.requestNumber }}
+            </span>
+            <span class="project-tag">
+              <span class="project-dot"></span>
+              {{ day()!.request.project?.name }}
+            </span>
+            @if (day()!.isHoliday) {
+              <span class="holiday-pill">Field Visit – Holiday</span>
+            }
+          </div>
+          <h2 class="site-name">
+            <svg lucideMapPin [size]="20" class="site-pin-icon"></svg>
+            {{ day()!.request.location }}
+          </h2>
+          <p class="hours-line">
+            <svg lucideClock [size]="13"></svg>
+            Approved hours: <strong>{{ day()!.request.startTime }} – {{ day()!.request.endTime }}</strong>
           </p>
         </div>
-        @if (day()!.isHoliday) {
-          <span class="holiday-pill">Field Visit – Holiday</span>
-        }
       </div>
 
-      <!-- Where you are, against the radius the request was approved with. -->
+      <!-- Geofence status readout -->
       <div class="fence" [class.inside]="withinSite()" [class.outside]="distanceM() != null && !withinSite()">
-        @if (locationError()) {
-          <svg lucideAlertTriangle [size]="16"></svg>
-          <span>{{ locationError() }}</span>
-        } @else if (distanceM() == null) {
-          <svg lucideNavigation [size]="16"></svg>
-          <span>Finding your location…</span>
-        } @else if (withinSite()) {
-          <svg lucideCheckCircle [size]="16"></svg>
-          <span>You are {{ spokenDistance() }} from the site — inside the {{ radiusM() }} m radius.</span>
-        } @else {
-          <svg lucideAlertTriangle [size]="16"></svg>
-          <span>
-            You are outside the approved Field Visit location. Move within {{ radiusM() }} m of the site
-            to clock in or out — you are {{ spokenDistance() }} away.
-          </span>
-        }
-        <button class="link-btn" type="button" (click)="refreshLocation()">Recheck</button>
-      </div>
+        <div class="radar-dot-wrap">
+          <div class="radar-ring"></div>
+          <div class="radar-core"></div>
+        </div>
 
-      @if (fix()?.accuracyM) {
-        <p class="accuracy-note">Location accurate to about {{ fix()!.accuracyM | number:'1.0-0' }} m.</p>
-      }
+        <div class="fence-text-content">
+          @if (locationError()) {
+            <span class="fence-msg">{{ locationError() }}</span>
+          } @else if (distanceM() == null) {
+            <span class="fence-msg">Finding your precise GPS location…</span>
+          } @else if (withinSite()) {
+            <span class="fence-msg">
+              <strong>Within site bounds:</strong> You are {{ spokenDistance() }} from the site pin — inside the {{ radiusM() }} m geofence.
+            </span>
+          } @else {
+            <span class="fence-msg">
+              <strong>Outside geofence:</strong> You are {{ spokenDistance() }} away. Move within {{ radiusM() }} m of the site pin to clock in or out.
+            </span>
+          }
+          @if (fix()?.accuracyM) {
+            <span class="accuracy-badge">Accuracy: ±{{ fix()!.accuracyM | number:'1.0-0' }} m</span>
+          }
+        </div>
+
+        <button class="recheck-btn" type="button" (click)="refreshLocation()">
+          <svg lucideRefreshCw [size]="13"></svg>
+          Recheck GPS
+        </button>
+      </div>
     </div>
 
-    <!-- §5: the task is picked before clocking in, and stays with the day. -->
+    <!-- Tasks Selection Card (§5) -->
     @if (day()!.tasks.length) {
       <div class="card tasks-card">
-        <h3>What are you here to do?</h3>
+        <div class="card-head-row">
+          <h3>
+            <svg lucideSparkles [size]="16"></svg>
+            What are you working on today?
+          </h3>
+          <span class="task-count-pill">{{ day()!.tasks.length }} task{{ day()!.tasks.length === 1 ? '' : 's' }}</span>
+        </div>
+
         @if (day()!.clockInTime) {
-          <p class="locked-task">
-            Clocked in against <strong>{{ day()!.issue?.title || 'a task' }}</strong>.
-          </p>
+          <div class="locked-task-banner">
+            <svg lucideCheckCircle2 [size]="16" class="locked-icon"></svg>
+            <span>
+              Clocked in against: <strong>{{ day()!.issue?.title || 'Assigned site task' }}</strong>
+            </span>
+          </div>
         } @else {
           <div class="task-list">
             @for (task of day()!.tasks; track task.id) {
               <button
                 type="button"
-                class="task-option"
+                class="task-option-card"
                 [class.selected]="selectedTaskId() === task.id"
                 (click)="selectTask(task.id)">
-                <span class="task-key">{{ task.key }}</span>
-                <span class="task-title">{{ task.title }}</span>
+                <div class="task-select-radio">
+                  <div class="radio-inner" *ngIf="selectedTaskId() === task.id"></div>
+                </div>
+                <div class="task-opt-info">
+                  <span class="task-key-tag">{{ task.key }}</span>
+                  <span class="task-title-text">{{ task.title }}</span>
+                </div>
               </button>
             }
           </div>
@@ -88,50 +192,99 @@
       </div>
     }
 
+    <!-- Clock In/Out Actions Card -->
     <div class="card clock-card">
-      <div class="times">
-        <div class="time-block">
-          <span class="time-label">Clock in</span>
-          <span class="time-value">{{ day()!.clockInTime ? (day()!.clockInTime | date:'shortTime') : '—' }}</span>
+      <div class="card-head-row">
+        <h3>
+          <svg lucideClock [size]="16"></svg>
+          Attendance Punch
+        </h3>
+        <span class="clock-status-pill" [class.clocked-in]="day()!.clockInTime && !day()!.clockOutTime" [class.completed]="day()!.clockOutTime">
+          {{ day()!.clockOutTime ? 'Completed' : (day()!.clockInTime ? 'Active On-Site' : 'Not Clocked In') }}
+        </span>
+      </div>
+
+      <div class="times-grid">
+        <div class="time-metric-box">
+          <div class="metric-top">
+            <span class="metric-label">Clock in</span>
+            <span class="metric-icon-dot in-dot"></span>
+          </div>
+          <div class="metric-value">{{ day()!.clockInTime ? (day()!.clockInTime | date:'h:mm a') : '—' }}</div>
           @if (day()!.clockInDistanceKm != null) {
-            <span class="time-note">{{ (day()!.clockInDistanceKm! * 1000) | number:'1.0-0' }} m from site</span>
+            <span class="metric-distance inside-dist">
+              <svg lucideCheckCircle [size]="11"></svg>
+              {{ (day()!.clockInDistanceKm! * 1000) | number:'1.0-0' }} m from site
+            </span>
+          } @else {
+            <span class="metric-distance muted">Pending clock-in</span>
           }
         </div>
-        <div class="time-block">
-          <span class="time-label">Clock out</span>
-          <span class="time-value">{{ day()!.clockOutTime ? (day()!.clockOutTime | date:'shortTime') : '—' }}</span>
+
+        <div class="time-metric-box">
+          <div class="metric-top">
+            <span class="metric-label">Clock out</span>
+            <span class="metric-icon-dot out-dot"></span>
+          </div>
+          <div class="metric-value">{{ day()!.clockOutTime ? (day()!.clockOutTime | date:'h:mm a') : '—' }}</div>
           @if (day()!.clockOutDistanceKm != null) {
-            <span class="time-note">{{ (day()!.clockOutDistanceKm! * 1000) | number:'1.0-0' }} m from site</span>
+            <span class="metric-distance inside-dist">
+              <svg lucideCheckCircle [size]="11"></svg>
+              {{ (day()!.clockOutDistanceKm! * 1000) | number:'1.0-0' }} m from site
+            </span>
+          } @else {
+            <span class="metric-distance muted">{{ day()!.clockInTime ? 'Pending shift end' : 'Waiting for clock-in' }}</span>
           }
         </div>
       </div>
 
-      @if (day()!.status === 'COMPLETED') {
-        <div class="done-line">
-          <svg lucideCheckCircle [size]="16"></svg>
-          Today's field visit attendance is recorded.
+      @if (day()!.status === 'COMPLETED' || day()!.clockOutTime) {
+        <div class="done-banner">
+          <svg lucideCheckCircle2 [size]="18"></svg>
+          <div>
+            <strong>Visit attendance complete!</strong>
+            <p>Your work hours and site GPS records for today are recorded.</p>
+          </div>
         </div>
       } @else if (!day()!.clockInTime) {
-        <button class="primary-btn" type="button" [disabled]="!canClockIn()" (click)="clockIn()">
-          <svg lucideClock [size]="16"></svg>
-          {{ isWorking() ? 'Clocking in…' : 'Clock In' }}
+        <button class="primary-btn clock-btn in-btn" type="button" [disabled]="!canClockIn()" (click)="clockIn()">
+          <svg lucideClock [size]="18"></svg>
+          <span>{{ isWorking() ? 'Recording clock-in…' : 'Clock In to Site' }}</span>
         </button>
+        @if (!withinSite() && distanceM() != null) {
+          <p class="btn-subhint">
+            <svg lucideAlertTriangle [size]="13"></svg>
+            You must be inside the {{ radiusM() }} m geofence to clock in (currently {{ spokenDistance() }} away).
+          </p>
+        }
       } @else {
-        <button class="primary-btn danger" type="button" [disabled]="!canClockOut()" (click)="clockOut()">
-          <svg lucideClock [size]="16"></svg>
-          {{ isWorking() ? 'Clocking out…' : 'Clock Out' }}
+        <button class="primary-btn clock-btn out-btn" type="button" [disabled]="!canClockOut()" (click)="clockOut()">
+          <svg lucideClock [size]="18"></svg>
+          <span>{{ isWorking() ? 'Recording clock-out…' : 'Clock Out from Site' }}</span>
         </button>
+        @if (!withinSite() && distanceM() != null) {
+          <p class="btn-subhint">
+            <svg lucideAlertTriangle [size]="13"></svg>
+            You must be inside the {{ radiusM() }} m geofence to clock out (currently {{ spokenDistance() }} away).
+          </p>
+        }
       }
 
       @if (error()) {
-        <p class="error-line">{{ error() }}</p>
+        <div class="error-banner">
+          <svg lucideAlertTriangle [size]="16"></svg>
+          <span>{{ error() }}</span>
+        </div>
       }
     </div>
 
     @if (days().length > 1) {
-      <div class="card muted-card">
-        You are scheduled on {{ days().length }} field visits today. Clocking here applies to
-        {{ day()!.request.requestNumber }} — speak to your manager about the overlap.
+      <div class="card warning-card">
+        <svg lucideAlertTriangle [size]="18"></svg>
+        <span>
+          You are scheduled on {{ days().length }} field visits today. Clocking actions above apply to
+          <strong>{{ day()!.request.requestNumber }}</strong>. Contact your project manager regarding this schedule overlap.
+        </span>
       </div>
     }
   }

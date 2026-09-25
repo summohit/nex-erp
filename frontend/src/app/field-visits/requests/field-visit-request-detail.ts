@@ -5,8 +5,12 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
-  LucideArrowLeft, LucideCheckCircle, LucideX, LucideClock,
+  LucideArrowLeft, LucideCheckCircle, LucideCheckCircle2, LucideX, LucideClock,
   LucideHistory, LucideExternalLink, LucideSend, LucideBan, LucidePencil,
+  LucideMapPin, LucideRoute, LucideNavigation, LucideCalendar, LucideCalendarDays,
+  LucideUsers, LucideUser, LucideMail, LucideTarget, LucideFileText, LucideDownload,
+  LucideSparkles, LucideInfo, LucideBuilding2, LucideRefreshCw, LucideCopy,
+  LucideAlertTriangle,
 } from '@lucide/angular';
 import {
   FieldVisitRequestsService, FieldVisitRequest, FieldVisitActivity,
@@ -37,8 +41,12 @@ const STATUS_LABELS: Record<string, string> = {
   imports: [
     CommonModule, FormsModule, RouterModule,
     FieldVisitRequestFormComponent,
-    LucideArrowLeft, LucideCheckCircle, LucideX, LucideClock,
+    LucideArrowLeft, LucideCheckCircle, LucideCheckCircle2, LucideX, LucideClock,
     LucideHistory, LucideExternalLink, LucideSend, LucideBan, LucidePencil,
+    LucideMapPin, LucideRoute, LucideNavigation, LucideCalendar, LucideCalendarDays,
+    LucideUsers, LucideUser, LucideMail, LucideTarget, LucideFileText, LucideDownload,
+    LucideSparkles, LucideInfo, LucideBuilding2, LucideRefreshCw, LucideCopy,
+    LucideAlertTriangle,
   ],
   templateUrl: './field-visit-request-detail.html',
   styleUrls: ['./field-visit-request-detail.css'],
@@ -95,6 +103,39 @@ export class FieldVisitRequestDetailComponent implements OnInit {
     );
   }
 
+  /**
+   * The day's state in words (§11).
+   *
+   * ON_LEAVE is why the row is kept rather than deleted when leave is
+   * approved: a missing day is a hole the register cannot explain, and
+   * "On leave" is the explanation.
+   */
+  dayLabel(status: string): string {
+    switch (status) {
+      case 'SCHEDULED': return 'Scheduled';
+      case 'IN_PROGRESS': return 'On site';
+      case 'COMPLETED': return 'Completed';
+      case 'ON_LEAVE': return 'On leave';
+      default: return status;
+    }
+  }
+
+  /**
+   * Where the person actually stood, not just how far off it was (§11).
+   *
+   * The distance answers "was this allowed"; the point answers "where were
+   * they", which is the question asked when a figure looks wrong.
+   */
+  mapLink(lat?: number | null, lng?: number | null): string {
+    if (lat == null || lng == null) return '';
+    return `https://www.google.com/maps?q=${lat},${lng}`;
+  }
+
+  gpsTitle(lat?: number | null, lng?: number | null): string {
+    if (lat == null || lng == null) return 'No coordinates recorded';
+    return `${lat}, ${lng} — open in Google Maps`;
+  }
+
   /** Metres, from the kilometres the clock recorded. */
   metres(km?: number | null): string {
     if (km == null) return '—';
@@ -110,6 +151,32 @@ export class FieldVisitRequestDetailComponent implements OnInit {
 
   personName(person: { firstName?: string; lastName?: string } | null | undefined): string {
     return `${person?.firstName ?? ''} ${person?.lastName ?? ''}`.trim() || 'Someone';
+  }
+
+  initials(person: { firstName?: string; lastName?: string } | null | undefined): string {
+    const f = person?.firstName?.[0] || '';
+    const l = person?.lastName?.[0] || '';
+    return (f + l).toUpperCase() || 'U';
+  }
+
+  avatarColor(name: string): string {
+    const colors = [
+      '#4f46e5', '#0284c7', '#0d9488', '#059669',
+      '#d97706', '#dc2626', '#7c3aed', '#db2777',
+    ];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  copyCoordinates(): void {
+    const req = this.request();
+    if (!req) return;
+    const text = `${req.latitude}, ${req.longitude}`;
+    navigator.clipboard?.writeText(text);
+    this.toast.success('Coordinates copied to clipboard');
   }
 
   // ─── Decisions ─────────────────────────────────────────────────────────────

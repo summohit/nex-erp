@@ -63,8 +63,22 @@ function makeService(over: any = {}) {
       count: jest.fn().mockResolvedValue(6),
       findFirst: jest.fn().mockResolvedValue(PENDING_REQUEST),
       findMany: jest.fn().mockResolvedValue([]),
-      create: jest.fn().mockImplementation((a: any) =>
-        Promise.resolve({ id: 9, raisedBy: { id: PM }, ...a.data })),
+      // Prisma returns what `select` asked for, so a nested `create` comes back
+      // as the resulting rows — not as the write instruction. A mock echoing
+      // `data` verbatim hands the code a shape it never sees in life.
+      create: jest.fn().mockImplementation((a: any) => {
+        const { members, tasks, attachments, ...scalars } = a.data;
+        return Promise.resolve({
+          id: 9,
+          raisedBy: { id: PM, firstName: 'Priya', lastName: 'Menon' },
+          ...scalars,
+          members: (members?.create ?? []).map((m: any, i: number) => ({
+            id: i + 1, employee: { id: m.employeeId },
+          })),
+          tasks: (tasks?.create ?? []).map((t: any, i: number) => ({ id: i + 1, ...t })),
+          attachments: [],
+        });
+      }),
       update: jest.fn().mockImplementation((a: any) =>
         Promise.resolve({ id: 9, requestNumber: 'FVR-0009', ...a.data })),
     },
@@ -124,6 +138,24 @@ describe('raising a request', () => {
     expect(notifications.notifyApprovers).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'ACTION_REQUIRED' }),
     );
+  });
+
+  it('tells the people named on it that they are on it', async () => {
+    const { service, notifications } = makeService();
+    await service.create(1, PM, 'EMPLOYEE', body({ submit: true }) as any);
+
+    // At submission, not approval: there is still time to say "I cannot make
+    // those days" while somebody can act on it.
+    expect(notifications.notifyEmployees).toHaveBeenCalledWith(
+      MEMBERS,
+      expect.objectContaining({ title: 'You are on a field visit', type: 'INFO' }),
+    );
+  });
+
+  it('says nothing to anybody while it is still a draft', async () => {
+    const { service, notifications } = makeService();
+    await service.create(1, PM, 'EMPLOYEE', body() as any);
+    expect(notifications.notifyEmployees).not.toHaveBeenCalled();
   });
 
   it('refuses somebody who neither runs the project nor administers the company', async () => {

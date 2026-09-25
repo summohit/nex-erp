@@ -1,9 +1,23 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AttendanceService } from '../../attendance/attendance.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { haversineKm } from '../../common/geo.util';
 import { istDateKey } from '../../common/timezone.util';
-import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visit-status';
+import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY, OPEN_VISIT_DAYS } from '../field-visit-status';
+
+/**
+ * A clock refused because of where the person is standing (§6, §12).
+ *
+ * Its own type so the caller can tell a geofence refusal from every other
+ * BadRequest and leave a note about it — the toast disappears, and "why is
+ * there no attendance for that day" is asked later, by somebody else.
+ */
+export class GeofenceRefusal extends BadRequestException {
+  constructor(message: string, readonly distanceM: number) {
+    super(message);
+  }
+}
 
 export interface ClockData {
   /** Which trip, when somebody is on more than one today. */
@@ -37,7 +51,11 @@ export class FieldVisitClockService {
   constructor(
     private prisma: PrismaService,
     private attendance: AttendanceService,
+    private notifications: NotificationsService,
   ) {}
+
+  /** Where these notifications send somebody. */
+  private readonly LINK = '/field-visits/my';
 
   private readonly DAY_SELECT = {
     id: true, visitDate: true, isHoliday: true, status: true,
@@ -113,9 +131,10 @@ export class FieldVisitClockService {
     const radiusM = request.geofenceRadiusM ?? 500;
 
     if (distanceM > radiusM) {
-      throw new BadRequestException(
+      throw new GeofenceRefusal(
         `You are outside the approved Field Visit location. Please move within ${radiusM} metres`
         + ` of the site to Clock In/Clock Out. You are ${this.spokenDistance(distanceM)} from ${request.location}.`,
+        distanceM,
       );
     }
     return distanceKm;
@@ -188,6 +207,11 @@ export class FieldVisitClockService {
     const employee = await this.employeeOf(userId);
     const day = await this.dayForToday(employee.id, data?.requestId);
 
+    if (day.status === FIELD_VISIT_DAY.ON_LEAVE) {
+      throw new BadRequestException(
+        `You are on approved leave for ${day.request.requestNumber} today, so this day is not yours to clock.`,
+      );
+    }
     if (day.clockInTime) {
       throw new BadRequestException(
         `You clocked into ${day.request.requestNumber} at ${this.spokenTime(day.clockInTime)} today.`,
@@ -195,7 +219,9 @@ export class FieldVisitClockService {
     }
 
     const issueId = await this.resolveTask(day.request.id, employee.id, data?.issueId);
-    const distanceKm = this.measureFromSite(day.request, data?.lat, data?.lng);
+    const distanceKm = await this.measureOrTell(
+      employee.id, day, data?.lat, data?.lng, 'clock in',
+    );
 
     // Attendance first, and deliberately not in a transaction with the day
     // below: it is the call that can still refuse — an abandoned session from
@@ -227,6 +253,42 @@ export class FieldVisitClockService {
     });
   }
 
+  /**
+   * Measure, and when it is refused, leave a note saying so (§12).
+   *
+   * The message on screen is gone the moment the page moves. A notification
+   * survives, which matters when somebody asks a week later why a day has no
+   * attendance against it — "blocked, 1.2km away, 09:04" is an answer.
+   */
+  private async measureOrTell(
+    employeeId: number, day: any, lat: number | undefined, lng: number | undefined,
+    what: string,
+  ): Promise<number> {
+    try {
+      return this.measureFromSite(day.request, lat, lng);
+    } catch (error) {
+      if (error instanceof GeofenceRefusal) {
+        const employee = await this.prisma.employee.findUnique({
+          where: { id: employeeId },
+          select: { userId: true, companyId: true },
+        });
+        if (employee?.userId) {
+          await this.notifications.createNotification(
+            employee.userId,
+            `Could not ${what} — too far from the site`,
+            `${day.request.requestNumber} at ${day.request.location}:`
+            + ` you were ${this.spokenDistance(error.distanceM)} away,`
+            + ` outside the ${day.request.geofenceRadiusM ?? 500} m radius.`,
+            'WARNING',
+            this.LINK,
+            employee.companyId,
+          );
+        }
+      }
+      throw error;
+    }
+  }
+
   async clockOut(userId: number, data: ClockData) {
     const employee = await this.employeeOf(userId);
     const day = await this.dayForToday(employee.id, data?.requestId);
@@ -242,7 +304,9 @@ export class FieldVisitClockService {
 
     // The same radius on the way out. Leaving the site and closing the day
     // from the road is exactly what the rule is there to catch.
-    const distanceKm = this.measureFromSite(day.request, data?.lat, data?.lng);
+    const distanceKm = await this.measureOrTell(
+      employee.id, day, data?.lat, data?.lng, 'clock out',
+    );
 
     await this.attendance.clockOut(
       userId,
@@ -256,7 +320,7 @@ export class FieldVisitClockService {
       },
     );
 
-    return this.prisma.fieldVisitAttendance.update({
+    const closed = await this.prisma.fieldVisitAttendance.update({
       where: { id: day.id },
       data: {
         clockOutTime: new Date(),
@@ -266,6 +330,49 @@ export class FieldVisitClockService {
         status: FIELD_VISIT_DAY.COMPLETED,
       },
       select: this.DAY_SELECT,
+    });
+
+    await this.completeIfNothingLeft(day.request.id);
+    return closed;
+  }
+
+  /**
+   * Close the trip once nobody is still expected on it (§3).
+   *
+   * COMPLETED existed as a status that nothing ever set, so every trip stayed
+   * APPROVED for ever — including ones that finished months ago. The last
+   * clock-out of the last person is the moment it is over, so that is where
+   * this asks the question.
+   *
+   * Days somebody is on leave for do not hold a trip open; nobody is coming.
+   * A day that was simply never clocked does, which the nightly sweep picks up
+   * once the end date has passed.
+   */
+  private async completeIfNothingLeft(requestId: number): Promise<void> {
+    const open = await this.prisma.fieldVisitAttendance.count({
+      where: { requestId, status: { in: OPEN_VISIT_DAYS } },
+    });
+    if (open > 0) return;
+
+    const request = await this.prisma.fieldVisitRequest.findFirst({
+      where: { id: requestId, status: FIELD_VISIT_STATUS.APPROVED },
+      select: { id: true, raisedById: true, companyId: true, requestNumber: true, location: true },
+    });
+    if (!request) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.fieldVisitRequest.update({
+        where: { id: requestId },
+        data: { status: FIELD_VISIT_STATUS.COMPLETED },
+      });
+      await tx.fieldVisitRequestActivity.create({
+        data: {
+          requestId,
+          action: 'COMPLETED',
+          detail: 'Every scheduled day has been clocked out',
+          actorId: request.raisedById,
+        },
+      });
     });
   }
 

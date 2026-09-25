@@ -11,13 +11,14 @@ import { NotificationsModule } from '../notifications/notifications.module';
 // The field visit clock delegates the attendance record itself rather than
 // keeping a second implementation of open sessions, lateness and half days.
 import { AttendanceModule } from '../attendance/attendance.module';
+import { FieldVisitRemindersCron } from './field-visit-reminders.cron';
 
 @Module({
   imports: [NotificationsModule, AttendanceModule],
   controllers: [FieldVisitsController, FieldVisitRequestsController, FieldVisitClockController],
   providers: [
     FieldVisitsService, FieldVisitRequestsService, FieldVisitActivationService,
-    FieldVisitClockService, PrismaService,
+    FieldVisitClockService, FieldVisitRemindersCron, PrismaService,
   ],
   // Exported for LeavesService: approving leave over a trip has to give those
   // days back, and the logic for what that means lives with the fan-out that

@@ -7,6 +7,9 @@ export interface FieldVisitPerson {
   firstName: string;
   lastName: string;
   avatarUrl?: string | null;
+  department?: { id: number; name: string } | null;
+  designation?: { id: number; name: string } | null;
+  user?: { email?: string | null } | null;
 }
 
 export interface FieldVisitRequestTask {
@@ -32,8 +35,14 @@ export interface FieldVisitRequestDay {
   status: string;
   clockInTime?: string | null;
   clockInDistanceKm?: number | null;
+  clockInLat?: number | null;
+  clockInLng?: number | null;
   clockOutTime?: string | null;
   clockOutDistanceKm?: number | null;
+  clockOutLat?: number | null;
+  clockOutLng?: number | null;
+  /** The task the day was clocked against (§5). */
+  issue?: { id: number; key: string; title: string } | null;
   employee: FieldVisitPerson;
 }
 

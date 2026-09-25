@@ -30,6 +30,7 @@ function makeTx(over: any = {}) {
     fieldVisitAttendance: {
       findMany: jest.fn().mockResolvedValue([DAY]),
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       // Two other days of the trip are left.
       count: jest.fn().mockResolvedValue(2),
     },
@@ -101,7 +102,11 @@ describe('releasing the days once leave is approved', () => {
     const { service, tx } = makeTx();
     const released = await service.releaseDaysForLeave(tx, LEAVE);
 
-    expect(tx.fieldVisitAttendance.deleteMany).toHaveBeenCalledWith({ where: { id: { in: [44] } } });
+    expect(tx.fieldVisitAttendance.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [44] } },
+      data: { status: 'ON_LEAVE' },
+    });
+    expect(tx.fieldVisitAttendance.deleteMany).not.toHaveBeenCalled();
     expect(tx.shiftRosterEntry.deleteMany).toHaveBeenCalledWith({ where: { id: { in: [77] } } });
     expect(released).toEqual([{
       requestId: 9, requestNumber: 'FVR-0009', raisedById: 71, days: 1, archivedTasks: 0,
@@ -114,6 +119,9 @@ describe('releasing the days once leave is approved', () => {
     // Somebody was at the site that day; leave approved afterwards does not
     // unmake the attendance.
     expect(tx.fieldVisitAttendance.findMany.mock.calls[0][0].where.clockInTime).toBeNull();
+    // Nor is a day already covered by leave released a second time.
+    expect(tx.fieldVisitAttendance.findMany.mock.calls[0][0].where.status)
+      .toEqual({ in: ['SCHEDULED', 'IN_PROGRESS'] });
   });
 
   it('leaves the tasks alone when part of the trip remains', async () => {
@@ -128,6 +136,7 @@ describe('releasing the days once leave is approved', () => {
       fieldVisitAttendance: {
         findMany: jest.fn().mockResolvedValue([DAY]),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn().mockResolvedValue(0),
       },
     });
@@ -157,7 +166,7 @@ describe('releasing the days once leave is approved', () => {
     const [trip] = await service.releaseDaysForLeave(tx, { ...LEAVE, isHalfDay: true });
 
     // They are still expected on site for the other half.
-    expect(tx.fieldVisitAttendance.deleteMany).not.toHaveBeenCalled();
+    expect(tx.fieldVisitAttendance.updateMany).not.toHaveBeenCalled();
     expect(tx.shiftRosterEntry.deleteMany).not.toHaveBeenCalled();
     expect(tx.fieldVisitRequestActivity.create.mock.calls[0][0].data.action).toBe('MEMBER_HALF_DAY');
     expect(trip.days).toBe(0);
@@ -174,20 +183,21 @@ describe('releasing the days once leave is approved', () => {
           },
         ]),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn().mockResolvedValue(1),
       },
     });
 
     const released = await service.releaseDaysForLeave(tx, LEAVE);
     expect(released.map((r) => r.requestNumber)).toEqual(['FVR-0009', 'FVR-0010']);
-    expect(tx.fieldVisitAttendance.deleteMany).toHaveBeenCalledTimes(2);
+    expect(tx.fieldVisitAttendance.updateMany).toHaveBeenCalledTimes(2);
   });
 
   it('does nothing at all when the leave touches no trip', async () => {
     const { service, tx } = makeTx({
       fieldVisitAttendance: {
         findMany: jest.fn().mockResolvedValue([]),
-        deleteMany: jest.fn(), count: jest.fn(),
+        deleteMany: jest.fn(), updateMany: jest.fn(), count: jest.fn(),
       },
     });
     expect(await service.releaseDaysForLeave(tx, LEAVE)).toEqual([]);

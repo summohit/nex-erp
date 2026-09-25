@@ -63,7 +63,15 @@ export class FieldVisitRequestsService {
   private readonly LINK = '/field-visits/requests';
 
   private readonly PERSON = {
-    select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      avatarUrl: true,
+      department: { select: { id: true, name: true } },
+      designation: { select: { id: true, name: true } },
+      user: { select: { email: true } },
+    },
   } as const;
 
   private readonly SELECT = {
@@ -315,8 +323,13 @@ export class FieldVisitRequestsService {
         attendances: {
           select: {
             id: true, visitDate: true, isHoliday: true, status: true,
-            clockInTime: true, clockInDistanceKm: true,
-            clockOutTime: true, clockOutDistanceKm: true,
+            // §11 asks Delivery for the coordinates, not only how far off they
+            // were: "0.6km away" is a number, while a point on a map is where
+            // somebody actually stood.
+            clockInTime: true, clockInDistanceKm: true, clockInLat: true, clockInLng: true,
+            clockOutTime: true, clockOutDistanceKm: true, clockOutLat: true, clockOutLng: true,
+            // Which task the day was clocked against (§5).
+            issue: { select: { id: true, key: true, title: true } },
             employee: this.PERSON,
           },
           orderBy: [{ visitDate: 'asc' }],
@@ -442,7 +455,10 @@ export class FieldVisitRequestsService {
     // After the commit, never inside it — a push round trip has no business
     // holding a transaction open, and a notification for a request that then
     // rolled back would point at nothing.
-    if (submitting) await this.notifyAwaitingApproval(companyId, created, employeeId);
+    if (submitting) {
+      await this.notifyAwaitingApproval(companyId, created, employeeId);
+      await this.notifyMembersNamed(companyId, created, employeeId);
+    }
     return created;
   }
 
@@ -590,7 +606,32 @@ export class FieldVisitRequestsService {
     });
 
     await this.notifyAwaitingApproval(companyId, submitted, employeeId);
+    await this.notifyMembersNamed(companyId, submitted, employeeId);
     return submitted;
+  }
+
+  /**
+   * Tell the people named on a trip that they are on it (§12).
+   *
+   * At submission, not approval: being put down for three days at a client
+   * site is worth knowing while there is still time to say "I cannot make
+   * that", and the approver is often not the person who would hear it first.
+   * INFO rather than ACTION_REQUIRED — nothing is being asked of them yet.
+   */
+  private async notifyMembersNamed(companyId: number, request: any, actorId: number | null) {
+    const memberIds = (request.members ?? []).map((m: any) => m.employee?.id ?? m.employeeId);
+    if (!memberIds.length) return;
+
+    await this.notifications.notifyEmployees(memberIds, {
+      companyId,
+      excludeEmployeeId: actorId,
+      title: 'You are on a field visit',
+      message: `${this.who(request.raisedBy)} has put you on ${request.requestNumber} —`
+        + ` ${request.visitDays} day(s) at ${request.location} from ${this.day(request.startDate)},`
+        + ' pending approval.',
+      type: 'INFO',
+      linkUrl: this.LINK,
+    });
   }
 
   /**

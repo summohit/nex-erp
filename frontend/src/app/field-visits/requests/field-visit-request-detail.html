@@ -1,43 +1,101 @@
 <div class="fvd-page">
+  <!-- Back Breadcrumb Button -->
   <button class="back-btn" type="button" (click)="back()">
     <svg lucideArrowLeft [size]="16"></svg>
-    All field visit requests
+    <span>All field visit requests</span>
   </button>
 
   @if (isLoading()) {
-    <div class="card muted-card">Loading…</div>
+    <div class="card muted-card loading-card">
+      <svg lucideRefreshCw [size]="20" class="spin-anim"></svg>
+      <span>Loading request details…</span>
+    </div>
   } @else if (!request()) {
-    <div class="card muted-card">This field visit request is not available to you.</div>
+    <div class="card muted-card empty-detail-card">
+      <svg lucideAlertTriangle [size]="24"></svg>
+      <span>This field visit request is not available or has been removed.</span>
+    </div>
   } @else {
+    <!-- Header Card -->
     <div class="card head-card">
-      <div>
-        <span class="mono">{{ request()!.requestNumber }}</span>
-        <h1>{{ request()!.location }}</h1>
-        <p class="sub">
-          {{ request()!.project.name }} ·
-          raised by {{ personName(request()!.raisedBy) }} ·
-          {{ request()!.createdAt | date:'d MMM y' }}
-        </p>
+      <div class="head-content">
+        <div class="req-id-row">
+          <span class="request-number-badge">
+            <svg lucideRoute [size]="13"></svg>
+            {{ request()!.requestNumber }}
+          </span>
+          <span class="project-tag" [style.border-color]="request()!.project.color || '#6366f1'">
+            <span class="project-dot" [style.background-color]="request()!.project.color || '#6366f1'"></span>
+            {{ request()!.project.name }}
+          </span>
+        </div>
+        <h1 class="req-title">
+          <svg lucideMapPin [size]="24" class="title-pin-icon"></svg>
+          {{ request()!.location }}
+        </h1>
+        <div class="meta-chips">
+          <div class="creator-chip">
+            <div class="mini-avatar" [style.background-color]="avatarColor(personName(request()!.raisedBy))">
+              @if (request()!.raisedBy.avatarUrl) {
+                <img [src]="request()!.raisedBy.avatarUrl" [alt]="personName(request()!.raisedBy)" />
+              } @else {
+                <span>{{ initials(request()!.raisedBy) }}</span>
+              }
+            </div>
+            <span>Raised by <strong>{{ personName(request()!.raisedBy) }}</strong></span>
+          </div>
+          <span class="meta-dot">·</span>
+          <span class="meta-item">
+            <svg lucideCalendar [size]="13"></svg>
+            {{ request()!.createdAt | date:'d MMM y' }}
+          </span>
+          @if (request()!.reviewedBy) {
+            <span class="meta-dot">·</span>
+            <span class="meta-item">
+              <svg lucideCheckCircle2 [size]="13"></svg>
+              Reviewed by {{ personName(request()!.reviewedBy) }}
+            </span>
+          }
+        </div>
       </div>
-      <span class="status-pill" [class]="'st-' + request()!.status">{{ label(request()!.status) }}</span>
+
+      <div class="head-status-box">
+        <span class="status-badge" [class]="'st-' + request()!.status">
+          @if (request()!.status === 'APPROVED') {
+            <svg lucideCheckCircle2 [size]="14"></svg>
+          } @else if (request()!.status === 'PENDING_APPROVAL') {
+            <svg lucideClock [size]="14"></svg>
+          } @else if (request()!.status === 'REJECTED') {
+            <svg lucideX [size]="14"></svg>
+          } @else if (request()!.status === 'CANCELLED') {
+            <svg lucideBan [size]="14"></svg>
+          }
+          {{ label(request()!.status) }}
+        </span>
+      </div>
     </div>
 
+    <!-- Rejection Alert -->
     @if (request()!.status === 'REJECTED' && request()!.rejectionReason) {
       <div class="card reason-card">
-        <strong>Rejected by {{ personName(request()!.reviewedBy) }}:</strong>
-        {{ request()!.rejectionReason }}
+        <svg lucideAlertTriangle [size]="20" class="reason-icon"></svg>
+        <div class="reason-content">
+          <strong>Rejected by {{ personName(request()!.reviewedBy) }}:</strong>
+          <p>{{ request()!.rejectionReason }}</p>
+        </div>
       </div>
     }
 
-    <!-- §10: a change somebody has asked for. The trip below is still the
-         approved one — this is only what it would become. -->
+    <!-- Proposed Change Alert / Diff (§10) -->
     @if (request()!.pendingChange) {
       <div class="card change-card">
-        <h3>
-          <svg lucidePencil [size]="15"></svg>
-          Change requested
-          <span class="change-when">{{ request()!.pendingChangeAt | date:'d MMM, shortTime' }}</span>
-        </h3>
+        <div class="change-head">
+          <h3>
+            <svg lucidePencil [size]="16"></svg>
+            Change requested
+          </h3>
+          <span class="change-when">{{ request()!.pendingChangeAt | date:'d MMM, h:mm a' }}</span>
+        </div>
         <p class="change-note">
           The trip runs as approved until this is decided — people on site keep clocking against
           the site and dates below.
@@ -86,166 +144,360 @@
         } @else {
           <p class="await-note">
             <svg lucideClock [size]="15"></svg>
-            Waiting on an administrator.
+            Waiting on an administrator review.
           </p>
         }
       </div>
     }
 
+    <!-- 2 Column Details: The Trip & Who is Going / Tasks -->
     <div class="two-col">
-      <div class="card">
-        <h3>The trip</h3>
-        <dl class="facts">
-          <dt>Dates</dt>
-          <dd>{{ request()!.startDate | date:'d MMM y' }} – {{ request()!.endDate | date:'d MMM y' }}</dd>
-          <dt>Days</dt>
-          <dd>{{ request()!.visitDays }}</dd>
-          <dt>Expected hours</dt>
-          <dd>{{ request()!.startTime }} – {{ request()!.endTime }}</dd>
-          <dt>Clock-in radius</dt>
-          <dd>{{ request()!.geofenceRadiusM }} m from the pin</dd>
-          <dt>Coordinates</dt>
-          <dd>
-            <a [href]="'https://www.google.com/maps?q=' + request()!.latitude + ',' + request()!.longitude"
-               target="_blank" class="map-link">
-              {{ request()!.latitude }}, {{ request()!.longitude }}
-              <svg lucideExternalLink [size]="12"></svg>
-            </a>
-          </dd>
-          @if (request()!.remarks) {
-            <dt>Remarks</dt>
-            <dd>{{ request()!.remarks }}</dd>
-          }
-        </dl>
+      <!-- Left Column: The Trip -->
+      <div class="card trip-card">
+        <div class="card-header-bar">
+          <h3>
+            <svg lucideNavigation [size]="17"></svg>
+            The trip
+          </h3>
+          <span class="days-badge">{{ request()!.visitDays }} {{ request()!.visitDays === 1 ? 'Day' : 'Days' }}</span>
+        </div>
 
-        <div class="map-frame">
-          <iframe [src]="mapUrl()" title="Site location" loading="lazy"></iframe>
+        <div class="facts-grid">
+          <div class="fact-item">
+            <div class="fact-icon ic-blue">
+              <svg lucideCalendar [size]="16"></svg>
+            </div>
+            <div class="fact-content">
+              <span class="fact-label">Dates</span>
+              <span class="fact-value">{{ request()!.startDate | date:'d MMM y' }} – {{ request()!.endDate | date:'d MMM y' }}</span>
+            </div>
+          </div>
+
+          <div class="fact-item">
+            <div class="fact-icon ic-amber">
+              <svg lucideClock [size]="16"></svg>
+            </div>
+            <div class="fact-content">
+              <span class="fact-label">Expected hours</span>
+              <span class="fact-value">{{ request()!.startTime }} – {{ request()!.endTime }}</span>
+            </div>
+          </div>
+
+          <div class="fact-item">
+            <div class="fact-icon ic-emerald">
+              <svg lucideTarget [size]="16"></svg>
+            </div>
+            <div class="fact-content">
+              <span class="fact-label">Clock-in radius</span>
+              <span class="fact-value">{{ request()!.geofenceRadiusM }} m from site pin</span>
+            </div>
+          </div>
+
+          <div class="fact-item">
+            <div class="fact-icon ic-purple">
+              <svg lucideMapPin [size]="16"></svg>
+            </div>
+            <div class="fact-content">
+              <span class="fact-label">Coordinates</span>
+              <div class="coords-row">
+                <span class="coords-text">{{ request()!.latitude | number:'1.6-6' }}, {{ request()!.longitude | number:'1.6-6' }}</span>
+                <button type="button" class="mini-copy-btn" (click)="copyCoordinates()" title="Copy coordinates">
+                  <svg lucideCopy [size]="12"></svg>
+                </button>
+                <a [href]="'https://www.google.com/maps?q=' + request()!.latitude + ',' + request()!.longitude"
+                   target="_blank" class="map-link-btn" title="Open in Google Maps">
+                  <svg lucideExternalLink [size]="12"></svg>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        @if (request()!.remarks) {
+          <div class="remarks-box">
+            <svg lucideInfo [size]="15" class="remarks-icon"></svg>
+            <div>
+              <span class="remarks-label">Trip Remarks / Objective:</span>
+              <p class="remarks-text">{{ request()!.remarks }}</p>
+            </div>
+          </div>
+        }
+
+        <div class="map-wrapper">
+          <div class="map-header">
+            <span><svg lucideMapPin [size]="13"></svg> Site Geofence Preview</span>
+            <span class="map-hint">Radius: {{ request()!.geofenceRadiusM }} m</span>
+          </div>
+          <div class="map-frame">
+            <iframe [src]="mapUrl()" title="Site location" loading="lazy"></iframe>
+          </div>
         </div>
       </div>
 
-      <div class="card">
-        <h3>Who is going</h3>
-        <div class="chips">
+      <!-- Right Column: Who is Going & Tasks & Attachments -->
+      <div class="card team-tasks-card">
+        <!-- Who is Going -->
+        <div class="card-header-bar">
+          <h3>
+            <svg lucideUsers [size]="17"></svg>
+            Who is going
+          </h3>
+          <span class="count-badge">{{ request()!.members.length }} member{{ request()!.members.length === 1 ? '' : 's' }}</span>
+        </div>
+
+        <div class="member-cards-list">
           @for (m of request()!.members; track m.id) {
-            <span class="chip">{{ personName(m.employee) }}</span>
+            <div class="member-profile-card">
+              <div class="member-avatar" [style.background-color]="avatarColor(personName(m.employee))">
+                @if (m.employee.avatarUrl) {
+                  <img [src]="m.employee.avatarUrl" [alt]="personName(m.employee)" />
+                } @else {
+                  <span>{{ initials(m.employee) }}</span>
+                }
+              </div>
+              <div class="member-details">
+                <div class="member-name-row">
+                  <span class="member-name">{{ personName(m.employee) }}</span>
+                  <span class="member-dept-badge">{{ m.employee.department?.name || 'Field Team' }}</span>
+                </div>
+                <div class="member-meta-row">
+                  <span class="member-role">
+                    <svg lucideUser [size]="12"></svg>
+                    {{ m.employee.designation?.name || 'Field Specialist' }}
+                  </span>
+                  @if (m.employee.user?.email) {
+                    <a [href]="'mailto:' + m.employee.user!.email" class="member-email" title="Send email">
+                      <svg lucideMail [size]="12"></svg>
+                      {{ m.employee.user!.email }}
+                    </a>
+                  }
+                </div>
+              </div>
+            </div>
           }
         </div>
 
-        <h3 class="spaced">Tasks</h3>
-        <ul class="task-list">
-          @for (t of request()!.tasks; track t.id) {
-            <li>
-              <strong>{{ t.name }}</strong>
-              @if (t.description) { <span class="task-note">{{ t.description }}</span> }
-            </li>
+        <!-- Tasks -->
+        <div class="card-header-bar spaced">
+          <h3>
+            <svg lucideFileText [size]="17"></svg>
+            Tasks
+          </h3>
+          <span class="count-badge">{{ request()!.tasks.length }} task{{ request()!.tasks.length === 1 ? '' : 's' }}</span>
+        </div>
+
+        <div class="task-cards-list">
+          @for (t of request()!.tasks; track t.id; let idx = $index) {
+            <div class="task-card-item">
+              <span class="task-number-pill">Task {{ idx + 1 }}</span>
+              <div class="task-info">
+                <strong class="task-name">{{ t.name }}</strong>
+                @if (t.description) {
+                  <p class="task-desc">{{ t.description }}</p>
+                }
+              </div>
+            </div>
           }
-        </ul>
-        <p class="hint">
+        </div>
+        <p class="hint-banner">
+          <svg lucideSparkles [size]="14"></svg>
           On approval each task is assigned to each person —
-          {{ request()!.tasks.length * request()!.members.length }} task(s) in all.
+          <strong>{{ request()!.tasks.length * request()!.members.length }} task(s) in all</strong>.
         </p>
 
+        <!-- Attachments -->
         @if (request()!.attachments.length) {
-          <h3 class="spaced">Attachments</h3>
-          <ul class="attachment-list">
+          <div class="card-header-bar spaced">
+            <h3>
+              <svg lucideDownload [size]="17"></svg>
+              Attachments
+            </h3>
+            <span class="count-badge">{{ request()!.attachments.length }}</span>
+          </div>
+          <div class="attachment-cards-list">
             @for (a of request()!.attachments; track a.id) {
-              <li><a [href]="a.fileUrl" target="_blank">{{ a.fileName }}</a></li>
+              <a [href]="a.fileUrl" target="_blank" class="attachment-card-item">
+                <svg lucideFileText [size]="18" class="file-icon"></svg>
+                <div class="attachment-info">
+                  <span class="file-name">{{ a.fileName }}</span>
+                  <span class="file-meta">{{ a.createdAt | date:'d MMM y' }}</span>
+                </div>
+                <svg lucideDownload [size]="14" class="dl-icon"></svg>
+              </a>
             }
-          </ul>
+          </div>
         }
       </div>
     </div>
 
-    <!-- §11: the register. Times, coordinates and distance as recorded. -->
+    <!-- Attendance Register Table -->
     @if (request()!.attendances?.length) {
-      <div class="card">
-        <h3>Attendance</h3>
-        <table class="register">
-          <thead>
-            <tr>
-              <th>Person</th>
-              <th>Date</th>
-              <th>Clock in</th>
-              <th>Distance</th>
-              <th>Clock out</th>
-              <th>Distance</th>
-              <th>Day</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (d of request()!.attendances!; track d.id) {
+      <div class="card attendance-card">
+        <div class="card-header-bar">
+          <h3>
+            <svg lucideClock [size]="17"></svg>
+            Attendance Register
+          </h3>
+          <span class="count-badge">{{ request()!.attendances!.length }} record{{ request()!.attendances!.length === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="table-container">
+          <table class="register-table">
+            <thead>
               <tr>
-                <td>{{ personName(d.employee) }}</td>
-                <td class="nowrap">
-                  {{ d.visitDate | date:'d MMM' }}
-                  @if (d.isHoliday) { <span class="holiday-tag">Holiday</span> }
-                </td>
-                <td>{{ d.clockInTime ? (d.clockInTime | date:'shortTime') : '—' }}</td>
-                <td [class.outside]="d.clockInDistanceKm != null && !wasInside(d.clockInDistanceKm)">
-                  {{ metres(d.clockInDistanceKm) }}
-                </td>
-                <td>{{ d.clockOutTime ? (d.clockOutTime | date:'shortTime') : '—' }}</td>
-                <td [class.outside]="d.clockOutDistanceKm != null && !wasInside(d.clockOutDistanceKm)">
-                  {{ metres(d.clockOutDistanceKm) }}
-                </td>
-                <td><span class="day-pill" [class]="'day-' + d.status">{{ d.status }}</span></td>
+                <th>Person</th>
+                <th>Date</th>
+                <th>Clock in</th>
+                <th>Distance</th>
+                <th>Clock out</th>
+                <th>Distance</th>
+                <th>Day</th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (d of request()!.attendances!; track d.id) {
+                <tr>
+                  <td>
+                    <div class="attendee-cell">
+                      <div class="mini-avatar" [style.background-color]="avatarColor(personName(d.employee))">
+                        @if (d.employee.avatarUrl) {
+                          <img [src]="d.employee.avatarUrl" [alt]="personName(d.employee)" />
+                        } @else {
+                          <span>{{ initials(d.employee) }}</span>
+                        }
+                      </div>
+                      <div class="attendee-info">
+                        <span class="attendee-name">{{ personName(d.employee) }}</span>
+                        <span class="attendee-dept">{{ d.employee.designation?.name || 'Field Specialist' }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="nowrap">
+                    <span class="date-text">{{ d.visitDate | date:'d MMM y' }}</span>
+                    @if (d.isHoliday) { <span class="holiday-tag">Holiday</span> }
+                  </td>
+                  <td>
+                    @if (d.clockInTime) {
+                      <span class="time-stamp-badge">{{ d.clockInTime | date:'h:mm a' }}</span>
+                    } @else {
+                      <span class="empty-dash">—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (d.clockInDistanceKm != null) {
+                      <a class="distance-pill"
+                         [class.inside-pill]="wasInside(d.clockInDistanceKm)"
+                         [class.outside-pill]="!wasInside(d.clockInDistanceKm)"
+                         [href]="mapLink(d.clockInLat, d.clockInLng)"
+                         [title]="gpsTitle(d.clockInLat, d.clockInLng)"
+                         target="_blank">
+                        @if (wasInside(d.clockInDistanceKm)) {
+                          <svg lucideCheckCircle [size]="11"></svg>
+                        } @else {
+                          <svg lucideAlertTriangle [size]="11"></svg>
+                        }
+                        {{ metres(d.clockInDistanceKm) }}
+                        <span class="dist-status">({{ wasInside(d.clockInDistanceKm) ? 'Inside' : 'Outside' }})</span>
+                      </a>
+                    } @else {
+                      <span class="empty-dash">—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (d.clockOutTime) {
+                      <span class="time-stamp-badge">{{ d.clockOutTime | date:'h:mm a' }}</span>
+                    } @else {
+                      <span class="empty-dash">—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (d.clockOutDistanceKm != null) {
+                      <a class="distance-pill"
+                         [class.inside-pill]="wasInside(d.clockOutDistanceKm)"
+                         [class.outside-pill]="!wasInside(d.clockOutDistanceKm)"
+                         [href]="mapLink(d.clockOutLat, d.clockOutLng)"
+                         [title]="gpsTitle(d.clockOutLat, d.clockOutLng)"
+                         target="_blank">
+                        @if (wasInside(d.clockOutDistanceKm)) {
+                          <svg lucideCheckCircle [size]="11"></svg>
+                        } @else {
+                          <svg lucideAlertTriangle [size]="11"></svg>
+                        }
+                        {{ metres(d.clockOutDistanceKm) }}
+                        <span class="dist-status">({{ wasInside(d.clockOutDistanceKm) ? 'Inside' : 'Outside' }})</span>
+                      </a>
+                    } @else {
+                      <span class="empty-dash">—</span>
+                    }
+                  </td>
+                  <td>
+                    <span class="day-pill" [class]="'day-' + d.status">{{ dayLabel(d.status) }}</span>
+                    <!-- §5: which task they said they were there to do. -->
+                    @if (d.issue) {
+                      <span class="clocked-task" [title]="d.issue.title">{{ d.issue.key }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       </div>
     }
 
-    <!-- Decisions. What is offered comes from the server, not from guessing. -->
+    <!-- Action Toolbar Card -->
     <div class="card actions-card">
-      @if (request()!.canSubmit) {
-        <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="submit()">
-          <svg lucideSend [size]="16"></svg>
-          Submit for approval
-        </button>
-      }
-      @if (request()!.canReview) {
-        <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="approve()">
-          <svg lucideCheckCircle [size]="16"></svg>
-          Approve
-        </button>
-        <button class="ghost-btn danger" type="button" [disabled]="isWorking()" (click)="isRejecting.set(true)">
-          <svg lucideX [size]="16"></svg>
-          Reject
-        </button>
-      }
-      @if (request()!.canWithdraw) {
-        <button class="ghost-btn" type="button" [disabled]="isWorking()" (click)="withdraw()">
-          <svg lucideArrowLeft [size]="16"></svg>
-          Withdraw to draft
-        </button>
-      }
-      <!-- §10: an approved trip is changed by asking, not by editing. -->
-      @if (request()!.canRequestChange) {
-        <button class="ghost-btn" type="button" [disabled]="isWorking()" (click)="isChanging.set(true)">
-          <svg lucidePencil [size]="16"></svg>
-          Request a change
-        </button>
-      }
-      @if (request()!.status === 'DRAFT' || request()!.status === 'PENDING_APPROVAL' || request()!.status === 'APPROVED') {
-        <button class="ghost-btn" type="button" [disabled]="isWorking()" (click)="cancel()">
-          <svg lucideBan [size]="16"></svg>
-          Cancel visit
-        </button>
-      }
+      <div class="actions-left">
+        @if (request()!.canSubmit) {
+          <button class="primary-btn submit-btn" type="button" [disabled]="isWorking()" (click)="submit()">
+            <svg lucideSend [size]="16"></svg>
+            Submit for approval
+          </button>
+        }
+        @if (request()!.canReview) {
+          <button class="primary-btn approve-btn" type="button" [disabled]="isWorking()" (click)="approve()">
+            <svg lucideCheckCircle [size]="16"></svg>
+            Approve
+          </button>
+          <button class="ghost-btn danger" type="button" [disabled]="isWorking()" (click)="isRejecting.set(true)">
+            <svg lucideX [size]="16"></svg>
+            Reject
+          </button>
+        }
+        @if (request()!.canWithdraw) {
+          <button class="ghost-btn" type="button" [disabled]="isWorking()" (click)="withdraw()">
+            <svg lucideArrowLeft [size]="16"></svg>
+            Withdraw to draft
+          </button>
+        }
+        <!-- §10: an approved trip is changed by asking, not by editing. -->
+        @if (request()!.canRequestChange) {
+          <button class="ghost-btn change-btn" type="button" [disabled]="isWorking()" (click)="isChanging.set(true)">
+            <svg lucidePencil [size]="15"></svg>
+            Request a change
+          </button>
+        }
+        @if (request()!.status === 'DRAFT' || request()!.status === 'PENDING_APPROVAL' || request()!.status === 'APPROVED') {
+          <button class="ghost-btn danger-outline" type="button" [disabled]="isWorking()" (click)="cancel()">
+            <svg lucideBan [size]="15"></svg>
+            Cancel visit
+          </button>
+        }
+      </div>
+
       @if (!request()!.canSubmit && !request()!.canReview && request()!.status === 'PENDING_APPROVAL') {
         <p class="await-note">
           <svg lucideClock [size]="15"></svg>
-          Waiting on an administrator.
+          Waiting on an administrator decision.
         </p>
       }
     </div>
 
+    <!-- Rejection Dialog Form Card -->
     @if (isRejecting()) {
       <div class="card reject-card">
         <label>Why is this being rejected?</label>
         <textarea rows="3" [(ngModel)]="rejectionReason"
-                  placeholder="The manager acts on this, so say what would need to change."></textarea>
+                  placeholder="The manager acts on this, so state clearly what would need to change."></textarea>
         <div class="reject-actions">
           <button class="ghost-btn" type="button" (click)="isRejecting.set(false)">Never mind</button>
           <button class="primary-btn danger" type="button" [disabled]="isWorking()" (click)="reject()">
@@ -255,25 +507,59 @@
       </div>
     }
 
-    <!-- §11: who created, approved, rejected, modified or cancelled it. -->
-    <div class="card">
-      <h3>
-        <svg lucideHistory [size]="15"></svg>
-        History
-      </h3>
+    <!-- History Audit Trail -->
+    <div class="card history-card">
+      <div class="card-header-bar">
+        <h3>
+          <svg lucideHistory [size]="17"></svg>
+          History
+        </h3>
+        <span class="count-badge">{{ timeline().length }} record{{ timeline().length === 1 ? '' : 's' }}</span>
+      </div>
       @if (!timeline().length) {
         <p class="muted">Nothing recorded yet.</p>
       } @else {
-        <ol class="timeline">
+        <div class="timeline-v2">
           @for (a of timeline(); track a.id) {
-            <li>
-              <span class="tl-action">{{ a.action.replace('_', ' ') | titlecase }}</span>
-              <span class="tl-who">{{ personName(a.actor) }}</span>
-              <span class="tl-when">{{ a.createdAt | date:'d MMM y, shortTime' }}</span>
-              @if (a.detail) { <p class="tl-detail">{{ a.detail }}</p> }
-            </li>
+            <div class="timeline-item">
+              <div class="tl-node-col">
+                <div class="tl-node" [class]="'tl-act-' + a.action">
+                  @if (a.action === 'APPROVED' || a.action === 'APPROVE') {
+                    <svg lucideCheckCircle2 [size]="14"></svg>
+                  } @else if (a.action === 'REJECTED' || a.action === 'REJECT') {
+                    <svg lucideX [size]="14"></svg>
+                  } @else if (a.action === 'SUBMITTED' || a.action === 'SUBMIT') {
+                    <svg lucideSend [size]="14"></svg>
+                  } @else if (a.action === 'MODIFIED' || a.action === 'CHANGE_REQUESTED') {
+                    <svg lucidePencil [size]="14"></svg>
+                  } @else {
+                    <svg lucideClock [size]="14"></svg>
+                  }
+                </div>
+                <div class="tl-line"></div>
+              </div>
+              <div class="tl-content-card">
+                <div class="tl-header">
+                  <span class="tl-action-badge">{{ a.action.replace('_', ' ') | titlecase }}</span>
+                  <div class="tl-actor">
+                    <div class="mini-avatar xs" [style.background-color]="avatarColor(personName(a.actor))">
+                      @if (a.actor?.avatarUrl) {
+                        <img [src]="a.actor.avatarUrl" [alt]="personName(a.actor)" />
+                      } @else {
+                        <span>{{ initials(a.actor) }}</span>
+                      }
+                    </div>
+                    <span class="actor-name">{{ personName(a.actor) }}</span>
+                  </div>
+                  <span class="tl-timestamp">{{ a.createdAt | date:'d MMM y, h:mm a' }}</span>
+                </div>
+                @if (a.detail) {
+                  <p class="tl-detail-msg">{{ a.detail }}</p>
+                }
+              </div>
+            </div>
           }
-        </ol>
+        </div>
       }
     </div>
   }

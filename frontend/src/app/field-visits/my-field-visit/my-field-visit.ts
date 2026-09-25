@@ -1,9 +1,12 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import {
   LucideMapPin, LucideNavigation, LucideClock, LucideCheckCircle,
   LucideAlertTriangle, LucideRefreshCw, LucideCalendarDays,
+  LucideRoute, LucideCheckCircle2, LucideSparkles, LucideCalendar,
+  LucideTarget, LucideCompass,
 } from '@lucide/angular';
 import {
   FieldVisitAttendanceService, FieldVisitDay,
@@ -29,9 +32,11 @@ interface Fix {
   selector: 'app-my-field-visit',
   standalone: true,
   imports: [
-    CommonModule, FormsModule,
+    CommonModule, FormsModule, RouterModule,
     LucideMapPin, LucideNavigation, LucideClock, LucideCheckCircle,
     LucideAlertTriangle, LucideRefreshCw, LucideCalendarDays,
+    LucideRoute, LucideCheckCircle2, LucideSparkles, LucideCalendar,
+    LucideTarget, LucideCompass,
   ],
   templateUrl: './my-field-visit.html',
   styleUrls: ['./my-field-visit.css'],
@@ -39,10 +44,17 @@ interface Fix {
 export class MyFieldVisitComponent implements OnInit, OnDestroy {
   private api = inject(FieldVisitAttendanceService);
 
+  today = new Date();
   days = signal<FieldVisitDay[]>([]);
   isLoading = signal(true);
   isWorking = signal(false);
   error = signal<string | null>(null);
+
+  gpsStatus = computed(() => {
+    if (this.locationError()) return { label: 'Location Error', state: 'error' };
+    if (!this.fix()) return { label: 'Locating GPS…', state: 'locating' };
+    return { label: 'GPS Active', state: 'active' };
+  });
 
   fix = signal<Fix | null>(null);
   locationError = signal<string | null>(null);

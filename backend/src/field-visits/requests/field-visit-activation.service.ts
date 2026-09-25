@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { FIELD_VISIT_DAY, OPEN_VISIT_DAYS } from '../field-visit-status';
 
 /**
  * A Prisma client inside a transaction.
@@ -438,6 +439,8 @@ export class FieldVisitActivationService {
         employeeId,
         companyId,
         visitDate: { gte: this.dayKey(from), lte: this.dayKey(to) },
+        // A day already covered by leave is not a fresh clash.
+        status: { in: OPEN_VISIT_DAYS },
         request: { status: 'APPROVED' },
       },
       select: {
@@ -487,6 +490,7 @@ export class FieldVisitActivationService {
         companyId: leave.companyId,
         visitDate: { gte: this.dayKey(leave.from), lte: this.dayKey(leave.to) },
         clockInTime: null,
+        status: { in: OPEN_VISIT_DAYS },
         request: { status: 'APPROVED' },
       },
       select: {
@@ -530,14 +534,26 @@ export class FieldVisitActivationService {
         continue;
       }
 
-      await tx.fieldVisitAttendance.deleteMany({ where: { id: { in: group.ids } } });
+      // Marked, not deleted. A deleted day is a hole the Delivery view cannot
+      // explain — §11 asks it to show leave status, and a row that says
+      // ON_LEAVE is the only way it can. The clock refuses these days, and the
+      // roster entry still goes, so the on-site geofence exemption goes with it.
+      await tx.fieldVisitAttendance.updateMany({
+        where: { id: { in: group.ids } },
+        data: { status: FIELD_VISIT_DAY.ON_LEAVE },
+      });
       await this.releaseRoster(tx, leave.employeeId, leave.companyId, group.requestNumber, group.dates);
 
       // Only if the leave swallowed their whole trip. Somebody away for one
       // day of three still has the work; archiving it would leave them back on
-      // site with nothing assigned.
+      // site with nothing assigned. Days they are on leave for do not count as
+      // still being expected.
       const remaining = await tx.fieldVisitAttendance.count({
-        where: { requestId, employeeId: leave.employeeId },
+        where: {
+          requestId,
+          employeeId: leave.employeeId,
+          status: { in: OPEN_VISIT_DAYS },
+        },
       });
       let archivedTasks = 0;
       if (remaining === 0) {

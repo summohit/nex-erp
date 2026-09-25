@@ -42,7 +42,7 @@ const DAY = {
 
 function makeService(over: any = {}) {
   const prisma: any = {
-    employee: { findUnique: jest.fn().mockResolvedValue({ id: 60, companyId: 1 }) },
+    employee: { findUnique: jest.fn().mockResolvedValue({ id: 60, companyId: 1, userId: 500 }) },
     fieldVisitAttendance: {
       findMany: jest.fn().mockResolvedValue([DAY]),
       update: jest.fn().mockImplementation((a: any) => Promise.resolve({ id: 44, ...a.data })),
@@ -56,7 +56,11 @@ function makeService(over: any = {}) {
     clockIn: jest.fn().mockResolvedValue({ id: 1 }),
     clockOut: jest.fn().mockResolvedValue({ id: 1 }),
   };
-  return { service: new FieldVisitClockService(prisma, attendance), prisma, attendance };
+  const notifications: any = { createNotification: jest.fn().mockResolvedValue({}) };
+  return {
+    service: new FieldVisitClockService(prisma, attendance, notifications),
+    prisma, attendance, notifications,
+  };
 }
 
 describe('the 500 metre rule', () => {
