@@ -30,6 +30,7 @@ function makeService(over: any = {}) {
     project: {
       findUnique: jest.fn().mockResolvedValue({ leadId: 999 }),
       findFirst: jest.fn().mockResolvedValue({ id: 3 }),
+      update: jest.fn().mockResolvedValue({ issueSeq: 21 }),
     },
     projectMember: { findFirst: jest.fn().mockResolvedValue({ id: 1 }) },
     projectTicket: {
@@ -297,6 +298,7 @@ describe('who has to wait for approval', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 3 }),
         // nextTicketNumber reads the company off the project.
         findUnique: jest.fn().mockResolvedValue({ id: 3, companyId: 1 }),
+        update: jest.fn().mockResolvedValue({ issueSeq: 5 }),
       },
       projectMember: { findFirst: jest.fn().mockResolvedValue({ id: 1 }) },
       company: { findUnique: jest.fn().mockResolvedValue({ id: 1 }) },

@@ -381,6 +381,69 @@
   color: #0f172a;
 }
 
+/* --------------------------------------------------------------------------
+   Exact Date Filter (native date input, styled to match the dropdowns)
+   -------------------------------------------------------------------------- */
+.date-filter-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 6px 10px;
+  transition: all 0.15s ease;
+}
+
+.date-filter-wrapper:hover {
+  background: #ffffff;
+  border-color: #94a3b8;
+}
+
+.date-filter-wrapper.has-selection {
+  background: #ffffff;
+  border-color: #3b82f6;
+}
+
+.date-filter-wrapper input[type="date"] {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  outline: none;
+  width: 130px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.date-filter-wrapper.has-selection input[type="date"] {
+  color: #0f172a;
+}
+
+.date-filter-wrapper input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.btn-clear-date {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.btn-clear-date:hover {
+  color: #475569;
+}
+
 .trigger-prefix-icon {
   color: #64748b;
   flex-shrink: 0;
@@ -827,6 +890,27 @@
   border: 1px solid #dbeafe;
 }
 .status-rejected .status-indicator-dot { background: #1373e5; }
+
+.status-pill.status-leave-badge {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+.status-pill.status-leave-badge .status-indicator-dot { background: #3b82f6; }
+
+.status-pill.status-holiday-badge {
+  background: #f3efff;
+  color: #6b3fd6;
+  border: 1px solid #e0d7ff;
+}
+.status-pill.status-holiday-badge .status-indicator-dot { background: #8b5cf6; }
+
+.status-pill.status-dayoff-badge {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+.status-pill.status-dayoff-badge .status-indicator-dot { background: #94a3b8; }
 
 .time-cell {
   display: flex;
@@ -1431,6 +1515,15 @@
   background: #f1f5f9;
 }
 
+.matrix-table th.col-day-header.is-filtered-date {
+  background: #eff6ff;
+  box-shadow: inset 0px -2px 0px #3b82f6;
+}
+
+.matrix-table th.col-day-header.is-filtered-date .day-num {
+  color: #2563eb;
+}
+
 .day-header-inner {
   display: flex;
   flex-direction: column;
@@ -1588,6 +1681,21 @@
 
 .col-day-cell.is-weekend {
   background: rgba(241, 245, 249, 0.4);
+}
+
+/* Status-filtered grid: non-matching day cells recede, matching ones stay */
+.col-day-cell .day-cell-badge.cell-dimmed {
+  opacity: 0.16;
+  box-shadow: none;
+  transform: scale(0.85);
+}
+
+.matrix-row.row-no-match td:not(.col-total-cell) {
+  opacity: 0.38;
+}
+
+.matrix-row.row-no-match .col-day-cell .day-cell-badge.cell-dimmed {
+  opacity: 0.12;
 }
 
 .day-cell-badge {

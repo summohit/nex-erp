@@ -396,6 +396,7 @@ export class CrmService {
         description: true,
         taskType: true,
         status: true,
+        createdAt: true,
         scheduledAt: true,
         estimatedMinutes: true,
         assignedToId: true,
@@ -403,7 +404,7 @@ export class CrmService {
         lead: { select: { id: true, title: true, leadCode: true, companyName: true, contactName: true, flow: true } },
         assignedTo: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
       },
-      orderBy: [{ scheduledAt: 'asc' }, { id: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: opts.take ?? 200,
     });
 
@@ -438,6 +439,8 @@ export class CrmService {
         startDate: null,
         dueDate: t.scheduledAt,
         estimatedHours: t.estimatedMinutes != null ? t.estimatedMinutes / 60 : null,
+        createdAt: t.createdAt ?? null,
+        projectId: null,
         assignees: t.assignedTo ? [t.assignedTo] : [],
         parent: {
           kind: 'LEAD' as const,

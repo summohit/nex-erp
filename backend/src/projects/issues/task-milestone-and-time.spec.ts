@@ -327,7 +327,7 @@ describe('assigned hours at creation', () => {
           }),
         }),
         project: model({
-          findUnique: jest.fn().mockResolvedValue({ allowManualTimeLogging: true, name: 'P' }),
+          findUnique: jest.fn().mockResolvedValue({ allowManualTimeLogging: true, name: 'P', key: 'NEX' }),
           update: jest.fn().mockResolvedValue({ issueSeq: 1, key: 'NEX' }),
         }),
         boardColumn: model({
@@ -382,6 +382,12 @@ describe('assigned hours at creation', () => {
 
   it('coerces a numeric string, since a number input yields one', async () => {
     expect(await create({ title: 'T', estimatedHours: '6' })).toMatchObject({ estimatedHours: 6 });
+  });
+
+  // The key comes from the project counter, not the row count: `count + 1`
+  // reused numbers after a deletion and collided when two creations raced.
+  it('issues the key from the project counter', async () => {
+    expect(await create({ title: 'T' })).toMatchObject({ key: 'NEX-1' });
   });
 });
 
@@ -581,7 +587,7 @@ describe('requiring a phase on a new task', () => {
           findFirst: jest.fn().mockResolvedValue({ id: 3 }),
         }),
         project: model({
-          findUnique: jest.fn().mockResolvedValue({ allowManualTimeLogging: true, name: 'P' }),
+          findUnique: jest.fn().mockResolvedValue({ allowManualTimeLogging: true, name: 'P', key: 'NEX' }),
           update: jest.fn().mockResolvedValue({ issueSeq: 1, key: 'NEX' }),
         }),
         boardColumn: model({

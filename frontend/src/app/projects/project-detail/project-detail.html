@@ -493,6 +493,10 @@
           </div>
         </div>
       </div>
+      <button class="top-bar-add-task-btn" (click)="openCreateIssue()" title="Add task to this project">
+        <svg lucidePlus size="14"></svg>
+        <span>Add task</span>
+      </button>
     </div>
   </div>
 
@@ -874,23 +878,26 @@
         </div>
       </div>
 
-      <!-- Status Filter Popover -->
+      <!-- Status Filter Popover — the single consolidated list/status filter.
+           A board list is a workflow step, so filtering by list was the same
+           thing as filtering by status; one option set replaces both. -->
       <div style="position: relative;">
         <button (click)="togglePopover('list-filter-status')" 
                 style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; font-size: 13px; font-weight: 500; color: #334155; cursor: pointer;"
-                [style.background-color]="listFilterColumnIds().length > 0 ? '#eff6ff' : 'white'"
-                [style.border-color]="listFilterColumnIds().length > 0 ? '#bfdbfe' : '#e2e8f0'">
+                [style.background-color]="listFilterStatuses().length > 0 ? '#eff6ff' : 'white'"
+                [style.border-color]="listFilterStatuses().length > 0 ? '#bfdbfe' : '#e2e8f0'">
           Status 
-          <span *ngIf="listFilterColumnIds().length > 0" style="background: #3b82f6; color: white; border-radius: 999px; padding: 0 6px; font-size: 11px;">{{ listFilterColumnIds().length }}</span>
+          <span *ngIf="listFilterStatuses().length > 0" style="background: #3b82f6; color: white; border-radius: 999px; padding: 0 6px; font-size: 11px;">{{ listFilterStatuses().length }}</span>
           <svg *ngIf="activePopover() !== 'list-filter-status'" lucideChevronDown size="14"></svg>
           <svg *ngIf="activePopover() === 'list-filter-status'" lucideX size="14"></svg>
         </button>
         <div *ngIf="activePopover() === 'list-filter-status'" class="custom-popover" style="position: absolute; top: calc(100% + 4px); left: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); width: 200px; z-index: 1000; padding: 12px;">
            <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Filter by Status</div>
-           <div style="display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto;">
-             <label *ngFor="let col of columns()" style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 6px 8px; border-radius: 6px;" class="hover:bg-gray-50 transition-colors">
-               <input type="checkbox" [checked]="listFilterColumnIds().includes(col.id)" (change)="toggleListFilterColumn(col.id)"> 
-               <span style="color: #334155; font-weight: 500;">{{ col.name }}</span>
+           <div style="display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto;">
+             <label *ngFor="let st of listFilterStatusOptions" style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 6px 8px; border-radius: 6px;" class="hover:bg-gray-50 transition-colors">
+               <input type="checkbox" [checked]="listFilterStatuses().includes(st.value)" (change)="toggleListFilterStatus(st.value)"> 
+               <span [style.background-color]="st.color" style="width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;"></span>
+               <span style="color: #334155; font-weight: 500;">{{ st.label }}</span>
              </label>
            </div>
         </div>
@@ -933,7 +940,7 @@
       </button>
 
       <!-- Clear filters -->
-      <button *ngIf="listSearchQuery() || listFilterAssigneeIds().length > 0 || listFilterColumnIds().length > 0 || listFilterPriorities().length > 0 || listFilterMyIssues()" 
+      <button *ngIf="listSearchQuery() || listFilterAssigneeIds().length > 0 || listFilterStatuses().length > 0 || listFilterPriorities().length > 0 || listFilterMyIssues()" 
               (click)="clearListFilters()" 
               style="display: flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #1373e5; background: #f7f7f8; border: 1px solid #ebebeb; border-radius: 4px; cursor: pointer;"
               class="hover:bg-red-100 hover:text-red-700 transition-all">
@@ -1019,53 +1026,6 @@
           <div class="fd-section">
             <div class="fd-section-label">Task name</div>
             <input type="text" class="fd-text-input" placeholder="Search by task name" [ngModel]="fdTaskName()" (ngModelChange)="fdTaskName.set($event)" title="Filter by task title">
-          </div>
-
-          <!-- List (matches grid "List" column) -->
-          <div class="fd-section">
-            <div class="fd-section-label">List</div>
-            <div class="fd-select-wrap">
-              <button class="fd-select-btn" (click)="toggleFdDropdown('list', $event)">
-                <span [style.color]="fdColumnIds().length ? '#0f172a' : '#94a3b8'">
-                  {{ fdColumnIds().length ? (fdColumnIds().length + ' selected') : 'All' }}
-                </span>
-                <svg lucideChevronDown size="14"></svg>
-              </button>
-              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'list'">
-                <button class="fd-select-option multi" [class.selected]="fdColumnIds().length === 0" (click)="fdColumnIds.set([])">
-                  <span class="fd-check" [style.background]="fdColumnIds().length === 0 ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdColumnIds().length === 0" size="11"></svg></span>
-                  <span>All</span>
-                </button>
-                <button *ngFor="let col of columns()" class="fd-select-option multi" [class.selected]="fdColumnIds().includes(col.id)" (click)="fdToggleArray(fdColumnIds, col.id)">
-                  <span class="fd-check" [style.background]="fdColumnIds().includes(col.id) ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdColumnIds().includes(col.id)" size="11"></svg></span>
-                  <span class="fd-label-dot" [style.background-color]="col.color || '#6b7280'"></span>
-                  <span>{{ col.name }}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Status (matches grid "Status" column) -->
-          <div class="fd-section">
-            <div class="fd-section-label">Status</div>
-            <div class="fd-select-wrap">
-              <button class="fd-select-btn" (click)="toggleFdDropdown('status', $event)">
-                <span [style.color]="fdStatuses().length ? '#0f172a' : '#94a3b8'">
-                  {{ fdStatuses().length ? (fdStatuses().length + ' selected') : 'All' }}
-                </span>
-                <svg lucideChevronDown size="14"></svg>
-              </button>
-              <div class="fd-select-menu" *ngIf="fdDropdownOpen() === 'status'">
-                <button class="fd-select-option multi" [class.selected]="fdStatuses().length === 0" (click)="fdStatuses.set([])">
-                  <span class="fd-check" [style.background]="fdStatuses().length === 0 ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdStatuses().length === 0" size="11"></svg></span>
-                  <span>All</span>
-                </button>
-                <button *ngFor="let st of ['TODO','IN_PROGRESS','IN_REVIEW','DONE']" class="fd-select-option multi" [class.selected]="fdStatuses().includes(st)" (click)="fdToggleArray(fdStatuses, st)">
-                  <span class="fd-check" [style.background]="fdStatuses().includes(st) ? '#2563eb' : 'transparent'"><svg lucideCheck *ngIf="fdStatuses().includes(st)" size="11"></svg></span>
-                  <span>{{ st.replace('_', ' ') }}</span>
-                </button>
-              </div>
-            </div>
           </div>
 
           <!-- Due Date (matches grid "Due Date" column) -->

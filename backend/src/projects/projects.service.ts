@@ -240,14 +240,29 @@ export class ProjectsService {
        * the analysis has just written its own tasks numbered from one, and
        * starting again would collide on @@unique([key, companyId]) and take
        * the whole kickoff down with it.
+       *
+       * The row count is not the whole story either. Deleted tasks shrink it
+       * below the highest number ever handed out, so a task created and then
+       * removed would leave `count` lower than `issueSeq` -- and numbering
+       * the defaults from the count would hand the deleted task's number to a
+       * new one, or advance issueSeq backwards and let the next manual task
+       * collide with one already on the board. Taking the higher of the two
+       * keeps every number issued so far safe.
        */
-      const existing = await this.prisma.issue.count({
-        where: { projectId: project.id, companyId },
-      });
+      const [existing, seqRow] = await Promise.all([
+        this.prisma.issue.count({
+          where: { projectId: project.id, companyId },
+        }),
+        this.prisma.project.findUnique({
+          where: { id: project.id },
+          select: { issueSeq: true },
+        }),
+      ]);
+      const base = Math.max(existing, seqRow?.issueSeq ?? 0);
 
       await this.prisma.issue.createMany({
         data: defaults.map((t, index) => ({
-          key: `${project.key}-${existing + index + 1}`,
+          key: `${project.key}-${base + index + 1}`,
           title: t.name,
           description: t.description,
           type: 'TASK',
@@ -258,7 +273,7 @@ export class ProjectsService {
           columnId: todo?.id ?? null,
           assigneeId,
           reporterId: leadId,
-          position: existing + index,
+          position: base + index,
         })),
       });
 
@@ -277,7 +292,7 @@ export class ProjectsService {
         const created = await this.prisma.issue.findMany({
           where: {
             projectId: project.id,
-            key: { in: defaults.map((_, i) => `${project.key}-${existing + i + 1}`) },
+            key: { in: defaults.map((_, i) => `${project.key}-${base + i + 1}`) },
           },
           select: { id: true },
         });
@@ -291,7 +306,7 @@ export class ProjectsService {
       // hand collides with one of these on @@unique([key, companyId]).
       await this.prisma.project.update({
         where: { id: project.id },
-        data: { issueSeq: existing + defaults.length },
+        data: { issueSeq: base + defaults.length },
       });
     } catch (err) {
       this.logger.error(
@@ -1143,6 +1158,16 @@ export class ProjectsService {
       return project;
     }
 
+    // Number the WBS tasks from what the project already holds, not from one,
+    // so the analysis cannot reuse a number an earlier task already carries.
+    // A fresh AI draft has none, so this ordinarily starts at one -- but it is
+    // the same rule the other key writers follow, and it costs nothing here.
+    const [existing, seqRow] = await Promise.all([
+      this.prisma.issue.count({ where: { projectId, companyId } }),
+      this.prisma.project.findUnique({ where: { id: projectId }, select: { issueSeq: true } }),
+    ]);
+    const base = Math.max(existing, seqRow?.issueSeq ?? 0);
+
     let position = 0;
     const issues = analysis.wbsTasks.map((task, idx) => {
       return {
@@ -1152,7 +1177,7 @@ export class ProjectsService {
         columnId: todoColumn.id,
         type: 'TASK',
         status: 'TODO',
-        key: `${project.key}-${idx + 1}`,
+        key: `${project.key}-${base + idx + 1}`,
         position: position++,
         startDate: task.startDate ? new Date(task.startDate) : null,
         dueDate: task.endDate ? new Date(task.endDate) : null,
@@ -1164,6 +1189,14 @@ export class ProjectsService {
     if (issues.length > 0) {
       await this.prisma.issue.createMany({
         data: issues
+      });
+
+      // Advance the counter here, not only in the seed that follows. The seed
+      // is deliberately non-fatal, and a project whose seed failed must not
+      // hand the next manual task a number one of these already holds.
+      await this.prisma.project.update({
+        where: { id: projectId },
+        data: { issueSeq: base + issues.length },
       });
     }
 

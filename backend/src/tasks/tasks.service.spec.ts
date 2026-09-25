@@ -144,13 +144,13 @@ describe('TasksService', () => {
       expect(prisma.preSalesTask).toBeUndefined();
     });
 
-    it('sorts by due date, with undated work last', async () => {
+    it('sorts newest assigned first, with undated work last', async () => {
       prisma.issue.findMany = jest.fn(async () => [
-        issueRow({ id: 1, dueDate: null }),
-        issueRow({ id: 2, dueDate: new Date('2026-10-01') }),
+        issueRow({ id: 1, createdAt: new Date('2026-09-01') }),
+        issueRow({ id: 2, createdAt: new Date('2026-09-15') }),
       ]);
       crm.getMyPreSalesTasks = jest.fn(async () => [
-        { source: 'PRE_SALES', id: 9, dueDate: new Date('2026-09-20') } as any,
+        { source: 'PRE_SALES', id: 9, createdAt: new Date('2026-09-20') } as any,
       ]);
       const { items } = await service.getMyTasks(1, 4, 'EMPLOYEE');
       expect(items.map((i) => i.id)).toEqual([9, 2, 1]);

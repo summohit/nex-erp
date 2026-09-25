@@ -19,6 +19,7 @@ import {
 import { ProjectsService } from '../services/projects';
 import { ClientsService } from '../services/clients';
 import { MasterDataService } from '../services/master-data.service';
+import { SocketService } from '../services/socket.service';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
 import { UploadService } from '../services/upload.service';
@@ -109,6 +110,7 @@ export class ProjectsComponent implements OnInit {
   private router = inject(Router);
   private authService = inject(AuthService);
   private tasksService = inject(TasksService);
+  private socketService = inject(SocketService);
   private uploadService = inject(UploadService);
   private toast = inject(HotToastService);
   private route = inject(ActivatedRoute);
@@ -1438,6 +1440,15 @@ export class ProjectsComponent implements OnInit {
         this.closeBoardDropdown();
       }
     }
+    // The in-row status menu closes on any click that is neither an option in
+    // the menu nor another status button. Opening a button sets the menu, and
+    // this handler skips the same button so the open survives this listener.
+    const target = event.target as HTMLElement;
+    if (this.myTasksStatusMenu()
+        && !target.closest('.my-tasks-status-menu')
+        && !target.closest('[data-act="board-status"]')) {
+      this.myTasksStatusMenu.set(null);
+    }
   }
 
   // Create / Edit Modal Searchable Selects
@@ -1690,6 +1701,21 @@ export class ProjectsComponent implements OnInit {
   ngOnInit() {
     this.syncTabFromRoute();
 
+    // Live sync with the board (§ tasks ↔ board): the socket only delivers
+    // issue_updated to clients inside the affected project's room, so — once
+    // we have joined each room whose tasks the list shows — a card moved or a
+    // status changed on the board lands here and the list re-reads the truth.
+    // Without this, the two halves of the same status drifted until reload.
+    this.socketService.onIssueUpdated()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        if (this.activeTab() === 'my-tasks') this.scheduleMyTasksReload();
+      });
+    this.destroyRef.onDestroy(() => {
+      this.myTasksJoinedRooms.forEach((id) => this.socketService.leaveProject(id));
+      this.myTasksJoinedRooms.clear();
+    });
+
     // Listen to route changes because Angular reuses this component instance
     // when navigating between /projects and /tasks (both point to ProjectsComponent).
     this.router.events
@@ -1741,6 +1767,14 @@ export class ProjectsComponent implements OnInit {
     const qp = this.route.snapshot.queryParamMap;
     const forcedTab = this.route.snapshot.data['forceTab'] as
       | 'all' | 'starred' | 'recent' | 'archived' | 'my-tasks' | undefined;
+
+    // A `/tasks?search=<key>` deep link (Timesheets "open task", a
+    // notification) is meant to land on the row, not just the tab. Without
+    // this the key is ignored and the list opens unfiltered.
+    const deepSearch = qp.get('search');
+    if (deepSearch) {
+      this.searchQuery.set(deepSearch);
+    }
 
     // Delivery > Tasks (/tasks) or forcedTab: always show my-tasks
     if (path.startsWith('/tasks') || forcedTab === 'my-tasks') {
@@ -2337,6 +2371,10 @@ export class ProjectsComponent implements OnInit {
     this.loadMyTasks();
   }
 
+  /** Project rooms joined so board changes reach this page's list. */
+  private myTasksJoinedRooms = new Set<number>();
+  private myTasksReloadTimer: any = null;
+
   loadMyTasks() {
     this.myTasksLoading.set(true);
     this.tasksService.getMyTasks({
@@ -2350,6 +2388,17 @@ export class ProjectsComponent implements OnInit {
         if (res.scope) this.myTasksScope.set(res.scope);
         this.myTasksLoading.set(false);
         this.myTasksLoaded.set(true);
+        // Join each project room whose tasks the list shows, so board changes
+        // emit here. Pre-sales rows have no project room of their own; general
+        // rows join their (system) project like any other.
+        (res.items || [])
+          .filter((t: any) => t.projectId != null)
+          .forEach((t: any) => {
+            if (!this.myTasksJoinedRooms.has(t.projectId)) {
+              this.myTasksJoinedRooms.add(t.projectId);
+              this.socketService.joinProject(t.projectId);
+            }
+          });
       },
       error: () => {
         this.myTasks.set([]);
@@ -2357,6 +2406,15 @@ export class ProjectsComponent implements OnInit {
         this.myTasksLoaded.set(true);
       },
     });
+  }
+
+  /** Collapse a burst of board moves into one refresh. */
+  private scheduleMyTasksReload() {
+    if (this.myTasksReloadTimer) clearTimeout(this.myTasksReloadTimer);
+    this.myTasksReloadTimer = setTimeout(() => {
+      this.myTasksReloadTimer = null;
+      this.loadMyTasks();
+    }, 400);
   }
 
   toggleMyTasksDone() {
@@ -2662,6 +2720,7 @@ export class ProjectsComponent implements OnInit {
     const hit = (event.event?.target as HTMLElement | undefined)?.closest?.('[data-act]') as HTMLElement | null;
     const act = hit?.getAttribute('data-act');
     if (act) {
+      if (act === 'board-status') { this.openMyTasksStatusMenu(task, hit); return; }
       if (act === 'status') this.openPreSalesStatus(task, hit!.getAttribute('data-status') || 'WORKING');
       else if (act === 'history') this.openPreSalesHistory(task);
       else if (act === 'edit') this.openEditPreSalesTask(task);
@@ -2677,6 +2736,59 @@ export class ProjectsComponent implements OnInit {
     }
     if (!task.link) return;
     this.router.navigate([task.link.route], { queryParams: task.link.queryParams });
+  }
+
+  // ── In-row status change (§ status ↔ board) ─────────────────────────────
+  // The STATUS cell of an issue row is a button; clicking it opens this
+  // floating menu here instead of navigating to the project. Choosing an item
+  // writes through the same endpoint the board's column drop uses, so every
+  // side effect that runs on the board (timer start/stop, ticket sync, the
+  // Done review request, the blocked-by gate) runs exactly the same here.
+  myTasksStatusMenu = signal<{ x: number; y: number; task: MyTask } | null>(null);
+
+  myTasksStatusOptions: { value: string; label: string; cls: string }[] = [
+    { value: 'TODO', label: 'To Do', cls: 'status-open' },
+    { value: 'IN_PROGRESS', label: 'In Progress', cls: 'status-in-progress' },
+    { value: 'IN_REVIEW', label: 'In Review', cls: 'status-in-progress' },
+    { value: 'DONE', label: 'Completed', cls: 'status-resolved' },
+  ];
+
+  openMyTasksStatusMenu(task: MyTask, btn: HTMLElement | null) {
+    const rect = btn?.getBoundingClientRect();
+    if (!rect) { this.myTasksStatusMenu.set({ x: 0, y: 0, task }); return; }
+    const menuW = 190;
+    const menuH = 4 * 40 + 30;
+    const x = Math.max(8, Math.min(rect.left, window.innerWidth - menuW - 8));
+    const fitsBelow = rect.bottom + 6 + menuH <= window.innerHeight - 8;
+    const y = fitsBelow ? rect.bottom + 6 : Math.max(8, rect.top - menuH - 6);
+    this.myTasksStatusMenu.set({ x, y, task });
+  }
+
+  onMyTasksStatusPick(status: string) {
+    const menu = this.myTasksStatusMenu();
+    this.myTasksStatusMenu.set(null);
+    const task = menu?.task;
+    if (!task || task.projectId == null || task.status === status) return;
+    this.projectsService.updateIssue(task.projectId, task.id, { status }).subscribe({
+      next: () => {
+        this.toast.success('Status updated');
+        this.loadMyTasks();
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.message || 'Could not update the status. Try again.');
+        this.loadMyTasks();
+      },
+    });
+  }
+
+  myTasksStatusDotColor(value: string): string {
+    const map: Record<string, string> = {
+      TODO: '#3b82f6',
+      IN_PROGRESS: '#6b3fd6',
+      IN_REVIEW: '#6b3fd6',
+      DONE: '#10b981',
+    };
+    return map[value] || '#3b82f6';
   }
 
   // ── Pre-sales tasks ──────────────────────────────────────────────────────
@@ -3037,25 +3149,23 @@ export class ProjectsComponent implements OnInit {
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
   }
 
-  /**
-   * Whether the grid can size itself to its rows.
-   *
-   * ag-Grid's 'normal' layout fills its container, and this wrapper has no
-   * height of its own — so a list long enough to leave 'autoHeight' collapsed
-   * to nothing but a pagination bar. Ten rows was never enough to notice; the
-   * administrator's company-wide view, at two hundred, is.
-   */
-  myTasksGridAutoHeight = computed(() => this.filteredMyTasks().length <= 10);
-
   myTasksGridApi: any = null;
 
   onMyTasksGridReady(params: any) {
     this.myTasksGridApi = params.api;
     setTimeout(() => {
       params.api.sizeColumnsToFit();
+      // autoHeight reflows after the first paint; without this the grid can
+      // collapse to nothing but the pagination bar when a large page loads.
+      params.api.onGridSizeChanged();
       const scrollContainer = document.querySelector('.my-tasks-grid .ag-body-horizontal-scroll-viewport');
       if (scrollContainer) (scrollContainer as HTMLElement).scrollLeft = 0;
     }, 50);
+  }
+
+  /** Recompute the height when the page-size selector changes row count. */
+  onMyTasksPaginationChanged(e: any) {
+    setTimeout(() => e?.api?.onGridSizeChanged(), 0);
   }
 
   myTasksDefaultColDef: ColDef = {
@@ -3161,24 +3271,30 @@ export class ProjectsComponent implements OnInit {
     {
       field: 'status',
       headerName: 'STATUS',
-      width: 125,
-      minWidth: 125,
+      width: 150,
+      minWidth: 140,
       cellRenderer: (p: any) => {
         const raw = String(p.value || 'TODO').toUpperCase();
         const statusMap: Record<string, { cls: string; label: string }> = {
-          TODO:        { cls: 'status-open', label: 'OPEN' },
-          OPEN:        { cls: 'status-open', label: 'OPEN' },
-          IN_PROGRESS: { cls: 'status-in-progress', label: 'IN PROGRESS' },
-          IN_REVIEW:   { cls: 'status-in-progress', label: 'IN REVIEW' },
-          DONE:        { cls: 'status-resolved', label: 'RESOLVED' },
-          RESOLVED:    { cls: 'status-resolved', label: 'RESOLVED' },
-          CLOSED:      { cls: 'status-closed', label: 'CLOSED' },
-          CANCELLED:   { cls: 'status-closed', label: 'CLOSED' },
-          BLOCKED:     { cls: 'status-rejected', label: 'BLOCKED' },
-          REJECTED:    { cls: 'status-rejected', label: 'REJECTED' },
+          TODO:        { cls: 'status-open', label: 'To Do' },
+          OPEN:        { cls: 'status-open', label: 'To Do' },
+          IN_PROGRESS: { cls: 'status-in-progress', label: 'In Progress' },
+          IN_REVIEW:   { cls: 'status-in-progress', label: 'In Review' },
+          DONE:        { cls: 'status-resolved', label: 'Completed' },
+          RESOLVED:    { cls: 'status-resolved', label: 'Completed' },
+          CLOSED:      { cls: 'status-resolved', label: 'Completed' },
+          ARCHIVED:    { cls: 'status-closed', label: 'Archived' },
         };
         const s = statusMap[raw] || { cls: 'status-open', label: raw.replace(/_/g, ' ') };
-        return `<span class="status-pill ${s.cls}"><span class="status-indicator-dot"></span>${s.label}</span>`;
+        // A pre-sales row moves through its own ladder via the ACTIONS column,
+        // so its status stays a static badge. An issue row belongs to a board —
+        // render it as a dropdown button that writes through the board's own
+        // endpoint, so changing a status here is the same change as dropping
+        // the card into the next column.
+        if (p.data?.projectId == null) {
+          return `<span class="status-pill ${s.cls}"><span class="status-indicator-dot"></span>${s.label}</span>`;
+        }
+        return `<button type="button" class="status-pill ${s.cls} status-menu-btn" data-act="board-status" title="Change status"><span class="status-indicator-dot"></span>${s.label}<svg class="status-menu-caret" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>`;
       },
     },
     {

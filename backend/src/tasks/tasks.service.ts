@@ -492,7 +492,7 @@ export class TasksService {
       },
       select: {
         id: true, key: true, title: true, status: true, priority: true,
-        startDate: true, dueDate: true, estimatedHours: true,
+        createdAt: true, startDate: true, dueDate: true, estimatedHours: true,
         project: { select: { id: true, name: true, key: true, isSystem: true } },
         // §17: the task list filters by project code and by milestone, and
         // both are cheap joins the row already half-carries.
@@ -515,7 +515,7 @@ export class TasksService {
           },
         },
       },
-      orderBy: [{ dueDate: 'asc' }, { id: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: PER_SOURCE_CAP,
     });
 
@@ -557,6 +557,12 @@ export class TasksService {
         startDate: i.startDate,
         dueDate: i.dueDate,
         estimatedHours: i.estimatedHours,
+        createdAt: i.createdAt ?? null,
+        // The project the issue lives in — null on a pre-sales task, and the
+        // system project on a general one. Drives i) the room the row joins so
+        // board changes reach it and ii) the status dropdown's write, both of
+        // which need a real project id that `parent` deliberately hides.
+        projectId: i.project?.id ?? null,
         assignees,
         parent,
         blockedBy: i.blockedBy
@@ -578,11 +584,14 @@ export class TasksService {
     });
 
     const all = [...items, ...preSales];
+    // Newest first: what was assigned most recently earns the top of the list
+    // and undated rows trail behind rather than jumping the queue. This is the
+    // answer to "my board work is beside my deal work" — both halves of the
+    // list read newest → oldest instead of each sorting by deadline.
     all.sort((a, b) => {
-      if (!a.dueDate && !b.dueDate) return 0;
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-      return a.dueDate.getTime() - b.dueDate.getTime();
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
     });
 
     return {

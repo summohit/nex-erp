@@ -69,9 +69,6 @@ export class IssuesService {
       );
     }
 
-    const count = await this.prisma.issue.count({ where: { projectId, companyId } });
-    const key = `${project.key}-${count + 1}`;
-
     let columnId = data.columnId;
     if (!columnId) {
       const board = await this.prisma.board.findFirst({ 
@@ -143,47 +140,71 @@ export class IssuesService {
     });
     const position = firstIssue ? firstIssue.position - 1 : 0;
 
-    const issue = await this.prisma.issue.create({
-      data: {
-        key,
-        title: data.title,
-        description: data.description,
-        type: data.type || 'TASK',
-        priority: data.priority || 'MEDIUM',
-        projectId,
-        companyId,
-        columnId,
-        reporterId,
-        assigneeId: data.assigneeId,
-        position,
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
-        startDate: data.startDate ? new Date(data.startDate) : null,
-        parentId: data.parentId ? Number(data.parentId) : null,
-        // §15: optional at creation — a task often exists before anyone
-        // decides which milestone it belongs to.
-        milestoneId: await this.resolveMilestoneId(companyId, projectId, data.milestoneId),
-        // §8: the delivery phase. Optional at creation for the same reason as
-        // the milestone above, and because every task predating phases has
-        // none -- requiring one here would refuse the board's quick-add.
-        phaseId: await this.resolvePhaseId(companyId, data.phaseId),
-        /// The hours the task is assigned (§3).
-        ///
-        /// Accepted here as well as on update: the board's create form has
-        /// collected Estimated Hours all along and this method silently
-        /// dropped it, so a task created with "4h" typed into it came out
-        /// unestimated -- and an unestimated task is unbounded, meaning the
-        /// hours ceiling never applied to anything created from the board.
-        estimatedHours: data.estimatedHours != null && data.estimatedHours !== ''
-          ? Number(data.estimatedHours)
-          : null,
-      }
-    });
+    /**
+     * A task's number comes from the project's counter, not from counting its
+     * rows, and the allocation and the write share one transaction.
+     *
+     * `${count + 1}` looked right until two creations happened in the same
+     * second, or a task was deleted: concurrent callers collided on
+     * @@unique([key, companyId]) and the second became a 500, and a deletion
+     * shrank the count so the next task silently reused the deleted one's
+     * number. issueSeq is a column, so incrementing it row-locks the project
+     * and hands each creator a number that no other writer can also receive —
+     * this method, the task form, a ticket conversion, a template and a
+     * project copy all draw from the same counter, so none of them can collide.
+     */
+    const { issue, activity } = await this.prisma.$transaction(async (tx) => {
+      const { issueSeq } = await tx.project.update({
+        where: { id: projectId },
+        data: { issueSeq: { increment: 1 } },
+        select: { issueSeq: true },
+      });
+      const key = `${project.key}-${issueSeq}`;
 
-    const activity = await this.prisma.issueActivity.create({
-      data: { action: 'CREATED', issueId: issue.id, actorId: reporterId },
-      include: {
-        actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
-      }
+      const created = await tx.issue.create({
+        data: {
+          key,
+          title: data.title,
+          description: data.description,
+          type: data.type || 'TASK',
+          priority: data.priority || 'MEDIUM',
+          projectId,
+          companyId,
+          columnId,
+          reporterId,
+          assigneeId: data.assigneeId,
+          position,
+          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          startDate: data.startDate ? new Date(data.startDate) : null,
+          parentId: data.parentId ? Number(data.parentId) : null,
+          // §15: optional at creation — a task often exists before anyone
+          // decides which milestone it belongs to.
+          milestoneId: await this.resolveMilestoneId(companyId, projectId, data.milestoneId),
+          // §8: the delivery phase. Optional at creation for the same reason as
+          // the milestone above, and because every task predating phases has
+          // none -- requiring one here would refuse the board's quick-add.
+          phaseId: await this.resolvePhaseId(companyId, data.phaseId),
+          /// The hours the task is assigned (§3).
+          ///
+          /// Accepted here as well as on update: the board's create form has
+          /// collected Estimated Hours all along and this method silently
+          /// dropped it, so a task created with "4h" typed into it came out
+          /// unestimated -- and an unestimated task is unbounded, meaning the
+          /// hours ceiling never applied to anything created from the board.
+          estimatedHours: data.estimatedHours != null && data.estimatedHours !== ''
+            ? Number(data.estimatedHours)
+            : null,
+        },
+      });
+
+      const createdActivity = await tx.issueActivity.create({
+        data: { action: 'CREATED', issueId: created.id, actorId: reporterId },
+        include: {
+          actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
+        }
+      });
+
+      return { issue: created, activity: createdActivity };
     });
 
     this.tasksGateway.emitIssueUpdated(issue.id, projectId, issue);

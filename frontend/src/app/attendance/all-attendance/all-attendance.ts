@@ -102,6 +102,8 @@ export class AllAttendanceComponent implements OnInit {
   // Active Filter state
   filterMonth = new Date().getMonth() + 1;
   filterYear = new Date().getFullYear();
+  /** Exact date (yyyy-mm-dd, local) override to show that single day only. */
+  filterDate: string | null = null;
   /** Bumped on every load() so month/year-dependent computed()s re-evaluate. */
   periodVersion = signal(0);
   filterEmployeeId: number | null = null;
@@ -132,17 +134,20 @@ export class AllAttendanceComponent implements OnInit {
 
   readonly statusOptions = [
     { value: '', label: 'All Statuses' },
-    { value: 'PRESENT', label: 'Present' },
-    { value: 'HALF_DAY', label: 'Half Day' },
-    { value: 'ABSENT', label: 'Absent' }
+    { value: 'Present', label: 'Present' },
+    { value: 'Half Day', label: 'Half Day' },
+    { value: 'Late', label: 'Late' },
+    { value: 'Absent', label: 'Absent' },
+    { value: 'On Leave', label: 'On Leave' },
+    { value: 'Holiday', label: 'Holiday' },
+    { value: 'Day Off', label: 'Day Off' },
+    { value: 'Overtime', label: 'Overtime' },
+    { value: 'Missed Clock Out', label: 'Missed Clock Out' }
   ];
 
   readonly flagOptions = [
     { value: 'ALL', label: 'All Flags / Logs' },
-    { value: 'LATE', label: 'Late Arrival' },
-    { value: 'EARLY', label: 'Early Departure' },
-    { value: 'ON_TIME', label: 'On Time Only' },
-    { value: 'MISSING_OUT', label: 'Still Clocked In' }
+    { value: 'EARLY', label: 'Early Departure' }
   ];
 
   constructor() {
@@ -167,8 +172,7 @@ export class AllAttendanceComponent implements OnInit {
       month: this.filterMonth,
       year: this.filterYear,
       employeeId: this.filterEmployeeId || undefined,
-      departmentId: this.filterDepartmentId || undefined,
-      status: this.filterStatus || undefined
+      departmentId: this.filterDepartmentId || undefined
     }).subscribe({
       next: (res) => {
         this.records.set(res || []);
@@ -183,6 +187,7 @@ export class AllAttendanceComponent implements OnInit {
 
   // Month navigation
   prevMonth() {
+    this.filterDate = null;
     if (this.filterMonth === 1) {
       this.filterMonth = 12;
       this.filterYear--;
@@ -193,6 +198,7 @@ export class AllAttendanceComponent implements OnInit {
   }
 
   nextMonth() {
+    this.filterDate = null;
     if (this.filterMonth === 12) {
       this.filterMonth = 1;
       this.filterYear++;
@@ -206,6 +212,7 @@ export class AllAttendanceComponent implements OnInit {
     const now = new Date();
     this.filterMonth = now.getMonth() + 1;
     this.filterYear = now.getFullYear();
+    this.filterDate = null;
     this.load();
   }
 
@@ -382,7 +389,7 @@ export class AllAttendanceComponent implements OnInit {
   stats = computed(() => {
     const list = this.records();
     const total = list.length;
-    const present = list.filter(r => r.status === 'PRESENT').length;
+    const present = list.filter(r => r.status === 'PRESENT' && !r.isLate).length;
     const halfDay = list.filter(r => r.status === 'HALF_DAY').length;
     const absent = list.filter(r => r.status === 'ABSENT').length;
     const late = list.filter(r => r.isLate).length;
@@ -407,7 +414,17 @@ export class AllAttendanceComponent implements OnInit {
     let list = [...this.records()];
     const q = this.searchQuery().toLowerCase().trim();
 
-    // 1. Text Search (Employee name, department)
+    // 1. Exact-date filter (show that single day only)
+    if (this.filterDate) {
+      list = list.filter(r => this.getBackendDateString(r.date) === this.filterDate);
+    }
+
+    // 2. Attendance Status filter (client-side, mirrors the grid's day-status)
+    if (this.filterStatus) {
+      list = list.filter(r => this.recordMatchesStatus(r));
+    }
+
+    // 3. Text Search (Employee name, department)
     if (q) {
       list = list.filter(r => {
         const name = `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.toLowerCase();
@@ -416,7 +433,7 @@ export class AllAttendanceComponent implements OnInit {
       });
     }
 
-    // 2. Flag filter
+    // 4. Flag filter
     if (this.filterFlag === 'LATE') {
       list = list.filter(r => r.isLate);
     } else if (this.filterFlag === 'EARLY') {
@@ -427,7 +444,7 @@ export class AllAttendanceComponent implements OnInit {
       list = list.filter(r => r.status === 'PRESENT' && !r.clockOut);
     }
 
-    // 3. Sorting
+    // 5. Sorting
     list.sort((a, b) => {
       if (this.sortBy === 'date_desc') {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -550,12 +567,14 @@ export class AllAttendanceComponent implements OnInit {
   // Select Actions
   selectMonth(month: number) {
     this.filterMonth = month;
+    this.filterDate = null;
     this.showMonthDropdown = false;
     this.load();
   }
 
   selectYear(year: number) {
     this.filterYear = year;
+    this.filterDate = null;
     this.showYearDropdown = false;
     this.load();
   }
@@ -575,12 +594,49 @@ export class AllAttendanceComponent implements OnInit {
   selectStatus(status: string) {
     this.filterStatus = status;
     this.showStatusDropdown = false;
-    this.load();
   }
 
   selectFlag(flag: any) {
     this.filterFlag = flag;
     this.showFlagDropdown = false;
+  }
+
+  selectDate(value: string) {
+    const dateStr = value || '';
+    if (!dateStr) {
+      this.filterDate = null;
+      return;
+    }
+    const d = new Date(`${dateStr}T00:00:00`);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    if (year !== this.filterYear || month !== this.filterMonth) {
+      this.filterYear = year;
+      this.filterMonth = month;
+      this.filterDate = dateStr;
+      this.load();
+    } else {
+      this.filterDate = dateStr;
+    }
+  }
+
+  clearDate() {
+    this.filterDate = null;
+  }
+
+  formatDateLabel(value: string): string {
+    if (!value) return '';
+    return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric'
+    });
+  }
+
+  dayMatchesDate(day: DayMatrixStatus): boolean {
+    return !this.filterDate || day.dateStr === this.filterDate;
+  }
+
+  hasMatchingDate(row: EmployeeMatrixRow): boolean {
+    return !this.filterDate || row.days.some(day => day.dateStr === this.filterDate);
   }
 
   toggleKpiStatus(status: string) {
@@ -589,20 +645,12 @@ export class AllAttendanceComponent implements OnInit {
     } else {
       this.filterStatus = status;
     }
-    this.load();
-  }
-
-  toggleKpiFlag(flag: 'LATE' | 'EARLY') {
-    if (this.filterFlag === flag) {
-      this.filterFlag = 'ALL';
-    } else {
-      this.filterFlag = flag;
-    }
   }
 
   hasActiveFilters(): boolean {
     return !!(
       this.searchQuery() ||
+      this.filterDate ||
       this.filterEmployeeId ||
       this.filterDepartmentId ||
       this.filterStatus ||
@@ -618,6 +666,14 @@ export class AllAttendanceComponent implements OnInit {
         key: 'search',
         label: `Search: "${this.searchQuery()}"`,
         clear: () => { this.searchQuery.set(''); }
+      });
+    }
+
+    if (this.filterDate) {
+      chips.push({
+        key: 'date',
+        label: `Date: ${this.formatDateLabel(this.filterDate)}`,
+        clear: () => { this.clearDate(); }
       });
     }
 
@@ -662,6 +718,7 @@ export class AllAttendanceComponent implements OnInit {
     this.filterYear = now.getFullYear();
     this.filterEmployeeId = null;
     this.filterDepartmentId = null;
+    this.filterDate = null;
     this.filterStatus = '';
     this.filterFlag = 'ALL';
     this.searchQuery.set('');
@@ -669,10 +726,50 @@ export class AllAttendanceComponent implements OnInit {
     this.load();
   }
 
+  // Mirrors the grid's day-cell classification for a single record.
+  recordDayStatus(r: AttendanceRecord): string {
+    if (r.clockIn) {
+      if (r.status === 'HALF_DAY') return 'Half Day';
+      if (r.isLate) return 'Late';
+      return 'Present';
+    }
+    if (r.status === 'ON_LEAVE') return 'On Leave';
+    if (r.status === 'HOLIDAY') return 'Holiday';
+    if (r.status === 'WEEKLY_OFF') return 'Day Off';
+    return 'Absent';
+  }
+
+  isMissedClockOut(r: AttendanceRecord): boolean {
+    return !!r.clockOutReason || !!r.missedClockOut || (r.status === 'PRESENT' && !r.clockOut);
+  }
+
+  recordMatchesStatus(r: AttendanceRecord): boolean {
+    const f = this.filterStatus;
+    if (!f) return true;
+    if (f === 'Overtime') return !!(r.overtimeHours && r.overtimeHours > 0);
+    if (f === 'Missed Clock Out') return this.isMissedClockOut(r);
+    return this.recordDayStatus(r) === f;
+  }
+
+  dayMatchesStatus(day: DayMatrixStatus): boolean {
+    const f = this.filterStatus;
+    if (!f) return true;
+    if (f === 'Overtime') return !!(day.record?.overtimeHours && day.record.overtimeHours > 0);
+    if (f === 'Missed Clock Out') return !!day.record && this.isMissedClockOut(day.record);
+    return day.status === f;
+  }
+
+  hasMatchingDay(row: EmployeeMatrixRow): boolean {
+    return row.days.some(day => this.dayMatchesStatus(day));
+  }
+
   statusClass(status: string): string {
-    if (status === 'PRESENT') return 'status-approved';
-    if (status === 'ABSENT') return 'status-rejected';
-    if (status === 'HALF_DAY') return 'status-pending';
+    if (status === 'Present') return 'status-approved';
+    if (status === 'Absent') return 'status-rejected';
+    if (status === 'Half Day' || status === 'Late') return 'status-pending';
+    if (status === 'On Leave') return 'status-leave-badge';
+    if (status === 'Holiday') return 'status-holiday-badge';
+    if (status === 'Day Off') return 'status-dayoff-badge';
     return 'status-pending';
   }
 

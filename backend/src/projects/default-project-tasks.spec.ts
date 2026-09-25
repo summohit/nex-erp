@@ -27,7 +27,11 @@ function make(over: any = {}) {
         return Promise.resolve({ count: a.data.length });
       }),
     },
-    project: { update: jest.fn().mockResolvedValue({}) },
+    project: {
+      update: jest.fn().mockResolvedValue({}),
+      // The counter the seed reads so it never renumbers past a deletion.
+      findUnique: jest.fn().mockResolvedValue({ issueSeq: 0 }),
+    },
     issueMember: { createMany: jest.fn().mockResolvedValue({ count: 3 }) },
     ...over,
   };
@@ -154,6 +158,32 @@ describe('seeding onto a project that already has tasks', () => {
       expect.objectContaining({ data: { issueSeq: 15 } }),
     );
   });
+
+  // The row count is not the whole story: a task created then deleted shrinks
+  // the count below the highest number ever handed out, and the counter is the
+  // only record of that number. Numbering from the count would hand the
+  // deleted task's number to a new one.
+  it('numbers from the counter when it is ahead of the row count', async () => {
+    const { service, prisma } = make({
+      issue: {
+        count: jest.fn().mockResolvedValue(3),
+        findMany: jest.fn().mockResolvedValue([{ id: 101 }, { id: 102 }, { id: 103 }]),
+        createMany: jest.fn().mockImplementation((a: any) => Promise.resolve({ count: a.data.length })),
+      },
+      project: {
+        update: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn().mockResolvedValue({ issueSeq: 15 }),
+      },
+    });
+    await seed(service);
+    const written = prisma.issue.createMany.mock.calls[0][0].data;
+    expect(written.map((t: any) => t.key)).toEqual([
+      'CES/0926/03-16', 'CES/0926/03-17', 'CES/0926/03-18',
+    ]);
+    expect(prisma.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { issueSeq: 18 } }),
+    );
+  });
 });
 
 /**
@@ -178,7 +208,12 @@ describe('the PM is a member too', () => {
   });
 
   it('still writes the tasks when there is nobody to assign them to', async () => {
-    const { service, created } = make({ project: { update: jest.fn().mockResolvedValue({}) } });
+    const { service, created } = make({
+      project: {
+        update: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn().mockResolvedValue({ issueSeq: 0 }),
+      },
+    });
     await (service as any).seedDefaultProjectTasks(1, { id: 7, key: 'CES/0926/03' }, 0, {});
     expect(created.length).toBe(3);
   });

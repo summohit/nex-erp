@@ -1186,11 +1186,27 @@
         [suppressPaginationPanel]="filteredMyTasks().length <= paginationPageSize"
         [quickFilterText]="searchQuery()"
         [animateRows]="true"
-        [domLayout]="myTasksGridAutoHeight() ? 'autoHeight' : 'normal'"
-        [style.height]="myTasksGridAutoHeight() ? null : 'clamp(420px, calc(100vh - 430px), 760px)'"
+        [domLayout]="'autoHeight'"
+        [style.height]="null"
         (gridReady)="onMyTasksGridReady($event)"
+        (paginationChanged)="onMyTasksPaginationChanged($event)"
         (rowClicked)="onMyTaskRowClicked($event)">
       </ag-grid-angular>
+
+      <div class="my-tasks-status-menu"
+           *ngIf="myTasksStatusMenu()"
+           [ngStyle]="{ left: (myTasksStatusMenu()?.x ?? 0) + 'px', top: (myTasksStatusMenu()?.y ?? 0) + 'px' }">
+        <div class="my-tasks-status-menu-title">Change status</div>
+        <button type="button"
+                class="my-tasks-status-option"
+                [class.active]="myTasksStatusMenu()?.task?.status === opt.value"
+                *ngFor="let opt of myTasksStatusOptions"
+                (click)="onMyTasksStatusPick(opt.value)">
+          <span class="status-indicator-dot" [style.background]="myTasksStatusDotColor(opt.value)"></span>
+          <span class="my-tasks-status-option-label">{{ opt.label }}</span>
+          <svg class="my-tasks-status-option-check" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" *ngIf="myTasksStatusMenu()?.task?.status === opt.value"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 

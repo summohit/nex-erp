@@ -41,6 +41,14 @@ export interface MyTaskDto {
   startDate: Date | null;
   dueDate: Date | null;
   estimatedHours: number | null;
+  /** When the work was raised — My Tasks sorts newest-first on this. */
+  createdAt: Date | null;
+  /**
+   * The id of the project the issue lives in, even when the row presents as
+   * GENERAL (system project). Null on a pre-sales task. This is what the
+   * row's status dropdown and its socket room key off.
+   */
+  projectId: number | null;
   assignees: TaskPerson[];
   parent: { kind: 'PROJECT' | 'GENERAL' | 'LEAD'; id: number; name: string } | null;
   /** Open blockers only. Informational — nothing is prevented by this. */

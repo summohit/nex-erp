@@ -4547,6 +4547,70 @@
 }
 .my-tasks-table-wrapper ::ng-deep .status-rejected .status-indicator-dot { background: #1373e5; }
 
+/* Status cell as a dropdown button (§ status ↔ board) */
+.my-tasks-table-wrapper ::ng-deep .status-menu-btn {
+  cursor: pointer;
+  user-select: none;
+  transition: filter .12s ease, box-shadow .12s ease;
+}
+.my-tasks-table-wrapper ::ng-deep .status-menu-btn:hover {
+  filter: brightness(.96);
+  box-shadow: 0 1px 3px rgba(9, 30, 66, .18);
+}
+.my-tasks-table-wrapper ::ng-deep .status-menu-caret {
+  margin-left: 2px;
+  opacity: .65;
+}
+
+/* Floating menu for the in-row status change */
+.my-tasks-status-menu {
+  position: fixed;
+  z-index: 5000;
+  min-width: 190px;
+  background: #ffffff;
+  border: 1px solid #d7dce3;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(9, 30, 66, .18);
+  padding: 5px;
+  animation: myTasksMenuIn .10s ease-out;
+}
+@keyframes myTasksMenuIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.my-tasks-status-menu-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: #64748b;
+  padding: 5px 9px 7px;
+}
+.my-tasks-status-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 9px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #243b53;
+  text-align: left;
+  transition: background .1s ease;
+}
+.my-tasks-status-option:hover { background: #f3f5f7; }
+.my-tasks-status-option.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+.my-tasks-status-option-label { flex: 1; }
+.my-tasks-status-option-check { opacity: .85; }
+
 /* User Cell */
 .my-tasks-table-wrapper ::ng-deep .user-cell {
   display: flex;

@@ -330,7 +330,16 @@ export class ProjectTicketsService {
     reviewerEmployeeId: number | null,
     companyId: number,
   ) {
-    const count = await tx.issue.count({ where: { projectId: ticket.projectId, companyId } });
+    // The task's number comes from the project counter, the same allocation
+    // every other writer uses. A `count + 1` here would reuse a number after
+    // a deletion or collide with the board the moment the two raced — both on
+    // @@unique([key, companyId]). We are already inside a transaction, so the
+    // increment commits or rolls back with the task it allocates.
+    const { issueSeq } = await tx.project.update({
+      where: { id: ticket.projectId },
+      data: { issueSeq: { increment: 1 } },
+      select: { issueSeq: true },
+    });
 
     /**
      * The board column, without which the task exists but renders nowhere.
@@ -353,7 +362,7 @@ export class ProjectTicketsService {
 
     const issue = await tx.issue.create({
       data: {
-        key: `${ticket.project?.key || 'TASK'}-${count + 1}`,
+        key: `${ticket.project?.key || 'TASK'}-${issueSeq}`,
         title: ticket.title,
         description: ticket.description,
         projectId: ticket.projectId,

@@ -254,6 +254,43 @@
   background: #f1f2f4;
 }
 
+.top-bar-add-task-btn {
+  height: 32px;
+  background: #6b3fd6 !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0 12px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+  transition: background 0.2s ease !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.top-bar-add-task-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  min-height: 14px !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
+  flex-shrink: 0 !important;
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+}
+
+.top-bar-add-task-btn:hover {
+  background: #5a34c2 !important;
+}
+
 /* Board Canvas Area */
 .board-canvas {
   flex: 1;

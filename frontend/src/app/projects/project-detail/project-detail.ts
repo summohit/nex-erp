@@ -570,9 +570,21 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   // List Tab Filters
   listSearchQuery = signal<string>('');
   listFilterAssigneeIds = signal<number[]>([]);
-  listFilterColumnIds = signal<number[]>([]);
+  listFilterStatuses = signal<string[]>([]);
   listFilterPriorities = signal<string[]>([]);
   listFilterMyIssues = signal<boolean>(false);
+
+  /** The single filter for where a task sits in the workflow. A board list IS
+   *  a workflow step (each column carries its status), so List and Status were
+   *  the same question twice — one option set replaces both. 'ARCHIVED'
+   *  reaches the rows the board normally hides. */
+  listFilterStatusOptions = [
+    { value: 'TODO', label: 'To Do', color: '#64748b' },
+    { value: 'IN_PROGRESS', label: 'In Progress', color: '#2563eb' },
+    { value: 'IN_REVIEW', label: 'In Review', color: '#9333ea' },
+    { value: 'DONE', label: 'Completed', color: '#16a34a' },
+    { value: 'ARCHIVED', label: 'Archived', color: '#94a3b8' },
+  ];
 
   filteredListIssues = computed(() => {
     let issues = this.activeIssues();
@@ -603,8 +615,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       });
     }
 
-    if (this.listFilterColumnIds().length > 0) {
-      issues = issues.filter(i => this.listFilterColumnIds().includes(i.columnId));
+    // Status — the single consolidated list/status filter. A board list is a
+    // workflow step, so "which list" and "which status" were the same filter
+    // wearing two names. 'ARCHIVED' also pulls in the rows the board hides.
+    const statuses = this.listFilterStatuses();
+    if (statuses.length > 0) {
+      if (statuses.includes('ARCHIVED')) {
+        issues = issues.concat(this.archivedIssues());
+      }
+      issues = issues.filter(i =>
+        i.isArchived ? statuses.includes('ARCHIVED') : statuses.includes(i.status),
+      );
     }
 
     if (this.listFilterPriorities().length > 0) {
@@ -691,16 +712,6 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       issues = issues.filter(i => i.title && i.title.toLowerCase().includes(q));
     }
 
-    // List (matches grid "List" column → board columnId)
-    if (this.fdColumnIds().length > 0) {
-      issues = issues.filter(i => this.fdColumnIds().includes(i.columnId));
-    }
-
-    // Status (matches grid "Status" column)
-    if (this.fdStatuses().length > 0) {
-      issues = issues.filter(i => this.fdStatuses().includes(i.status));
-    }
-
     // Due Date (matches grid "Due Date" column — dueDate, falls back to startDate)
     if (this.fdDueFrom() || this.fdDueTo()) {
       const from = this.fdDueFrom() ? new Date(this.fdDueFrom()!).getTime() : null;
@@ -754,12 +765,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleListFilterColumn(id: number) {
-    const current = this.listFilterColumnIds();
-    if (current.includes(id)) {
-      this.listFilterColumnIds.set(current.filter(x => x !== id));
+  toggleListFilterStatus(status: string) {
+    const current = this.listFilterStatuses();
+    if (current.includes(status)) {
+      this.listFilterStatuses.set(current.filter(x => x !== status));
     } else {
-      this.listFilterColumnIds.set([...current, id]);
+      this.listFilterStatuses.set([...current, status]);
     }
   }
 
@@ -775,7 +786,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   clearListFilters() {
     this.listSearchQuery.set('');
     this.listFilterAssigneeIds.set([]);
-    this.listFilterColumnIds.set([]);
+    this.listFilterStatuses.set([]);
     this.listFilterPriorities.set([]);
     this.listFilterMyIssues.set(false);
     this.fdDateOn.set(false);
@@ -791,8 +802,6 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.fdPhaseId.set(null);
     this.fdIssueKey.set('');
     this.fdTaskName.set('');
-    this.fdColumnIds.set([]);
-    this.fdStatuses.set([]);
     this.fdDueFrom.set(null);
     this.fdDueTo.set(null);
     this.fdCreatedFrom.set(null);
@@ -823,8 +832,6 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   // Column-aligned pipeline filters (mirror the tasks grid columns)
   fdIssueKey = signal<string>('');
   fdTaskName = signal<string>('');
-  fdColumnIds = signal<number[]>([]);
-  fdStatuses = signal<string[]>([]);
   fdDueFrom = signal<string | null>(null);
   fdDueTo = signal<string | null>(null);
   fdCreatedFrom = signal<string | null>(null);
@@ -852,8 +859,6 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (this.fdPhaseId()) n++;
     if (this.fdIssueKey().trim()) n++;
     if (this.fdTaskName().trim()) n++;
-    if (this.fdColumnIds().length > 0) n++;
-    if (this.fdStatuses().length > 0) n++;
     if (this.fdDueFrom() || this.fdDueTo()) n++;
     if (this.fdCreatedFrom() || this.fdCreatedTo()) n++;
     if (this.fdUpdatedFrom() || this.fdUpdatedTo()) n++;
@@ -3256,25 +3261,25 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     { field: 'key', headerName: 'ID', width: 100, pinned: 'left' },
     { field: 'title', headerName: 'Task', minWidth: 200, flex: 1, filter: true },
     { 
-      headerName: 'List', 
-      width: 140,
-      valueGetter: (params: any) => {
-        const col = this.columns().find(c => c.id === params.data?.columnId);
-        return col ? col.name : 'Unknown';
-      }
-    },
-    { 
-      field: 'status', 
       headerName: 'Status', 
-      width: 140,
+      width: 150,
+      // One column where there used to be two: a board list is a workflow
+      // step (each column carries its status), so "List" and "Status" said
+      // the same thing. Archived rows read as their own state.
+      valueGetter: (params: any) => {
+        const i = params.data;
+        return i?.isArchived ? 'ARCHIVED' : (i?.status || 'TODO');
+      },
       cellRenderer: (params: any) => {
-        const val = params.value || '';
-        let color = '#94a3b8'; let bg = '#f1f5f9';
-        if (val === 'DONE') { color = '#16a34a'; bg = '#dcfce7'; }
-        else if (val === 'TODO') { color = '#64748b'; bg = '#f1f5f9'; }
-        else if (val === 'IN_PROGRESS') { color = '#2563eb'; bg = '#dbeafe'; }
-        else if (val === 'IN_REVIEW') { color = '#9333ea'; bg = '#f3e8ff'; }
-        return `<span style="background-color: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">${val.replace('_', ' ')}</span>`;
+        const val = params.value || 'TODO';
+        let label = val.replace('_', ' ');
+        let color = '#64748b'; let bg = '#f1f5f9';
+        if (val === 'DONE') { label = 'Completed'; color = '#16a34a'; bg = '#dcfce7'; }
+        else if (val === 'TODO') { label = 'To Do'; color = '#64748b'; bg = '#f1f5f9'; }
+        else if (val === 'IN_PROGRESS') { label = 'In Progress'; color = '#2563eb'; bg = '#dbeafe'; }
+        else if (val === 'IN_REVIEW') { label = 'In Review'; color = '#9333ea'; bg = '#f3e8ff'; }
+        else if (val === 'ARCHIVED') { label = 'Archived'; color = '#94a3b8'; bg = '#f1f5f9'; }
+        return `<span style="background-color: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">${label}</span>`;
       }
     },
     { 

@@ -40,7 +40,7 @@
   <!-- KPI / Stats Row -->
   <div class="stats-row">
     <!-- Total Shifts Tracked -->
-    <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && filterFlag === 'ALL'" (click)="filterStatus=''; filterFlag='ALL'; load()" title="Click to show all records">
+    <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && filterFlag === 'ALL' && !filterDate" (click)="filterStatus=''; filterFlag='ALL'; filterDate=null; load()" title="Click to show all records">
       <div class="stat-icon-wrapper">
         <svg lucideCalendarDays [size]="22"></svg>
       </div>
@@ -52,7 +52,7 @@
     </div>
 
     <!-- Present & On-Time -->
-    <div class="stat-card stat-green" [class.active-card]="filterStatus === 'PRESENT' && filterFlag === 'ALL'" (click)="toggleKpiStatus('PRESENT')" title="Click to filter Present records">
+    <div class="stat-card stat-green" [class.active-card]="filterStatus === 'Present' && filterFlag === 'ALL'" (click)="toggleKpiStatus('Present')" title="Click to filter Present records">
       <div class="stat-icon-wrapper">
         <svg lucideUserCheck [size]="22"></svg>
       </div>
@@ -64,7 +64,7 @@
     </div>
 
     <!-- Late Arrivals -->
-    <div class="stat-card stat-amber" [class.active-card]="filterFlag === 'LATE'" (click)="toggleKpiFlag('LATE')" title="Click to filter Late Arrivals">
+    <div class="stat-card stat-amber" [class.active-card]="filterStatus === 'Late'" (click)="toggleKpiStatus('Late')" title="Click to filter Late Arrivals">
       <div class="stat-icon-wrapper">
         <svg lucideAlertTriangle [size]="22"></svg>
       </div>
@@ -76,7 +76,7 @@
     </div>
 
     <!-- Half Day / Early Leave -->
-    <div class="stat-card stat-rose" [class.active-card]="filterStatus === 'HALF_DAY'" (click)="toggleKpiStatus('HALF_DAY')" title="Click to filter Half Day shifts">
+    <div class="stat-card stat-rose" [class.active-card]="filterStatus === 'Half Day'" (click)="toggleKpiStatus('Half Day')" title="Click to filter Half Day shifts">
       <div class="stat-icon-wrapper">
         <svg lucideTimer [size]="22"></svg>
       </div>
@@ -150,6 +150,19 @@
             </div>
           </div>
           <div class="dropdown-backdrop-transparent" *ngIf="showYearDropdown" (click)="showYearDropdown = false"></div>
+        </div>
+
+        <!-- 2b. Exact Date Filter -->
+        <div class="date-filter-wrapper" [class.has-selection]="filterDate">
+          <svg lucideCalendarDays [size]="14" class="trigger-prefix-icon"></svg>
+          <input
+            type="date"
+            [ngModel]="filterDate"
+            (ngModelChange)="selectDate($event)"
+            title="Show attendance for a single day only" />
+          <button type="button" class="btn-clear-date" *ngIf="filterDate" (click)="clearDate()" title="Clear date filter">
+            <svg lucideX [size]="13"></svg>
+          </button>
         </div>
 
         <!-- 3. Employee Dropdown (Searchable) -->
@@ -362,7 +375,7 @@
         <thead>
           <tr>
             <th class="col-employee-header sticky-left">EMPLOYEE</th>
-            <th *ngFor="let day of daysOfMonth()" class="col-day-header" [class.is-weekend]="day.isWeekend">
+            <th *ngFor="let day of daysOfMonth()" class="col-day-header" [class.is-weekend]="day.isWeekend" [class.is-filtered-date]="day.dateStr === filterDate">
               <div class="day-header-inner">
                 <span class="day-num">{{ day.dayNumber }}</span>
                 <span class="day-week">{{ day.weekdayStr }}</span>
@@ -372,7 +385,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let row of employeeGridRows()" class="matrix-row">
+          <tr *ngFor="let row of employeeGridRows()" class="matrix-row" [class.row-no-match]="(filterStatus && !hasMatchingDay(row)) || (filterDate && !hasMatchingDate(row))">
             <!-- Employee Header Cell (Sticky Left) -->
             <td class="col-employee-cell sticky-left">
               <div class="emp-profile-lockup">
@@ -404,7 +417,8 @@
                      'bg-absent': day.status === 'Absent',
                      'bg-leave': day.status === 'On Leave',
                      'bg-holiday': day.status === 'Holiday',
-                     'bg-day-off': day.status === 'Day Off'
+                     'bg-day-off': day.status === 'Day Off',
+                     'cell-dimmed': (filterStatus && !dayMatchesStatus(day)) || (filterDate && !dayMatchesDate(day))
                    }">
                 <ng-container *ngIf="!day.isFuture">
                   <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
@@ -512,9 +526,9 @@
 
             <!-- Status -->
             <td>
-              <span class="status-pill" [ngClass]="statusClass(r.status)">
+              <span class="status-pill" [ngClass]="statusClass(recordDayStatus(r))">
                 <span class="status-indicator-dot"></span>
-                {{ r.status.replace('_', ' ') }}
+                {{ recordDayStatus(r) }}
               </span>
             </td>
 
