@@ -1,0 +1,472 @@
+<div class="modal-backdrop" (click)="close()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="modal-head">
+      <div class="modal-head-title-wrap">
+        <div class="modal-icon-badge">
+          <svg lucideRoute [size]="20"></svg>
+        </div>
+        <div>
+          <h2>{{ title }}</h2>
+          <p class="modal-subtitle">Configure destination, schedule, team personnel, and site deliverables.</p>
+        </div>
+      </div>
+      <button class="icon-btn close-btn" type="button" (click)="close()" title="Close dialog">
+        <svg lucideX [size]="18"></svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="modal-body">
+      @if (loadError()) {
+        <div class="load-error">
+          <svg lucideX [size]="18"></svg>
+          <span>{{ loadError() }}. The pickers below are empty because of it, not because there is nothing to pick.</span>
+          <button type="button" (click)="loadLists()">Try again</button>
+        </div>
+      }
+      @if (mode === 'modify') {
+        <div class="modify-note">
+          <div class="note-title">Running Field Visit Notice</div>
+          This trip is approved and may already be running. Nothing here changes until an
+          administrator approves it — people on site keep clocking against the approved
+          site and dates in the meantime.
+        </div>
+      }
+
+      <!-- SECTION 1: PROJECT & SITE -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-tag">Step 1</span>
+          <span class="section-title">Project & Destination</span>
+        </div>
+
+        <!-- Searchable Project Select -->
+        <div class="field">
+          <label>
+            <span>Project</span>
+            <span class="required-star">*</span>
+          </label>
+          <div class="searchable-select-container">
+            <button
+              type="button"
+              class="searchable-select-trigger"
+              [class.open]="isProjectDropdownOpen()"
+              [class.has-value]="selectedProjectId() !== null"
+              (click)="toggleProjectDropdown()">
+              <div class="trigger-left">
+                <svg lucideBuilding [size]="16" class="select-icon"></svg>
+                <span class="selected-text">{{ selectedProject()?.name || 'Select a project…' }}</span>
+              </div>
+              <div class="trigger-right">
+                @if (selectedProjectId() !== null) {
+                  <button type="button" class="btn-clear-select" (click)="$event.stopPropagation(); selectProject(null)" title="Clear selection">
+                    <svg lucideX [size]="14"></svg>
+                  </button>
+                }
+                <svg lucideChevronDown [size]="16" class="chevron-icon" [class.rotated]="isProjectDropdownOpen()"></svg>
+              </div>
+            </button>
+
+            @if (isProjectDropdownOpen()) {
+              <div class="searchable-select-menu" (click)="$event.stopPropagation()">
+                <div class="select-search-bar">
+                  <svg lucideSearch [size]="14" class="search-icon"></svg>
+                  <input
+                    type="text"
+                    placeholder="Search projects by name..."
+                    [ngModel]="projectSearchQuery()"
+                    (ngModelChange)="projectSearchQuery.set($event)"
+                    autofocus />
+                  @if (projectSearchQuery()) {
+                    <button type="button" class="search-clear-btn" (click)="projectSearchQuery.set('')">
+                      <svg lucideX [size]="12"></svg>
+                    </button>
+                  }
+                </div>
+
+                <div class="select-options-list">
+                  <div
+                    class="select-option none-option"
+                    [class.selected]="selectedProjectId() === null"
+                    (click)="selectProject(null)">
+                    <span>None (Clear selection)</span>
+                    @if (selectedProjectId() === null) {
+                      <svg lucideCheck [size]="15" class="option-check"></svg>
+                    }
+                  </div>
+
+                  @for (p of filteredProjects(); track p.id) {
+                    <div
+                      class="select-option"
+                      [class.selected]="selectedProjectId() === p.id"
+                      (click)="selectProject(p.id)">
+                      <div class="option-content">
+                        <svg lucideBuilding [size]="14" class="option-icon"></svg>
+                        <span class="option-name">{{ p.name }}</span>
+                      </div>
+                      @if (selectedProjectId() === p.id) {
+                        <svg lucideCheck [size]="15" class="option-check"></svg>
+                      }
+                    </div>
+                  }
+
+                  @if (filteredProjects().length === 0) {
+                    <div class="select-empty-state">
+                      <p>No projects match "{{ projectSearchQuery() }}"</p>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Site Location -->
+        <div class="field">
+          <label>
+            <span>Site Name & Address</span>
+            <span class="required-star">*</span>
+          </label>
+          <div class="input-with-icon">
+            <svg lucideMapPin [size]="16" class="field-icon"></svg>
+            <input type="text" [(ngModel)]="form.location" placeholder="e.g. Client Site – Delhi, Plot 42" />
+          </div>
+        </div>
+
+        <!-- Coordinates & Pin -->
+        <div class="field-row coordinates-row">
+          <div class="field">
+            <label>Latitude</label>
+            <input type="number" step="0.000001" [(ngModel)]="form.latitude" placeholder="e.g. 28.613939" />
+          </div>
+          <div class="field">
+            <label>Longitude</label>
+            <input type="number" step="0.000001" [(ngModel)]="form.longitude" placeholder="e.g. 77.209021" />
+          </div>
+          <button class="locate-btn" type="button" (click)="useMyLocation()">
+            <svg lucideCrosshair [size]="15"></svg>
+            Use my location
+          </button>
+        </div>
+
+        @if (form.latitude != null && form.longitude != null) {
+          <div class="map-container">
+            <div class="map-badge">
+              <span class="live-dot"></span>
+              Clock-in is verified within 500 m of this pin
+            </div>
+            <div class="map-frame">
+              <iframe [src]="mapUrl()" title="Site location" loading="lazy"></iframe>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- SECTION 2: SCHEDULE & HOURS -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-tag">Step 2</span>
+          <span class="section-title">Schedule & Working Hours</span>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Start Date</label>
+            <input type="date" [(ngModel)]="form.startDate" />
+          </div>
+          <div class="field">
+            <label>End Date</label>
+            <input type="date" [(ngModel)]="form.endDate" />
+          </div>
+          <div class="field days-field">
+            <label>Duration</label>
+            <div class="days-value-pill">
+              <svg lucideCalendarDays [size]="15"></svg>
+              <span>{{ visitDays() ? (visitDays() + (visitDays() === 1 ? ' Day' : ' Days')) : '—' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Expected Clock-in</label>
+            <div class="input-with-icon">
+              <svg lucideClock [size]="15" class="field-icon"></svg>
+              <input type="time" [(ngModel)]="form.startTime" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Expected Clock-out</label>
+            <div class="input-with-icon">
+              <svg lucideClock [size]="15" class="field-icon"></svg>
+              <input type="time" [(ngModel)]="form.endTime" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: FIELD TEAM (WHO IS GOING) -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-tag">Step 3</span>
+          <div class="section-title-wrap">
+            <span class="section-title">Who is going</span>
+            <span class="count-pill">{{ selectedEmployeeIds().length }} assigned</span>
+          </div>
+        </div>
+
+        <!-- Selected Members Badges -->
+        @if (selectedEmployees().length > 0) {
+          <div class="selected-team-row">
+            <span class="selected-label">Assigned:</span>
+            <div class="team-tags">
+              @for (e of selectedEmployees(); track e.id) {
+                <span class="team-tag">
+                  <div class="avatar-mini-wrap">
+                    @if (e.avatarUrl) {
+                      <img [src]="e.avatarUrl" [alt]="e.name" class="avatar-mini-img" (error)="e.avatarUrl = null" />
+                    } @else {
+                      <span class="avatar-mini">{{ getInitials(e.name) }}</span>
+                    }
+                  </div>
+                  <span class="tag-name">{{ e.name }}</span>
+                  <button type="button" class="tag-remove-btn" (click)="toggleEmployee(e.id)" title="Remove {{ e.name }}">
+                    <svg lucideX [size]="12"></svg>
+                  </button>
+                </span>
+              }
+              @if (selectedEmployeeIds().length > 1) {
+                <button type="button" class="btn-clear-all" (click)="clearSelectedEmployees()">Clear all</button>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Search input for members -->
+        <div class="member-search-box">
+          <svg lucideSearch [size]="15" class="search-icon"></svg>
+          <input
+            type="text"
+            placeholder="Search team members by name or email..."
+            [ngModel]="employeeSearchQuery()"
+            (ngModelChange)="employeeSearchQuery.set($event)" />
+          @if (employeeSearchQuery()) {
+            <button type="button" class="search-clear-btn" (click)="employeeSearchQuery.set('')">
+              <svg lucideX [size]="13"></svg>
+            </button>
+          }
+        </div>
+
+        <div class="member-picker-grid">
+          @for (e of filteredEmployees(); track e.id) {
+            <button
+              type="button"
+              class="member-card-option"
+              [class.selected]="isPicked(e.id)"
+              (click)="toggleEmployee(e.id)">
+              <div class="member-avatar-wrap">
+                @if (e.avatarUrl) {
+                  <img [src]="e.avatarUrl" [alt]="e.name" class="member-avatar-img" (error)="e.avatarUrl = null" />
+                } @else {
+                  <div class="member-avatar-fallback">{{ getInitials(e.name) }}</div>
+                }
+              </div>
+              <div class="member-details">
+                <span class="member-name">{{ e.name }}</span>
+                @if (e.email) {
+                  <span class="member-email">{{ e.email }}</span>
+                }
+              </div>
+              <div class="member-check-circle">
+                <svg lucideCheck [size]="12"></svg>
+              </div>
+            </button>
+          }
+          @if (filteredEmployees().length === 0) {
+            <div class="empty-members">
+              <p>No team members match "{{ employeeSearchQuery() }}"</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- SECTION 4: TASKS & DELIVERABLES -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-tag">Step 4</span>
+          <span class="section-title">Site Tasks & Scope</span>
+        </div>
+
+        <div class="tasks-container">
+          @for (task of form.tasks; track $index) {
+            <div class="task-card-row">
+              <span class="task-num-badge">{{ $index + 1 }}</span>
+              <div class="task-inputs">
+                <input
+                  type="text"
+                  placeholder="Task title (e.g. Site Inspection, Hardware Setup)"
+                  class="task-title-input"
+                  [(ngModel)]="task.name"
+                  [ngModelOptions]="{standalone: true}" />
+                <input
+                  type="text"
+                  placeholder="Notes or instructions (optional)"
+                  class="task-desc-input"
+                  [(ngModel)]="task.description"
+                  [ngModelOptions]="{standalone: true}" />
+              </div>
+              <button
+                class="btn-delete-task"
+                type="button"
+                (click)="removeTask($index)"
+                [disabled]="form.tasks.length === 1 && !task.name && !task.description"
+                title="Remove task">
+                <svg lucideTrash2 [size]="15"></svg>
+              </button>
+            </div>
+          }
+
+          <button class="add-task-dashed-btn" type="button" (click)="addTask()">
+            <svg lucidePlus [size]="16"></svg>
+            <span>Add another task</span>
+          </button>
+          <p class="section-hint">Each approved task is automatically assigned to all selected personnel upon visit approval.</p>
+        </div>
+      </div>
+
+      <!-- SECTION 5: ATTACHMENTS (DRAG & DROP) -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-tag">Step 5</span>
+          <div class="section-title-wrap">
+            <span class="section-title">Attachments & Supporting Documents</span>
+            <span class="count-pill">{{ form.attachments.length }} attached</span>
+          </div>
+        </div>
+
+        <!-- Drag and drop zone -->
+        <div
+          class="attachment-dropzone"
+          [class.dragging]="isDragging()"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)"
+          (click)="fileInput.click()">
+          <input
+            #fileInput
+            type="file"
+            multiple
+            hidden
+            (change)="onAttachmentPicked($event)" />
+
+          <div class="dropzone-icon-box">
+            @if (isUploading()) {
+              <svg lucideLoader [size]="24" class="spin-icon"></svg>
+            } @else {
+              <svg lucideUpload [size]="24"></svg>
+            }
+          </div>
+
+          <div class="dropzone-text-wrap">
+            @if (isUploading()) {
+              <div class="uploading-state">
+                <span class="uploading-title">Uploading files…</span>
+                <span class="uploading-desc">Please wait while your files are securely stored.</span>
+              </div>
+            } @else {
+              <div class="dropzone-prompt">
+                <span class="browse-link">Click to browse</span> or drag and drop files here
+              </div>
+              <span class="dropzone-specs">Supports PDF, DOCX, XLSX, Images, CSV, ZIP (up to 25MB each)</span>
+            }
+          </div>
+        </div>
+
+        <!-- Uploaded files cards list -->
+        @if (form.attachments.length > 0) {
+          <div class="attachments-list">
+            @for (a of form.attachments; track $index) {
+              <div class="attachment-file-card">
+                <div class="file-card-left">
+                  <span class="file-type-badge" [class]="getFileBadgeClass(a.fileName)">
+                    {{ getFileExtLabel(a.fileName) }}
+                  </span>
+                  <div class="file-card-details">
+                    <a [href]="a.fileUrl" target="_blank" class="file-name" title="{{ a.fileName }}">
+                      {{ a.fileName }}
+                    </a>
+                    @if (a.fileSize) {
+                      <span class="file-size">{{ formatFileSize(a.fileSize) }}</span>
+                    }
+                  </div>
+                </div>
+
+                <div class="file-card-actions">
+                  <a [href]="a.fileUrl" target="_blank" class="icon-link-btn" title="Open file in new tab">
+                    <svg lucideExternalLink [size]="15"></svg>
+                  </a>
+                  <button type="button" class="btn-remove-file" (click)="removeAttachment($index)" title="Delete attachment">
+                    <svg lucideTrash2 [size]="15"></svg>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- SECTION 6: REMARKS -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-tag">Step 6</span>
+          <span class="section-title">Remarks & Briefing Notes</span>
+        </div>
+
+        <div class="field">
+          <textarea
+            rows="3"
+            [(ngModel)]="form.remarks"
+            placeholder="Share key instructions, safety requirements, travel details, or notes the field team should know…"></textarea>
+        </div>
+      </div>
+
+      @if (error()) {
+        <div class="error-banner">
+          <svg lucideX [size]="16"></svg>
+          <span>{{ error() }}</span>
+        </div>
+      }
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="modal-foot">
+      <button class="ghost-btn cancel-btn" type="button" (click)="close()">Cancel</button>
+      @if (mode === 'modify') {
+        <button class="primary-btn submit-btn" type="button" [disabled]="isSaving()" (click)="proposeChange()">
+          @if (isSaving()) {
+            <svg lucideLoader [size]="15" class="spin-icon"></svg>
+            Sending…
+          } @else {
+            Send change for approval
+          }
+        </button>
+      } @else {
+        <button class="ghost-btn draft-btn" type="button" [disabled]="isSaving()" (click)="save(false)">
+          @if (isSaving()) {
+            <svg lucideLoader [size]="15" class="spin-icon"></svg>
+          }
+          Save draft
+        </button>
+        <button class="primary-btn submit-btn" type="button" [disabled]="isSaving()" (click)="save(true)">
+          @if (isSaving()) {
+            <svg lucideLoader [size]="15" class="spin-icon"></svg>
+            Saving…
+          } @else {
+            Submit for approval
+          }
+        </button>
+      }
+    </div>
+  </div>
+</div>

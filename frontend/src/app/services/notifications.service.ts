@@ -97,6 +97,7 @@ export class NotificationsService {
       // Show real-time toast banner
       this.toast.info(`🔔 ${newNotif.title}: ${newNotif.message}`, {
         duration: 5000,
+        dismissible: true,
         position: 'top-right',
         style: {
           border: '1px solid #1373e5',
@@ -134,7 +135,7 @@ export class NotificationsService {
   }
 
   markAsRead(id: number) {
-    this.http.put<{ notifications: NotificationItem[]; unreadCount: number }>(`/api/notifications/${id}/read`, {})
+    this.http.put<{ notifications: NotificationItem[]; unreadCount: number }>(`${environment.apiUrl}/notifications/${id}/read`, {})
       .subscribe({
         next: (res) => {
           this.notifications.set(res.notifications || []);
@@ -144,12 +145,33 @@ export class NotificationsService {
   }
 
   markAllAsRead() {
-    this.http.put<{ notifications: NotificationItem[]; unreadCount: number }>('/api/notifications/read-all', {})
+    this.http.put<{ notifications: NotificationItem[]; unreadCount: number }>(`${environment.apiUrl}/notifications/read-all`, {})
       .subscribe({
         next: (res) => {
           this.notifications.set(res.notifications || []);
           this.unreadCount.set(res.unreadCount || 0);
         }
+      });
+  }
+
+  dismissNotification(id: number) {
+    // Optimistic local update so notification disappears immediately
+    const toRemove = this.notifications().find(n => n.id === id);
+    if (toRemove && !toRemove.isRead) {
+      this.unreadCount.update(c => Math.max(0, c - 1));
+    }
+    this.notifications.update(list => list.filter(n => n.id !== id));
+
+    // Persist removal to backend
+    this.http.delete<{ notifications: NotificationItem[]; unreadCount: number }>(`${environment.apiUrl}/notifications/${id}`)
+      .subscribe({
+        next: (res) => {
+          if (res?.notifications) {
+            this.notifications.set(res.notifications);
+            this.unreadCount.set(res.unreadCount || 0);
+          }
+        },
+        error: (err) => console.error('Failed to dismiss notification:', err)
       });
   }
 }

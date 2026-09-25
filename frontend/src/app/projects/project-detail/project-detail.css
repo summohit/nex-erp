@@ -8295,3 +8295,126 @@ input[type=text], input[type=email], input[type=password] {
   line-height: 1;
 }
 .project-tab-btn.active .tab-count { background: #dbeafe; color: #1d4ed8; }
+
+/* The range the cursor is proposing, before the second click commits it. */
+.cal-day-cell.preview-range {
+  background: #f4f8ff;
+  color: #0c66e4;
+}
+
+.cal-day-cell.preview-range.due-date {
+  background: #0c66e4;
+  color: #ffffff;
+}
+
+/* What the two clicks add up to, so the range reads back in words. */
+.range-readout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+  font-size: 12.5px;
+}
+
+.range-summary {
+  font-weight: 700;
+  color: #172b4d;
+}
+
+.range-hint {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e9f2ff;
+  color: #0c66e4;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* What an invited person is added as — one choice for the whole list. */
+.invite-role-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.invite-role-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.invite-role-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.invite-role-chip {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.invite-role-chip:hover { border-color: #c7d2fe; }
+
+.invite-role-chip.active {
+  background: #0c66e4;
+  border-color: #0c66e4;
+  color: #ffffff;
+}
+
+/* A card the viewer may read but not move. */
+.trello-card.read-only-card {
+  cursor: pointer;
+}
+
+.trello-card.read-only-card:active {
+  cursor: pointer;
+}
+
+/* The status a technical architect reads rather than sets. */
+.modal-status-static {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Adding a member writes the row and then reloads the project; the button
+   says so rather than sitting there looking unpressed. */
+.add-member-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: add-member-spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+.btn-add-member-pill:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@keyframes add-member-spin {
+  to { transform: rotate(360deg); }
+}

@@ -103,13 +103,35 @@ export class AllAttendanceComponent implements OnInit {
   filterMonth = new Date().getMonth() + 1;
   filterYear = new Date().getFullYear();
   /** Exact date (yyyy-mm-dd, local) override to show that single day only. */
-  filterDate: string | null = null;
+  private _filterDate = signal<string | null>(null);
+  get filterDate(): string | null {
+    return this._filterDate();
+  }
+  set filterDate(v: string | null) {
+    this._filterDate.set(v || null);
+  }
+
   /** Bumped on every load() so month/year-dependent computed()s re-evaluate. */
   periodVersion = signal(0);
   filterEmployeeId: number | null = null;
   filterDepartmentId: number | null = null;
-  filterStatus = '';
-  filterFlag: 'ALL' | 'LATE' | 'EARLY' | 'ON_TIME' | 'MISSING_OUT' = 'ALL';
+
+  private _filterStatus = signal<string>('');
+  get filterStatus(): string {
+    return this._filterStatus();
+  }
+  set filterStatus(v: string) {
+    this._filterStatus.set(v || '');
+  }
+
+  private _filterFlag = signal<'ALL' | 'LATE' | 'EARLY' | 'ON_TIME' | 'MISSING_OUT'>('ALL');
+  get filterFlag(): 'ALL' | 'LATE' | 'EARLY' | 'ON_TIME' | 'MISSING_OUT' {
+    return this._filterFlag();
+  }
+  set filterFlag(v: 'ALL' | 'LATE' | 'EARLY' | 'ON_TIME' | 'MISSING_OUT') {
+    this._filterFlag.set(v || 'ALL');
+  }
+
   searchQuery = signal('');
   sortBy: 'date_desc' | 'date_asc' | 'name_asc' | 'hours_desc' = 'date_desc';
 
@@ -133,17 +155,21 @@ export class AllAttendanceComponent implements OnInit {
   flagSearchQuery = '';
 
   readonly statusOptions = [
-    { value: '', label: 'All Statuses' },
-    { value: 'Present', label: 'Present' },
-    { value: 'Half Day', label: 'Half Day' },
-    { value: 'Late', label: 'Late' },
-    { value: 'Absent', label: 'Absent' },
-    { value: 'On Leave', label: 'On Leave' },
-    { value: 'Holiday', label: 'Holiday' },
-    { value: 'Day Off', label: 'Day Off' },
-    { value: 'Overtime', label: 'Overtime' },
-    { value: 'Missed Clock Out', label: 'Missed Clock Out' }
+    { value: '', label: 'All Statuses', icon: '', bgClass: '', iconClass: '' },
+    { value: 'Present', label: 'Present', icon: 'check', bgClass: 'bg-present', iconClass: 'status-present' },
+    { value: 'Half Day', label: 'Half Day', icon: 'star-half', bgClass: 'bg-half-day', iconClass: 'status-half-day' },
+    { value: 'Late', label: 'Late', icon: 'alert-circle', bgClass: 'bg-late', iconClass: 'status-late' },
+    { value: 'Absent', label: 'Absent', icon: 'x', bgClass: 'bg-absent', iconClass: 'status-absent' },
+    { value: 'On Leave', label: 'On Leave', icon: 'plane', bgClass: 'bg-leave', iconClass: 'status-leave' },
+    { value: 'Holiday', label: 'Holiday', icon: 'star', bgClass: 'bg-holiday', iconClass: 'status-holiday' },
+    { value: 'Day Off', label: 'Day Off', icon: 'calendar', bgClass: 'bg-day-off', iconClass: 'status-day-off' },
+    { value: 'Overtime', label: 'Overtime', icon: 'zap', bgClass: 'bg-overtime', iconClass: 'status-overtime' },
+    { value: 'Missed Clock Out', label: 'Missed Clock Out', icon: 'timer-off', bgClass: 'bg-clockoff', iconClass: 'status-clockoff' }
   ];
+
+  get statusTags() {
+    return this.statusOptions.filter(s => !!s.value);
+  }
 
   readonly flagOptions = [
     { value: 'ALL', label: 'All Flags / Logs' },
@@ -309,7 +335,10 @@ export class AllAttendanceComponent implements OnInit {
       });
     }
 
-    return emps.map(emp => {
+    const statusFilter = this.filterStatus;
+    const dateFilter = this.filterDate;
+
+    let rows: EmployeeMatrixRow[] = emps.map(emp => {
       let workingDaysCount = 0;
       let presentCount = 0;
 
@@ -383,6 +412,18 @@ export class AllAttendanceComponent implements OnInit {
         totalWorkingDays: workingDaysCount || 1
       };
     });
+
+    // When status filter is active, only show employees who have at least one matching day
+    if (statusFilter) {
+      rows = rows.filter(row => row.days.some(day => this.dayMatchesStatus(day)));
+    }
+
+    // When date filter is active, only show employees who have a record or are active on that date
+    if (dateFilter) {
+      rows = rows.filter(row => row.days.some(day => day.dateStr === dateFilter && (day.record || !day.isFuture)));
+    }
+
+    return rows;
   });
 
   // Computed metrics
@@ -596,6 +637,19 @@ export class AllAttendanceComponent implements OnInit {
     this.showStatusDropdown = false;
   }
 
+  toggleStatusFilter(status: string) {
+    if (this.filterStatus === status) {
+      this.clearStatusFilter();
+    } else {
+      this.selectStatus(status);
+    }
+  }
+
+  clearStatusFilter() {
+    this.filterStatus = '';
+    this.showStatusDropdown = false;
+  }
+
   selectFlag(flag: any) {
     this.filterFlag = flag;
     this.showFlagDropdown = false;
@@ -641,9 +695,9 @@ export class AllAttendanceComponent implements OnInit {
 
   toggleKpiStatus(status: string) {
     if (this.filterStatus === status) {
-      this.filterStatus = '';
+      this.clearStatusFilter();
     } else {
-      this.filterStatus = status;
+      this.selectStatus(status);
     }
   }
 
@@ -697,7 +751,7 @@ export class AllAttendanceComponent implements OnInit {
       chips.push({
         key: 'status',
         label: `Status: ${this.getSelectedStatusLabel()}`,
-        clear: () => { this.filterStatus = ''; this.load(); }
+        clear: () => { this.clearStatusFilter(); }
       });
     }
 
@@ -754,6 +808,7 @@ export class AllAttendanceComponent implements OnInit {
   dayMatchesStatus(day: DayMatrixStatus): boolean {
     const f = this.filterStatus;
     if (!f) return true;
+    if (day.status === 'Empty' || (day.isFuture && !day.record)) return false;
     if (f === 'Overtime') return !!(day.record?.overtimeHours && day.record.overtimeHours > 0);
     if (f === 'Missed Clock Out') return !!day.record && this.isMissedClockOut(day.record);
     return day.status === f;
@@ -770,6 +825,8 @@ export class AllAttendanceComponent implements OnInit {
     if (status === 'On Leave') return 'status-leave-badge';
     if (status === 'Holiday') return 'status-holiday-badge';
     if (status === 'Day Off') return 'status-dayoff-badge';
+    if (status === 'Overtime') return 'status-overtime-badge';
+    if (status === 'Missed Clock Out') return 'status-clockoff-badge';
     return 'status-pending';
   }
 

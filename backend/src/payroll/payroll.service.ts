@@ -1136,9 +1136,21 @@ export class PayrollService {
   }
 
   /** One payslip, with everything a detail view or a PDF needs. */
-  async getPayslipDetail(companyId: number, id: number) {
+  /**
+   * One payslip in full.
+   *
+   * `onlyEmployeeId` is the caller when they are not a payroll administrator:
+   * a payslip is somebody's salary, and without this the id in the URL was the
+   * only thing between an employee and every colleague's pay. Null means the
+   * caller runs payroll and may read anybody's.
+   */
+  async getPayslipDetail(companyId: number, id: number, onlyEmployeeId: number | null = null) {
     const payslip = await this.prisma.payslip.findFirst({
-      where: { id, companyId },
+      where: {
+        id,
+        companyId,
+        ...(onlyEmployeeId == null ? {} : { employeeId: onlyEmployeeId }),
+      },
       include: {
         employee: {
           include: { user: { select: { email: true } }, department: true, designation: true },
@@ -1231,8 +1243,8 @@ export class PayrollService {
   }
 
   /** The PDF for one payslip, as bytes for the caller to stream. */
-  async getPayslipPdf(companyId: number, id: number) {
-    const payslip = await this.getPayslipDetail(companyId, id);
+  async getPayslipPdf(companyId: number, id: number, onlyEmployeeId: number | null = null) {
+    const payslip = await this.getPayslipDetail(companyId, id, onlyEmployeeId);
     const { buffer, isPdf } = await this.pdfService.generatePayslipPdf(payslip);
     const name = `${payslip.employee.firstName}-${payslip.month}-${payslip.year}`
       .replace(/[^A-Za-z0-9-]/g, '');

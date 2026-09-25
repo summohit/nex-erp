@@ -34,8 +34,20 @@
         </div>
       </div>
 
+      <div class="role-avatar-group" *ngIf="projectArchitects().length > 0">
+        <span class="role-avatar-label">Technical Architect:</span>
+        <div class="role-avatar-stack flex items-center -space-x-1">
+          <div class="user-avatar-bubble cursor-pointer hover:scale-110 transition-transform" *ngFor="let ta of projectArchitects()"
+               [title]="ta.employee?.firstName + ' ' + ta.employee?.lastName"
+               (click)="openMemberProfile(ta)">
+            <img *ngIf="ta.employee?.avatarUrl" [src]="ta.employee?.avatarUrl" class="avatar-img" [alt]="ta.employee?.firstName">
+            <span *ngIf="!ta.employee?.avatarUrl">{{ getMemberInitials(ta) }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Separator between roles and members -->
-      <div class="role-separator" *ngIf="(projectOwner() || projectManagers().length > 0) && (project()?.members?.length || 0) > 0"></div>
+      <div class="role-separator" *ngIf="(projectOwner() || projectManagers().length > 0 || projectArchitects().length > 0) && (project()?.members?.length || 0) > 0"></div>
 
       <div class="user-avatar-bubble-group flex items-center -space-x-1 relative">
         <div class="user-avatar-bubble cursor-pointer hover:scale-110 transition-transform" *ngFor="let m of project()?.members | slice:0:5" 
@@ -453,6 +465,21 @@
 
               <!-- Invite Tab Content -->
               <ng-container *ngIf="!isLoadingMembers() && shareTab() === 'invite'">
+                <!-- What they are being added as. Above the list, because it
+                     applies to every name below it. -->
+                <div class="invite-role-bar" *ngIf="isProjectOwner">
+                  <span class="invite-role-label">Add as</span>
+                  <div class="invite-role-options">
+                    <button
+                      *ngFor="let opt of inviteRoleOptions"
+                      type="button"
+                      class="invite-role-chip"
+                      [class.active]="inviteRole() === opt.value"
+                      [title]="opt.hint"
+                      (click)="inviteRole.set(opt.value)">{{ opt.label }}</button>
+                  </div>
+                </div>
+
                 <div class="member-share-item" *ngFor="let m of filteredAvailableMembers">
                   <div class="member-share-info">
                     <div class="member-share-avatar" [style.background-color]="getMemberColor(m)">
@@ -472,9 +499,17 @@
                   <button *ngIf="isProjectOwner"
                           class="btn-add-member-pill"
                           type="button"
+                          [disabled]="addingMemberId() !== null"
+                          [title]="'Add as ' + inviteRoleLabel().toLowerCase()"
                           (click)="addProjectMember(m)">
-                    <svg lucidePlus size="13"></svg>
-                    <span>Add</span>
+                    <ng-container *ngIf="!isAddingMember(m.id)">
+                      <svg lucidePlus size="13"></svg>
+                      <span>Add{{ inviteRole() === 'MEMBER' ? '' : ' as ' + inviteRoleLabel() }}</span>
+                    </ng-container>
+                    <ng-container *ngIf="isAddingMember(m.id)">
+                      <span class="add-member-spinner"></span>
+                      <span>Adding…</span>
+                    </ng-container>
                   </button>
                 </div>
                 <div *ngIf="filteredAvailableMembers.length === 0" class="no-members-empty">
@@ -2275,6 +2310,7 @@
       <!-- Columns -->
       <div class="trello-column" *ngFor="let col of columns()" 
            cdkDrag
+           [cdkDragDisabled]="isReadOnlyArchitect"
            [style.z-index]="activeColumnPopoverId() === col.id ? 50 : 1"
            [style.background-color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? col.color : ''">
         <!-- Column Header -->
@@ -2303,7 +2339,9 @@
               {{ getColumnIssues(col.id).length }}
             </span>
           </div>
-          <div class="col-actions" style="position: relative;">
+          <!-- List actions rename, recolour and archive the column. Read-only
+               for an architect, like everything else that changes the board. -->
+          <div class="col-actions" style="position: relative;" *ngIf="!isReadOnlyArchitect">
             <button class="btn-icon-tiny" 
                     [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'"
                     (click)="toggleColumnPopover(col.id)"><svg lucideMoreHorizontal size="15"></svg></button>
@@ -2390,8 +2428,10 @@
           <ng-container *ngIf="!isLoading()">
           <div class="trello-card" 
                [class.is-updating]="isIssueUpdating(issue.id)"
+               [class.read-only-card]="isReadOnlyArchitect"
                *ngFor="let issue of getColumnIssues(col.id)" 
-               cdkDrag 
+               cdkDrag
+               [cdkDragDisabled]="isReadOnlyArchitect"
                (click)="openIssueDetails(issue)">
 
             <!-- Moving / Updating Card Overlay Loader -->
@@ -2746,12 +2786,17 @@
         <span class="text-gray-900">{{ selectedIssue().key }}</span>
       </div>
 
-      <button class="modal-status-btn" (click)="togglePopover('status')">
+      <button class="modal-status-btn" *ngIf="!isReadOnlyArchitect" (click)="togglePopover('status')">
         <span class="status-dot" [ngClass]="getStatusDotClass(issueForm.columnId)"></span>
         <span>{{ getColumnName(issueForm.columnId) }}</span>
         <svg lucideChevronDown size="14"></svg>
       </button>
       
+      <span class="modal-status-static" *ngIf="isReadOnlyArchitect">
+        <span class="status-dot" [ngClass]="getStatusDotClass(issueForm.columnId)"></span>
+        <span>{{ getColumnName(issueForm.columnId) }}</span>
+      </span>
+
       <!-- Status Popover -->
       <div class="trello-popover status-popover" *ngIf="activePopover() === 'status'" (click)="$event.stopPropagation()">
         <div class="popover-header">
@@ -4055,7 +4100,7 @@
     </div>
 
     <!-- Calendar Days Grid (7 columns) -->
-    <div class="calendar-days-grid mb-4">
+    <div class="calendar-days-grid" (mouseleave)="clearCalendarHover()">
       <button type="button" 
               class="cal-day-cell" 
               *ngFor="let cell of calendarDaysGrid" 
@@ -4064,9 +4109,17 @@
               [class.start-date]="cell.isStart"
               [class.due-date]="cell.isDue"
               [class.in-range]="cell.isInRange"
+              [class.preview-range]="cell.isPreview"
+              (mouseenter)="onCalendarHover(cell)"
               (click)="selectCalendarDate(cell)">
         <span>{{ cell.dayNumber }}</span>
       </button>
+    </div>
+
+    <!-- What the two clicks have added up to, in words. -->
+    <div class="range-readout mb-4">
+      <span class="range-summary">{{ rangeSummary }}</span>
+      <span class="range-hint" *ngIf="awaitingRangeEnd">Now pick the end</span>
     </div>
 
     <!-- Start Date Section -->
@@ -4074,7 +4127,7 @@
       <label class="dates-section-label mb-1">Start date</label>
       <div class="flex items-center gap-2">
         <input type="checkbox" class="label-checkbox" [(ngModel)]="datesForm.enableStartDate">
-        <input type="text" class="label-search-input" style="width: 140px;" [(ngModel)]="datesForm.startDateStr" [disabled]="!datesForm.enableStartDate" placeholder="DD/MM/YYYY">
+        <input type="text" class="label-search-input" style="width: 140px;" [(ngModel)]="datesForm.startDateStr" [disabled]="!datesForm.enableStartDate" placeholder="DD/MM/YYYY" (blur)="normaliseDateInput('start')">
       </div>
     </div>
 
@@ -4083,7 +4136,7 @@
       <label class="dates-section-label mb-1">Due date</label>
       <div class="flex items-center gap-2">
         <input type="checkbox" class="label-checkbox" [(ngModel)]="datesForm.enableDueDate">
-        <input type="text" class="label-search-input" style="width: 140px;" [(ngModel)]="datesForm.dueDateStr" [disabled]="!datesForm.enableDueDate" placeholder="DD/MM/YYYY">
+        <input type="text" class="label-search-input" style="width: 140px;" [(ngModel)]="datesForm.dueDateStr" [disabled]="!datesForm.enableDueDate" placeholder="DD/MM/YYYY" (blur)="normaliseDateInput('due')">
         
         <!-- Time Picker Input / Select -->
         <div class="relative flex-1">

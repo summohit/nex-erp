@@ -720,10 +720,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             <span class="menu-text">View / Print Payslip</span>
           </button>
-          <button mat-menu-item (click)="openAdjustModal(payslip)">
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-            <span class="menu-text">Adjust Salary</span>
-          </button>
+
           <button mat-menu-item (click)="finalizeIndividual(payslip)" *ngIf="payslip.status === 'DRAFT'">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-svg-icon text-primary"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             <span class="menu-text">Finalize Payslip</span>
@@ -1226,60 +1223,257 @@
     <div class="widget-card mb-4 action-card">
       <div class="card-title-group">
         <h3>Reimbursement & Expense Claims</h3>
-        <p class="subtitle">Submit business expense claims and track approval status.</p>
+        <p class="subtitle">Submit business expense claims, track reimbursement workflows, and manage audit approvals.</p>
       </div>
-      <button class="btn btn-primary" (click)="openExpenseModal()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        Submit New Expense Claim
-      </button>
+      <div class="header-right-actions">
+        <button class="btn btn-primary" (click)="openExpenseModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Submit New Expense Claim
+        </button>
+      </div>
     </div>
 
     <!-- Admin View: All Company Claims -->
     <div class="widget-card mb-4" *ngIf="isAdmin()">
-      <div class="widget-header mb-3" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-        <div>
-          <h4 style="margin-bottom: 2px;">All Company Expense Claims</h4>
-          <p class="subtitle" style="margin: 0; font-size: 13px; color: #64748B;">Filter, review and approve employee business reimbursement claims.</p>
+      <!-- Executive KPI Figure Cards Ribbon -->
+      <div class="expense-kpi-row mb-4">
+        <!-- 1. Total Claims Card -->
+        <div class="expense-stat-card" [class.stat-active]="expenseStatusFilter() === 'ALL'" (click)="expenseStatusFilter.set('ALL')">
+          <div class="stat-top">
+            <span class="stat-label">Total Claims <span *ngIf="!isLoadingExpenses()">({{ expenseStats().totalCount }})</span></span>
+            <div class="stat-icon-pill icon-total">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+            </div>
+          </div>
+          <div class="stat-amount" *ngIf="!isLoadingExpenses()">₹{{ expenseStats().totalAmount | number:'1.0-0' }}</div>
+          <div class="skeleton-line skeleton-shimmer my-1" *ngIf="isLoadingExpenses()" style="width: 100px; height: 26px;"></div>
+          <div class="stat-footer-text">
+            {{ expenseFilterMonth() ? getMonthName(+expenseFilterMonth()) : 'All' }} {{ expenseFilterYear() || 'Periods' }}
+          </div>
         </div>
 
-        <!-- Filter Controls: Month & Year -->
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <svg lucideFilter size="16" style="color: #64748B;"></svg>
-            <select class="form-control inline-select" [ngModel]="expenseFilterMonth()" (ngModelChange)="expenseFilterMonth.set($event)">
-              <option value="">All Months</option>
-              <option *ngFor="let m of months" [value]="m.id">{{ m.name }}</option>
-            </select>
+        <!-- 2. Pending Approval Card -->
+        <div class="expense-stat-card card-pending" [class.stat-active]="expenseStatusFilter() === 'PENDING'" (click)="expenseStatusFilter.set('PENDING')">
+          <div class="stat-top">
+            <span class="stat-label">Pending Approval <span *ngIf="!isLoadingExpenses()">({{ expenseStats().pendingCount }})</span></span>
+            <div class="stat-icon-pill icon-pending">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
           </div>
-          <div>
-            <select class="form-control inline-select" [ngModel]="expenseFilterYear()" (ngModelChange)="expenseFilterYear.set($event)">
-              <option value="">All Years</option>
-              <option *ngFor="let y of [2024, 2025, 2026]" [value]="y">{{ y }}</option>
-            </select>
+          <div class="stat-amount text-amber" *ngIf="!isLoadingExpenses()">₹{{ expenseStats().pendingAmount | number:'1.0-0' }}</div>
+          <div class="skeleton-line skeleton-shimmer my-1" *ngIf="isLoadingExpenses()" style="width: 90px; height: 26px;"></div>
+          <div class="stat-footer-text">Requires review & action</div>
+        </div>
+
+        <!-- 3. Approved / Ready for Payout Card -->
+        <div class="expense-stat-card card-approved" [class.stat-active]="expenseStatusFilter() === 'APPROVED'" (click)="expenseStatusFilter.set('APPROVED')">
+          <div class="stat-top">
+            <span class="stat-label">Approved <span *ngIf="!isLoadingExpenses()">({{ expenseStats().approvedCount }})</span></span>
+            <div class="stat-icon-pill icon-approved">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
           </div>
-          <div>
-            <select class="form-control inline-select"
-                    [ngModel]="expenseStatusFilter()"
-                    (ngModelChange)="expenseStatusFilter.set($event)">
-              <option value="ALL">All statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="PAID">Paid</option>
-            </select>
+          <div class="stat-amount text-emerald" *ngIf="!isLoadingExpenses()">₹{{ expenseStats().approvedAmount | number:'1.0-0' }}</div>
+          <div class="skeleton-line skeleton-shimmer my-1" *ngIf="isLoadingExpenses()" style="width: 90px; height: 26px;"></div>
+          <div class="stat-footer-text">Ready for reimbursement payout</div>
+        </div>
+
+        <!-- 4. Paid Reimbursed Card -->
+        <div class="expense-stat-card card-paid" [class.stat-active]="expenseStatusFilter() === 'PAID'" (click)="expenseStatusFilter.set('PAID')">
+          <div class="stat-top">
+            <span class="stat-label">Paid / Settled <span *ngIf="!isLoadingExpenses()">({{ expenseStats().paidCount }})</span></span>
+            <div class="stat-icon-pill icon-paid">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
           </div>
-          <span class="expense-filter-count">
-            {{ filteredExpenseClaims().length }} of {{ expenseClaims().length }}
-            · ₹{{ filteredExpenseTotal() | number:'1.0-0' }}
-          </span>
+          <div class="stat-amount text-indigo" *ngIf="!isLoadingExpenses()">₹{{ expenseStats().paidAmount | number:'1.0-0' }}</div>
+          <div class="skeleton-line skeleton-shimmer my-1" *ngIf="isLoadingExpenses()" style="width: 90px; height: 26px;"></div>
+          <div class="stat-footer-text">Disbursed to employees</div>
         </div>
       </div>
 
-      <!-- AG Grid for Admin Expense Claims.
-           Bound to the FILTERED rows: it used to read expenseClaims() directly,
-           so the month and year selects above changed nothing and September
-           2025 still listed all 797 claims. -->
-      <div style="width: 100%; height: 640px;" class="mt-3 grid-wrapper">
+      <!-- Filter & Search Toolbar (Category, Month, Year, Status, Search) -->
+      <div class="salary-filter-toolbar">
+        <div class="filter-left-group">
+          <!-- Month Filter -->
+          <div class="filter-item">
+            <label>Month</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="expenseMonthOptions()"
+                [value]="expenseFilterMonth() ? expenseFilterMonth() : 'ALL'"
+                [clearable]="expenseFilterMonth() !== ''"
+                placeholder="All Months"
+                (valueChange)="onExpenseMonthChange($event)">
+              </app-searchable-select>
+            </div>
+          </div>
+
+          <!-- Year Filter -->
+          <div class="filter-item">
+            <label>Year</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="expenseYearOptions"
+                [value]="expenseFilterYear() ? expenseFilterYear() : 'ALL'"
+                [clearable]="expenseFilterYear() !== ''"
+                placeholder="All Years"
+                (valueChange)="onExpenseYearChange($event)">
+              </app-searchable-select>
+            </div>
+          </div>
+
+          <!-- Category Filter -->
+          <div class="filter-item">
+            <label>Category</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="expenseCategoryOptions"
+                [value]="expenseCategoryFilter()"
+                [clearable]="expenseCategoryFilter() !== 'ALL'"
+                placeholder="All Categories"
+                (valueChange)="expenseCategoryFilter.set($event || 'ALL')">
+              </app-searchable-select>
+            </div>
+          </div>
+
+          <!-- Search Input Field -->
+          <div class="search-box-wrapper">
+            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input 
+              type="text" 
+              class="search-input-field" 
+              placeholder="Search claim, employee, vendor, project..."
+              [ngModel]="expenseSearchQuery()"
+              (ngModelChange)="expenseSearchQuery.set($event)">
+            <button 
+              *ngIf="expenseSearchQuery()" 
+              class="clear-search-btn" 
+              (click)="expenseSearchQuery.set('')"
+              title="Clear Search">✕</button>
+          </div>
+        </div>
+
+        <div class="filter-right-group">
+          <!-- Quick Status Filter Pills -->
+          <div class="filter-pills-cluster">
+            <button 
+              type="button" 
+              class="filter-pill-tab" 
+              [class.active]="expenseStatusFilter() === 'ALL'" 
+              (click)="expenseStatusFilter.set('ALL')">
+              All ({{ expenseStats().totalCount }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab pill-pending" 
+              [class.active]="expenseStatusFilter() === 'PENDING'" 
+              (click)="expenseStatusFilter.set('PENDING')"
+              *ngIf="expenseStats().pendingCount > 0">
+              Pending ({{ expenseStats().pendingCount }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab pill-approved" 
+              [class.active]="expenseStatusFilter() === 'APPROVED'" 
+              (click)="expenseStatusFilter.set('APPROVED')"
+              *ngIf="expenseStats().approvedCount > 0">
+              Approved ({{ expenseStats().approvedCount }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab pill-paid" 
+              [class.active]="expenseStatusFilter() === 'PAID'" 
+              (click)="expenseStatusFilter.set('PAID')"
+              *ngIf="expenseStats().paidCount > 0">
+              Paid ({{ expenseStats().paidCount }})
+            </button>
+            <button 
+              type="button" 
+              class="filter-pill-tab pill-rejected" 
+              [class.active]="expenseStatusFilter() === 'REJECTED'" 
+              (click)="expenseStatusFilter.set('REJECTED')"
+              *ngIf="expenseStats().rejectedCount > 0">
+              Rejected ({{ expenseStats().rejectedCount }})
+            </button>
+          </div>
+
+          <!-- Reset / Clear Filters Button -->
+          <button 
+            type="button" 
+            class="btn-clear-inline" 
+            *ngIf="hasActiveExpenseFilters()" 
+            (click)="clearExpenseFilters()">
+            Clear Filters
+          </button>
+        </div>
+      </div>
+
+      <!-- Live summary tag strip -->
+      <div class="expense-meta-strip mt-3">
+        <span class="expense-filter-count">
+          Showing <strong>{{ filteredExpenseClaims().length }}</strong> of {{ expenseStats().totalCount }} claims
+          · Total Amount: <strong>₹{{ filteredExpenseTotal() | number:'1.2-2' }}</strong>
+        </span>
+      </div>
+
+      <!-- Skeleton Loading Table for Admin Expense Claims -->
+      <div *ngIf="isLoadingExpenses()" class="salary-table-container mt-3" style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);">
+        <table class="salary-data-table">
+          <thead>
+            <tr>
+              <th style="min-width: 220px;">Claimant</th>
+              <th style="min-width: 240px;">Title & Category</th>
+              <th style="min-width: 130px;">Purchase Date</th>
+              <th style="min-width: 120px;" class="text-right">Amount</th>
+              <th style="min-width: 140px;">Receipts</th>
+              <th style="min-width: 140px;" class="text-center">Status</th>
+              <th style="min-width: 110px;" class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of [1, 2, 3, 4, 5, 6, 7]" class="salary-skeleton-row">
+              <td class="td-employee">
+                <div class="emp-profile-cell">
+                  <div class="skeleton-avatar-circle skeleton-shimmer"></div>
+                  <div class="emp-name-stack">
+                    <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '140px' : '115px')" style="height: 14px;"></div>
+                    <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '85px' : '95px')" style="height: 11px;"></div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '160px' : '135px')" style="height: 14px; margin-bottom: 6px;"></div>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="skeleton-pill skeleton-shimmer" style="width: 58px; height: 18px; border-radius: 4px;"></div>
+                  <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '90px' : '75px')" style="height: 11px;"></div>
+                </div>
+              </td>
+              <td>
+                <div class="skeleton-line skeleton-shimmer" style="width: 95px; height: 13px;"></div>
+              </td>
+              <td class="text-right">
+                <div class="skeleton-line skeleton-shimmer ms-auto" [style.width]="(s % 2 === 0 ? '85px' : '70px')" style="height: 15px;"></div>
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="skeleton-pill skeleton-shimmer" style="width: 26px; height: 26px; border-radius: 6px;"></div>
+                  <div class="skeleton-line skeleton-shimmer" style="width: 75px; height: 12px;"></div>
+                </div>
+              </td>
+              <td class="text-center">
+                <div class="skeleton-pill skeleton-shimmer mx-auto" style="width: 86px; height: 26px; border-radius: 13px;"></div>
+              </td>
+              <td class="text-center">
+                <div class="skeleton-pill skeleton-shimmer mx-auto" style="width: 64px; height: 28px; border-radius: 6px;"></div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- AG Grid for Admin Expense Claims -->
+      <div *ngIf="!isLoadingExpenses()" style="width: 100%; height: 640px;" class="mt-3 grid-wrapper">
         <ag-grid-angular
           class="ag-theme-quartz"
           [theme]="'legacy'"
@@ -1293,7 +1487,6 @@
           [pagination]="true"
           [paginationPageSize]="20"
           [paginationPageSizeSelector]="[20, 50, 100, 200]"
-          (cellValueChanged)="onExpenseStatusChanged($event)"
           (cellClicked)="onExpenseRowClicked($event)">
         </ag-grid-angular>
       </div>
@@ -1305,8 +1498,53 @@
         <h4>My Submitted Claims</h4>
       </div>
       
+      <!-- Skeleton Loading Table for Employee Expense Claims -->
+      <div *ngIf="isLoadingExpenses()" class="salary-table-container mt-3" style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);">
+        <table class="salary-data-table">
+          <thead>
+            <tr>
+              <th style="min-width: 220px;">Title & Category</th>
+              <th style="min-width: 130px;">Purchase Date</th>
+              <th style="min-width: 120px;" class="text-right">Amount</th>
+              <th style="min-width: 130px;">Receipts</th>
+              <th style="min-width: 130px;" class="text-center">Status</th>
+              <th style="min-width: 100px;" class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of [1, 2, 3, 4]" class="salary-skeleton-row">
+              <td>
+                <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '160px' : '135px')" style="height: 14px; margin-bottom: 6px;"></div>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="skeleton-pill skeleton-shimmer" style="width: 58px; height: 18px; border-radius: 4px;"></div>
+                  <div class="skeleton-line skeleton-shimmer" [style.width]="(s % 2 === 0 ? '90px' : '75px')" style="height: 11px;"></div>
+                </div>
+              </td>
+              <td>
+                <div class="skeleton-line skeleton-shimmer" style="width: 95px; height: 13px;"></div>
+              </td>
+              <td class="text-right">
+                <div class="skeleton-line skeleton-shimmer ms-auto" [style.width]="(s % 2 === 0 ? '85px' : '70px')" style="height: 15px;"></div>
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="skeleton-pill skeleton-shimmer" style="width: 26px; height: 26px; border-radius: 6px;"></div>
+                  <div class="skeleton-line skeleton-shimmer" style="width: 75px; height: 12px;"></div>
+                </div>
+              </td>
+              <td class="text-center">
+                <div class="skeleton-pill skeleton-shimmer mx-auto" style="width: 86px; height: 26px; border-radius: 13px;"></div>
+              </td>
+              <td class="text-center">
+                <div class="skeleton-pill skeleton-shimmer mx-auto" style="width: 64px; height: 28px; border-radius: 6px;"></div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- AG Grid for Employee Expense Claims -->
-      <div style="width: 100%; height: 400px;" class="mt-3 grid-wrapper" *ngIf="myExpenseClaims().length > 0; else noExpenses">
+      <div style="width: 100%; height: 400px;" class="mt-3 grid-wrapper" *ngIf="!isLoadingExpenses() && myExpenseClaims().length > 0; else noExpenses">
         <ag-grid-angular
           class="ag-theme-quartz"
           [theme]="'legacy'"
@@ -1315,12 +1553,13 @@
           [columnDefs]="myExpenseColDefs"
           [defaultColDef]="defaultColDef"
           [rowHeight]="64"
-          [headerHeight]="48">
+          [headerHeight]="48"
+          (cellClicked)="onExpenseRowClicked($event)">
         </ag-grid-angular>
       </div>
 
       <ng-template #noExpenses>
-        <div class="empty-state">
+        <div class="empty-state" *ngIf="!isLoadingExpenses()">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
           <p>You haven't submitted any expense claims yet.</p>
         </div>
@@ -2015,51 +2254,6 @@
     </div>
   </div>
 
-  <!-- Drawer: Adjust Draft Payslip -->
-  <div class="drawer-overlay" *ngIf="isAdjustModalOpen()" (click)="closeAdjustModal()">
-    <div class="drawer-content" (click)="$event.stopPropagation()">
-      <div class="drawer-header">
-        <h2>Adjust Payslip — {{ selectedPayslipToAdjust()?.employee?.firstName }} {{ selectedPayslipToAdjust()?.employee?.lastName }}</h2>
-        <button class="btn-icon" (click)="closeAdjustModal()">✕</button>
-      </div>
-      <form (ngSubmit)="saveAdjustedPayslip()">
-        <div class="drawer-body">
-          <div class="info-banner mb-3">
-            <p>Review and manually override calculated Loss of Pay (LOP) or adjustments before finalizing the payslip.</p>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Gross Earnings (₹)</label>
-              <input type="number" class="form-control" [(ngModel)]="adjustForm.totalEarnings" name="gross">
-            </div>
-            <div class="form-group">
-              <label>Standard Deductions (₹)</label>
-              <input type="number" class="form-control" [(ngModel)]="adjustForm.totalDeductions" name="deductions">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Loss of Pay / Absence Penalty (₹)</label>
-              <input type="number" class="form-control" [(ngModel)]="adjustForm.lossOfPay" name="lop">
-              <small style="color: #64748B;">Calculated based on {{ selectedPayslipToAdjust()?.absentDays }} absent day(s).</small>
-            </div>
-            <div class="form-group">
-              <label>Expense Reimbursed (₹)</label>
-              <input type="number" class="form-control" [(ngModel)]="adjustForm.expenseAmount" name="expenses">
-            </div>
-          </div>
-          <div class="net-calc-box">
-            <span>Revised Net Pay:</span>
-            <strong>₹{{ adjustedNetPay.toLocaleString('en-IN') }}</strong>
-          </div>
-        </div>
-        <div class="drawer-footer">
-          <button type="button" class="btn btn-outline" (click)="closeAdjustModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Adjustments</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <!-- Drawer: New Expense Claim -->
   <div class="drawer-overlay" *ngIf="isExpenseModalOpen()" (click)="closeExpenseModal()">
@@ -2292,16 +2486,20 @@
         <div class="payslip-actions">
           <button class="btn btn-outline" (click)="closePayslipDetail()">Close</button>
 
+          <!-- Editing and re-sending belong to whoever runs payroll. An
+               employee opening their own payslip is reading a record, not
+               working on one — the same rule the API now enforces, so this is
+               the button disappearing rather than the only thing stopping it. -->
           <!-- A finalized or paid slip is a record; adjusting it should be a
                deliberate act, not the first button under the cursor. -->
-          <button class="btn btn-outline" (click)="openPayslipEdit(pd)"
+          <button class="btn btn-outline" *ngIf="isAdmin()" (click)="openPayslipEdit(pd)"
                   [disabled]="isPayslipBusy()"
                   [title]="pd.status === 'DRAFT' ? 'Edit this payslip' : 'This payslip is ' + pd.status.toLowerCase()">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
             <span>Edit</span>
           </button>
 
-          <button class="btn btn-outline" (click)="resendPayslip(pd)" [disabled]="isPayslipBusy()">
+          <button class="btn btn-outline" *ngIf="isAdmin()" (click)="resendPayslip(pd)" [disabled]="isPayslipBusy()">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
             <span>{{ isPayslipBusy() ? 'Working…' : 'Send Again' }}</span>
           </button>
@@ -2322,11 +2520,14 @@
   <div class="drawer-overlay" *ngIf="isExpenseDetailOpen()" (click)="closeExpenseDetail()">
     <div class="drawer-content expense-detail-content" (click)="$event.stopPropagation()"
          *ngIf="selectedExpense() as ex">
-      <div class="drawer-header">
-        <div>
+      <div class="drawer-header expense-drawer-header">
+        <div class="expense-drawer-title-group">
+          <div class="expense-id-row">
+            <span class="expense-id-pill">#CLM-{{ ex.id }}</span>
+            <span class="expense-cat-pill">{{ formatCategoryName(ex.category) }}</span>
+          </div>
           <h2>{{ ex.title || 'Expense Claim' }}</h2>
-          <p class="edit-sub">
-            <span class="cat-badge cat-laptop">{{ ex.category || 'OTHER' }}</span>
+          <div class="drawer-subtitle-row">
             <span class="status-round"
                   [class.status-approved]="ex.status === 'APPROVED'"
                   [class.status-pending]="ex.status === 'PENDING'"
@@ -2334,93 +2535,229 @@
                   [class.status-paid]="ex.status === 'PAID'">
               <span class="status-dot"></span>{{ ex.status || 'PENDING' }}
             </span>
-          </p>
+            <span class="subtitle-divider" *ngIf="ex.createdAt">·</span>
+            <span class="subtitle-meta" *ngIf="ex.createdAt">
+              Submitted on {{ ex.createdAt | date:'dd MMM yyyy' }}
+            </span>
+          </div>
         </div>
-        <button class="btn-icon" (click)="closeExpenseDetail()">✕</button>
+        <button class="btn-icon" (click)="closeExpenseDetail()" title="Close details">✕</button>
       </div>
 
-      <div class="drawer-body">
-        <div class="expense-amount-banner">
-          <span>Amount</span>
-          <h2>₹{{ ex.amount | number:'1.2-2' }}</h2>
-        </div>
-
-        <div class="edit-meta-grid mt-3">
-          <div class="edit-field">
-            <label>Claimed by</label>
-            <!-- A company cost has no claimant, and saying so is better than an
-                 empty box: 188 of these are rent and electricity. -->
-            <input class="form-control"
-                   [value]="ex.employee ? (ex.employee.firstName + ' ' + (ex.employee.lastName || '')) : 'Company expense — no claimant'"
-                   readonly>
+      <div class="drawer-body expense-drawer-body">
+        <!-- 1. Executive Amount Hero Banner -->
+        <div class="expense-amount-hero">
+          <div class="amount-hero-left">
+            <span class="hero-label">Reimbursement Claim Amount</span>
+            <div class="hero-amount-val">₹{{ ex.amount | number:'1.2-2' }}</div>
+            <p class="hero-amount-words">{{ amountInWords(ex.amount) }}</p>
           </div>
-          <div class="edit-field">
-            <label>Department</label>
-            <input class="form-control" [value]="ex.employee?.department?.name || '—'" readonly>
-          </div>
-          <div class="edit-field">
-            <label>Purchase date</label>
-            <input class="form-control"
-                   [value]="ex.purchaseDate ? (ex.purchaseDate | date:'dd MMM yyyy') : '—'" readonly>
-          </div>
-          <div class="edit-field">
-            <label>Vendor</label>
-            <input class="form-control" [value]="ex.purchasedFrom || '—'" readonly>
-          </div>
-          <div class="edit-field">
-            <label>Project</label>
-            <input class="form-control" [value]="ex.projectName || ex.projectCode || '—'" readonly>
-          </div>
-          <div class="edit-field">
-            <label>Approved by</label>
-            <input class="form-control"
-                   [value]="ex.approvedBy?.employee
-                              ? (ex.approvedBy.employee.firstName + ' ' + (ex.approvedBy.employee.lastName || ''))
-                              : '—'" readonly>
+          <div class="amount-hero-right">
+            <div class="hero-status-card" [ngClass]="'status-card-' + (ex.status || 'pending').toLowerCase()">
+              <div class="hero-status-icon">
+                <svg *ngIf="ex.status === 'PAID'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <svg *ngIf="ex.status === 'APPROVED'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <svg *ngIf="ex.status === 'PENDING'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <svg *ngIf="ex.status === 'REJECTED'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+              </div>
+              <div class="hero-status-text">
+                <div class="hero-status-title">
+                  {{ ex.status === 'PAID' ? 'Fully Reimbursed' : (ex.status === 'APPROVED' ? 'Approved for Payment' : (ex.status === 'REJECTED' ? 'Claim Rejected' : 'Under Review')) }}
+                </div>
+                <div class="hero-status-sub">
+                  {{ ex.status === 'PAID' ? 'Settled to employee' : (ex.status === 'APPROVED' ? 'Ready for payroll payout' : (ex.status === 'REJECTED' ? 'Review reason below' : 'Awaiting admin approval')) }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="edit-section mt-3" *ngIf="ex.description">
-          <h4 class="edit-section-title">Description</h4>
-          <p class="expense-description">{{ ex.description }}</p>
-        </div>
-
-        <div class="edit-section mt-3" *ngIf="ex.status === 'REJECTED' && ex.rejectionReason">
-          <h4 class="edit-section-title">Why it was rejected</h4>
-          <p class="expense-description text-rose">{{ ex.rejectionReason }}</p>
-        </div>
-
-        <div class="edit-section mt-3">
-          <h4 class="edit-section-title">Receipts</h4>
-          <!-- Half of these are PDFs. A thumbnail for the pictures, a
-               document tile for everything else — an <img> pointed at a tax
-               invoice draws a broken icon and nothing else. -->
-          <div class="expense-receipts" *ngIf="expenseReceipts(ex).length; else noReceipt">
-            <ng-container *ngFor="let r of expenseReceipts(ex); let i = index">
-              <img *ngIf="isImageUrl(r)" [src]="r" class="expense-receipt-thumb" alt="Receipt"
-                   (click)="openReceipt(expenseReceipts(ex), i)" />
-              <button *ngIf="!isImageUrl(r)" type="button" class="expense-receipt-doc"
-                      (click)="openReceipt(expenseReceipts(ex), i)"
-                      [title]="r">
-                <span class="doc-kind">{{ isPdfUrl(r) ? 'PDF' : 'FILE' }}</span>
-                <span class="doc-open">Open ↗</span>
-              </button>
-            </ng-container>
+        <!-- 2. Claimant Profile Card -->
+        <div class="expense-claimant-card">
+          <div class="claimant-avatar-box">
+            <img *ngIf="ex.employee?.avatarUrl" [src]="ex.employee.avatarUrl" class="claimant-avatar-img" alt="" />
+            <div *ngIf="!ex.employee?.avatarUrl" class="claimant-avatar-fallback">
+              {{ (ex.employee?.firstName || 'C').charAt(0) }}
+            </div>
           </div>
-          <ng-template #noReceipt>
-            <p class="expense-description text-secondary">No receipt attached.</p>
+          <div class="claimant-info">
+            <div class="claimant-tag">CLAIMANT PROFILE</div>
+            <h4 class="claimant-name">
+              {{ ex.employee ? (ex.employee.firstName + ' ' + (ex.employee.lastName || '')) : 'Company Expense (No Individual Claimant)' }}
+            </h4>
+            <div class="claimant-meta-row">
+              <span class="meta-pill" *ngIf="ex.employee?.department?.name">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"></path></svg>
+                {{ ex.employee.department.name }}
+              </span>
+              <span class="meta-pill" *ngIf="ex.employee?.designation?.name">
+                {{ ex.employee.designation.name }}
+              </span>
+              <span class="meta-pill pill-company" *ngIf="!ex.employee">
+                Corporate Overhead / Direct Expense
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Structured Metadata Grid (replaces 6 disabled inputs) -->
+        <div class="expense-info-grid">
+          <div class="info-tile">
+            <div class="tile-icon-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-label">Purchase Date</span>
+              <span class="tile-value">{{ ex.purchaseDate ? (ex.purchaseDate | date:'dd MMM yyyy') : '—' }}</span>
+            </div>
+          </div>
+
+          <div class="info-tile">
+            <div class="tile-icon-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-label">Vendor / Merchant</span>
+              <span class="tile-value" [class.text-muted]="!ex.purchasedFrom">{{ ex.purchasedFrom || '—' }}</span>
+            </div>
+          </div>
+
+          <div class="info-tile">
+            <div class="tile-icon-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-label">Category</span>
+              <span class="tile-value">{{ formatCategoryName(ex.category) }}</span>
+            </div>
+          </div>
+
+          <div class="info-tile">
+            <div class="tile-icon-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-label">Project Allocation</span>
+              <span class="tile-value" [class.text-muted]="!ex.projectName && !ex.projectCode">
+                {{ ex.projectName || ex.projectCode || 'General / Non-Project' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="info-tile">
+            <div class="tile-icon-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-label">Approved By</span>
+              <span class="tile-value" [class.text-muted]="!ex.approvedBy">
+                {{ ex.approvedBy?.employee ? (ex.approvedBy.employee.firstName + ' ' + (ex.approvedBy.employee.lastName || '')) : (ex.status === 'PENDING' ? 'Awaiting Approval' : '—') }}
+              </span>
+            </div>
+          </div>
+
+          <div class="info-tile">
+            <div class="tile-icon-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-label">Submission Date</span>
+              <span class="tile-value">{{ ex.createdAt ? (ex.createdAt | date:'dd MMM yyyy') : (ex.purchaseDate | date:'dd MMM yyyy') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Description / Justification Card -->
+        <div class="expense-desc-card" *ngIf="ex.description">
+          <div class="desc-card-header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <h4>Business Justification &amp; Notes</h4>
+          </div>
+          <p class="desc-card-body">{{ ex.description }}</p>
+        </div>
+
+        <!-- 5. Rejection Reason Banner -->
+        <div class="expense-rejection-card" *ngIf="ex.status === 'REJECTED' && ex.rejectionReason">
+          <div class="rejection-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+          </div>
+          <div class="rejection-content">
+            <h5>Rejection Reason</h5>
+            <p>{{ ex.rejectionReason }}</p>
+          </div>
+        </div>
+
+        <!-- 6. Receipts & Attached Invoices -->
+        <div class="expense-receipts-card">
+          <div class="receipts-header">
+            <div class="receipts-title-row">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+              <h4>Attached Receipts &amp; Invoices</h4>
+            </div>
+            <span class="receipts-count-badge" *ngIf="expenseReceipts(ex).length">
+              {{ expenseReceipts(ex).length }} {{ expenseReceipts(ex).length === 1 ? 'file' : 'files' }}
+            </span>
+          </div>
+
+          <div class="receipts-gallery" *ngIf="expenseReceipts(ex).length; else noReceiptsTemplate">
+            <div *ngFor="let r of expenseReceipts(ex); let i = index" class="receipt-item-card">
+              <!-- Image Preview Tile -->
+              <div *ngIf="isImageUrl(r)" class="receipt-thumb-wrap" (click)="openReceipt(expenseReceipts(ex), i)">
+                <img [src]="r" class="receipt-thumb-image" alt="Receipt preview" />
+                <div class="receipt-thumb-hover">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                  <span>Preview</span>
+                </div>
+              </div>
+
+              <!-- PDF / Doc Preview Tile -->
+              <div *ngIf="!isImageUrl(r)" class="receipt-doc-tile" (click)="openReceipt(expenseReceipts(ex), i)">
+                <div class="doc-icon-container" [class.doc-pdf]="isPdfUrl(r)">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  <span class="doc-format-badge">{{ isPdfUrl(r) ? 'PDF' : 'DOC' }}</span>
+                </div>
+                <div class="doc-details">
+                  <span class="doc-title">{{ isPdfUrl(r) ? 'Tax Invoice / Receipt' : 'Attachment Document' }}</span>
+                  <span class="doc-action-link">Open in New Tab ↗</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <ng-template #noReceiptsTemplate>
+            <div class="no-receipts-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              <p>No receipt or invoice was attached with this claim.</p>
+            </div>
           </ng-template>
         </div>
       </div>
 
-      <div class="drawer-footer payslip-actions">
+      <div class="drawer-footer expense-drawer-footer">
         <button class="btn btn-outline" (click)="closeExpenseDetail()">Close</button>
-        <button class="btn btn-outline" *ngIf="ex.status !== 'APPROVED' && ex.status !== 'PAID'"
-                (click)="updateExpenseStatus(ex.id, 'APPROVED'); closeExpenseDetail()">Approve</button>
-        <button class="btn btn-outline" *ngIf="ex.status !== 'REJECTED'"
-                (click)="openRejectModal(ex.id); closeExpenseDetail()">Reject</button>
-        <button class="btn btn-primary" *ngIf="ex.status === 'APPROVED'"
-                (click)="markExpensePaid(ex); closeExpenseDetail()">Mark Paid</button>
+        
+        <div class="footer-action-group">
+          <!-- Reject action -->
+          <button class="btn btn-danger-soft" *ngIf="ex.status !== 'REJECTED' && isAdmin()"
+                  (click)="openRejectModal(ex.id); closeExpenseDetail()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+            Reject Claim
+          </button>
+          
+          <!-- Approve action -->
+          <button class="btn btn-success-modern" *ngIf="ex.status !== 'APPROVED' && ex.status !== 'PAID' && isAdmin()"
+                  (click)="updateExpenseStatus(ex.id, 'APPROVED'); closeExpenseDetail()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Approve Claim
+          </button>
+          
+          <!-- Mark Paid action -->
+          <button class="btn btn-primary" *ngIf="ex.status === 'APPROVED' && isAdmin()"
+                  (click)="markExpensePaid(ex); closeExpenseDetail()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><line x1="12" y1="6" x2="12" y2="8"></line><line x1="12" y1="16" x2="12" y2="18"></line></svg>
+            Mark as Paid
+          </button>
+        </div>
       </div>
     </div>
   </div>

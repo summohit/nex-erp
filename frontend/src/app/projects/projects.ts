@@ -268,6 +268,28 @@ export class ProjectsComponent implements OnInit {
   pmDropdownOpen = signal(false);
   pmSearchQuery = signal<string>('');
 
+  /**
+   * The technical architect picker.
+   *
+   * Its own list rather than a role dropdown on each member, because this is
+   * the question the owner is actually answering — who holds the shape of the
+   * work — and it belongs next to the manager it sits beside.
+   */
+  architectDropdownOpen = signal(false);
+  architectSearchQuery = signal<string>('');
+
+  filteredArchitectEmployees = computed(() => {
+    const q = this.architectSearchQuery().toLowerCase().trim();
+    const all = this.employees() || [];
+    if (!q) return all;
+    return all.filter((e: any) =>
+      `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(q) ||
+      (e.user?.email || '').toLowerCase().includes(q) ||
+      (e.designation?.name || '').toLowerCase().includes(q) ||
+      (e.department?.name || '').toLowerCase().includes(q)
+    );
+  });
+
   projectManagerEmployees = computed(() => {
     return this.employees().filter((e: any) =>
       e.isProjectManager === true || /project.*manager|manager.*project/i.test(e.designation?.name || '')
@@ -443,6 +465,20 @@ export class ProjectsComponent implements OnInit {
   removePm(id: number) {
     const idx = this.projectForm.pmIds.indexOf(id);
     if (idx >= 0) this.projectForm.pmIds.splice(idx, 1);
+  }
+
+  toggleArchitect(id: number) {
+    const idx = this.projectForm.architectIds.indexOf(id);
+    if (idx >= 0) {
+      this.projectForm.architectIds.splice(idx, 1);
+    } else {
+      this.projectForm.architectIds.push(id);
+    }
+  }
+
+  removeArchitect(id: number) {
+    const idx = this.projectForm.architectIds.indexOf(id);
+    if (idx >= 0) this.projectForm.architectIds.splice(idx, 1);
   }
   
   // Local persistence for Starred & Recently Viewed
@@ -988,6 +1024,7 @@ export class ProjectsComponent implements OnInit {
       clientId: null as number | null,
       leadContactId: null as number | null,
       pmIds: [] as number[],
+      architectIds: [] as number[],
       memberIds: [] as number[],
       address: '',
       // ── Delivery (§4, §7, §9) ──
@@ -1521,6 +1558,7 @@ export class ProjectsComponent implements OnInit {
 
   closeAllModalDropdowns() {
     this.pmDropdownOpen.set(false);
+    this.architectDropdownOpen.set(false);
     this.memberDropdownOpen.set(false);
     this.clientDropdownOpen.set(false);
     this.categoryDropdownOpen.set(false);
@@ -3485,6 +3523,7 @@ export class ProjectsComponent implements OnInit {
       clientId: project.clientId,
       leadContactId: project.leadContactId ?? project.leadContact?.id ?? null,
       pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || [],
+      architectIds: project.members?.filter((m: any) => m.role === 'TECHNICAL_ARCHITECT').map((m: any) => m.employeeId) || [],
       memberIds: project.members?.filter((m: any) => m.role === 'MEMBER').map((m: any) => m.employeeId) || [],
       address: project.address || '',
       category: project.category || '',
@@ -3563,6 +3602,7 @@ export class ProjectsComponent implements OnInit {
     this.categorySearchQuery.set('');
     this.departmentSearchQuery.set('');
     this.pmSearchQuery.set('');
+    this.architectSearchQuery.set('');
     this.memberSearchQuery.set('');
 
     this.duplicateCopy.set({
@@ -3681,6 +3721,7 @@ export class ProjectsComponent implements OnInit {
     this.isCreateModalOpen.set(false);
     this.closeAllModalDropdowns();
     this.pmSearchQuery.set('');
+    this.architectSearchQuery.set('');
     this.clientSearchQuery.set('');
     this.categorySearchQuery.set('');
     this.departmentSearchQuery.set('');

@@ -11,6 +11,7 @@ import { AuthService } from '../services/auth.service';
 import { ProjectsService } from '../services/projects';
 import { ActionCellRendererComponent } from '../shared/components/action-cell-renderer.component';
 import { ExpenseActionCellRendererComponent } from '../shared/components/expense-action-cell-renderer.component';
+import { ExpenseStatusCellRendererComponent } from '../shared/components/expense-status-cell-renderer.component';
 import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
 import { UploadService } from '../services/upload.service';
 import { 
@@ -34,7 +35,9 @@ import { MatMenuModule } from '@angular/material/menu';
     LucideUploadCloud,
     LucideX,
     MatMenuModule,
-    SearchableSelectComponent
+    SearchableSelectComponent,
+    ExpenseStatusCellRendererComponent,
+    ExpenseActionCellRendererComponent
   ],
   templateUrl: './payroll.html',
   styleUrls: ['./payroll.css']
@@ -113,15 +116,6 @@ export class PayrollComponent implements OnInit {
 
   private uploadService = inject(UploadService);
 
-  // Drawer / Modal states
-  isAdjustModalOpen = signal<boolean>(false);
-  selectedPayslipToAdjust = signal<Payslip | null>(null);
-  adjustForm = { lossOfPay: 0, totalEarnings: 0, totalDeductions: 0, expenseAmount: 0 };
-
-  get adjustedNetPay(): number {
-    const raw = (this.adjustForm.totalEarnings || 0) - (this.adjustForm.totalDeductions || 0) - (this.adjustForm.lossOfPay || 0) + (this.adjustForm.expenseAmount || 0);
-    return Math.max(0, raw);
-  }
 
   isExpenseModalOpen = signal<boolean>(false);
   expenseForm = { title: '', description: '', amount: 0, category: 'OTHER', receiptUrl: '', receipts: [] as string[], purchaseDate: '', purchasedFrom: '', projectCode: '', projectName: '', projectId: null as number | null };
@@ -202,37 +196,59 @@ export class PayrollComponent implements OnInit {
     return name ? name.includes('[Statutory]') : false;
   }
 
-  // Expense Filtering & Grouping
+  // Expense Filtering, Search, Categories & Statistics
   expenseFilterMonth = signal<number | ''>(new Date().getMonth() + 1);
   expenseFilterYear = signal<number | ''>(new Date().getFullYear());
+  expenseStatusFilter = signal<string>('ALL');
+  expenseCategoryFilter = signal<string>('ALL');
+  expenseSearchQuery = signal<string>('');
+  isLoadingExpenses = signal<boolean>(false);
   expandedEmployeeIds = signal<number[]>([]);
 
-  /** All Company Expense Claims: status filter, alongside the period ones. */
-  expenseStatusFilter = signal<string>('ALL');
+  expenseMonthOptions = computed<SearchableSelectOption[]>(() => [
+    { id: 'ALL', name: 'All Months' },
+    ...this.months.map(m => ({ id: m.id, name: m.name }))
+  ]);
 
-  /**
-   * The rows the company grid actually shows.
-   *
-   * The grid was bound straight to expenseClaims(), so the month and year
-   * selects above it did nothing at all: picking September 2025 left all 797
-   * rows on screen, including May and June. The signals existed and only the
-   * other, grouped view read them.
-   *
-   * Filtered on purchaseDate, not createdAt. Every imported row was created on
-   * the same day, so createdAt would put 795 expenses in one month and empty
-   * every other.
-   */
-  filteredExpenseClaims = computed(() => {
+  expenseYearOptions: SearchableSelectOption[] = [
+    { id: 'ALL', name: 'All Years' },
+    { id: 2024, name: '2024' },
+    { id: 2025, name: '2025' },
+    { id: 2026, name: '2026' }
+  ];
+
+  expenseCategoryOptions: SearchableSelectOption[] = [
+    { id: 'ALL', name: 'All Categories' },
+    { id: 'TRAVEL', name: 'Travel & Commute' },
+    { id: 'MEALS', name: 'Meals & Food' },
+    { id: 'ACCOMMODATION', name: 'Stay & Accommodation' },
+    { id: 'EQUIPMENT', name: 'Office Equipment' },
+    { id: 'OTHER', name: 'Other Expenses' }
+  ];
+
+  onExpenseMonthChange(val: any) {
+    if (!val || val === 'ALL') {
+      this.expenseFilterMonth.set('');
+    } else {
+      this.expenseFilterMonth.set(Number(val));
+    }
+  }
+
+  onExpenseYearChange(val: any) {
+    if (!val || val === 'ALL') {
+      this.expenseFilterYear.set('');
+    } else {
+      this.expenseFilterYear.set(Number(val));
+    }
+  }
+
+  /** Period-filtered claims for metrics and totals */
+  expensePeriodClaims = computed(() => {
     const month = this.expenseFilterMonth();
     const year = this.expenseFilterYear();
-    const status = this.expenseStatusFilter();
 
     return this.expenseClaims().filter((c) => {
-      if (status !== 'ALL' && (c.status || 'PENDING') !== status) return false;
       if (month === '' && year === '') return true;
-
-      // A claim with no purchase date cannot be placed in a period. Hiding it
-      // whenever a filter is set would make it unreachable, so it stays.
       const raw = c.purchaseDate || c.createdAt;
       if (!raw) return true;
       const d = new Date(raw);
@@ -244,9 +260,122 @@ export class PayrollComponent implements OnInit {
     });
   });
 
-  /** Totals for what is on screen, not for everything ever claimed. */
+  /** Executive KPI Metrics for current expense period */
+  expenseStats = computed(() => {
+    const list = this.expensePeriodClaims();
+    let pendingCount = 0, pendingAmount = 0;
+    let approvedCount = 0, approvedAmount = 0;
+    let paidCount = 0, paidAmount = 0;
+    let rejectedCount = 0, rejectedAmount = 0;
+    let totalAmount = 0;
+
+    for (const c of list) {
+      const amt = Number(c.amount) || 0;
+      totalAmount += amt;
+      const s = (c.status || 'PENDING').toUpperCase();
+      if (s === 'PENDING') {
+        pendingCount++;
+        pendingAmount += amt;
+      } else if (s === 'APPROVED') {
+        approvedCount++;
+        approvedAmount += amt;
+      } else if (s === 'PAID') {
+        paidCount++;
+        paidAmount += amt;
+      } else if (s === 'REJECTED') {
+        rejectedCount++;
+        rejectedAmount += amt;
+      }
+    }
+
+    return {
+      totalCount: list.length,
+      totalAmount,
+      pendingCount,
+      pendingAmount,
+      approvedCount,
+      approvedAmount,
+      paidCount,
+      paidAmount,
+      rejectedCount,
+      rejectedAmount
+    };
+  });
+
+  /**
+   * Rows shown in the table, filtered by period, status, category, and text search.
+   */
+  filteredExpenseClaims = computed(() => {
+    const status = this.expenseStatusFilter();
+    const category = this.expenseCategoryFilter();
+    const search = this.expenseSearchQuery().trim().toLowerCase();
+
+    return this.expensePeriodClaims().filter((c) => {
+      if (status !== 'ALL' && (c.status || 'PENDING').toUpperCase() !== status) {
+        return false;
+      }
+
+      if (category !== 'ALL' && (c.category || 'OTHER').toUpperCase() !== category) {
+        return false;
+      }
+
+      if (search) {
+        const empName = `${c.employee?.firstName || ''} ${c.employee?.lastName || ''}`.toLowerCase();
+        const deptName = (c.employee?.department?.name || '').toLowerCase();
+        const title = (c.title || '').toLowerCase();
+        const vendor = (c.purchasedFrom || '').toLowerCase();
+        const project = `${c.projectName || ''} ${c.projectCode || ''}`.toLowerCase();
+        const cat = (c.category || '').toLowerCase();
+        const amountStr = String(c.amount || '');
+
+        const matches =
+          empName.includes(search) ||
+          deptName.includes(search) ||
+          title.includes(search) ||
+          vendor.includes(search) ||
+          project.includes(search) ||
+          cat.includes(search) ||
+          amountStr.includes(search);
+
+        if (!matches) return false;
+      }
+
+      return true;
+    });
+  });
+
   filteredExpenseTotal = computed(() =>
-    this.filteredExpenseClaims().reduce((t, c) => t + (c.amount || 0), 0));
+    this.filteredExpenseClaims().reduce((t, c) => t + (Number(c.amount) || 0), 0));
+
+  hasActiveExpenseFilters = computed(() => {
+    return (
+      !!this.expenseSearchQuery().trim() ||
+      this.expenseStatusFilter() !== 'ALL' ||
+      this.expenseCategoryFilter() !== 'ALL' ||
+      this.expenseFilterMonth() !== (new Date().getMonth() + 1) ||
+      this.expenseFilterYear() !== new Date().getFullYear()
+    );
+  });
+
+  clearExpenseFilters() {
+    this.expenseSearchQuery.set('');
+    this.expenseStatusFilter.set('ALL');
+    this.expenseCategoryFilter.set('ALL');
+    this.expenseFilterMonth.set(new Date().getMonth() + 1);
+    this.expenseFilterYear.set(new Date().getFullYear());
+  }
+
+  formatCategoryName(cat?: string): string {
+    if (!cat) return 'General Expense';
+    const map: Record<string, string> = {
+      TRAVEL: 'Travel & Commute',
+      MEALS: 'Meals & Food',
+      ACCOMMODATION: 'Stay & Accommodation',
+      EQUIPMENT: 'Office Equipment',
+      OTHER: 'General Expense'
+    };
+    return map[cat.toUpperCase()] || cat;
+  }
 
   groupedExpenseClaims = computed(() => {
     const claims = this.expenseClaims();
@@ -273,7 +402,7 @@ export class PayrollComponent implements OnInit {
     }>();
 
     for (const claim of filtered) {
-      const empId = claim.employeeId;
+      const empId = claim.employeeId ?? claim.employee?.id ?? 0;
       const empName = claim.employee?.lastName 
         ? `${claim.employee.firstName} ${claim.employee.lastName}` 
         : (claim.employee?.firstName || 'Unknown Employee');
@@ -830,15 +959,15 @@ export class PayrollComponent implements OnInit {
   });
 
   expensePinnedBottomRow = computed(() => {
-    const list = this.expenseClaims();
+    const list = this.filteredExpenseClaims();
     if (!list || list.length === 0) return [];
     
-    const totalAmount = list.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const totalAmount = list.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
     return [{
       isSummaryRow: true,
       employee: { firstName: `TOTAL (${list.length})`, lastName: '' },
-      title: 'Total Claims',
+      title: 'Total Filtered Claims',
       amount: totalAmount,
       status: ''
     }];
@@ -1102,8 +1231,8 @@ export class PayrollComponent implements OnInit {
       cellRenderer: ActionCellRendererComponent,
       cellRendererParams: {
         onView: (data: any) => this.openPayslipDetail(data),
-        onEdit: (data: any) => this.openAdjustModal(data),
-        editLabel: 'Adjust Salary',
+        onEdit: (data: any) => this.openPayslipEdit(data),
+        editLabel: 'Edit Payslip',
         onFinalize: (data: any) => data.status === 'DRAFT' ? this.finalizeIndividual(data) : this.toast.info(`Payslip is already ${data.status.toLowerCase()}`),
         onMarkPaid: (data: any) => data.status !== 'PAID' ? this.markIndividualPaid(data) : this.toast.info('Payslip is already marked as PAID')
       }
@@ -1229,32 +1358,13 @@ export class PayrollComponent implements OnInit {
       field: 'status',
       headerName: 'Status',
       flex: 1.2,
-      minWidth: 150,
-      // Editable in place: the four states a claim can be in, including PAID,
-      // which previously existed only as a "Mark Paid" item buried in the row
-      // menu. Changing it here saves immediately — see onExpenseStatusChanged.
-      editable: (p: any) => !p.data?.isSummaryRow,
-      cellEditor: 'agSelectCellEditor',
-      cellEditorParams: { values: ['PENDING', 'APPROVED', 'REJECTED', 'PAID'] },
-      cellRenderer: (params: any) => {
-        if (params.data?.isSummaryRow) return '';
-        const s = params.value || 'PENDING';
-        let statusClass = 'status-pending';
-        if (s === 'APPROVED') statusClass = 'status-approved';
-        if (s === 'REJECTED') statusClass = 'status-rejected';
-        if (s === 'PAID') statusClass = 'status-paid';
-        const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason
-          ? `<div style="font-size: 10px; color: #1373e5; font-weight: 500; line-height: 1.2; margin-top: 3px;">Reason: ${params.data.rejectionReason}</div>`
-          : '';
-        return `
-          <div class="cell-stacked">
-            <span class="status-round ${statusClass}">
-              <span class="status-dot"></span>
-              ${s}
-            </span>
-            ${reasonHtml}
-          </div>
-        `;
+      minWidth: 160,
+      cellRenderer: ExpenseStatusCellRendererComponent,
+      cellRendererParams: {
+        canEdit: true,
+        onStatusChange: (data: any, newStatus: string) => this.onStatusChangeFromCell(data, newStatus),
+        onReject: (data: any) => this.openRejectModal(data.id),
+        onMarkPaid: (data: any) => this.markExpensePaid(data)
       }
     },
     {
@@ -1265,6 +1375,7 @@ export class PayrollComponent implements OnInit {
       filter: false,
       cellRenderer: ExpenseActionCellRendererComponent,
       cellRendererParams: {
+        onViewDetail: (data: any) => this.openExpenseDetail(data),
         onApprove: (data: any) => this.updateExpenseStatus(data.id, 'APPROVED'),
         onReject: (data: any) => this.openRejectModal(data.id),
         onMarkPaid: (data: any) => this.markExpensePaid(data)
@@ -1272,8 +1383,97 @@ export class PayrollComponent implements OnInit {
     }
   ];
 
-  // Column definitions for employee's own submitted claims - NO approve/reject, but CAN cancel
-  myExpenseColDefs: ColDef[] = this.expenseColDefs.slice(0, -1).concat([
+  // Column definitions for employee's own submitted claims - NO approve/reject, but CAN cancel & view details
+  myExpenseColDefs: ColDef[] = [
+    {
+      field: 'title',
+      headerName: 'Title & Category',
+      flex: 1.8,
+      minWidth: 200,
+      cellRenderer: (params: any) => {
+        if (params.data?.isSummaryRow) return `<strong>${params.value || ''}</strong>`;
+        const title = params.data?.title || 'Expense Claim';
+        const vendor = params.data?.purchasedFrom ? `Vendor: ${params.data.purchasedFrom}` : '';
+        const category = params.data?.category || 'OTHER';
+        return `
+          <div class="cell-stacked">
+            <div class="cell-title-bold">${title}</div>
+            <div class="cell-subtitle-row">
+              <span class="cat-badge cat-laptop">${category}</span>
+              <span>${vendor}</span>
+            </div>
+          </div>
+        `;
+      }
+    },
+    {
+      field: 'purchaseDate',
+      headerName: 'Purchase Date',
+      flex: 1.1,
+      minWidth: 130,
+      valueFormatter: (params: any) => {
+        if (!params.value) return '-';
+        return new Date(params.value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
+    },
+    {
+      field: 'amount',
+      headerName: 'Amount',
+      flex: 1.1,
+      minWidth: 120,
+      valueFormatter: (params: ValueFormatterParams) => `₹${(params.value || 0).toLocaleString('en-IN')}`,
+      cellStyle: { fontWeight: 'bold' }
+    },
+    {
+      field: 'receiptUrl',
+      headerName: 'Receipts',
+      flex: 1.1,
+      minWidth: 130,
+      cellRenderer: (params: any) => {
+        if (params.data?.isSummaryRow) return '';
+        let imgs: string[] = [];
+        if (params.value) {
+          try {
+            imgs = typeof params.value === 'string' && params.value.startsWith('[') ? JSON.parse(params.value) : [params.value];
+          } catch (e) { imgs = [params.value]; }
+        }
+        if (!imgs || imgs.length === 0 || !imgs[0]) return '<span style="color: #94A3B8; font-size: 12px;">No receipt</span>';
+        const first = imgs[0];
+        const thumb = this.isImageUrl(first)
+          ? `<img src="${first}" class="receipt-thumb-sm" alt="" />`
+          : `<span class="receipt-doc-badge">${this.isPdfUrl(first) ? 'PDF' : 'FILE'}</span>`;
+        const label = imgs.length > 1
+          ? `${imgs.length} receipts`
+          : (this.isImageUrl(first) ? 'View receipt' : 'Open document');
+        return `
+          <div class="cell-user-avatar-row" style="cursor: pointer;" title="${first}">
+            ${thumb}
+            <span style="font-size: 11px; font-weight: 600; color: #2563EB;">${label}</span>
+          </div>
+        `;
+      },
+      onCellClicked: (params: any) => {
+        let imgs: string[] = [];
+        if (params.value) {
+          try {
+            imgs = typeof params.value === 'string' && params.value.startsWith('[') ? JSON.parse(params.value) : [params.value];
+          } catch (e) { imgs = [params.value]; }
+        }
+        if (imgs && imgs.length > 0 && imgs[0]) {
+          this.openReceipt(imgs, 0);
+        }
+      }
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      flex: 1.2,
+      minWidth: 160,
+      cellRenderer: ExpenseStatusCellRendererComponent,
+      cellRendererParams: {
+        canEdit: false
+      }
+    },
     {
       headerName: 'Actions',
       width: 110,
@@ -1282,11 +1482,11 @@ export class PayrollComponent implements OnInit {
       filter: false,
       cellRenderer: ExpenseActionCellRendererComponent,
       cellRendererParams: {
-        // No onApprove or onReject — employees cannot approve/reject their own claims
+        onViewDetail: (data: any) => this.openExpenseDetail(data),
         onDelete: (data: any) => this.deleteMyExpense(data.id)
       }
     }
-  ]);
+  ];
 
   defaultColDef: ColDef = {
     flex: 1,
@@ -1348,8 +1548,7 @@ export class PayrollComponent implements OnInit {
       this.loadPayslips();
       this.loadMyPayslips();
     } else if (tab === 'expenses') {
-      this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
-      this.payrollService.getMyExpenseClaims().subscribe(res => this.myExpenseClaims.set(res));
+      this.loadExpenses();
     } else if (tab === 'structure') {
       this.payrollService.getComponents().subscribe(res => this.components.set(res));
       this.loadSalaryStructuresTable();
@@ -1516,36 +1715,6 @@ export class PayrollComponent implements OnInit {
     });
   }
 
-  // Adjust Payslip Modal
-  openAdjustModal(payslip: Payslip) {
-    this.selectedPayslipToAdjust.set(payslip);
-    this.adjustForm = {
-      lossOfPay: payslip.lossOfPay,
-      totalEarnings: payslip.totalEarnings,
-      totalDeductions: payslip.totalDeductions,
-      expenseAmount: payslip.expenseAmount
-    };
-    this.isAdjustModalOpen.set(true);
-  }
-
-  closeAdjustModal() {
-    this.isAdjustModalOpen.set(false);
-    this.selectedPayslipToAdjust.set(null);
-  }
-
-  saveAdjustedPayslip() {
-    const p = this.selectedPayslipToAdjust();
-    if (!p) return;
-
-    this.payrollService.updatePayslip(p.id, this.adjustForm).subscribe({
-      next: () => {
-        this.toast.success('Payslip adjusted successfully');
-        this.closeAdjustModal();
-        this.loadPayslips();
-      },
-      error: (err) => this.toast.error(err.error?.message || 'Failed to adjust payslip')
-    });
-  }
 
   isPayslipBusy = signal(false);
 
@@ -2100,19 +2269,53 @@ export class PayrollComponent implements OnInit {
       next: () => {
         this.toast.success('Expense claim rejected');
         this.closeRejectModal();
-        this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
+        this.loadExpenses();
       },
       error: (err) => this.toast.error(err.error?.message || 'Failed to reject claim')
     });
   }
 
-  updateExpenseStatus(id: number, status: 'APPROVED' | 'REJECTED') {
-    this.payrollService.updateExpenseClaimStatus(id, { status }).subscribe({
+  updateExpenseStatus(id: number, status: 'APPROVED' | 'REJECTED' | 'PENDING' | 'PAID' | string) {
+    this.payrollService.updateExpenseClaimStatus(id, { status: status as any }).subscribe({
       next: () => {
-        this.toast.success(`Expense claim ${status.toLowerCase()}`);
-        this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
+        this.toast.success(`Expense claim marked as ${status.toLowerCase()}`);
+        this.loadExpenses();
       },
       error: (err) => this.toast.error(err.error?.message || 'Failed to update expense claim')
+    });
+  }
+
+  onStatusChangeFromCell(data: any, newStatus: string) {
+    if (!data?.id) return;
+    const next = newStatus.toUpperCase();
+    if (next === 'REJECTED') {
+      this.openRejectModal(data.id);
+    } else if (next === 'PAID') {
+      this.markExpensePaid(data);
+    } else {
+      this.updateExpenseStatus(data.id, next);
+    }
+  }
+
+  loadExpenses() {
+    this.isLoadingExpenses.set(true);
+    if (this.isAdmin()) {
+      this.payrollService.getAllExpenseClaims().subscribe({
+        next: (res) => {
+          this.expenseClaims.set(res);
+          this.isLoadingExpenses.set(false);
+        },
+        error: () => this.isLoadingExpenses.set(false)
+      });
+    }
+    this.payrollService.getMyExpenseClaims().subscribe({
+      next: (res) => {
+        this.myExpenseClaims.set(res);
+        if (!this.isAdmin()) this.isLoadingExpenses.set(false);
+      },
+      error: () => {
+        if (!this.isAdmin()) this.isLoadingExpenses.set(false);
+      }
     });
   }
 
@@ -2220,7 +2423,7 @@ export class PayrollComponent implements OnInit {
     this.payrollService.updateExpenseClaimStatus(data.id, { status: 'PAID' }).subscribe({
       next: () => {
         this.toast.success('Expense claim marked as paid');
-        this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
+        this.loadExpenses();
       },
       error: (err) => this.toast.error(err.error?.message || 'Failed to mark expense claim as paid')
     });
@@ -2235,10 +2438,7 @@ export class PayrollComponent implements OnInit {
     this.payrollService.deleteExpenseClaim(id).subscribe({
       next: () => {
         this.toast.success('Expense claim deleted');
-        this.payrollService.getMyExpenseClaims().subscribe(res => this.myExpenseClaims.set(res));
-        if (this.isAdmin()) {
-          this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
-        }
+        this.loadExpenses();
       },
       error: (err) => this.toast.error(err.error?.message || 'Failed to delete claim')
     });

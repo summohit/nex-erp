@@ -105,6 +105,12 @@ export class NotificationsController {
     return this.notificationsService.markAllAsRead(userId);
   }
 
+  @Delete(':id')
+  async deleteNotification(@Param('id') id: string, @Req() req: any) {
+    const userId = this.extractUserId(req);
+    return this.notificationsService.deleteNotification(Number(id), userId);
+  }
+
   private extractUserId(req: any): number {
     const user = req.user;
     if (!user || !user.sub) {

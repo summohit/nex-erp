@@ -3,8 +3,20 @@ import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
 import { LateClockOutError, OpenSessionError } from './open-session.error';
 import { haversineKm } from '../common/geo.util';
+import { FIELD_VISIT_STATUS } from '../field-visits/field-visit-status';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShiftRosterService, EffectiveShift } from './shift-roster.service';
+
+/**
+ * What the field visit clock tells attendance about the day it is clocking.
+ * Its presence is also the assertion that the site geofence has already been
+ * applied — see `assertNotOnFieldVisit`.
+ */
+export interface FieldVisitClockContext {
+  requestId: number;
+  requestNumber: string;
+  projectId: number | null;
+}
 
 @Injectable()
 export class AttendanceService {
@@ -143,7 +155,45 @@ export class AttendanceService {
       .then((rows) => rows.map((r) => this.withTotalHours(r)));
   }
 
-  async clockIn(userId: number, data: { lat?: number, lng?: number, ipAddress?: string }) {
+  /**
+   * Refuse the office clock when the day belongs to an approved field visit.
+   *
+   * Not a formality. The roster entry that approval writes marks the day
+   * on-site, and an on-site day skips both the branch IP check and the branch
+   * geofence — so without this, walking in through the ordinary clock-in is a
+   * way to clock a field visit day from anywhere at all, which is exactly what
+   * the 500m rule exists to prevent. Sending them to the field visit screen
+   * also gets the day recorded against the task they were there to do.
+   */
+  private async assertNotOnFieldVisit(
+    employeeId: number, dateKey: Date, direction: 'in' | 'out',
+  ): Promise<void> {
+    const day = await this.prisma.fieldVisitAttendance.findFirst({
+      where: {
+        employeeId,
+        visitDate: dateKey,
+        request: { status: FIELD_VISIT_STATUS.APPROVED },
+      },
+      select: { request: { select: { requestNumber: true, location: true } } },
+    });
+    if (!day) return;
+
+    throw new BadRequestException(
+      `You are on field visit ${day.request.requestNumber} at ${day.request.location} today.`
+      + ` Clock ${direction} from the Field Visit screen so your site attendance is recorded.`,
+    );
+  }
+
+  /**
+   * `options.fieldVisit` marks a clock-in that came through the field visit
+   * screen, which has already measured the person against the approved site.
+   * Nothing else may set it — see `assertNotOnFieldVisit` below.
+   */
+  async clockIn(
+    userId: number,
+    data: { lat?: number, lng?: number, ipAddress?: string },
+    options?: { fieldVisit?: FieldVisitClockContext },
+  ) {
     const employee = await this.prisma.employee.findUnique({ 
       where: { userId },
       include: { shift: true, branch: true }
@@ -157,7 +207,20 @@ export class AttendanceService {
     // shift, or (the usual case) nothing, in which case the standing shift
     // still applies exactly as before.
     const effective = await this.roster.getEffectiveShift(employee.id, todayKey, employee.shift);
-    const onsite = !!effective.onsite;
+
+    // A day on an approved field visit is clocked from the field visit screen,
+    // which measures the person against the site's own 500m radius. Coming in
+    // here instead would skip that check entirely, because the roster entry the
+    // approval wrote marks the day on-site and on-site days are exempt from the
+    // branch geofence — so the office clock-in is the bypass, and this closes it.
+    if (!options?.fieldVisit) {
+      await this.assertNotOnFieldVisit(employee.id, todayKey, 'in');
+    }
+
+    // On-site either because the roster says so, or because this came through
+    // the field visit screen — which is on-site by definition, and says so even
+    // if somebody has since edited the roster entry out from under the trip.
+    const onsite = !!effective.onsite || !!options?.fieldVisit;
 
     const branch = employee.branch;
     if (branch) {
@@ -249,7 +312,7 @@ export class AttendanceService {
           status: isHalfDay ? 'HALF_DAY' : 'PRESENT',
           isLate,
           shiftId: effective.shift?.id ?? null,
-          projectId: effective.onsite?.projectId ?? null,
+          projectId: effective.onsite?.projectId ?? options?.fieldVisit?.projectId ?? null,
           isOnsite: onsite,
         },
         include: { logs: true }
@@ -334,7 +397,11 @@ export class AttendanceService {
    * remembering. The real hours go through regularization, which is the path
    * that already exists for correcting a day.
    */
-  async clockOut(userId: number, data: { lat?: number, lng?: number, reason?: string }) {
+  async clockOut(
+    userId: number,
+    data: { lat?: number, lng?: number, reason?: string },
+    options?: { fieldVisit?: FieldVisitClockContext },
+  ) {
     const employee = await this.prisma.employee.findUnique({
       where: { userId },
       include: { shift: true, branch: true }
@@ -343,6 +410,12 @@ export class AttendanceService {
 
     const now = new Date();
     const todayKey = istDateKey(now);
+
+    // Same reasoning as clock-in: the way out of a field visit day is measured
+    // against the site, not the office.
+    if (!options?.fieldVisit) {
+      await this.assertNotOnFieldVisit(employee.id, todayKey, 'out');
+    }
 
     let existing = await this.prisma.attendance.findUnique({
       where: { employeeId_date: { employeeId: employee.id, date: todayKey } },
@@ -386,7 +459,7 @@ export class AttendanceService {
     // the morning is at home, and enforcing the office radius would leave the
     // session permanently unclosable, which is the one outcome worse than an
     // imprecise location.
-    if (!isPreviousDay && !effective.onsite && branch && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
+    if (!isPreviousDay && !effective.onsite && !options?.fieldVisit && branch && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
       if (data.lat == null || data.lng == null) {
         throw new BadRequestException('Location is required to clock out at this branch.');
       }

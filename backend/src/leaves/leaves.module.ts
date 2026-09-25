@@ -4,9 +4,10 @@ import { LeavesService } from './leaves.service';
 import { LeaveAccrualCron } from './leave-accrual.cron';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { FieldVisitsModule } from '../field-visits/field-visits.module';
 
 @Module({
-  imports: [PrismaModule, NotificationsModule],
+  imports: [PrismaModule, NotificationsModule, FieldVisitsModule],
   controllers: [LeavesController],
   providers: [LeavesService, LeaveAccrualCron],
   exports: [LeavesService]

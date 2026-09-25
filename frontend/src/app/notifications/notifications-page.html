@@ -137,13 +137,21 @@
         <span class="notif-time">{{ n.createdAt | date:'MMM d, y · h:mm a' }}</span>
       </div>
 
-      <button
-        class="btn-mark-read"
-        *ngIf="!n.isRead"
-        (click)="markRead(n, $event)"
-        title="Mark as read">
-        <svg lucideCheck [size]="14"></svg>
-      </button>
+      <div class="notif-row-actions">
+        <button
+          class="btn-mark-read"
+          *ngIf="!n.isRead"
+          (click)="markRead(n, $event)"
+          title="Mark as read">
+          <svg lucideCheck [size]="14"></svg>
+        </button>
+        <button
+          class="btn-dismiss-row"
+          (click)="dismiss(n, $event)"
+          title="Dismiss notification">
+          <svg lucideX [size]="14"></svg>
+        </button>
+      </div>
     </div>
   </div>
 

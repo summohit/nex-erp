@@ -12,6 +12,7 @@ import FormData from 'form-data';
 const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
 import * as xlsx from 'xlsx';
+import { resolveProjectViewer, taskVisibilityFilter, PROJECT_ROLE } from './project-roles';
 
 @Injectable()
 export class ProjectsService {
@@ -167,7 +168,7 @@ export class ProjectsService {
           // the project is MEMBER — de-duplicated, because ProjectMember is
           // unique on (projectId, employeeId) and somebody picked as both a
           // manager and a user would otherwise fail the insert.
-          create: buildInitialMembers(leadId, data.pmIds, data.memberIds)
+          create: buildInitialMembers(leadId, data.pmIds, data.memberIds, (data as any).architectIds)
         },
         boards: {
           create: {
@@ -581,7 +582,7 @@ export class ProjectsService {
         if (data?.pmIds != null && data?.memberIds != null) {
           // leadId is always a number here: it falls back to actorEmployeeId
           // when the source lead is gone.
-          for (const row of buildInitialMembers(project.leadId!, data.pmIds, data.memberIds)) {
+          for (const row of buildInitialMembers(project.leadId!, data.pmIds, data.memberIds, (data as any).architectIds)) {
             if (activeIds.has(row.employeeId)) roleByEmployee.set(row.employeeId, row.role);
           }
         } else {
@@ -1075,10 +1076,9 @@ export class ProjectsService {
           clientId: autoClient.id,
 
           members: {
-            create: [
-              { employeeId: leadId, role: 'ADMIN' },
-              ...(data.pmIds ? data.pmIds.map((id: number) => ({ employeeId: id, role: 'PROJECT_MANAGER' })) : [])
-            ]
+            create: buildInitialMembers(
+              leadId, data.pmIds, (data as any).memberIds, (data as any).architectIds,
+            ),
           },
           boards: {
             create: {
@@ -1702,7 +1702,23 @@ export class ProjectsService {
     return project;
   }
 
-  async getProjectSummary(companyId: number, projectId: number) {
+  /**
+   * The numbers on the Summary and Reports tabs.
+   *
+   * Scoped the same way the board is. A member who sees six of a project's
+   * forty tasks must not read "40 tasks, 12 done" here — the count would hand
+   * back exactly what the board withholds.
+   */
+  async getProjectSummary(
+    companyId: number, projectId: number,
+    employeeId: number | null = null, companyRole?: string,
+  ) {
+    const viewer = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, employeeId, companyRole,
+    );
+    const visible = taskVisibilityFilter(viewer);
+    /** Folded into every task query below; empty when they see everything. */
+    const scope = visible ? { AND: [visible] } : {};
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -1725,37 +1741,39 @@ export class ProjectsService {
       fourteenDaysIssues
     ] = await Promise.all([
       this.prisma.issue.count({
-        where: { projectId, companyId, isArchived: false, status: 'DONE', updatedAt: { gte: sevenDaysAgo } }
+        where: { projectId, companyId, ...scope, isArchived: false, status: 'DONE', updatedAt: { gte: sevenDaysAgo } }
       }),
       this.prisma.issue.count({
-        where: { projectId, companyId, isArchived: false, updatedAt: { gte: sevenDaysAgo } }
+        where: { projectId, companyId, ...scope, isArchived: false, updatedAt: { gte: sevenDaysAgo } }
       }),
       this.prisma.issue.count({
-        where: { projectId, companyId, isArchived: false, createdAt: { gte: sevenDaysAgo } }
+        where: { projectId, companyId, ...scope, isArchived: false, createdAt: { gte: sevenDaysAgo } }
       }),
       this.prisma.issue.count({
-        where: { projectId, companyId, isArchived: false, dueDate: { gte: new Date(), lte: sevenDaysFromNow }, status: { not: 'DONE' } }
+        where: { projectId, companyId, ...scope, isArchived: false, dueDate: { gte: new Date(), lte: sevenDaysFromNow }, status: { not: 'DONE' } }
       }),
       this.prisma.issue.groupBy({
         by: ['status'],
-        where: { projectId, companyId, isArchived: false },
+        where: { projectId, companyId, ...scope, isArchived: false },
         _count: { _all: true }
       }),
       this.prisma.issueMember.groupBy({
         by: ['employeeId'],
-        where: { issue: { projectId, companyId, isArchived: false } },
+        // Who is on the work — read through the issue, so it is the same slice
+        // of tasks as everything else here.
+        where: { issue: { projectId, companyId, ...scope, isArchived: false } },
         _count: { _all: true }
       }),
       this.prisma.issue.count({
-        where: { projectId, companyId, isArchived: false, members: { none: {} } }
+        where: { projectId, companyId, ...scope, isArchived: false, members: { none: {} } }
       }),
       this.prisma.issue.groupBy({
         by: ['priority'],
-        where: { projectId, companyId, isArchived: false },
+        where: { projectId, companyId, ...scope, isArchived: false },
         _count: { _all: true }
       }),
       this.prisma.issueActivity.findMany({
-        where: { issue: { projectId, companyId } },
+        where: { issue: { projectId, companyId, ...scope } },
         include: {
           actor: { select: { firstName: true, lastName: true, avatarUrl: true } },
           issue: { select: { id: true, key: true, title: true, status: true, type: true } }
@@ -1765,20 +1783,20 @@ export class ProjectsService {
       }),
       this.prisma.issue.groupBy({
         by: ['type'],
-        where: { projectId, companyId, isArchived: false },
+        where: { projectId, companyId, ...scope, isArchived: false },
         _count: { _all: true }
       }),
       this.prisma.issue.aggregate({
         _sum: { estimatedHours: true },
-        where: { projectId, companyId, isArchived: false }
+        where: { projectId, companyId, ...scope, isArchived: false }
       }),
       this.prisma.issueTimeLog.aggregate({
         _sum: { durationMin: true },
-        where: { issue: { projectId, companyId } }
+        where: { issue: { projectId, companyId, ...scope } }
       }),
       this.prisma.issue.findMany({
         where: { 
-          projectId, companyId, isArchived: false,
+          projectId, companyId, ...scope, isArchived: false,
           OR: [
             { createdAt: { gte: new Date(new Date().setDate(new Date().getDate() - 14)) } },
             { status: 'DONE', updatedAt: { gte: new Date(new Date().setDate(new Date().getDate() - 14)) } }
@@ -1906,19 +1924,34 @@ export class ProjectsService {
       throw new ForbiddenException('Only the project owner can add members');
     }
 
+    // The role decides what they see, so an unrecognised one would create a
+    // member who matches no rule — visible to nobody's reckoning and holding
+    // no rights. Anything unknown is a plain member.
+    const known: string[] = Object.values(PROJECT_ROLE);
+    const safeRole = known.includes(role) ? role : PROJECT_ROLE.MEMBER;
+
     const existing = await this.prisma.projectMember.findUnique({
       where: { projectId_employeeId: { projectId, employeeId } }
     });
 
     if (existing) {
-      return existing; // Already a member
+      // Already on the board. Adding them again with a different role is how
+      // the share panel promotes somebody, so honour it rather than ignoring
+      // the click.
+      if (existing.role !== safeRole) {
+        return this.prisma.projectMember.update({
+          where: { id: existing.id },
+          data: { role: safeRole },
+        });
+      }
+      return existing;
     }
 
     return this.prisma.projectMember.create({
       data: {
         projectId,
         employeeId,
-        role
+        role: safeRole
       },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } } } }

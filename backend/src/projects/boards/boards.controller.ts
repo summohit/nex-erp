@@ -28,7 +28,10 @@ export class BoardsController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() body: { columnIds: number[] }
   ) {
-    return this.boardsService.reorderColumns(req.user.companyId, projectId, body.columnIds);
+    return this.boardsService.reorderColumns(
+      req.user.companyId, projectId, body.columnIds,
+      req.user.employeeId ?? req.user.sub, req.user.role,
+    );
   }
 
   @Put('columns/:columnId')
@@ -48,7 +51,10 @@ export class BoardsController {
     @Param('columnId', ParseIntPipe) columnId: number,
     @Req() req: any
   ) {
-    return this.boardsService.deleteColumn(req.user.companyId, projectId, columnId);
+    return this.boardsService.deleteColumn(
+      req.user.companyId, projectId, columnId,
+      req.user.employeeId ?? req.user.sub, req.user.role,
+    );
   }
 
   @Get('columns/archived')
@@ -65,6 +71,9 @@ export class BoardsController {
     @Param('columnId', ParseIntPipe) columnId: number,
     @Req() req: any
   ) {
-    return this.boardsService.unarchiveColumn(req.user.companyId, projectId, columnId);
+    return this.boardsService.unarchiveColumn(
+      req.user.companyId, projectId, columnId,
+      req.user.employeeId ?? req.user.sub, req.user.role,
+    );
   }
 }

@@ -89,8 +89,18 @@
     <!-- Notifications Dropdown -->
     <div class="header-popover notifications-popover" *ngIf="isNotificationOpen()" (click)="$event.stopPropagation()">
       <div class="notifications-header">
-        <span>Notifications</span>
-        <button class="mark-read-btn" (click)="markAllAsRead()" *ngIf="notificationsService.unreadCount() > 0">Mark all read</button>
+        <div class="notifications-title-area">
+          <span>Notifications</span>
+          <span class="notification-badge-inline" *ngIf="notificationsService.unreadCount() > 0">
+            {{ notificationsService.unreadCount() }} new
+          </span>
+        </div>
+        <div class="notifications-header-actions">
+          <button class="mark-read-btn" (click)="markAllAsRead()" *ngIf="notificationsService.unreadCount() > 0">Mark all read</button>
+          <button type="button" class="btn-close-popover" (click)="isNotificationOpen.set(false)" title="Close notifications">
+            <svg lucideX size="15"></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Shown only while the browser has not been asked. Once the answer is
@@ -122,6 +132,13 @@
             <div class="notification-desc">{{ n.message }}</div>
             <div class="notification-time">{{ n.createdAt | date:'shortTime' }}</div>
           </div>
+          <button 
+            type="button" 
+            class="notification-dismiss-btn" 
+            (click)="dismissNotification($event, n.id)" 
+            title="Dismiss notification">
+            <svg lucideX size="14"></svg>
+          </button>
         </div>
       </div>
 

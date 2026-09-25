@@ -29,6 +29,9 @@ describe('IssuesService — blockers on the Review/Done transition', () => {
         findUnique: jest.fn(async () => ({ id: 200, name: 'Done', type: 'DONE', position: 3 })),
         findMany: jest.fn(async () => []),
       },
+      // Changing a task now reads the actor's standing on the project, so that
+      // a technical architect — who sees every task — cannot move one.
+      projectMember: { findFirst: jest.fn(async () => null) },
       project: {
         findFirst: jest.fn(async () => ({ leadId: 4 })),
         findUnique: jest.fn(async () => ({ leadId: 4, name: 'Website' })),

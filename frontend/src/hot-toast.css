@@ -217,28 +217,42 @@
 }
 
 .hot-toast-close-btn {
-  align-self: var(--hot-toast-close-btn-align-self, flex-start);
-  background-color: var(--hot-toast-close-btn-background-color, transparent);
-  background-image: var(--hot-toast-close-btn-background-image, url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'%3e%3cpath d='M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707a1 1 0 010-1.414z'/%3e%3c/svg%3e"));
-  background-position: var(--hot-toast-close-btn-background-position, center);
-  background-repeat: var(--hot-toast-close-btn-background-repeat, no-repeat);
-  background-size: var(--hot-toast-close-btn-background-size, 0.75em);
-  border: var(--hot-toast-close-btn-border, 0);
-  border-radius: var(--hot-toast-close-btn-border-radius, 0.25rem);
-  box-sizing: var(--hot-toast-close-btn-box-sizing, content-box);
-  display: var(--hot-toast-close-btn-display, flex);
-  height: var(--hot-toast-close-btn-height, 0.8em);
-  margin-top: var(--hot-toast-close-btn-margin-top, 0.25em);
-  opacity: var(--hot-toast-close-btn-opacity, 0.5);
-  padding: var(--hot-toast-close-btn-padding, 0.25em);
-  width: var(--hot-toast-close-btn-width, 0.8em);
+  align-self: flex-start;
+  background-color: #f1f5f9;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%2364748b'%3e%3cpath d='M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707a1 1 0 010-1.414z'/%3e%3c/svg%3e");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 10px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  width: 22px;
+  min-width: 22px;
+  margin-top: 1px;
+  margin-left: 10px;
+  margin-right: -2px;
+  opacity: 0.8;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
 }
+
 .hot-toast-close-btn:focus {
-  box-shadow: var(--hot-toast-close-btn-box-shadow, 0 0 0 0.125rem rgba(13, 110, 253, 0.25));
-  outline: var(--hot-toast-close-btn-outline, none);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
 }
-.hot-toast-close-btn:hover, .hot-toast-close-btn:focus {
-  opacity: var(--hot-toast-close-btn-opacity, 0.75);
+
+.hot-toast-close-btn:hover {
+  background-color: #fee2e2;
+  border-color: #fca5a5;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ef4444'%3e%3cpath d='M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707a1 1 0 010-1.414z'/%3e%3c/svg%3e");
+  opacity: 1;
+  transform: scale(1.06);
 }
 
 .hot-toast-icon {

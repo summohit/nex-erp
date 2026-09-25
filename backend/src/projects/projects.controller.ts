@@ -126,7 +126,9 @@ export class ProjectsController {
 
   @Get(':id/summary')
   getProjectSummary(@Req() req, @Param('id', ParseIntPipe) id: number) {
-    return this.projectsService.getProjectSummary(req.user.companyId, id);
+    return this.projectsService.getProjectSummary(
+      req.user.companyId, id, req.user.employeeId ?? null, req.user.role,
+    );
   }
 
   @Patch(':id/archive')

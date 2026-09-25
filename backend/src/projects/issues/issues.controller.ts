@@ -45,7 +45,9 @@ export class IssuesController {
     @Req() req,
     @Param('projectId', ParseIntPipe) projectId: number
   ) {
-    return this.issuesService.getIssues(req.user.companyId, projectId);
+    return this.issuesService.getIssues(
+      req.user.companyId, projectId, req.user.employeeId ?? null, req.user.role,
+    );
   }
 
   @Put(':id')

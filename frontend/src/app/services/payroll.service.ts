@@ -103,12 +103,14 @@ export interface Payslip {
 
 export interface ExpenseClaim {
   id: number;
-  employeeId: number;
+  employeeId?: number;
   employee?: {
     id: number;
     firstName: string;
     lastName: string;
     department?: { name: string };
+    designation?: { name: string };
+    avatarUrl?: string;
   };
   title: string;
   description?: string;
@@ -117,9 +119,13 @@ export interface ExpenseClaim {
   receiptUrl?: string;
   purchaseDate?: string;
   purchasedFrom?: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  projectCode?: string;
+  projectName?: string;
+  projectId?: number | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID' | string;
   rejectionReason?: string;
   createdAt: string;
+  updatedAt?: string;
   approvedBy?: {
     employee?: {
       firstName: string;

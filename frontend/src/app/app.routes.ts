@@ -288,6 +288,27 @@ export const routes: Routes = [
         loadComponent: () => import('./field-visits/field-visits-page').then(m => m.FieldVisitsPageComponent)
       },
       {
+        // The employee's own field visit for today: clock in and out from the
+        // site. No permission gate beyond being signed in — everybody who is
+        // sent on a visit has to be able to clock it.
+        path: 'field-visits/my',
+        loadComponent: () => import('./field-visits/my-field-visit/my-field-visit').then(m => m.MyFieldVisitComponent)
+      },
+      {
+        // Raising and approving trips. Shares the projects permission like the
+        // visits log above — a field visit is always against a project.
+        path: 'field-visits/requests',
+        canActivate: [permissionGuard],
+        data: { module: 'projects' },
+        loadComponent: () => import('./field-visits/requests/field-visit-requests-page').then(m => m.FieldVisitRequestsPageComponent)
+      },
+      {
+        path: 'field-visits/requests/:id',
+        canActivate: [permissionGuard],
+        data: { module: 'projects' },
+        loadComponent: () => import('./field-visits/requests/field-visit-request-detail').then(m => m.FieldVisitRequestDetailComponent)
+      },
+      {
         path: 'clients',
         canActivate: [permissionGuard],
         data: { module: 'clients' },

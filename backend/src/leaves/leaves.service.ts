@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { FieldVisitActivationService } from '../field-visits/requests/field-visit-activation.service';
 
 /** One employee's figures for a single leave type in the quota report. */
 export interface QuotaCell {
@@ -50,7 +51,8 @@ export class LeavesService {
 
   constructor(
     private prisma: PrismaService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private fieldVisits: FieldVisitActivationService
   ) {}
 
   async assignLeaveBalance(data: { employeeId: number, leaveTypeId: number, allocated: number, year: number }) {
@@ -302,6 +304,14 @@ export class LeavesService {
       throw new BadRequestException('Leave duration evaluates to 0 working days.');
     }
 
+    // §9: somebody on an approved field visit does not simply take the day.
+    // The request is still allowed — refusing it outright would leave a sick
+    // employee with nowhere to go — but it is flagged for the approver, who is
+    // the one who can weigh a day at a client site against the reason for it.
+    const fieldVisitConflicts = await this.fieldVisits.conflictsFor(
+      this.prisma, employee.id, employee.companyId, startDate, endDate,
+    );
+
     return this.prisma.leaveRequest.create({
       data: {
         employeeId: employee.id,
@@ -314,12 +324,15 @@ export class LeavesService {
         halfDayPeriod: data.halfDayPeriod || null
       }
     }).then(async (request) => {
-      await this.notifyManager(employee, request);
-      return request;
+      await this.notifyManager(employee, request, fieldVisitConflicts);
+      return { ...request, fieldVisitConflicts };
     });
   }
 
-  private async notifyManager(employee: any, request: any) {
+  private async notifyManager(
+    employee: any, request: any,
+    fieldVisitConflicts: { requestNumber: string; location: string; days: number }[] = [],
+  ) {
     const name = employee.firstName && employee.lastName
       ? `${employee.firstName} ${employee.lastName}`
       : employee.user?.email || 'An employee';
@@ -327,7 +340,17 @@ export class LeavesService {
     const start = new Date(request.startDate).toISOString().split('T')[0];
     const end = new Date(request.endDate).toISOString().split('T')[0];
     const dates = start === end ? start : `${start} to ${end}`;
-    const message = `${name} has requested leave from ${dates}.`;
+    // The clash goes in the message itself rather than a notification of its
+    // own: the approver is deciding one thing, and "they are on a field visit
+    // those days" is part of that decision.
+    const clash = fieldVisitConflicts.length
+      ? ` They are on approved field visit${fieldVisitConflicts.length > 1 ? 's' : ''} `
+        + fieldVisitConflicts
+          .map((c) => `${c.requestNumber} at ${c.location} (${c.days} day${c.days === 1 ? '' : 's'})`)
+          .join(', ')
+        + ' — approving this takes those days off the trip.'
+      : '';
+    const message = `${name} has requested leave from ${dates}.${clash}`;
 
     // Track notified user IDs to avoid duplicates
     const notifiedUserIds = new Set<number>();
@@ -606,7 +629,13 @@ export class LeavesService {
       throw new BadRequestException('Not authorized to update this leave request');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    // Filled inside the transaction, acted on once it commits.
+    let released: {
+      requestId: number; requestNumber: string; raisedById: number;
+      days: number; archivedTasks: number;
+    }[] = [];
+
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updatedRequest = await tx.leaveRequest.update({
         where: { id: requestId },
         data: {
@@ -630,6 +659,19 @@ export class LeavesService {
           data: {
             used: { increment: diffDays }
           }
+        });
+
+        // §9: the trip gives back the days this leave covers, in the same
+        // write that grants it. Leave approved while the person is still
+        // rostered at a client site is the state where the two systems
+        // disagree about where somebody is supposed to be.
+        released = await this.fieldVisits.releaseDaysForLeave(tx, {
+          employeeId: request.employeeId,
+          companyId: request.employee.companyId,
+          from: start,
+          to: end,
+          isHalfDay: request.isHalfDay,
+          actorId: actor.employee?.id ?? null,
         });
       } else if (status === 'REJECTED' && request.status === 'APPROVED') {
         const start = new Date(request.startDate);
@@ -669,6 +711,24 @@ export class LeavesService {
 
       return updatedRequest;
     });
+
+    // The project manager finds out that somebody they are counting on is not
+    // coming. After the commit, never inside it: a notification for days that
+    // were then rolled back would point at a trip nobody had left.
+    for (const trip of released.filter((t) => t.days > 0)) {
+      const who = `${request.employee.firstName ?? ''} ${request.employee.lastName ?? ''}`.trim()
+        || 'An employee';
+      await this.notificationsService.notifyEmployees([trip.raisedById], {
+        companyId: request.employee.companyId,
+        title: 'Field visit: someone is on leave',
+        message: `${who} has approved leave covering ${trip.days} day(s) of ${trip.requestNumber}.`
+          + `${trip.archivedTasks ? ` Their ${trip.archivedTasks} task(s) on it were archived.` : ''}`,
+        type: 'WARNING',
+        linkUrl: '/field-visits/requests',
+      });
+    }
+
+    return updated;
   }
 
   private calculateWorkingDays(start: Date, end: Date, weeklyOffsStr: string, isHalfDay: boolean, holidayDates?: Set<string>): number {

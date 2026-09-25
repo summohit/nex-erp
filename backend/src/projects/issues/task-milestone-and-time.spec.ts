@@ -319,6 +319,9 @@ describe('assigned hours at creation', () => {
     const prisma: any = new Proxy(
       {
         issue: model({
+          // The key now comes from the highest key in use rather than a count,
+          // so creating a task reads the existing ones. Empty project here.
+          findMany: jest.fn().mockResolvedValue([]),
           count: jest.fn().mockResolvedValue(0),
           findFirst: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockImplementation((a: any) => {
@@ -575,6 +578,9 @@ describe('requiring a phase on a new task', () => {
     const prisma: any = new Proxy(
       {
         issue: model({
+          // The key now comes from the highest key in use rather than a count,
+          // so creating a task reads the existing ones. Empty project here.
+          findMany: jest.fn().mockResolvedValue([]),
           count: jest.fn().mockResolvedValue(0),
           findFirst: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockImplementation((a: any) => {

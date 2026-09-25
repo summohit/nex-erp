@@ -83,6 +83,23 @@ export interface LeaveRequest {
   };
 }
 
+/**
+ * An approved field visit the requested leave lands on (§9).
+ *
+ * The request is still filed — this is what the employee is told about it, and
+ * what the approver has to weigh.
+ */
+export interface FieldVisitConflict {
+  requestNumber: string;
+  location: string;
+  days: number;
+  dates: string[];
+}
+
+export interface LeaveRequestResult extends LeaveRequest {
+  fieldVisitConflicts?: FieldVisitConflict[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -114,8 +131,8 @@ export class LeavesService {
     return this.http.get<QuotaReport>(`${this.apiUrl}/reports/quota`, { params });
   }
 
-  requestLeave(data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }): Observable<LeaveRequest> {
-    return this.http.post<LeaveRequest>(`${this.apiUrl}/request`, data);
+  requestLeave(data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }): Observable<LeaveRequestResult> {
+    return this.http.post<LeaveRequestResult>(`${this.apiUrl}/request`, data);
   }
 
   getMyRequests(): Observable<LeaveRequest[]> {

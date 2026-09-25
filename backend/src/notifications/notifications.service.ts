@@ -74,6 +74,14 @@ export class NotificationsService {
     return this.getUserNotifications(userId);
   }
 
+  async deleteNotification(notificationId: number, userId: number) {
+    await this.prisma.notification.deleteMany({
+      where: { id: notificationId, userId },
+    });
+
+    return this.getUserNotifications(userId);
+  }
+
   async createNotification(
     userId: number,
     title: string,

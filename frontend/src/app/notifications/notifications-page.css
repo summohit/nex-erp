@@ -396,7 +396,15 @@
 .type-assignment { background: #e0f2fe; color: #075985; }
 .type-payroll    { background: #ecfdf5; color: #065f46; }
 
-.btn-mark-read {
+.notif-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-mark-read,
+.btn-dismiss-row {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
@@ -415,6 +423,12 @@
   background: #eff6ff;
   border-color: #bfdbfe;
   color: #2563eb;
+}
+
+.btn-dismiss-row:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #ef4444;
 }
 
 /* Empty */

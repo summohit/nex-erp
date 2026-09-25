@@ -184,6 +184,13 @@ export class NotificationsPageComponent implements OnInit {
     this.notificationsService.markAsRead(item.id);
   }
 
+  dismiss(item: NotificationItem, event?: Event) {
+    event?.stopPropagation();
+    this.items.update((list) => list.filter((n) => n.id !== item.id));
+    this.total.update((t) => Math.max(0, t - 1));
+    this.notificationsService.dismissNotification(item.id);
+  }
+
   markAllRead() {
     this.notificationsService.markAllAsRead();
     this.items.update((list) => list.map((n) => ({ ...n, isRead: true })));

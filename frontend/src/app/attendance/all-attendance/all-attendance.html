@@ -248,7 +248,10 @@
           <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterStatus" (click)="showStatusDropdown = !showStatusDropdown; showMonthDropdown=false; showYearDropdown=false; showEmployeeDropdown=false; showDeptDropdown=false; showFlagDropdown=false">
             <svg lucideCheckCircle2 [size]="14" class="trigger-prefix-icon"></svg>
             <span class="trigger-text">{{ getSelectedStatusLabel() }}</span>
-            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showStatusDropdown"></svg>
+            <button type="button" class="btn-clear-trigger" *ngIf="filterStatus" (click)="$event.stopPropagation(); clearStatusFilter()" title="Clear status filter">
+              <svg lucideX [size]="12"></svg>
+            </button>
+            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showStatusDropdown" *ngIf="!filterStatus"></svg>
           </button>
           <div class="filter-dropdown-popover" *ngIf="showStatusDropdown">
             <div class="popover-search-box">
@@ -258,7 +261,20 @@
             </div>
             <div class="popover-options-scroll">
               <div class="popover-option-item" *ngFor="let s of getFilteredStatuses(statusSearchQuery)" (click)="selectStatus(s.value)" [class.selected]="filterStatus === s.value">
-                <span class="option-primary">{{ s.label }}</span>
+                <div class="popover-status-row">
+                  <div class="legend-icon-wrapper mini-icon" [ngClass]="s.bgClass" *ngIf="s.value">
+                    <svg *ngIf="s.icon === 'check'" lucideCheck class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'star-half'" lucideStarHalf class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'alert-circle'" lucideAlertCircle class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'x'" lucideX class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'plane'" lucidePlane class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'star'" lucideStar class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'calendar'" lucideCalendar class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'zap'" lucideZap class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="s.iconClass"></svg>
+                  </div>
+                  <span class="option-primary">{{ s.label }}</span>
+                </div>
                 <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterStatus === s.value"></svg>
               </div>
               <div class="popover-empty" *ngIf="getFilteredStatuses(statusSearchQuery).length === 0">
@@ -321,44 +337,50 @@
     </div>
   </div>
 
-  <!-- Status Legend (matching Screenshot 1) -->
-  <div class="status-legend" *ngIf="viewMode() === 'grid' && !isLoading()">
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-present"><svg lucideCheck class="status-present status-icon"></svg></div>
-      <span>Present</span>
+  <!-- Status Legend & Interactive Filter Tags (matching Screenshot 1 & Screenshot 2) -->
+  <div class="status-legend" *ngIf="!isLoading()">
+    <div class="legend-items-list">
+      <button
+        *ngFor="let tag of statusTags"
+        type="button"
+        class="legend-item"
+        [class.active]="filterStatus === tag.value"
+        [attr.data-status]="tag.value"
+        (click)="toggleStatusFilter(tag.value)"
+        [title]="filterStatus === tag.value ? 'Click to clear ' + tag.label + ' filter' : 'Filter by ' + tag.label">
+        <div class="legend-icon-wrapper" [ngClass]="tag.bgClass">
+          <svg *ngIf="tag.icon === 'check'" lucideCheck class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'star-half'" lucideStarHalf class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'alert-circle'" lucideAlertCircle class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'x'" lucideX class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'plane'" lucidePlane class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'star'" lucideStar class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'calendar'" lucideCalendar class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'zap'" lucideZap class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="tag.iconClass"></svg>
+        </div>
+        <span class="legend-label">{{ tag.label }}</span>
+        <!-- Inline Clear Button when tag is active -->
+        <span
+          *ngIf="filterStatus === tag.value"
+          class="tag-clear-btn"
+          (click)="$event.stopPropagation(); clearStatusFilter()"
+          title="Clear filter">
+          <svg lucideX [size]="11"></svg>
+        </span>
+      </button>
     </div>
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-half-day"><svg lucideStarHalf class="status-half-day status-icon"></svg></div>
-      <span>Half Day</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-late"><svg lucideAlertCircle class="status-late status-icon"></svg></div>
-      <span>Late</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-absent"><svg lucideX class="status-absent status-icon"></svg></div>
-      <span>Absent</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-leave"><svg lucidePlane class="status-leave status-icon"></svg></div>
-      <span>On Leave</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-holiday"><svg lucideStar class="status-holiday status-icon"></svg></div>
-      <span>Holiday</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-day-off"><svg lucideCalendar class="status-day-off status-icon"></svg></div>
-      <span>Day Off</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-overtime"><svg lucideZap class="status-overtime status-icon"></svg></div>
-      <span>Overtime</span>
-    </div>
-    <div class="legend-item">
-      <div class="legend-icon-wrapper bg-clockoff"><svg lucideTimerOff class="status-clockoff status-icon"></svg></div>
-      <span>Missed Clock Out</span>
-    </div>
+
+    <!-- Clear Filter Pill in Legend bar -->
+    <button
+      *ngIf="filterStatus"
+      type="button"
+      class="legend-clear-all"
+      (click)="clearStatusFilter()"
+      title="Clear status filter">
+      <svg lucideX [size]="12"></svg>
+      <span>Clear filter</span>
+    </button>
   </div>
   </div>
 
@@ -418,7 +440,8 @@
                      'bg-leave': day.status === 'On Leave',
                      'bg-holiday': day.status === 'Holiday',
                      'bg-day-off': day.status === 'Day Off',
-                     'cell-dimmed': (filterStatus && !dayMatchesStatus(day)) || (filterDate && !dayMatchesDate(day))
+                     'cell-dimmed': (filterStatus && !dayMatchesStatus(day)) || (filterDate && !dayMatchesDate(day)),
+                     'cell-highlighted': (filterStatus && dayMatchesStatus(day)) || (filterDate && dayMatchesDate(day))
                    }">
                 <ng-container *ngIf="!day.isFuture">
                   <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>

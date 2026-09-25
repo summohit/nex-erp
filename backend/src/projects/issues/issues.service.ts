@@ -46,6 +46,7 @@ function sameValue(next: unknown, current: unknown): boolean {
   return String(next) === String(current);
 }
 import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
+import { resolveProjectViewer, taskVisibilityFilter, mayChangeAnyTask, seesEveryTask, PROJECT_ROLE } from '../project-roles';
 
 @Injectable()
 export class IssuesService {
@@ -213,9 +214,44 @@ export class IssuesService {
     return issue;
   }
 
-  async getIssues(companyId: number, projectId: number) {
+  /**
+   * The technical architect reads the board; they do not run it.
+   *
+   * Their whole point is sight of the plan without a hand on it, so the one
+   * thing their role adds — seeing every task — must not become a licence to
+   * move them. Commenting and logging time go through their own endpoints and
+   * are deliberately untouched here.
+   */
+  private async assertMayChange(
+    companyId: number, projectId: number, employeeId: number | null, role?: string,
+  ): Promise<void> {
+    const viewer = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, employeeId, role,
+    );
+    if (viewer.projectRole === PROJECT_ROLE.ARCHITECT && !mayChangeAnyTask(viewer)) {
+      throw new ForbiddenException(
+        'As technical architect you can see the whole board, but changing a task is the project manager\'s call.',
+      );
+    }
+  }
+
+  async getIssues(
+    companyId: number, projectId: number,
+    employeeId: number | null = null, companyRole?: string,
+  ) {
+    const viewer = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, employeeId, companyRole,
+    );
+    const visible = taskVisibilityFilter(viewer);
+
     const issues = await this.prisma.issue.findMany({
-      where: { projectId, companyId },
+      where: {
+        projectId,
+        companyId,
+        // AND, not a spread: several callers of this shape carry an OR of
+        // their own, and spreading would silently replace it.
+        ...(visible ? { AND: [visible] } : {}),
+      },
       include: {
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         reporter: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -355,7 +391,7 @@ export class IssuesService {
       });
       if (assigneeIsPM) {
         throw new ForbiddenException(
-          'This task is assigned to a Project Manager, so only the project owner (or an administrator) can move it to Review, Done or Archived.',
+          'This task is assigned to a Project Manager, so only the project owner (or an administrator) can move it to Done or Archived.',
         );
       }
     }
@@ -403,6 +439,8 @@ export class IssuesService {
   async updateIssue(companyId: number, employeeId: number, projectId: number, issueId: number, data: any, role?: string) {
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
+
+    await this.assertMayChange(companyId, projectId, employeeId, role);
 
 
     /**
@@ -1392,9 +1430,20 @@ export class IssuesService {
     }
   }
 
+  /**
+   * The people who can be put on a board.
+   *
+   * Only those who can actually sign in: a suspended account cannot open the
+   * project, and an employee with no login never could. Both were being
+   * offered in the invite list, which on this company meant 43 of 97 names
+   * were people nobody could usefully add.
+   */
   async getCompanyMembers(companyId: number) {
     return this.prisma.employee.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        user: { is: { status: { not: 'SUSPENDED' } } },
+      },
       select: {
         id: true,
         userId: true,

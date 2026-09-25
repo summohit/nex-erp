@@ -62,7 +62,9 @@ describe('LeavesService.getQuotaReport', () => {
         ),
       },
     };
-    service = new LeavesService(prisma, {} as any);
+    // The quota report touches neither notifications nor field visits; the
+    // third dependency is only reached when leave is applied for or approved.
+    service = new LeavesService(prisma, {} as any, {} as any);
   });
 
   const asAdmin = (employeeId?: number) =>

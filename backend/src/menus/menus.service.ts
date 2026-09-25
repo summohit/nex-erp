@@ -154,9 +154,12 @@ export class MenusService implements OnModuleInit {
             { title: 'Projects', route: '/projects', displayOrder: 1 },
             { title: 'Tasks', route: '/tasks', displayOrder: 2 },
             { title: 'Timesheet', route: '/timesheets', displayOrder: 3 },
-            { title: 'Client Visits', route: '/field-visits', displayOrder: 4 },
+            // Planned trips: raised, approved, and clocked against the site.
+            { title: 'Field Visits', route: '/field-visits/requests', displayOrder: 4 },
+            // The employee's own trip for today, where the geofenced clock is.
+            { title: 'My Field Visit', route: '/field-visits/my', displayOrder: 5 },
             // §4: additional-hours requests across every project.
-            { title: 'Requests', route: '/task-requests', displayOrder: 5 },
+            { title: 'Requests', route: '/task-requests', displayOrder: 6 },
           ];
 
           for (const child of deliveryChildren) {
@@ -169,6 +172,13 @@ export class MenusService implements OnModuleInit {
               // Renamed in place so installs from before the rename converge on
               // "Client Visits" too, not just fresh seeds.
               if (existing.title !== child.title) updates.title = child.title;
+              // Order reconciles too. Without this, inserting a row into the
+              // middle of the list above leaves older installs with two
+              // children on the same displayOrder, and the sidebar order comes
+              // down to whatever the database happens to return.
+              if (existing.displayOrder !== child.displayOrder) {
+                updates.displayOrder = child.displayOrder;
+              }
               if (Object.keys(updates).length > 0) {
                 await this.prisma.menu.update({ where: { id: existing.id }, data: updates });
               }
@@ -180,14 +190,23 @@ export class MenusService implements OnModuleInit {
             this.logger.log(`Delivery > ${child.title} menu auto-seeded successfully.`);
           }
 
-          // Client Visits used to sit beside Projects at the top level. Retire
-          // the old row rather than leaving it in two places.
+          // Client Visits is off the sidebar.
+          //
+          // Two entries a click apart called "Client Visits" and "Field
+          // Visits" read as the same thing, and they are not: one is the log
+          // of trips people started from the app, the other is a trip somebody
+          // approved. The log is being folded into the Field Visits section
+          // rather than sitting beside it, so the row goes now and the merge
+          // follows.
+          //
+          // Only the menu row. /field-visits still serves, and the project
+          // detail's Client Visits tab and the CRM widget still reach it.
           const { count: movedFieldVisits } = await this.prisma.menu.updateMany({
-            where: { route: '/field-visits', parentId: parent.id, isActive: true },
+            where: { route: '/field-visits', isActive: true },
             data: { isActive: false },
           });
           if (movedFieldVisits > 0) {
-            this.logger.log('Client Visits moved under Delivery.');
+            this.logger.log('Client Visits removed from the sidebar; the page itself still serves.');
           }
         }
 
@@ -350,6 +369,10 @@ export class MenusService implements OnModuleInit {
     allowedModules.add('employees/me/profile');
     allowedModules.add('dashboard');
     allowedModules.add('crm/tickets');
+    // Anybody can be sent on a field visit, and the geofenced clock lives on
+    // this screen — so it is granted like the profile rather than through the
+    // projects permission, which most people on a trip do not have.
+    allowedModules.add('field-visits/my');
     // Self-service account security (two-factor setup). Every role manages their
     // own, so it is granted alongside the profile rather than via RolePermission.
     allowedModules.add('settings/security');
@@ -363,7 +386,8 @@ export class MenusService implements OnModuleInit {
     // project — and Tasks and Timesheet are the same work seen from a
     // different angle, not a separate permission surface.
     if (allowedModules.has('projects')) {
-      ['field-visits', 'tasks', 'timesheets'].forEach((m) => allowedModules.add(m));
+      ['field-visits', 'field-visits/requests', 'tasks', 'timesheets']
+        .forEach((m) => allowedModules.add(m));
     }
 
     // The leave quota report is a read-only view of balances that the

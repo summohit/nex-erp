@@ -67,3 +67,38 @@ describe('buildInitialMembers', () => {
     );
   });
 });
+
+describe('the technical architect', () => {
+  it('is written as its own role', () => {
+    const rows = buildInitialMembers(1, [], [60], [61]);
+    expect(rows).toEqual(expect.arrayContaining([
+      { employeeId: 61, role: 'TECHNICAL_ARCHITECT' },
+      { employeeId: 60, role: 'MEMBER' },
+    ]));
+  });
+
+  it('outranks plain membership', () => {
+    // Named in both lists: seeing the whole board is the stronger standing.
+    const rows = buildInitialMembers(1, [], [60], [60]);
+    expect(rows.find(r => r.employeeId === 60)!.role).toBe('TECHNICAL_ARCHITECT');
+  });
+
+  it('gives way to the project manager', () => {
+    // An architect who also manages keeps their hand on the board.
+    const rows = buildInitialMembers(1, [60], [], [60]);
+    expect(rows.find(r => r.employeeId === 60)!.role).toBe('PROJECT_MANAGER');
+  });
+
+  it('still collapses to one row for the owner', () => {
+    const rows = buildInitialMembers(1, [], [], [1]);
+    expect(rows.filter(r => r.employeeId === 1)).toEqual([{ employeeId: 1, role: 'ADMIN' }]);
+  });
+
+  it('is optional, so every existing caller behaves as before', () => {
+    expect(buildInitialMembers(1, [2], [3])).toEqual([
+      { employeeId: 3, role: 'MEMBER' },
+      { employeeId: 2, role: 'PROJECT_MANAGER' },
+      { employeeId: 1, role: 'ADMIN' },
+    ]);
+  });
+});

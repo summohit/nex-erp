@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { LeavesService } from './leaves.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { FieldVisitActivationService } from '../field-visits/requests/field-visit-activation.service';
 
 /** Was Nest boilerplate that supplied no providers and could not compile. */
 describe('LeavesService', () => {
@@ -14,6 +15,8 @@ describe('LeavesService', () => {
         LeavesService,
         { provide: PrismaService, useValue: {} },
         { provide: NotificationsService, useValue: {} },
+        // Applying for leave now asks whether the days belong to a field visit.
+        { provide: FieldVisitActivationService, useValue: {} },
       ],
     }).compile();
 

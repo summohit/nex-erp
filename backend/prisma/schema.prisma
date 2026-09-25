@@ -2111,6 +2111,9 @@ model Issue {
   fieldVisitRequestId Int?
   fieldVisitRequest   FieldVisitRequest? @relation(fields: [fieldVisitRequestId], references: [id])
 
+  /// The field-visit days clocked against this task (§5).
+  fieldVisitAttendances FieldVisitAttendance[] @relation("FieldVisitAttendanceIssue")
+
   @@unique([key, companyId])
   /// "What is assigned to me, soonest first" — the My Tasks query.
   @@index([companyId, assigneeId, isArchived])
@@ -3879,6 +3882,27 @@ model FieldVisitRequest {
   endTime   String
   remarks   String?
 
+  /// How close to `latitude`/`longitude` a clock-in has to be, in metres.
+  ///
+  /// On the row rather than a constant in the clock-in code: the radius a day
+  /// was judged against has to stay readable afterwards, so changing the
+  /// company's rule cannot retroactively move the line under days already
+  /// clocked. 500 is the rule as specified; nothing in the UI edits it yet.
+  geofenceRadiusM Int @default(500)
+
+  /// A change to an already-approved trip, waiting for the same approval the
+  /// trip itself had (§10).
+  ///
+  /// Held here rather than applied, because the trip keeps running while it is
+  /// reviewed. Every clock-in measures against the coordinates and the radius
+  /// on this row, so writing a proposed site into them would move the geofence
+  /// under people already standing at the approved one.
+  ///
+  /// Who proposed it is not duplicated here — the MODIFICATION_REQUESTED row in
+  /// the activity trail carries that, with a foreign key behind it.
+  pendingChange   Json?
+  pendingChangeAt DateTime?
+
   status          String    @default("DRAFT")
   reviewedById    Int?
   reviewedBy      Employee? @relation("FieldVisitRequestsReviewed", fields: [reviewedById], references: [id])
@@ -3990,6 +4014,12 @@ model FieldVisitAttendance {
   /// The tracked visit this day produced, once one is started.
   fieldVisitId Int?
   fieldVisit   FieldVisit? @relation("FieldVisitAttendanceVisit", fields: [fieldVisitId], references: [id])
+
+  /// The task the person said they were there to do, captured at clock-in
+  /// (§5). SetNull rather than Cascade: a task deleted afterwards must not
+  /// take the attendance for the day with it.
+  issueId Int?
+  issue   Issue? @relation("FieldVisitAttendanceIssue", fields: [issueId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

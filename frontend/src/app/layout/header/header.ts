@@ -373,6 +373,11 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.notificationsService.markAsRead(id);
   }
 
+  dismissNotification(event: Event, id: number) {
+    event.stopPropagation();
+    this.notificationsService.dismissNotification(id);
+  }
+
   getUserInitials(): string {
     const u = this.currentUser();
     if (!u) return 'U';

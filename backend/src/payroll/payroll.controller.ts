@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, ParseIntPipe, Res } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, ParseIntPipe, Res, ForbiddenException } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -6,6 +6,40 @@ import { AuthGuard } from '../auth/auth.guard';
 @UseGuards(AuthGuard)
 export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
+
+  /**
+   * Who runs payroll.
+   *
+   * The same set the payroll screen calls an admin, checked here because the
+   * screen hiding a button is not a rule — every one of these endpoints was
+   * reachable by any signed-in employee, which meant anyone could rewrite the
+   * amounts on a payslip, mark it paid, or re-send it by email.
+   *
+   * Not expressed through PermissionsGuard: that grants ADMIN and SUPERADMIN
+   * outright and requires an explicit RolePermission row for everyone else,
+   * and this company has VIEW rows only — HR and Finance would have lost the
+   * payroll they run today.
+   */
+  private readonly PAYROLL_ROLES = ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN', 'HR', 'FINANCE'];
+
+  private isPayrollOperator(req: any): boolean {
+    return this.PAYROLL_ROLES.includes(req?.user?.role);
+  }
+
+  private assertPayrollOperator(req: any, what = 'change a payslip'): void {
+    if (!this.isPayrollOperator(req)) {
+      throw new ForbiddenException(`Only payroll administrators can ${what}.`);
+    }
+  }
+
+  /**
+   * The employee a non-operator is allowed to read, or null for someone who
+   * may read anybody's. Payslips carry salary: without this, an employee could
+   * walk the ids and read every colleague's pay.
+   */
+  private readerScope(req: any): number | null {
+    return this.isPayrollOperator(req) ? null : (req?.user?.employeeId ?? -1);
+  }
 
   // ==================== 1. SALARY COMPONENTS ====================
 
@@ -73,6 +107,7 @@ export class PayrollController {
     @Request() req,
     @Body() body: { month: number; year: number; skipLossOfPay?: boolean },
   ) {
+    this.assertPayrollOperator(req, 'generate payslips');
     return this.payrollService.generatePayslips(
       req.user.companyId, Number(body.month), Number(body.year),
       { skipLossOfPay: !!body.skipLossOfPay },
@@ -81,6 +116,7 @@ export class PayrollController {
 
   @Post('payslips/send-emails')
   batchSendEmails(@Request() req, @Body() body: { month: number; year: number }) {
+    this.assertPayrollOperator(req, 'send payslips');
     return this.payrollService.batchSendPayslipEmails(req.user.companyId, Number(body.month), Number(body.year));
   }
 
@@ -91,22 +127,25 @@ export class PayrollController {
 
   @Get('payslips')
   getPayslips(@Request() req, @Query('month') month?: number, @Query('year') year?: number) {
+    this.assertPayrollOperator(req, 'browse every payslip in the company');
     return this.payrollService.getPayslips(req.user.companyId, month, year);
   }
 
   @Put('payslips/finalize-all')
   batchFinalizePayslips(@Request() req, @Body() body: { month: number; year: number }) {
+    this.assertPayrollOperator(req, 'finalise payslips');
     return this.payrollService.batchFinalizePayslips(req.user.companyId, Number(body.month), Number(body.year));
   }
 
   @Put('payslips/mark-paid')
   markPayslipsPaid(@Request() req, @Body() body: { month: number; year: number }) {
+    this.assertPayrollOperator(req, 'mark payslips paid');
     return this.payrollService.markPayslipsPaid(req.user.companyId, Number(body.month), Number(body.year));
   }
 
   @Get('payslips/:id/detail')
   getPayslipDetail(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.payrollService.getPayslipDetail(req.user.companyId, id);
+    return this.payrollService.getPayslipDetail(req.user.companyId, id, this.readerScope(req));
   }
 
   @Put('payslips/:id/items')
@@ -119,13 +158,14 @@ export class PayrollController {
       presentDays?: number;
     },
   ) {
+    this.assertPayrollOperator(req);
     return this.payrollService.updatePayslipItems(req.user.companyId, id, body);
   }
 
   @Get('payslips/:id/pdf')
   async downloadPayslip(@Request() req, @Param('id', ParseIntPipe) id: number, @Res() res) {
     const { buffer, isPdf, filename } =
-      await this.payrollService.getPayslipPdf(req.user.companyId, id);
+      await this.payrollService.getPayslipPdf(req.user.companyId, id, this.readerScope(req));
     res.set({
       'Content-Type': isPdf ? 'application/pdf' : 'text/html',
       'Content-Disposition': `attachment; filename="${filename}"`,
@@ -136,6 +176,7 @@ export class PayrollController {
 
   @Post('payslips/:id/send-email')
   sendOnePayslipEmail(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    this.assertPayrollOperator(req, 'send a payslip');
     return this.payrollService.sendOnePayslipEmail(req.user.companyId, id);
   }
 
@@ -145,6 +186,7 @@ export class PayrollController {
     @Param('id', ParseIntPipe) id: number,
     @Body() data: { lossOfPay?: number; totalEarnings?: number; totalDeductions?: number; expenseAmount?: number; status?: string }
   ) {
+    this.assertPayrollOperator(req);
     return this.payrollService.updatePayslip(req.user.companyId, id, data);
   }
 

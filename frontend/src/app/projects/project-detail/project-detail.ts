@@ -117,6 +117,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return p.members.filter((m: any) => m.role === 'PROJECT_MANAGER');
   });
 
+  /** Named beside the manager because it is the same kind of fact: who holds what. */
+  projectArchitects = computed(() => {
+    const p = this.project();
+    if (!p || !p.members) return [];
+    return p.members.filter((m: any) => m.role === 'TECHNICAL_ARCHITECT');
+  });
+
   // Attachments Tab Filters
   attSearchQuery = signal<string>('');
   attFilterAddedBy = signal<number[]>([]);
@@ -2564,7 +2571,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   canMoveIntoReviewOrDone(issue: any, columnId: number): boolean {
-    if (this.isAssigneeProjectManager(issue) && (this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId))) {
+    if (this.isAssigneeProjectManager(issue) && this.isDoneOrArchiveColumn(columnId)) {
       return this.isProjectOwner;
     }
     if (this.isDoneOrArchiveColumn(columnId)) {
@@ -3827,14 +3834,27 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       this.toast.error('Only Admins or Project Lead can add members');
       return;
     }
-    const role = employee.isProjectManager ? 'PROJECT_MANAGER' : 'MEMBER';
+    if (this.addingMemberId() !== null) return;
+
+    const role = this.inviteRole();
+    this.addingMemberId.set(employee.id);
     this.projectsService.addProjectMember(this.projectId, employee.id, role).subscribe({
       next: () => {
         this.loadProjectDetails(); // Reload to get updated roles/state from server
-        this.toast.success(`${employee.firstName || 'Member'} added to project`);
+        this.addingMemberId.set(null);
+        this.toast.success(
+          `${employee.firstName || 'Member'} added as ${this.inviteRoleLabel().toLowerCase()}`,
+        );
       },
-      error: () => this.toast.error('Failed to add member to project')
+      error: (err: any) => {
+        this.addingMemberId.set(null);
+        this.toast.error(err?.error?.message || 'Failed to add member to project');
+      },
     });
+  }
+
+  isAddingMember(employeeId: number): boolean {
+    return this.addingMemberId() === employeeId;
   }
 
   removeProjectMember(employee: any) {
@@ -4018,6 +4038,27 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
    */
   get canManageTask(): boolean {
     return this.isProjectOwner || this.isCurrentUserPM();
+  }
+
+  /**
+   * A technical architect, and nothing more.
+   *
+   * Their role is sight of the whole board without a hand on it, so the
+   * affordances that change a task are taken away rather than left to fail
+   * against the server. Deliberately narrow: it says nothing about ordinary
+   * members, who drag their own cards exactly as they did before.
+   *
+   * Owner, project manager and company administrator all answer false here
+   * even when they also hold the architect role — standing adds up.
+   */
+  get isReadOnlyArchitect(): boolean {
+    if (this.isProjectOwner || this.isCurrentUserPM()) return false;
+    const myEmpId = this.currentEmployeeId();
+    if (!myEmpId) return false;
+    return (this.project()?.members || []).some(
+      (m: any) => (m.employeeId === myEmpId || m.employee?.id === myEmpId)
+        && m.role === 'TECHNICAL_ARCHITECT',
+    );
   }
 
   /** The milestone's name, for the read-only view of it. */
@@ -4399,6 +4440,23 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   showRecurringDropdown = signal(false);
   showReminderDropdown = signal(false);
 
+  /**
+   * Whether the next calendar click closes the range or starts a new one.
+   *
+   * A range needs two clicks and the picker has to remember which one it is
+   * on. Without it, the old behaviour compared the clicked day to the start
+   * and could only ever push the END around — the start date could not be
+   * moved later by clicking at all, only by typing.
+   */
+  awaitingRangeEnd = false;
+
+  /** The day under the cursor, so a half-made range previews before the click. */
+  calendarHoverDate: Date | null = null;
+
+  /** The last values that parsed, to fall back to when typing goes wrong. */
+  private lastValidStartStr = '';
+  private lastValidDueStr = '';
+
   recurringOptions = ['Never', 'Daily', 'Monday to Friday', 'Weekly', 'Monthly on the 26th', 'Monthly on the last Saturday'];
   reminderOptions = ['At time of due date', '5 Minutes before', '15 Minutes before', '1 Hour before', '2 Hours before', '1 Day before', '2 Days before'];
 
@@ -4445,6 +4503,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       this.datesForm.dueReminder = '1 Day before';
       this.calendarViewDate = new Date(now);
     }
+
+    // Opening the picker is not the middle of a selection.
+    this.awaitingRangeEnd = false;
+    this.calendarHoverDate = null;
+    this.lastValidStartStr = this.datesForm.startDateStr;
+    this.lastValidDueStr = this.datesForm.dueDateStr;
   }
 
   formatDateToDDMMYYYY(d: Date): string {
@@ -4456,13 +4520,21 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   parseDDMMYYYY(s: string): Date | null {
     if (!s) return null;
-    const parts = s.split('/');
+    const parts = s.trim().split('/');
     if (parts.length !== 3) return null;
     const d = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10) - 1;
     const y = parseInt(parts[2], 10);
-    if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
-    return new Date(y, m, d);
+    if (isNaN(d) || isNaN(m) || isNaN(y) || y < 1000) return null;
+
+    const date = new Date(y, m, d);
+    // A Date rolls 31/02 forward into March rather than refusing it, so the
+    // only way to catch an impossible day is to read it back. Saving used to
+    // accept "31/02/2026" and quietly store the 3rd of March.
+    if (date.getFullYear() !== y || date.getMonth() !== m || date.getDate() !== d) {
+      return null;
+    }
+    return date;
   }
 
   formatTimeToHHMM(d: Date): string {
@@ -4506,6 +4578,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const today = new Date();
     const startDateObj = this.datesForm.enableStartDate ? this.parseDDMMYYYY(this.datesForm.startDateStr) : null;
     const dueDateObj = this.datesForm.enableDueDate ? this.parseDDMMYYYY(this.datesForm.dueDateStr) : null;
+    // While the range is half-made, the day under the cursor stands in for the
+    // end — so the range being chosen is visible before it is committed.
+    const previewTo = this.awaitingRangeEnd ? this.calendarHoverDate : null;
     
     const days: any[] = [];
 
@@ -4513,13 +4588,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     for (let i = dayOfWeek - 1; i >= 0; i--) {
       const dNum = prevMonthLastDate - i;
       const dObj = new Date(year, month - 1, dNum);
-      days.push(this.buildDayCell(dNum, dObj, false, today, startDateObj, dueDateObj));
+      days.push(this.buildDayCell(dNum, dObj, false, today, startDateObj, dueDateObj, previewTo));
     }
 
     // Current month days
     for (let i = 1; i <= daysInMonth; i++) {
       const dObj = new Date(year, month, i);
-      days.push(this.buildDayCell(i, dObj, true, today, startDateObj, dueDateObj));
+      days.push(this.buildDayCell(i, dObj, true, today, startDateObj, dueDateObj, previewTo));
     }
 
     // Next month padding days to complete 42 cells (6 rows x 7)
@@ -4527,30 +4602,34 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const remaining = 42 - totalCells;
     for (let i = 1; i <= remaining; i++) {
       const dObj = new Date(year, month + 1, i);
-      days.push(this.buildDayCell(i, dObj, false, today, startDateObj, dueDateObj));
+      days.push(this.buildDayCell(i, dObj, false, today, startDateObj, dueDateObj, previewTo));
     }
 
     return days;
   }
 
-  buildDayCell(dayNumber: number, dObj: Date, isCurrentMonth: boolean, today: Date, startDateObj: Date | null, dueDateObj: Date | null): any {
-    const isToday = dObj.getFullYear() === today.getFullYear() && dObj.getMonth() === today.getMonth() && dObj.getDate() === today.getDate();
-    
-    let isStart = false;
-    let isDue = false;
+  buildDayCell(
+    dayNumber: number, dObj: Date, isCurrentMonth: boolean, today: Date,
+    startDateObj: Date | null, dueDateObj: Date | null, previewTo: Date | null = null,
+  ): any {
+    const isToday = this.isSameDay(dObj, today);
+
+    const isStart = !!startDateObj && this.isSameDay(dObj, startDateObj);
+    const isDue = !!dueDateObj && this.isSameDay(dObj, dueDateObj);
+
     let isInRange = false;
-
-    if (startDateObj && this.isSameDay(dObj, startDateObj)) {
-      isStart = true;
-    }
-    if (dueDateObj && this.isSameDay(dObj, dueDateObj)) {
-      isDue = true;
-    }
-
     if (startDateObj && dueDateObj && startDateObj < dueDateObj) {
-      if (dObj > startDateObj && dObj < dueDateObj) {
-        isInRange = true;
-      }
+      isInRange = dObj > startDateObj && dObj < dueDateObj;
+    }
+
+    // The range the cursor is currently proposing, drawn lighter than the one
+    // already chosen. Either end may be the anchor, since picking backwards
+    // swaps them.
+    let isPreview = false;
+    if (previewTo && startDateObj) {
+      const from = previewTo < startDateObj ? previewTo : startDateObj;
+      const to = previewTo < startDateObj ? startDateObj : previewTo;
+      isPreview = dObj >= from && dObj <= to && !isStart && !isInRange;
     }
 
     return {
@@ -4560,7 +4639,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       isToday,
       isStart,
       isDue,
-      isInRange
+      isInRange,
+      isPreview,
     };
   }
 
@@ -4568,27 +4648,161 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
   }
 
+  /**
+   * Pick a day out of the calendar.
+   *
+   * Two ends enabled means two clicks: the first anchors the start, the second
+   * closes the range, and the next one starts over. The old rule instead asked
+   * "is this before the start?" on every click, which made the start date
+   * impossible to move later — every click at or after it landed on the due
+   * date, and there was no way back short of typing.
+   */
   selectCalendarDate(dayCell: any) {
-    const formatted = this.formatDateToDDMMYYYY(dayCell.dateObj);
+    const picked: Date = dayCell.dateObj;
+    const formatted = this.formatDateToDDMMYYYY(picked);
 
-    if (this.datesForm.enableStartDate && this.datesForm.enableDueDate) {
-      const startObj = this.parseDDMMYYYY(this.datesForm.startDateStr);
-      if (!startObj || dayCell.dateObj < startObj) {
+    // A day from the greyed-out edges belongs to another month. Follow it, or
+    // the selection lands somewhere the calendar is not showing.
+    if (!dayCell.isCurrentMonth) {
+      this.calendarViewDate = new Date(picked.getFullYear(), picked.getMonth(), 1);
+    }
+    this.calendarHoverDate = null;
+
+    // Only one end in play: the click sets that one, whichever it is.
+    if (!this.datesForm.enableStartDate || !this.datesForm.enableDueDate) {
+      if (this.datesForm.enableStartDate) {
         this.datesForm.startDateStr = formatted;
       } else {
+        this.datesForm.enableDueDate = true;
         this.datesForm.dueDateStr = formatted;
       }
-    } else if (this.datesForm.enableStartDate) {
+      this.awaitingRangeEnd = false;
+      this.rememberValidDates();
+      return;
+    }
+
+    if (!this.awaitingRangeEnd) {
+      // First click: anchor the start. An existing due date is kept when it
+      // still makes sense, so nudging the start of a planned range does not
+      // throw the end away.
       this.datesForm.startDateStr = formatted;
+      const dueObj = this.parseDDMMYYYY(this.datesForm.dueDateStr);
+      if (!dueObj || dueObj < picked) {
+        this.datesForm.dueDateStr = formatted;
+      }
+      this.awaitingRangeEnd = true;
+      this.rememberValidDates();
+      return;
+    }
+
+    // Second click closes the range. Picking backwards is not an error — it
+    // means the range runs the other way, so the two ends swap rather than the
+    // click being ignored.
+    const startObj = this.parseDDMMYYYY(this.datesForm.startDateStr);
+    if (startObj && picked < startObj) {
+      this.datesForm.startDateStr = formatted;
+      this.datesForm.dueDateStr = this.formatDateToDDMMYYYY(startObj);
     } else {
-      this.datesForm.enableDueDate = true;
       this.datesForm.dueDateStr = formatted;
     }
+    this.awaitingRangeEnd = false;
+    this.rememberValidDates();
+  }
+
+  /** Preview the half-made range as the cursor moves over the grid. */
+  onCalendarHover(dayCell: any) {
+    if (!this.awaitingRangeEnd) return;
+    this.calendarHoverDate = dayCell.dateObj;
+  }
+
+  clearCalendarHover() {
+    this.calendarHoverDate = null;
+  }
+
+  /**
+   * Put a typed date right, or put it back.
+   *
+   * These inputs are free text, and `saveDates` stores a date only when it
+   * parses — so typing "3/9" over a good date and saving used to clear the
+   * date silently rather than complain. Now an unreadable value returns to
+   * what it was, and a readable one is written out in full.
+   */
+  normaliseDateInput(which: 'start' | 'due') {
+    const typed = which === 'start' ? this.datesForm.startDateStr : this.datesForm.dueDateStr;
+    const parsed = this.parseDDMMYYYY(typed);
+
+    if (!parsed) {
+      if (which === 'start') {
+        this.datesForm.startDateStr = this.lastValidStartStr;
+      } else {
+        this.datesForm.dueDateStr = this.lastValidDueStr;
+      }
+      this.toast.error(`"${typed}" is not a date. Use DD/MM/YYYY.`);
+      return;
+    }
+
+    const canonical = this.formatDateToDDMMYYYY(parsed);
+    if (which === 'start') {
+      this.datesForm.startDateStr = canonical;
+    } else {
+      this.datesForm.dueDateStr = canonical;
+    }
+
+    // Typing an end before the start is the same gesture as clicking backwards
+    // on the calendar, and means the same thing.
+    if (this.datesForm.enableStartDate && this.datesForm.enableDueDate) {
+      const startObj = this.parseDDMMYYYY(this.datesForm.startDateStr);
+      const dueObj = this.parseDDMMYYYY(this.datesForm.dueDateStr);
+      if (startObj && dueObj && dueObj < startObj) {
+        this.datesForm.startDateStr = this.formatDateToDDMMYYYY(dueObj);
+        this.datesForm.dueDateStr = this.formatDateToDDMMYYYY(startObj);
+      }
+    }
+    this.awaitingRangeEnd = false;
+    this.rememberValidDates();
+  }
+
+  private rememberValidDates() {
+    if (this.parseDDMMYYYY(this.datesForm.startDateStr)) {
+      this.lastValidStartStr = this.datesForm.startDateStr;
+    }
+    if (this.parseDDMMYYYY(this.datesForm.dueDateStr)) {
+      this.lastValidDueStr = this.datesForm.dueDateStr;
+    }
+  }
+
+  /** "25 Sep – 27 Sep · 3 days", so the range reads back in words. */
+  get rangeSummary(): string {
+    const startObj = this.datesForm.enableStartDate ? this.parseDDMMYYYY(this.datesForm.startDateStr) : null;
+    const dueObj = this.datesForm.enableDueDate ? this.parseDDMMYYYY(this.datesForm.dueDateStr) : null;
+    const short = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+    if (startObj && dueObj) {
+      if (this.isSameDay(startObj, dueObj)) return `${short(startObj)} · 1 day`;
+      const days = Math.round((dueObj.getTime() - startObj.getTime()) / 86400000) + 1;
+      return `${short(startObj)} – ${short(dueObj)} · ${days} days`;
+    }
+    if (dueObj) return `Due ${short(dueObj)}`;
+    if (startObj) return `Starts ${short(startObj)}`;
+    return 'No dates set';
   }
 
   saveDates() {
     const issue = this.selectedIssue();
     if (!issue) return;
+
+    // Last line of defence on the order. The calendar and the blur handler
+    // both keep these the right way round, but a value typed and saved without
+    // ever leaving the field would otherwise reach the database as a task that
+    // ends before it starts.
+    if (this.datesForm.enableStartDate && this.datesForm.enableDueDate) {
+      const s0 = this.parseDDMMYYYY(this.datesForm.startDateStr);
+      const d0 = this.parseDDMMYYYY(this.datesForm.dueDateStr);
+      if (s0 && d0 && d0 < s0) {
+        this.datesForm.startDateStr = this.formatDateToDDMMYYYY(d0);
+        this.datesForm.dueDateStr = this.formatDateToDDMMYYYY(s0);
+      }
+    }
 
     let startDate: string | null = null;
     let dueDate: string | null = null;
@@ -4751,6 +4965,38 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   isLoadingMembers = signal(false);
   memberSearchQuery = '';
   shareTab = signal<'members'|'invite'>('members');
+
+  /**
+   * What the next person invited is added as.
+   *
+   * One selector above the list rather than a control on every row: inviting
+   * is usually several people in the same role, and the answer should be
+   * visible before the click rather than guessed from it.
+   *
+   * It used to be guessed — `employee.isProjectManager` — and the endpoint
+   * feeding this list does not return that field, so the flag was always
+   * undefined and everybody came in as a plain member.
+   */
+  inviteRole = signal<'MEMBER' | 'PROJECT_MANAGER' | 'TECHNICAL_ARCHITECT'>('MEMBER');
+
+  /**
+   * The person currently being added, so the row says so.
+   *
+   * Adding writes a member and then reloads the whole project to pick up the
+   * new roles, which is long enough for a second click to land — and long
+   * enough for the first one to look ignored.
+   */
+  addingMemberId = signal<number | null>(null);
+
+  inviteRoleOptions = [
+    { value: 'MEMBER' as const, label: 'Member', hint: 'Sees the tasks that are theirs' },
+    { value: 'PROJECT_MANAGER' as const, label: 'Project manager', hint: 'Sees everything, runs the board' },
+    { value: 'TECHNICAL_ARCHITECT' as const, label: 'Technical architect', hint: 'Sees everything, changes nothing' },
+  ];
+
+  inviteRoleLabel(): string {
+    return this.inviteRoleOptions.find(o => o.value === this.inviteRole())?.label ?? 'Member';
+  }
   activeMemberActionMenu = signal<number | null>(null);
 
   toggleMemberActionMenu(employeeId: number) {

@@ -2499,6 +2499,84 @@
           <span class="cbm-field-helper">Project managers have permission to review, approve tasks, and control project delivery milestones.</span>
         </div>
 
+        <!-- Technical architect: sees every task on the project without being
+             able to change them. Optional — a project can run without one. -->
+        <div class="cbm-field-group">
+          <label class="cbm-field-label" data-field="architectIds">Technical Architects</label>
+          <div class="cbm-searchable-select" (click)="$event.stopPropagation()">
+            <div 
+              class="cbm-select-trigger cbm-multi-trigger" 
+              [class.open]="architectDropdownOpen()"
+              (click)="architectDropdownOpen.set(!architectDropdownOpen()); pmDropdownOpen.set(false); clientDropdownOpen.set(false); categoryDropdownOpen.set(false); departmentDropdownOpen.set(false)">
+              <div class="cbm-chips-wrap" *ngIf="projectForm.architectIds.length > 0">
+                <span class="cbm-user-chip" *ngFor="let taId of projectForm.architectIds">
+                  <img *ngIf="getPmAvatarUrl(taId) as url" [src]="url" class="cbm-chip-avatar" alt="Avatar" />
+                  <span *ngIf="!getPmAvatarUrl(taId)" class="cbm-chip-avatar-text" [style.background]="getPmColor(taId)">{{ getPmInitial(taId) }}</span>
+                  <span class="cbm-chip-name">{{ getPmName(taId) }}</span>
+                  <button type="button" class="cbm-chip-remove" (click)="removeArchitect(taId); $event.stopPropagation()">
+                    <svg lucideX size="12"></svg>
+                  </button>
+                </span>
+              </div>
+              <div class="cbm-select-placeholder" *ngIf="projectForm.architectIds.length === 0">
+                <svg lucideUsers size="16" class="cbm-placeholder-icon"></svg>
+                <span>Search &amp; assign technical architects...</span>
+              </div>
+              <svg lucideChevronDown size="16" class="cbm-chevron" [class.rotated]="architectDropdownOpen()"></svg>
+            </div>
+
+            <div class="cbm-dropdown-panel" *ngIf="architectDropdownOpen()">
+              <div class="cbm-search-header">
+                <svg lucideSearch size="15" class="cbm-search-icon"></svg>
+                <input 
+                  type="text" 
+                  class="cbm-search-input" 
+                  placeholder="Search users by name, email, designation..." 
+                  [ngModel]="architectSearchQuery()" 
+                  (ngModelChange)="architectSearchQuery.set($event)"
+                  (click)="$event.stopPropagation()">
+                <button 
+                  type="button" 
+                  class="cbm-search-clear" 
+                  *ngIf="architectSearchQuery()" 
+                  (click)="architectSearchQuery.set('')">
+                  <svg lucideX size="13"></svg>
+                </button>
+              </div>
+
+              <div class="cbm-options-list">
+                <div 
+                  class="cbm-option-item user-option-item" 
+                  *ngFor="let emp of filteredArchitectEmployees()" 
+                  [class.selected]="projectForm.architectIds.includes(emp.id)"
+                  (click)="toggleArchitect(emp.id)">
+                  <div class="cbm-checkbox" [class.checked]="projectForm.architectIds.includes(emp.id)">
+                    <svg lucideCheck size="12" *ngIf="projectForm.architectIds.includes(emp.id)"></svg>
+                  </div>
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="cbm-user-avatar" alt="User" />
+                  <div *ngIf="!emp.avatarUrl" class="cbm-user-avatar-text" [style.background]="getPmColor(emp.id)">{{ getPmInitial(emp.id) }}</div>
+                  <div class="cbm-option-info">
+                    <div class="cbm-option-primary-row">
+                      <span class="cbm-option-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                      <span class="cbm-role-tag" *ngIf="emp.designation?.name">{{ emp.designation.name }}</span>
+                    </div>
+                    <div class="cbm-option-meta-row">
+                      <span class="cbm-meta-item" *ngIf="emp.user?.email">{{ emp.user.email }}</span>
+                      <span class="cbm-meta-item" *ngIf="emp.department?.name">• {{ emp.department.name }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="cbm-empty-search" *ngIf="filteredArchitectEmployees().length === 0">
+                  <svg lucideUsers size="20" class="cbm-empty-icon"></svg>
+                  <span>No team members found matching "{{ architectSearchQuery() }}"</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <span class="cbm-field-helper">Technical architects see every task on the project. They cannot add, edit or move them — that stays with the project manager.</span>
+        </div>
+
         <!-- Assigned users: the people who do the work, as distinct from the
              managers who own it. Stored as ProjectMember MEMBER rows; anyone
              picked in both lists keeps the higher role. -->
@@ -3316,6 +3394,84 @@
             </div>
           </div>
           <span class="cbm-field-helper">Project managers have permission to review, approve tasks, and control project delivery milestones.</span>
+        </div>
+
+        <!-- Technical architect: sees every task on the project without being
+             able to change them. Optional — a project can run without one. -->
+        <div class="cbm-field-group">
+          <label class="cbm-field-label" data-field="architectIds">Technical Architects</label>
+          <div class="cbm-searchable-select" (click)="$event.stopPropagation()">
+            <div 
+              class="cbm-select-trigger cbm-multi-trigger" 
+              [class.open]="architectDropdownOpen()"
+              (click)="architectDropdownOpen.set(!architectDropdownOpen()); pmDropdownOpen.set(false); clientDropdownOpen.set(false); categoryDropdownOpen.set(false); departmentDropdownOpen.set(false)">
+              <div class="cbm-chips-wrap" *ngIf="projectForm.architectIds.length > 0">
+                <span class="cbm-user-chip" *ngFor="let taId of projectForm.architectIds">
+                  <img *ngIf="getPmAvatarUrl(taId) as url" [src]="url" class="cbm-chip-avatar" alt="Avatar" />
+                  <span *ngIf="!getPmAvatarUrl(taId)" class="cbm-chip-avatar-text" [style.background]="getPmColor(taId)">{{ getPmInitial(taId) }}</span>
+                  <span class="cbm-chip-name">{{ getPmName(taId) }}</span>
+                  <button type="button" class="cbm-chip-remove" (click)="removeArchitect(taId); $event.stopPropagation()">
+                    <svg lucideX size="12"></svg>
+                  </button>
+                </span>
+              </div>
+              <div class="cbm-select-placeholder" *ngIf="projectForm.architectIds.length === 0">
+                <svg lucideUsers size="16" class="cbm-placeholder-icon"></svg>
+                <span>Search &amp; assign technical architects...</span>
+              </div>
+              <svg lucideChevronDown size="16" class="cbm-chevron" [class.rotated]="architectDropdownOpen()"></svg>
+            </div>
+
+            <div class="cbm-dropdown-panel" *ngIf="architectDropdownOpen()">
+              <div class="cbm-search-header">
+                <svg lucideSearch size="15" class="cbm-search-icon"></svg>
+                <input 
+                  type="text" 
+                  class="cbm-search-input" 
+                  placeholder="Search users by name, email, designation..." 
+                  [ngModel]="architectSearchQuery()" 
+                  (ngModelChange)="architectSearchQuery.set($event)"
+                  (click)="$event.stopPropagation()">
+                <button 
+                  type="button" 
+                  class="cbm-search-clear" 
+                  *ngIf="architectSearchQuery()" 
+                  (click)="architectSearchQuery.set('')">
+                  <svg lucideX size="13"></svg>
+                </button>
+              </div>
+
+              <div class="cbm-options-list">
+                <div 
+                  class="cbm-option-item user-option-item" 
+                  *ngFor="let emp of filteredArchitectEmployees()" 
+                  [class.selected]="projectForm.architectIds.includes(emp.id)"
+                  (click)="toggleArchitect(emp.id)">
+                  <div class="cbm-checkbox" [class.checked]="projectForm.architectIds.includes(emp.id)">
+                    <svg lucideCheck size="12" *ngIf="projectForm.architectIds.includes(emp.id)"></svg>
+                  </div>
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" class="cbm-user-avatar" alt="User" />
+                  <div *ngIf="!emp.avatarUrl" class="cbm-user-avatar-text" [style.background]="getPmColor(emp.id)">{{ getPmInitial(emp.id) }}</div>
+                  <div class="cbm-option-info">
+                    <div class="cbm-option-primary-row">
+                      <span class="cbm-option-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                      <span class="cbm-role-tag" *ngIf="emp.designation?.name">{{ emp.designation.name }}</span>
+                    </div>
+                    <div class="cbm-option-meta-row">
+                      <span class="cbm-meta-item" *ngIf="emp.user?.email">{{ emp.user.email }}</span>
+                      <span class="cbm-meta-item" *ngIf="emp.department?.name">• {{ emp.department.name }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="cbm-empty-search" *ngIf="filteredArchitectEmployees().length === 0">
+                  <svg lucideUsers size="20" class="cbm-empty-icon"></svg>
+                  <span>No team members found matching "{{ architectSearchQuery() }}"</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <span class="cbm-field-helper">Technical architects see every task on the project. They cannot add, edit or move them — that stays with the project manager.</span>
         </div>
 
         <!-- Assigned users -->

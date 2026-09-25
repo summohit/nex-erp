@@ -1,0 +1,275 @@
+<div class="fvr-page">
+  <!-- Page Header Card -->
+  <div class="page-header-card">
+    <div class="header-title-row">
+      <div class="header-icon-box">
+        <svg lucideRoute [size]="24"></svg>
+      </div>
+      <div>
+        <h1>Field Visit Requests</h1>
+        <p>Coordinate site visits, assign field teams, define client-site tasks, and track approvals.</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      @if (hasActiveFilters()) {
+        <button class="ghost-btn reset-btn" type="button" (click)="resetFilters()" title="Reset all filters">
+          <svg lucideRotateCcw [size]="14"></svg>
+          <span>Reset filters</span>
+        </button>
+      }
+      <button class="ghost-btn refresh-btn" type="button" (click)="load()" title="Refresh requests">
+        <svg lucideRefreshCw [size]="14" [class.spin-anim]="isLoading()"></svg>
+        <span>Refresh</span>
+      </button>
+      <button class="primary-btn new-request-btn" type="button" (click)="openForm()">
+        <svg lucidePlus [size]="16"></svg>
+        <span>New request</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Summary Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon ic-blue">
+        <svg lucideRoute [size]="18"></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ summaryKpis().total }}</div>
+        <div class="kpi-label">Total Requests</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon ic-green">
+        <svg lucideCheckCircle2 [size]="18"></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ summaryKpis().approved }}</div>
+        <div class="kpi-label">Approved Visits</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon ic-amber">
+        <svg lucideClock [size]="18"></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ summaryKpis().pending }}</div>
+        <div class="kpi-label">Pending Approval</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon ic-purple">
+        <svg lucideCalendarDays [size]="18"></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ summaryKpis().totalDays }} <span class="kpi-unit">days</span></div>
+        <div class="kpi-label">Approved Field Days</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Tabs Bar -->
+  <div class="tabs-container">
+    <div class="tabs-nav">
+      @for (s of statuses; track s.key) {
+        <button
+          type="button"
+          class="tab-btn"
+          [class.active]="statusFilter() === s.key"
+          (click)="setStatus(s.key)">
+          <span class="tab-label">{{ s.label }}</span>
+          <span class="tab-count-pill" [class.active-pill]="statusFilter() === s.key">
+            {{ statusCounts()[s.key] ?? 0 }}
+          </span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Filters Toolbar Card -->
+  <div class="toolbar-card">
+    <div class="toolbar-left">
+      <!-- Search Input -->
+      <div class="search-box-wrap">
+        <svg lucideSearch [size]="15" class="search-icon"></svg>
+        <input
+          type="text"
+          placeholder="Search by request #, project, site, personnel..."
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)" />
+        @if (searchQuery()) {
+          <button type="button" class="btn-clear-search" (click)="searchQuery.set('')" title="Clear search">
+            <svg lucideX [size]="13"></svg>
+          </button>
+        }
+      </div>
+
+      <!-- Project Filter -->
+      <div class="filter-select-wrap">
+        <svg lucideBuilding [size]="14" class="select-icon"></svg>
+        <select [ngModel]="selectedProjectId()" (ngModelChange)="selectedProjectId.set($event)">
+          <option [ngValue]="null">All Projects</option>
+          @for (p of availableProjects(); track p.id) {
+            <option [ngValue]="p.id">{{ p.name }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Personnel / Member Filter -->
+      <div class="filter-select-wrap">
+        <svg lucideUsers [size]="14" class="select-icon"></svg>
+        <select [ngModel]="selectedEmployeeId()" (ngModelChange)="selectedEmployeeId.set($event)">
+          <option [ngValue]="null">All Personnel</option>
+          @for (e of availableEmployees(); track e.id) {
+            <option [ngValue]="e.id">{{ e.name }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Date Range Filter -->
+      <div class="filter-select-wrap">
+        <svg lucideCalendarDays [size]="14" class="select-icon"></svg>
+        <select [ngModel]="dateRangeFilter()" (ngModelChange)="dateRangeFilter.set($event)">
+          @for (d of dateRangeOptions; track d.key) {
+            <option [value]="d.key">{{ d.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    @if (hasActiveFilters()) {
+      <button class="btn-text-reset" type="button" (click)="resetFilters()">
+        <svg lucideRotateCcw [size]="13"></svg>
+        <span>Reset filters</span>
+      </button>
+    }
+  </div>
+
+  <!-- Table View / Empty States -->
+  @if (isLoading()) {
+    <div class="card loading-card">
+      <div class="loading-spinner"></div>
+      <p>Loading field visit requests…</p>
+    </div>
+  } @else if (!allRequests().length) {
+    <!-- Global Zero Requests -->
+    <div class="card empty-card">
+      <div class="empty-icon-wrap">
+        <svg lucideMapPin [size]="32"></svg>
+      </div>
+      <h2>No field visit requests yet</h2>
+      <p>Raise a new site visit request for your projects. Once submitted, it goes to management for approval.</p>
+      <button class="primary-btn" type="button" (click)="openForm()">
+        <svg lucidePlus [size]="16"></svg>
+        <span>Create first request</span>
+      </button>
+    </div>
+  } @else if (filteredRequests().length === 0) {
+    <!-- Empty tab or no matching filters -->
+    <div class="card empty-card">
+      <div class="empty-icon-wrap">
+        @if (searchQuery() || selectedProjectId() !== null || selectedEmployeeId() !== null || dateRangeFilter()) {
+          <svg lucideFilter [size]="28"></svg>
+        } @else {
+          <svg lucideRoute [size]="28"></svg>
+        }
+      </div>
+
+      @if (statusFilter() && !searchQuery() && selectedProjectId() === null && selectedEmployeeId() === null && !dateRangeFilter()) {
+        <h2>No {{ label(statusFilter()).toLowerCase() }} requests</h2>
+        <p>There are currently no field visit requests in "{{ label(statusFilter()) }}" status.</p>
+        <button class="ghost-btn" type="button" (click)="setStatus('')">
+          View all requests ({{ allRequests().length }})
+        </button>
+      } @else {
+        <h2>No matching requests</h2>
+        <p>No field visit requests match your selected filters. Try adjusting or clearing your criteria.</p>
+        <button class="ghost-btn" type="button" (click)="resetFilters()">
+          <svg lucideRotateCcw [size]="13"></svg>
+          Reset all filters
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="card table-card">
+      <table class="fvr-table">
+        <thead>
+          <tr>
+            <th>Request</th>
+            <th>Project</th>
+            <th>Site Location</th>
+            <th>Scheduled Dates</th>
+            <th class="num">Days</th>
+            <th class="num">Team</th>
+            <th class="num">Tasks</th>
+            <th>Status</th>
+            <th class="action-col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of filteredRequests(); track r.id) {
+            <tr [routerLink]="['/field-visits/requests', r.id]" class="clickable-row">
+              <td class="req-cell">
+                <span class="request-tag">{{ r.requestNumber }}</span>
+              </td>
+              <td class="project-cell">
+                <div class="project-info">
+                  <svg lucideBuilding [size]="14" class="cell-icon"></svg>
+                  <span class="project-name" title="{{ r.project.name }}">{{ r.project.name }}</span>
+                </div>
+              </td>
+              <td class="site-cell">
+                <div class="site-info" title="{{ r.location }}">
+                  <svg lucideMapPin [size]="13" class="cell-icon site-icon"></svg>
+                  <span class="site-text">{{ r.location }}</span>
+                </div>
+              </td>
+              <td class="date-cell nowrap">
+                <div class="date-info">
+                  <svg lucideCalendarDays [size]="13" class="cell-icon"></svg>
+                  <span>{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</span>
+                </div>
+              </td>
+              <td class="num">
+                <span class="badge-num days-badge">{{ r.visitDays }}d</span>
+              </td>
+              <td class="num">
+                <span class="badge-num people-badge" title="{{ r.members.length }} members assigned">
+                  <svg lucideUsers [size]="11"></svg>
+                  {{ r.members.length }}
+                </span>
+              </td>
+              <td class="num">
+                <span class="badge-num tasks-badge" title="{{ r.tasks.length }} tasks">{{ r.tasks.length }}</span>
+              </td>
+              <td>
+                <span class="status-pill" [class]="'st-' + r.status">
+                  <span class="status-dot"></span>
+                  {{ label(r.status) }}
+                </span>
+              </td>
+              <td class="action-col">
+                <div class="row-arrow">
+                  <svg lucideArrowRight [size]="15"></svg>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+@if (isFormOpen()) {
+  <app-field-visit-request-form
+    [request]="editing()"
+    [mode]="editing() ? 'edit' : 'create'"
+    (saved)="onSaved()"
+    (closed)="closeForm()">
+  </app-field-visit-request-form>
+}

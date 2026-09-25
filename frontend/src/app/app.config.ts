@@ -17,14 +17,22 @@ export const appConfig: ApplicationConfig = {
       position: 'top-right',
       duration: 5000,
       autoClose: true,
+      dismissible: true,
       success: {
         duration: 5000,
+        dismissible: true,
       },
       error: {
         duration: 5000,
+        dismissible: true,
       },
       warning: {
         duration: 5000,
+        dismissible: true,
+      },
+      info: {
+        duration: 5000,
+        dismissible: true,
       }
     })
   ]

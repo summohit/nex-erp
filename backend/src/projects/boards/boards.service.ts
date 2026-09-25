@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { resolveProjectViewer, mayChangeAnyTask } from '../project-roles';
 
 @Injectable()
 export class BoardsService {
@@ -19,6 +20,30 @@ export class BoardsService {
     }
   }
 
+  /**
+   * Who may change the shape of the board.
+   *
+   * The columns are the board, so this is the same standing as changing the
+   * work on it: the owner, a project manager, or a company administrator.
+   *
+   * It exists because three of these endpoints had no check at all — deleting
+   * a column, reordering them and restoring an archived one were reachable by
+   * any signed-in employee, on any project in the company. Hiding the menu
+   * from a technical architect in the browser did nothing about that.
+   */
+  private async assertMayChangeBoard(
+    companyId: number, projectId: number, employeeId: number | null, role?: string,
+  ): Promise<void> {
+    const viewer = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, employeeId, role,
+    );
+    if (!mayChangeAnyTask(viewer)) {
+      throw new ForbiddenException(
+        'Only the project owner, a project manager or an administrator can change this board.',
+      );
+    }
+  }
+
   async getBoard(companyId: number, projectId: number) {
     const board = await this.prisma.board.findFirst({
       where: { projectId, project: { companyId } },
@@ -35,7 +60,7 @@ export class BoardsService {
   }
 
   async createColumn(companyId: number, projectId: number, data: { name: string, color?: string }, employeeId: number, role?: string) {
-    await this.assertOwner(companyId, projectId, employeeId, role);
+    await this.assertMayChangeBoard(companyId, projectId, employeeId, role);
 
     const board = await this.prisma.board.findFirst({
       where: { projectId, project: { companyId } }
@@ -60,9 +85,10 @@ export class BoardsService {
   }
 
   async updateColumn(companyId: number, projectId: number, columnId: number, data: { color?: string, name?: string, position?: number }, employeeId: number, role?: string) {
-    if (data.name !== undefined) {
-      await this.assertOwner(companyId, projectId, employeeId, role);
-    }
+    // Every field, not only the name. Recolouring and repositioning a column
+    // were open to anyone signed in, which made the rename check the only
+    // thing anybody had to work around.
+    await this.assertMayChangeBoard(companyId, projectId, employeeId, role);
 
     const board = await this.prisma.board.findFirst({
       where: { projectId, project: { companyId } }
@@ -80,7 +106,12 @@ export class BoardsService {
     });
   }
 
-  async deleteColumn(companyId: number, projectId: number, columnId: number) {
+  async deleteColumn(
+    companyId: number, projectId: number, columnId: number,
+    employeeId: number | null = null, role?: string,
+  ) {
+    await this.assertMayChangeBoard(companyId, projectId, employeeId, role);
+
     const board = await this.prisma.board.findFirst({
       where: { projectId, project: { companyId } }
     });
@@ -113,7 +144,12 @@ export class BoardsService {
     });
   }
 
-  async unarchiveColumn(companyId: number, projectId: number, columnId: number) {
+  async unarchiveColumn(
+    companyId: number, projectId: number, columnId: number,
+    employeeId: number | null = null, role?: string,
+  ) {
+    await this.assertMayChangeBoard(companyId, projectId, employeeId, role);
+
     const board = await this.prisma.board.findFirst({
       where: { projectId, project: { companyId } }
     });
@@ -130,7 +166,12 @@ export class BoardsService {
     });
   }
 
-  async reorderColumns(companyId: number, projectId: number, columnIds: number[]) {
+  async reorderColumns(
+    companyId: number, projectId: number, columnIds: number[],
+    employeeId: number | null = null, role?: string,
+  ) {
+    await this.assertMayChangeBoard(companyId, projectId, employeeId, role);
+
     const board = await this.prisma.board.findFirst({
       where: { projectId, project: { companyId } }
     });

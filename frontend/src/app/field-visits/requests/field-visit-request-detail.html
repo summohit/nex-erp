@@ -1,0 +1,289 @@
+<div class="fvd-page">
+  <button class="back-btn" type="button" (click)="back()">
+    <svg lucideArrowLeft [size]="16"></svg>
+    All field visit requests
+  </button>
+
+  @if (isLoading()) {
+    <div class="card muted-card">Loading…</div>
+  } @else if (!request()) {
+    <div class="card muted-card">This field visit request is not available to you.</div>
+  } @else {
+    <div class="card head-card">
+      <div>
+        <span class="mono">{{ request()!.requestNumber }}</span>
+        <h1>{{ request()!.location }}</h1>
+        <p class="sub">
+          {{ request()!.project.name }} ·
+          raised by {{ personName(request()!.raisedBy) }} ·
+          {{ request()!.createdAt | date:'d MMM y' }}
+        </p>
+      </div>
+      <span class="status-pill" [class]="'st-' + request()!.status">{{ label(request()!.status) }}</span>
+    </div>
+
+    @if (request()!.status === 'REJECTED' && request()!.rejectionReason) {
+      <div class="card reason-card">
+        <strong>Rejected by {{ personName(request()!.reviewedBy) }}:</strong>
+        {{ request()!.rejectionReason }}
+      </div>
+    }
+
+    <!-- §10: a change somebody has asked for. The trip below is still the
+         approved one — this is only what it would become. -->
+    @if (request()!.pendingChange) {
+      <div class="card change-card">
+        <h3>
+          <svg lucidePencil [size]="15"></svg>
+          Change requested
+          <span class="change-when">{{ request()!.pendingChangeAt | date:'d MMM, shortTime' }}</span>
+        </h3>
+        <p class="change-note">
+          The trip runs as approved until this is decided — people on site keep clocking against
+          the site and dates below.
+        </p>
+
+        <table class="diff">
+          <thead>
+            <tr><th>What</th><th>Now</th><th>Proposed</th></tr>
+          </thead>
+          <tbody>
+            @for (row of changeDiff(); track row.field) {
+              <tr>
+                <td class="diff-field">{{ row.field }}</td>
+                <td class="diff-from">{{ row.from }}</td>
+                <td class="diff-to">{{ row.to }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        @if (request()!.canReviewChange) {
+          <div class="change-actions">
+            <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="approveChange()">
+              <svg lucideCheckCircle [size]="16"></svg>
+              Approve change
+            </button>
+            <button class="ghost-btn danger" type="button" [disabled]="isWorking()" (click)="isRejectingChange.set(true)">
+              <svg lucideX [size]="16"></svg>
+              Decline
+            </button>
+          </div>
+
+          @if (isRejectingChange()) {
+            <div class="reject-card inline">
+              <label>Why is this change being declined?</label>
+              <textarea rows="3" [(ngModel)]="changeRejectionReason"
+                        placeholder="The trip carries on as approved — say what would need to be different."></textarea>
+              <div class="reject-actions">
+                <button class="ghost-btn" type="button" (click)="isRejectingChange.set(false)">Never mind</button>
+                <button class="primary-btn danger" type="button" [disabled]="isWorking()" (click)="rejectChange()">
+                  Decline change
+                </button>
+              </div>
+            </div>
+          }
+        } @else {
+          <p class="await-note">
+            <svg lucideClock [size]="15"></svg>
+            Waiting on an administrator.
+          </p>
+        }
+      </div>
+    }
+
+    <div class="two-col">
+      <div class="card">
+        <h3>The trip</h3>
+        <dl class="facts">
+          <dt>Dates</dt>
+          <dd>{{ request()!.startDate | date:'d MMM y' }} – {{ request()!.endDate | date:'d MMM y' }}</dd>
+          <dt>Days</dt>
+          <dd>{{ request()!.visitDays }}</dd>
+          <dt>Expected hours</dt>
+          <dd>{{ request()!.startTime }} – {{ request()!.endTime }}</dd>
+          <dt>Clock-in radius</dt>
+          <dd>{{ request()!.geofenceRadiusM }} m from the pin</dd>
+          <dt>Coordinates</dt>
+          <dd>
+            <a [href]="'https://www.google.com/maps?q=' + request()!.latitude + ',' + request()!.longitude"
+               target="_blank" class="map-link">
+              {{ request()!.latitude }}, {{ request()!.longitude }}
+              <svg lucideExternalLink [size]="12"></svg>
+            </a>
+          </dd>
+          @if (request()!.remarks) {
+            <dt>Remarks</dt>
+            <dd>{{ request()!.remarks }}</dd>
+          }
+        </dl>
+
+        <div class="map-frame">
+          <iframe [src]="mapUrl()" title="Site location" loading="lazy"></iframe>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Who is going</h3>
+        <div class="chips">
+          @for (m of request()!.members; track m.id) {
+            <span class="chip">{{ personName(m.employee) }}</span>
+          }
+        </div>
+
+        <h3 class="spaced">Tasks</h3>
+        <ul class="task-list">
+          @for (t of request()!.tasks; track t.id) {
+            <li>
+              <strong>{{ t.name }}</strong>
+              @if (t.description) { <span class="task-note">{{ t.description }}</span> }
+            </li>
+          }
+        </ul>
+        <p class="hint">
+          On approval each task is assigned to each person —
+          {{ request()!.tasks.length * request()!.members.length }} task(s) in all.
+        </p>
+
+        @if (request()!.attachments.length) {
+          <h3 class="spaced">Attachments</h3>
+          <ul class="attachment-list">
+            @for (a of request()!.attachments; track a.id) {
+              <li><a [href]="a.fileUrl" target="_blank">{{ a.fileName }}</a></li>
+            }
+          </ul>
+        }
+      </div>
+    </div>
+
+    <!-- §11: the register. Times, coordinates and distance as recorded. -->
+    @if (request()!.attendances?.length) {
+      <div class="card">
+        <h3>Attendance</h3>
+        <table class="register">
+          <thead>
+            <tr>
+              <th>Person</th>
+              <th>Date</th>
+              <th>Clock in</th>
+              <th>Distance</th>
+              <th>Clock out</th>
+              <th>Distance</th>
+              <th>Day</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of request()!.attendances!; track d.id) {
+              <tr>
+                <td>{{ personName(d.employee) }}</td>
+                <td class="nowrap">
+                  {{ d.visitDate | date:'d MMM' }}
+                  @if (d.isHoliday) { <span class="holiday-tag">Holiday</span> }
+                </td>
+                <td>{{ d.clockInTime ? (d.clockInTime | date:'shortTime') : '—' }}</td>
+                <td [class.outside]="d.clockInDistanceKm != null && !wasInside(d.clockInDistanceKm)">
+                  {{ metres(d.clockInDistanceKm) }}
+                </td>
+                <td>{{ d.clockOutTime ? (d.clockOutTime | date:'shortTime') : '—' }}</td>
+                <td [class.outside]="d.clockOutDistanceKm != null && !wasInside(d.clockOutDistanceKm)">
+                  {{ metres(d.clockOutDistanceKm) }}
+                </td>
+                <td><span class="day-pill" [class]="'day-' + d.status">{{ d.status }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- Decisions. What is offered comes from the server, not from guessing. -->
+    <div class="card actions-card">
+      @if (request()!.canSubmit) {
+        <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="submit()">
+          <svg lucideSend [size]="16"></svg>
+          Submit for approval
+        </button>
+      }
+      @if (request()!.canReview) {
+        <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="approve()">
+          <svg lucideCheckCircle [size]="16"></svg>
+          Approve
+        </button>
+        <button class="ghost-btn danger" type="button" [disabled]="isWorking()" (click)="isRejecting.set(true)">
+          <svg lucideX [size]="16"></svg>
+          Reject
+        </button>
+      }
+      @if (request()!.canWithdraw) {
+        <button class="ghost-btn" type="button" [disabled]="isWorking()" (click)="withdraw()">
+          <svg lucideArrowLeft [size]="16"></svg>
+          Withdraw to draft
+        </button>
+      }
+      <!-- §10: an approved trip is changed by asking, not by editing. -->
+      @if (request()!.canRequestChange) {
+        <button class="ghost-btn" type="button" [disabled]="isWorking()" (click)="isChanging.set(true)">
+          <svg lucidePencil [size]="16"></svg>
+          Request a change
+        </button>
+      }
+      @if (request()!.status === 'DRAFT' || request()!.status === 'PENDING_APPROVAL' || request()!.status === 'APPROVED') {
+        <button class="ghost-btn" type="button" [disabled]="isWorking()" (click)="cancel()">
+          <svg lucideBan [size]="16"></svg>
+          Cancel visit
+        </button>
+      }
+      @if (!request()!.canSubmit && !request()!.canReview && request()!.status === 'PENDING_APPROVAL') {
+        <p class="await-note">
+          <svg lucideClock [size]="15"></svg>
+          Waiting on an administrator.
+        </p>
+      }
+    </div>
+
+    @if (isRejecting()) {
+      <div class="card reject-card">
+        <label>Why is this being rejected?</label>
+        <textarea rows="3" [(ngModel)]="rejectionReason"
+                  placeholder="The manager acts on this, so say what would need to change."></textarea>
+        <div class="reject-actions">
+          <button class="ghost-btn" type="button" (click)="isRejecting.set(false)">Never mind</button>
+          <button class="primary-btn danger" type="button" [disabled]="isWorking()" (click)="reject()">
+            Reject request
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- §11: who created, approved, rejected, modified or cancelled it. -->
+    <div class="card">
+      <h3>
+        <svg lucideHistory [size]="15"></svg>
+        History
+      </h3>
+      @if (!timeline().length) {
+        <p class="muted">Nothing recorded yet.</p>
+      } @else {
+        <ol class="timeline">
+          @for (a of timeline(); track a.id) {
+            <li>
+              <span class="tl-action">{{ a.action.replace('_', ' ') | titlecase }}</span>
+              <span class="tl-who">{{ personName(a.actor) }}</span>
+              <span class="tl-when">{{ a.createdAt | date:'d MMM y, shortTime' }}</span>
+              @if (a.detail) { <p class="tl-detail">{{ a.detail }}</p> }
+            </li>
+          }
+        </ol>
+      }
+    </div>
+  }
+</div>
+
+@if (isChanging() && request()) {
+  <app-field-visit-request-form
+    [request]="request()"
+    mode="modify"
+    (saved)="onChangeProposed()"
+    (closed)="isChanging.set(false)">
+  </app-field-visit-request-form>
+}

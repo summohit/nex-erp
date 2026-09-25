@@ -1046,8 +1046,23 @@ export class AttendanceLeaveComponent implements OnInit {
         : this.leavesService.requestLeave(payload);
 
       ob$.subscribe({
-        next: () => {
-          this.toast.success(this.editMode() ? 'Leave request updated' : 'Leave requested successfully');
+        next: (res: any) => {
+          // §9: the request is filed either way, but somebody who is on an
+          // approved field visit those days needs to be told now rather than
+          // discover it when the trip loses the day.
+          const clashes = res?.fieldVisitConflicts ?? [];
+          if (clashes.length) {
+            const spoken = clashes
+              .map((c: any) => `${c.requestNumber} at ${c.location} (${c.days} day${c.days === 1 ? '' : 's'})`)
+              .join(', ');
+            this.toast.warning(
+              `Leave requested — but you are on approved field visit ${spoken}. `
+              + 'Your approver will see the clash, and approving the leave takes those days off the trip.',
+              { duration: 9000 },
+            );
+          } else {
+            this.toast.success(this.editMode() ? 'Leave request updated' : 'Leave requested successfully');
+          }
           this.closeRequestModal();
           this.loadData();
         },
