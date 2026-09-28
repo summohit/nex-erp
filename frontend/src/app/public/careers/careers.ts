@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit } from '@angular/core';
+import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -42,7 +42,9 @@ export interface PublicJob {
   styleUrls: ['./careers.css'],
   providers: [DatePipe]
 })
-export class CareersComponent implements OnInit {
+export class CareersComponent implements OnInit, OnDestroy {
+  private static readonly TAWK_SCRIPT_ID = 'tawk-to-careers';
+
   private http = inject(HttpClient);
   private route = inject(ActivatedRoute);
 
@@ -102,8 +104,58 @@ export class CareersComponent implements OnInit {
   previousApplicationData = signal<any>(null);
   hasLoadedPreviousDetails = signal(false);
 
+  /** The injected Tawk <script>, kept so it can be torn down again. */
+  private tawkScript: HTMLScriptElement | null = null;
+
   ngOnInit() {
     this.fetchPublicJobs();
+    this.loadTawkWidget();
+  }
+
+  ngOnDestroy() {
+    this.unloadTawkWidget();
+  }
+
+  /**
+   * Tawk.to live chat, careers page only.
+   *
+   * The whole app is one SPA, so a widget loaded here would otherwise follow
+   * the visitor into every other route for the rest of the session. It is
+   * injected on enter and torn down on leave, and it stays off entirely
+   * unless both ids are configured.
+   */
+  private loadTawkWidget() {
+    const { tawkPropertyId, tawkWidgetId } = environment as any;
+    if (!tawkPropertyId || !tawkWidgetId) return;
+    if (document.getElementById(CareersComponent.TAWK_SCRIPT_ID)) return;
+
+    const win = window as any;
+    win.Tawk_API = win.Tawk_API || {};
+    win.Tawk_LoadStart = new Date();
+
+    const script = document.createElement('script');
+    script.id = CareersComponent.TAWK_SCRIPT_ID;
+    script.async = true;
+    script.src = `https://embed.tawk.to/${tawkPropertyId}/${tawkWidgetId}`;
+    script.charset = 'UTF-8';
+    script.setAttribute('crossorigin', '*');
+    document.body.appendChild(script);
+    this.tawkScript = script;
+  }
+
+  private unloadTawkWidget() {
+    const win = window as any;
+    // Tawk renders into its own iframes outside our component tree, so hiding
+    // through its API is the only way to take the launcher off the screen.
+    try {
+      win.Tawk_API?.hideWidget?.();
+    } catch {
+      /* widget never finished loading — nothing to hide */
+    }
+
+    this.tawkScript?.remove();
+    this.tawkScript = null;
+    document.getElementById(CareersComponent.TAWK_SCRIPT_ID)?.remove();
   }
 
   async fetchPublicJobs() {

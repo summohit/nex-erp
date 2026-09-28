@@ -121,7 +121,9 @@
    -------------------------------------------------------------------------- */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Auto-fit rather than a fixed count: the KPI row grew past four cards and
+     will keep growing, and each card still needs room for its subtext. */
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
   gap: 16px;
   width: 100%;
 }
@@ -240,6 +242,24 @@
 .stat-rose.active-card {
   border-color: #6b3fd6;
   background: #f8f8f8;
+}
+
+.stat-red .stat-icon-wrapper {
+  background: #fef2f2;
+  color: #dc2626;
+}
+.stat-red.active-card {
+  border-color: #dc2626;
+  background: #fffafa;
+}
+
+.stat-violet .stat-icon-wrapper {
+  background: #f3efff;
+  color: #6b3fd6;
+}
+.stat-violet.active-card {
+  border-color: #6b3fd6;
+  background: #fbfaff;
 }
 
 /* --------------------------------------------------------------------------
@@ -1688,15 +1708,6 @@
   background: #f1f5f9;
 }
 
-.matrix-table th.col-day-header.is-filtered-date {
-  background: #eff6ff;
-  box-shadow: inset 0px -2px 0px #3b82f6;
-}
-
-.matrix-table th.col-day-header.is-filtered-date .day-num {
-  color: #2563eb;
-}
-
 .day-header-inner {
   display: flex;
   flex-direction: column;
@@ -1857,6 +1868,11 @@
 }
 
 /* Status-filtered grid: non-matching day cells recede, matching ones stay */
+/* A status pill that carries a reason on hover says so with the cursor. */
+.status-pill.has-reason {
+  cursor: help;
+}
+
 .col-day-cell .day-cell-badge.cell-dimmed {
   opacity: 0.16;
   box-shadow: none;

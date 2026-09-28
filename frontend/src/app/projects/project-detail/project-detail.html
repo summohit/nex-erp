@@ -528,7 +528,7 @@
           </div>
         </div>
       </div>
-      <button class="top-bar-add-task-btn" (click)="openCreateIssue()" title="Add task to this project">
+      <button class="top-bar-add-task-btn" *ngIf="showAddTaskButton()" (click)="openCreateIssue()" title="Add task to this project">
         <svg lucidePlus size="14"></svg>
         <span>Add task</span>
       </button>
@@ -539,7 +539,7 @@
   <div class="project-tabs-bar">
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'summary'" (click)="setProjectTab('summary')"><svg lucideGlobe size="14"></svg> Summary</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'board'" (click)="setProjectTab('board')"><svg lucideKanban size="14"></svg> Board</button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'list'" (click)="setProjectTab('list')"><svg lucideList size="14"></svg> List</button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'list'" (click)="setProjectTab('list')"><svg lucideList size="14"></svg> Tasks</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'milestones'" (click)="setProjectTab('milestones')" *ngIf="canSeeFinancialTabs"><svg lucideFlag size="14"></svg> Milestones<span class="tab-count" *ngIf="projectMilestones().length > 0">{{ projectMilestones().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'roadmap'" (click)="setProjectTab('roadmap')"><svg lucideGanttChart size="14"></svg> Roadmap</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
@@ -597,7 +597,7 @@
             <svg lucideKanban size="15"></svg> Open Board
           </button>
           <button type="button" class="btn-summary-action" (click)="setProjectTab('list')">
-            <svg lucideList size="15"></svg> View List
+            <svg lucideList size="15"></svg> View Tasks
           </button>
         </div>
       </div>

@@ -4017,6 +4017,19 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * The top-bar "Add task" button only belongs on the tabs that show tasks.
+   *
+   * It used to sit in the header on every tab, so Reports, Attachments and
+   * Budget requests all offered to create a task that the tab could not then
+   * show you. Board and Tasks are the two places where a new task appears
+   * where you are looking.
+   */
+  showAddTaskButton(): boolean {
+    const tab = this.activeProjectTab();
+    return tab === 'board' || tab === 'list';
+  }
+
+  /**
    * Who may set the hours a task is assigned (§3).
    *
    * The same people the server allows, and the same people who rule on

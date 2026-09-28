@@ -17,7 +17,7 @@ import {
   LucideSparkles, LucidePlay, LucideSquare, LucideMapPin,
   LucideChevronRight, LucideFolderKanban,
   LucideCheck, LucideX, LucideTicket, LucideUserPlus, LucideTrophy, LucideTimer,
-  LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock,
+  LucideCalendarDays, LucideRefreshCw, LucideCalendarClock,
   LucideAlertTriangle, LucideBell, LucidePaperclip, LucideImage, LucideFileSpreadsheet,
   LucideFile, LucideExternalLink
 } from '@lucide/angular';
@@ -38,7 +38,7 @@ import { HotToastService } from '@ngneat/hot-toast';
     LucideSparkles, LucidePlay, LucideSquare, LucideMapPin,
     LucideChevronRight, LucideFolderKanban,
     LucideCheck, LucideX, LucideTicket, LucideUserPlus, LucideTrophy, LucideTimer,
-    LucideCalendarDays, LucideRefreshCw, LucideHourglass, LucideCalendarClock,
+    LucideCalendarDays, LucideRefreshCw, LucideCalendarClock,
     LucideMegaphone, LucideAlertTriangle, LucideBell, LucidePaperclip, LucideImage,
     LucideFileSpreadsheet, LucideFile, LucideExternalLink
   ],

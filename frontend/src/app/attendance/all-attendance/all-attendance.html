@@ -47,7 +47,7 @@
       <div class="stat-info">
         <span class="stat-label">Total Shifts</span>
         <div class="stat-value">{{ stats().total }}</div>
-        <span class="stat-subtext">Logged in {{ getSelectedMonthLabel() }} {{ filterYear }}</span>
+        <span class="stat-subtext">{{ statsScopeLabel() }}</span>
       </div>
     </div>
 
@@ -84,6 +84,30 @@
         <span class="stat-label">Half Day</span>
         <div class="stat-value">{{ stats().halfDay }}</div>
         <span class="stat-subtext">{{ stats().early }} early departure flags</span>
+      </div>
+    </div>
+
+    <!-- Absent -->
+    <div class="stat-card stat-red" [class.active-card]="filterStatus === 'Absent'" (click)="toggleKpiStatus('Absent')" title="Click to filter Absent records">
+      <div class="stat-icon-wrapper">
+        <svg lucideUserX [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Absent</span>
+        <div class="stat-value">{{ stats().absent }}</div>
+        <span class="stat-subtext">No clock-in recorded</span>
+      </div>
+    </div>
+
+    <!-- On Leave -->
+    <div class="stat-card stat-violet" [class.active-card]="filterStatus === 'On Leave'" (click)="toggleKpiStatus('On Leave')" title="Click to filter On Leave records">
+      <div class="stat-icon-wrapper">
+        <svg lucidePlane [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">On Leave</span>
+        <div class="stat-value">{{ stats().onLeave }}</div>
+        <span class="stat-subtext">{{ stats().missedClockOut }} missed clock-outs</span>
       </div>
     </div>
   </div>
@@ -397,7 +421,7 @@
         <thead>
           <tr>
             <th class="col-employee-header sticky-left">EMPLOYEE</th>
-            <th *ngFor="let day of daysOfMonth()" class="col-day-header" [class.is-weekend]="day.isWeekend" [class.is-filtered-date]="day.dateStr === filterDate">
+            <th *ngFor="let day of visibleDaysOfMonth()" class="col-day-header" [class.is-weekend]="day.isWeekend">
               <div class="day-header-inner">
                 <span class="day-num">{{ day.dayNumber }}</span>
                 <span class="day-week">{{ day.weekdayStr }}</span>
@@ -407,7 +431,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let row of employeeGridRows()" class="matrix-row" [class.row-no-match]="(filterStatus && !hasMatchingDay(row)) || (filterDate && !hasMatchingDate(row))">
+          <tr *ngFor="let row of employeeGridRows()" class="matrix-row" [class.row-no-match]="filterStatus && !hasMatchingDay(row)">
             <!-- Employee Header Cell (Sticky Left) -->
             <td class="col-employee-cell sticky-left">
               <div class="emp-profile-lockup">
@@ -440,8 +464,8 @@
                      'bg-leave': day.status === 'On Leave',
                      'bg-holiday': day.status === 'Holiday',
                      'bg-day-off': day.status === 'Day Off',
-                     'cell-dimmed': (filterStatus && !dayMatchesStatus(day)) || (filterDate && !dayMatchesDate(day)),
-                     'cell-highlighted': (filterStatus && dayMatchesStatus(day)) || (filterDate && dayMatchesDate(day))
+                     'cell-dimmed': filterStatus && !dayMatchesStatus(day),
+                     'cell-highlighted': filterStatus && dayMatchesStatus(day)
                    }">
                 <ng-container *ngIf="!day.isFuture">
                   <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
@@ -549,7 +573,9 @@
 
             <!-- Status -->
             <td>
-              <span class="status-pill" [ngClass]="statusClass(recordDayStatus(r))">
+              <span class="status-pill has-reason"
+                    [ngClass]="statusClass(recordDayStatus(r))"
+                    [title]="recordReason(r) || recordDayStatus(r)">
                 <span class="status-indicator-dot"></span>
                 {{ recordDayStatus(r) }}
               </span>

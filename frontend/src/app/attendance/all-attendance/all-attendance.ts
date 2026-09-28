@@ -27,6 +27,12 @@ export interface DayMatrixStatus {
   status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty';
   tooltip: string;
   record?: AttendanceRecord;
+  /** Why this day carries the status it does — shown on hover. */
+  reason?: string;
+  /** This day counts towards the row's "present" tally. */
+  countsPresent?: boolean;
+  /** This day counts towards the row's "working days" denominator. */
+  countsWorking?: boolean;
 }
 
 export interface EmployeeMatrixRow {
@@ -284,6 +290,17 @@ export class AllAttendanceComponent implements OnInit {
     return days;
   });
 
+  /**
+   * The day columns the grid actually renders. A date filter means "show me
+   * that day", so it narrows the grid to that one column rather than drawing
+   * the whole month and tinting one cell in it.
+   */
+  visibleDaysOfMonth = computed(() => {
+    const only = this.filterDate;
+    const days = this.daysOfMonth();
+    return only ? days.filter(d => d.dateStr === only) : days;
+  });
+
   // Employee rows for the Monthly Matrix Grid
   employeeGridRows = computed<EmployeeMatrixRow[]>(() => {
     const records = this.records();
@@ -339,10 +356,9 @@ export class AllAttendanceComponent implements OnInit {
     const dateFilter = this.filterDate;
 
     let rows: EmployeeMatrixRow[] = emps.map(emp => {
-      let workingDaysCount = 0;
-      let presentCount = 0;
-
       const dayCells: DayMatrixStatus[] = days.map(day => {
+        let countsPresent = false;
+        let countsWorking = false;
         const key = `${emp.id}_${day.dateStr}`;
         const record = recordMap.get(key);
         const holiday = holidays.find(h => this.getBackendDateString(h.date) === day.dateStr);
@@ -372,10 +388,10 @@ export class AllAttendanceComponent implements OnInit {
             tooltip += ' · Missed clock out';
           }
           if (['Present', 'Late', 'Half Day'].includes(status)) {
-            presentCount++;
+            countsPresent = true;
           }
           if (!day.isWeekend && !holiday) {
-            workingDaysCount++;
+            countsWorking = true;
           }
         } else if (record && record.status === 'ON_LEAVE') {
           status = 'On Leave';
@@ -389,8 +405,10 @@ export class AllAttendanceComponent implements OnInit {
         } else {
           status = 'Absent';
           tooltip = 'Absent (No punch recorded)';
-          workingDaysCount++;
+          countsWorking = true;
         }
+
+        const reason = this.statusReason(status, record, holiday);
 
         return {
           dayNumber: day.dayNumber,
@@ -400,16 +418,26 @@ export class AllAttendanceComponent implements OnInit {
           isWeekend: day.isWeekend,
           isFuture: day.isFuture,
           status,
-          tooltip,
-          record
+          tooltip: reason ? `${tooltip} · ${reason}` : tooltip,
+          reason,
+          record,
+          countsPresent,
+          countsWorking
         };
       });
 
+      // A date filter narrows the grid to that one day, so the row's tally has
+      // to describe the days on screen — a 1-column grid showing "20/22" is
+      // reporting on columns the viewer cannot see.
+      const visibleCells = dateFilter
+        ? dayCells.filter(d => d.dateStr === dateFilter)
+        : dayCells;
+
       return {
         employee: emp,
-        days: dayCells,
-        totalPresent: presentCount,
-        totalWorkingDays: workingDaysCount || 1
+        days: visibleCells,
+        totalPresent: visibleCells.filter(d => d.countsPresent).length,
+        totalWorkingDays: visibleCells.filter(d => d.countsWorking).length || 1
       };
     });
 
@@ -420,39 +448,22 @@ export class AllAttendanceComponent implements OnInit {
 
     // When date filter is active, only show employees who have a record or are active on that date
     if (dateFilter) {
-      rows = rows.filter(row => row.days.some(day => day.dateStr === dateFilter && (day.record || !day.isFuture)));
+      rows = rows.filter(row => row.days.some(day => day.record || !day.isFuture));
     }
 
     return rows;
   });
 
-  // Computed metrics
-  stats = computed(() => {
-    const list = this.records();
-    const total = list.length;
-    const present = list.filter(r => r.status === 'PRESENT' && !r.isLate).length;
-    const halfDay = list.filter(r => r.status === 'HALF_DAY').length;
-    const absent = list.filter(r => r.status === 'ABSENT').length;
-    const late = list.filter(r => r.isLate).length;
-    const early = list.filter(r => r.isEarlyLeave).length;
-    const onTime = list.filter(r => r.status === 'PRESENT' && !r.isLate).length;
-    const onTimeRate = total > 0 ? Math.round((onTime / total) * 100) : 0;
-
-    return {
-      total,
-      present,
-      halfDay,
-      absent,
-      late,
-      early,
-      onTime,
-      onTimeRate
-    };
-  });
-
-  // Filtered & Sorted Records
-  filteredRecords = computed(() => {
-    let list = [...this.records()];
+  /**
+   * Everything the filter bar narrows EXCEPT the status and flag filters.
+   *
+   * The KPI cards are themselves the status filter (clicking "Late" sets
+   * filterStatus), so the cards have to count a set that the card's own
+   * filter has not already narrowed — otherwise picking one card zeroes
+   * every other card and there is no way to read your way back out.
+   */
+  baseFilteredRecords = computed(() => {
+    let list = this.records();
     const q = this.searchQuery().toLowerCase().trim();
 
     // 1. Exact-date filter (show that single day only)
@@ -460,12 +471,7 @@ export class AllAttendanceComponent implements OnInit {
       list = list.filter(r => this.getBackendDateString(r.date) === this.filterDate);
     }
 
-    // 2. Attendance Status filter (client-side, mirrors the grid's day-status)
-    if (this.filterStatus) {
-      list = list.filter(r => this.recordMatchesStatus(r));
-    }
-
-    // 3. Text Search (Employee name, department)
+    // 2. Text Search (Employee name, department)
     if (q) {
       list = list.filter(r => {
         const name = `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.toLowerCase();
@@ -474,7 +480,60 @@ export class AllAttendanceComponent implements OnInit {
       });
     }
 
-    // 4. Flag filter
+    return list;
+  });
+
+  /**
+   * Computed metrics. Counted over the filtered set, not the whole month, so
+   * the KPI row and the table below it always describe the same records.
+   *
+   * Statuses come from recordDayStatus() — the same function the status
+   * filter and the grid cells use — so a card's number and the rows you get
+   * from clicking that card cannot disagree.
+   */
+  stats = computed(() => {
+    const list = this.baseFilteredRecords();
+    const total = list.length;
+    const byStatus = (name: string) => list.filter(r => this.recordDayStatus(r) === name).length;
+
+    const present = byStatus('Present');
+    const halfDay = byStatus('Half Day');
+    const absent = byStatus('Absent');
+    const onLeave = byStatus('On Leave');
+    const late = list.filter(r => r.isLate).length;
+    const early = list.filter(r => r.isEarlyLeave).length;
+    const missedClockOut = list.filter(r => this.isMissedClockOut(r)).length;
+
+    // On-time rate is a share of the days actually worked, not of every row —
+    // leave, holidays and days off are not late and should not dilute it.
+    const worked = list.filter(r => !!r.clockIn).length;
+    const onTime = present;
+    const onTimeRate = worked > 0 ? Math.round((onTime / worked) * 100) : 0;
+
+    return {
+      total,
+      present,
+      halfDay,
+      absent,
+      onLeave,
+      late,
+      early,
+      missedClockOut,
+      onTime,
+      onTimeRate
+    };
+  });
+
+  // Filtered & Sorted Records
+  filteredRecords = computed(() => {
+    let list = [...this.baseFilteredRecords()];
+
+    // 1. Attendance Status filter (client-side, mirrors the grid's day-status)
+    if (this.filterStatus) {
+      list = list.filter(r => this.recordMatchesStatus(r));
+    }
+
+    // 2. Flag filter
     if (this.filterFlag === 'LATE') {
       list = list.filter(r => r.isLate);
     } else if (this.filterFlag === 'EARLY') {
@@ -485,7 +544,7 @@ export class AllAttendanceComponent implements OnInit {
       list = list.filter(r => r.status === 'PRESENT' && !r.clockOut);
     }
 
-    // 5. Sorting
+    // 3. Sorting
     list.sort((a, b) => {
       if (this.sortBy === 'date_desc') {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -580,6 +639,20 @@ export class AllAttendanceComponent implements OnInit {
     const found = this.months.find(m => m.value === this.filterMonth);
     return found ? found.label : 'Select Month';
   }
+
+  /**
+   * What the KPI numbers are counting, said plainly. The cards no longer read
+   * the whole month, so the row has to admit when it is showing a narrowed
+   * set — otherwise a filtered total looks like a wrong total.
+   */
+  statsScopeLabel = computed(() => {
+    if (this.filterDate) {
+      return `On ${this.formatDateLabel(this.filterDate)}`;
+    }
+    const scope = `${this.getSelectedMonthLabel()} ${this.filterYear}`;
+    const narrowed = !!this.searchQuery().trim();
+    return narrowed ? `Matching records in ${scope}` : `Logged in ${scope}`;
+  });
 
   getSelectedEmployeeLabel(): string {
     if (!this.filterEmployeeId) return 'All Employees';
@@ -685,14 +758,6 @@ export class AllAttendanceComponent implements OnInit {
     });
   }
 
-  dayMatchesDate(day: DayMatrixStatus): boolean {
-    return !this.filterDate || day.dateStr === this.filterDate;
-  }
-
-  hasMatchingDate(row: EmployeeMatrixRow): boolean {
-    return !this.filterDate || row.days.some(day => day.dateStr === this.filterDate);
-  }
-
   toggleKpiStatus(status: string) {
     if (this.filterStatus === status) {
       this.clearStatusFilter();
@@ -791,6 +856,57 @@ export class AllAttendanceComponent implements OnInit {
     if (r.status === 'HOLIDAY') return 'Holiday';
     if (r.status === 'WEEKLY_OFF') return 'Day Off';
     return 'Absent';
+  }
+
+  /**
+   * Why a day carries the status it does, in one short clause.
+   *
+   * A status badge says what was decided; it does not say why, and "Half Day"
+   * or "Absent" against your own name is the kind of thing people want to
+   * query. Everything here is read off the record — no thresholds are assumed,
+   * so a reason is only offered where the data actually carries one.
+   */
+  statusReason(status: string, r?: AttendanceRecord, holiday?: any): string {
+    if (status === 'Holiday') {
+      return holiday?.name ? `Company holiday — ${holiday.name}` : 'Company holiday';
+    }
+    if (status === 'Day Off') return 'Non-working day on this roster';
+    if (status === 'On Leave') return 'Approved leave for this day';
+    if (status === 'Absent') return 'No clock-in recorded on a working day';
+    if (!r) return '';
+
+    const parts: string[] = [];
+    if (status === 'Half Day') {
+      parts.push(
+        r.totalHours
+          ? `Half day — ${this.formatHours(r.totalHours)} recorded`
+          : 'Half day — short of a full shift'
+      );
+    }
+    if (r.isLate) parts.push('Clocked in after shift start');
+    if (r.isEarlyLeave) parts.push('Clocked out before shift end');
+    if (r.overtimeHours && r.overtimeHours > 0) {
+      parts.push(`Overtime — ${this.formatHours(r.overtimeHours)} past the shift`);
+    }
+    if (r.clockOutReason) parts.push(`Missed clock-out — "${r.clockOutReason}"`);
+    else if (r.autoClockedOut) parts.push('Never clocked out — closed by the 23:00 sweep');
+    else if (r.missedClockOut) parts.push('Still open — clock-out overdue');
+
+    return parts.join(' · ');
+  }
+
+  /** Hours as "7h 30m", so a reason never reads "7.5h". */
+  formatHours(hours: number): string {
+    const mins = Math.round(hours * 60);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h}h ${m}m`;
+    return h ? `${h}h` : `${m}m`;
+  }
+
+  /** The hover reason for a table row, which has no prebuilt day cell. */
+  recordReason(r: AttendanceRecord): string {
+    return this.statusReason(this.recordDayStatus(r), r);
   }
 
   isMissedClockOut(r: AttendanceRecord): boolean {
