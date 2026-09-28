@@ -124,6 +124,18 @@ export class ProjectsController {
     return this.projectsService.getProjectDetails(req.user.companyId, id, req.user.sub, req.user.role);
   }
 
+  /** §PB3: hours logged on this project, per person and per day. */
+  @Get(':id/timesheet-graph')
+  getTimesheetGraph(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Query('days') days?: string,
+  ) {
+    return this.projectsService.getProjectTimesheetGraph(
+      req.user.companyId, id, days ? parseInt(days, 10) : 30,
+    );
+  }
+
   @Get(':id/summary')
   getProjectSummary(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.projectsService.getProjectSummary(

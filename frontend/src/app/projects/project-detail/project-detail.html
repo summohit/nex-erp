@@ -647,6 +647,45 @@
         </span>
       </div>
 
+      <!-- §PB3: who has been putting hours into this project. -->
+      <div class="timesheet-graph-card">
+        <div class="timesheet-graph-head">
+          <div>
+            <h3>Time worked</h3>
+            <span class="timesheet-graph-sub" *ngIf="timesheetGraph() as g">
+              {{ g.totalHours | number:'1.0-1' }} hours since {{ g.since | date:'d MMM' }}<span *ngIf="g.approvedOnly"> · approved time only</span>
+            </span>
+          </div>
+          <div class="timesheet-window-switch">
+            <button type="button" *ngFor="let d of [7, 30, 90]"
+                    [class.active]="timesheetWindow() === d"
+                    (click)="setTimesheetWindow(d)">{{ d }}d</button>
+          </div>
+        </div>
+
+        <div class="timesheet-graph-loading" *ngIf="isLoadingTimesheetGraph()">Loading…</div>
+
+        <ng-container *ngIf="!isLoadingTimesheetGraph() && timesheetGraph() as g">
+          <!-- Bars are relative to the biggest contributor, so the graph reads
+               as a comparison rather than against an arbitrary axis. -->
+          <div class="timesheet-bars" *ngIf="g.byMember.length; else noTimeLogged">
+            <div class="timesheet-bar-row" *ngFor="let m of g.byMember">
+              <span class="timesheet-bar-name" [title]="m.name">{{ m.name }}</span>
+              <div class="timesheet-bar-track">
+                <div class="timesheet-bar-fill" [style.width.%]="timesheetBarWidth(m.hours)"></div>
+              </div>
+              <span class="timesheet-bar-val">{{ m.hours | number:'1.0-1' }}h</span>
+            </div>
+          </div>
+
+          <ng-template #noTimeLogged>
+            <p class="timesheet-graph-empty">
+              No time logged on this project in the last {{ g.windowDays }} days.
+            </p>
+          </ng-template>
+        </ng-container>
+      </div>
+
       <!-- KPI Metric Cards -->
       <div class="summary-metrics-grid">
         <div class="summary-metric-card">

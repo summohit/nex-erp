@@ -1564,6 +1564,108 @@ export class ProjectsService {
    * Until now neither applied: rejected hours were costed exactly like
    * approved ones, so rejecting a day changed a status and nothing else.
    */
+  /**
+   * Hours logged on a project, per person and per day (§PB3).
+   *
+   * Shares getCostRollupByProject's rule about which logged hours count: when
+   * timesheet approval is on, only approved days; otherwise everything except
+   * rejected. A graph that counted hours the cost figure refuses would put two
+   * numbers on one screen that cannot both be right.
+   *
+   * `days` bounds the window. Unbounded would mean a two-year project renders
+   * seven hundred bars, and nobody reads a timesheet graph to find out about
+   * last March.
+   */
+  async getProjectTimesheetGraph(
+    companyId: number,
+    projectId: number,
+    days = 30,
+  ) {
+    const window = Math.min(Math.max(Math.round(days) || 30, 1), 180);
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - (window - 1));
+
+    const settings = await this.prisma.systemSetting.findUnique({
+      where: { companyId },
+      select: { timesheetApprovalRequired: true },
+    });
+    const approvalRequired = settings?.timesheetApprovalRequired ?? false;
+    const countable = approvalRequired
+      ? Prisma.sql`d."status" = 'APPROVED'`
+      : Prisma.sql`(d."status" IS NULL OR d."status" <> 'REJECTED')`;
+
+    const rows = await this.prisma.$queryRaw<
+      {
+        employeeId: number; firstName: string | null; lastName: string | null;
+        avatarUrl: string | null; day: Date; minutes: bigint | null;
+      }[]
+    >`
+      SELECT t."employeeId"                     AS "employeeId",
+             e."firstName"                      AS "firstName",
+             e."lastName"                       AS "lastName",
+             e."avatarUrl"                      AS "avatarUrl",
+             (t."startedAt")::date              AS day,
+             SUM(COALESCE(t."durationMin", 0))  AS minutes
+        FROM "IssueTimeLog" t
+        JOIN "Issue" i    ON i.id = t."issueId"
+        JOIN "Employee" e ON e.id = t."employeeId"
+        LEFT JOIN "TimesheetDay" d
+               ON d."employeeId" = t."employeeId"
+              AND d."date" = (t."startedAt")::date
+       WHERE i."projectId" = ${projectId}
+         AND i."companyId" = ${companyId}
+         AND t."startedAt" >= ${since}
+         AND ${countable}
+       GROUP BY t."employeeId", e."firstName", e."lastName", e."avatarUrl", (t."startedAt")::date
+    `;
+
+    const hours = (min: bigint | null) => Math.round((Number(min ?? 0) / 60) * 100) / 100;
+
+    const byMember = new Map<number, { employeeId: number; name: string; avatarUrl: string | null; hours: number }>();
+    const byDay = new Map<string, number>();
+
+    for (const r of rows) {
+      const h = hours(r.minutes);
+
+      const member = byMember.get(r.employeeId) ?? {
+        employeeId: r.employeeId,
+        name: `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim() || `Employee ${r.employeeId}`,
+        avatarUrl: r.avatarUrl,
+        hours: 0,
+      };
+      member.hours = Math.round((member.hours + h) * 100) / 100;
+      byMember.set(r.employeeId, member);
+
+      const key = new Date(r.day).toISOString().slice(0, 10);
+      byDay.set(key, Math.round(((byDay.get(key) ?? 0) + h) * 100) / 100);
+    }
+
+    const members = [...byMember.values()].sort((a, b) => b.hours - a.hours);
+    const totalHours = Math.round(members.reduce((sum, m) => sum + m.hours, 0) * 100) / 100;
+
+    return {
+      windowDays: window,
+      since: since.toISOString().slice(0, 10),
+      /** Whether these hours are the approved ones, so the UI can say which. */
+      approvedOnly: approvalRequired,
+      totalHours,
+      /** Sorted by hours: the graph reads as a ranking, biggest bar first. */
+      byMember: members,
+      /**
+       * Every day in the window, including the ones nobody logged against.
+       * Omitting them would draw a continuous line over weekends and holidays
+       * and make an idle fortnight look like steady work.
+       */
+      byDay: Array.from({ length: window }, (_, i) => {
+        const d = new Date(since);
+        d.setDate(d.getDate() + i);
+        const key = d.toISOString().slice(0, 10);
+        return { date: key, hours: byDay.get(key) ?? 0 };
+      }),
+    };
+  }
+
   private async getCostRollupByProject(
     projectIds: number[],
     companyId: number,

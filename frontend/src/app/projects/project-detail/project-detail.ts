@@ -5,7 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { ProjectsService, ProjectSummary } from '../../services/projects';
+import { ProjectsService, ProjectSummary, TimesheetGraph } from '../../services/projects';
 import { MilestonesTabComponent } from '../milestones/milestones-tab';
 import { TicketsTabComponent } from '../tickets/tickets-tab';
 import { BudgetRequestsTabComponent } from '../budget-requests/budget-requests-tab';
@@ -494,6 +494,31 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   activeTab = signal<'board'|'backlog'|'analytics'|'settings'>('board');
   activeProjectTab = signal<string>('board');
   projectSummary = signal<ProjectSummary | null>(null);
+
+  // §PB3: hours logged on this project.
+  timesheetGraph = signal<TimesheetGraph | null>(null);
+  timesheetWindow = signal<number>(30);
+  isLoadingTimesheetGraph = signal(false);
+
+  /**
+   * The longest bar, so the rest can be drawn relative to it.
+   *
+   * Relative to the biggest contributor rather than to a fixed scale: the
+   * point of the graph is who did how much compared with whom, and a fixed
+   * axis makes every bar on a quiet project a sliver.
+   */
+  timesheetPeak = computed(() => {
+    const rows = this.timesheetGraph()?.byMember ?? [];
+    return rows.reduce((max, r) => Math.max(max, r.hours), 0);
+  });
+
+  timesheetBarWidth(hours: number): number {
+    const peak = this.timesheetPeak();
+    if (peak <= 0) return 0;
+    // A floor of 2%, so somebody who logged twenty minutes still has a bar
+    // rather than an invisible one next to their name.
+    return Math.max(2, Math.round((hours / peak) * 100));
+  }
 
   // Project activity feed. IssueActivity rows were already being written on
   // every status change, comment and timer action — nothing surfaced them.
@@ -1835,6 +1860,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       case 'summary':
       case 'reports':
         this.loadSummary();
+        this.loadTimesheetGraph();
         break;
       case 'field-visits':
         this.loadFieldVisits();
@@ -1851,6 +1877,27 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.loadArchivedColumns();
         break;
     }
+  }
+
+  /** §PB3: load the hours graph for the current window. */
+  loadTimesheetGraph() {
+    this.isLoadingTimesheetGraph.set(true);
+    this.projectsService.getTimesheetGraph(this.projectId, this.timesheetWindow()).subscribe({
+      next: (data) => {
+        this.timesheetGraph.set(data);
+        this.isLoadingTimesheetGraph.set(false);
+      },
+      error: () => {
+        this.timesheetGraph.set(null);
+        this.isLoadingTimesheetGraph.set(false);
+      },
+    });
+  }
+
+  setTimesheetWindow(days: number) {
+    if (days === this.timesheetWindow()) return;
+    this.timesheetWindow.set(days);
+    this.loadTimesheetGraph();
   }
 
   loadSummary() {

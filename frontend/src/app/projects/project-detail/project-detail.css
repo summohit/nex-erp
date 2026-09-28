@@ -8492,3 +8492,106 @@ input[type=text], input[type=email], input[type=password] {
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* ── §PB3 time worked ──────────────────────────────────────────────────── */
+.timesheet-graph-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.timesheet-graph-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.timesheet-graph-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.timesheet-graph-sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.timesheet-window-switch {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.timesheet-window-switch button {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.timesheet-window-switch button.active {
+  background: #6b3fd6;
+  border-color: #6b3fd6;
+  color: #ffffff;
+}
+
+.timesheet-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.timesheet-bar-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 160px) 1fr 56px;
+  align-items: center;
+  gap: 12px;
+}
+
+.timesheet-bar-name {
+  font-size: 12.5px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timesheet-bar-track {
+  background: #f1f5f9;
+  border-radius: 999px;
+  height: 14px;
+  overflow: hidden;
+}
+
+.timesheet-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6b3fd6, #8b5cf6);
+  transition: width 0.25s ease;
+}
+
+.timesheet-bar-val {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.timesheet-graph-empty,
+.timesheet-graph-loading {
+  margin: 0;
+  padding: 14px 0;
+  font-size: 12.5px;
+  color: #94a3b8;
+}

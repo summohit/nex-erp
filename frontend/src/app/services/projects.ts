@@ -2,6 +2,17 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 
+/** §PB3: hours logged on a project, per person and per day. */
+export interface TimesheetGraph {
+  windowDays: number;
+  since: string;
+  /** True when only approved days are counted, so the UI can say which. */
+  approvedOnly: boolean;
+  totalHours: number;
+  byMember: { employeeId: number; name: string; avatarUrl: string | null; hours: number }[];
+  byDay: { date: string; hours: number }[];
+}
+
 /** §PB6: the commercial read of a project. */
 export interface ProjectBudgetSummary {
   currency: string;
@@ -327,6 +338,13 @@ export class ProjectsService {
    * and is not scoped to contacts the viewer personally added, which the CRM
    * board's own list is.
    */
+  /** §PB3: hours logged per person and per day, for the project graph. */
+  getTimesheetGraph(projectId: number, days = 30) {
+    return this.http.get<TimesheetGraph>(
+      `${this.apiUrl}/${projectId}/timesheet-graph?days=${days}`
+    );
+  }
+
   getLeadContactOptions() {
     return this.http.get<LeadContactOption[]>(
       `${environment.apiUrl}/crm/lead-contacts/options`
