@@ -6,7 +6,7 @@
     </div>
     <button class="btn-primary" (click)="openModal('create')">
       <svg lucidePlus size="18"></svg>
-      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
+      Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'visit-locations' ? 'Visit Location' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
     </button>
   </div>
 
@@ -82,6 +82,15 @@
       [attr.aria-selected]="activeTab() === 'default-project-tasks'"
       (click)="switchTab('default-project-tasks')">
       Default Project Tasks
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'visit-locations'" 
+      [attr.aria-selected]="activeTab() === 'visit-locations'"
+      (click)="switchTab('visit-locations')">
+      Visit Locations
     </button>
     <button 
       type="button"
@@ -235,6 +244,25 @@
       [gridOptions]="gridOptions">
     </ag-grid-angular>
 
+    <!-- §PB10: the sites a client visit can be raised against. -->
+    <div *ngIf="activeTab() === 'visit-locations'">
+      <p class="tab-intro">
+        Sites a field visit can be raised against. A trip's coordinates decide
+        whether somebody clocking in there counts as on site, so pin each one —
+        a site without a pin fills the address and leaves the map to be set by
+        hand. Retiring a site hides it from new trips and leaves past ones alone.
+      </p>
+      <ag-grid-angular
+        class="ag-theme-quartz"
+        [theme]="'legacy'"
+        style="width: 100%; height: 500px;"
+        [rowData]="visitLocations()"
+        [columnDefs]="visitLocationColDefs"
+        [defaultColDef]="defaultColDef"
+        [gridOptions]="gridOptions">
+      </ag-grid-angular>
+    </div>
+
     <!-- §1: the tasks every new project starts with, assigned to its PM. -->
     <div *ngIf="activeTab() === 'default-project-tasks'">
       <p class="tab-intro">
@@ -340,7 +368,7 @@
           <div class="modal-header-icon-badge" *ngIf="activeTab() === 'shifts'">
             <svg lucideClock size="20"></svg>
           </div>
-          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
+          <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'visit-locations' ? 'Visit Location' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
         </div>
         <p class="subtitle">{{ activeTab() === 'shifts' ? 'Configure shift timings, punch policies, and weekly working schedule' : 'Enter the details to keep your master data organized' }}</p>
       </div>
@@ -689,7 +717,39 @@
           <textarea class="form-control" rows="4" [(ngModel)]="formData.description"
                     placeholder="What this task covers — becomes the task's own description."></textarea>
         </div>
-        <div class="form-group" *ngIf="activeTab() === 'task-types' || activeTab() === 'project-phases' || activeTab() === 'default-project-tasks'">
+        <!-- §PB10: address and pin for a visit location. -->
+        <div class="form-group full-width" *ngIf="activeTab() === 'visit-locations'">
+          <label>Address</label>
+          <input type="text" class="form-control" [(ngModel)]="formData.address"
+                 placeholder="e.g. Plot 42, Sector 62, Noida">
+        </div>
+        <div class="form-group full-width" *ngIf="activeTab() === 'visit-locations'">
+          <label>Client</label>
+          <select class="form-control" [(ngModel)]="formData.clientId">
+            <option [ngValue]="null">Not client-specific</option>
+            <option *ngFor="let c of clientOptions()" [ngValue]="c.id">{{ c.name }}</option>
+          </select>
+          <small class="form-hint">
+            Optional — a supplier site, data centre or site office belongs to nobody
+            in particular.
+          </small>
+        </div>
+
+        <div class="form-group" *ngIf="activeTab() === 'visit-locations'">
+          <label>Latitude</label>
+          <input type="number" step="0.000001" class="form-control" [(ngModel)]="formData.latitude"
+                 placeholder="e.g. 28.613939">
+        </div>
+        <div class="form-group" *ngIf="activeTab() === 'visit-locations'">
+          <label>Longitude</label>
+          <input type="number" step="0.000001" class="form-control" [(ngModel)]="formData.longitude"
+                 placeholder="e.g. 77.209021">
+          <small class="form-hint">
+            The pin decides whether a clock-in at this site counts as on site.
+          </small>
+        </div>
+
+        <div class="form-group" *ngIf="activeTab() === 'task-types' || activeTab() === 'project-phases' || activeTab() === 'default-project-tasks' || activeTab() === 'visit-locations'">
           <label>Display order</label>
           <input type="number" class="form-control" [(ngModel)]="formData.position" min="0">
           <small class="form-hint">Lower numbers appear first in the task form.</small>

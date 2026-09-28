@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MasterDataService, Department, Designation, Branch, LeaveType, Holiday, TaskType, ProjectPhase, DefaultProjectTask } from '../../services/master-data.service';
+import { MasterDataService, Department, Designation, Branch, LeaveType, Holiday, TaskType, ProjectPhase, DefaultProjectTask, VisitLocation } from '../../services/master-data.service';
 import { ShiftsService } from '../../services/shifts.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { 
@@ -13,10 +13,11 @@ import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry, GridOptions, GridApi } from 'ag-grid-community';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
 import { StatusToggleRendererComponent } from '../../shared/components/status-toggle-renderer.component';
+import { ClientsService } from '../../services/clients';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-types' | 'project-phases' | 'default-project-tasks' | 'holidays' | 'blackout-dates' | 'shifts';
+type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-types' | 'project-phases' | 'default-project-tasks' | 'visit-locations' | 'holidays' | 'blackout-dates' | 'shifts';
 
 export interface BlackoutDate {
   id: number;
@@ -39,6 +40,7 @@ export interface BlackoutDate {
 })
 export class MasterDataComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
+  private clientsService = inject(ClientsService);
   private shiftsService = inject(ShiftsService);
   private toast = inject(HotToastService);
 
@@ -51,6 +53,10 @@ export class MasterDataComponent implements OnInit {
   taskTypes = signal<TaskType[]>([]);
   /** §8: the company's delivery phases. */
   projectPhases = signal<ProjectPhase[]>([]);
+  /** §PB10: the sites a field visit can be raised against. */
+  visitLocations = signal<VisitLocation[]>([]);
+  /** Clients a site can be tied to. Optional — plenty of sites belong to none. */
+  clientOptions = signal<{ id: number; name: string }[]>([]);
   /** §1: the tasks every new project starts with. */
   defaultProjectTasks = signal<DefaultProjectTask[]>([]);
   holidays = signal<Holiday[]>([]);
@@ -637,6 +643,57 @@ export class MasterDataComponent implements OnInit {
       },
     },
   ];
+  /**
+   * §PB10: sites for the field visit picker.
+   *
+   * Coordinates are shown rather than tucked away in the edit form: a site
+   * without them still fills the address but leaves the pin to be placed by
+   * hand, and the person maintaining this list is the one who can tell at a
+   * glance which rows are missing them.
+   */
+  visitLocationColDefs: ColDef[] = [
+    { field: 'name', headerName: 'Site', minWidth: 200 },
+    { field: 'address', headerName: 'Address', minWidth: 240,
+      valueFormatter: (p) => p.value || '—' },
+    { field: 'client.name', headerName: 'Client', width: 160,
+      valueFormatter: (p) => p.value || 'Not client-specific' },
+    {
+      headerName: 'Pinned',
+      width: 130,
+      valueGetter: (p) => p.data?.latitude != null && p.data?.longitude != null,
+      valueFormatter: (p) => (p.value ? 'Yes' : 'No pin'),
+      cellStyle: (p) => (p.value ? null : { color: '#b45309' }),
+    },
+    {
+      field: 'isActive',
+      headerName: 'Active',
+      width: 130,
+      cellRenderer: StatusToggleRendererComponent,
+      cellRendererParams: {
+        activeLabel: 'Yes', inactiveLabel: 'No',
+        onToggle: (data: any, isActive: boolean) => {
+          this.masterDataService.updateVisitLocation(data.id, { isActive }).subscribe({
+            next: () => this.loadData(),
+            error: () => this.toast.error('Could not update the site'),
+          });
+        },
+      },
+    },
+    { field: 'position', headerName: 'Order', width: 110 },
+    {
+      headerName: 'Actions',
+      width: 120,
+      flex: 0,
+      sortable: false,
+      filter: false,
+      cellRenderer: ActionCellRendererComponent,
+      cellRendererParams: {
+        onEdit: (data: any) => this.openModal('edit', data),
+        onDelete: (data: any) => this.deleteItem(data.id),
+      },
+    },
+  ];
+
   // §1: as phases above, plus the description that becomes the task's own.
   defaultProjectTaskColDefs: ColDef[] = [
     { field: 'name', headerName: 'Task', minWidth: 240 },
@@ -929,6 +986,13 @@ export class MasterDataComponent implements OnInit {
     this.masterDataService.getLeaveTypes().subscribe({ next: (data) => this.leaveTypes.set(data) });
     this.masterDataService.getTaskTypes().subscribe({ next: (data) => this.taskTypes.set(data) });
     this.masterDataService.getProjectPhases().subscribe({ next: (data) => this.projectPhases.set(data) });
+    this.masterDataService.getVisitLocations().subscribe({ next: (data) => this.visitLocations.set(data) });
+    // Non-fatal: the client link is optional, so a failure here must not stop
+    // somebody adding a site.
+    this.clientsService.getClients().subscribe({
+      next: (rows) => this.clientOptions.set((rows || []).map((c: any) => ({ id: c.id, name: c.name }))),
+      error: () => this.clientOptions.set([]),
+    });
     this.masterDataService.getDefaultProjectTasks().subscribe({ next: (data) => this.defaultProjectTasks.set(data) });
     this.masterDataService.getHolidays().subscribe({ next: (data) => this.holidays.set(data) });
     this.masterDataService.getBlackoutDates().subscribe({ next: (data) => this.blackoutDates.set(data) });
@@ -1034,6 +1098,26 @@ export class MasterDataComponent implements OnInit {
       this.formData.position = Number(this.formData.position) || 0;
       if (mode === 'create') this.masterDataService.createTaskType(this.formData).subscribe({ next: () => onSuccess('Task Type created'), error: onError });
       else this.masterDataService.updateTaskType(id, this.formData).subscribe({ next: () => onSuccess('Task Type updated'), error: onError });
+    } else if (tab === 'visit-locations') {
+      if (!this.formData.name?.trim()) {
+        this.toast.error('A site needs a name');
+        return;
+      }
+      const pinned = this.formData.latitude != null && this.formData.longitude != null;
+      const onlyOne = (this.formData.latitude == null) !== (this.formData.longitude == null);
+      if (onlyOne) {
+        this.toast.error('A pin needs both a latitude and a longitude');
+        return;
+      }
+      if (!pinned && mode === 'create'
+          && !confirm('Save this site without a pin?\n\n'
+            + 'Picking it will fill the address but leave the map pin to be placed by '
+            + 'hand on every trip, and the coordinates are what decide whether somebody '
+            + 'clocking in there counts as on site.')) {
+        return;
+      }
+      if (mode === 'create') this.masterDataService.createVisitLocation(this.formData).subscribe({ next: () => onSuccess('Site created'), error: onError });
+      else this.masterDataService.updateVisitLocation(id, this.formData).subscribe({ next: () => onSuccess('Site updated'), error: onError });
     } else if (tab === 'project-phases') {
       if (!this.formData.name || !this.formData.name.trim()) {
         this.toast.error('A phase needs a name');
@@ -1118,6 +1202,7 @@ export class MasterDataComponent implements OnInit {
     else if (tab === 'leave-types') deleteSub = this.masterDataService.deleteLeaveType(id);
     else if (tab === 'task-types') deleteSub = this.masterDataService.deleteTaskType(id);
     else if (tab === 'project-phases') deleteSub = this.masterDataService.deleteProjectPhase(id);
+    else if (tab === 'visit-locations') deleteSub = this.masterDataService.deleteVisitLocation(id);
     else if (tab === 'default-project-tasks') deleteSub = this.masterDataService.deleteDefaultProjectTask(id);
     else if (tab === 'holidays') deleteSub = this.masterDataService.deleteHoliday(id);
     else if (tab === 'blackout-dates') deleteSub = this.masterDataService.deleteBlackoutDate(id);
