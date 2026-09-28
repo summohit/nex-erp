@@ -10,7 +10,7 @@ describe('deleting a task (§PB4)', () => {
     const del = jest.fn(async () => ({}));
     const prisma = { issue: { findFirst: jest.fn(async () => issue), delete: del } };
     const gateway = { emitIssueUpdated: jest.fn(), emitActivityAdded: jest.fn() };
-    const svc = new IssuesService(prisma as any, gateway as any, null as any);
+    const svc = new IssuesService(prisma as any, gateway as any, null as any, null as any);
     return { svc, prisma, del };
   };
 

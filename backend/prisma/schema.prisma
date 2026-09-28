@@ -122,6 +122,7 @@ model Company {
   defaultProjectTasks   DefaultProjectTask[]
   notices               Notice[]
   projectBudgetRequests ProjectBudgetRequest[]
+  visitLocations    VisitLocation[]
 }
 
 // Authentication & RBAC
@@ -2766,6 +2767,7 @@ model Client {
   salesOrders SalesOrder[]
 
   @@unique([name, companyId])
+  visitLocations VisitLocation[]
 }
 
 model ClientContact {
@@ -3728,6 +3730,40 @@ model TaskHoursRequestActivity {
 /// across its projects, and giving every project its own copy would mean
 /// seeding six rows per project and filtering across a union of them wherever
 /// phases are listed.
+/// A site a field visit can be raised against (§PB10).
+///
+/// Master data rather than free text: a trip's location is pinned on a map and
+/// its coordinates decide whether someone clocking in there is treated as on
+/// site, so a typo is not a cosmetic problem. Branch was the only existing
+/// table carrying coordinates, but a Branch is one of our own offices — the
+/// wrong thing to offer for a client visit — and Client addresses carry no
+/// coordinates at all.
+///
+/// clientId is optional: plenty of sites belong to a client, and plenty
+/// (a supplier, a data centre, a site office) belong to nobody in particular.
+model VisitLocation {
+  id        Int      @id @default(autoincrement())
+  name      String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  /// Soft-disable, as every other master-data table does: a location already
+  /// recorded against past visits is the truth about those visits, so it is
+  /// hidden from new ones rather than removed from old ones.
+  isActive  Boolean  @default(true)
+  position  Int      @default(0)
+  clientId  Int?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  requests  FieldVisitRequest[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+}
+
 model ProjectPhase {
   id        Int      @id @default(autoincrement())
   name      String
@@ -3880,6 +3916,12 @@ model FieldVisitRequest {
   location  String
   latitude  Float
   longitude Float
+  /// The master-data site this was picked from, when it was picked rather than
+  /// typed (§PB10). SetNull, and the location/coordinates above stay put: where
+  /// somebody actually went is a fact about the trip, and retiring a site from
+  /// the picker must not erase it from trips already made.
+  visitLocationId Int?
+  visitLocation   VisitLocation? @relation(fields: [visitLocationId], references: [id], onDelete: SetNull)
 
   startDate DateTime
   endDate   DateTime

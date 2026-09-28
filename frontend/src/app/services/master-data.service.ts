@@ -90,6 +90,20 @@ export interface BlackoutDate {
   companyId: number;
 }
 
+
+/** A site a field visit can be raised against (§PB10). */
+export interface VisitLocation {
+  id: number;
+  name: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  isActive: boolean;
+  position: number;
+  clientId?: number | null;
+  client?: { id: number; name: string } | null;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -179,6 +193,24 @@ export class MasterDataService {
     return this.http.delete(`${this.apiUrl}/task-types/${id}`);
   }
   // §8: project phases. Same four calls as task types above.
+  /** Sites a field visit can be raised against (§PB10). */
+  getVisitLocations(activeOnly = false): Observable<VisitLocation[]> {
+    const suffix = activeOnly ? '?activeOnly=true' : '';
+    return this.http.get<VisitLocation[]>(`${this.apiUrl}/visit-locations${suffix}`);
+  }
+
+  createVisitLocation(data: Partial<VisitLocation>): Observable<VisitLocation> {
+    return this.http.post<VisitLocation>(`${this.apiUrl}/visit-locations`, data);
+  }
+
+  updateVisitLocation(id: number, data: Partial<VisitLocation>): Observable<VisitLocation> {
+    return this.http.put<VisitLocation>(`${this.apiUrl}/visit-locations/${id}`, data);
+  }
+
+  deleteVisitLocation(id: number) {
+    return this.http.delete(`${this.apiUrl}/visit-locations/${id}`);
+  }
+
   getProjectPhases(activeOnly = false): Observable<ProjectPhase[]> {
     const suffix = activeOnly ? '?activeOnly=true' : '';
     return this.http.get<ProjectPhase[]>(`${this.apiUrl}/project-phases${suffix}`);

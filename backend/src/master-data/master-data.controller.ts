@@ -407,6 +407,95 @@ export class MasterDataController {
     return this.prisma.projectPhase.delete({ where: { id, companyId: req.user.companyId } });
   }
 
+  // --- Visit Location CRUD (§PB10) ---
+  //
+  // The sites a field visit can be raised against. Same shape as project
+  // phases above, plus coordinates: a trip's location is pinned on a map and
+  // those coordinates decide whether somebody clocking in there counts as on
+  // site, which is why this is master data and not free text.
+
+  @Get('visit-locations')
+  async getVisitLocations(@Request() req, @Query('activeOnly') activeOnly?: string) {
+    return this.prisma.visitLocation.findMany({
+      where: {
+        companyId: req.user.companyId,
+        ...(activeOnly === 'true' ? { isActive: true } : {}),
+      },
+      include: { client: { select: { id: true, name: true } } },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  @Post('visit-locations')
+  async createVisitLocation(
+    @Request() req,
+    @Body() data: {
+      name: string; address?: string; latitude?: number; longitude?: number;
+      clientId?: number; position?: number;
+    },
+  ) {
+    if (!data?.name?.trim()) throw new BadRequestException('A location needs a name');
+    const existing = await this.prisma.visitLocation.findFirst({
+      where: { name: { equals: data.name.trim(), mode: 'insensitive' }, companyId: req.user.companyId },
+    });
+    if (existing) throw new BadRequestException('That location already exists');
+
+    return this.prisma.visitLocation.create({
+      data: {
+        name: data.name.trim(),
+        address: data.address?.trim() || null,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
+        clientId: data.clientId ?? null,
+        position: data.position ?? 0,
+        companyId: req.user.companyId,
+      },
+    });
+  }
+
+  @Put('visit-locations/:id')
+  async updateVisitLocation(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: {
+      name?: string; address?: string; latitude?: number; longitude?: number;
+      clientId?: number | null; isActive?: boolean; position?: number;
+    },
+  ) {
+    const updateData: any = {};
+    if (data.name !== undefined) {
+      if (!data.name.trim()) throw new BadRequestException('A location needs a name');
+      updateData.name = data.name.trim();
+    }
+    if (data.address !== undefined) updateData.address = data.address?.trim() || null;
+    if (data.latitude !== undefined) updateData.latitude = data.latitude ?? null;
+    if (data.longitude !== undefined) updateData.longitude = data.longitude ?? null;
+    if (data.clientId !== undefined) updateData.clientId = data.clientId ?? null;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.position !== undefined) updateData.position = data.position;
+
+    return this.prisma.visitLocation.update({
+      where: { id, companyId: req.user.companyId },
+      data: updateData,
+    });
+  }
+
+  @Delete('visit-locations/:id')
+  async deleteVisitLocation(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    // A location past visits were raised against is the truth about where
+    // those people went. Hide it from new trips rather than rewriting that.
+    const inUse = await this.prisma.fieldVisitRequest.count({
+      where: { visitLocationId: id, companyId: req.user.companyId },
+    });
+    if (inUse > 0) {
+      return this.prisma.visitLocation.update({
+        where: { id, companyId: req.user.companyId },
+        data: { isActive: false },
+      });
+    }
+    return this.prisma.visitLocation.delete({ where: { id, companyId: req.user.companyId } });
+  }
+
   // --- Default Project Task CRUD (§1) ---
   //
   // The tasks every new project starts with. Same shape as project phases

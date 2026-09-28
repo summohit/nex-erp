@@ -16,6 +16,7 @@ import {
 } from '../../services/field-visit-requests';
 import { ProjectsService } from '../../services/projects';
 import { EmployeeService } from '../../services/employee.service';
+import { MasterDataService, VisitLocation } from '../../services/master-data.service';
 import { environment } from '../../../environments/environment';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -56,11 +57,15 @@ export class FieldVisitRequestFormComponent implements OnInit {
   private api = inject(FieldVisitRequestsService);
   private projectsService = inject(ProjectsService);
   private employeeService = inject(EmployeeService);
+  private masterData = inject(MasterDataService);
   private sanitizer = inject(DomSanitizer);
   private toast = inject(HotToastService);
   private http = inject(HttpClient);
 
   projects = signal<{ id: number; name: string }[]>([]);
+  /** Sites the company keeps on file, for the location picker (§PB10). */
+  visitLocations = signal<VisitLocation[]>([]);
+  selectedVisitLocationId = signal<number | null>(null);
   employees = signal<{
     id: number;
     name: string;
@@ -89,6 +94,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
   form = {
     projectId: null as number | null,
     location: '',
+    visitLocationId: null as number | null,
     latitude: null as number | null,
     longitude: null as number | null,
     startDate: '',
@@ -109,10 +115,12 @@ export class FieldVisitRequestFormComponent implements OnInit {
   ngOnInit(): void {
     if (this.request) {
       this.selectedProjectId.set(this.request.project.id);
+      this.selectedVisitLocationId.set((this.request as any).visitLocationId ?? null);
       this.selectedEmployeeIds.set(this.request.members.map((m) => m.employee.id));
       this.form = {
         projectId: this.request.project.id,
         location: this.request.location,
+        visitLocationId: (this.request as any).visitLocationId ?? null,
         latitude: this.request.latitude,
         longitude: this.request.longitude,
         startDate: this.request.startDate.slice(0, 10),
@@ -146,6 +154,14 @@ export class FieldVisitRequestFormComponent implements OnInit {
       );
       done();
     };
+
+    // Non-fatal: a company that has not set any up must still be able to raise
+    // a trip by typing the address, which is how this worked before the list
+    // existed.
+    this.masterData.getVisitLocations(true).subscribe({
+      next: (rows) => this.visitLocations.set(rows || []),
+      error: () => this.visitLocations.set([]),
+    });
 
     this.projectsService.getProjects().subscribe({
       next: (rows: any[]) => {
@@ -218,6 +234,31 @@ export class FieldVisitRequestFormComponent implements OnInit {
       this.toast.error(complaint);
     }
     this.lastDateComplaint = complaint;
+  }
+
+  /**
+   * Fill the site from the picker (§PB10).
+   *
+   * The name, address and pin are copied onto the request rather than read
+   * through the link. Where somebody actually went is a fact about that trip,
+   * so retiring or re-pinning a site later must not rewrite trips already
+   * made — the link records which site was chosen, the copy records where it
+   * was at the time.
+   *
+   * Nothing is cleared when the picker is cleared: somebody who picked a site
+   * and then adjusted the pin by hand has done that deliberately.
+   */
+  onVisitLocationPicked(id: number | null): void {
+    this.selectedVisitLocationId.set(id);
+    this.form.visitLocationId = id;
+    if (id == null) return;
+
+    const site = this.visitLocations().find((l) => l.id === id);
+    if (!site) return;
+
+    this.form.location = [site.name, site.address].filter(Boolean).join(' – ');
+    if (site.latitude != null) this.form.latitude = site.latitude;
+    if (site.longitude != null) this.form.longitude = site.longitude;
   }
 
   mapUrl(): SafeResourceUrl {
@@ -449,6 +490,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
     return {
       projectId: Number(this.selectedProjectId() ?? this.form.projectId),
       location: this.form.location.trim(),
+      visitLocationId: this.form.visitLocationId ?? undefined,
       latitude: Number(this.form.latitude),
       longitude: Number(this.form.longitude),
       startDate: this.form.startDate,

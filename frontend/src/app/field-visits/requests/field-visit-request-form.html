@@ -122,6 +122,25 @@
           </div>
         </div>
 
+        <!-- Saved sites, when the company keeps any (§PB10) -->
+        <div class="field" *ngIf="visitLocations().length">
+          <label><span>Saved Site</span></label>
+          <div class="input-with-icon">
+            <svg lucideBuilding [size]="16" class="field-icon"></svg>
+            <select [ngModel]="selectedVisitLocationId()"
+                    (ngModelChange)="onVisitLocationPicked($event)">
+              <option [ngValue]="null">Type the address instead…</option>
+              <option *ngFor="let site of visitLocations()" [ngValue]="site.id">
+                {{ site.name }}{{ site.client?.name ? ' · ' + site.client?.name : '' }}
+              </option>
+            </select>
+          </div>
+          <p class="field-hint">
+            Picking a site fills the address and pin below. Both stay editable —
+            the trip records where you actually went.
+          </p>
+        </div>
+
         <!-- Site Location -->
         <div class="field">
           <label>

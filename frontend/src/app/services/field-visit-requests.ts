@@ -113,6 +113,8 @@ export interface FieldVisitActivity {
 export interface FieldVisitRequestInput {
   projectId: number;
   location: string;
+  /** The saved site this was picked from, when it was (§PB10). */
+  visitLocationId?: number;
   latitude: number;
   longitude: number;
   startDate: string;

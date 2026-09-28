@@ -26,6 +26,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export interface FieldVisitRequestInput {
   projectId: number;
   location: string;
+  /** The saved site this was picked from, when it was picked (§PB10). */
+  visitLocationId?: number | null;
   latitude: number;
   longitude: number;
   startDate: string;
@@ -253,6 +255,11 @@ export class FieldVisitRequestsService {
       fields: {
         projectId: project.id,
         location, latitude, longitude,
+        // Which saved site this came from, when it came from one. The location
+        // text and pin above are copied onto the trip regardless — this only
+        // records the provenance, so retiring a site later cannot rewrite
+        // where somebody actually went.
+        visitLocationId: data?.visitLocationId == null ? null : Number(data.visitLocationId),
         startDate, endDate, visitDays,
         startTime, endTime,
         remarks: String(data?.remarks ?? '').trim() || null,
