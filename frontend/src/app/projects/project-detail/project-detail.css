@@ -8418,3 +8418,77 @@ input[type=text], input[type=email], input[type=password] {
 @keyframes add-member-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── §PB6 project budget KPIs ──────────────────────────────────────────── */
+.budget-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.budget-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 16px 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  border-left: 3px solid #6b3fd6;
+}
+
+/* Over budget is a fact worth seeing before the number is read, not after. */
+.budget-kpi.over {
+  border-left-color: #dc2626;
+  background: #fffafa;
+}
+
+.budget-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.budget-kpi-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.4px;
+}
+
+.budget-kpi-of {
+  font-size: 14px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.budget-kpi-sub {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.budget-kpi-sub.muted {
+  font-style: italic;
+}
+
+.budget-kpi-caveat {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #92400e;
+}
+
+.budget-kpi-caveat svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

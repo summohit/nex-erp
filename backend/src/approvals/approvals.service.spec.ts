@@ -11,7 +11,7 @@ describe('approval delegation (§Att5, §PB7, §PB8)', () => {
         upsert: jest.fn(async (args: any) => ({ id: 1, ...args.create })),
         deleteMany: jest.fn(async () => ({ count: 1 })),
       },
-      employee: { findFirst: jest.fn(async () => ({ id: 42 })) },
+      employee: { findFirst: jest.fn(async (): Promise<{ id: number } | null> => ({ id: 42 })) },
     };
     return { svc: new ApprovalsService(prisma as any), prisma };
   };

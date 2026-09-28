@@ -1856,7 +1856,68 @@ export class ProjectsService {
       }
     });
 
+    // §PB6: the commercial read of the project.
+    //
+    // Cost comes from getCostRollupByProject rather than a sum computed here,
+    // so the summary cannot disagree with the project list about what a project
+    // has cost — and so it inherits the timesheetApprovalRequired rule about
+    // which logged hours are allowed to count.
+    const [project, approvedExtras, costRollup] = await Promise.all([
+      this.prisma.project.findFirst({
+        where: { id: projectId, companyId },
+        select: {
+          budgetAmount: true, estimatedHours: true, hourlyRate: true, currency: true,
+        },
+      }),
+      this.prisma.projectBudgetRequest.aggregate({
+        where: { projectId, companyId, status: 'APPROVED' },
+        _sum: { additionalBudget: true, additionalHours: true },
+      }),
+      this.getCostRollupByProject([projectId], companyId),
+    ]);
+
+    const rollup = costRollup.get(projectId)
+      ?? { loggedHours: 0, employeeCost: 0, unratedHours: 0 };
+
+    // Approved increases are part of the budget. A project running to an
+    // agreed overspend is on budget; showing it against the original figure
+    // would report every approved request as a failure.
+    const budget = (project?.budgetAmount ?? 0) + (approvedExtras._sum.additionalBudget ?? 0);
+    const hoursBudget = (project?.estimatedHours ?? 0) + (approvedExtras._sum.additionalHours ?? 0);
+
+    const round = (n: number) => Math.round(n * 100) / 100;
+    const pct = (used: number, total: number) =>
+      total > 0 ? Math.round((used / total) * 100) : null;
+
     return {
+      budget: {
+        currency: project?.currency ?? 'INR',
+        /** What was agreed originally, before any approved increase. */
+        original: round(project?.budgetAmount ?? 0),
+        approvedExtra: round(approvedExtras._sum.additionalBudget ?? 0),
+        total: round(budget),
+        spent: round(rollup.employeeCost),
+        remaining: round(budget - rollup.employeeCost),
+        /** Null rather than 0 when there is no budget: "no budget set" and
+         *  "nothing spent" are different facts and must not render alike. */
+        percentUsed: pct(rollup.employeeCost, budget),
+        hours: {
+          original: round(project?.estimatedHours ?? 0),
+          approvedExtra: round(approvedExtras._sum.additionalHours ?? 0),
+          total: round(hoursBudget),
+          logged: round(rollup.loggedHours),
+          remaining: round(hoursBudget - rollup.loggedHours),
+          percentUsed: pct(rollup.loggedHours, hoursBudget),
+        },
+        /**
+         * Hours logged by people with no cost rate on file. They are in the
+         * hours but contribute nothing to spend, so the figure is understated
+         * by however much they are worth. Reported rather than hidden: a
+         * budget number quietly missing a chunk of its cost is worse than one
+         * that admits it.
+         */
+        unratedHours: round(rollup.unratedHours),
+      },
       metrics: {
         completedLast7Days,
         updatedLast7Days,

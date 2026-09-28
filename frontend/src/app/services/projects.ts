@@ -2,7 +2,34 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 
+/** §PB6: the commercial read of a project. */
+export interface ProjectBudgetSummary {
+  currency: string;
+  /** What was agreed originally, before any approved increase. */
+  original: number;
+  approvedExtra: number;
+  total: number;
+  spent: number;
+  /** Negative when the agreed budget has been exceeded. */
+  remaining: number;
+  /** Null when no budget is set — which is NOT the same as 0% and must not
+   *  render like a project comfortably on track. */
+  percentUsed: number | null;
+  hours: {
+    original: number;
+    approvedExtra: number;
+    total: number;
+    logged: number;
+    remaining: number;
+    percentUsed: number | null;
+  };
+  /** Hours logged by people with no cost rate, so `spent` is understated by
+   *  whatever they are worth. */
+  unratedHours: number;
+}
+
 export interface ProjectSummary {
+  budget?: ProjectBudgetSummary;
   metrics: {
     completedLast7Days: number;
     updatedLast7Days: number;

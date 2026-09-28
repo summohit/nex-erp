@@ -602,6 +602,51 @@
         </div>
       </div>
 
+      <!-- §PB6: the commercial read, above the delivery one. -->
+      <div class="budget-kpi-row" *ngIf="projectSummary()?.budget as b">
+        <div class="budget-kpi" [class.over]="b.percentUsed !== null && b.percentUsed > 100">
+          <span class="budget-kpi-label">Budget</span>
+          <span class="budget-kpi-val">{{ b.currency }} {{ b.total | number:'1.0-0' }}</span>
+          <span class="budget-kpi-sub" *ngIf="b.approvedExtra > 0">
+            {{ b.original | number:'1.0-0' }} + {{ b.approvedExtra | number:'1.0-0' }} approved
+          </span>
+          <span class="budget-kpi-sub" *ngIf="!b.approvedExtra">No approved increases</span>
+        </div>
+
+        <div class="budget-kpi" [class.over]="b.percentUsed !== null && b.percentUsed > 100">
+          <span class="budget-kpi-label">Spent</span>
+          <span class="budget-kpi-val">{{ b.currency }} {{ b.spent | number:'1.0-0' }}</span>
+          <!-- Null percent means no budget is set, which is not the same as 0%
+               and must not read like a project comfortably on track. -->
+          <span class="budget-kpi-sub" *ngIf="b.percentUsed !== null">{{ b.percentUsed }}% of budget</span>
+          <span class="budget-kpi-sub muted" *ngIf="b.percentUsed === null">No budget set</span>
+        </div>
+
+        <div class="budget-kpi" [class.over]="b.remaining < 0">
+          <span class="budget-kpi-label">{{ b.remaining < 0 ? 'Over budget by' : 'Remaining' }}</span>
+          <span class="budget-kpi-val">{{ b.currency }} {{ (b.remaining < 0 ? -b.remaining : b.remaining) | number:'1.0-0' }}</span>
+          <span class="budget-kpi-sub">{{ b.remaining < 0 ? 'Agreed budget exceeded' : 'Left to spend' }}</span>
+        </div>
+
+        <div class="budget-kpi" [class.over]="b.hours.percentUsed !== null && b.hours.percentUsed > 100">
+          <span class="budget-kpi-label">Hours</span>
+          <span class="budget-kpi-val">{{ b.hours.logged | number:'1.0-1' }}<span class="budget-kpi-of"> / {{ b.hours.total | number:'1.0-0' }}</span></span>
+          <span class="budget-kpi-sub" *ngIf="b.hours.percentUsed !== null">{{ b.hours.percentUsed }}% of planned</span>
+          <span class="budget-kpi-sub muted" *ngIf="b.hours.percentUsed === null">No hours planned</span>
+        </div>
+      </div>
+
+      <!-- The spend above is understated by whatever these hours are worth, so
+           it says so rather than letting the number pass as complete. -->
+      <div class="budget-kpi-caveat" *ngIf="(projectSummary()?.budget?.unratedHours || 0) > 0">
+        <svg lucideAlertCircle size="14"></svg>
+        <span>
+          {{ projectSummary()?.budget?.unratedHours | number:'1.0-1' }} logged hours are from
+          people with no cost rate on file, so the spend above is lower than the
+          real cost.
+        </span>
+      </div>
+
       <!-- KPI Metric Cards -->
       <div class="summary-metrics-grid">
         <div class="summary-metric-card">
