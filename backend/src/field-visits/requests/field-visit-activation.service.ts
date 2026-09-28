@@ -300,56 +300,67 @@ export class FieldVisitActivationService {
     });
     let position = top ? top.position - 1 : 0;
 
-    let numbered = await tx.issue.count({
-      where: { projectId: request.projectId, companyId: request.companyId },
-    });
+    /**
+     * Task keys come from the project's counter, the same one every other
+     * writer draws from.
+     *
+     * This numbered from `tx.issue.count()` instead, which reads the rows but
+     * never advances `Project.issueSeq`. Activating a visit therefore minted
+     * keys the counter knew nothing about, and the next task raised by hand
+     * incremented the counter straight onto a number one of these already
+     * held. @@unique([key, companyId]) rejected it, the surrounding
+     * transaction rolled the increment back with it, and every later attempt
+     * collided on that same number -- task creation stayed wedged for good
+     * rather than failing once.
+     */
+    const nextKey = async (): Promise<string> => {
+      const { issueSeq } = await tx.project.update({
+        where: { id: request.projectId },
+        data: { issueSeq: { increment: 1 } },
+        select: { issueSeq: true },
+      });
+      return `${project.key}-${issueSeq}`;
+    };
 
     let created = 0;
     for (const task of [...request.tasks].sort((a, b) => a.position - b.position)) {
       for (const employeeId of employeeIds) {
         if (done.has(`${employeeId}|${task.name}`)) continue;
 
-        // The key is derived from a count, so two tasks created at once can
-        // compute the same one. The unique index on (key, companyId) is what
-        // decides; this walks the number up until it is free.
-        for (let attempt = 0; ; attempt++) {
-          try {
-            await tx.issue.create({
-              data: {
-                key: `${project.key}-${numbered + 1}`,
-                title: task.name,
-                description: task.description,
-                type: 'TASK',
-                status: 'TODO',
-                priority: 'MEDIUM',
-                projectId: request.projectId,
-                companyId: request.companyId,
-                columnId,
-                reporterId: request.raisedById,
-                assigneeId: employeeId,
-                position,
-                // The task is the visit: it opens when the trip does and is due
-                // when it ends, so it reads as work with a date on somebody's
-                // board rather than an undated backlog item.
-                startDate: request.startDate,
-                dueDate: request.endDate,
-                // Left unset deliberately. A task raised by hand must name its
-                // phase, but approval is not a moment anyone can be asked to
-                // pick one, and refusing the trip over it would be a blockade.
-                phaseId: null,
-                fieldVisitRequestId: request.id,
-              },
-            });
-            numbered++;
-            break;
-          } catch (error: any) {
-            if (error?.code === 'P2002' && attempt < 10) {
-              numbered++;
-              continue;
-            }
-            throw error;
-          }
-        }
+        // No retry around this any more. Incrementing the counter row-locks
+        // the project, so concurrent callers cannot be handed the same key
+        // and there is nothing left to walk up. The loop it replaces could
+        // not have worked here regardless: Postgres aborts the whole
+        // transaction on a failed statement, so catching P2002 inside one and
+        // carrying on only turns the error into "current transaction is
+        // aborted" on the following write.
+        await tx.issue.create({
+          data: {
+            key: await nextKey(),
+            title: task.name,
+            description: task.description,
+            type: 'TASK',
+            status: 'TODO',
+            priority: 'MEDIUM',
+            projectId: request.projectId,
+            companyId: request.companyId,
+            columnId,
+            reporterId: request.raisedById,
+            assigneeId: employeeId,
+            position,
+            // The task is the visit: it opens when the trip does and is due
+            // when it ends, so it reads as work with a date on somebody's
+            // board rather than an undated backlog item.
+            startDate: request.startDate,
+            dueDate: request.endDate,
+            // Left unset deliberately. A task raised by hand must name its
+            // phase, but approval is not a moment anyone can be asked to
+            // pick one, and refusing the trip over it would be a blockade.
+            phaseId: null,
+            fieldVisitRequestId: request.id,
+          },
+        });
+
         position--;
         created++;
       }

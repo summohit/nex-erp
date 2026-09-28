@@ -32,6 +32,7 @@ const REQUEST: ActivationRequest = {
 };
 
 function makeTx(over: any = {}) {
+  let seq = 4;
   const tx: any = {
     holiday: { findMany: jest.fn().mockResolvedValue([]) },
     fieldVisitAttendance: {
@@ -51,7 +52,12 @@ function makeTx(over: any = {}) {
         { id: 61, firstName: 'Vikram', lastName: 'Singh' },
       ]),
     },
-    project: { findFirst: jest.fn().mockResolvedValue({ id: 3, key: 'ACME' }) },
+    project: {
+      findFirst: jest.fn().mockResolvedValue({ id: 3, key: 'ACME' }),
+      // The project's key counter, standing at 4, so the next allocation is
+      // ACME-5. Incrementing it is what hands out a task key -- see nextKey().
+      update: jest.fn().mockImplementation(async () => ({ issueSeq: ++seq })),
+    },
     board: { findFirst: jest.fn().mockResolvedValue({ columns: [{ id: 5 }] }) },
     issue: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -160,16 +166,27 @@ describe('the tasks', () => {
       .not.toContain('Site Inspection|60');
   });
 
-  it('walks the key up when another task takes the number first', async () => {
+  /**
+   * The regression that wedged task creation in production.
+   *
+   * Keys used to be numbered from `issue.count()`, which never advanced
+   * Project."issueSeq". The activation tasks therefore held numbers the
+   * counter did not know about, and the next task raised by hand incremented
+   * onto one of them and died on @@unique([key, companyId]) -- permanently,
+   * because the rollback took the increment with it.
+   */
+  it('takes every key from the project counter, advancing it once per task', async () => {
     const { service, tx } = makeTx();
-    const clash = Object.assign(new Error('unique'), { code: 'P2002' });
-    tx.issue.create.mockRejectedValueOnce(clash);
-
     await service.activate(tx, REQUEST, 90);
+
     const keys = created(tx.issue.create).map((i: any) => i.key);
-    expect(keys[0]).toBe('ACME-5');
-    expect(keys[1]).toBe('ACME-6');
-    expect(keys[2]).toBe('ACME-7');
+    expect(tx.project.update).toHaveBeenCalledTimes(keys.length);
+    expect(tx.project.update.mock.calls[0][0]).toMatchObject({
+      where: { id: 3 },
+      data: { issueSeq: { increment: 1 } },
+    });
+    // Never the row count: that is the read that let the counter fall behind.
+    expect(tx.issue.count).not.toHaveBeenCalled();
   });
 });
 
