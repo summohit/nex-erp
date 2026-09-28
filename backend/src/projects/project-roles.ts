@@ -6,6 +6,8 @@
  * and the answer must be identical in all three. A board that hides a task the
  * reports tab then shows is not a permission, it is a decoration.
  */
+import { isCompanyAdmin } from '../common/company-roles';
+
 
 /** The roles a ProjectMember row can hold. */
 export const PROJECT_ROLE = {
@@ -22,9 +24,6 @@ export const PROJECT_ROLE = {
   MEMBER: 'MEMBER',
   VIEWER: 'VIEWER',
 } as const;
-
-/** Company roles that outrank anything a project says. */
-const COMPANY_ADMIN_ROLES = ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'];
 
 export interface ProjectViewer {
   employeeId: number | null;
@@ -75,7 +74,7 @@ export async function resolveProjectViewer(
  * ADMIN role — sees the tasks they are actually on.
  */
 export function seesEveryTask(viewer: ProjectViewer): boolean {
-  if (COMPANY_ADMIN_ROLES.includes(viewer.companyRole)) return true;
+  if (isCompanyAdmin(viewer.companyRole)) return true;
   if (viewer.isOwner) return true;
   return viewer.projectRole === PROJECT_ROLE.MANAGER
     || viewer.projectRole === PROJECT_ROLE.ARCHITECT;
@@ -89,7 +88,7 @@ export function seesEveryTask(viewer: ProjectViewer): boolean {
  * handled where those actions are, not here.
  */
 export function mayChangeAnyTask(viewer: ProjectViewer): boolean {
-  if (COMPANY_ADMIN_ROLES.includes(viewer.companyRole)) return true;
+  if (isCompanyAdmin(viewer.companyRole)) return true;
   if (viewer.isOwner) return true;
   return viewer.projectRole === PROJECT_ROLE.MANAGER;
 }

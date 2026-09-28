@@ -6,6 +6,17 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { FieldVisitActivationService } from './field-visit-activation.service';
 import { FIELD_VISIT_STATUS } from '../field-visit-status';
+import { CompanyRole, isCompanyAdmin } from '../../common/company-roles';
+
+/**
+ * Who is notified about a trip awaiting a decision.
+ *
+ * A list rather than a predicate because it is also sent to the notification
+ * service as a targeting filter, which queries by role rather than asking a
+ * question about one. isCompanyAdmin() decides whether a given person may
+ * rule on a trip; this says who to go and tell.
+ */
+const APPROVER_ROLES: CompanyRole[] = ['SUPERADMIN', 'ADMIN'];
 
 // Re-exported so callers that already import it from here keep working.
 export { FIELD_VISIT_STATUS };
@@ -56,8 +67,7 @@ export class FieldVisitRequestsService {
     private activation: FieldVisitActivationService,
   ) {}
 
-  /** Who rules on a trip. SUPER_ADMIN is the older spelling, still in tokens. */
-  private readonly APPROVER_ROLES = ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'];
+
 
   /** Where a request is actioned, for the notification links. */
   private readonly LINK = '/field-visits/requests';
@@ -256,7 +266,7 @@ export class FieldVisitRequestsService {
   // ─── Who may do what ───────────────────────────────────────────────────────
 
   private isApprover(role: string): boolean {
-    return this.APPROVER_ROLES.includes(role);
+    return isCompanyAdmin(role);
   }
 
   private managesProject(project: any, employeeId: number | null): boolean {
@@ -811,7 +821,7 @@ export class FieldVisitRequestsService {
   private async notifyAwaitingApproval(companyId: number, request: any, raiserId: number | null) {
     const reached = await this.notifications.notifyApprovers({
       companyId,
-      roles: this.APPROVER_ROLES,
+      roles: APPROVER_ROLES,
       title: 'Field visit awaiting approval',
       message: `${this.who(request.raisedBy)} raised ${request.requestNumber} — `
         + `${request.visitDays} day(s) at ${request.location} for ${request.project?.name ?? 'a project'}.`,
@@ -958,7 +968,7 @@ export class FieldVisitRequestsService {
 
     await this.notifications.notifyApprovers({
       companyId,
-      roles: this.APPROVER_ROLES,
+      roles: APPROVER_ROLES,
       title: 'Field visit change awaiting approval',
       message: `${this.who(updated.raisedBy)} asked to change ${request.requestNumber}`
         + ` (${changed.join(', ')}) at ${request.location}.`,

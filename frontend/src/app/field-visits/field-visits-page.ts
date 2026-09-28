@@ -14,6 +14,7 @@ import { EmployeeService } from '../services/employee.service';
 import { ProjectsService } from '../services/projects';
 import { AuthService } from '../services/auth.service';
 import { SkeletonComponent } from '../shared/components/skeleton/skeleton.component';
+import { RoleService } from '../services/role.service';
 
 type RangeKey = '7d' | '30d' | '90d' | '6m' | '1y' | 'custom';
 
@@ -41,6 +42,7 @@ const EMPTY_SUMMARY: FieldVisitSummary = {
 })
 export class FieldVisitsPageComponent implements OnInit {
   private fieldVisitsService = inject(FieldVisitsService);
+  private roles = inject(RoleService);
   private employeeService = inject(EmployeeService);
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
@@ -56,10 +58,7 @@ export class FieldVisitsPageComponent implements OnInit {
    * Only admins can browse the whole company's visits. Everyone else sees just
    * their own — matched server-side too, this only gates the filter UI.
    */
-  isManager = computed(() => {
-    const role = this.authService.currentUser()?.role;
-    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN';
-  });
+  isManager = computed(() => this.roles.isAdmin());
 
   /**
    * The other side of isManager, for copy that addresses the reader: "My

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, ParseIntPipe, Res, ForbiddenException } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { isPayrollRole } from '../common/company-roles';
 
 @Controller('payroll')
 @UseGuards(AuthGuard)
@@ -20,10 +21,10 @@ export class PayrollController {
    * and this company has VIEW rows only — HR and Finance would have lost the
    * payroll they run today.
    */
-  private readonly PAYROLL_ROLES = ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN', 'HR', 'FINANCE'];
+  
 
   private isPayrollOperator(req: any): boolean {
-    return this.PAYROLL_ROLES.includes(req?.user?.role);
+    return isPayrollRole(req?.user?.role);
   }
 
   private assertPayrollOperator(req: any, what = 'change a payslip'): void {

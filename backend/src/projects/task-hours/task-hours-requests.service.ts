@@ -4,6 +4,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { allowedHours, remainingHours } from '../../tasks/task-hours';
+import { isCompanyAdmin } from '../../common/company-roles';
 
 /**
  * Additional-hours requests on a task, and their activity timeline (§3, §4).
@@ -22,7 +23,6 @@ export class TaskHoursRequestsService {
     private notifications: NotificationsService,
   ) {}
 
-  private readonly ADMIN_ROLES = ['SUPERADMIN', 'ADMIN'];
 
   /** Statuses a request can sit in before anybody has ruled on it. */
   private readonly OPEN = 'REQUESTED';
@@ -77,7 +77,7 @@ export class TaskHoursRequestsService {
   }
 
   private mayApprove(issue: any, role: string, employeeId: number | null): boolean {
-    return this.ADMIN_ROLES.includes(role) || this.managesProject(issue, employeeId);
+    return isCompanyAdmin(role) || this.managesProject(issue, employeeId);
   }
 
   /**
@@ -442,7 +442,7 @@ export class TaskHoursRequestsService {
       where.issue = { projectId: Number(filters.projectId) };
     }
 
-    if (!this.ADMIN_ROLES.includes(role)) {
+    if (!isCompanyAdmin(role)) {
       const managed = await this.prisma.projectMember.findMany({
         where: { employeeId: employeeId ?? -1, role: 'PROJECT_MANAGER' },
         select: { projectId: true },

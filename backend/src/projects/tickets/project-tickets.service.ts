@@ -2,6 +2,7 @@ import {
   Injectable, NotFoundException, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isCompanyAdmin } from '../../common/company-roles';
 
 /**
  * Project tickets (§29, §30).
@@ -34,7 +35,6 @@ const PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 export class ProjectTicketsService {
   constructor(private prisma: PrismaService) {}
 
-  private readonly ADMIN_ROLES = ['SUPERADMIN', 'ADMIN'];
 
   private readonly LIST_SELECT = {
     id: true, ticketNumber: true, title: true, description: true,
@@ -85,7 +85,7 @@ export class ProjectTicketsService {
 
   /** Everything waiting on an administrator, across projects (§30). */
   async pending(companyId: number, role: string) {
-    if (!this.ADMIN_ROLES.includes(role)) {
+    if (!isCompanyAdmin(role)) {
       throw new ForbiddenException('Only an administrator reviews project tickets');
     }
     return this.prisma.projectTicket.findMany({
@@ -111,7 +111,7 @@ export class ProjectTicketsService {
     });
     if (!project) throw new NotFoundException('Project not found');
 
-    if (!this.ADMIN_ROLES.includes(role) && !(await this.managesProject(projectId, actorEmployeeId))) {
+    if (!isCompanyAdmin(role) && !(await this.managesProject(projectId, actorEmployeeId))) {
       throw new ForbiddenException('Only a project manager raises tickets on this project');
     }
 
@@ -156,7 +156,7 @@ export class ProjectTicketsService {
      * admin as its reviewer: the paper trail is the same, only the waiting is
      * skipped.
      */
-    if (this.ADMIN_ROLES.includes(role)) {
+    if (isCompanyAdmin(role)) {
       return this.prisma.$transaction(async (tx) => {
         const ticket = await tx.projectTicket.create({
           data: {
@@ -229,7 +229,7 @@ export class ProjectTicketsService {
         'This ticket has already been reviewed, so it can no longer be edited.',
       );
     }
-    if (!this.ADMIN_ROLES.includes(role) && !(await this.managesProject(ticket.projectId, actorEmployeeId))) {
+    if (!isCompanyAdmin(role) && !(await this.managesProject(ticket.projectId, actorEmployeeId))) {
       throw new ForbiddenException('Only a project manager edits tickets on this project');
     }
 
@@ -280,7 +280,7 @@ export class ProjectTicketsService {
     decision: 'APPROVED' | 'REJECTED',
     reason?: string,
   ) {
-    if (!this.ADMIN_ROLES.includes(role)) {
+    if (!isCompanyAdmin(role)) {
       throw new ForbiddenException('Only an administrator approves project tickets');
     }
     if (decision === 'REJECTED' && !reason?.trim()) {
@@ -409,7 +409,7 @@ export class ProjectTicketsService {
     if (ticket.status !== 'REQUESTED') {
       throw new BadRequestException('Only a ticket still awaiting review can be cancelled');
     }
-    if (!this.ADMIN_ROLES.includes(role) && !(await this.managesProject(ticket.projectId, actorEmployeeId))) {
+    if (!isCompanyAdmin(role) && !(await this.managesProject(ticket.projectId, actorEmployeeId))) {
       throw new ForbiddenException('Only a project manager cancels tickets on this project');
     }
 

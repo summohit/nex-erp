@@ -27,6 +27,7 @@ import {
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../services/auth.service';
+import { RoleService } from '../../services/role.service';
 
 @Component({
   selector: 'app-security-settings',
@@ -62,6 +63,7 @@ import { AuthService } from '../../services/auth.service';
 })
 export class SecurityComponent implements OnInit {
   private authService = inject(AuthService);
+  private roles = inject(RoleService);
   private toast = inject(HotToastService);
 
   isLoading = signal(true);
@@ -119,7 +121,7 @@ export class SecurityComponent implements OnInit {
   adminConfirming = signal(false);
 
   get isSuperAdmin(): boolean {
-    return this.authService.currentUser()?.role === 'SUPERADMIN';
+    return this.roles.isSuperAdmin();
   }
 
   /** The signed-in user, who must not reset their own second factor here. */

@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, ForbiddenException } from '@
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY, PermissionRequirement } from '../require-permissions.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isCompanyAdmin } from '../../common/company-roles';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -23,7 +24,7 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('User is not authenticated');
     }
 
-    if (user.role === 'SUPER_ADMIN' || user.role === 'SUPERADMIN' || user.role === 'ADMIN') {
+    if (isCompanyAdmin(user.role)) {
       return true;
     }
 

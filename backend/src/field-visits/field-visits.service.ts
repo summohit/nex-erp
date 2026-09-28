@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { isCompanyAdmin } from '../common/company-roles';
 
 @Injectable()
 export class FieldVisitsService {
@@ -11,7 +12,7 @@ export class FieldVisitsService {
    * client asks for. Mirrors the role set used by PermissionsGuard.
    */
   private canSeeAllVisits(role?: string): boolean {
-    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN';
+    return isCompanyAdmin(role);
   }
 
   private async requireOwnEmployeeId(userId: number): Promise<number> {

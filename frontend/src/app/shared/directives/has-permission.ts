@@ -1,5 +1,6 @@
 import { Directive, Input, TemplateRef, ViewContainerRef, inject, effect } from '@angular/core';
 import { AuthService } from '../../services/auth.service';
+import { RoleService } from '../../services/role.service';
 
 @Directive({
   selector: '[appHasPermission]',
@@ -7,6 +8,7 @@ import { AuthService } from '../../services/auth.service';
 })
 export class HasPermission {
   private authService = inject(AuthService);
+  private roles = inject(RoleService);
   private templateRef = inject(TemplateRef);
   private viewContainer = inject(ViewContainerRef);
   
@@ -31,7 +33,14 @@ export class HasPermission {
       return;
     }
 
-    if (user.role === 'SUPER_ADMIN') {
+    // The company owner is not subject to granular permissions.
+    //
+    // This tested 'SUPER_ADMIN', a spelling no User row has ever held, so the
+    // bypass never fired. Nothing broke only because the directive is not yet
+    // used in any template — the first `*appHasPermission` added would have
+    // hidden itself from every Super Admin, none of whom hold explicit
+    // permission rows.
+    if (this.roles.isSuperAdmin()) {
       this.showView();
       return;
     }

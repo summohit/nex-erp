@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { isHrAdmin } from '../common/company-roles';
 
 /**
  * The company notice board.
@@ -34,7 +35,7 @@ function endOfDayIfDateOnly(value: string): Date {
 @Injectable()
 export class NoticesService {
   private readonly logger = new Logger(NoticesService.name);
-  private readonly ADMIN_ROLES = ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN', 'HR'];
+  
 
   constructor(
     private prisma: PrismaService,
@@ -42,7 +43,7 @@ export class NoticesService {
   ) {}
 
   private assertMayPublish(role: string) {
-    if (!this.ADMIN_ROLES.includes(role)) {
+    if (!isHrAdmin(role)) {
       throw new ForbiddenException('Only an administrator or HR can post a notice');
     }
   }
@@ -72,7 +73,7 @@ export class NoticesService {
    * announcement yet, and a retired one is no longer being made.
    */
   async list(companyId: number, role: string) {
-    if (this.ADMIN_ROLES.includes(role)) {
+    if (isHrAdmin(role)) {
       return this.prisma.notice.findMany({
         where: { companyId },
         orderBy: [{ publishedAt: 'desc' }],
@@ -95,7 +96,7 @@ export class NoticesService {
 
   /** Whether this role may post, so the page knows what to offer. */
   canPost(role: string): boolean {
-    return this.ADMIN_ROLES.includes(role);
+    return isHrAdmin(role);
   }
 
   /**

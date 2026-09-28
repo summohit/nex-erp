@@ -37,6 +37,7 @@ import {
 
 import { AssetActionCellRendererComponent } from '../shared/components/asset-action-cell-renderer.component';
 import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
+import { RoleService } from '../services/role.service';
 
 const ADD_NEW_CATEGORY_ID = '__ADD_NEW_CATEGORY__';
 
@@ -111,6 +112,7 @@ const IT_CATEGORIES = ['LAPTOP', 'DESKTOP', 'MONITOR', 'PRINTER', 'PERIPHERAL', 
 })
 export class AssetsComponent implements OnInit {
   private assetService = inject(AssetService);
+  private roles = inject(RoleService);
   private employeeService = inject(EmployeeService);
   private uploadService = inject(UploadService);
   private authService = inject(AuthService);
@@ -162,9 +164,7 @@ export class AssetsComponent implements OnInit {
     const r = this.currentUser()?.role;
     return r === 'SUPERADMIN' || r === 'ADMIN' || r === 'HR' || r === 'OFFICE_STAFF';
   });
-  isSuperAdmin = computed(() => {
-    return this.currentUser()?.role === 'SUPERADMIN';
-  });
+  isSuperAdmin = computed(() => this.roles.isSuperAdmin());
 
   // Legacy KPI Metrics (requests tab)
   pendingRequestsCount = computed(() => this.requests().filter(r => r.status === 'PENDING').length);

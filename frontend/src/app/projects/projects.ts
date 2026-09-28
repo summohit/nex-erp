@@ -28,6 +28,7 @@ import { DialogService } from '../shared/services/dialog.service';
 import { ProjectStarCellRendererComponent } from '../shared/components/project-star-cell-renderer.component';
 import { ProjectActionCellRendererComponent } from '../shared/components/project-action-cell-renderer.component';
 import { getAccessToken } from '../core/token-storage';
+import { RoleService } from '../services/role.service';
 import {
   TasksService, MyTask, TaskCapabilities, TaskType, LeadOption, TaskScope,
   PreSalesInfo, PreSalesTaskHistoryEntry,
@@ -104,6 +105,7 @@ function getStatusColors(status: string): { bg: string; color: string } {
 })
 export class ProjectsComponent implements OnInit {
   private projectsService = inject(ProjectsService);
+  private roles = inject(RoleService);
   private clientsService = inject(ClientsService);
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
@@ -1057,7 +1059,7 @@ export class ProjectsComponent implements OnInit {
 
   // Duplicating a project is a super-admin-only action.
   get isSuperAdmin(): boolean {
-    return this.currentUser()?.role === 'SUPERADMIN';
+    return this.roles.isSuperAdmin();
   }
 
   // Management-level administrator: system admin role, or CEO/CTO by designation.
