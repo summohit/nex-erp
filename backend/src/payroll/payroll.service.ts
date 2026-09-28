@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import { EmailService } from './email.service';
+import { countsAsAttended } from '../attendance/clock-out-approval';
 
 const PREDEFINED_COMPONENTS = [
   { name: 'Basic Salary', type: 'EARNING', description: 'Base component of employee salary' },
@@ -286,19 +287,28 @@ export class PayrollService {
           employeeId: emp.id,
           date: { gte: new Date(year, month - 1, 1), lte: new Date(year, month, 0) },
         },
-        select: { date: true, status: true },
+        select: { date: true, status: true, clockOutApproval: true },
       });
       const byDay = new Map<string, string>();
       let present = 0;
       let half = 0;
       for (const a of attendances) {
+        // §Att5: a late clock-out awaiting approval, or refused, is a claim
+        // about a day rather than a record of one. It must not reach payroll
+        // as attendance — the day falls through to the absence check below,
+        // exactly as it would if it had never been opened, until somebody
+        // rules on it.
+        if (!countsAsAttended(a)) continue;
         byDay.set(a.date.toISOString().split('T')[0], a.status);
         if (a.status === 'PRESENT') present++;
         else if (a.status === 'HALF_DAY') half++;
       }
 
+      // §Att10: deleted leave stops covering an absence. Left in, a removed
+      // request would keep excusing days it no longer exists to excuse — and
+      // the only visible symptom would be pay that nobody can account for.
       const leaves = await this.prisma.leaveRequest.findMany({
-        where: { employeeId: emp.id, status: 'APPROVED' },
+        where: { employeeId: emp.id, status: 'APPROVED', deletedAt: null },
         select: { startDate: true, endDate: true },
       });
 
@@ -437,6 +447,7 @@ export class PayrollService {
         where: {
           employeeId: emp.id,
           status: 'APPROVED',
+          deletedAt: null,
           leaveType: { isPaid: true },
           startDate: { lte: endDate },
           endDate: { gte: startDate }
@@ -449,6 +460,8 @@ export class PayrollService {
       
       const attendanceMap = new Map();
       for (const att of attendances) {
+        // §Att5, same rule as the preview above: unapproved is not attended.
+        if (!countsAsAttended(att)) continue;
         // Simple YYYY-MM-DD string for safe comparison ignoring timezones
         const dateStr = att.date.toISOString().split('T')[0];
         attendanceMap.set(dateStr, att.status);

@@ -631,6 +631,68 @@ export class FieldVisitActivationService {
     }
   }
 
+  /**
+   * Put somebody back on their own shift after leave over those days goes away
+   * (§Att10).
+   *
+   * Cancelling leave does NOT put them back on the trip. By the time the leave
+   * was approved the days were released, their tasks may have been archived and
+   * somebody else was very likely asked to cover; silently restoring all of it
+   * would resurrect a plan that has moved on. The trip keeps its ON_LEAVE days
+   * and the person goes back to ordinary work, which is what "returns to the
+   * general shift" means.
+   *
+   * So this only clears on-site residue: a roster cell still naming a project,
+   * an address or a bespoke clock window for a day nobody is going to site.
+   * Left behind, it would claim they are at a client site — and because on-site
+   * days skip the office geofence, it is a hole in the attendance rules as well
+   * as a wrong roster.
+   *
+   * Deliberately does not touch `isDayOff`, or a cell whose shift somebody set
+   * on purpose. A manager rostering them to nights that week made a decision
+   * that has nothing to do with the leave, and undoing it would be this
+   * function exceeding what it knows.
+   *
+   * Idempotent: with nothing to clear it does nothing, which is the normal case
+   * for leave that never touched a trip.
+   */
+  async restoreStandingShiftAfterLeave(
+    tx: Tx,
+    leave: { employeeId: number; companyId: number; from: Date; to: Date },
+  ): Promise<number> {
+    const rows = await tx.shiftRosterEntry.findMany({
+      where: {
+        companyId: leave.companyId,
+        employeeId: leave.employeeId,
+        date: { gte: this.dayKey(leave.from), lte: this.dayKey(leave.to) },
+        OR: [
+          { projectId: { not: null } },
+          { address: { not: null } },
+        ],
+      },
+      select: { id: true, shiftId: true },
+    });
+    if (!rows.length) return 0;
+
+    // A cell with no shift of its own existed only to carry the on-site
+    // details. Emptied, it says nothing, and an empty row is not the same as
+    // no row: the resolver reads a row as an override. Remove it so the
+    // standing shift applies.
+    const empty = rows.filter((r: any) => r.shiftId == null).map((r: any) => r.id);
+    const kept = rows.filter((r: any) => r.shiftId != null).map((r: any) => r.id);
+
+    if (empty.length) {
+      await tx.shiftRosterEntry.deleteMany({ where: { id: { in: empty } } });
+    }
+    if (kept.length) {
+      await tx.shiftRosterEntry.updateMany({
+        where: { id: { in: kept } },
+        data: { projectId: null, address: null, startTime: null, endTime: null, note: null },
+      });
+    }
+    return rows.length;
+  }
+
   // ─── When an approved trip changes ─────────────────────────────────────────
 
   /**

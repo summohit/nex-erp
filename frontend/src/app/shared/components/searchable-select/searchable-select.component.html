@@ -1,9 +1,9 @@
 <div class="searchable-select" [class.open]="isOpen" [class.disabled]="disabled" [class.full-width]="fullWidth">
-  <button type="button" class="select-trigger form-control" (click)="toggle()" [disabled]="disabled">
-    <div class="select-trigger-content">
+  <button type="button" class="select-trigger form-control" (click)="toggle()" [disabled]="disabled" style="text-align: left;">
+    <div class="select-trigger-content" style="text-align: left; justify-content: flex-start;">
       <ng-content select="[prefix]"></ng-content>
-      <div class="select-text-group">
-        <span class="select-label" [class.placeholder]="isPlaceholder">{{ selectedLabel }}</span>
+      <div class="select-text-group" style="text-align: left; align-items: flex-start;">
+        <span class="select-label" [class.placeholder]="isPlaceholder" style="text-align: left;">{{ selectedLabel }}</span>
       </div>
     </div>
     <div class="select-trigger-tail">

@@ -606,25 +606,25 @@
               <tr 
                 *ngFor="let p of filteredProcessingPayslips()" 
                 class="salary-row processing-row"
-                [class.payroll-row-inactive]="p.employee?.user?.status === 'SUSPENDED'">
+                [class.payroll-row-inactive]="p.employee.user?.status === 'SUSPENDED'">
                 
                 <!-- 1. Employee Profile (Avatar, Name, Designation, Department below) -->
                 <td class="td-employee">
                   <div class="emp-profile-cell" (click)="openPayslipDetail(p)">
-                    <img [src]="p.employee?.avatarUrl" alt="" class="row-avatar-img" *ngIf="p.employee?.avatarUrl">
-                    <div class="row-avatar-circle" *ngIf="!p.employee?.avatarUrl">
-                      {{ (p.employee?.firstName || 'E').charAt(0) }}{{ (p.employee?.lastName || '').charAt(0) }}
+                    <img [src]="p.employee.avatarUrl" alt="" class="row-avatar-img" *ngIf="p.employee.avatarUrl">
+                    <div class="row-avatar-circle" *ngIf="!p.employee.avatarUrl">
+                      {{ (p.employee.firstName || 'E').charAt(0) }}{{ (p.employee.lastName || '').charAt(0) }}
                     </div>
                     <div class="emp-name-stack">
                       <div class="emp-display-name">
-                        {{ p.employee?.firstName }} {{ p.employee?.lastName }}
-                        <span class="inactive-pill" *ngIf="p.employee?.user?.status === 'SUSPENDED'">Suspended</span>
+                        {{ p.employee.firstName }} {{ p.employee.lastName }}
+                        <span class="inactive-pill" *ngIf="p.employee.user?.status === 'SUSPENDED'">Suspended</span>
                       </div>
                       <div class="emp-sub-designation">
-                        {{ p.employee?.designation?.name || 'Staff' }}
+                        {{ p.employee.designation?.name || 'Staff' }}
                       </div>
-                      <div class="emp-sub-department" *ngIf="p.employee?.department?.name">
-                        {{ p.employee?.department?.name }}
+                      <div class="emp-sub-department" *ngIf="p.employee.department?.name">
+                        {{ p.employee.department?.name }}
                       </div>
                     </div>
                   </div>
@@ -1063,25 +1063,25 @@
               <tr 
                 *ngFor="let p of filteredPayslipsList()" 
                 class="salary-row processing-row"
-                [class.payroll-row-inactive]="p.employee?.user?.status === 'SUSPENDED'">
+                [class.payroll-row-inactive]="p.employee.user?.status === 'SUSPENDED'">
                 
                 <!-- 1. Employee Profile (Avatar, Name, Designation, Department below) -->
                 <td class="td-employee">
                   <div class="emp-profile-cell" (click)="openPayslipDetail(p)">
-                    <img [src]="p.employee?.avatarUrl" alt="" class="row-avatar-img" *ngIf="p.employee?.avatarUrl">
-                    <div class="row-avatar-circle" *ngIf="!p.employee?.avatarUrl">
-                      {{ (p.employee?.firstName || 'E').charAt(0) }}{{ (p.employee?.lastName || '').charAt(0) }}
+                    <img [src]="p.employee.avatarUrl" alt="" class="row-avatar-img" *ngIf="p.employee.avatarUrl">
+                    <div class="row-avatar-circle" *ngIf="!p.employee.avatarUrl">
+                      {{ (p.employee.firstName || 'E').charAt(0) }}{{ (p.employee.lastName || '').charAt(0) }}
                     </div>
                     <div class="emp-name-stack">
                       <div class="emp-display-name">
-                        {{ p.employee?.firstName }} {{ p.employee?.lastName }}
-                        <span class="inactive-pill" *ngIf="p.employee?.user?.status === 'SUSPENDED'">Suspended</span>
+                        {{ p.employee.firstName }} {{ p.employee.lastName }}
+                        <span class="inactive-pill" *ngIf="p.employee.user?.status === 'SUSPENDED'">Suspended</span>
                       </div>
                       <div class="emp-sub-designation">
-                        {{ p.employee?.designation?.name || 'Staff' }}
+                        {{ p.employee.designation?.name || 'Staff' }}
                       </div>
-                      <div class="emp-sub-department" *ngIf="p.employee?.department?.name">
-                        {{ p.employee?.department?.name }}
+                      <div class="emp-sub-department" *ngIf="p.employee.department?.name">
+                        {{ p.employee.department?.name }}
                       </div>
                     </div>
                   </div>
@@ -2785,7 +2785,7 @@
               {{ getMonthName(ep.month) }} {{ ep.year }}
             </span>
             <span class="divider-dot">·</span>
-            <span class="emp-name-sub">{{ ep.employee?.firstName }} {{ ep.employee?.lastName }}</span>
+            <span class="emp-name-sub">{{ ep.employee.firstName }} {{ ep.employee.lastName }}</span>
           </p>
         </div>
         <button class="btn-icon" (click)="closePayslipEdit()" title="Close editor">✕</button>
@@ -2796,18 +2796,18 @@
         <div class="edit-employee-card">
           <div class="emp-card-left">
             <div class="emp-card-avatar">
-              {{ (ep.employee?.firstName?.[0] || 'E') + (ep.employee?.lastName?.[0] || '') }}
+              {{ (ep.employee.firstName[0] || 'E') + (ep.employee.lastName[0] || '') }}
             </div>
             <div class="emp-card-info">
-              <h3 class="emp-card-name">{{ ep.employee?.firstName }} {{ ep.employee?.lastName }}</h3>
+              <h3 class="emp-card-name">{{ ep.employee.firstName }} {{ ep.employee.lastName }}</h3>
               <div class="emp-card-tags">
                 <span class="emp-tag designation-tag">
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-                  {{ ep.employee?.designation?.name || 'Staff' }}
+                  {{ ep.employee.designation?.name || 'Staff' }}
                 </span>
-                <span class="emp-tag dept-tag" *ngIf="ep.employee?.department?.name">
+                <span class="emp-tag dept-tag" *ngIf="ep.employee.department?.name">
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M9 8h1"></path><path d="M9 12h1"></path><path d="M9 16h1"></path><path d="M14 8h1"></path><path d="M14 12h1"></path><path d="M14 16h1"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path></svg>
-                  {{ ep.employee?.department?.name }}
+                  {{ ep.employee.department?.name }}
                 </span>
               </div>
             </div>

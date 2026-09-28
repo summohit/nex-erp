@@ -410,9 +410,43 @@
         </div>
       </div>
 
+      <!-- §Att9: apply for somebody else. Only shown to people the server says
+           may do it, and only when raising a new request — editing an existing
+           one never changes whose leave it is. -->
+      <div class="form-group mb-4" *ngIf="canActOnBehalf() === true && !editMode()">
+        <label>Applying for</label>
+        <select class="form-control" [(ngModel)]="requestForm.onBehalfOfEmployeeId">
+          <option [ngValue]="null">Myself</option>
+          <option *ngFor="let emp of onBehalfEmployees()" [ngValue]="emp.id">
+            {{ emp.name }}<span *ngIf="emp.subtitle"> · {{ emp.subtitle }}</span>
+          </option>
+        </select>
+        <!-- Says plainly what is about to happen: this is approved on the spot
+             and the balance moves, which is not what "apply for leave" usually
+             means on this screen. -->
+        <div *ngIf="requestForm.onBehalfOfEmployeeId"
+             style="margin-top: 10px; padding: 10px 12px; background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; font-size: 12.5px; color: #1e40af; line-height: 1.5;">
+          This will be recorded as <strong>approved</strong> straight away and the days
+          will come off {{ onBehalfName() }}'s balance. The record will show that you raised it.
+          <span *ngIf="requestForm.startDate && requestForm.endDate"> Past dates are allowed here.</span>
+        </div>
+      </div>
+
       <div class="form-group mb-4">
         <label>Leave Type <span style="color: #919192;">*</span></label>
-        <select class="form-control" [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#919192' : ''" [disabled]="myBalances().length === 0">
+        <!-- §Att9: raising it for somebody else, the list comes from the
+             company's leave types rather than the applicant's own balances —
+             an HR user with no allocation of their own would otherwise see an
+             empty dropdown and be unable to file anything for anyone. The
+             balance that matters is the target's, and the server checks it. -->
+        <select *ngIf="requestForm.onBehalfOfEmployeeId" class="form-control"
+                [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()"
+                [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#919192' : ''">
+          <option value="">Select Leave Type...</option>
+          <option *ngFor="let t of leaveTypes()" [value]="t.id">{{ t.name }}</option>
+        </select>
+
+        <select *ngIf="!requestForm.onBehalfOfEmployeeId" class="form-control" [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#919192' : ''" [disabled]="myBalances().length === 0">
           <option value="">{{ myBalances().length === 0 ? 'No Leave Types Available' : 'Select Leave Type...' }}</option>
           <option *ngFor="let balance of myBalances()" [value]="balance.leaveType.id">
             {{ balance.leaveType.name }} ({{ balance.allocated - balance.used }} days available)

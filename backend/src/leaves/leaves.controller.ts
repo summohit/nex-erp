@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, Query, ParseIntPipe } from '@nestjs/common';
 import { LeavesService } from './leaves.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -46,6 +46,27 @@ export class LeavesController {
     return this.leavesService.requestLeave(req.user.sub, data);
   }
 
+  // §Att9: apply leave for somebody else. Its own route rather than an
+  // optional employeeId on `request`, so an ordinary employee cannot reach the
+  // on-behalf path by adding a field to a payload.
+  @Post('request/on-behalf')
+  requestLeaveOnBehalf(
+    @Request() req,
+    @Body() data: { employeeId: number, leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string },
+  ) {
+    return this.leavesService.requestLeaveOnBehalf(req.user.sub, data);
+  }
+
+  /** Whether to offer the on-behalf option at all — partly a delegate list. */
+  @Get('request/can-act-on-behalf')
+  async canActOnBehalf(@Request() req) {
+    return {
+      canActOnBehalf: await this.leavesService.mayActOnBehalf(
+        req.user.companyId, req.user.role, req.user.employeeId ?? null,
+      ),
+    };
+  }
+
   @Get('requests/me')
   getMyRequests(@Request() req) {
     return this.leavesService.getMyRequests(req.user.sub);
@@ -69,6 +90,14 @@ export class LeavesController {
   @Put('requests/:id/cancel')
   cancelRequest(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.leavesService.cancelRequest(req.user.sub, id);
+  }
+
+  // §Att10: Super Admin only, enforced in the service. A soft delete — the row
+  // survives, every reader stops seeing it, and an approved request gives its
+  // days back on the way out.
+  @Delete('requests/:id')
+  deleteRequest(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.leavesService.deleteRequest(req.user.sub, id);
   }
 
   @Put('requests/:id/status')

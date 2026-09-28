@@ -165,6 +165,13 @@ export class AttendanceLeaveComponent implements OnInit {
     note: ''
   };
 
+  /**
+   * §Att10: deleting a leave request is the Super Admin's alone — narrower
+   * than `isAdmin`, which admits ADMIN and HR. The server enforces the same
+   * rule; this only decides whether the button is worth showing.
+   */
+  canDeleteLeave = computed(() => this.authService.currentUser()?.role === 'SUPERADMIN');
+
   isAdmin = computed(() => {
     const role = this.authService.currentUser()?.role;
     return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN';
@@ -296,7 +303,11 @@ export class AttendanceLeaveComponent implements OnInit {
         onEdit: (data: any) => this.editLeaveRequest(data),
         onCancel: (data: any) => this.cancelLeaveRequest(data.id),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
-        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason)
+        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason),
+        // §Att10: handed over only to a Super Admin. The renderer treats the
+        // callback's presence as the permission, so withholding it hides the
+        // menu entry entirely rather than showing something that would 403.
+        onDelete: this.canDeleteLeave() ? (data: any) => this.deleteLeaveRequest(data) : undefined
       }
     }
   ];
@@ -528,7 +539,8 @@ export class AttendanceLeaveComponent implements OnInit {
         onApprove: (data: any) => this.approveLeaveRequest(data.id),
         onReject: (data: any) => this.openRejectModal(data.id),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
-        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason)
+        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason),
+        onDelete: this.canDeleteLeave() ? (data: any) => this.deleteLeaveRequest(data) : undefined
       }
     }
   ];
@@ -585,8 +597,18 @@ export class AttendanceLeaveComponent implements OnInit {
     reason: '',
     attachmentUrl: '',
     isHalfDay: false,
-    halfDayPeriod: 'AM'
+    halfDayPeriod: 'AM',
+    /** §Att9: whose leave this is. Null — the default — means the applicant's own. */
+    onBehalfOfEmployeeId: null as number | null,
   };
+
+  /**
+   * §Att9. Null until the server has answered: the option must not flicker
+   * into view, and an administrator must not be told they cannot do something
+   * while the check is still running.
+   */
+  canActOnBehalf = signal<boolean | null>(null);
+  onBehalfEmployees = signal<{ id: number; name: string; subtitle?: string }[]>([]);
 
   // Regularization State
   myRegularizations = signal<any[]>([]);
@@ -815,12 +837,14 @@ export class AttendanceLeaveComponent implements OnInit {
         reason: request.reason || '',
         attachmentUrl: request.attachmentUrl || '',
         isHalfDay: !!request.isHalfDay,
-        halfDayPeriod: request.halfDayPeriod || 'AM'
+        halfDayPeriod: request.halfDayPeriod || 'AM',
+        // Editing an existing request never changes whose it is.
+        onBehalfOfEmployeeId: null,
       };
     } else {
       this.editMode.set(false);
       this.selectedRequestId.set(null);
-      this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM' };
+      this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM', onBehalfOfEmployeeId: null };
     }
     this.isRequestModalOpen.set(true);
   }
@@ -837,7 +861,7 @@ export class AttendanceLeaveComponent implements OnInit {
     this.editMode.set(false);
     this.selectedRequestId.set(null);
     this.selectedFile = null;
-    this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM' };
+    this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM', onBehalfOfEmployeeId: null };
   }
 
   onFileSelected(event: any) {
@@ -1019,12 +1043,18 @@ export class AttendanceLeaveComponent implements OnInit {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     const requestedDays = this.requestForm.isHalfDay ? 0.5 : diffDays;
 
-    const balance = this.myBalances().find(b => b.leaveType.id === Number(this.requestForm.leaveTypeId));
-    if (balance) {
-      const available = balance.allocated - balance.used;
-      if (requestedDays > available) {
-        this.toast.error(`Insufficient balance. You requested ${requestedDays} ${requestedDays === 1 ? 'day' : 'days'} but only have ${available} days available.`);
-        return;
+    // §Att9: this check reads the APPLICANT's balance, which is the wrong
+    // person's the moment the leave is being raised for somebody else. Skipped
+    // rather than adapted — the server holds the target's real balance and is
+    // the only place that can answer it without a second round trip.
+    if (!this.requestForm.onBehalfOfEmployeeId) {
+      const balance = this.myBalances().find(b => b.leaveType.id === Number(this.requestForm.leaveTypeId));
+      if (balance) {
+        const available = balance.allocated - balance.used;
+        if (requestedDays > available) {
+          this.toast.error(`Insufficient balance. You requested ${requestedDays} ${requestedDays === 1 ? 'day' : 'days'} but only have ${available} days available.`);
+          return;
+        }
       }
     }
     
@@ -1041,9 +1071,15 @@ export class AttendanceLeaveComponent implements OnInit {
         halfDayPeriod: this.requestForm.isHalfDay ? this.requestForm.halfDayPeriod : null
       };
 
-      const ob$ = this.editMode() && this.selectedRequestId() 
+      // §Att9: raising it for somebody else is a different endpoint, not a flag
+      // on this one — the server will not accept an employeeId here.
+      const onBehalfOf = this.requestForm.onBehalfOfEmployeeId;
+
+      const ob$ = this.editMode() && this.selectedRequestId()
         ? this.leavesService.updateRequest(this.selectedRequestId()!, payload)
-        : this.leavesService.requestLeave(payload);
+        : onBehalfOf
+          ? this.leavesService.requestLeaveOnBehalf({ ...payload, employeeId: onBehalfOf })
+          : this.leavesService.requestLeave(payload);
 
       ob$.subscribe({
         next: (res: any) => {
@@ -1061,7 +1097,11 @@ export class AttendanceLeaveComponent implements OnInit {
               { duration: 9000 },
             );
           } else {
-            this.toast.success(this.editMode() ? 'Leave request updated' : 'Leave requested successfully');
+            this.toast.success(
+              this.editMode() ? 'Leave request updated'
+                : onBehalfOf ? 'Leave applied and approved'
+                : 'Leave requested successfully',
+            );
           }
           this.closeRequestModal();
           this.loadData();
@@ -1121,6 +1161,57 @@ export class AttendanceLeaveComponent implements OnInit {
   // ── Leave detail modal ──────────────────────────────────────────────────
   isLeaveDetailOpen = signal(false);
   selectedLeave = signal<any>(null);
+
+  /** The people leave can be raised for (§Att9). */
+  private loadOnBehalfEmployees() {
+    this.employeeService.getEmployeesBasicList().subscribe({
+      next: (list: any[]) => this.onBehalfEmployees.set(
+        (list ?? []).map((e) => ({
+          id: e.id,
+          name: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() || `Employee ${e.id}`,
+          subtitle: e.employeeCode || e.designation?.name || e.designation || undefined,
+        })),
+      ),
+      error: () => this.toast.error('Could not load the employee list'),
+    });
+  }
+
+  /** The chosen person's name, for the notice in the modal. */
+  onBehalfName(): string {
+    const id = this.requestForm.onBehalfOfEmployeeId;
+    if (!id) return '';
+    return this.onBehalfEmployees().find((e) => e.id === id)?.name ?? '';
+  }
+
+  /**
+   * §Att10: remove a leave request outright. Super Admin only — the server
+   * refuses anybody else, and the button is hidden from them too.
+   *
+   * Asked about first, and the wording says what it costs: for an approved
+   * request the days go back, which is the part nobody expects.
+   */
+  deleteLeaveRequest(request: any) {
+    const who = request?.employee
+      ? `${request.employee.firstName} ${request.employee.lastName}`.trim()
+      : 'this employee';
+    const approved = request?.status === 'APPROVED';
+
+    const ok = confirm(
+      approved
+        ? `Delete ${who}'s APPROVED leave?\n\nThe days go back to their balance and the request disappears everywhere, including payroll.`
+        : `Delete ${who}'s leave request?\n\nIt will disappear everywhere.`,
+    );
+    if (!ok) return;
+
+    this.leavesService.deleteRequest(request.id).subscribe({
+      next: () => {
+        this.toast.success('Leave request deleted');
+        this.loadData();
+        this.loadAdminData();
+      },
+      error: (err: any) => this.toast.error(err.error?.message || 'Could not delete that request'),
+    });
+  }
 
   openLeaveDetail(data: any) {
     this.selectedLeave.set(data);
@@ -1534,6 +1625,17 @@ export class AttendanceLeaveComponent implements OnInit {
   private timerInterval: any;
 
   ngOnInit() {
+    // §Att9: whether to offer applying on somebody else's behalf. Asked of the
+    // server rather than inferred from the role, because a delegate holding no
+    // special role may also be allowed.
+    this.leavesService.canActOnBehalf().subscribe({
+      next: (res) => {
+        this.canActOnBehalf.set(!!res?.canActOnBehalf);
+        if (res?.canActOnBehalf) this.loadOnBehalfEmployees();
+      },
+      error: () => this.canActOnBehalf.set(false),
+    });
+
     this.route.paramMap.subscribe(params => {
       const tab = params.get('tab');
       if (tab === 'timesheets' || tab === 'attendance') {

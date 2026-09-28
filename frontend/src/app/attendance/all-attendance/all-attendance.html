@@ -112,6 +112,84 @@
     </div>
   </div>
 
+  <!-- §Att6: Top Performers Recognition (Attendance Champions Leaderboard) -->
+  <div class="top-performers-card" *ngIf="topPerformers().length > 0">
+    <div class="performers-header">
+      <div class="ph-left">
+        <div class="ph-icon-box">
+          <svg lucideTrophy [size]="20"></svg>
+        </div>
+        <div>
+          <div class="ph-title-row">
+            <h3>Attendance Champions</h3>
+            <span class="ph-month-badge">{{ getSelectedMonthLabel() }} {{ filterYear }}</span>
+          </div>
+          <p class="ph-sub">Recognizing employees with the highest consistency, punctuality, and attendance rate</p>
+        </div>
+      </div>
+      <div class="ph-right">
+        <span class="ph-pill"><svg lucideSparkles [size]="14"></svg> Top 3 Recognition</span>
+      </div>
+    </div>
+
+    <div class="performers-grid">
+      <div class="performer-card" *ngFor="let p of topPerformers()" [ngClass]="p.meta.class">
+        <!-- Top Tier Banner / Header -->
+        <div class="p-card-top">
+          <div class="p-rank-pill">
+            <span class="rank-num">#{{ p.rankNumber }}</span>
+            <span class="rank-name">{{ p.meta.title }}</span>
+          </div>
+          <span class="p-tier-badge">{{ p.meta.badge }}</span>
+        </div>
+
+        <!-- Performer Profile -->
+        <div class="p-profile">
+          <div class="p-avatar-wrap">
+            <div class="avatar-circle" *ngIf="!p.emp?.avatarUrl">{{ (p.emp?.firstName || '?')[0] }}{{ (p.emp?.lastName || '')[0] }}</div>
+            <img class="avatar-img" *ngIf="p.emp?.avatarUrl" [src]="p.emp?.avatarUrl" alt="Avatar" />
+            <div class="rank-icon-indicator">
+              <svg *ngIf="p.rankNumber === 1" lucideTrophy [size]="12"></svg>
+              <svg *ngIf="p.rankNumber === 2" lucideAward [size]="12"></svg>
+              <svg *ngIf="p.rankNumber === 3" lucideStar [size]="12"></svg>
+            </div>
+          </div>
+          <div class="p-details">
+            <h4 class="p-name">{{ p.emp?.firstName }} {{ p.emp?.lastName }}</h4>
+            <span class="p-designation">{{ p.emp?.designation?.name || p.emp?.department?.name || 'Staff' }}</span>
+            <span class="p-code" *ngIf="p.emp?.employeeCode">{{ p.emp?.employeeCode }}</span>
+          </div>
+        </div>
+
+        <!-- Metrics Row -->
+        <div class="p-metrics-row">
+          <div class="metric-box">
+            <div class="m-label-row">
+              <svg lucideUserCheck [size]="13"></svg>
+              <span>ATTENDANCE</span>
+            </div>
+            <div class="m-val">{{ p.pct }}%</div>
+            <div class="m-sub">{{ p.presentDays }} / {{ p.workingDays }} days</div>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-box">
+            <div class="m-label-row">
+              <svg lucideTimer [size]="13"></svg>
+              <span>PUNCTUALITY</span>
+            </div>
+            <div class="m-val" [class.text-green]="p.punctuality >= 90">{{ p.punctuality }}%</div>
+            <div class="m-sub">{{ p.onTimeDays }} on-time</div>
+          </div>
+        </div>
+
+        <!-- Progress / Consistency bar -->
+        <div class="p-progress-track" title="Attendance Rate">
+          <div class="p-progress-fill" [style.width.%]="p.pct"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Sticky Controls Section (Filter Bar + Status Legend) -->
   <div class="sticky-controls-section">
     <!-- Search & Filter Card -->
@@ -416,7 +494,7 @@
 
   <!-- Monthly Grid View for All Employees -->
   <div class="matrix-card-container" *ngIf="viewMode() === 'grid' && !isLoading()">
-    <div class="matrix-scroll-wrapper" *ngIf="employeeGridRows().length > 0; else noMatrixData">
+    <div class="matrix-scroll-wrapper" (scroll)="onMatrixScroll()" *ngIf="employeeGridRows().length > 0; else noMatrixData">
       <table class="matrix-table">
         <thead>
           <tr>
@@ -454,7 +532,8 @@
             <td *ngFor="let day of row.days" class="col-day-cell" [class.is-weekend]="day.isWeekend">
               <div class="day-cell-badge"
                    [class.is-empty]="day.isFuture"
-                   [title]="day.tooltip"
+                   (mouseenter)="onCellMouseEnter($event, day)"
+                   (mouseleave)="onCellMouseLeave()"
                    (click)="openDayDetails(row.employee, day, day.record)"
                    [ngClass]="{
                      'bg-present': day.status === 'Present',
@@ -476,8 +555,8 @@
                   <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
                   <span *ngIf="day.record?.clockInLat" class="day-location-pin" title="GPS location logged">📍</span>
-                  <svg *ngIf="day.record?.overtimeHours" lucideZap class="day-corner-symbol day-ot-symbol status-overtime" title="Overtime — worked past the shift and clocked out late"></svg>
-                  <svg *ngIf="day.record?.clockOutReason" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Missed clock out — closed late with a recorded reason"></svg>
+                  <svg *ngIf="day.record?.overtimeHours" lucideZap class="day-corner-symbol day-ot-symbol status-overtime" title="Overtime"></svg>
+                  <svg *ngIf="day.record?.clockOutReason" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Missed clock out"></svg>
                 </ng-container>
                 <span *ngIf="day.isFuture" class="future-dot">·</span>
               </div>
@@ -505,6 +584,47 @@
         </button>
       </div>
     </ng-template>
+  </div>
+
+  <!-- Floating Custom Cell Tooltip (Never clipped by table overflow or boundaries) -->
+  <div class="fixed-cell-tooltip"
+       *ngIf="hoveredTooltip() as tip"
+       [class.placement-top]="tip.placement === 'top'"
+       [class.placement-bottom]="tip.placement === 'bottom'"
+       [style.top.px]="tip.top"
+       [style.left.px]="tip.left">
+    <div class="cell-tooltip-arrow" [style.left.px]="tip.arrowLeft"></div>
+    <div class="cell-tooltip-header">
+      <span class="cell-tooltip-status"
+            [ngClass]="{
+              'tip-present': tip.day.status === 'Present',
+              'tip-half-day': tip.day.status === 'Half Day',
+              'tip-late': tip.day.status === 'Late',
+              'tip-absent': tip.day.status === 'Absent',
+              'tip-leave': tip.day.status === 'On Leave',
+              'tip-holiday': tip.day.status === 'Holiday',
+              'tip-day-off': tip.day.status === 'Day Off'
+            }">{{ tip.day.status }}</span>
+      <span class="cell-tooltip-date">{{ tip.day.dayNumber }} {{ tip.day.weekdayStr }}</span>
+    </div>
+    <div class="cell-tooltip-body" *ngIf="tip.day.record?.clockIn">
+      <div class="cell-tooltip-times">
+        <span class="cell-tooltip-time"><strong>In:</strong> {{ formatTime(tip.day.record?.clockIn || null) }}</span>
+        <span class="cell-tooltip-time"><strong>Out:</strong> {{ tip.day.record?.clockOut ? formatTime(tip.day.record?.clockOut || null) : 'Not clocked out' }}</span>
+      </div>
+      <div class="cell-tooltip-detail" *ngIf="tip.day.record?.totalHours">
+        <strong>Duration:</strong> {{ formatHours(tip.day.record?.totalHours || 0) }}
+      </div>
+      <div class="cell-tooltip-detail cell-tooltip-overtime" *ngIf="(tip.day.record?.overtimeHours || 0) > 0">
+        ⚡ Overtime: {{ formatHours(tip.day.record?.overtimeHours || 0) }}
+      </div>
+      <div class="cell-tooltip-detail cell-tooltip-missed" *ngIf="tip.day.record?.clockOutReason">
+        ⏱ Missed clock-out: "{{ tip.day.record?.clockOutReason }}"
+      </div>
+    </div>
+    <div class="cell-tooltip-reason" *ngIf="tip.day.reason">
+      {{ tip.day.reason }}
+    </div>
   </div>
 
   <!-- Table View: Empty State -->

@@ -152,15 +152,22 @@
     <div class="drawer-body">
       <div class="form-grid">
         <!-- Searchable Department -->
-        <div class="form-group dropdown-field-container">
-          <label>Department <span class="required-star">*</span></label>
-          <div class="custom-select-trigger" (click)="toggleDeptDropdown()" [class.active]="deptDropdownOpen">
+        <div class="form-group dropdown-field-container" [class.has-error]="isFieldInvalid('department')">
+          <div class="field-label-row">
+            <label data-field="department">Department <span class="required-star">*</span></label>
+            <span class="field-error-badge" *ngIf="isFieldInvalid('department')">Required</span>
+          </div>
+          <div class="custom-select-trigger" (click)="toggleDeptDropdown()" [class.active]="deptDropdownOpen" [class.is-invalid]="isFieldInvalid('department')">
             <div class="selected-val">
               <svg lucideBuilding class="select-icon" *ngIf="jobForm.departmentName"></svg>
               <span *ngIf="jobForm.departmentName" class="selected-text">{{ jobForm.departmentName }}</span>
               <span *ngIf="!jobForm.departmentName" class="placeholder-text">Select Department...</span>
             </div>
             <svg lucideChevronDown class="chevron-icon" [class.rotated]="deptDropdownOpen"></svg>
+          </div>
+          <div class="field-error-text" *ngIf="isFieldInvalid('department')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>Department is required</span>
           </div>
 
           <div class="custom-dropdown-panel" *ngIf="deptDropdownOpen">
@@ -199,9 +206,22 @@
             <option *ngFor="let desig of allDesignations()" [value]="desig.name"></option>
           </datalist>
         </div>
-        <div class="form-group full-width">
-          <label>Custom Job Title (Optional)</label>
-          <input type="text" class="form-control" [(ngModel)]="jobForm.title" placeholder="e.g. Senior Frontend Developer (React)">
+        <div class="form-group full-width" [class.has-error]="isFieldInvalid('title')">
+          <div class="field-label-row">
+            <label data-field="title">Custom Job Title <span class="required-star">*</span></label>
+            <span class="field-error-badge" *ngIf="isFieldInvalid('title')">Required</span>
+          </div>
+          <input 
+            type="text" 
+            class="form-control" 
+            [class.is-invalid]="isFieldInvalid('title')"
+            [(ngModel)]="jobForm.title" 
+            (input)="onFieldInput('title')"
+            placeholder="e.g. Senior Frontend Developer (React)">
+          <div class="field-error-text" *ngIf="isFieldInvalid('title')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>Custom Job Title is required</span>
+          </div>
         </div>
 
         <!-- Experience Required -->
@@ -216,22 +236,36 @@
           </select>
         </div>
 
-        <div class="form-group">
-          <label>Employment Type</label>
-          <select class="form-control" [(ngModel)]="jobForm.type">
-            <option>Full Time</option>
-            <option>Part Time</option>
-            <option>Contractual</option>
-            <option>Freelancer</option>
-            <option>Internship</option>
-            <option>Trainee</option>
-            <option>Other</option>
+        <div class="form-group" [class.has-error]="isFieldInvalid('type')">
+          <div class="field-label-row">
+            <label data-field="type">Employment Type</label>
+            <span class="field-error-badge" *ngIf="isFieldInvalid('type')">Required</span>
+          </div>
+          <select class="form-control" [class.is-invalid]="isFieldInvalid('type')" [(ngModel)]="jobForm.type" (change)="onFieldInput('type')">
+            <option value="Full Time">Full Time</option>
+            <option value="Part Time">Part Time</option>
+            <option value="Contractual">Contractual</option>
+            <option value="Freelancer">Freelancer</option>
+            <option value="Internship">Internship</option>
+            <option value="Trainee">Trainee</option>
+            <option value="Other">Other</option>
           </select>
+          <div class="field-error-text" *ngIf="isFieldInvalid('type')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>Employment Type is required</span>
+          </div>
         </div>
 
-        <div class="form-group" *ngIf="jobForm.type === 'Other'">
-          <label>Custom Employment Type</label>
-          <input type="text" class="form-control" [(ngModel)]="jobForm.typeOther" placeholder="e.g. Volunteer">
+        <div class="form-group" *ngIf="jobForm.type === 'Other'" [class.has-error]="isFieldInvalid('typeOther')">
+          <div class="field-label-row">
+            <label data-field="typeOther">Custom Employment Type <span class="required-star">*</span></label>
+            <span class="field-error-badge" *ngIf="isFieldInvalid('typeOther')">Required</span>
+          </div>
+          <input type="text" class="form-control" [class.is-invalid]="isFieldInvalid('typeOther')" [(ngModel)]="jobForm.typeOther" (input)="onFieldInput('typeOther')" placeholder="e.g. Volunteer">
+          <div class="field-error-text" *ngIf="isFieldInvalid('typeOther')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>Please specify the employment type</span>
+          </div>
         </div>
 
         <div class="form-group">
@@ -315,11 +349,20 @@
           <input type="date" class="form-control" [(ngModel)]="jobForm.startDate">
         </div>
 
-        <div class="form-group">
-          <label>End Date (Optional)</label>
+        <div class="form-group" [class.has-error]="isFieldInvalid('endDate')">
+          <div class="field-label-row">
+            <label data-field="endDate">End Date (Optional)</label>
+            <span class="field-error-badge" *ngIf="isFieldInvalid('endDate')">Invalid Date</span>
+          </div>
           <input type="date" class="form-control"
+                 [class.is-invalid]="isFieldInvalid('endDate')"
                  [(ngModel)]="jobForm.endDate"
+                 (change)="onFieldInput('endDate')"
                  [disabled]="jobForm.neverExpires">
+          <div class="field-error-text" *ngIf="isFieldInvalid('endDate')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>End date cannot be earlier than start date</span>
+          </div>
 
           <!-- Never expires == no end date. The auto-close job already skips
                date checks when endDate is null, so this needs no backend rule. -->
@@ -374,15 +417,22 @@
               <label>Min Salary (₹)</label>
               <div class="input-with-currency">
                 <span class="currency-symbol">₹</span>
-                <input type="number" class="form-control pl-curr" [(ngModel)]="jobForm.minSalary" placeholder="e.g. 500000">
+                <input type="number" class="form-control pl-curr" [(ngModel)]="jobForm.minSalary" (input)="onFieldInput('maxSalary')" placeholder="e.g. 500000">
               </div>
             </div>
             
-            <div class="form-group">
-              <label>Max Salary (₹)</label>
+            <div class="form-group" [class.has-error]="isFieldInvalid('maxSalary')">
+              <div class="field-label-row">
+                <label data-field="maxSalary">Max Salary (₹)</label>
+                <span class="field-error-badge" *ngIf="isFieldInvalid('maxSalary')">Invalid</span>
+              </div>
               <div class="input-with-currency">
                 <span class="currency-symbol">₹</span>
-                <input type="number" class="form-control pl-curr" [(ngModel)]="jobForm.maxSalary" placeholder="e.g. 800000">
+                <input type="number" class="form-control pl-curr" [class.is-invalid]="isFieldInvalid('maxSalary')" [(ngModel)]="jobForm.maxSalary" (input)="onFieldInput('maxSalary')" placeholder="e.g. 800000">
+              </div>
+              <div class="field-error-text" *ngIf="isFieldInvalid('maxSalary')">
+                <svg lucideAlertCircle size="13"></svg>
+                <span>Max salary cannot be less than min salary</span>
               </div>
             </div>
           </div>

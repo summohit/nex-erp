@@ -31,7 +31,10 @@ function makeService(over: any = {}) {
     blackoutDate: { findMany: jest.fn().mockResolvedValue([]) },
     leaveRequest: {
       findMany: jest.fn().mockResolvedValue([]),
-      findUnique: jest.fn().mockResolvedValue({
+      // findFirst, not findUnique: §Att10 made the lookup filter on
+      // `deletedAt: null` so a removed request cannot be approved, and
+      // findUnique cannot filter on anything but the key.
+      findFirst: jest.fn().mockResolvedValue({
         id: 30, employeeId: 60, leaveTypeId: 2, status: 'PENDING',
         isHalfDay: false,
         startDate: new Date('2026-10-01T00:00:00.000Z'),
@@ -62,7 +65,7 @@ function makeService(over: any = {}) {
     ]),
   };
   return {
-    service: new LeavesService(prisma, notifications, fieldVisits),
+    service: new LeavesService(prisma, notifications, fieldVisits, {} as any),
     prisma, notifications, fieldVisits,
   };
 }

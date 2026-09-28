@@ -742,17 +742,34 @@
             </div>
             <div class="budget-billing-body">
               
+              <!-- Reads the same §PB6 budget block as the KPI row above, so the
+                   two cannot disagree. The bar was hardcoded to 45% and the
+                   remaining figure to budgetAmount * 0.55, which meant every
+                   fixed-price project reported the same invented consumption
+                   directly beneath its real one. -->
               <div *ngIf="project()?.billingType === 'FIXED'">
-                <div class="budget-metric-row">
+                <ng-container *ngIf="projectSummary()?.budget as b">
+                  <div class="budget-metric-row">
+                    <span class="budget-metric-label">Allocated Project Budget</span>
+                    <span class="budget-metric-value text-primary">{{ b.total | currency:b.currency:'symbol':'1.0-0' }}</span>
+                  </div>
+                  <div class="budget-progress-track">
+                    <!-- Capped at 100% so an overspend fills the track rather
+                         than overflowing it; the figures below say by how much. -->
+                    <div class="budget-progress-bar"
+                         [class.over]="(b.percentUsed || 0) > 100"
+                         [style.width.%]="b.percentUsed === null ? 0 : (b.percentUsed > 100 ? 100 : b.percentUsed)"></div>
+                  </div>
+                  <div class="budget-sub-stats">
+                    <span *ngIf="b.percentUsed !== null">{{ b.percentUsed }}% consumed</span>
+                    <span *ngIf="b.percentUsed === null">No budget set</span>
+                    <span *ngIf="b.remaining >= 0">{{ b.remaining | currency:b.currency:'symbol':'1.0-0' }} remaining</span>
+                    <span *ngIf="b.remaining < 0" class="over-budget">{{ -b.remaining | currency:b.currency:'symbol':'1.0-0' }} over budget</span>
+                  </div>
+                </ng-container>
+                <div class="budget-metric-row" *ngIf="!projectSummary()?.budget">
                   <span class="budget-metric-label">Allocated Project Budget</span>
                   <span class="budget-metric-value text-primary">{{ project()?.budgetAmount | currency:'INR':'symbol':'1.0-0' }}</span>
-                </div>
-                <div class="budget-progress-track">
-                  <div class="budget-progress-bar" style="width: 45%;"></div>
-                </div>
-                <div class="budget-sub-stats">
-                  <span>45% consumed</span>
-                  <span>{{ (project()?.budgetAmount * 0.55) | currency:'INR':'symbol':'1.0-0' }} remaining</span>
                 </div>
               </div>
 
@@ -2027,8 +2044,16 @@
         </div>
 
         <!-- Purpose -->
-        <div *ngIf="visit.purpose" style="font-size: 13px; color: #334155; margin-bottom: 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+        <div *ngIf="visit.purpose" style="font-size: 13px; color: #334155; margin-bottom: 8px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
           {{ visit.purpose }}
+        </div>
+
+        <!-- Visit Location / Address (§PB10) -->
+        <div *ngIf="visit.startAddress || visit.endAddress" style="display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: #475569; margin-bottom: 12px; line-height: 1.35;">
+          <svg lucideMapPin size="13" style="color: #64748b; flex-shrink: 0; margin-top: 1px;"></svg>
+          <span style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+            {{ visit.startAddress || visit.endAddress }}
+          </span>
         </div>
 
         <!-- Metrics row -->
@@ -2913,7 +2938,7 @@
             <svg *ngIf="issueForm.completed" lucideCheck size="14"></svg>
           </span>
         </button>
-        <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" placeholder="Card Title" [readOnly]="!canManageTask">
+        <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" (keyup.enter)="!selectedIssue() && saveIssue()" placeholder="Card Title" [readOnly]="!canManageTask">
       </div>
 
       <!-- Action Buttons Row -->
@@ -3127,7 +3152,7 @@
 
         <!-- Members Popover -->
         <div class="popover-container">
-          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('members')">
+          <button class="modal-action-btn" *ngIf="canManageTask || !selectedIssue()" (click)="togglePopover('members')">
             <svg lucideUsers size="14" class="btn-icon-svg"></svg>
             <span>Members</span>
           </button>
@@ -3157,6 +3182,7 @@
                   <div class="member-popover-item"
                        *ngFor="let m of filteredProjectMembers"
                        [class.selected]="isMemberAttached(m.id)"
+                       [class.loading]="isMemberLoading(m.id)"
                        (click)="toggleCardMember(m)">
                     <div class="member-popover-avatar" [style.background-color]="getMemberColor(m)">
                       <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" class="avatar-img" [alt]="m.firstName">
@@ -3166,7 +3192,10 @@
                       <div class="member-popover-name">{{ m.firstName }} {{ m.lastName }}</div>
                       <div class="member-popover-email">{{ m.user?.email || m.designation?.name }}</div>
                     </div>
-                    <svg lucideCheck size="16" *ngIf="isMemberAttached(m.id)" class="member-check-icon"></svg>
+                    <!-- Small Loader spinner while member request is processing -->
+                    <div class="member-toggle-spinner" *ngIf="isMemberLoading(m.id)" title="Updating member..."></div>
+                    <!-- Check icon when attached and not loading -->
+                    <svg lucideCheck size="16" *ngIf="!isMemberLoading(m.id) && isMemberAttached(m.id)" class="member-check-icon"></svg>
                   </div>
                   <div class="no-members-empty" *ngIf="filteredProjectMembers.length === 0">No project members found</div>
                 </ng-template>
@@ -3240,31 +3269,31 @@
       </div>
 
       <!-- Attached Task Properties & Attributes Row -->
-      <div class="modal-meta-attached-row flex flex-wrap gap-4 my-3" *ngIf="(selectedIssue()?.members && selectedIssue()?.members.length > 0) || (selectedIssue()?.labels && selectedIssue()?.labels.length > 0) || selectedIssue()?.dueDate || selectedIssue()?.startDate || issueForm.priority || selectedIssue()?.priority || allPhases().length > 0 || projectMilestones().length > 0 || !canManageTask">
+      <div class="modal-meta-attached-row flex flex-wrap gap-4 my-3" *ngIf="(currentIssueMembers().length > 0) || (selectedIssue()?.labels && selectedIssue()?.labels.length > 0) || selectedIssue()?.dueDate || selectedIssue()?.startDate || issueForm.priority || selectedIssue()?.priority || allPhases().length > 0 || projectMilestones().length > 0 || !canManageTask">
         <!-- Members Section -->
-        <div class="modal-attached-members-section" *ngIf="(selectedIssue()?.members && selectedIssue()?.members.length > 0) || canManageTask">
+        <div class="modal-attached-members-section" *ngIf="(currentIssueMembers().length > 0) || canManageTask || !selectedIssue()">
           <div class="section-label-subtitle">Members</div>
           <div class="attached-members-flex-row flex items-center gap-1">
-            <ng-container *ngIf="selectedIssue()?.members && selectedIssue()?.members.length > 0">
+            <ng-container *ngIf="currentIssueMembers().length > 0">
               <div class="attached-member-avatar" 
-                   *ngFor="let m of getVisibleMembers(selectedIssue()?.members)" 
+                   *ngFor="let m of getVisibleMembers(currentIssueMembers())" 
                    [style.background-color]="getMemberColor(m)" 
-                   [title]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')"
-                   (click)="canManageTask && togglePopover('members')">
-                <img *ngIf="m.employee?.avatarUrl" [src]="m.employee?.avatarUrl" class="avatar-img" [alt]="m.employee?.firstName">
-                <span *ngIf="!m.employee?.avatarUrl">{{ getMemberInitials(m) }}</span>
+                   [title]="(m.employee?.firstName || m.firstName || '') + ' ' + (m.employee?.lastName || m.lastName || '')"
+                   (click)="(canManageTask || !selectedIssue()) && togglePopover('members')">
+                <img *ngIf="m.employee?.avatarUrl || m.avatarUrl" [src]="m.employee?.avatarUrl || m.avatarUrl" class="avatar-img" [alt]="m.employee?.firstName || m.firstName">
+                <span *ngIf="!m.employee?.avatarUrl && !m.avatarUrl">{{ getMemberInitials(m) }}</span>
               </div>
 
               <!-- Overflow Counter Badge -->
               <div class="attached-member-overflow-badge" 
-                   *ngIf="getRemainingMembersCount(selectedIssue()?.members) > 0" 
-                   (click)="canManageTask && togglePopover('members')" 
+                   *ngIf="getRemainingMembersCount(currentIssueMembers()) > 0" 
+                   (click)="(canManageTask || !selectedIssue()) && togglePopover('members')" 
                    title="View all members">
-                +{{ getRemainingMembersCount(selectedIssue()?.members) }}
+                +{{ getRemainingMembersCount(currentIssueMembers()) }}
               </div>
             </ng-container>
 
-            <button class="btn-add-member-circle" *ngIf="canManageTask" (click)="togglePopover('members')" type="button" title="Add members">
+            <button class="btn-add-member-circle" *ngIf="canManageTask || !selectedIssue()" (click)="togglePopover('members')" type="button" title="Add members">
               <svg lucidePlus size="16"></svg>
             </button>
           </div>
@@ -3288,15 +3317,15 @@
           <div class="section-label-subtitle">Priority</div>
           <div class="popover-container">
             <button class="attached-priority-btn" type="button"
-                    [class.is-readonly]="!canManageTask"
-                    (click)="canManageTask && togglePopover('priority-meta')">
+                    [class.is-readonly]="!canManageTask && !!selectedIssue()"
+                    (click)="(canManageTask || !selectedIssue()) && togglePopover('priority-meta')">
               <span class="priority-dot-indicator" [style.background-color]="getPriorityColor(issueForm.priority || selectedIssue()?.priority)"></span>
               <span>{{ getPriorityLabel(issueForm.priority || selectedIssue()?.priority) }}</span>
-              <svg lucideChevronDown size="13" class="ml-1" *ngIf="canManageTask"></svg>
+              <svg lucideChevronDown size="13" class="ml-1" *ngIf="canManageTask || !selectedIssue()"></svg>
             </button>
 
             <!-- Priority Popover for Meta Row -->
-            <div class="trello-popover" *ngIf="canManageTask && activePopover() === 'priority-meta'" (click)="$event.stopPropagation()">
+            <div class="trello-popover" *ngIf="(canManageTask || !selectedIssue()) && activePopover() === 'priority-meta'" (click)="$event.stopPropagation()">
               <div class="popover-header">
                 <span>Change Priority</span>
                 <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
@@ -3330,11 +3359,11 @@
         <!-- §8: Phase Section -->
         <div class="modal-milestone-section" *ngIf="allPhases().length > 0">
           <div class="section-label-subtitle">Phase</div>
-          <div class="milestone-picker-wrapper" *ngIf="canManageTask; else phaseReadOnly">
+          <div class="milestone-picker-wrapper" *ngIf="canManageTask || !selectedIssue(); else phaseReadOnly">
             <svg lucideLayers size="14" class="milestone-picker-icon"></svg>
             <select
               class="milestone-picker"
-              [ngModel]="selectedIssue()?.phaseId ?? null"
+              [ngModel]="selectedIssue() ? (selectedIssue()?.phaseId ?? null) : (issueForm.phaseId ?? null)"
               (ngModelChange)="setIssuePhase($event)">
               <option [ngValue]="null">No phase</option>
               <option *ngFor="let p of allPhases()" [ngValue]="p.id">{{ p.name }}</option>
@@ -3352,11 +3381,11 @@
         <!-- §15: Milestone Section -->
         <div class="modal-milestone-section" *ngIf="projectMilestones().length > 0">
           <div class="section-label-subtitle">Milestone</div>
-          <div class="milestone-picker-wrapper" *ngIf="canManageTask; else milestoneReadOnly">
+          <div class="milestone-picker-wrapper" *ngIf="canManageTask || !selectedIssue(); else milestoneReadOnly">
             <svg lucideFlag size="14" class="milestone-picker-icon"></svg>
             <select
               class="milestone-picker"
-              [ngModel]="selectedIssue()?.milestoneId ?? null"
+              [ngModel]="selectedIssue() ? (selectedIssue()?.milestoneId ?? null) : (issueForm.milestoneId ?? null)"
               (ngModelChange)="setIssueMilestone($event)">
               <option [ngValue]="null">No milestone</option>
               <option *ngFor="let m of projectMilestones()" [ngValue]="m.id">{{ m.name }}</option>

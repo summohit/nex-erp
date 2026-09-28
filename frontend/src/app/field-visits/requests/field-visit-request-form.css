@@ -1251,3 +1251,184 @@
   color: #94a3b8;
   background: #f8fafc;
 }
+
+/* ── Standardized Client Location Dropdown Enhanced Styles (§PB10) ── */
+.field-label-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.manage-locations-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  transition: all 0.15s ease;
+}
+
+.manage-locations-link:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.location-select-trigger {
+  min-height: 44px;
+  padding: 8px 14px;
+}
+
+.loc-pin-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: #f1f5f9;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.loc-pin-icon.pinned {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.loc-text-col {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  min-width: 0;
+  flex: 1;
+}
+
+.loc-text-col .selected-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loc-text-col .selected-text.placeholder {
+  font-size: 13px;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.loc-text-col .selected-subtext {
+  font-size: 11.5px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.location-select-menu {
+  max-height: 320px;
+}
+
+.location-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  gap: 12px;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.loc-option-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.loc-pin-bubble {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.loc-pin-bubble.has-coords {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.loc-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.loc-option-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.loc-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.loc-company-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.loc-address-text {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loc-coords-pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #16a34a;
+  display: inline-block;
+  margin-top: 1px;
+}
+
+.empty-action-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.empty-action-link:hover {
+  text-decoration: underline;
+}

@@ -9,9 +9,10 @@ import { ShiftRemindersCron } from './shift-reminders.cron';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ApprovalsModule } from '../approvals/approvals.module';
 
 @Module({
-  imports: [PrismaModule, PermissionsModule, NotificationsModule],
+  imports: [PrismaModule, PermissionsModule, NotificationsModule, ApprovalsModule],
   controllers: [AttendanceController, ShiftsController],
   providers: [
     AttendanceService, ShiftsService, ShiftRosterService,

@@ -32,6 +32,31 @@
               [(ngModel)]="dialog.promptValue"
               autofocus></textarea>
 
+    <!-- §Att4: proof beside the reason. Optional by design — see the comment
+         on DialogState.attachment. -->
+    <div class="dlg-attach" *ngIf="s.variant === 'prompt' && s.attachment as att">
+      <label class="dlg-attach-label" *ngIf="!dialog.promptFile">
+        <input type="file" [accept]="att.accept" (change)="onFilePicked($event)" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+        </svg>
+        <span>{{ att.label }}</span>
+      </label>
+
+      <div class="dlg-attach-chosen" *ngIf="dialog.promptFile as file">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <span class="dlg-attach-name" [title]="file.name">{{ file.name }}</span>
+        <span class="dlg-attach-size">{{ fileSizeLabel(file) }}</span>
+        <button type="button" class="dlg-attach-clear" (click)="clearFile()" title="Remove attachment">&times;</button>
+      </div>
+
+      <p class="dlg-attach-hint" *ngIf="att.hint && !attachError()">{{ att.hint }}</p>
+      <p class="dlg-attach-error" *ngIf="attachError() as err">{{ err }}</p>
+    </div>
+
     <div class="dlg-actions">
       <button *ngIf="s.variant === 'confirm' || s.variant === 'prompt'"
               class="dlg-btn dlg-btn-secondary" (click)="respond(false)">{{s.cancelLabel}}</button>

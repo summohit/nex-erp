@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request, Param, Query, ParseIntPipe } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -38,8 +38,44 @@ export class AttendanceController {
   }
 
   @Post('clock-out')
-  clockOut(@Request() req, @Body() data: { lat?: number, lng?: number, reason?: string }) {
+  clockOut(@Request() req, @Body() data: { lat?: number, lng?: number, reason?: string, proofUrl?: string }) {
     return this.attendanceService.clockOut(req.user.sub, data);
+  }
+
+  // §Att5: the late clock-out queue. Guarded in the service rather than with a
+  // roles decorator, because who may approve is partly a database question —
+  // the delegates a Super Admin has named — and not only a role.
+  @Get('clock-out/pending')
+  getPendingClockOuts(@Request() req) {
+    return this.attendanceService.getPendingClockOuts(
+      req.user.companyId, req.user.role, req.user.employeeId ?? null,
+    );
+  }
+
+  /** Whether to show the queue at all, so the client need not guess. */
+  @Get('clock-out/can-approve')
+  async canApproveClockOut(@Request() req) {
+    return {
+      canApprove: await this.attendanceService.mayApproveClockOut(
+        req.user.companyId, req.user.role, req.user.employeeId ?? null,
+      ),
+    };
+  }
+
+  @Get('clock-out/mine')
+  getMyClockOutApprovals(@Request() req) {
+    return this.attendanceService.getMyClockOutApprovals(req.user.sub);
+  }
+
+  @Post('clock-out/:id/review')
+  reviewClockOut(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { action: 'APPROVE' | 'REJECT'; note?: string },
+  ) {
+    return this.attendanceService.reviewClockOut(
+      req.user.companyId, id, data, req.user.role, req.user.employeeId ?? null,
+    );
   }
 
   @Get('regularization/me')

@@ -245,22 +245,68 @@
     </ag-grid-angular>
 
     <!-- §PB10: the sites a client visit can be raised against. -->
-    <div *ngIf="activeTab() === 'visit-locations'">
-      <p class="tab-intro">
-        Sites a field visit can be raised against. A trip's coordinates decide
-        whether somebody clocking in there counts as on site, so pin each one —
-        a site without a pin fills the address and leaves the map to be set by
-        hand. Retiring a site hides it from new trips and leaves past ones alone.
-      </p>
-      <ag-grid-angular
-        class="ag-theme-quartz"
-        [theme]="'legacy'"
-        style="width: 100%; height: 500px;"
-        [rowData]="visitLocations()"
-        [columnDefs]="visitLocationColDefs"
-        [defaultColDef]="defaultColDef"
-        [gridOptions]="gridOptions">
-      </ag-grid-angular>
+    <div *ngIf="activeTab() === 'visit-locations'" class="visit-locations-tab-wrapper">
+      <div class="visit-locations-toolbar">
+        <div class="visit-locations-search-box">
+          <svg lucideSearch size="16" class="search-icon"></svg>
+          <input 
+            type="text" 
+            class="visit-locations-search-input" 
+            placeholder="Search sites by name, address, or contact..." 
+            [value]="visitLocationSearchText()" 
+            (input)="onVisitLocationSearchChange($any($event.target).value)">
+          <button 
+            *ngIf="visitLocationSearchText()" 
+            class="clear-search-btn" 
+            (click)="clearVisitLocationSearch()" 
+            title="Clear search">
+            <svg lucideX size="14"></svg>
+          </button>
+        </div>
+
+        <div class="visit-locations-stats-chips">
+          <div class="stat-chip total" title="Total Sites">
+            <span class="chip-label">Total Sites:</span>
+            <span class="chip-value">{{ visitLocationStats().total }}</span>
+          </div>
+          <div class="stat-chip pinned" title="Sites with GPS Coordinates Pinned">
+            <span class="chip-dot pinned-dot"></span>
+            <span class="chip-label">GPS Pinned:</span>
+            <span class="chip-value">{{ visitLocationStats().pinned }}</span>
+          </div>
+          <div class="stat-chip unpinned" title="Sites missing GPS Coordinates">
+            <span class="chip-dot unpinned-dot"></span>
+            <span class="chip-label">No Pin:</span>
+            <span class="chip-value">{{ visitLocationStats().unpinned }}</span>
+          </div>
+          <div class="stat-chip active-chip" title="Active Sites">
+            <span class="chip-dot active-dot"></span>
+            <span class="chip-label">Active:</span>
+            <span class="chip-value">{{ visitLocationStats().active }}</span>
+          </div>
+        </div>
+
+        <div class="visit-locations-toolbar-actions">
+          <button class="btn-refresh" (click)="refreshVisitLocations()" title="Refresh sites list">
+            <svg lucideRotateCcw size="15"></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid-container visit-locations-grid-wrapper">
+        <ag-grid-angular
+          class="ag-theme-quartz visit-locations-grid-table"
+          [theme]="'legacy'"
+          style="width: 100%; height: 520px;"
+          [rowData]="filteredVisitLocations()"
+          [columnDefs]="visitLocationColDefs"
+          [defaultColDef]="defaultColDef"
+          [gridOptions]="visitLocationGridOptions"
+          [rowHeight]="56"
+          [headerHeight]="46">
+        </ag-grid-angular>
+      </div>
     </div>
 
     <!-- §1: the tasks every new project starts with, assigned to its PM. -->
@@ -361,16 +407,19 @@
 
 <!-- Modal -->
 <div class="modal-overlay" *ngIf="isModalOpen()">
-  <div class="modal-content slide-in" [class.modal-wide]="activeTab() === 'shifts'">
+  <div class="modal-content slide-in" [class.modal-wide]="activeTab() === 'shifts'" [class.modal-visit-location]="activeTab() === 'visit-locations'">
     <div class="modal-header">
       <div class="header-titles">
         <div class="modal-title-row">
           <div class="modal-header-icon-badge" *ngIf="activeTab() === 'shifts'">
             <svg lucideClock size="20"></svg>
           </div>
+          <div class="modal-header-icon-badge visit-location-badge" *ngIf="activeTab() === 'visit-locations'">
+            <svg lucideMapPin size="20"></svg>
+          </div>
           <h2>{{ modalMode() === 'create' ? 'Create' : 'Update' }} {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'visit-locations' ? 'Visit Location' : activeTab() === 'holidays' ? 'Holiday' : activeTab() === 'shifts' ? 'Shift' : 'Blackout Date' }}</h2>
         </div>
-        <p class="subtitle">{{ activeTab() === 'shifts' ? 'Configure shift timings, punch policies, and weekly working schedule' : 'Enter the details to keep your master data organized' }}</p>
+        <p class="subtitle" *ngIf="activeTab() !== 'visit-locations'">{{ activeTab() === 'shifts' ? 'Configure shift timings, punch policies, and weekly working schedule' : 'Enter the details to keep your master data organized' }}</p>
       </div>
       <button class="btn-icon close-btn" (click)="closeModal()">
         <svg lucideX size="18"></svg>
@@ -379,19 +428,21 @@
     
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-group" [class.full-width]="activeTab() === 'departments'" *ngIf="activeTab() !== 'holidays' && activeTab() !== 'blackout-dates' && activeTab() !== 'shifts'">
+        <div class="form-group" [class.full-width]="activeTab() === 'departments'" *ngIf="activeTab() !== 'holidays' && activeTab() !== 'blackout-dates' && activeTab() !== 'shifts' && activeTab() !== 'visit-locations'">
           <label>Name</label>
           <input type="text" class="form-control" [(ngModel)]="formData.name" placeholder="Enter name">
         </div>
 
         <div class="form-group" *ngIf="activeTab() === 'designations'">
           <label>Parent Department</label>
-          <select class="form-control" [(ngModel)]="formData.departmentId">
-            <option [ngValue]="0" disabled>Select a department</option>
-            <option *ngFor="let dept of departments()" [ngValue]="dept.id">
-              {{ dept.name }}
-            </option>
-          </select>
+          <app-searchable-select
+            [options]="departmentSelectOptions()"
+            [value]="formData.departmentId"
+            [fullWidth]="true"
+            placeholder="Select a department"
+            (valueChange)="formData.departmentId = $event">
+            <svg prefix lucideBuilding2 size="15"></svg>
+          </app-searchable-select>
         </div>
 
         <div class="form-group full-width toggle-group" *ngIf="activeTab() === 'designations'">
@@ -717,39 +768,183 @@
           <textarea class="form-control" rows="4" [(ngModel)]="formData.description"
                     placeholder="What this task covers — becomes the task's own description."></textarea>
         </div>
-        <!-- §PB10: address and pin for a visit location. -->
-        <div class="form-group full-width" *ngIf="activeTab() === 'visit-locations'">
-          <label>Address</label>
-          <input type="text" class="form-control" [(ngModel)]="formData.address"
-                 placeholder="e.g. Plot 42, Sector 62, Noida">
-        </div>
-        <div class="form-group full-width" *ngIf="activeTab() === 'visit-locations'">
-          <label>Client</label>
-          <select class="form-control" [(ngModel)]="formData.clientId">
-            <option [ngValue]="null">Not client-specific</option>
-            <option *ngFor="let c of clientOptions()" [ngValue]="c.id">{{ c.name }}</option>
-          </select>
-          <small class="form-hint">
-            Optional — a supplier site, data centre or site office belongs to nobody
-            in particular.
-          </small>
-        </div>
+        <!-- Visit Locations Form Redesign -->
+        <ng-container *ngIf="activeTab() === 'visit-locations'">
+          <div class="form-group full-width">
+            <div class="field-label-row">
+              <label class="field-label-text">
+                <span>Site / Location Name</span>
+                <span class="required-star">*</span>
+              </label>
+            </div>
+            <div class="input-with-icon">
+              <svg lucideMapPin size="15" class="input-prefix-icon"></svg>
+              <input type="text" class="form-control with-icon" [(ngModel)]="formData.name" placeholder="e.g. Acme Tech Hub, Sector 62" required>
+            </div>
+          </div>
 
-        <div class="form-group" *ngIf="activeTab() === 'visit-locations'">
-          <label>Latitude</label>
-          <input type="number" step="0.000001" class="form-control" [(ngModel)]="formData.latitude"
-                 placeholder="e.g. 28.613939">
-        </div>
-        <div class="form-group" *ngIf="activeTab() === 'visit-locations'">
-          <label>Longitude</label>
-          <input type="number" step="0.000001" class="form-control" [(ngModel)]="formData.longitude"
-                 placeholder="e.g. 77.209021">
-          <small class="form-hint">
-            The pin decides whether a clock-in at this site counts as on site.
-          </small>
-        </div>
+          <div class="form-group full-width">
+            <div class="field-label-row">
+              <label class="field-label-text">
+                <span>Site Address</span>
+              </label>
+            </div>
+            <input type="text" class="form-control" [(ngModel)]="formData.address" placeholder="e.g. Plot 42, Sector 62, Noida, Uttar Pradesh">
+          </div>
 
-        <div class="form-group" *ngIf="activeTab() === 'task-types' || activeTab() === 'project-phases' || activeTab() === 'default-project-tasks' || activeTab() === 'visit-locations'">
+          <div class="form-group full-width">
+            <div class="field-label-row">
+              <label class="field-label-text">
+                <span>Client / Company Association</span>
+                <span class="optional-badge">Optional</span>
+              </label>
+              <span class="label-badge-count" *ngIf="leadContactSelectOptions().length > 0">
+                {{ leadContactSelectOptions().length }} available
+              </span>
+            </div>
+            <app-searchable-select
+              [options]="leadContactSelectOptions()"
+              [value]="formData.leadContactId"
+              [clearable]="true"
+              [fullWidth]="true"
+              placeholder="Not linked to anyone (General / Internal Site)"
+              (valueChange)="formData.leadContactId = $event">
+              <svg prefix lucideBuilding2 size="15"></svg>
+            </app-searchable-select>
+            <small class="form-hint">
+              Optional — link to a client company or contact person, or leave unlinked for supplier sites, data centres, or internal offices.
+            </small>
+          </div>
+
+          <!-- GPS Coordinates & Pin Card -->
+          <div class="gps-pin-card full-width">
+            <div class="gps-card-header">
+              <div class="gps-header-left">
+                <svg lucideNavigation size="15" class="gps-header-icon"></svg>
+                <span class="gps-header-title">GPS Geofence Pin</span>
+                
+                <span class="gps-status-badge error" *ngIf="isPartiallyPinned()">
+                  <svg lucideAlertCircle size="12"></svg>
+                  <span>Both Lat & Lng Required</span>
+                </span>
+                <span class="gps-status-badge empty" *ngIf="!isPinned() && !isPartiallyPinned()">
+                  <span class="gps-status-dot empty"></span>
+                  <span>No Pin (Manual trips)</span>
+                </span>
+              </div>
+
+              <div class="gps-header-actions">
+                <button 
+                  type="button" 
+                  class="btn-gps-action locate" 
+                  (click)="useMyLocation()" 
+                  [disabled]="isLocating()"
+                  title="Detect GPS from current device position">
+                  <svg lucideCrosshair size="13" [class.spinning]="isLocating()"></svg>
+                  <span>{{ isLocating() ? 'Detecting...' : 'Use My GPS' }}</span>
+                </button>
+
+                <button 
+                  *ngIf="formData.latitude || formData.longitude"
+                  type="button" 
+                  class="btn-gps-action clear" 
+                  (click)="clearCoordinates()"
+                  title="Clear coordinates">
+                  <svg lucideX size="13"></svg>
+                  <span>Clear</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="gps-coords-grid">
+              <div class="coord-field">
+                <label class="coord-label">Latitude</label>
+                <div class="coord-input-wrap">
+                  <span class="coord-prefix">LAT</span>
+                  <input 
+                    type="number" 
+                    step="0.000001" 
+                    class="form-control coord-input" 
+                    [(ngModel)]="formData.latitude" 
+                    (ngModelChange)="onCoordInputChanged()"
+                    placeholder="e.g. 28.613939">
+                </div>
+              </div>
+
+              <div class="coord-field">
+                <label class="coord-label">Longitude</label>
+                <div class="coord-input-wrap">
+                  <span class="coord-prefix">LNG</span>
+                  <input 
+                    type="number" 
+                    step="0.000001" 
+                    class="form-control coord-input" 
+                    [(ngModel)]="formData.longitude" 
+                    (ngModelChange)="onCoordInputChanged()"
+                    placeholder="e.g. 77.209021">
+                </div>
+              </div>
+            </div>
+
+            <!-- Free Interactive Map Picker -->
+            <div class="free-map-wrapper">
+              <div class="map-search-bar">
+                <div class="map-search-input-wrap">
+                  <svg lucideSearch size="14" class="search-icon"></svg>
+                  <input 
+                    type="text" 
+                    class="map-search-input" 
+                    [ngModel]="mapSearchText()" 
+                    (ngModelChange)="mapSearchText.set($event)"
+                    (keydown.enter)="$event.preventDefault(); searchMapLocation()"
+                    placeholder="Search place, landmark, or city to place pin...">
+                </div>
+                <button 
+                  type="button" 
+                  class="btn-map-search" 
+                  (click)="searchMapLocation()" 
+                  [disabled]="isSearchingMap()">
+                  <svg lucideMapPin size="13" *ngIf="!isSearchingMap()"></svg>
+                  <svg lucideLoader2 size="13" class="spinning" *ngIf="isSearchingMap()"></svg>
+                  <span>{{ isSearchingMap() ? 'Searching...' : 'Locate' }}</span>
+                </button>
+              </div>
+
+              <div id="free-map-picker" class="free-map-picker"></div>
+
+              <div class="map-footer-hint">
+                <div class="map-hint-left">
+                  <svg lucideInfo size="13"></svg>
+                  <span>Click anywhere on the map or drag the marker to pick coordinates.</span>
+                </div>
+                <a 
+                  *ngIf="isPinned()"
+                  [href]="'https://www.google.com/maps?q=' + formData.latitude + ',' + formData.longitude" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  class="btn-open-gmaps"
+                  title="Open in Google Maps">
+                  <svg lucideExternalLink size="12"></svg>
+                  <span>Google Maps</span>
+                </a>
+              </div>
+            </div>
+
+            <p class="gps-card-help">
+              Coordinates determine automated on-site clock-in geofence validation for visits.
+            </p>
+          </div>
+
+          <div class="form-group full-width">
+            <div class="field-label-row">
+              <label class="field-label-text">Display Order</label>
+            </div>
+            <input type="number" class="form-control" [(ngModel)]="formData.position" min="0" placeholder="0">
+            <small class="form-hint">Lower numbers appear first in the site selector list.</small>
+          </div>
+        </ng-container>
+
+        <div class="form-group" *ngIf="activeTab() === 'task-types' || activeTab() === 'project-phases' || activeTab() === 'default-project-tasks'">
           <label>Display order</label>
           <input type="number" class="form-control" [(ngModel)]="formData.position" min="0">
           <small class="form-hint">Lower numbers appear first in the task form.</small>
@@ -851,12 +1046,15 @@
         </div>
         <div class="form-group full-width" *ngIf="activeTab() === 'blackout-dates'">
           <label>Department (Optional)</label>
-          <select class="form-control" [(ngModel)]="formData.departmentId">
-            <option [ngValue]="0">All Departments</option>
-            <option *ngFor="let dept of departments()" [ngValue]="dept.id">
-              {{ dept.name }}
-            </option>
-          </select>
+          <app-searchable-select
+            [options]="departmentSelectOptions()"
+            [value]="formData.departmentId"
+            [clearable]="true"
+            [fullWidth]="true"
+            placeholder="All Departments"
+            (valueChange)="formData.departmentId = $event || 0">
+            <svg prefix lucideBuilding2 size="15"></svg>
+          </app-searchable-select>
           <p class="help-text">If you select a department, this blackout date only applies to them.</p>
         </div>
       </div>

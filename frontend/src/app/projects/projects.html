@@ -1996,7 +1996,7 @@
 </div>
 
 <!-- Create / Edit Board Modal with Backdrop Overlay -->
-<div class="cbm-overlay" *ngIf="isCreateModalOpen()" (click)="closeCreateModal()">
+<div class="cbm-overlay" *ngIf="isCreateModalOpen()" (click)="closeAllModalDropdowns()">
   <div class="cbm-card" (click)="$event.stopPropagation(); closeAllModalDropdowns()">
     
     <!-- Modal Header -->
@@ -2902,7 +2902,7 @@
 </div>
 
 <!-- Duplicate Project Modal -->
-<div class="cbm-overlay" *ngIf="duplicateModalProject()" (click)="closeDuplicateModal()">
+<div class="cbm-overlay" *ngIf="duplicateModalProject()" (click)="closeAllModalDropdowns()">
   <div class="cbm-card" (click)="$event.stopPropagation()">
 
     <!-- Modal Header -->

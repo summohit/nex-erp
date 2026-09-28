@@ -8,7 +8,7 @@ import {
   LucidePlus, LucideBriefcase, LucideMapPin, LucideClock, LucideSparkles,
   LucideX, LucideMoreVertical, LucideSearch, LucideBold, LucideItalic,
   LucideList, LucideListOrdered, LucideHelpCircle, LucideTrash2, LucideBuilding,
-  LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff
+  LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff, LucideAlertCircle
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
@@ -35,6 +35,7 @@ declare var Quill: any;
     LucideSparkles, LucideX, LucideSearch,
     LucideHelpCircle, LucideTrash2, LucideBuilding,
     LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff,
+    LucideAlertCircle,
     AgGridAngular, DatePipe, SkeletonComponent
   ],
   templateUrl: './job-postings.html',
@@ -325,7 +326,7 @@ export class JobPostingsComponent implements OnInit {
     designationName: '',
     branchId: '',
     experienceYears: '3-5 Years',
-    type: 'Full-time',
+    type: 'Full Time',
     typeOther: '',
     workLocationType: 'On-site',
     recruiterId: '',
@@ -343,6 +344,69 @@ export class JobPostingsComponent implements OnInit {
     maxSalary: '',
     aiPrompt: ''
   };
+
+  isSubmitted = false;
+
+  isFieldInvalid(field: string): boolean {
+    if (!this.isSubmitted) return false;
+    switch (field) {
+      case 'department':
+        return !this.jobForm.departmentName && !this.jobForm.departmentId;
+      case 'title':
+        return !this.jobForm.title || !this.jobForm.title.trim();
+      case 'type':
+        return !this.jobForm.type;
+      case 'typeOther':
+        return this.jobForm.type === 'Other' && (!this.jobForm.typeOther || !this.jobForm.typeOther.trim());
+      case 'endDate':
+        return !!(this.jobForm.startDate && this.jobForm.endDate && !this.jobForm.neverExpires && this.jobForm.endDate < this.jobForm.startDate);
+      case 'maxSalary':
+        return !!(this.jobForm.minSalary && this.jobForm.maxSalary && Number(this.jobForm.maxSalary) < Number(this.jobForm.minSalary));
+      default:
+        return false;
+    }
+  }
+
+  onFieldInput(field?: string) {
+    // Dynamically re-evaluates isFieldInvalid
+  }
+
+  focusFirstInvalidField() {
+    const fields = [
+      { key: 'department', isInvalid: () => !this.jobForm.departmentName && !this.jobForm.departmentId },
+      { key: 'title', isInvalid: () => !this.jobForm.title || !this.jobForm.title.trim() },
+      { key: 'type', isInvalid: () => !this.jobForm.type },
+      { key: 'typeOther', isInvalid: () => this.jobForm.type === 'Other' && (!this.jobForm.typeOther || !this.jobForm.typeOther.trim()) },
+      { key: 'endDate', isInvalid: () => !!(this.jobForm.startDate && this.jobForm.endDate && !this.jobForm.neverExpires && this.jobForm.endDate < this.jobForm.startDate) },
+      { key: 'maxSalary', isInvalid: () => !!(this.jobForm.minSalary && this.jobForm.maxSalary && Number(this.jobForm.maxSalary) < Number(this.jobForm.minSalary)) },
+    ];
+
+    const first = fields.find(f => f.isInvalid());
+    if (!first) return;
+
+    setTimeout(() => {
+      const targetLabel = document.querySelector(`[data-field="${first.key}"]`) as HTMLElement | null;
+      const targetGroup = targetLabel ? (targetLabel.closest('.form-group') as HTMLElement | null) : null;
+      const targetElement = targetGroup || targetLabel;
+
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetElement.classList.add('field-highlight-pulse');
+        setTimeout(() => targetElement.classList.remove('field-highlight-pulse'), 1500);
+
+        if (first.key === 'department') {
+          const trigger = targetElement.querySelector('.custom-select-trigger') as HTMLElement | null;
+          trigger?.focus();
+          if (!this.deptDropdownOpen) {
+            this.toggleDeptDropdown();
+          }
+        } else {
+          const input = targetElement.querySelector('input, select, textarea') as HTMLElement | null;
+          input?.focus({ preventScroll: true });
+        }
+      }
+    }, 50);
+  }
 
   // Searchable Dropdowns state
   deptDropdownOpen = false;
@@ -423,6 +487,7 @@ export class JobPostingsComponent implements OnInit {
   isGeneratingAI = signal(false);
 
   openCreateModal() {
+    this.isSubmitted = false;
     this.deptDropdownOpen = false;
     this.recruiterDropdownOpen = false;
     this.selectedRecruiterEmployee = null;
@@ -438,7 +503,7 @@ export class JobPostingsComponent implements OnInit {
       designationName: '',
       branchId: '',
       experienceYears: '3-5 Years',
-      type: 'Full-time',
+      type: 'Full Time',
       typeOther: '',
       workLocationType: 'On-site',
       recruiterId: '',
@@ -446,7 +511,7 @@ export class JobPostingsComponent implements OnInit {
       totalOpenings: 1,
       startDate: '',
       endDate: '',
-    neverExpires: false,
+      neverExpires: false,
       discloseSalary: false,
       status: 'Open',
       location: '',
@@ -462,12 +527,14 @@ export class JobPostingsComponent implements OnInit {
   }
 
   closeCreateModal() {
+    this.isSubmitted = false;
     this.deptDropdownOpen = false;
     this.recruiterDropdownOpen = false;
     this.isCreateModalOpen.set(false);
   }
 
   editJob(job: Job) {
+    this.isSubmitted = false;
     this.deptDropdownOpen = false;
     this.recruiterDropdownOpen = false;
     this.selectedJob.set(job);
@@ -532,6 +599,33 @@ export class JobPostingsComponent implements OnInit {
   }
 
   saveJob() {
+    this.isSubmitted = true;
+
+    if (
+      this.isFieldInvalid('department') ||
+      this.isFieldInvalid('title') ||
+      this.isFieldInvalid('type') ||
+      this.isFieldInvalid('typeOther') ||
+      this.isFieldInvalid('endDate') ||
+      this.isFieldInvalid('maxSalary')
+    ) {
+      if (this.isFieldInvalid('department') && this.isFieldInvalid('title')) {
+        this.toast.error('Please enter Department and Custom Job Title');
+      } else if (this.isFieldInvalid('department')) {
+        this.toast.error('Department is required');
+      } else if (this.isFieldInvalid('title')) {
+        this.toast.error('Custom Job Title is required');
+      } else if (this.isFieldInvalid('type') || this.isFieldInvalid('typeOther')) {
+        this.toast.error('Employment Type is required');
+      } else if (this.isFieldInvalid('endDate')) {
+        this.toast.error('End date cannot be earlier than start date');
+      } else if (this.isFieldInvalid('maxSalary')) {
+        this.toast.error('Max salary cannot be less than min salary');
+      }
+      this.focusFirstInvalidField();
+      return;
+    }
+
     const dept = this.departments().find(d => d.name === this.jobForm.departmentName);
     const deptId = dept ? dept.id : null;
     const hr = this.hrEmployees().find(e => `${e.firstName} ${e.lastName}` === this.jobForm.recruiterName);
@@ -541,7 +635,7 @@ export class JobPostingsComponent implements OnInit {
     const branchId = Number(this.jobForm.branchId) || null;
     
     const payload = {
-      title: this.jobForm.title || 'Untitled Job',
+      title: this.jobForm.title.trim(),
       departmentId: deptId,
       designationId: desigId,
       branchId: branchId,

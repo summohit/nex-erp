@@ -17,6 +17,7 @@ import {
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { DialogService } from '../../shared/services/dialog.service';
+import { UploadService } from '../../services/upload.service';
 import { PushNotificationsService } from '../../services/push-notifications.service';
 
 @Component({
@@ -45,6 +46,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private ticketService = inject(TicketService);
   private toast = inject(HotToastService);
   private dialog = inject(DialogService);
+  private uploadService = inject(UploadService);
   private push = inject(PushNotificationsService);
   notificationsService = inject(NotificationsService);
 
@@ -221,11 +223,11 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private static readonly OPEN_PREVIOUS_SESSION = 'OPEN_PREVIOUS_SESSION';
   private static readonly LATE_REASON_REQUIRED = 'LATE_CLOCK_OUT_REASON_REQUIRED';
 
-  private executeClock(action: 'clockIn' | 'clockOut', reason?: string) {
+  private executeClock(action: 'clockIn' | 'clockOut', reason?: string, proofUrl?: string) {
     const proceed = (lat?: number, lng?: number) => {
       const sub = action === 'clockIn'
         ? this.attendanceService.clockIn(lat, lng)
-        : this.attendanceService.clockOut(lat, lng, reason);
+        : this.attendanceService.clockOut(lat, lng, reason, proofUrl);
 
       sub.subscribe({
         next: () => {
@@ -296,22 +298,58 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.executeClock('clockOut');
   }
 
-  /** Ask why a previous day is being closed now, then retry with the answer. */
+  /**
+   * Ask why a previous day is being closed now, then retry with the answer.
+   *
+   * §Att4 adds proof beside the reason, and §Att5 means the answer now goes to
+   * somebody: the day is closed but does not count until it is approved, so
+   * the dialog says so rather than letting the clock-out look final.
+   */
   private async askLateClockOutReason(openDate: string | undefined) {
     const day = openDate ? this.formatDay(openDate) : 'a previous day';
-    const reason = await this.dialog.prompt(
-      `You are clocking out for ${day}. Please provide a reason — it is saved against that day's record.`,
+    const answer = await this.dialog.promptWithAttachment(
+      `You are clocking out for ${day}. Please say why — it is saved against that day's record and sent for approval, and the day does not count as attended until it is approved.`,
       'Reason for late clock-out',
       {
         placeholder: 'e.g. Left the site in a hurry and forgot to clock out',
         confirmLabel: 'Clock out',
         required: true,
+        accept: 'image/*,application/pdf',
+        attachmentLabel: 'Attach a screenshot or photo (optional)',
+        attachmentHint: 'Anything that backs up the reason — a ticket, a site photo, a message. Up to 10 MB.',
       },
     );
-    if (!reason) return;
+    if (!answer) return;
 
     this.isClocking.set(true);
-    this.executeClock('clockOut', reason);
+
+    // No file: nothing to wait for.
+    if (!answer.file) {
+      this.executeClock('clockOut', answer.text);
+      return;
+    }
+
+    // The upload has to finish first — the clock-out carries the URL, and
+    // there is no second call to attach it afterwards. A failed upload must
+    // not silently drop the proof, so it asks rather than deciding for them.
+    this.uploadService.uploadAttendanceProof(answer.file).subscribe({
+      next: (res: any) => {
+        const url = res?.url ?? res?.path ?? res?.location ?? null;
+        this.executeClock('clockOut', answer.text, url ?? undefined);
+      },
+      error: async () => {
+        this.isClocking.set(false);
+        const ok = await this.dialog.confirm(
+          'The attachment could not be uploaded. Clock out with just the reason, or cancel and try again?',
+          'Attachment failed',
+          'Clock out without it',
+          'Cancel',
+        );
+        if (!ok) return;
+        this.isClocking.set(true);
+        this.executeClock('clockOut', answer.text);
+      },
+    });
   }
 
   /** "2026-09-14" → "14 Sep 2026". */

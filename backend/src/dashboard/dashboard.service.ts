@@ -197,6 +197,7 @@ export class DashboardService {
       where: {
         employee: { companyId },
         status: 'APPROVED',
+        deletedAt: null,
         startDate: { lte: now },
         endDate: { gte: todayMidnight }
       },
@@ -465,7 +466,7 @@ export class DashboardService {
       this.prisma.holiday.findMany({ where: { companyId, date: { gte: startUtc, lt: endUtc } }, select: { id: true, name: true, date: true } }),
       this.prisma.employee.findMany({ where: { companyId }, select: { id: true, firstName: true, lastName: true, dateOfBirth: true } }),
       this.prisma.leaveRequest.findMany({
-        where: { employee: { companyId }, status: 'APPROVED', startDate: { lt: endUtc }, endDate: { gte: startUtc } },
+        where: { employee: { companyId }, status: 'APPROVED', deletedAt: null, startDate: { lt: endUtc }, endDate: { gte: startUtc } },
         include: {
           leaveType: { select: { name: true } },
           employee: { select: { id: true, firstName: true, lastName: true } }
@@ -725,6 +726,7 @@ export class DashboardService {
         where: {
           employee: { companyId },
           status: 'APPROVED',
+          deletedAt: null,
           startDate: { lte: today },
           endDate: { gte: today }
         }
@@ -775,7 +777,7 @@ export class DashboardService {
 
   private async getLeaveByType(companyId: number) {
     const requests = await this.prisma.leaveRequest.findMany({
-      where: { employee: { companyId } },
+      where: { employee: { companyId }, deletedAt: null },
       select: { leaveType: { select: { name: true } } }
     });
     return this.countBy(requests, (r: any) => r.leaveType?.name || 'Unknown');

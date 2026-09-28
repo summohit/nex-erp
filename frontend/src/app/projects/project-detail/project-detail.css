@@ -3667,6 +3667,28 @@ svg[lucide], svg[class*=lucide] {
   color: #5e6c84;
 }
 
+.member-popover-item.loading {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.member-check-icon {
+  color: #0c66e4;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.member-toggle-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: add-member-spin 0.6s linear infinite;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 /* Member Profile Popover Card */
 .member-profile-popover {
   position: absolute;
@@ -5035,6 +5057,17 @@ input[type=text], input[type=email], input[type=password] {
   background: linear-gradient(90deg, #10b981 0%, #059669 100%);
   border-radius: 999px;
   transition: width 0.4s ease;
+}
+
+/* An overspent budget reads red at a glance; the track is already full, so
+   colour is the only thing left to carry the difference. */
+.budget-progress-bar.over {
+  background: linear-gradient(90deg, #f43f5e 0%, #e11d48 100%);
+}
+
+.budget-sub-stats .over-budget {
+  color: #e11d48;
+  font-weight: 700;
 }
 
 .budget-sub-stats {

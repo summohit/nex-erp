@@ -103,7 +103,7 @@ describe('an unclosed session from a previous day', () => {
         startTime: '09:30', endTime: '18:30', isDayOff: false, onsite: null,
       }),
     };
-    service = new AttendanceService(prisma, {} as any, roster as ShiftRosterService);
+    service = new AttendanceService(prisma, {} as any, roster as ShiftRosterService, {} as any);
   });
 
   afterEach(() => jest.useRealTimers());

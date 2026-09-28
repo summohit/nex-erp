@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { ICellRendererAngularComp } from 'ag-grid-angular';
 import { ICellRendererParams } from 'ag-grid-community';
-import { LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, LucideEye } from '@lucide/angular';
+import { LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, LucideEye, LucideTrash2 } from '@lucide/angular';
 import { CommonModule } from '@angular/common';
 import { MatMenuModule } from '@angular/material/menu';
 
@@ -13,12 +13,18 @@ export interface LeaveActionCellParams extends ICellRendererParams {
   onReject?: (data: any) => void;
   onViewAttachment?: (data: any) => void;
   onViewReason?: (data: any) => void;
+  /**
+   * §Att10: remove the request outright. Passed only by screens whose viewer
+   * is a Super Admin, so its presence is the permission — the menu never has
+   * to ask who is looking.
+   */
+  onDelete?: (data: any) => void;
 }
 
 @Component({
   selector: 'app-leave-action-cell-renderer',
   standalone: true,
-  imports: [CommonModule, LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, LucideEye, MatMenuModule],
+  imports: [CommonModule, LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, LucideEye, LucideTrash2, MatMenuModule],
   template: `
     <div class="action-container" (click)="$event.stopPropagation()">
       <button class="btn-view" (click)="view()" *ngIf="params.onView" title="View full details">
@@ -54,6 +60,13 @@ export interface LeaveActionCellParams extends ICellRendererParams {
         <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject && params.data.status === 'PENDING'">
           <svg lucideXCircle size="18" class="menu-icon"></svg>
           <span class="menu-text">Reject</span>
+        </button>
+        <!-- §Att10. Last, and set apart: cancelling leaves a record that says
+             cancelled, whereas this makes the request disappear. Sitting next
+             to Cancel with the same weight would invite the wrong one. -->
+        <button mat-menu-item class="menu-item menu-destructive" (click)="remove()" *ngIf="params.onDelete">
+          <svg lucideTrash2 size="18" class="menu-icon"></svg>
+          <span class="menu-text">Delete request</span>
         </button>
       </mat-menu>
     </div>
@@ -126,6 +139,14 @@ export interface LeaveActionCellParams extends ICellRendererParams {
     .text-success:hover {
       background: #d1fae5 !important;
     }
+    /* Deletion is the only irreversible thing in this menu, and the only red. */
+    .menu-destructive {
+      color: #dc2626 !important;
+      border-top: 1px solid #f1f5f9;
+    }
+    .menu-destructive:hover {
+      background: #fef2f2 !important;
+    }
   `]
 })
 export class LeaveActionCellRendererComponent implements ICellRendererAngularComp {
@@ -170,6 +191,12 @@ export class LeaveActionCellRendererComponent implements ICellRendererAngularCom
     }
   }
 
+  remove() {
+    if (this.params.onDelete) {
+      this.params.onDelete(this.params.data);
+    }
+  }
+
   isPastStartDate(startDateStr: string): boolean {
     if (!startDateStr) return true;
     const today = new Date();
@@ -199,6 +226,7 @@ export class LeaveActionCellRendererComponent implements ICellRendererAngularCom
     if (this.params.onCancel && !this.isPastStartDate(d.startDate) && d.status !== 'CANCELLED' && d.status !== 'REJECTED') return true;
     if (this.params.onApprove && d.status === 'PENDING') return true;
     if (this.params.onReject && d.status === 'PENDING') return true;
+    if (this.params.onDelete) return true;
     return false;
   }
 }

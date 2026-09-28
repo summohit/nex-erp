@@ -19,4 +19,20 @@ export class UploadService {
       headers: { Authorization: `Bearer ${token}` }
     });
   }
+
+  /**
+   * Proof for a late clock-out (§Att4).
+   *
+   * Its own endpoint, not the generic one above: that route is unauthenticated
+   * and accepts any file type, and this one is evidence in an approval.
+   */
+  uploadAttendanceProof(file: File): Observable<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = getAccessToken();
+    return this.http.post<{ url: string }>(`${environment.apiUrl}/upload/attendance-proof`, formData, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
 }

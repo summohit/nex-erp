@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
 import { LateClockOutError, OpenSessionError } from './open-session.error';
@@ -7,6 +7,11 @@ import { FIELD_VISIT_STATUS } from '../field-visits/field-visit-status';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShiftRosterService, EffectiveShift } from './shift-roster.service';
 import { ShiftPeriod, resolvePeriod, datesInRange } from './shift-period-summary';
+import { CLOCK_OUT_APPROVAL } from './clock-out-approval';
+import { isHalfDayStart } from './half-day-rule';
+import { ApprovalsService } from '../approvals/approvals.service';
+import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
+import { isHrAdmin } from '../common/company-roles';
 
 /**
  * What the field visit clock tells attendance about the day it is clocking.
@@ -25,6 +30,7 @@ export class AttendanceService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private roster: ShiftRosterService,
+    private approvals: ApprovalsService,
   ) {}
 
   async getTodayAttendance(userId: number) {
@@ -296,10 +302,12 @@ export class AttendanceService {
       }
 
       // Clocking in past the shift's half-day boundary is more than late — the
-      // day reads as a half day from the start.
-      if (effective.shift?.halfDayTime && now > istTimeInstant(now, effective.shift.halfDayTime)) {
-        isHalfDay = true;
-      }
+      // day reads as a half day from the start. The rule lives in
+      // half-day-rule.ts, which also refuses a boundary configured at or before
+      // the shift's own start: that setting halves everybody's day.
+      isHalfDay = isHalfDayStart(
+        now, effective.startTime, effective.shift?.halfDayTime, istTimeInstant,
+      );
     }
 
     if (!existing) {
@@ -400,7 +408,7 @@ export class AttendanceService {
    */
   async clockOut(
     userId: number,
-    data: { lat?: number, lng?: number, reason?: string },
+    data: { lat?: number, lng?: number, reason?: string, proofUrl?: string },
     options?: { fieldVisit?: FieldVisitClockContext },
   ) {
     const employee = await this.prisma.employee.findUnique({
@@ -525,11 +533,163 @@ export class AttendanceService {
         // The reason is the permanent record that this day's clock-out time is
         // a closure rather than an observation. `missedClockOut` is the live
         // "still open and overdue" state and is spent the moment it closes.
-        ...(isPreviousDay ? { clockOutReason: reason } : {}),
+        //
+        // §Att4/§Att5: the proof and the queue go on at the same moment and for
+        // the same reason. The day is closed so the employee is not left with a
+        // session they cannot shut, but it enters PENDING and does not count as
+        // attended until somebody rules on it — see clock-out-approval.ts.
+        ...(isPreviousDay
+          ? {
+              clockOutReason: reason,
+              clockOutProofUrl: data.proofUrl ?? null,
+              clockOutApproval: CLOCK_OUT_APPROVAL.PENDING,
+              clockOutApprovedById: null,
+              clockOutApprovedAt: null,
+              clockOutReviewNote: null,
+            }
+          : {}),
         missedClockOut: false,
       },
       include: { logs: true }
     }).then(r => this.withTotalHours(r));
+  }
+
+  /**
+   * May this person rule on late clock-outs (§Att5)?
+   *
+   * Super Admin and HR always can — that is the company's own structure and
+   * not the super admin's to revoke. On top of that sits the delegation:
+   * named people put on the CLOCK_OUT queue, so the screen can be handed to
+   * an office manager without handing them an HR role that carries far more.
+   *
+   * Combining a contextual rule with the delegate table is the pattern
+   * ApprovalsService documents; it deliberately does not know about HR.
+   */
+  async mayApproveClockOut(
+    companyId: number,
+    role?: string | null,
+    employeeId?: number | null,
+  ): Promise<boolean> {
+    if (isHrAdmin(role)) return true;
+    return this.approvals.mayApprove(
+      companyId, APPROVAL_WORKFLOW.CLOCK_OUT, role, employeeId,
+    );
+  }
+
+  private async assertMayApproveClockOut(
+    companyId: number, role?: string | null, employeeId?: number | null,
+  ) {
+    if (!(await this.mayApproveClockOut(companyId, role, employeeId))) {
+      throw new ForbiddenException(
+        'You are not on the late clock-out approval list. A Super Admin can add you.',
+      );
+    }
+  }
+
+  /**
+   * The queue: days closed out of a previous session and not yet ruled on.
+   *
+   * Oldest first. A clock-out approval is not a pile to triage by importance —
+   * the person is waiting on their own attendance record, and the one that has
+   * waited longest is the one to answer.
+   */
+  async getPendingClockOuts(
+    companyId: number, role?: string | null, employeeId?: number | null,
+  ) {
+    await this.assertMayApproveClockOut(companyId, role, employeeId);
+    return this.prisma.attendance.findMany({
+      where: {
+        clockOutApproval: CLOCK_OUT_APPROVAL.PENDING,
+        employee: { companyId },
+      },
+      include: {
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, avatarUrl: true,
+            employeeCode: true, designation: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+        shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+      },
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  /** What an employee is still waiting on, for their own attendance screen. */
+  async getMyClockOutApprovals(userId: number) {
+    const employee = await this.prisma.employee.findUnique({ where: { userId } });
+    if (!employee) throw new BadRequestException('Employee profile not found');
+    return this.prisma.attendance.findMany({
+      where: { employeeId: employee.id, clockOutApproval: { not: null } },
+      orderBy: { date: 'desc' },
+      take: 50,
+    });
+  }
+
+  /**
+   * Rule on one late clock-out.
+   *
+   * A rejection must say why. An approval need not: "yes, that is what
+   * happened" adds nothing, whereas a refusal the employee cannot read is a
+   * decision they have no way to answer.
+   */
+  async reviewClockOut(
+    companyId: number,
+    attendanceId: number,
+    data: { action: 'APPROVE' | 'REJECT'; note?: string },
+    role?: string | null,
+    approverEmployeeId?: number | null,
+  ) {
+    await this.assertMayApproveClockOut(companyId, role, approverEmployeeId);
+
+    const record = await this.prisma.attendance.findFirst({
+      where: { id: attendanceId, employee: { companyId } },
+      include: { employee: { select: { id: true, userId: true, firstName: true } } },
+    });
+    if (!record) throw new BadRequestException('Attendance record not found');
+    if (record.clockOutApproval !== CLOCK_OUT_APPROVAL.PENDING) {
+      throw new BadRequestException(
+        `This clock-out has already been ${String(record.clockOutApproval ?? 'settled').toLowerCase()}.`,
+      );
+    }
+
+    // Nobody rules on their own forgotten clock-out, whatever list they are on.
+    if (approverEmployeeId != null && record.employeeId === approverEmployeeId) {
+      throw new ForbiddenException('You cannot approve your own clock-out.');
+    }
+
+    const rejecting = data.action === 'REJECT';
+    const note = data.note?.trim() || '';
+    if (rejecting && !note) {
+      throw new BadRequestException('A rejection has to say why.');
+    }
+
+    const updated = await this.prisma.attendance.update({
+      where: { id: record.id },
+      data: {
+        clockOutApproval: rejecting
+          ? CLOCK_OUT_APPROVAL.REJECTED
+          : CLOCK_OUT_APPROVAL.APPROVED,
+        clockOutApprovedById: approverEmployeeId ?? null,
+        clockOutApprovedAt: new Date(),
+        clockOutReviewNote: note || null,
+      },
+      include: { logs: true },
+    });
+
+    await this.notificationsService.notifyEmployees([record.employeeId], {
+      companyId,
+      title: rejecting ? 'Clock-out rejected' : 'Clock-out approved',
+      message: rejecting
+        ? `Your clock-out for ${record.date.toISOString().slice(0, 10)} was rejected: ${note}`
+        : `Your clock-out for ${record.date.toISOString().slice(0, 10)} was approved.`,
+      type: 'ATTENDANCE',
+      linkUrl: '/attendance/my',
+      excludeEmployeeId: approverEmployeeId ?? null,
+    });
+
+    return this.withTotalHours(updated);
   }
 
   async getMyRegularizations(userId: number) {

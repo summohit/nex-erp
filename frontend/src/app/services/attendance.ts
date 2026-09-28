@@ -36,6 +36,11 @@ export interface AttendanceRecord {
    * for (and stored) a reason for the missed clock-out.
    */
   clockOutReason?: string | null;
+  /** §Att4/§Att5: the proof attached to a late clock-out, and its ruling. */
+  clockOutProofUrl?: string | null;
+  clockOutApproval?: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  clockOutApprovedAt?: string | null;
+  clockOutReviewNote?: string | null;
   /** Live "session still open and overdue" flag; cleared once the day closes. */
   missedClockOut?: boolean;
   employeeId: number;
@@ -121,8 +126,27 @@ export class AttendanceService {
    * belongs to a previous IST day. The server decides; the client sends it in
    * response to a LATE_CLOCK_OUT_REASON_REQUIRED refusal.
    */
-  clockOut(lat?: number, lng?: number, reason?: string) {
-    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out`, { lat, lng, reason });
+  clockOut(lat?: number, lng?: number, reason?: string, proofUrl?: string) {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out`, { lat, lng, reason, proofUrl });
+  }
+
+  // §Att5: the late clock-out queue.
+  getPendingClockOuts(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/clock-out/pending`);
+  }
+
+  /** Whether to show the queue at all — the answer is partly a delegate list,
+   *  so the client asks rather than inferring it from the role. */
+  canApproveClockOuts(): Observable<{ canApprove: boolean }> {
+    return this.http.get<{ canApprove: boolean }>(`${this.apiUrl}/clock-out/can-approve`);
+  }
+
+  getMyClockOutApprovals(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/clock-out/mine`);
+  }
+
+  reviewClockOut(id: number, action: 'APPROVE' | 'REJECT', note?: string) {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out/${id}/review`, { action, note });
   }
 
   getMyRegularizations(): Observable<any[]> {

@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, inject, signal, computed } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -82,6 +82,10 @@ export class FieldVisitRequestFormComponent implements OnInit {
   selectedProjectId = signal<number | null>(null);
   isProjectDropdownOpen = signal(false);
   projectSearchQuery = signal('');
+
+  // Searchable Location select state (§PB10)
+  isLocationDropdownOpen = signal(false);
+  locationSearchQuery = signal('');
 
   // Searchable Employee picker state
   selectedEmployeeIds = signal<number[]>([]);
@@ -330,6 +334,46 @@ export class FieldVisitRequestFormComponent implements OnInit {
     this.selectedProjectId.set(projectId);
     this.form.projectId = projectId;
     this.isProjectDropdownOpen.set(false);
+  }
+
+  // ── Searchable Visit Location Picker (§PB10) ───────────────────────────
+  selectedVisitLocation = computed(() => {
+    const id = this.selectedVisitLocationId();
+    if (id == null) return null;
+    return this.visitLocations().find((l) => l.id === id) || null;
+  });
+
+  filteredVisitLocations = computed(() => {
+    const q = this.locationSearchQuery().trim().toLowerCase();
+    const list = this.visitLocations();
+    if (!q) return list;
+    return list.filter((l) =>
+      l.name.toLowerCase().includes(q) ||
+      (l.address && l.address.toLowerCase().includes(q)) ||
+      (l.leadContact?.companyName && l.leadContact.companyName.toLowerCase().includes(q))
+    );
+  });
+
+  toggleLocationDropdown(): void {
+    this.isLocationDropdownOpen.update((v) => !v);
+    if (this.isLocationDropdownOpen()) {
+      this.locationSearchQuery.set('');
+      this.isProjectDropdownOpen.set(false);
+    }
+  }
+
+  selectVisitLocation(locId: number | null): void {
+    this.onVisitLocationPicked(locId);
+    this.isLocationDropdownOpen.set(false);
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.searchable-select-container')) {
+      this.isProjectDropdownOpen.set(false);
+      this.isLocationDropdownOpen.set(false);
+    }
   }
 
   // ── Searchable Employee Picker ──────────────────────────────────────────

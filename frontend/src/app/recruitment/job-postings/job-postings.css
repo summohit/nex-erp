@@ -1289,3 +1289,69 @@ select.form-control:disabled {
 .grid-container ::ng-deep .ag-pinned-right-cols-container .ag-cell {
   cursor: default;
 }
+
+/* Form Validation & Error Styles */
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-error-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ef4444;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.field-error-text {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.field-error-text svg {
+  flex-shrink: 0;
+  color: #ef4444;
+}
+
+.form-control.is-invalid,
+.custom-select-trigger.is-invalid {
+  border-color: #ef4444 !important;
+  background-color: #fffafb !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+@keyframes fieldPulse {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.25);
+  }
+  60% {
+    transform: scale(0.99);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.field-highlight-pulse {
+  animation: fieldPulse 0.6s ease-in-out;
+  border-radius: 8px;
+}
+

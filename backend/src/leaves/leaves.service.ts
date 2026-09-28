@@ -1,7 +1,10 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { FieldVisitActivationService } from '../field-visits/requests/field-visit-activation.service';
+import { ApprovalsService } from '../approvals/approvals.service';
+import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
+import { isHrAdmin, isSuperAdmin } from '../common/company-roles';
 
 /** One employee's figures for a single leave type in the quota report. */
 export interface QuotaCell {
@@ -52,7 +55,8 @@ export class LeavesService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-    private fieldVisits: FieldVisitActivationService
+    private fieldVisits: FieldVisitActivationService,
+    private approvals: ApprovalsService
   ) {}
 
   async assignLeaveBalance(data: { employeeId: number, leaveTypeId: number, allocated: number, year: number }) {
@@ -233,7 +237,26 @@ export class LeavesService {
       include: { user: true, branch: true, manager: { include: { user: true } } }
     });
     if (!employee) throw new BadRequestException('Employee not found');
+    return this.createLeaveRequestFor(employee, data);
+  }
 
+  /**
+   * The body of a leave request, once we know whose it is (§Att9).
+   *
+   * Split out of `requestLeave` rather than copied, because everything here —
+   * the half-day rules, the overlap check, the working-day count, the field
+   * visit conflicts — has to apply identically whether somebody applied for
+   * themselves or an administrator did it for them. A second implementation
+   * would be a second set of rules the day either one is edited.
+   *
+   * `onBehalf` relaxes exactly two things, and only those two. See where each
+   * is used for why.
+   */
+  private async createLeaveRequestFor(
+    employee: any,
+    data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string },
+    onBehalf?: { raisedByUserId: number },
+  ) {
     const startDate = new Date(data.startDate);
     const endDate = new Date(data.endDate);
 
@@ -254,11 +277,18 @@ export class LeavesService {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (startDate < today) {
+    // An employee cannot backdate their own leave. An administrator entering it
+    // for somebody else routinely must: the common case for this feature is
+    // recording the week a person was off sick and unable to file anything.
+    if (startDate < today && !onBehalf) {
       throw new BadRequestException('Cannot apply for leave in the past');
     }
 
-    if (employee.user.role !== 'SUPERADMIN' && employee.user.role !== 'ADMIN' && employee.user.role !== 'HR') {
+    // Raised on behalf, the blackout has already been considered: an
+    // administrator choosing this employee and these dates is making the
+    // decision the blackout exists to force. Blocking them here would only
+    // mean deleting the blackout to get the entry in.
+    if (!onBehalf && employee.user.role !== 'SUPERADMIN' && employee.user.role !== 'ADMIN' && employee.user.role !== 'HR') {
       const blackouts = await this.prisma.blackoutDate.findMany({
         where: {
           companyId: employee.companyId,
@@ -280,6 +310,7 @@ export class LeavesService {
     const potentialOverlaps = await this.prisma.leaveRequest.findMany({
       where: {
         employeeId: employee.id,
+        deletedAt: null,
         status: { in: ['PENDING', 'APPROVED'] },
         startDate: { lte: endDate },
         endDate: { gte: startDate }
@@ -321,10 +352,14 @@ export class LeavesService {
         reason: data.reason,
         attachmentUrl: data.attachmentUrl,
         isHalfDay: data.isHalfDay || false,
-        halfDayPeriod: data.halfDayPeriod || null
+        halfDayPeriod: data.halfDayPeriod || null,
+        raisedById: onBehalf?.raisedByUserId ?? null
       }
     }).then(async (request) => {
-      await this.notifyManager(employee, request, fieldVisitConflicts);
+      // Raised on behalf, the manager is told when it is approved a moment
+      // later, by the same notification every approval sends. Telling them
+      // twice about one decision they were not asked to make is noise.
+      if (!onBehalf) await this.notifyManager(employee, request, fieldVisitConflicts);
       return { ...request, fieldVisitConflicts };
     });
   }
@@ -397,7 +432,10 @@ export class LeavesService {
 
   async getRequests(companyId: number, filter: any) {
     return this.prisma.leaveRequest.findMany({
-      where: { employee: { companyId } },
+      // §Att10: a deleted request is gone for every reader. Soft deletion that
+      // leaks into one list is worse than none — it tells the Super Admin the
+      // record is gone while everybody else keeps seeing it.
+      where: { employee: { companyId }, deletedAt: null },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
         leaveType: true,
@@ -410,7 +448,7 @@ export class LeavesService {
 
   async getPendingApprovalsForCompany(companyId: number, take: number = 8) {
     return this.prisma.leaveRequest.findMany({
-      where: { employee: { companyId }, status: 'PENDING' },
+      where: { employee: { companyId }, status: 'PENDING', deletedAt: null },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
         leaveType: true,
@@ -432,7 +470,7 @@ export class LeavesService {
     if (descendantIds.length === 0) return [];
 
     return this.prisma.leaveRequest.findMany({
-      where: { employeeId: { in: descendantIds }, status: 'PENDING' },
+      where: { employeeId: { in: descendantIds }, status: 'PENDING', deletedAt: null },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
         leaveType: true,
@@ -477,7 +515,7 @@ export class LeavesService {
     if (!employee) throw new BadRequestException('Employee not found');
 
     const request = await this.prisma.leaveRequest.findFirst({
-      where: { id: requestId, employeeId: employee.id }
+      where: { id: requestId, employeeId: employee.id, deletedAt: null }
     });
 
     if (!request) throw new BadRequestException('Request not found or not authorized');
@@ -511,6 +549,7 @@ export class LeavesService {
       where: {
         id: { not: requestId },
         employeeId: employee.id,
+        deletedAt: null,
         status: { in: ['PENDING', 'APPROVED'] },
         startDate: { lte: newEnd },
         endDate: { gte: newStart }
@@ -543,7 +582,7 @@ export class LeavesService {
     if (!employee) throw new BadRequestException('Employee not found');
 
     const request = await this.prisma.leaveRequest.findFirst({
-      where: { id: requestId, employeeId: employee.id }
+      where: { id: requestId, employeeId: employee.id, deletedAt: null }
     });
 
     if (!request) throw new BadRequestException('Request not found or not authorized');
@@ -572,9 +611,154 @@ export class LeavesService {
             used: { decrement: diffDays }
           }
         });
+
+        // §Att10: the days are theirs to work again, so the roster has to stop
+        // describing them as somebody else's. This gives back the standing
+        // shift; it deliberately does not put them back on a client visit the
+        // leave took them off — see restoreStandingShiftAfterLeave.
+        await this.fieldVisits.restoreStandingShiftAfterLeave(tx, {
+          employeeId: request.employeeId,
+          companyId: employee.companyId,
+          from: start,
+          to: end,
+        });
       }
 
       return updatedRequest;
+    });
+  }
+
+  /**
+   * May this person raise or remove leave for somebody else (§Att9/§Att10)?
+   *
+   * Super Admin and HR always may — that is the company's own structure, not
+   * the Super Admin's to revoke — plus anyone put on the LEAVE_ON_BEHALF
+   * queue. The same shape as the clock-out rule, and for the same reason: the
+   * answer is partly a role and partly a list, so it cannot live in a
+   * decorator.
+   */
+  async mayActOnBehalf(
+    companyId: number, role?: string | null, employeeId?: number | null,
+  ): Promise<boolean> {
+    if (isHrAdmin(role)) return true;
+    return this.approvals.mayApprove(
+      companyId, APPROVAL_WORKFLOW.LEAVE_ON_BEHALF, role, employeeId,
+    );
+  }
+
+  /**
+   * Apply leave for somebody else (§Att9).
+   *
+   * Approved on creation rather than raised as pending. The people who may do
+   * this are already the people who approve leave, so routing it back for them
+   * to approve their own entry decides nothing — it only leaves a request
+   * sitting in a queue looking like it needs attention.
+   *
+   * The approval itself goes through `updateRequestStatus`, unchanged: that is
+   * where the balance is deducted, field visit days are released and the
+   * employee is notified. Re-implementing any of it here would be a second
+   * definition of what approving leave means.
+   */
+  async requestLeaveOnBehalf(
+    actorUserId: number,
+    data: {
+      employeeId: number, leaveTypeId: number, startDate: string, endDate: string,
+      reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string,
+    },
+  ) {
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+      select: { id: true, role: true, employee: { select: { id: true, companyId: true } } },
+    });
+    if (!actor) throw new BadRequestException('User not found');
+
+    const companyId = actor.employee?.companyId;
+    if (companyId == null) throw new BadRequestException('Your account is not linked to an employee record');
+
+    if (!(await this.mayActOnBehalf(companyId, actor.role, actor.employee?.id ?? null))) {
+      throw new ForbiddenException(
+        'You are not allowed to apply leave for other people. A Super Admin can add you to this list.',
+      );
+    }
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: data.employeeId, companyId },
+      include: { user: true, branch: true, manager: { include: { user: true } } },
+    });
+    if (!employee) throw new BadRequestException('Employee not found');
+
+    const created = await this.createLeaveRequestFor(employee, data, {
+      raisedByUserId: actorUserId,
+    });
+
+    // Approved through the ordinary path, so the balance, the field visits and
+    // the employee's notification all happen exactly as they always do.
+    const approved = await this.updateRequestStatus(actorUserId, created.id, 'APPROVED');
+    return { ...approved, fieldVisitConflicts: created.fieldVisitConflicts };
+  }
+
+  /**
+   * Remove a leave request (§Att10).
+   *
+   * A soft delete. It is gone for every reader — every query in this service
+   * filters `deletedAt: null` — but the row survives, because leave history is
+   * the evidence behind somebody's pay and a mis-click should not be able to
+   * destroy a year-old approved absence.
+   *
+   * An approved request gives its days back on the way out, in the same write.
+   * Removing the record while leaving the balance spent would take leave from
+   * somebody twice, and the second time invisibly.
+   */
+  async deleteRequest(actorUserId: number, requestId: number) {
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+      select: { id: true, role: true, employee: { select: { id: true, companyId: true } } },
+    });
+    if (!actor) throw new BadRequestException('User not found');
+    if (!isSuperAdmin(actor.role)) {
+      throw new ForbiddenException('Only a Super Admin can delete a leave request.');
+    }
+
+    const request = await this.prisma.leaveRequest.findFirst({
+      where: { id: requestId, deletedAt: null, employee: { companyId: actor.employee?.companyId } },
+      include: { employee: { include: { branch: true } } },
+    });
+    if (!request) throw new BadRequestException('Request not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.leaveRequest.update({
+        where: { id: requestId },
+        data: { deletedAt: new Date(), deletedById: actorUserId },
+      });
+
+      if (request.status === 'APPROVED') {
+        const start = new Date(request.startDate);
+        const end = new Date(request.endDate);
+        const days = this.calculateWorkingDays(
+          start, end, request.employee.branch?.weeklyOffs || '0', request.isHalfDay,
+          await this.getHolidayDates(request.employee.companyId, start, end),
+        );
+        await tx.leaveBalance.updateMany({
+          where: {
+            employeeId: request.employeeId,
+            leaveTypeId: request.leaveTypeId,
+            year: start.getFullYear(),
+          },
+          data: { used: { decrement: days } },
+        });
+
+        // §Att10: same as cancelling. A deleted leave has to leave the roster
+        // in the same state a cancelled one does, or the two ways of undoing
+        // leave would disagree about where somebody is expected to be.
+        await this.fieldVisits.restoreStandingShiftAfterLeave(tx, {
+          employeeId: request.employeeId,
+          companyId: request.employee.companyId,
+          from: start,
+          to: end,
+        });
+      }
+
+      return { deleted: true, id: deleted.id };
     });
   }
 
@@ -583,7 +767,7 @@ export class LeavesService {
     if (!employee) throw new BadRequestException('Employee not found');
 
     return this.prisma.leaveRequest.findMany({
-      where: { employeeId: employee.id },
+      where: { employeeId: employee.id, deletedAt: null },
       include: {
         leaveType: true,
         // The detail view identifies whose leave it is. Without this it fell
@@ -613,8 +797,10 @@ export class LeavesService {
     });
     if (!actor) throw new BadRequestException('User not found');
 
-    const request = await this.prisma.leaveRequest.findUnique({
-      where: { id: requestId },
+    // findFirst rather than findUnique: a deleted request must not be
+    // approvable, and findUnique cannot filter on anything but the key.
+    const request = await this.prisma.leaveRequest.findFirst({
+      where: { id: requestId, deletedAt: null },
       include: { employee: { include: { branch: true } } }
     });
 

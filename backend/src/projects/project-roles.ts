@@ -6,7 +6,7 @@
  * and the answer must be identical in all three. A board that hides a task the
  * reports tab then shows is not a permission, it is a decoration.
  */
-import { isCompanyAdmin } from '../common/company-roles';
+import { isCompanyAdmin, isSuperAdmin, normaliseRole } from '../common/company-roles';
 
 
 /** The roles a ProjectMember row can hold. */
@@ -114,4 +114,25 @@ export function taskVisibilityFilter(viewer: ProjectViewer): any | null {
       { members: { some: { employeeId: me } } },
     ],
   };
+}
+
+/**
+ * Whether they may see what the project costs (§PB5).
+ *
+ * The summary, milestones, budget requests and reports tabs all read the same
+ * money: agreed budget, spend to date, and what each person's logged hours are
+ * worth. Finance and the super admin see it because it is their job; the
+ * project's own manager and its owner because they are answerable for it.
+ *
+ * Deliberately narrower than `seesEveryTask`: a company ADMIN or a technical
+ * architect sees all the work without seeing what it is billed at. Kept in
+ * step with `canSeeSummary` / `canSeeFinancialTabs` on the client — the client
+ * hides the tab, this decides the answer, and hiding a tab whose endpoint
+ * still answers is not a permission.
+ */
+export function seesProjectFinancials(viewer: ProjectViewer): boolean {
+  if (isSuperAdmin(viewer.companyRole)) return true;
+  if (normaliseRole(viewer.companyRole) === 'FINANCE') return true;
+  if (viewer.isOwner) return true;
+  return viewer.projectRole === PROJECT_ROLE.MANAGER;
 }

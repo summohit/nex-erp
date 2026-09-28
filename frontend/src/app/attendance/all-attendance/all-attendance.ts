@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -11,9 +11,10 @@ import {
   LucideLayers, LucideEye, LucideMapPin, LucideInbox,
   LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
   LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
-  LucideZap, LucideExternalLink
+  LucideZap, LucideExternalLink, LucideTrophy, LucideAward
 } from '@lucide/angular';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
+import { isWeeklyOff } from '../../shared/utils/weekly-offs';
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
 
@@ -55,7 +56,7 @@ export interface EmployeeMatrixRow {
     LucideLayers, LucideEye, LucideMapPin, LucideInbox,
     LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
     LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
-    LucideZap, LucideExternalLink
+    LucideZap, LucideExternalLink, LucideTrophy, LucideAward
   ],
   templateUrl: './all-attendance.html',
   styleUrls: ['./all-attendance.css']
@@ -96,6 +97,14 @@ export class AllAttendanceComponent implements OnInit {
     missedClockOutReason: string | null;
   } | null>(null);
   isDetailsModalOpen = signal(false);
+  /** Floating tooltip state positioned dynamically to avoid table overflow clipping. */
+  hoveredTooltip = signal<{
+    day: DayMatrixStatus;
+    top: number;
+    left: number;
+    placement: 'top' | 'bottom';
+    arrowLeft: number;
+  } | null>(null);
 
   months = [
     { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
@@ -273,6 +282,9 @@ export class AllAttendanceComponent implements OnInit {
 
     for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
       const date = new Date(year, month - 1, dayNum);
+      // Kept only for the column header's shading. Whether the day is actually
+      // OFF is a question about a person, not a date, and is answered per
+      // employee below against their branch's weeklyOffs.
       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
       const isFuture = date > today;
       const weekdayStr = weekdays[date.getDay()];
@@ -356,12 +368,19 @@ export class AllAttendanceComponent implements OnInit {
     const dateFilter = this.filterDate;
 
     let rows: EmployeeMatrixRow[] = emps.map(emp => {
+      // This person's own days off, not a hardcoded Saturday and Sunday. Every
+      // branch here is "0" — Sunday only — which made every Saturday read as a
+      // day off: absences on Saturdays were invisible, and Saturdays worked
+      // inflated the present tally without ever entering the denominator.
+      const weeklyOffs = emp.branch?.weeklyOffs;
+
       const dayCells: DayMatrixStatus[] = days.map(day => {
         let countsPresent = false;
         let countsWorking = false;
         const key = `${emp.id}_${day.dateStr}`;
         const record = recordMap.get(key);
         const holiday = holidays.find(h => this.getBackendDateString(h.date) === day.dateStr);
+        const isDayOff = isWeeklyOff(day.date, weeklyOffs);
 
         let status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty' = 'Empty';
         let tooltip = '';
@@ -389,8 +408,12 @@ export class AllAttendanceComponent implements OnInit {
           }
           if (['Present', 'Late', 'Half Day'].includes(status)) {
             countsPresent = true;
-          }
-          if (!day.isWeekend && !holiday) {
+            // A day actually worked belongs in both halves of the fraction.
+            // Counting it as present but not as a working day is what produced
+            // totals like "23/20", where the numerator could exceed the
+            // denominator and the ratio stopped meaning anything.
+            countsWorking = true;
+          } else if (!isDayOff && !holiday) {
             countsWorking = true;
           }
         } else if (record && record.status === 'ON_LEAVE') {
@@ -399,9 +422,9 @@ export class AllAttendanceComponent implements OnInit {
         } else if (holiday || (record && record.status === 'HOLIDAY')) {
           status = 'Holiday';
           tooltip = (holiday && holiday.name) || 'Holiday';
-        } else if (day.isWeekend || (record && record.status === 'WEEKLY_OFF')) {
+        } else if (isDayOff || (record && record.status === 'WEEKLY_OFF')) {
           status = 'Day Off';
-          tooltip = 'Weekend Day Off';
+          tooltip = 'Weekly Day Off';
         } else {
           status = 'Absent';
           tooltip = 'Absent (No punch recorded)';
@@ -415,7 +438,8 @@ export class AllAttendanceComponent implements OnInit {
           weekdayStr: day.weekdayStr,
           date: day.date,
           dateStr: day.dateStr,
-          isWeekend: day.isWeekend,
+          // The cell's own answer, not the calendar's.
+          isWeekend: isDayOff,
           isFuture: day.isFuture,
           status,
           tooltip: reason ? `${tooltip} · ${reason}` : tooltip,
@@ -452,6 +476,78 @@ export class AllAttendanceComponent implements OnInit {
     }
 
     return rows;
+  });
+
+  /**
+   * §Att6: Top Attendance Performers.
+   * Calculates the best attendance records based on total present days,
+   * punctuality (fewest late days), and total working days.
+   */
+  topPerformers = computed(() => {
+    const rows = this.employeeGridRows();
+    if (!rows || rows.length === 0) return [];
+    
+    // We want employees who have recorded attendance in this period
+    let candidates = rows.map(r => {
+      // If employee worked extra shifts/weekends, present can exceed scheduled working days,
+      // but standard attendance rate cannot exceed 100%.
+      const workingDenominator = Math.max(r.totalWorkingDays, 1);
+      const rawPct = (r.totalPresent / workingDenominator) * 100;
+      const pct = Math.min(100, Math.round(rawPct));
+      
+      let onTime = 0;
+      let totalPresents = 0;
+      let lateCount = 0;
+      r.days.forEach(d => {
+        if (d.countsPresent) {
+          totalPresents++;
+          if (d.record && !d.record.isLate) {
+            onTime++;
+          } else if (d.record && d.record.isLate) {
+            lateCount++;
+          }
+        }
+      });
+      
+      const punctualityRate = totalPresents > 0 ? (onTime / totalPresents) * 100 : 0;
+      const punctuality = Math.round(punctualityRate);
+
+      // Composite performance score:
+      // High attendance (60%) + High punctuality (40%) + bonus for extra working days
+      const extraDaysBonus = Math.min(5, Math.max(0, r.totalPresent - r.totalWorkingDays));
+      const compositeScore = (pct * 0.60) + (punctuality * 0.40) + extraDaysBonus;
+
+      return {
+        emp: r.employee,
+        pct: pct,
+        punctuality: punctuality,
+        presentDays: r.totalPresent,
+        workingDays: r.totalWorkingDays,
+        onTimeDays: onTime,
+        lateDays: lateCount,
+        score: compositeScore
+      };
+    }).filter(c => c.presentDays > 0);
+
+    // Sort by composite score descending, then punctuality, then presentDays
+    candidates.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.pct !== a.pct) return b.pct - a.pct;
+      if (b.punctuality !== a.punctuality) return b.punctuality - a.punctuality;
+      return b.presentDays - a.presentDays;
+    });
+
+    const rankMeta = [
+      { title: 'Top Performer', tier: 'Gold Tier', badge: '1st Place', class: 'rank-gold', icon: 'trophy' },
+      { title: 'Runner Up', tier: 'Silver Tier', badge: '2nd Place', class: 'rank-silver', icon: 'medal' },
+      { title: 'Honorable Mention', tier: 'Bronze Tier', badge: '3rd Place', class: 'rank-bronze', icon: 'award' }
+    ];
+
+    return candidates.slice(0, 3).map((c, idx) => ({
+      ...c,
+      meta: rankMeta[idx] || rankMeta[2],
+      rankNumber: idx + 1
+    }));
   });
 
   /**
@@ -1000,6 +1096,7 @@ export class AllAttendanceComponent implements OnInit {
   // Open Detailed Session Modal (Screenshot 3)
   openDayDetails(emp: any, day: any, record?: AttendanceRecord) {
     if (day.isFuture) return;
+    this.hoveredTooltip.set(null);
 
     // Merge emp and record.employee so we have all fields available
     const mergedEmp = {
@@ -1095,5 +1192,60 @@ export class AllAttendanceComponent implements OnInit {
 
   closeDetail() {
     this.selectedRecord.set(null);
+  }
+
+  // ── Custom Dynamic Cell Tooltip ──────────────────────────────────────────
+  onCellMouseEnter(event: MouseEvent, day: DayMatrixStatus) {
+    if (day.isFuture || !day.tooltip) {
+      this.hoveredTooltip.set(null);
+      return;
+    }
+
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const tooltipWidth = 270;
+
+    // Flip to bottom if there's not enough room above (e.g. single user row right under sticky thead)
+    const placeBelow = rect.top < 195;
+    const placement: 'top' | 'bottom' = placeBelow ? 'bottom' : 'top';
+
+    const badgeCenterX = rect.left + rect.width / 2;
+
+    // Clamp horizontally to stay within viewport
+    const minMargin = 12;
+    const maxLeft = Math.max(minMargin, window.innerWidth - tooltipWidth - minMargin);
+    const tooltipLeft = Math.max(minMargin, Math.min(maxLeft, badgeCenterX - tooltipWidth / 2));
+
+    // Vertical coordinate
+    const tooltipTop = placement === 'bottom' ? rect.bottom + 8 : rect.top - 8;
+
+    // Arrow pointer relative to tooltip box
+    const rawArrowLeft = badgeCenterX - tooltipLeft;
+    const arrowLeft = Math.max(16, Math.min(tooltipWidth - 16, rawArrowLeft));
+
+    this.hoveredTooltip.set({
+      day,
+      top: tooltipTop,
+      left: tooltipLeft,
+      placement,
+      arrowLeft
+    });
+  }
+
+  onCellMouseLeave() {
+    this.hoveredTooltip.set(null);
+  }
+
+  onMatrixScroll() {
+    if (this.hoveredTooltip()) {
+      this.hoveredTooltip.set(null);
+    }
+  }
+
+  @HostListener('window:scroll')
+  onWindowScroll() {
+    if (this.hoveredTooltip()) {
+      this.hoveredTooltip.set(null);
+    }
   }
 }

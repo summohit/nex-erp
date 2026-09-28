@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -98,6 +98,9 @@ export class JobsService {
 
   async create(companyId: number, data: any) {
     const { minSalary, maxSalary, startDate, endDate, totalOpenings, recruiterId, discloseSalary, ...rest } = data;
+    if (!rest.title || !String(rest.title).trim()) {
+      throw new BadRequestException('Job title is required');
+    }
     return this.prisma.job.create({
       data: {
         ...rest,
@@ -117,6 +120,9 @@ export class JobsService {
   async update(id: number, companyId: number, data: any) {
     const job = await this.findOne(id, companyId);
     const { minSalary, maxSalary, startDate, endDate, totalOpenings, recruiterId, discloseSalary, ...rest } = data;
+    if (data.title !== undefined && (!data.title || !String(data.title).trim())) {
+      throw new BadRequestException('Job title cannot be empty');
+    }
     
     const updateData = { ...rest };
     if (minSalary !== undefined) updateData.minSalary = minSalary ? parseFloat(minSalary) : null;

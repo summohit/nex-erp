@@ -132,6 +132,15 @@ export const routes: Routes = [
         loadComponent: () => import('./settings/permissions/permissions.component').then(m => m.PermissionsComponent)
       },
       {
+        // §Att5. Guarded on settings/permissions: choosing who may approve is
+        // the same kind of decision as choosing who may do anything else, and
+        // the server refuses the write to anyone but a Super Admin regardless.
+        path: 'settings/approvals',
+        canActivate: [permissionGuard],
+        data: { module: 'settings/permissions' },
+        loadComponent: () => import('./settings/approvals/approvals').then(m => m.ApprovalSettingsComponent)
+      },
+      {
         path: 'settings/system',
         canActivate: [permissionGuard],
         data: { module: 'settings/system' },
@@ -169,6 +178,15 @@ export const routes: Routes = [
         canActivate: [permissionGuard],
         data: { module: 'attendance/all' },
         loadComponent: () => import('./attendance/shift-summary/shift-summary').then(m => m.ShiftSummaryComponent)
+      },
+      {
+        // §Att5. Guarded on the same module as company-wide attendance: who may
+        // actually decide is a delegate list the server owns, and the page asks
+        // it directly rather than the route trying to second-guess it.
+        path: 'attendance/clock-out-approvals',
+        canActivate: [permissionGuard],
+        data: { module: 'attendance/all' },
+        loadComponent: () => import('./attendance/clock-out-approvals/clock-out-approvals').then(m => m.ClockOutApprovalsComponent)
       },
       {
         path: 'attendance/shift-roster',

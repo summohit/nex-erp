@@ -122,22 +122,132 @@
           </div>
         </div>
 
-        <!-- Saved sites, when the company keeps any (§PB10) -->
-        <div class="field" *ngIf="visitLocations().length">
-          <label><span>Saved Site</span></label>
-          <div class="input-with-icon">
-            <svg lucideBuilding [size]="16" class="field-icon"></svg>
-            <select [ngModel]="selectedVisitLocationId()"
-                    (ngModelChange)="onVisitLocationPicked($event)">
-              <option [ngValue]="null">Type the address instead…</option>
-              <option *ngFor="let site of visitLocations()" [ngValue]="site.id">
-                {{ site.name }}{{ site.client?.name ? ' · ' + site.client?.name : '' }}
-              </option>
-            </select>
+        <!-- Standardized saved sites dropdown (§PB10) -->
+        <div class="field">
+          <div class="field-label-split">
+            <label><span>Standardized Client Location</span></label>
+            <a href="/settings/master-data" target="_blank" class="manage-locations-link" title="Open Master Data in new tab">
+              <span>Manage Sites</span>
+              <svg lucideExternalLink [size]="11"></svg>
+            </a>
           </div>
+
+          <div class="searchable-select-container">
+            <button
+              type="button"
+              class="searchable-select-trigger location-select-trigger"
+              [class.open]="isLocationDropdownOpen()"
+              [class.has-value]="selectedVisitLocationId() !== null"
+              (click)="toggleLocationDropdown()">
+              <div class="trigger-left">
+                <div class="loc-pin-icon" [class.pinned]="selectedVisitLocation()?.latitude != null">
+                  <svg lucideMapPin [size]="15"></svg>
+                </div>
+                <div class="loc-text-col">
+                  @if (selectedVisitLocation(); as loc) {
+                    <span class="selected-text">{{ loc.name }}</span>
+                    @if (loc.leadContact?.companyName || loc.address) {
+                      <span class="selected-subtext">{{ loc.leadContact?.companyName ? (loc.leadContact?.companyName + ' · ') : '' }}{{ loc.address }}</span>
+                    }
+                  } @else {
+                    <span class="selected-text placeholder">Select from standardized client sites (or type address below)…</span>
+                  }
+                </div>
+              </div>
+              <div class="trigger-right">
+                @if (selectedVisitLocationId() !== null) {
+                  <button type="button" class="btn-clear-select" (click)="$event.stopPropagation(); selectVisitLocation(null)" title="Clear site selection">
+                    <svg lucideX [size]="14"></svg>
+                  </button>
+                }
+                <svg lucideChevronDown [size]="16" class="chevron-icon" [class.rotated]="isLocationDropdownOpen()"></svg>
+              </div>
+            </button>
+
+            @if (isLocationDropdownOpen()) {
+              <div class="searchable-select-menu location-select-menu" (click)="$event.stopPropagation()">
+                <div class="select-search-bar">
+                  <svg lucideSearch [size]="14" class="search-icon"></svg>
+                  <input
+                    type="text"
+                    placeholder="Search saved sites by name, company, or address…"
+                    [ngModel]="locationSearchQuery()"
+                    (ngModelChange)="locationSearchQuery.set($event)"
+                    autofocus />
+                  @if (locationSearchQuery()) {
+                    <button type="button" class="search-clear-btn" (click)="locationSearchQuery.set('')">
+                      <svg lucideX [size]="12"></svg>
+                    </button>
+                  }
+                </div>
+
+                <div class="select-options-list">
+                  <!-- Clear / Type Address Option -->
+                  <div
+                    class="select-option none-option"
+                    [class.selected]="selectedVisitLocationId() === null"
+                    (click)="selectVisitLocation(null)">
+                    <div class="option-content">
+                      <svg lucideBuilding [size]="14" class="option-icon"></svg>
+                      <span class="option-name">Type address manually (No saved site)</span>
+                    </div>
+                    @if (selectedVisitLocationId() === null) {
+                      <svg lucideCheck [size]="15" class="option-check"></svg>
+                    }
+                  </div>
+
+                  <!-- Location Items -->
+                  @for (loc of filteredVisitLocations(); track loc.id) {
+                    <div
+                      class="select-option location-option-row"
+                      [class.selected]="selectedVisitLocationId() === loc.id"
+                      (click)="selectVisitLocation(loc.id)">
+                      <div class="loc-option-left">
+                        <div class="loc-pin-bubble" [class.has-coords]="loc.latitude != null">
+                          <svg lucideMapPin [size]="14"></svg>
+                        </div>
+                        <div class="loc-option-info">
+                          <div class="loc-option-title-row">
+                            <span class="loc-title">{{ loc.name }}</span>
+                            @if (loc.leadContact?.companyName) {
+                              <span class="loc-company-badge">{{ loc.leadContact?.companyName }}</span>
+                            }
+                          </div>
+                          @if (loc.address) {
+                            <span class="loc-address-text">{{ loc.address }}</span>
+                          }
+                          @if (loc.latitude != null && loc.longitude != null) {
+                            <span class="loc-coords-pill">GPS: {{ loc.latitude | number:'1.4-4' }}, {{ loc.longitude | number:'1.4-4' }}</span>
+                          }
+                        </div>
+                      </div>
+                      @if (selectedVisitLocationId() === loc.id) {
+                        <svg lucideCheck [size]="16" class="option-check"></svg>
+                      }
+                    </div>
+                  }
+
+                  @if (filteredVisitLocations().length === 0 && visitLocations().length > 0) {
+                    <div class="select-empty-state">
+                      <p>No locations match "{{ locationSearchQuery() }}"</p>
+                    </div>
+                  }
+
+                  @if (visitLocations().length === 0) {
+                    <div class="select-empty-state">
+                      <p>No standardized sites configured in Master Data.</p>
+                      <a href="/settings/master-data" target="_blank" class="empty-action-link">
+                        + Add sites in Master Data
+                      </a>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
           <p class="field-hint">
-            Picking a site fills the address and pin below. Both stay editable —
-            the trip records where you actually went.
+            Selecting a location auto-fills the name, address and GPS pin below. You can still adjust details if needed.
           </p>
         </div>
 

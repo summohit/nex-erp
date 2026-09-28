@@ -81,6 +81,15 @@ export interface LeaveRequest {
     firstName: string;
     lastName: string;
   };
+  /**
+   * §Att9: set when somebody other than the employee raised this. Null — the
+   * overwhelming majority — means they applied for it themselves.
+   */
+  raisedById?: number | null;
+  raisedBy?: {
+    email?: string;
+    employee?: { firstName: string; lastName: string } | null;
+  } | null;
 }
 
 /**
@@ -157,5 +166,30 @@ export class LeavesService {
 
   cancelRequest(id: number) {
     return this.http.put<LeaveRequest>(`${this.apiUrl}/requests/${id}/cancel`, {});
+  }
+
+  /**
+   * Apply leave for somebody else (§Att9).
+   *
+   * Its own endpoint rather than an employeeId on `requestLeave`, so the
+   * on-behalf path cannot be reached by adding a field to an ordinary request.
+   * Approved on arrival — the people allowed to do this are the people who
+   * approve leave.
+   */
+  requestLeaveOnBehalf(data: {
+    employeeId: number, leaveTypeId: number, startDate: string, endDate: string,
+    reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string,
+  }): Observable<LeaveRequestResult> {
+    return this.http.post<LeaveRequestResult>(`${this.apiUrl}/request/on-behalf`, data);
+  }
+
+  /** Whether to offer the option — partly a delegate list, so the client asks. */
+  canActOnBehalf(): Observable<{ canActOnBehalf: boolean }> {
+    return this.http.get<{ canActOnBehalf: boolean }>(`${this.apiUrl}/request/can-act-on-behalf`);
+  }
+
+  /** §Att10: Super Admin only. A soft delete — gone for every reader. */
+  deleteRequest(id: number) {
+    return this.http.delete<{ deleted: boolean; id: number }>(`${this.apiUrl}/requests/${id}`);
   }
 }

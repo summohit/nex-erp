@@ -1,0 +1,247 @@
+/* §Att5 and the workflows that will follow it: who approves what. */
+
+.apv-page {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.apv-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.apv-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.apv-head p {
+  margin: 0;
+  max-width: 560px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.apv-refresh {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apv-refresh:hover:not(:disabled) {
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.apv-refresh:disabled { opacity: 0.6; cursor: default; }
+
+.apv-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 50px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.spin { animation: apv-spin 0.9s linear infinite; }
+
+@keyframes apv-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+.apv-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.apv-card {
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.apv-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.apv-card-head h2 {
+  margin: 0 0 5px;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.apv-always {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.apv-add {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apv-add:hover:not(:disabled) { background: #dbeafe; }
+
+.apv-add:disabled { opacity: 0.5; cursor: default; }
+
+.apv-picker {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.apv-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.apv-btn {
+  padding: 8px 16px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apv-btn:disabled { opacity: 0.5; cursor: default; }
+
+.apv-btn.ghost {
+  border-color: #e2e8f0;
+  background: #fff;
+  color: #475569;
+}
+
+.apv-btn.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.apv-btn.primary:hover:not(:disabled) { background: #1d4ed8; }
+
+.apv-people {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apv-person {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.apv-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e0e7ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.apv-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.apv-person-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.apv-person-text strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.apv-person-text span {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.apv-remove {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.apv-remove:hover:not(:disabled) { background: #fff1f2; color: #be123c; }
+
+.apv-remove:disabled { opacity: 0.4; cursor: default; }
+
+.apv-none {
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-style: italic;
+  color: #94a3b8;
+}
+
+@media (max-width: 640px) {
+  .apv-page { padding: 16px; }
+  .apv-head, .apv-card-head { flex-direction: column; }
+}

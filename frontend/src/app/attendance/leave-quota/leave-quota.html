@@ -186,19 +186,26 @@
       <div class="filter-dropdowns-group">
         <!-- Year Select -->
         <div class="filter-select-wrapper">
+          <svg lucideCalendarDays [size]="15" class="filter-select-icon"></svg>
           <span class="filter-select-label">Year:</span>
-          <select class="custom-select" [value]="year()" (change)="onYearChange($any($event.target).value)">
-            <option *ngFor="let y of years()" [value]="y">{{ y }}</option>
+          <select 
+            class="custom-select" 
+            [ngModel]="year()" 
+            (ngModelChange)="onYearChange($event)">
+            <option *ngFor="let y of years()" [ngValue]="y">
+              {{ y }} {{ y === currentYear ? '(Current)' : '' }}
+            </option>
           </select>
         </div>
 
         <!-- Leave Type Select -->
         <div class="filter-select-wrapper">
+          <svg lucideFilter [size]="15" class="filter-select-icon"></svg>
           <span class="filter-select-label">Type:</span>
           <select
             class="custom-select"
             [ngModel]="leaveTypeId()"
-            (ngModelChange)="leaveTypeId.set($event === 'null' || $event === null ? null : +$event)">
+            (ngModelChange)="onLeaveTypeChange($event)">
             <option [ngValue]="null">All leave types</option>
             <option *ngFor="let t of report()?.leaveTypes || []" [ngValue]="t.id">{{ t.name }}</option>
           </select>
@@ -297,21 +304,22 @@
       </button>
     </div>
 
-    <!-- AG Grid matching system standards -->
+    <!-- AG Grid showing complete users with natural page scroll -->
     <div class="table-container" *ngIf="!loading() && rows().length">
       <ag-grid-angular
-        class="ag-theme-quartz"
+        class="ag-theme-quartz leave-quota-grid"
         [theme]="'legacy'"
-        style="width: 100%; height: 600px;"
+        style="width: 100%;"
+        [domLayout]="'autoHeight'"
+        [style.height]="null"
         [rowData]="rows()"
         [columnDefs]="columnDefs"
         [defaultColDef]="defaultColDef"
         [gridOptions]="gridOptions"
-        [rowHeight]="64"
-        [headerHeight]="52"
-        [pagination]="true"
-        [paginationPageSize]="20"
-        [paginationPageSizeSelector]="[10, 20, 50, 100]"
+        [rowHeight]="54"
+        [headerHeight]="46"
+        [pagination]="false"
+        [suppressPaginationPanel]="true"
         (gridReady)="onGridReady($event)">
       </ag-grid-angular>
     </div>
@@ -321,27 +329,75 @@
 <!-- ── Per-type Breakdown Modal ────────────────────────────────────────────── -->
 <div class="modal-overlay" *ngIf="detailRow() as row" (click)="closeDetail()">
   <div class="modal-card" (click)="$event.stopPropagation()">
-    <!-- Modal Header -->
+    <!-- Modal Header with Full Employee Profile Details -->
     <div class="modal-header">
       <div class="modal-header-user">
-        <div class="modal-avatar">
-          {{ (row.employee.name || '?').slice(0, 2) }}
+        <div class="modal-avatar-wrapper">
+          <img
+            *ngIf="row.employee.avatarUrl"
+            [src]="row.employee.avatarUrl"
+            class="modal-avatar-img"
+            [alt]="row.employee.name"
+            (error)="$any($event.target).style.display='none'; fallbackAvatar.style.display='flex';" />
+          <div #fallbackAvatar class="modal-avatar" [style.display]="row.employee.avatarUrl ? 'none' : 'flex'">
+            {{ getInitials(row.employee.name) }}
+          </div>
         </div>
-        <div>
+        <div class="modal-user-info">
           <div class="modal-name-row">
             <h2>{{ row.employee.name }}</h2>
+            <span class="modal-code-badge" *ngIf="row.employee.employeeCode">{{ row.employee.employeeCode }}</span>
+            <span class="modal-status-badge" [class.inactive]="!row.employee.isActive">
+              {{ row.employee.isActive ? 'Active' : 'Inactive' }}
+            </span>
             <span class="modal-year-pill">{{ year() }}</span>
           </div>
-          <p class="modal-sub">
-            {{ row.employee.designation || 'Staff' }}
-            <ng-container *ngIf="row.employee.department"> · {{ row.employee.department }}</ng-container>
-            <ng-container *ngIf="row.employee.employeeCode"> · ID: {{ row.employee.employeeCode }}</ng-container>
-          </p>
+          <div class="modal-sub-row">
+            <span class="modal-desig">{{ row.employee.designation || 'Staff' }}</span>
+            <span class="modal-sep" *ngIf="row.employee.department">·</span>
+            <span class="modal-dept" *ngIf="row.employee.department">{{ row.employee.department }}</span>
+          </div>
         </div>
       </div>
-      <button class="icon-btn" (click)="closeDetail()" aria-label="Close modal">
-        <svg lucideX [size]="20"></svg>
-      </button>
+
+      <div class="modal-header-actions">
+        <a
+          [routerLink]="['/employees', row.employee.id, 'profile']"
+          class="btn-view-profile"
+          target="_blank"
+          title="Open employee profile in new tab">
+          <span>View Profile</span>
+          <svg lucideExternalLink [size]="13"></svg>
+        </a>
+        <button class="icon-btn" (click)="closeDetail()" aria-label="Close modal" title="Close">
+          <svg lucideX [size]="18"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Quick KPI Stats Strip -->
+    <div class="modal-kpi-strip">
+      <div class="modal-kpi-item">
+        <span class="modal-kpi-label">Total Allocated</span>
+        <span class="modal-kpi-val">{{ days(row.totals.allocated) }} <small>days</small></span>
+      </div>
+      <div class="modal-kpi-divider"></div>
+      <div class="modal-kpi-item">
+        <span class="modal-kpi-label">Days Used</span>
+        <span class="modal-kpi-val modal-kpi-used">{{ days(row.totals.used) }} <small>days</small></span>
+      </div>
+      <div class="modal-kpi-divider"></div>
+      <div class="modal-kpi-item">
+        <span class="modal-kpi-label">Remaining</span>
+        <span class="modal-kpi-val" [class.modal-kpi-positive]="row.totals.remaining > 0" [class.modal-kpi-negative]="row.totals.remaining < 0" [class.modal-kpi-zero]="row.totals.remaining === 0">
+          {{ days(row.totals.remaining) }} <small>days</small>
+        </span>
+      </div>
+      <div class="modal-kpi-divider" *ngIf="row.totals.encashed"></div>
+      <div class="modal-kpi-item" *ngIf="row.totals.encashed">
+        <span class="modal-kpi-label">Encashed</span>
+        <span class="modal-kpi-val modal-kpi-encashed">{{ days(row.totals.encashed) }} <small>days</small></span>
+      </div>
     </div>
 
     <!-- Modal Body -->

@@ -1,5 +1,6 @@
 import {
   PROJECT_ROLE, seesEveryTask, mayChangeAnyTask, taskVisibilityFilter, resolveProjectViewer,
+  seesProjectFinancials,
 } from './project-roles';
 
 /**
@@ -101,5 +102,42 @@ describe('reading the viewer off the database', () => {
     const v = await resolveProjectViewer(p as any, 1, 3, null, 'EMPLOYEE');
     expect(p.projectMember.findFirst).not.toHaveBeenCalled();
     expect(seesEveryTask(v)).toBe(false);
+  });
+});
+
+
+/**
+ * Who sees the money (§PB5).
+ *
+ * Narrower than who sees the work, and deliberately so: seeing every task is
+ * about doing the job, seeing the spend is about being answerable for it.
+ */
+describe('who sees what the project costs', () => {
+  it.each([
+    ['a superadmin', viewer({ companyRole: 'SUPERADMIN' })],
+    ['the legacy superadmin spelling', viewer({ companyRole: 'SUPER_ADMIN' })],
+    ['finance', viewer({ companyRole: 'FINANCE' })],
+    ['the project owner', viewer({ isOwner: true })],
+    ['the project manager', viewer({ projectRole: PROJECT_ROLE.MANAGER })],
+  ])('%s does', (_label, v) => {
+    expect(seesProjectFinancials(v)).toBe(true);
+  });
+
+  it.each([
+    // Sees every task, but not what those tasks are billed at.
+    ['a company administrator', viewer({ companyRole: 'ADMIN' })],
+    ['a technical architect', viewer({ projectRole: PROJECT_ROLE.ARCHITECT })],
+    ['a project ADMIN member', viewer({ projectRole: PROJECT_ROLE.ADMIN })],
+    ['a plain member', viewer({ projectRole: PROJECT_ROLE.MEMBER })],
+    ['a viewer', viewer({ projectRole: PROJECT_ROLE.VIEWER })],
+    ['somebody not on the project at all', viewer()],
+  ])('%s does not', (_label, v) => {
+    expect(seesProjectFinancials(v)).toBe(false);
+  });
+
+  it('is stricter than task visibility, not a copy of it', () => {
+    const architect = viewer({ projectRole: PROJECT_ROLE.ARCHITECT });
+    expect(seesEveryTask(architect)).toBe(true);
+    expect(seesProjectFinancials(architect)).toBe(false);
   });
 });

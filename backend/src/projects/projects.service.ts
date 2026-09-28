@@ -12,7 +12,7 @@ import FormData from 'form-data';
 const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
 import * as xlsx from 'xlsx';
-import { resolveProjectViewer, taskVisibilityFilter, PROJECT_ROLE } from './project-roles';
+import { resolveProjectViewer, taskVisibilityFilter, seesProjectFinancials, PROJECT_ROLE } from './project-roles';
 
 @Injectable()
 export class ProjectsService {
@@ -1818,6 +1818,17 @@ export class ProjectsService {
     const viewer = await resolveProjectViewer(
       this.prisma as any, companyId, projectId, employeeId, companyRole,
     );
+
+    // §PB5: the summary is a money document — it reports spend, remaining
+    // budget and what each member's logged hours cost. The client hides the
+    // tab from everyone else, but a hidden tab is not a permission: without
+    // this the figures were a plain GET away for any member of the project.
+    if (!seesProjectFinancials(viewer)) {
+      throw new ForbiddenException(
+        'Only the project manager, the project owner, finance or a super administrator can view the project summary.',
+      );
+    }
+
     const visible = taskVisibilityFilter(viewer);
     /** Folded into every task query below; empty when they see everything. */
     const scope = visible ? { AND: [visible] } : {};

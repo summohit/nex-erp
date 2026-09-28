@@ -30,6 +30,17 @@ const TICKET_FILE_EXTENSIONS = [
   // Archives
   '.zip', '.rar', '.7z',
 ];
+// §Att4: what can back up a forgotten clock-out. A picture of the situation or
+// a document — nothing an approver would have to unpack to look at.
+const MAX_ATTENDANCE_PROOF_SIZE = 10 * 1024 * 1024;
+const ATTENDANCE_PROOF_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.pdf',
+];
+const ATTENDANCE_PROOF_MIME_TYPES = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/heic',
+  'application/pdf',
+];
+
 const TICKET_FILE_MIME_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml', 'image/heic',
   'application/pdf',
@@ -134,6 +145,45 @@ export class UploadController {
   }))
   async uploadTicketAttachment(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
     return this.processUpload(file, '/ticket_attachments', req);
+  }
+
+  /**
+   * Proof attached to a late clock-out (§Att4).
+   *
+   * Its own route rather than the generic one above, for two reasons: that one
+   * is unauthenticated and applies no type filter at all, and this file is
+   * evidence in an approval decision — it should be traceable to a signed-in
+   * person and limited to things an approver can actually look at.
+   *
+   * Extension-gated like ticket attachments, for the same reason stated there:
+   * MIME is client-supplied. Deliberately narrower than that list — a
+   * screenshot, a photo or a PDF is what backs up a forgotten clock-out; an
+   * archive is not.
+   */
+  @UseGuards(AuthGuard)
+  @Post('attendance-proof')
+  @UseInterceptors(FileInterceptor('file', {
+    fileFilter: (req: any, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!ATTENDANCE_PROOF_EXTENSIONS.includes(ext)) {
+        return cb(new HttpException(
+          `File type "${ext || 'unknown'}" is not allowed. Attach an image or a PDF.`,
+          HttpStatus.BAD_REQUEST,
+        ), false);
+      }
+      if (file.mimetype && file.mimetype !== 'application/octet-stream'
+          && !ATTENDANCE_PROOF_MIME_TYPES.includes(file.mimetype)) {
+        return cb(new HttpException(
+          `Content type "${file.mimetype}" is not allowed`,
+          HttpStatus.BAD_REQUEST,
+        ), false);
+      }
+      cb(null, true);
+    },
+    limits: { fileSize: MAX_ATTENDANCE_PROOF_SIZE }
+  }))
+  async uploadAttendanceProof(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    return this.processUpload(file, '/attendance_proof', req);
   }
 
   private async processUpload(file: Express.Multer.File, folder: string, req: any) {

@@ -138,3 +138,88 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* §Att4: the optional proof on a late clock-out. */
+.dlg-attach {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.dlg-attach-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.dlg-attach-label:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dlg-attach-chosen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 13px;
+}
+
+/* The name is the part that can be arbitrarily long, so it is the part that
+   gives way — the size and the remove button must stay reachable. */
+.dlg-attach-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.dlg-attach-size {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #3b82f6;
+}
+
+.dlg-attach-clear {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #1e40af;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dlg-attach-clear:hover {
+  background: #dbeafe;
+}
+
+.dlg-attach-hint {
+  margin: 6px 2px 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.dlg-attach-error {
+  margin: 6px 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e11d48;
+}

@@ -15,7 +15,7 @@ describe('AttendanceService — history payload', () => {
       employee: { findUnique: jest.fn(async () => ({ id: 29 })) },
       attendance: { findMany: jest.fn(async () => []) },
     };
-    service = new AttendanceService(prisma, {} as any, {} as any);
+    service = new AttendanceService(prisma, {} as any, {} as any, {} as any);
   });
 
   const lastCall = () => prisma.attendance.findMany.mock.calls[0][0];

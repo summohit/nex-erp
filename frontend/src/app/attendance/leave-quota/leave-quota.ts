@@ -11,7 +11,7 @@ import {
   LucideSearch, LucideClock, LucideCheckCircle2,
   LucideTrendingUp, LucidePieChart, LucideUsers,
   LucideFilter, LucideChevronRight, LucideInfo,
-  LucideFileText, LucideAlertCircle
+  LucideFileText, LucideAlertCircle, LucideExternalLink
 } from '@lucide/angular';
 
 import { LeavesService, QuotaReport, QuotaRow } from '../../services/leaves';
@@ -28,6 +28,7 @@ export type QuickFilterType = 'ALL' | 'LOW_REMAINING' | 'HIGH_USED' | 'UNASSIGNE
     LucideDownload, LucideRefreshCw, LucideX, LucideTriangleAlert, LucideCalendarDays,
     LucideSearch, LucideClock, LucideCheckCircle2, LucideTrendingUp, LucidePieChart,
     LucideUsers, LucideFilter, LucideChevronRight, LucideInfo, LucideFileText, LucideAlertCircle,
+    LucideExternalLink,
   ],
   templateUrl: './leave-quota.html',
   styleUrls: ['./leave-quota.css'],
@@ -39,7 +40,8 @@ export class LeaveQuotaComponent implements OnInit {
   loading = signal(true);
   report = signal<QuotaReport | null>(null);
 
-  /** Balances are keyed by year, so the year is the report's primary axis. */
+  readonly currentYear = new Date().getFullYear();
+  /** Balances are keyed by year, so the year is the report's primary axis. Default is current year. */
   year = signal<number>(new Date().getFullYear());
   /** null = every leave type, totalled. Otherwise one type's figures. */
   leaveTypeId = signal<number | null>(null);
@@ -50,10 +52,10 @@ export class LeaveQuotaComponent implements OnInit {
 
   private gridApi?: GridApi;
 
-  /** Five years back and one forward covers every realistic report. */
+  /** Current year first, then previous 4 years, and next year */
   readonly years = computed(() => {
-    const current = new Date().getFullYear();
-    return Array.from({ length: 7 }, (_, i) => current + 1 - i);
+    const current = this.currentYear;
+    return [current, current - 1, current - 2, current - 3, current - 4, current + 1];
   });
 
   ngOnInit() {
@@ -74,9 +76,17 @@ export class LeaveQuotaComponent implements OnInit {
     });
   }
 
-  onYearChange(value: string) {
-    this.year.set(Number(value));
-    this.load();
+  onYearChange(value: any) {
+    const num = Number(value);
+    if (!isNaN(num) && num !== this.year()) {
+      this.year.set(num);
+      this.load();
+    }
+  }
+
+  onLeaveTypeChange(value: any) {
+    const num = value === 'null' || value === null || value === undefined ? null : Number(value);
+    this.leaveTypeId.set(num);
   }
 
   setQuickFilter(filter: QuickFilterType) {
@@ -231,39 +241,38 @@ export class LeaveQuotaComponent implements OnInit {
   gridOptions: GridOptions = {
     theme: 'legacy' as const,
     animateRows: true,
+    domLayout: 'autoHeight',
   };
 
   columnDefs: ColDef[] = [
     {
       field: 'employee.name',
       headerName: 'Employee',
-      flex: 1.5,
-      minWidth: 260,
-      maxWidth: 420,
-      pinned: 'left',
+      flex: 1.8,
+      minWidth: 230,
       cellRenderer: (p: any) => {
         const e = p.data?.employee;
         if (!e) return '';
         const name = (e.name || '?').trim();
-        const initials = name.split(' ').map((s: string) => s[0]).slice(0, 2).join('').toUpperCase();
+        const initials = name.split(' ').map((s: string) => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'EM';
         const avatarHtml = e.avatarUrl
-          ? `<img src="${this.escape(e.avatarUrl)}" class="avatar-img-sm" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><div class="avatar-circle-sm" style="display:none;">${initials}</div>`
-          : `<div class="avatar-circle-sm">${initials}</div>`;
+          ? `<img src="${this.escape(e.avatarUrl)}" class="lq-avatar-img" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><div class="lq-avatar-circle" style="display:none;">${initials}</div>`
+          : `<div class="lq-avatar-circle">${initials}</div>`;
         const sub = [e.designation, e.department].filter(Boolean).join(' · ');
-        const code = e.employeeCode ? `<span class="tag-mono">${this.escape(e.employeeCode)}</span>` : '';
-        const inactive = e.isActive ? '' : '<span class="status-round status-archived" style="padding: 1px 6px; font-size: 10px;"><span class="status-dot"></span>Inactive</span>';
+        const code = e.employeeCode ? `<span class="lq-code-tag">${this.escape(e.employeeCode)}</span>` : '';
+        const inactive = e.isActive ? '' : '<span class="lq-inactive-badge">Inactive</span>';
 
         return `
-          <div class="cell-user-avatar-row">
+          <div class="lq-user-cell">
             ${avatarHtml}
-            <div class="user-text-stack">
-              <div class="cell-title-bold" style="display: flex; align-items: center; gap: 6px;">
-                <span>${this.escape(name)}</span>
+            <div class="lq-user-info">
+              <div class="lq-user-name-row">
+                <span class="lq-user-name" title="${this.escape(name)}">${this.escape(name)}</span>
                 ${inactive}
               </div>
-              <div class="cell-subtitle-row">
+              <div class="lq-user-meta-row">
                 ${code}
-                <span title="${this.escape(sub)}">${this.escape(sub || 'Staff')}</span>
+                <span class="lq-user-sub" title="${this.escape(sub)}">${this.escape(sub || 'Staff')}</span>
               </div>
             </div>
           </div>`;
@@ -272,88 +281,100 @@ export class LeaveQuotaComponent implements OnInit {
     {
       field: 'allocated',
       headerName: 'Allocated',
-      width: 125,
+      flex: 0.9,
+      minWidth: 105,
       type: 'numericColumn',
-      valueFormatter: (p) => this.days(p.value),
-      cellRenderer: (p: any) => `<span class="cell-title-bold" style="font-variant-numeric: tabular-nums;">${this.days(p.value)}</span>`
+      cellRenderer: (p: any) => {
+        if (p.data?.hasNoBalances) return '<span class="lq-muted-dash">—</span>';
+        return `<span class="lq-num-bold">${this.days(p.value)}</span>`;
+      }
     },
     {
       field: 'used',
       headerName: 'Used',
-      width: 115,
+      flex: 0.8,
+      minWidth: 80,
       type: 'numericColumn',
-      valueFormatter: (p) => this.days(p.value),
-      cellRenderer: (p: any) => `<span class="cell-title-bold" style="font-variant-numeric: tabular-nums;">${this.days(p.value)}</span>`
+      cellRenderer: (p: any) => {
+        if (p.data?.hasNoBalances) return '<span class="lq-muted-dash">—</span>';
+        const val = Number(p.value ?? 0);
+        return `<span class="lq-num-used">${this.days(val)}</span>`;
+      }
     },
     {
       field: 'remaining',
       headerName: 'Remaining',
-      width: 155,
+      flex: 1.1,
+      minWidth: 125,
       type: 'numericColumn',
-      valueFormatter: (p) => this.days(p.value),
       cellRenderer: (p: any) => {
         if (p.data?.hasNoBalances) {
-          return '<span class="status-round status-archived"><span class="status-dot"></span>Unassigned</span>';
+          return '<span class="lq-status-chip unassigned"><span class="lq-dot"></span>Unassigned</span>';
         }
         const val = Number(p.value ?? 0);
-        if (val <= 0) {
-          return `<span class="status-round status-rejected"><span class="status-dot"></span>${this.days(val)} left</span>`;
+        if (val < 0) {
+          return `<span class="lq-status-chip overdrawn" title="Overdrawn leave balance by ${Math.abs(val)} days"><span class="lq-dot"></span>${this.days(val)} left</span>`;
+        }
+        if (val === 0) {
+          return `<span class="lq-status-chip zero"><span class="lq-dot"></span>0 left</span>`;
         }
         if (val <= 2) {
-          return `<span class="status-round status-pending"><span class="status-dot"></span>${this.days(val)} left</span>`;
+          return `<span class="lq-status-chip low" title="Low balance warning"><span class="lq-dot"></span>${this.days(val)} left</span>`;
         }
-        return `<span class="status-round status-available"><span class="status-dot"></span>${this.days(val)} left</span>`;
+        return `<span class="lq-status-chip healthy"><span class="lq-dot"></span>${this.days(val)} left</span>`;
       },
     },
     {
       field: 'encashed',
       headerName: 'Encashed',
-      width: 125,
+      flex: 0.9,
+      minWidth: 105,
       type: 'numericColumn',
-      valueFormatter: (p) => this.days(p.value),
       cellRenderer: (p: any) => {
-        if (!p.value || p.value === 0) {
-          return '<span style="color: #94A3B8; font-weight: 500;">—</span>';
+        const val = Number(p.value ?? 0);
+        if (!val) {
+          return '<span class="lq-muted-dash">—</span>';
         }
-        return `<span style="color: #6b3fd6; font-weight: 700; font-variant-numeric: tabular-nums;" title="Paid out with the December salary">${this.days(p.value)}</span>`;
+        return `<span class="lq-encashed-tag" title="Paid out with December salary">${this.days(val)}</span>`;
       }
     },
     {
       field: 'utilisation',
-      headerName: 'Used %',
-      width: 170,
+      headerName: 'Utilisation',
+      flex: 1.3,
+      minWidth: 140,
       cellRenderer: (p: any) => {
         if (p.data?.hasNoBalances) {
-          return '<span style="color: #94A3B8; font-size: 11.5px;">—</span>';
+          return '<span class="lq-muted-dash">—</span>';
         }
-        const pct = Math.min(100, Math.max(0, p.value || 0));
-        let barColor = '#10B981';
-        let textColor = '#047857';
-        if (pct >= 80) {
-          barColor = '#1373e5';
-          textColor = '#0f4f9c';
-        } else if (pct >= 50) {
-          barColor = '#6b3fd6';
-          textColor = '#4f2aa7';
-        }
+        const pct = Math.max(0, p.value || 0);
+        const cappedPct = Math.min(100, pct);
+        let colorClass = 'green';
+        if (pct > 100) colorClass = 'over';
+        else if (pct >= 75) colorClass = 'amber';
+        else if (pct >= 50) colorClass = 'blue';
 
         return `
-          <div style="display: flex; align-items: center; gap: 8px; width: 100%; height: 100%;">
-            <div style="flex: 1; height: 6px; background: #F1F5F9; border-radius: 9999px; overflow: hidden;">
-              <div style="height: 100%; width: ${pct}%; background: ${barColor}; border-radius: 9999px; transition: width 0.3s ease;"></div>
+          <div class="lq-progress-cell">
+            <div class="lq-progress-track">
+              <div class="lq-progress-fill ${colorClass}" style="width: ${cappedPct}%;"></div>
             </div>
-            <span style="font-size: 12px; font-weight: 700; color: ${textColor}; min-width: 34px; text-align: right; font-variant-numeric: tabular-nums;">${pct.toFixed(0)}%</span>
+            <span class="lq-progress-label ${colorClass}">${pct.toFixed(0)}%</span>
           </div>`;
       },
     },
     {
       headerName: 'Action',
-      width: 125,
+      flex: 0.9,
+      minWidth: 110,
       sortable: false,
       cellRenderer: () => `
-        <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-          <button class="btn-view" type="button" title="View leave breakdown">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <div class="lq-action-cell">
+          <button class="lq-btn-breakdown" type="button" title="View detailed leave breakdown">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
             <span>Breakdown</span>
           </button>
         </div>`,
@@ -404,6 +425,11 @@ export class LeaveQuotaComponent implements OnInit {
   days(value: number | null | undefined): string {
     const n = Number(value ?? 0);
     return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  }
+
+  getInitials(name: string | null | undefined): string {
+    if (!name) return '?';
+    return name.trim().split(' ').map((s) => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
   }
 
   private slug(s: string) {

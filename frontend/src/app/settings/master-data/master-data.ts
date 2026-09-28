@@ -1,21 +1,27 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { MasterDataService, Department, Designation, Branch, LeaveType, Holiday, TaskType, ProjectPhase, DefaultProjectTask, VisitLocation } from '../../services/master-data.service';
 import { ShiftsService } from '../../services/shifts.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { 
   LucidePlus, LucideX, LucideCalendar, LucideList, LucideChevronLeft, LucideChevronRight, 
   LucideClock, LucideSearch, LucideSliders, LucideUsers, LucideCheck, 
-  LucideTag, LucideRotateCcw, LucideTimer, LucideMoon 
+  LucideTag, LucideRotateCcw, LucideTimer, LucideMoon,
+  LucideMapPin, LucideBuilding2, LucideCrosshair, LucideExternalLink, LucideAlertCircle, LucideNavigation,
+  LucideInfo, LucideLoader2
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry, GridOptions, GridApi } from 'ag-grid-community';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
 import { StatusToggleRendererComponent } from '../../shared/components/status-toggle-renderer.component';
-import { ClientsService } from '../../services/clients';
+import { ProjectsService, LeadContactOption } from '../../services/projects';
+import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
+
+declare const L: any;
 
 type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-types' | 'project-phases' | 'default-project-tasks' | 'visit-locations' | 'holidays' | 'blackout-dates' | 'shifts';
 
@@ -33,16 +39,20 @@ export interface BlackoutDate {
     CommonModule, FormsModule, LucidePlus, LucideX, LucideCalendar, LucideList, 
     LucideChevronLeft, LucideChevronRight, LucideClock, LucideSearch, LucideSliders, 
     LucideUsers, LucideCheck, LucideTag, LucideRotateCcw, 
-    LucideTimer, LucideMoon, AgGridAngular
+    LucideTimer, LucideMoon, AgGridAngular,
+    LucideMapPin, LucideBuilding2, LucideCrosshair, LucideExternalLink, LucideAlertCircle, LucideNavigation,
+    LucideInfo, LucideLoader2,
+    SearchableSelectComponent
   ],
   templateUrl: './master-data.html',
   styleUrls: ['./master-data.css']
 })
 export class MasterDataComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
-  private clientsService = inject(ClientsService);
+  private projectsService = inject(ProjectsService);
   private shiftsService = inject(ShiftsService);
   private toast = inject(HotToastService);
+  private sanitizer = inject(DomSanitizer);
 
   activeTab = signal<Tab>('departments');
   
@@ -55,8 +65,354 @@ export class MasterDataComponent implements OnInit {
   projectPhases = signal<ProjectPhase[]>([]);
   /** §PB10: the sites a field visit can be raised against. */
   visitLocations = signal<VisitLocation[]>([]);
-  /** Clients a site can be tied to. Optional — plenty of sites belong to none. */
-  clientOptions = signal<{ id: number; name: string }[]>([]);
+  /**
+   * Who a site can be tied to. Optional — plenty belong to nobody.
+   *
+   * Lead contacts rather than clients: a project already opens against one, and
+   * the Client table here also holds rows created by CRM lead conversion, some
+   * of them a person's name, which made a client picker read as a list of
+   * prospects. Sorted by company then name by the endpoint.
+   */
+  leadContactOptions = signal<LeadContactOption[]>([]);
+  
+  leadContactSelectOptions = computed<SearchableSelectOption[]>(() => {
+    return this.leadContactOptions().map(c => {
+      const details: string[] = [];
+      if (c.companyName) details.push(`Contact: ${c.name}`);
+      if (c.email) details.push(c.email);
+      if (c.contactCode) details.push(`#${c.contactCode}`);
+      const comp = (c.companyName || '').trim();
+      const contact = (c.name || '').trim();
+      const displayName = comp && contact ? `${comp} — ${contact}` : comp || contact;
+      return {
+        id: c.id,
+        name: displayName,
+        subtitle: details.length > 0 ? details.join(' • ') : undefined
+      };
+    });
+  });
+
+  departmentSelectOptions = computed<SearchableSelectOption[]>(() => {
+    return this.departments().map(d => ({
+      id: d.id,
+      name: d.name
+    }));
+  });
+
+  visitLocationSearchText = signal('');
+
+  filteredVisitLocations = computed(() => {
+    const q = this.visitLocationSearchText().toLowerCase().trim();
+    const list = this.visitLocations();
+    if (!q) return list;
+    return list.filter(item => {
+      const name = (item.name || '').toLowerCase();
+      const addr = (item.address || '').toLowerCase();
+      const contact = (item.leadContact?.name || '').toLowerCase();
+      const company = (item.leadContact?.companyName || '').toLowerCase();
+      return name.includes(q) || addr.includes(q) || contact.includes(q) || company.includes(q);
+    });
+  });
+
+  visitLocationStats = computed(() => {
+    const list = this.visitLocations();
+    const total = list.length;
+    const pinned = list.filter(l => l.latitude != null && l.longitude != null).length;
+    const unpinned = total - pinned;
+    const active = list.filter(l => l.isActive).length;
+    return { total, pinned, unpinned, active };
+  });
+
+  isLocating = signal(false);
+  mapSearchText = signal('');
+  isSearchingMap = signal(false);
+  leafletMap: any = null;
+  mapMarker: any = null;
+
+  onVisitLocationSearchChange(val: string) {
+    this.visitLocationSearchText.set(val);
+  }
+
+  clearVisitLocationSearch() {
+    this.visitLocationSearchText.set('');
+  }
+
+  refreshVisitLocations() {
+    this.masterDataService.getVisitLocations().subscribe({
+      next: (data) => {
+        this.visitLocations.set(data);
+        this.toast.success('Visit locations refreshed');
+      },
+      error: () => this.toast.error('Failed to refresh visit locations')
+    });
+  }
+
+  isPinned(): boolean {
+    const lat = this.formData.latitude;
+    const lng = this.formData.longitude;
+    return lat != null && lat !== '' && !isNaN(Number(lat)) &&
+           lng != null && lng !== '' && !isNaN(Number(lng));
+  }
+
+  isPartiallyPinned(): boolean {
+    const hasLat = this.formData.latitude != null && this.formData.latitude !== '' && !isNaN(Number(this.formData.latitude));
+    const hasLng = this.formData.longitude != null && this.formData.longitude !== '' && !isNaN(Number(this.formData.longitude));
+    return hasLat !== hasLng;
+  }
+
+  getMapPreviewUrl(lat?: any, lng?: any): SafeResourceUrl {
+    if (lat == null || lng == null || lat === '' || lng === '' || isNaN(Number(lat)) || isNaN(Number(lng))) {
+      return this.sanitizer.bypassSecurityTrustResourceUrl('');
+    }
+    return this.sanitizer.bypassSecurityTrustResourceUrl(
+      `https://maps.google.com/maps?q=${lat},${lng}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+    );
+  }
+
+  ensureLeafletLoaded(): Promise<any> {
+    return new Promise((resolve) => {
+      if ((window as any).L) {
+        resolve((window as any).L);
+        return;
+      }
+      const existingScript = document.getElementById('leaflet-script');
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve((window as any).L));
+        return;
+      }
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+
+      const script = document.createElement('script');
+      script.id = 'leaflet-script';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => resolve((window as any).L);
+      document.head.appendChild(script);
+    });
+  }
+
+  async initFreeMap(): Promise<void> {
+    const leaflet = await this.ensureLeafletLoaded();
+    if (!leaflet) return;
+
+    // Allow modal DOM animation to complete
+    setTimeout(() => {
+      const container = document.getElementById('free-map-picker');
+      if (!container) return;
+
+      if (this.leafletMap) {
+        this.leafletMap.remove();
+        this.leafletMap = null;
+        this.mapMarker = null;
+      }
+
+      const hasCoords = this.isPinned();
+      const initialLat = hasCoords ? Number(this.formData.latitude) : 28.6139;
+      const initialLng = hasCoords ? Number(this.formData.longitude) : 77.2090;
+      const initialZoom = hasCoords ? 15 : 12;
+
+      this.leafletMap = leaflet.map(container, {
+        center: [initialLat, initialLng],
+        zoom: initialZoom,
+        zoomControl: true,
+        attributionControl: false
+      });
+
+      leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(this.leafletMap);
+
+      if (hasCoords) {
+        this.setMapMarker([initialLat, initialLng]);
+      }
+
+      this.leafletMap.on('click', (e: any) => {
+        const lat = Number(e.latlng.lat.toFixed(6));
+        const lng = Number(e.latlng.lng.toFixed(6));
+        this.formData.latitude = lat;
+        this.formData.longitude = lng;
+        this.setMapMarker([lat, lng]);
+        this.reverseGeocodeAndFillAddress(lat, lng);
+      });
+
+      setTimeout(() => {
+        this.leafletMap?.invalidateSize();
+      }, 200);
+    }, 120);
+  }
+
+  setMapMarker(coords: [number, number], pan: boolean = false, zoom?: number): void {
+    if (!this.leafletMap) return;
+    const leaflet = (window as any).L;
+    if (!leaflet) return;
+
+    const pinIcon = leaflet.divIcon({
+      className: 'custom-leaflet-pin',
+      html: `
+        <div class="leaflet-svg-pin">
+          <svg width="28" height="36" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 18 12 18s12-9 12-18c0-6.63-5.37-12-12-12z" fill="#0284c7"/>
+            <circle cx="12" cy="11" r="4.5" fill="#FFFFFF"/>
+          </svg>
+        </div>
+      `,
+      iconSize: [28, 36],
+      iconAnchor: [14, 36],
+      popupAnchor: [0, -36]
+    });
+
+    if (this.mapMarker) {
+      this.mapMarker.setLatLng(coords);
+    } else {
+      this.mapMarker = leaflet.marker(coords, {
+        draggable: true,
+        icon: pinIcon
+      }).addTo(this.leafletMap);
+
+      this.mapMarker.on('dragend', () => {
+        const pos = this.mapMarker.getLatLng();
+        const lat = Number(pos.lat.toFixed(6));
+        const lng = Number(pos.lng.toFixed(6));
+        this.formData.latitude = lat;
+        this.formData.longitude = lng;
+        this.reverseGeocodeAndFillAddress(lat, lng);
+      });
+    }
+
+    if (zoom) {
+      this.leafletMap.setView(coords, zoom);
+    } else if (pan) {
+      this.leafletMap.panTo(coords);
+    }
+  }
+
+  onCoordInputChanged(): void {
+    const lat = Number(this.formData.latitude);
+    const lng = Number(this.formData.longitude);
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      if (this.leafletMap) {
+        this.setMapMarker([lat, lng], true);
+      }
+    }
+  }
+
+  searchMapLocation(): void {
+    const q = this.mapSearchText().trim();
+    if (!q) return;
+    this.isSearchingMap.set(true);
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`, {
+      headers: { 'Accept-Language': 'en' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        this.isSearchingMap.set(false);
+        if (data && data.length > 0) {
+          const lat = Number(parseFloat(data[0].lat).toFixed(6));
+          const lng = Number(parseFloat(data[0].lon).toFixed(6));
+          this.formData.latitude = lat;
+          this.formData.longitude = lng;
+          if (!this.formData.address || !this.formData.address.trim()) {
+            this.formData.address = data[0].display_name || '';
+          }
+          if (this.leafletMap) {
+            this.leafletMap.flyTo([lat, lng], 16);
+            this.setMapMarker([lat, lng]);
+          }
+          this.toast.success(`Location set: ${data[0].display_name.split(',')[0]}`);
+        } else {
+          this.toast.error('Location not found. Try searching another landmark or city.');
+        }
+      })
+      .catch(() => {
+        this.isSearchingMap.set(false);
+        this.toast.error('Could not search location.');
+      });
+  }
+
+  async reverseGeocodeAndFillAddress(lat: number, lng: number): Promise<void> {
+    try {
+      const addr = await this.reverseGeocode(lat, lng);
+      if (addr && (!this.formData.address || !this.formData.address.trim())) {
+        this.formData.address = addr;
+        this.toast.info('Address auto-filled from selected pin location');
+      }
+    } catch {
+      // non-fatal
+    }
+  }
+
+  useMyLocation(): void {
+    if (!navigator.geolocation) {
+      this.toast.error('Geolocation is not supported by your browser.');
+      return;
+    }
+    this.isLocating.set(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        this.formData.latitude = lat;
+        this.formData.longitude = lng;
+        this.toast.success(`GPS coordinates captured: ${lat}, ${lng}`);
+        
+        if (this.leafletMap) {
+          this.leafletMap.flyTo([lat, lng], 16);
+          this.setMapMarker([lat, lng]);
+        }
+
+        // Reverse geocode if address is currently blank
+        if (!this.formData.address || !this.formData.address.trim()) {
+          try {
+            const addr = await this.reverseGeocode(lat, lng);
+            if (addr) {
+              this.formData.address = addr;
+              this.toast.info('Address auto-filled from GPS location');
+            }
+          } catch {
+            // non-fatal
+          }
+        }
+        this.isLocating.set(false);
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        let msg = 'Could not access your location.';
+        if (err.code === 1) msg = 'Location access permission was denied.';
+        else if (err.code === 2) msg = 'GPS location unavailable.';
+        else if (err.code === 3) msg = 'Location request timed out.';
+        this.toast.error(msg);
+        this.isLocating.set(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  async reverseGeocode(lat: number, lng: number): Promise<string> {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`, {
+        headers: { 'Accept-Language': 'en' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.display_name || '';
+      }
+    } catch {
+      // Fallback
+    }
+    return '';
+  }
+
+  clearCoordinates(): void {
+    this.formData.latitude = null;
+    this.formData.longitude = null;
+    if (this.mapMarker && this.leafletMap) {
+      this.leafletMap.removeLayer(this.mapMarker);
+      this.mapMarker = null;
+    }
+  }
   /** §1: the tasks every new project starts with. */
   defaultProjectTasks = signal<DefaultProjectTask[]>([]);
   holidays = signal<Holiday[]>([]);
@@ -231,6 +587,13 @@ export class MasterDataComponent implements OnInit {
 
   shiftGridOptions: GridOptions = {
     rowHeight: 70,
+    headerHeight: 46,
+    enableCellTextSelection: true,
+    animateRows: true
+  };
+
+  visitLocationGridOptions: GridOptions = {
+    rowHeight: 56,
     headerHeight: 46,
     enableCellTextSelection: true,
     animateRows: true
@@ -652,22 +1015,104 @@ export class MasterDataComponent implements OnInit {
    * glance which rows are missing them.
    */
   visitLocationColDefs: ColDef[] = [
-    { field: 'name', headerName: 'Site', minWidth: 200 },
-    { field: 'address', headerName: 'Address', minWidth: 240,
-      valueFormatter: (p) => p.value || '—' },
-    { field: 'client.name', headerName: 'Client', width: 160,
-      valueFormatter: (p) => p.value || 'Not client-specific' },
+    { 
+      field: 'name', 
+      headerName: 'Site / Location', 
+      minWidth: 200,
+      flex: 1.5,
+      tooltipField: 'name',
+      cellRenderer: (p: any) => {
+        const name = p.value || 'Unnamed Site';
+        return `
+          <div class="site-name-cell">
+            <div class="site-icon-dot">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </div>
+            <div class="site-name-content">
+              <span class="site-name-title" title="${name}">${name}</span>
+            </div>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'address', 
+      headerName: 'Address', 
+      minWidth: 260,
+      flex: 2,
+      tooltipField: 'address',
+      cellRenderer: (p: any) => {
+        const val = p.value;
+        if (!val) return `<span class="empty-site-text">—</span>`;
+        return `
+          <div class="site-address-cell" title="${val}">
+            <span class="site-address-text">${val}</span>
+          </div>
+        `;
+      }
+    },
     {
-      headerName: 'Pinned',
-      width: 130,
-      valueGetter: (p) => p.data?.latitude != null && p.data?.longitude != null,
-      valueFormatter: (p) => (p.value ? 'Yes' : 'No pin'),
-      cellStyle: (p) => (p.value ? null : { color: '#b45309' }),
+      headerName: 'Client / Contact',
+      minWidth: 180,
+      flex: 1.2,
+      cellRenderer: (p: any) => {
+        const c = p.data?.leadContact;
+        if (!c) return `<span class="empty-site-text">Not linked</span>`;
+        const comp = c.companyName ? `<span class="contact-company">${c.companyName}</span>` : '';
+        const person = `<span class="contact-person">${c.name}</span>`;
+        const full = `${c.companyName || ''} ${c.name || ''}`.trim();
+        return `
+          <div class="site-contact-cell" title="${full}">
+            ${comp}
+            ${comp && person ? '<span class="contact-sep">•</span>' : ''}
+            ${person}
+          </div>
+        `;
+      }
+    },
+    {
+      headerName: 'GPS Pin',
+      width: 148,
+      minWidth: 140,
+      flex: 0,
+      cellRenderer: (p: any) => {
+        const lat = p.data?.latitude;
+        const lng = p.data?.longitude;
+        const isPinned = lat != null && lng != null;
+        if (isPinned) {
+          return `
+            <div class="site-pinned-cell">
+              <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener noreferrer" class="pinned-badge active" title="Open in Google Maps (${lat}, ${lng})" onclick="event.stopPropagation()">
+                <span class="pinned-dot"></span>
+                <span>GPS Pinned</span>
+                <svg class="pin-link-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+              </a>
+            </div>
+          `;
+        }
+        return `
+          <div class="site-pinned-cell">
+            <span class="pinned-badge unpinned" title="Missing GPS coordinates">
+              <span class="unpinned-dot"></span>
+              <span>No Pin</span>
+            </span>
+          </div>
+        `;
+      }
     },
     {
       field: 'isActive',
-      headerName: 'Active',
-      width: 130,
+      headerName: 'Status',
+      width: 115,
+      minWidth: 110,
+      flex: 0,
       cellRenderer: StatusToggleRendererComponent,
       cellRendererParams: {
         activeLabel: 'Yes', inactiveLabel: 'No',
@@ -679,11 +1124,18 @@ export class MasterDataComponent implements OnInit {
         },
       },
     },
-    { field: 'position', headerName: 'Order', width: 110 },
+    { 
+      field: 'position', 
+      headerName: 'Order', 
+      width: 85,
+      flex: 0,
+      cellRenderer: (p: any) => `<span class="order-badge">${p.value ?? 0}</span>`
+    },
     {
       headerName: 'Actions',
-      width: 120,
+      width: 105,
       flex: 0,
+      pinned: 'right',
       sortable: false,
       filter: false,
       cellRenderer: ActionCellRendererComponent,
@@ -987,11 +1439,11 @@ export class MasterDataComponent implements OnInit {
     this.masterDataService.getTaskTypes().subscribe({ next: (data) => this.taskTypes.set(data) });
     this.masterDataService.getProjectPhases().subscribe({ next: (data) => this.projectPhases.set(data) });
     this.masterDataService.getVisitLocations().subscribe({ next: (data) => this.visitLocations.set(data) });
-    // Non-fatal: the client link is optional, so a failure here must not stop
-    // somebody adding a site.
-    this.clientsService.getClients().subscribe({
-      next: (rows) => this.clientOptions.set((rows || []).map((c: any) => ({ id: c.id, name: c.name }))),
-      error: () => this.clientOptions.set([]),
+    // Non-fatal: the link is optional, so a failure here must not stop somebody
+    // adding a site.
+    this.projectsService.getLeadContactOptions().subscribe({
+      next: (rows) => this.leadContactOptions.set(rows || []),
+      error: () => this.leadContactOptions.set([]),
     });
     this.masterDataService.getDefaultProjectTasks().subscribe({ next: (data) => this.defaultProjectTasks.set(data) });
     this.masterDataService.getHolidays().subscribe({ next: (data) => this.holidays.set(data) });
@@ -1006,7 +1458,13 @@ export class MasterDataComponent implements OnInit {
   openModal(mode: 'create' | 'edit', item?: any) {
     this.modalMode.set(mode);
     if (mode === 'edit' && item) {
-      this.formData = { ...item };
+      this.formData = { 
+        ...item,
+        leadContactId: item.leadContactId ?? (item.leadContact?.id ?? null),
+        latitude: item.latitude != null ? item.latitude : null,
+        longitude: item.longitude != null ? item.longitude : null,
+        position: item.position ?? 0
+      };
       if (this.activeTab() === 'shifts') {
         this.formData = {
           ...this.shiftDefaults(), ...item,
@@ -1038,6 +1496,9 @@ export class MasterDataComponent implements OnInit {
         // Task types order the dropdown; departments opt into raising tasks.
         position: 0, canCreateTasks: false,
         date: '',
+        leadContactId: null,
+        latitude: null,
+        longitude: null,
         ...this.shiftDefaults()
       };
       if (this.activeTab() === 'branches') {
@@ -1045,10 +1506,19 @@ export class MasterDataComponent implements OnInit {
       }
     }
     this.isModalOpen.set(true);
+    if (this.activeTab() === 'visit-locations') {
+      this.mapSearchText.set('');
+      this.initFreeMap();
+    }
   }
 
   closeModal() {
     this.isModalOpen.set(false);
+    if (this.leafletMap) {
+      this.leafletMap.remove();
+      this.leafletMap = null;
+      this.mapMarker = null;
+    }
   }
 
   save() {
@@ -1099,14 +1569,18 @@ export class MasterDataComponent implements OnInit {
       if (mode === 'create') this.masterDataService.createTaskType(this.formData).subscribe({ next: () => onSuccess('Task Type created'), error: onError });
       else this.masterDataService.updateTaskType(id, this.formData).subscribe({ next: () => onSuccess('Task Type updated'), error: onError });
     } else if (tab === 'visit-locations') {
-      if (!this.formData.name?.trim()) {
+      if (!this.formData.name || !this.formData.name.trim()) {
         this.toast.error('A site needs a name');
+        this.isSaving.set(false);
         return;
       }
-      const pinned = this.formData.latitude != null && this.formData.longitude != null;
-      const onlyOne = (this.formData.latitude == null) !== (this.formData.longitude == null);
+      const hasLat = this.formData.latitude !== null && this.formData.latitude !== '' && this.formData.latitude !== undefined && !isNaN(Number(this.formData.latitude));
+      const hasLng = this.formData.longitude !== null && this.formData.longitude !== '' && this.formData.longitude !== undefined && !isNaN(Number(this.formData.longitude));
+      const pinned = hasLat && hasLng;
+      const onlyOne = hasLat !== hasLng;
       if (onlyOne) {
         this.toast.error('A pin needs both a latitude and a longitude');
+        this.isSaving.set(false);
         return;
       }
       if (!pinned && mode === 'create'
@@ -1114,10 +1588,23 @@ export class MasterDataComponent implements OnInit {
             + 'Picking it will fill the address but leave the map pin to be placed by '
             + 'hand on every trip, and the coordinates are what decide whether somebody '
             + 'clocking in there counts as on site.')) {
+        this.isSaving.set(false);
         return;
       }
-      if (mode === 'create') this.masterDataService.createVisitLocation(this.formData).subscribe({ next: () => onSuccess('Site created'), error: onError });
-      else this.masterDataService.updateVisitLocation(id, this.formData).subscribe({ next: () => onSuccess('Site updated'), error: onError });
+      const payload: any = {
+        name: this.formData.name.trim(),
+        address: this.formData.address?.trim() || null,
+        leadContactId: this.formData.leadContactId ? Number(this.formData.leadContactId) : null,
+        latitude: pinned ? Number(this.formData.latitude) : null,
+        longitude: pinned ? Number(this.formData.longitude) : null,
+        position: Number(this.formData.position) || 0
+      };
+      if (mode === 'edit' && this.formData.isActive !== undefined) {
+        payload.isActive = this.formData.isActive;
+      }
+
+      if (mode === 'create') this.masterDataService.createVisitLocation(payload).subscribe({ next: () => onSuccess('Site created'), error: onError });
+      else this.masterDataService.updateVisitLocation(id, payload).subscribe({ next: () => onSuccess('Site updated'), error: onError });
     } else if (tab === 'project-phases') {
       if (!this.formData.name || !this.formData.name.trim()) {
         this.toast.error('A phase needs a name');

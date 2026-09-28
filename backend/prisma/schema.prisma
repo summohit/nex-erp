@@ -142,6 +142,9 @@ model User {
   updatedAt                DateTime                   @updatedAt
   employee                 Employee?
   approvedLeaveRequests    LeaveRequest[]
+  /// §Att9/§Att10: leave this user raised for somebody else, and leave they removed.
+  raisedLeaveRequests      LeaveRequest[]             @relation("LeaveRequestRaisedBy")
+  deletedLeaveRequests     LeaveRequest[]             @relation("LeaveRequestDeletedBy")
   approvedExpenseClaims    ExpenseClaim[]             @relation("ExpenseApprover")
   approvedHardwareRequests HardwareRequest[]          @relation("HardwareApprover")
   createdInventoryTxns     InventoryTransaction[]     @relation("InventoryCreatedBy")
@@ -464,6 +467,8 @@ model Employee {
   appreciations     Appreciation[]
   leaveRequests     LeaveRequest[]
   attendances       Attendance[]
+  /// §Att5: the late clock-outs this person has ruled on.
+  clockOutApprovals Attendance[] @relation("AttendanceClockOutApprover")
   shiftReminders    ShiftReminderLog[]
   salaryStructures  SalaryStructure[]
   payslips          Payslip[]
@@ -713,8 +718,31 @@ model LeaveRequest {
   rejectionReason String?
   approvedById    Int?
   approvedBy      User?     @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+  /// §Att9: who raised this, when it was not the employee themselves.
+  ///
+  /// Null on every self-applied request, which is what null means here and why
+  /// no backfill was needed. Set when a Super Admin, HR or a delegate applies
+  /// leave for somebody else — without it, leave entered on an employee's
+  /// behalf is indistinguishable from leave they asked for, and that
+  /// distinction is the first thing anyone asks about when a deduction is
+  /// disputed.
+  raisedById      Int?
+  raisedBy        User?     @relation("LeaveRequestRaisedBy", fields: [raisedById], references: [id], onDelete: SetNull)
+  /// §Att10: removed by a Super Admin, and when.
+  ///
+  /// A soft delete: the row stays, every query filters it out, and the balance
+  /// it consumed is given back. Leave history is the evidence behind somebody's
+  /// pay, so "permanently deleted" is made true for every reader rather than
+  /// true of the database — a mis-clicked hard delete of a year-old approved
+  /// leave is not something the person it belonged to could ever reconstruct.
+  deletedAt       DateTime?
+  deletedById     Int?
+  deletedBy       User?     @relation("LeaveRequestDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  /// Every list reads the live rows; the deleted ones are the exception.
+  @@index([deletedAt])
 }
 
 /// What an employee was paid for the leave they did not take.
@@ -791,6 +819,24 @@ model Attendance {
   /// what a manager's screen can filter on. Cleared when the session is
   /// finally closed.
   missedClockOut Boolean         @default(false)
+  /// Proof attached to a late clock-out (§Att4) — a screenshot, a site photo,
+  /// a ticket. Stored beside `clockOutReason` because the two answer the same
+  /// question: a typed reason is a claim, this is what backs it up. Optional:
+  /// an approver can still accept a reason on its own.
+  clockOutProofUrl String?
+  /// Where a late clock-out stands with its approver (§Att5).
+  ///
+  /// Null on an ordinary day — a session closed on the day it opened needs
+  /// nobody's permission. Set to PENDING the moment a PREVIOUS day is closed,
+  /// because at that point the clock-out time is the employee's own account of
+  /// a day that has already ended. PENDING days deliberately do not count as
+  /// present: an unreviewed claim must not reach payroll as a fact.
+  clockOutApproval     String?    // PENDING, APPROVED, REJECTED
+  clockOutApprovedById Int?
+  clockOutApprovedBy   Employee?  @relation("AttendanceClockOutApprover", fields: [clockOutApprovedById], references: [id], onDelete: SetNull)
+  clockOutApprovedAt   DateTime?
+  /// The approver's own words, and the only place a rejection is explained.
+  clockOutReviewNote   String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   logs           AttendanceLog[]
@@ -798,6 +844,8 @@ model Attendance {
   @@unique([employeeId, date])
   /// "Whose session is still open?" runs every minute in the reminder sweep.
   @@index([clockOut, date])
+  /// The approval queue reads exactly this: one company's PENDING days.
+  @@index([clockOutApproval])
 }
 
 model AttendanceLog {

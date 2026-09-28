@@ -59,7 +59,7 @@ describe('the ordinary clock on a field visit day', () => {
         onsite: { projectId: 3, address: 'Client Site – Delhi' },
       }),
     };
-    service = new AttendanceService(prisma, {} as any, roster as ShiftRosterService);
+    service = new AttendanceService(prisma, {} as any, roster as ShiftRosterService, {} as any);
   });
 
   afterEach(() => jest.useRealTimers());

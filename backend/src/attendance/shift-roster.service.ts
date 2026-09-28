@@ -141,6 +141,8 @@ export class ShiftRosterService {
         where: {
           employeeId: { in: empIds },
           status: 'APPROVED',
+          // §Att10: a deleted request no longer excuses anything.
+          deletedAt: null,
           startDate: { lte: end },
           endDate: { gte: start },
         },

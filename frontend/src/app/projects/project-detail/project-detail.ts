@@ -1,4 +1,5 @@
 import { Component, signal, computed, effect, inject, OnInit, OnDestroy, ViewChild, ElementRef, ViewEncapsulation } from '@angular/core';
+import { forkJoin, of } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -1688,14 +1689,26 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   activePopover = signal<string | null>(null);
   activeMemberProfile = signal<any>(null);
   selectedIssue = signal<any>(null);
-  issueForm = {
+  issueForm: {
+    title: string;
+    description: string;
+    type: string;
+    priority: string;
+    columnId: number | null;
+    completed: boolean;
+    estimatedHours: number | null;
+    phaseId?: number | null;
+    milestoneId?: number | null;
+  } = {
     title: '',
     description: '',
     type: 'TASK',
     priority: 'MEDIUM',
     columnId: null as number | null,
     completed: false,
-    estimatedHours: null as number | null
+    estimatedHours: null as number | null,
+    phaseId: null as number | null,
+    milestoneId: null as number | null
   };
   commentText = '';
   
@@ -2057,28 +2070,42 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   private loadPhases() {
     this.masterDataService.getProjectPhases(true).subscribe({
-      next: (p: any) => this.allPhases.set(p || []),
+      next: (p: any) => {
+        const phases = p || [];
+        this.allPhases.set(phases);
+        if (!this.selectedIssue() && !this.issueForm.phaseId && phases.length > 0) {
+          this.issueForm.phaseId = phases[0].id;
+        }
+      },
       error: () => {},
     });
   }
 
-  setIssuePhase(phaseId: number | null) {
+  setIssuePhase(phaseId: any) {
+    const numericPhaseId = (phaseId !== null && phaseId !== undefined && phaseId !== '' && phaseId !== 'null')
+      ? Number(phaseId)
+      : null;
+    this.issueForm.phaseId = numericPhaseId;
     const issue = this.selectedIssue();
     if (!issue) return;
-    const phase = this.allPhases().find((p: any) => p.id === phaseId) || null;
+    const phase = this.allPhases().find((p: any) => p.id === numericPhaseId) || null;
     // Optimistic on both, so the select and its label agree while the save
     // is in flight.
-    this.selectedIssue.set({ ...issue, phaseId, phase });
-    this.updateIssueDetails({ phaseId });
+    this.selectedIssue.set({ ...issue, phaseId: numericPhaseId, phase });
+    this.updateIssueDetails({ phaseId: numericPhaseId });
   }
 
-  setIssueMilestone(milestoneId: number | null) {
+  setIssueMilestone(milestoneId: any) {
+    const numericMilestoneId = (milestoneId !== null && milestoneId !== undefined && milestoneId !== '' && milestoneId !== 'null')
+      ? Number(milestoneId)
+      : null;
+    this.issueForm.milestoneId = numericMilestoneId;
     const issue = this.selectedIssue();
     if (!issue) return;
     // Optimistic, so the select does not snap back while the save is in
     // flight; loadBoardAndIssues reconciles it either way.
-    this.selectedIssue.set({ ...issue, milestoneId });
-    this.updateIssueDetails({ milestoneId });
+    this.selectedIssue.set({ ...issue, milestoneId: numericMilestoneId });
+    this.updateIssueDetails({ milestoneId: numericMilestoneId });
   }
 
   loadBoardAndIssues() {
@@ -2891,9 +2918,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   openCreateIssue(columnId?: number) {
     this.selectedIssue.set(null);
+    this.draftMembers.set([]);
+    this.loadingMemberIds.set(new Set());
     this.comments.set([]);
     this.checklists.set([]);
     this.isEditingDescription.set(true);
+    const defaultPhaseId = this.allPhases().length > 0 ? this.allPhases()[0].id : null;
     this.issueForm = {
       title: '',
       description: '',
@@ -2901,7 +2931,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       priority: 'MEDIUM',
       columnId: columnId || (this.columns().length > 0 ? this.columns()[0].id : null),
       completed: false,
-      estimatedHours: null
+      estimatedHours: null,
+      phaseId: defaultPhaseId,
+      milestoneId: null
     };
     this.isDrawerOpen.set(true);
     setTimeout(() => this.initQuill(), 100);
@@ -2911,6 +2943,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   openIssueDetails(issue: any) {
     this.selectedIssue.set(issue);
+    this.draftMembers.set([]);
+    this.loadingMemberIds.set(new Set());
     this.isEditingDescription.set(false);
     this.issueForm = {
       title: issue.title || '',
@@ -2919,7 +2953,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       priority: issue.priority || 'MEDIUM',
       columnId: issue.columnId,
       completed: issue.status === 'DONE',
-      estimatedHours: issue.estimatedHours || null
+      estimatedHours: issue.estimatedHours || null,
+      phaseId: issue.phaseId ?? null,
+      milestoneId: issue.milestoneId ?? null
     };
     this.isDrawerOpen.set(true);
     this.loadFeedItems(issue.id);
@@ -2957,6 +2993,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     
     this.isDrawerOpen.set(false);
     this.selectedIssue.set(null);
+    this.draftMembers.set([]);
+    this.loadingMemberIds.set(new Set());
     this.isEditingDescription.set(false);
     this.quillInstance = null;
     this.closePopover();
@@ -3320,7 +3358,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   listGridColDefs: ColDef[] = [
-    { field: 'key', headerName: 'ID', width: 100, pinned: 'left' },
+    { field: 'key', headerName: 'ID', width: 160, pinned: 'left' },
     { field: 'title', headerName: 'Task', minWidth: 200, flex: 1, filter: true },
     { 
       headerName: 'Status', 
@@ -5019,12 +5057,52 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         }
       });
     } else {
-      this.projectsService.createIssue(this.projectId, this.issueForm).subscribe({
-        next: () => {
+      if (!this.issueForm.title || !this.issueForm.title.trim()) {
+        this.toast.error('Please enter a card title');
+        return;
+      }
+
+      let phaseId = this.issueForm.phaseId;
+      if (!phaseId && this.allPhases().length > 0) {
+        phaseId = this.allPhases()[0].id;
+      }
+
+      const pendingMembers = [...this.draftMembers()];
+      const payload = {
+        ...this.issueForm,
+        phaseId: phaseId ? Number(phaseId) : null,
+        milestoneId: this.issueForm.milestoneId ? Number(this.issueForm.milestoneId) : null,
+        columnId: this.issueForm.columnId || (this.columns().length > 0 ? this.columns()[0].id : null),
+        title: this.issueForm.title.trim(),
+        assigneeId: pendingMembers[0]?.id || null,
+      };
+
+      this.projectsService.createIssue(this.projectId, payload).subscribe({
+        next: (createdIssue: any) => {
           this.toast.success('Issue created');
           this.isEditingDescription.set(false);
-          this.loadBoardAndIssues();
+          this.draftMembers.set([]);
+
+          const newId = createdIssue?.id || createdIssue?.issue?.id;
+          if (pendingMembers.length > 0 && newId) {
+            const attachRequests = pendingMembers.map(m =>
+              this.projectsService.toggleIssueMember(this.projectId, newId, m.id)
+            );
+            forkJoin(attachRequests).subscribe({
+              next: () => {
+                this.loadBoardAndIssues();
+              },
+              error: () => {
+                this.loadBoardAndIssues();
+              }
+            });
+          } else {
+            this.loadBoardAndIssues();
+          }
           this.closeDrawer();
+        },
+        error: (err) => {
+          this.toast.error(err?.error?.message || 'Failed to create issue');
         }
       });
     }
@@ -5149,7 +5227,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   get filteredProjectMembers(): any[] {
-    return this.filteredMembers.filter(m => this.isProjectMember(m.id));
+    const projMembers = this.filteredMembers.filter(m => this.isProjectMember(m.id));
+    if (projMembers.length === 0 && this.filteredMembers.length > 0) {
+      return this.filteredMembers;
+    }
+    return projMembers;
   }
 
   get filteredAvailableMembers(): any[] {
@@ -5178,15 +5260,62 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return this.canManageMembers;
   }
 
+  loadingMemberIds = signal<Set<number>>(new Set());
+  draftMembers = signal<any[]>([]);
+
+  currentIssueMembers = computed(() => {
+    const issue = this.selectedIssue();
+    if (issue && issue.members) {
+      return issue.members;
+    }
+    return this.draftMembers();
+  });
+
+  isMemberLoading(employeeId: number): boolean {
+    return this.loadingMemberIds().has(employeeId);
+  }
+
   isMemberAttached(employeeId: number): boolean {
     const issue = this.selectedIssue();
-    if (!issue || !issue.members) return false;
-    return issue.members.some((m: any) => m.employeeId === employeeId || m.employee?.id === employeeId);
+    if (issue && issue.members) {
+      return issue.members.some((m: any) => m.employeeId === employeeId || m.employee?.id === employeeId || m.id === employeeId);
+    }
+    return this.draftMembers().some((m: any) => m.id === employeeId || m.employeeId === employeeId);
   }
 
   toggleCardMember(member: any) {
+    if (this.isMemberLoading(member.id)) return;
+
+    this.loadingMemberIds.update(s => new Set(s).add(member.id));
+
     const issue = this.selectedIssue();
-    if (!issue) return;
+    if (!issue) {
+      setTimeout(() => {
+        const currentDraft = this.draftMembers();
+        const exists = currentDraft.some((m: any) => m.id === member.id || m.employeeId === member.id);
+        if (exists) {
+          this.draftMembers.set(currentDraft.filter((m: any) => m.id !== member.id && m.employeeId !== member.id));
+          this.toast.success(`Removed ${member.firstName} from card`);
+        } else {
+          const newDraftMember = {
+            id: member.id,
+            employeeId: member.id,
+            employee: member,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            avatarUrl: member.avatarUrl,
+          };
+          this.draftMembers.set([...currentDraft, newDraftMember]);
+          this.toast.success(`Added ${member.firstName} to card`);
+        }
+        this.loadingMemberIds.update(s => {
+          const next = new Set(s);
+          next.delete(member.id);
+          return next;
+        });
+      }, 180);
+      return;
+    }
 
     this.projectsService.toggleIssueMember(this.projectId, issue.id, member.id).subscribe({
       next: (res) => {
@@ -5201,8 +5330,20 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
           this.toast.success(`Removed ${member.firstName} from card`);
         }
         this.loadBoardAndIssues();
+        this.loadingMemberIds.update(s => {
+          const next = new Set(s);
+          next.delete(member.id);
+          return next;
+        });
       },
-      error: () => this.toast.error('Failed to update member assignment')
+      error: () => {
+        this.toast.error('Failed to update member assignment');
+        this.loadingMemberIds.update(s => {
+          const next = new Set(s);
+          next.delete(member.id);
+          return next;
+        });
+      }
     });
   }
 

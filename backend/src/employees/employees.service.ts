@@ -83,7 +83,13 @@ export class EmployeesService {
         employeeCode: true,
         department: { select: { id: true, name: true } },
         designation: { select: { id: true, name: true } },
-        user: { select: { email: true, role: true } }
+        user: { select: { email: true, role: true } },
+        // Which days are this person's own. The attendance grid was assuming
+        // Saturday and Sunday for everybody, which is not what any branch here
+        // actually has — and a wrong day off is not cosmetic: a real working
+        // day rendered as a day off hides an absence, and a day off rendered
+        // as a working day invents one.
+        branch: { select: { id: true, name: true, weeklyOffs: true } }
       },
       orderBy: { firstName: 'asc' }
     });

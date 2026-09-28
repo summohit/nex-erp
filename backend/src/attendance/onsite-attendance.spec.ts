@@ -52,7 +52,7 @@ describe('clockIn / clockOut on an on-site day', () => {
       fieldVisitAttendance: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     roster = { getEffectiveShift: jest.fn() };
-    service = new AttendanceService(prisma, {} as any, roster as ShiftRosterService);
+    service = new AttendanceService(prisma, {} as any, roster as ShiftRosterService, {} as any);
   });
 
   const onsiteDay = (startTime: string, endTime: string) =>

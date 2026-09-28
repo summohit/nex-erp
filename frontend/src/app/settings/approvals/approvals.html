@@ -1,0 +1,83 @@
+<div class="apv-page">
+
+  <div class="apv-head">
+    <div>
+      <h1><svg lucideShieldCheck [size]="20"></svg> Approvals</h1>
+      <p>
+        Choose who, besides the people already trusted by role, may rule on each
+        of these. A Super Admin can approve all of them regardless, so nothing
+        here can lock a queue away.
+      </p>
+    </div>
+    <button class="apv-refresh" (click)="load()" [disabled]="isLoading()">
+      <svg lucideRefreshCw [size]="15" [class.spin]="isLoading()"></svg>
+      Refresh
+    </button>
+  </div>
+
+  <div class="apv-loading" *ngIf="isLoading() && !groups().length">
+    <svg lucideRefreshCw [size]="18" class="spin"></svg>
+    <span>Loading…</span>
+  </div>
+
+  <div class="apv-groups">
+    <section class="apv-card" *ngFor="let group of groups()">
+
+      <header class="apv-card-head">
+        <div>
+          <h2>{{ group.label }}</h2>
+          <!-- An empty list does not mean nobody can approve; say so. -->
+          <p class="apv-always" *ngIf="alwaysAllowed[group.workflow]">
+            <svg lucideInfo [size]="13"></svg>
+            {{ alwaysAllowed[group.workflow] }}
+          </p>
+        </div>
+        <button class="apv-add" *ngIf="addingTo() !== group.workflow"
+                (click)="openPicker(group.workflow)" [disabled]="busy()">
+          <svg lucideUserPlus [size]="15"></svg>
+          Add someone
+        </button>
+      </header>
+
+      <div class="apv-picker" *ngIf="addingTo() === group.workflow">
+        <app-searchable-select
+          [options]="optionsFor(group)"
+          [value]="picked()"
+          [clearable]="true"
+          [fullWidth]="true"
+          placeholder="Choose an employee"
+          (valueChange)="picked.set($event)">
+        </app-searchable-select>
+        <div class="apv-picker-actions">
+          <button class="apv-btn ghost" (click)="cancelPicker()" [disabled]="busy()">Cancel</button>
+          <button class="apv-btn primary" (click)="grant(group.workflow)"
+                  [disabled]="picked() === null || busy()">Add</button>
+        </div>
+      </div>
+
+      <ul class="apv-people" *ngIf="group.delegates.length">
+        <li class="apv-person" *ngFor="let row of group.delegates">
+          <div class="apv-avatar">
+            <img *ngIf="row.employee?.avatarUrl" [src]="row.employee.avatarUrl" [alt]="fullName(row)">
+            <span *ngIf="!row.employee?.avatarUrl">{{ initials(row) }}</span>
+          </div>
+          <div class="apv-person-text">
+            <strong>{{ fullName(row) }}</strong>
+            <span *ngIf="row.grantedBy">
+              added by {{ row.grantedBy.firstName }} {{ row.grantedBy.lastName }}
+            </span>
+          </div>
+          <button class="apv-remove" (click)="revoke(group, row)" [disabled]="busy()"
+                  [title]="'Remove ' + fullName(row)">
+            <svg lucideX [size]="15"></svg>
+          </button>
+        </li>
+      </ul>
+
+      <p class="apv-none" *ngIf="!group.delegates.length && addingTo() !== group.workflow">
+        Nobody added. Only the roles named above can approve these.
+      </p>
+
+    </section>
+  </div>
+</div>
