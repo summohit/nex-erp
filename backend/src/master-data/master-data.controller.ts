@@ -421,7 +421,7 @@ export class MasterDataController {
         companyId: req.user.companyId,
         ...(activeOnly === 'true' ? { isActive: true } : {}),
       },
-      include: { client: { select: { id: true, name: true } } },
+      include: { leadContact: { select: { id: true, name: true, companyName: true } } },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
     });
   }
@@ -431,7 +431,7 @@ export class MasterDataController {
     @Request() req,
     @Body() data: {
       name: string; address?: string; latitude?: number; longitude?: number;
-      clientId?: number; position?: number;
+      leadContactId?: number; position?: number;
     },
   ) {
     if (!data?.name?.trim()) throw new BadRequestException('A location needs a name');
@@ -446,7 +446,7 @@ export class MasterDataController {
         address: data.address?.trim() || null,
         latitude: data.latitude ?? null,
         longitude: data.longitude ?? null,
-        clientId: data.clientId ?? null,
+        leadContactId: data.leadContactId ?? null,
         position: data.position ?? 0,
         companyId: req.user.companyId,
       },
@@ -459,7 +459,7 @@ export class MasterDataController {
     @Param('id', ParseIntPipe) id: number,
     @Body() data: {
       name?: string; address?: string; latitude?: number; longitude?: number;
-      clientId?: number | null; isActive?: boolean; position?: number;
+      leadContactId?: number | null; isActive?: boolean; position?: number;
     },
   ) {
     const updateData: any = {};
@@ -470,7 +470,7 @@ export class MasterDataController {
     if (data.address !== undefined) updateData.address = data.address?.trim() || null;
     if (data.latitude !== undefined) updateData.latitude = data.latitude ?? null;
     if (data.longitude !== undefined) updateData.longitude = data.longitude ?? null;
-    if (data.clientId !== undefined) updateData.clientId = data.clientId ?? null;
+    if (data.leadContactId !== undefined) updateData.leadContactId = data.leadContactId ?? null;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.position !== undefined) updateData.position = data.position;
 

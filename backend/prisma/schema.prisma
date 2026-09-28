@@ -123,6 +123,7 @@ model Company {
   notices               Notice[]
   projectBudgetRequests ProjectBudgetRequest[]
   visitLocations    VisitLocation[]
+  approvalDelegates ApprovalDelegate[]
 }
 
 // Authentication & RBAC
@@ -547,6 +548,8 @@ model Employee {
   noticesAuthored        Notice[]                   @relation("NoticeAuthor")
 
   @@unique([companyId, employeeCode])
+  approvalDelegations   ApprovalDelegate[] @relation("ApprovalDelegate")
+  approvalDelegationsGranted ApprovalDelegate[] @relation("ApprovalDelegateGrantedBy")
 }
 
 model EmergencyContact {
@@ -2767,7 +2770,6 @@ model Client {
   salesOrders SalesOrder[]
 
   @@unique([name, companyId])
-  visitLocations VisitLocation[]
 }
 
 model ClientContact {
@@ -2926,6 +2928,7 @@ model LeadContact {
   leadsBrought      Lead[]
   notes             LeadContactNote[]
   projects          Project[]         @relation("ProjectLeadContact")
+  visitLocations    VisitLocation[]
 }
 
 // A follow-up is a single logged/scheduled interaction on a lead — a running
@@ -3741,6 +3744,40 @@ model TaskHoursRequestActivity {
 ///
 /// clientId is optional: plenty of sites belong to a client, and plenty
 /// (a supplier, a data centre, a site office) belong to nobody in particular.
+/// Somebody the company owner has put on an approval queue (§Att5, §PB7, §PB8).
+///
+/// Approval in this system is contextual first: a task's extra hours go to the
+/// project's managers, a field visit to whoever runs the company. That works
+/// until a decision has no natural context — a forgotten clock-out belongs to
+/// nobody's project — and the answer becomes "the Super Admin", which is one
+/// person and a bottleneck.
+///
+/// This is the delegation on top of that, and only on top: it adds people to a
+/// workflow's approvers, never removes any. The company owner can always
+/// approve, whatever this table says, so a workflow cannot be locked away from
+/// them by an unlucky edit.
+model ApprovalDelegate {
+  id          Int      @id @default(autoincrement())
+  /// Which queue. One of APPROVAL_WORKFLOW in approvals/approval-workflows.ts —
+  /// a string rather than an enum so adding a workflow is a code change and not
+  /// a migration.
+  workflow    String
+  employeeId  Int
+  employee    Employee @relation("ApprovalDelegate", fields: [employeeId], references: [id], onDelete: Cascade)
+  /// Who delegated it. SetNull: the delegation outlives the person who granted
+  /// it, and losing who granted it must not silently revoke somebody's ability
+  /// to approve.
+  grantedById Int?
+  grantedBy   Employee? @relation("ApprovalDelegateGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, workflow, employeeId])
+  @@index([companyId, workflow])
+}
+
 model VisitLocation {
   id        Int      @id @default(autoincrement())
   name      String
@@ -3752,8 +3789,16 @@ model VisitLocation {
   /// hidden from new ones rather than removed from old ones.
   isActive  Boolean  @default(true)
   position  Int      @default(0)
-  clientId  Int?
-  client    Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  /// Who the site belongs to, when it belongs to anybody.
+  ///
+  /// A LeadContact rather than a Client: Project already opens against one, so
+  /// this keeps the two consistent, and the Client table here holds a dozen
+  /// rows with status LEAD created by CRM conversion — several of them a
+  /// person's name rather than a company — which made a Client picker a list
+  /// of prospects. LeadContact also carries the address, which a Client row
+  /// does not in any usable form.
+  leadContactId Int?
+  leadContact   LeadContact? @relation(fields: [leadContactId], references: [id], onDelete: SetNull)
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())

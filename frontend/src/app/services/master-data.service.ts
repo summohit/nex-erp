@@ -100,8 +100,8 @@ export interface VisitLocation {
   longitude?: number | null;
   isActive: boolean;
   position: number;
-  clientId?: number | null;
-  client?: { id: number; name: string } | null;
+  leadContactId?: number | null;
+  leadContact?: { id: number; name: string; companyName?: string | null } | null;
 }
 
 @Injectable({
