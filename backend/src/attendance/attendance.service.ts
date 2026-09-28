@@ -6,6 +6,7 @@ import { haversineKm } from '../common/geo.util';
 import { FIELD_VISIT_STATUS } from '../field-visits/field-visit-status';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShiftRosterService, EffectiveShift } from './shift-roster.service';
+import { ShiftPeriod, resolvePeriod, datesInRange } from './shift-period-summary';
 
 /**
  * What the field visit clock tells attendance about the day it is clocking.
@@ -729,4 +730,127 @@ export class AttendanceService {
 
     return records;
   }
+  /**
+   * Attendance grouped by shift, for a week or a month (§Att7).
+   *
+   * One query rather than one per shift: a company with eight shifts over a
+   * month is eight round trips that all read the same table, and the totals
+   * have to agree with each other anyway.
+   *
+   * Days with no shift recorded are reported under their own heading rather
+   * than dropped. Attendance.shiftId is nullable and every row written before
+   * shifts existed has it null, so silently excluding them would make a
+   * per-shift summary quietly disagree with the headline attendance figures
+   * somebody has open in the next tab.
+   */
+  async getShiftPeriodSummary(
+    companyId: number,
+    period: ShiftPeriod,
+    anchorDate?: string,
+  ) {
+    const anchor = anchorDate ? new Date(`${anchorDate}T12:00:00`) : new Date();
+    if (Number.isNaN(anchor.getTime())) {
+      throw new BadRequestException('That date could not be read.');
+    }
+    const range = resolvePeriod(period, anchor);
+
+    const rows = await this.prisma.attendance.findMany({
+      where: {
+        employee: { companyId },
+        date: { gte: range.from, lte: range.to },
+      },
+      select: {
+        shiftId: true, status: true, isLate: true, isEarlyLeave: true,
+        clockIn: true, clockOut: true, overtimeHours: true, employeeId: true,
+        shift: { select: { id: true, name: true, shortCode: true, colorCode: true } },
+      },
+    });
+
+    type Bucket = {
+      shiftId: number | null; name: string; shortCode: string | null; colorCode: string | null;
+      present: number; halfDay: number; absent: number; onLeave: number; weeklyOff: number; holiday: number;
+      late: number; earlyLeave: number; hours: number; overtimeHours: number;
+      employeeIds: Set<number>;
+    };
+
+    const buckets = new Map<number | null, Bucket>();
+    const bucketFor = (r: typeof rows[number]): Bucket => {
+      const key = r.shiftId ?? null;
+      let b = buckets.get(key);
+      if (!b) {
+        b = {
+          shiftId: key,
+          name: r.shift?.name ?? 'No shift recorded',
+          shortCode: r.shift?.shortCode ?? null,
+          colorCode: r.shift?.colorCode ?? null,
+          present: 0, halfDay: 0, absent: 0, onLeave: 0, weeklyOff: 0, holiday: 0,
+          late: 0, earlyLeave: 0, hours: 0, overtimeHours: 0,
+          employeeIds: new Set<number>(),
+        };
+        buckets.set(key, b);
+      }
+      return b;
+    };
+
+    for (const r of rows) {
+      const b = bucketFor(r);
+      b.employeeIds.add(r.employeeId);
+
+      switch (r.status) {
+        case 'HALF_DAY': b.halfDay++; break;
+        case 'ABSENT': b.absent++; break;
+        case 'ON_LEAVE': b.onLeave++; break;
+        case 'WEEKLY_OFF': b.weeklyOff++; break;
+        case 'HOLIDAY': b.holiday++; break;
+        default: b.present++; break;
+      }
+
+      if (r.isLate) b.late++;
+      if (r.isEarlyLeave) b.earlyLeave++;
+      b.overtimeHours += r.overtimeHours || 0;
+
+      // Only a closed session has a duration. An open one is still running,
+      // and guessing its end would put hours nobody has worked into a total
+      // somebody may be paid from.
+      if (r.clockIn && r.clockOut) {
+        const mins = (new Date(r.clockOut).getTime() - new Date(r.clockIn).getTime()) / 60000;
+        if (mins > 0) b.hours += mins / 60;
+      }
+    }
+
+    const round = (n: number) => Math.round(n * 100) / 100;
+    const shifts = [...buckets.values()]
+      .map(({ employeeIds, ...b }) => ({
+        ...b,
+        hours: round(b.hours),
+        overtimeHours: round(b.overtimeHours),
+        people: employeeIds.size,
+        /** Days anybody was expected: the denominator for "how did this shift do". */
+        workingDays: b.present + b.halfDay + b.absent,
+      }))
+      // Named shifts first, biggest by headcount; "No shift recorded" last,
+      // because it is a data gap rather than a shift anybody works.
+      .sort((a, b) => {
+        if ((a.shiftId === null) !== (b.shiftId === null)) return a.shiftId === null ? 1 : -1;
+        return b.people - a.people;
+      });
+
+    return {
+      period,
+      from: range.from.toISOString().slice(0, 10),
+      to: range.to.toISOString().slice(0, 10),
+      label: range.label,
+      days: datesInRange(range).length,
+      shifts,
+      totals: {
+        present: shifts.reduce((n, s) => n + s.present, 0),
+        halfDay: shifts.reduce((n, s) => n + s.halfDay, 0),
+        absent: shifts.reduce((n, s) => n + s.absent, 0),
+        onLeave: shifts.reduce((n, s) => n + s.onLeave, 0),
+        late: shifts.reduce((n, s) => n + s.late, 0),
+        hours: round(shifts.reduce((n, s) => n + s.hours, 0)),
+      },
+    };
+  }
+
 }

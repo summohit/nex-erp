@@ -1,0 +1,129 @@
+<div class="shift-summary-page">
+
+  <div class="page-head">
+    <div class="page-title-group">
+      <div class="page-icon">
+        <svg lucideCalendarDays [size]="22"></svg>
+      </div>
+      <div>
+        <h1>Shift Attendance</h1>
+        <p>How each shift performed over the period.</p>
+      </div>
+    </div>
+
+    <div class="period-switch">
+      <button type="button" [class.active]="period() === 'week'" (click)="setPeriod('week')">Week</button>
+      <button type="button" [class.active]="period() === 'month'" (click)="setPeriod('month')">Month</button>
+    </div>
+  </div>
+
+  <!-- Arrows move a whole period, so they move what the label says. -->
+  <div class="period-nav">
+    <button type="button" class="nav-btn" (click)="step(-1)" [attr.aria-label]="'Previous ' + period()">
+      <svg lucideChevronLeft [size]="16"></svg>
+    </button>
+    <span class="period-label">{{ summary()?.label || '—' }}</span>
+    <button type="button" class="nav-btn" (click)="step(1)" [attr.aria-label]="'Next ' + period()">
+      <svg lucideChevronRight [size]="16"></svg>
+    </button>
+    <button type="button" class="today-btn" (click)="today()">Today</button>
+  </div>
+
+  <div class="loading-note" *ngIf="isLoading()">Loading…</div>
+
+  <ng-container *ngIf="!isLoading() && summary() as s">
+    <!-- Period totals, so the per-shift rows have something to add up to. -->
+    <div class="totals-row">
+      <div class="total-card">
+        <span class="total-label">Present</span>
+        <span class="total-val">{{ s.totals.present | number }}</span>
+      </div>
+      <div class="total-card">
+        <span class="total-label">Half day</span>
+        <span class="total-val">{{ s.totals.halfDay | number }}</span>
+      </div>
+      <div class="total-card">
+        <span class="total-label">Absent</span>
+        <span class="total-val">{{ s.totals.absent | number }}</span>
+      </div>
+      <div class="total-card">
+        <span class="total-label">On leave</span>
+        <span class="total-val">{{ s.totals.onLeave | number }}</span>
+      </div>
+      <div class="total-card">
+        <span class="total-label">Late</span>
+        <span class="total-val">{{ s.totals.late | number }}</span>
+      </div>
+      <div class="total-card">
+        <span class="total-label">Hours</span>
+        <span class="total-val">{{ s.totals.hours | number:'1.0-1' }}</span>
+      </div>
+    </div>
+
+    <div class="shift-table-wrap" *ngIf="hasRows(); else nothingLogged">
+      <table class="shift-table">
+        <thead>
+          <tr>
+            <th class="col-shift">Shift</th>
+            <th>People</th>
+            <th>Present</th>
+            <th>Half day</th>
+            <th>Absent</th>
+            <th>On leave</th>
+            <th>Late</th>
+            <th>Hours</th>
+            <th>Avg / day</th>
+            <th class="col-rate">Attendance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of s.shifts" [class.unassigned]="row.shiftId === null">
+            <td class="col-shift">
+              <span class="shift-dot" [style.background]="row.colorCode || '#94a3b8'"></span>
+              <span class="shift-name">{{ row.name }}</span>
+              <span class="shift-code" *ngIf="row.shortCode">{{ row.shortCode }}</span>
+            </td>
+            <td>{{ row.people }}</td>
+            <td>{{ row.present }}</td>
+            <td>{{ row.halfDay }}</td>
+            <td [class.flagged]="row.absent > 0">{{ row.absent }}</td>
+            <td>{{ row.onLeave }}</td>
+            <td [class.flagged]="row.late > 0">{{ row.late }}</td>
+            <td>{{ row.hours | number:'1.0-1' }}</td>
+            <td>{{ averageHours(row) !== null ? (averageHours(row) | number:'1.0-1') : '—' }}</td>
+            <td class="col-rate">
+              <!-- Null, not 0%: a shift nobody was rostered on has no
+                   attendance rate, and 0% would read as everybody absent. -->
+              <ng-container *ngIf="attendanceRate(row) !== null; else noRate">
+                <div class="rate-track">
+                  <div class="rate-fill"
+                       [style.width.%]="attendanceRate(row)"
+                       [class.low]="(attendanceRate(row) || 0) < 80"></div>
+                </div>
+                <span class="rate-val">{{ attendanceRate(row) }}%</span>
+              </ng-container>
+              <ng-template #noRate><span class="rate-none">—</span></ng-template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Attendance.shiftId is nullable, and every row written before shifts
+         existed has it null. Saying so beats letting the reader wonder why
+         this total is smaller than the one on All Attendance. -->
+    <p class="unassigned-note" *ngIf="hasUnassigned()">
+      <svg lucideAlertCircle [size]="14"></svg>
+      "No shift recorded" covers days whose attendance was logged without a shift —
+      usually records predating the shift roster. They are counted here so this
+      page agrees with the headline attendance figures.
+    </p>
+
+    <ng-template #nothingLogged>
+      <div class="empty-state">
+        <svg lucideInbox [size]="34"></svg>
+        <p>No attendance recorded for {{ s.label }}.</p>
+      </div>
+    </ng-template>
+  </ng-container>
+</div>

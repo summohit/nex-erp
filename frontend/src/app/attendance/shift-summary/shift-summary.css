@@ -1,0 +1,102 @@
+.shift-summary-page { padding: 24px; }
+
+.page-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.page-title-group { display: flex; align-items: center; gap: 12px; }
+.page-icon {
+  width: 42px; height: 42px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: #eef2ff; color: #6b3fd6;
+}
+.page-head h1 { margin: 0; font-size: 19px; font-weight: 800; color: #0f172a; }
+.page-head p { margin: 2px 0 0; font-size: 12.5px; color: #94a3b8; }
+
+.period-switch { display: flex; gap: 4px; }
+.period-switch button {
+  border: 1px solid #e2e8f0; background: #fff; color: #64748b;
+  font-size: 12.5px; font-weight: 600; padding: 6px 14px;
+  border-radius: 8px; cursor: pointer;
+}
+.period-switch button.active { background: #6b3fd6; border-color: #6b3fd6; color: #fff; }
+
+.period-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.nav-btn, .today-btn {
+  border: 1px solid #e2e8f0; background: #fff; color: #475569;
+  border-radius: 8px; cursor: pointer; display: flex; align-items: center;
+  justify-content: center;
+}
+.nav-btn { width: 30px; height: 30px; }
+.today-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; }
+.period-label {
+  font-size: 14px; font-weight: 700; color: #0f172a; min-width: 190px;
+}
+
+.totals-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px; margin-bottom: 18px;
+}
+.total-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 11px;
+  padding: 13px 15px; display: flex; flex-direction: column; gap: 3px;
+}
+.total-label {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #64748b;
+}
+.total-val { font-size: 20px; font-weight: 800; color: #0f172a; }
+
+.shift-table-wrap {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;
+}
+.shift-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.shift-table th {
+  text-align: right; padding: 11px 14px; background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;
+}
+.shift-table td {
+  text-align: right; padding: 11px 14px; border-bottom: 1px solid #f1f5f9;
+  color: #334155; font-variant-numeric: tabular-nums;
+}
+.shift-table th.col-shift, .shift-table td.col-shift { text-align: left; }
+.shift-table tr:last-child td { border-bottom: none; }
+
+/* A data gap, not a shift anybody works. */
+.shift-table tr.unassigned td { background: #fcfcfd; color: #64748b; font-style: italic; }
+
+.shift-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-right: 8px; vertical-align: middle;
+}
+.shift-name { font-weight: 600; color: #0f172a; }
+.shift-code {
+  margin-left: 7px; font-size: 10.5px; font-weight: 700; color: #64748b;
+  background: #f1f5f9; border-radius: 5px; padding: 1px 6px;
+}
+
+.shift-table td.flagged { color: #b45309; font-weight: 700; }
+
+.col-rate { min-width: 150px; }
+.shift-table td.col-rate { display: flex; align-items: center; gap: 9px; justify-content: flex-end; }
+.rate-track { flex: 1; height: 7px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.rate-fill { height: 100%; background: #16a34a; border-radius: 999px; }
+.rate-fill.low { background: #f59e0b; }
+.rate-val { font-weight: 700; color: #0f172a; min-width: 34px; }
+.rate-none { color: #cbd5e1; }
+
+.unassigned-note {
+  display: flex; align-items: flex-start; gap: 8px; margin: 14px 0 0;
+  font-size: 12px; line-height: 1.5; color: #92400e;
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 10px 13px;
+}
+.unassigned-note svg { flex-shrink: 0; margin-top: 2px; }
+
+.empty-state {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 46px 20px; text-align: center; color: #94a3b8;
+}
+.empty-state p { margin: 12px 0 0; font-size: 13px; }
+
+.loading-note { padding: 24px 0; font-size: 13px; color: #94a3b8; }

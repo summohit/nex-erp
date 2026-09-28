@@ -67,6 +67,19 @@ export class AttendanceController {
     return this.attendanceService.getTeamTimeline(req.user.companyId, start, end);
   }
 
+  /** §Att7: attendance grouped by shift, for a week or a month. */
+  @Get('shift-summary')
+  @Permissions('attendance/all')
+  getShiftPeriodSummary(
+    @Request() req,
+    @Query('period') period?: string,
+    @Query('date') date?: string,
+  ) {
+    return this.attendanceService.getShiftPeriodSummary(
+      req.user.companyId, period === 'week' ? 'week' : 'month', date,
+    );
+  }
+
   @Get('all')
   @Permissions('attendance/all')
   getAllEmployeesAttendance(

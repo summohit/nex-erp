@@ -43,12 +43,53 @@ export interface AttendanceRecord {
   logs?: any[];
 }
 
+
+/** §Att7: attendance rolled up by shift over a week or a month. */
+export interface ShiftPeriodRow {
+  shiftId: number | null;
+  name: string;
+  shortCode: string | null;
+  colorCode: string | null;
+  present: number;
+  halfDay: number;
+  absent: number;
+  onLeave: number;
+  weeklyOff: number;
+  holiday: number;
+  late: number;
+  earlyLeave: number;
+  hours: number;
+  overtimeHours: number;
+  people: number;
+  /** Days anybody was expected — the denominator for "how did this shift do". */
+  workingDays: number;
+}
+
+export interface ShiftPeriodSummary {
+  period: 'week' | 'month';
+  from: string;
+  to: string;
+  label: string;
+  days: number;
+  shifts: ShiftPeriodRow[];
+  totals: {
+    present: number; halfDay: number; absent: number;
+    onLeave: number; late: number; hours: number;
+  };
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class AttendanceService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/attendance`;
+
+  /** §Att7: attendance grouped by shift, for a week or a month. */
+  getShiftPeriodSummary(period: 'week' | 'month', date?: string) {
+    const q = `?period=${period}${date ? `&date=${date}` : ''}`;
+    return this.http.get<ShiftPeriodSummary>(`${this.apiUrl}/shift-summary${q}`);
+  }
 
   getTodayAttendance(): Observable<AttendanceRecord | null> {
     return this.http.get<AttendanceRecord>(`${this.apiUrl}/me`);

@@ -164,6 +164,13 @@ export const routes: Routes = [
         loadComponent: () => import('./attendance/all-attendance/all-attendance').then(m => m.AllAttendanceComponent)
       },
       {
+        // §Att7. Above 'attendance/:tab' for the same reason the others are.
+        path: 'attendance/shift-summary',
+        canActivate: [permissionGuard],
+        data: { module: 'attendance/all' },
+        loadComponent: () => import('./attendance/shift-summary/shift-summary').then(m => m.ShiftSummaryComponent)
+      },
+      {
         path: 'attendance/shift-roster',
         canActivate: [permissionGuard],
         data: { module: 'attendance/shifts' },
