@@ -58,6 +58,14 @@ export interface OfferLetterConfig {
   employeeEsicPercent?: number; // 0.75
 }
 
+/**
+ * Where the salary annexure goes in an edited letter.
+ *
+ * Kept as plain text so a rich-text editor carries it through untouched, and
+ * swapped for the real table at generation.
+ */
+const SALARY_TABLE_TOKEN = '##SALARY_TABLE##';
+
 const CONFIG_DEFAULTS: Required<Omit<OfferLetterConfig,
   'legalEntityName' | 'cin' | 'officeAddress' | 'contactPhone' | 'contactEmail' | 'website' | 'tagline'>> = {
   variablePayPercent: 20,
@@ -583,9 +591,17 @@ export class OfferLettersService {
     }
 
     const settings = await this.prisma.systemSetting.findUnique({ where: { companyId } });
-    const { html, header, footer } = await this.generateHtmlFromSettings(settings, application);
+    const rendered = await this.generateHtmlFromSettings(settings, application);
 
-    const { buffer, isPdf } = await this.htmlToPdf(html, header, footer);
+    // A body edited for this candidate replaces the template's, but keeps the
+    // letterhead and footer: those repeat on every page via Puppeteer and are
+    // company identity rather than letter text, so they are not the recruiter's
+    // to edit per candidate.
+    const html = application.offerLetterBody?.trim()
+      ? this.applySalaryTable(this.printableBody(application.offerLetterBody), rendered.salaryTableHtml)
+      : rendered.html;
+
+    const { buffer, isPdf } = await this.htmlToPdf(html, rendered.header, rendered.footer);
     const pdfUrl = await this.uploadPdf(buffer, isPdf, applicationId);
 
     // Keep the existing envelope so links already sent still resolve.
@@ -627,6 +643,170 @@ export class OfferLettersService {
       signingPath: `/offer/${letter.accessToken}`,
       documentPassword: this.derivePassword(application),
     };
+  }
+
+  // ═══════════════════════════════════════════
+  // PER-CANDIDATE LETTER TEXT
+  // ═══════════════════════════════════════════
+
+  /**
+   * The letter body to put in front of the editor.
+   *
+   * Returns this candidate's edited text when they have one, and otherwise the
+   * template rendered against them — merge tags already resolved, so what the
+   * recruiter edits is the finished letter rather than a form full of
+   * ##PLACEHOLDERS## they would have to fill in by hand.
+   */
+  async getDraft(applicationId: number, companyId: number) {
+    const application = await this.prisma.jobApplication.findFirst({
+      where: { id: applicationId, companyId },
+      include: { job: { include: { company: true } } },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+
+    const settings = await this.prisma.systemSetting.findUnique({
+      where: { companyId },
+    });
+    const rendered = await this.generateHtmlFromSettings(
+      settings, application, undefined, { keepSalaryTableToken: true },
+    );
+    const isCustomised = !!application.offerLetterBody?.trim();
+
+    return {
+      body: isCustomised ? application.offerLetterBody : rendered.html,
+      templateBody: rendered.html,
+      isCustomised,
+      // A letter already signed must not be quietly rewritten underneath the
+      // signature; the caller disables editing rather than discovering this on
+      // save.
+      isLocked: await this.isSigned(applicationId),
+    };
+  }
+
+  /** Store the letter text for this candidate alone. */
+  async saveDraft(applicationId: number, companyId: number, body: string) {
+    const application = await this.prisma.jobApplication.findFirst({
+      where: { id: applicationId, companyId },
+      select: { id: true },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+
+    if (!body || !body.trim()) {
+      throw new BadRequestException('The offer letter cannot be saved empty.');
+    }
+    if (await this.isSigned(applicationId)) {
+      throw new BadRequestException(
+        'This offer has already been signed. Withdraw the signed offer before editing its text.',
+      );
+    }
+
+    await this.prisma.jobApplication.update({
+      where: { id: applicationId },
+      data: { offerLetterBody: body },
+    });
+    return { isCustomised: true };
+  }
+
+  /** Put the candidate back on the shared template. */
+  async resetDraft(applicationId: number, companyId: number) {
+    const application = await this.prisma.jobApplication.findFirst({
+      where: { id: applicationId, companyId },
+      select: { id: true },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+
+    if (await this.isSigned(applicationId)) {
+      throw new BadRequestException(
+        'This offer has already been signed. Withdraw the signed offer before editing its text.',
+      );
+    }
+
+    await this.prisma.jobApplication.update({
+      where: { id: applicationId },
+      data: { offerLetterBody: null },
+    });
+    return { isCustomised: false };
+  }
+
+  private async isSigned(applicationId: number): Promise<boolean> {
+    const letter = await this.prisma.offerLetter.findUnique({
+      where: { applicationId },
+      select: { status: true },
+    });
+    return letter?.status === 'ACCEPTED';
+  }
+
+  /**
+   * Put the salary annexure back into an edited letter.
+   *
+   * The edited body is emitted exactly as stored, with no wrapper of our own:
+   * the template carries its own font, width and spacing, and imposing a second
+   * set on top of it was what shrank the type and pushed lines past the right
+   * margin.
+   *
+   * A letter edited before the token existed has no placeholder in it, so the
+   * table is appended rather than dropped — losing the annexure silently is the
+   * one outcome worth writing extra code to avoid.
+   */
+  /**
+   * Make an edited body printable.
+   *
+   * Two things have to be undone before it goes near Puppeteer:
+   *
+   * 1. The editor rewrites ordinary spaces as `&nbsp;` when it loads HTML. A
+   *    paragraph joined entirely by non-breaking spaces cannot wrap, so every
+   *    line ran past the right margin and was clipped — which also swallowed
+   *    text rather than flowing it onto another page. Only the separators are
+   *    converted; a leading indent keeps its nbsp.
+   *
+   * 2. The editor strips the template's wrapper div, and with it the letter's
+   *    font, size and measure, leaving whatever the print engine defaults to.
+   *    A wrapper is restored here — deliberately plain, matching the template's
+   *    own serif body copy rather than imposing a second design on it.
+   */
+  private printableBody(body: string): string {
+    // Only an nbsp sitting BETWEEN two visible characters is a word separator.
+    // One against a tag boundary is deliberate — `<p>&nbsp;</p>` is the blank
+    // line between sections, and converting it collapses the paragraph to zero
+    // height and closes up the letter's spacing.
+    const wrappable = body.replace(/(?<=[^\s>])&nbsp;(?=[^\s<])/g, ' ');
+
+    return `<div style="font-family:'Times New Roman',Times,serif;font-size:15px;`
+      + `line-height:1.65;color:#111827;max-width:100%;overflow-wrap:break-word;`
+      + `word-break:normal;">${wrappable}</div>`;
+  }
+
+  private applySalaryTable(body: string, salaryTableHtml: string): string {
+    if (!salaryTableHtml) {
+      this.logger.warn('No salary table to substitute; the letter will print without an annexure.');
+      return body;
+    }
+
+    // An editor leaves the token in a paragraph of its own — <p>##SALARY_TABLE##
+    // &nbsp;</p> — and a <table> inside a <p> is invalid: the browser hoists the
+    // table out and leaves the empty paragraph behind, which breaks the spacing
+    // around the annexure. Swallow the whole paragraph when the token is all it
+    // holds.
+    const paragraph = new RegExp(
+      `<p\\b[^>]*>(?:\\s|&nbsp;|<br\\s*/?>)*${SALARY_TABLE_TOKEN}(?:\\s|&nbsp;|<br\\s*/?>)*</p>`,
+      'gi',
+    );
+
+    const withTable = body
+      .replace(paragraph, salaryTableHtml)
+      .replace(/{{\s*salaryTable\s*}}/g, salaryTableHtml)
+      .split(SALARY_TABLE_TOKEN).join(salaryTableHtml);
+
+    if (withTable !== body) return withTable;
+
+    // Letters edited before the token existed carry no placeholder. Appending
+    // puts the annexure in the wrong place, but a misplaced annexure is a far
+    // better failure than a salary schedule that silently vanishes from a
+    // signed document.
+    this.logger.warn(
+      'Offer letter body has no salary-table placeholder; appending the annexure at the end.',
+    );
+    return `${body}${salaryTableHtml}`;
   }
 
   // ═══════════════════════════════════════════
@@ -1045,7 +1225,8 @@ export class OfferLettersService {
     settings: any,
     application: any,
     issuedDate?: Date,
-  ): Promise<{ html: string; header: string; footer: string }> {
+    opts?: { keepSalaryTableToken?: boolean },
+  ): Promise<{ html: string; header: string; footer: string; salaryTableHtml: string }> {
     const company = application.job.company;
     const cfg = { ...CONFIG_DEFAULTS, ...((settings?.offerLetterConfig as OfferLetterConfig) || {}) };
 
@@ -1053,7 +1234,18 @@ export class OfferLettersService {
       d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 
     const annualCtc = Number(application.offeredSalary) || 0;
-    const breakup = annualCtc > 0 ? this.buildSalaryBreakup(annualCtc, cfg) : [];
+    // The Compensation Annexure wins when somebody has tailored it.
+    //
+    // The letter used to derive its own table from the company percentages and
+    // ignore the annexure entirely, so a recruiter who adjusted a candidate's
+    // structure ended up issuing two documents that disagreed about the same
+    // salary. The annexure is the one a human edited, so it is the one that
+    // decides; the percentage split remains the fallback for candidates nobody
+    // has customised.
+    const breakup = annualCtc > 0
+      ? (this.buildBreakupFromStructure(application.compensationStructure, annualCtc)
+         ?? this.buildSalaryBreakup(annualCtc, cfg))
+      : [];
 
     // Flat scalars so a .docx template can lay out its own annexure table.
     const salaryFields: Record<string, string> = {};
@@ -1146,6 +1338,7 @@ export class OfferLettersService {
           html: `<div style="font-family: Arial, sans-serif; color: #172b4d; font-size: 12px; line-height: 1.6;">${result.value}</div>`,
           header,
           footer,
+          salaryTableHtml: '',
         };
       } catch (err) {
         this.logger.error('Failed to process .docx template, falling back to HTML', err);
@@ -1166,11 +1359,21 @@ export class OfferLettersService {
       : '<p><em>Salary details to be shared separately.</em></p>';
     // The table is HTML, so it is substituted after the plain scalar merge — in
     // both syntaxes, since a Letter Template uses ##TAGS##.
-    const withTable = merged
-      .replace(/{{\s*salaryTable\s*}}/g, salaryTableHtml)
-      .split('##SALARY_TABLE##').join(salaryTableHtml);
+    // When the caller is going to hand this to an editor, the token stays put:
+    // the annexure is a table, editors that cannot represent one silently drop
+    // it, and a salary annexure that disappears because of a rich-text format
+    // is not an acceptable failure for a legal document. Substituting at
+    // generation instead also keeps the table live — it reflects the current
+    // compensation structure rather than whatever was frozen in at edit time.
+    const tableReplacement = opts?.keepSalaryTableToken
+      ? SALARY_TABLE_TOKEN
+      : salaryTableHtml;
 
-    return { html: withTable, header, footer };
+    const withTable = merged
+      .replace(/{{\s*salaryTable\s*}}/g, tableReplacement)
+      .split('##SALARY_TABLE##').join(tableReplacement);
+
+    return { html: withTable, header, footer, salaryTableHtml };
   }
 
   /**
@@ -1372,6 +1575,112 @@ export class OfferLettersService {
    * the employer's PF contribution, and "Other Allowance" absorbs the difference so the
    * component rows always sum exactly to Gross.
    */
+  /**
+   * The annexure's saved components as letter rows, or null when there is no
+   * saved structure and the caller should fall back to the percentage split.
+   *
+   * Excluded components are dropped rather than shown at zero: the annexure
+   * keeps a toggled-off row so its amount survives for later, but that is
+   * editor state and has no business appearing in a legal document.
+   *
+   * The BALANCER row is not persisted — the annexure re-derives it on load —
+   * so it is re-derived here too, or the letter would total short of the CTC.
+   */
+  private buildBreakupFromStructure(structure: any, annualCtc: number): SalaryRow[] | null {
+    const components = structure?.components;
+    if (!Array.isArray(components) || components.length === 0) return null;
+
+    const included = components.filter((c: any) => c?.included !== false && c?.kind !== 'BALANCER');
+    if (!included.length) return null;
+
+    const row = (label: string, monthly: number, opts: Partial<SalaryRow> = {}): SalaryRow => ({
+      label, monthly, annual: monthly * 12, ...opts,
+    });
+
+    const monthlyCtc = annualCtc / 12;
+    const earnings = included.filter((c: any) => c.group === 'EARNINGS' || !c.group);
+    const contributions = included.filter((c: any) => c.group === 'DEDUCTIONS');
+    const withheld = included.filter((c: any) => c.group === 'EMPLOYEE_DEDUCTIONS');
+
+    // Employee deductions sit inside gross, so they play no part in reaching
+    // the CTC the balancer fills.
+    const fixedTotal = [...earnings, ...contributions]
+      .reduce((sum: number, c: any) => sum + (Number(c.monthly) || 0), 0);
+    const balance = Math.max(0, Math.round(monthlyCtc - fixedTotal));
+
+    const rows: SalaryRow[] = [row('CTC', monthlyCtc, { emphasis: true, group: true })];
+    earnings.forEach((c: any) => rows.push(row(String(c.name), Number(c.monthly) || 0)));
+    if (balance > 0) rows.push(row('Other Allowance (Balancing)', balance));
+
+    const grossMonthly = earnings.reduce((sum: number, c: any) => sum + (Number(c.monthly) || 0), 0) + balance;
+    rows.push(row('Gross Salary', grossMonthly, { emphasis: true, group: true }));
+
+    contributions.forEach((c: any) => rows.push(row(String(c.name), Number(c.monthly) || 0)));
+
+    if (withheld.length) {
+      withheld.forEach((c: any) => rows.push(row(String(c.name), Number(c.monthly) || 0)));
+      const netMonthly = Math.max(
+        0,
+        grossMonthly - withheld.reduce((sum: number, c: any) => sum + (Number(c.monthly) || 0), 0),
+      );
+      rows.push(row('Net Take Home Salary', netMonthly, { emphasis: true }));
+    }
+
+    return rows;
+  }
+
+  /**
+   * ESIC applies only up to a statutory monthly wage ceiling.
+   *
+   * Above it neither side contributes, which is why the company's own
+   * structure sheet shows a dash rather than a figure on both ESIC lines for
+   * salaries of this size. Encoded rather than left to the recruiter, because
+   * a number typed into an inapplicable row is a wrong annexure.
+   */
+  private static readonly ESIC_WAGE_CEILING = 21000;
+
+  /**
+   * The company's standard salary structure, as annexure components.
+   *
+   * One model, two documents. The offer letter's table and the Compensation
+   * Annexure used to derive salaries from different settings — the letter from
+   * offerLetterConfig, the annexure from payrollSettings — so the same
+   * candidate had two different Employer PF figures depending on which
+   * document you opened. This is the shared definition; the annexure seeds
+   * from it and the recruiter edits from there.
+   *
+   * "Other Allowance" is not returned: it is the balancing row, derived last
+   * so the components always reconcile to the offered CTC.
+   */
+  async defaultAnnexureComponents(companyId: number, annualCtc: number) {
+    const settings = await this.prisma.systemSetting.findUnique({ where: { companyId } });
+    const cfg = { ...CONFIG_DEFAULTS, ...((settings?.offerLetterConfig as OfferLetterConfig) || {}) };
+
+    const monthlyCtc = annualCtc / 12;
+    const basic = Math.round(monthlyCtc * (cfg.basicPercentOfCtc / 100));
+    const hra = Math.round(basic * (cfg.hraPercentOfBasic / 100));
+    const employerPf = Math.round(cfg.pfBase * (cfg.pfPercent / 100));
+    const employeePf = Math.round(cfg.pfBase * (cfg.pfPercent / 100));
+
+    // Gross is what is left of the CTC once the employer's own contributions
+    // are taken out of it — the structure sheet's "CTC − Employer PF".
+    const grossApprox = monthlyCtc - employerPf;
+    const esicApplies = grossApprox <= OfferLettersService.ESIC_WAGE_CEILING;
+    const employerEsic = esicApplies ? Math.round(basic * (cfg.employerEsicPercent / 100)) : 0;
+    const employeeEsic = esicApplies ? Math.round(basic * (cfg.employeeEsicPercent / 100)) : 0;
+
+    return [
+      { id: 'basic', name: `Basic Salary (${cfg.basicPercentOfCtc}% of CTC)`, group: 'EARNINGS', kind: 'FIXED', monthly: basic },
+      { id: 'hra', name: `House Rent Allowance – HRA (${cfg.hraPercentOfBasic}% of Basic)`, group: 'EARNINGS', kind: 'FIXED', monthly: hra },
+      { id: 'travelling', name: 'Travelling Allowance', group: 'EARNINGS', kind: 'FIXED', monthly: cfg.travellingAllowance },
+      { id: 'medical', name: 'Medical Allowance', group: 'EARNINGS', kind: 'FIXED', monthly: cfg.medicalAllowance },
+      { id: 'employer-pf', name: `Employer PF (${cfg.pfPercent}% of PF Base)`, group: 'DEDUCTIONS', kind: 'FIXED', monthly: employerPf },
+      { id: 'employer-esic', name: `Employer ESIC (${cfg.employerEsicPercent}%)`, group: 'DEDUCTIONS', kind: 'FIXED', monthly: employerEsic },
+      { id: 'employee-pf', name: `Employee PF (${cfg.pfPercent}% of PF Base)`, group: 'EMPLOYEE_DEDUCTIONS', kind: 'FIXED', monthly: employeePf },
+      { id: 'employee-esic', name: `Employee ESIC (${cfg.employeeEsicPercent}%)`, group: 'EMPLOYEE_DEDUCTIONS', kind: 'FIXED', monthly: employeeEsic },
+    ];
+  }
+
   private buildSalaryBreakup(annualCtc: number, cfg: Required<OfferLetterConfig> | any): SalaryRow[] {
     const monthlyCtc = annualCtc / 12;
 

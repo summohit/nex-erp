@@ -1317,6 +1317,13 @@ model JobApplication {
   // { version, components: [{ id, name, group, kind, monthly }] }. When null the
   // annexure falls back to the company's default percentage split.
   compensationStructure  Json?
+  /// This candidate's offer letter, as edited by hand for them alone.
+  ///
+  /// Null means "render from the company template", which is the normal case.
+  /// Once set, generation uses this verbatim instead — so a later fix to the
+  /// shared template deliberately does NOT reach a letter somebody has already
+  /// tailored. Clearing it puts the candidate back on the template.
+  offerLetterBody        String?      @db.Text
   aiScore                Int?
   aiSummary              String?      @db.Text
   isAiScored             Boolean      @default(false)

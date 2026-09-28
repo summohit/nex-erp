@@ -3740,6 +3740,11 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* The card has to be bounded, or header + body + footer add up past the
+     viewport and the overlay's centring clips the ends off with no way to
+     reach them. Bounding it here is what lets the body below do the
+     scrolling. */
+  max-height: 92vh;
 }
 
 .annexure-modal-header {
@@ -3809,7 +3814,13 @@
   flex-direction: column;
   gap: 20px;
   background: #ffffff;
-  max-height: 72vh;
+  /* Take whatever the header and footer leave, and scroll inside it. A fixed
+     72vh was the bug: on a laptop it plus the header and footer exceeded the
+     screen, so the card overflowed and the last rows — and the add-component
+     controls under them — were unreachable. min-height:0 is required, or a
+     flex child refuses to shrink below its content and never scrolls. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -3869,7 +3880,6 @@
 .annexure-table-wrapper {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  overflow: hidden;
 }
 
 .annexure-styled-table {
@@ -4838,4 +4848,164 @@
     grid-template-columns: 1fr;
     align-items: stretch;
   }
+}
+
+
+/* ── Offer Letter Text editor ─────────────────────────────────────────────
+   Shares the annexure modal's card, header and footer; only the editor and
+   its banners are its own. */
+.letter-editor-card {
+  max-width: 900px;
+}
+
+.letter-editor-body {
+  gap: 14px;
+}
+
+.letter-editor-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+
+.letter-editor-banner svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.letter-editor-banner.hint {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.letter-editor-banner.tailored {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.letter-editor-banner.locked {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.letter-revert-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.letter-revert-btn:hover:not(:disabled) {
+  background: #fffbeb;
+}
+
+.letter-revert-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* The editor is the one thing in the modal that should grow: the letter is
+   long, and a short box would mean scrolling a viewport inside a viewport. */
+.letter-editor-body .letter-quill {
+  display: block;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  /* Not `hidden`: that establishes a clipping context the sticky toolbar
+     cannot escape, which pins it to the wrapper instead of the viewport. */
+  overflow: visible;
+}
+
+.letter-editor-body .letter-quill .ql-toolbar {
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  /* Sticks to the top of the modal body as you scroll the letter, so the
+     formatting controls stay reachable in a document this long. Sticky against
+     the BODY's scroll — the editor itself deliberately does not scroll. */
+  position: sticky;
+  top: -24px;
+  z-index: 3;
+}
+
+.letter-editor-body .letter-quill .ql-container {
+  border: none;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 0.8125rem;
+}
+
+.letter-editor-body .letter-quill .ql-editor {
+  /* No height cap and no scroll of its own. A scrollable editor inside a
+     scrollable modal body traps the wheel, carries the toolbar out of view and
+     opens the letter part-way down it. The body is the one scroll container;
+     the editor simply grows to the length of the letter. */
+  min-height: 340px;
+  max-height: none;
+  overflow-y: visible;
+  line-height: 1.6;
+  color: #1e293b;
+}
+
+/* Quill measures its own container; without this it keeps the default 100%
+   height and clips the letter instead of growing with it. */
+.letter-editor-body .letter-quill .ql-container {
+  height: auto;
+}
+
+.letter-editor-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.letter-editor-note code {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.7rem;
+  color: #475569;
+}
+
+/* ── Annexure laid out as the company's structure sheet ─────────────────── */
+
+/* Derived rows are sums the components must satisfy, never inputs. */
+.annexure-styled-table tr.annexure-derived-row td {
+  background: #fff7ed;
+  border-top: 1px solid #fed7aa;
+  border-bottom: 1px solid #fed7aa;
+  color: #0f172a;
+}
+
+.annexure-styled-table tr.annexure-derived-row.ctc td {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.annexure-styled-table tr.annexure-derived-row.net td {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+/* The blank bands the printed sheet uses to group the three blocks. */
+.annexure-styled-table tr.annexure-spacer-row td {
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: transparent;
 }

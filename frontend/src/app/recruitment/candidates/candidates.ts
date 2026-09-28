@@ -23,6 +23,10 @@ import {
   LucideCirclePlus
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
+import { QuillModule } from 'ngx-quill';
+
+/** Mirrors AnnexureGroup on the server (applications.service.ts). */
+type AnnexureGroup = 'EARNINGS' | 'DEDUCTIONS' | 'EMPLOYEE_DEDUCTIONS';
 import { ColDef, AllCommunityModule, ModuleRegistry, RowClassRules, GridOptions, GridApi } from 'ag-grid-community';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
@@ -32,7 +36,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
   selector: 'app-candidates',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, DragDropModule, AgGridAngular, DatePipe, RouterLink,
+    CommonModule, FormsModule, DragDropModule, AgGridAngular, DatePipe, RouterLink, QuillModule,
     LucideX, LucideLayoutGrid, LucideTable, LucideFileText,
     LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
     LucideClock, LucideBuilding, LucideTrash2, LucideSparkles, LucideSend,
@@ -426,16 +430,24 @@ export class CandidatesComponent implements OnInit {
   isSavingAnnexure = signal(false);
   annexureComponents = signal<any[]>([]);
   annexureCatId = signal('');
+  /** A component the catalogue does not carry, named by the recruiter. */
+  annexureCustomName = signal('');
+  annexureCustomGroup = signal<AnnexureGroup>('EARNINGS');
 
   annexureEarningsComps = computed(() => this.annexureComponents().filter(c => c.group === 'EARNINGS'));
   annexureDeductionsComps = computed(() => this.annexureComponents().filter(c => c.group === 'DEDUCTIONS'));
+  annexureEmployeeDedComps = computed(() => this.annexureComponents().filter(c => c.group === 'EMPLOYEE_DEDUCTIONS'));
   annexureEarningsMonthly = computed(() => this.annexureEarningsComps().filter(c => c.included !== false).reduce((s, c) => s + (Number(c.monthly) || 0), 0));
   annexureDeductionsMonthly = computed(() => this.annexureDeductionsComps().filter(c => c.included !== false).reduce((s, c) => s + (Number(c.monthly) || 0), 0));
+  annexureEmployeeDedMonthly = computed(() => this.annexureEmployeeDedComps().filter(c => c.included !== false).reduce((s, c) => s + (Number(c.monthly) || 0), 0));
+  /** CTC = gross + employer contributions. What the employee has withheld is
+   *  already inside gross, so it is deliberately absent from this sum. */
   annexureTotalMonthly = computed(() => this.annexureEarningsMonthly() + this.annexureDeductionsMonthly());
+  annexureNetMonthly = computed(() => Math.max(0, this.annexureEarningsMonthly() - this.annexureEmployeeDedMonthly()));
   annexureTotalAnnual = computed(() => this.annexureTotalMonthly() * 12);
 
   /** Components the recruiter may add to the structure from the picker. */
-  annexureCatalogue: { id: string; group: 'EARNINGS' | 'DEDUCTIONS'; name: string }[] = [
+  annexureCatalogue: { id: string; group: AnnexureGroup; name: string }[] = [
     { id: 'basic', group: 'EARNINGS', name: 'Basic Salary' },
     { id: 'hra', group: 'EARNINGS', name: 'House Rent Allowance (HRA)' },
     { id: 'special', group: 'EARNINGS', name: 'Special Allowance / Bonus' },
@@ -459,11 +471,43 @@ export class CandidatesComponent implements OnInit {
     { id: 'health-insurance', group: 'DEDUCTIONS', name: 'Group Health Insurance' },
     { id: 'term-life', group: 'DEDUCTIONS', name: 'Group Term Life' },
     { id: 'other-contribution', group: 'DEDUCTIONS', name: 'Other Employer Contribution' },
+    // Withheld from the candidate's own gross — inside CTC already, so these
+    // reduce take-home without changing the cost of the hire.
+    { id: 'employee-pf', group: 'EMPLOYEE_DEDUCTIONS', name: 'Employee PF' },
+    { id: 'employee-esic', group: 'EMPLOYEE_DEDUCTIONS', name: 'Employee ESIC' },
+    { id: 'professional-tax', group: 'EMPLOYEE_DEDUCTIONS', name: 'Professional Tax' },
+    { id: 'tds', group: 'EMPLOYEE_DEDUCTIONS', name: 'TDS / Income Tax' },
+    { id: 'employee-insurance', group: 'EMPLOYEE_DEDUCTIONS', name: 'Insurance Premium (Employee Share)' },
+    { id: 'other-employee-deduction', group: 'EMPLOYEE_DEDUCTIONS', name: 'Other Employee Deduction' },
   ];
 
   offerLetter = signal<any>(null);
   isGeneratingOfferLetter = signal(false);
   isSendingOfferLetter = signal(false);
+
+  // ── Per-candidate offer letter text ──────────────────────────────────────
+  showLetterEditor = signal(false);
+  isLoadingLetterDraft = signal(false);
+  isSavingLetterDraft = signal(false);
+  /** The body being edited. Plain property: ngModel on quill-editor writes it. */
+  letterDraftBody = '';
+  /** The template's own rendering, kept so "revert" needs no second request. */
+  letterTemplateBody = signal('');
+  letterDraftCustomised = signal(false);
+  letterDraftLocked = signal(false);
+
+  readonly letterQuillModules = {
+    toolbar: [
+      [{ header: [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ color: [] }, { background: [] }],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      [{ align: [] }],
+      [{ indent: '-1' }, { indent: '+1' }],
+      ['blockquote', 'link'],
+      ['clean'],
+    ],
+  };
   
   newInterview = signal<any>({});
   editInterviewMode = signal<number | null>(null);
@@ -1093,6 +1137,11 @@ export class CandidatesComponent implements OnInit {
     return d?.components?.filter((c: any) => c.group === 'EARNINGS' && c.included !== false) ?? [];
   }
 
+  /** Employee-side deductions on a saved annexure (read mode). */
+  annexureEmployeeDeductions(d: any): any[] {
+    return (d?.components || []).filter((c: any) => c.group === 'EMPLOYEE_DEDUCTIONS');
+  }
+
   annexureDeductions(d: any): any[] {
     return d?.components?.filter((c: any) => c.group === 'DEDUCTIONS' && c.included !== false) ?? [];
   }
@@ -1111,13 +1160,18 @@ export class CandidatesComponent implements OnInit {
   private recalcAnnexure(list: any[]): any[] {
     const target = Math.max(1, Math.round((this.annexureData()?.totalCTC ?? 0) / 12));
     const base = list.filter(c => c.kind !== 'BALANCER');
-    const includedFixed = base.filter(c => c.included !== false).reduce((s, c) => s + (Number(c.monthly) || 0), 0);
+    // Employee deductions come out of gross, not on top of it, so they must not
+    // consume the CTC the balancer is filling — otherwise ticking "Employee PF"
+    // would quietly cut the same amount off the candidate's allowances.
+    const includedFixed = base
+      .filter(c => c.included !== false && c.group !== 'EMPLOYEE_DEDUCTIONS')
+      .reduce((s, c) => s + (Number(c.monthly) || 0), 0);
     const balanceMonthly = Math.max(0, target - includedFixed);
     const out = base.map(c => ({ ...c }));
     if (balanceMonthly > 0) {
       out.push({
         id: 'balance',
-        name: 'Balance / Flexible Allowance',
+        name: 'Other Allowance (Balancing)',
         group: 'EARNINGS',
         kind: 'BALANCER',
         included: true,
@@ -1146,6 +1200,7 @@ export class CandidatesComponent implements OnInit {
     this.annexureEditing.set(false);
     this.annexureComponents.set([]);
     this.annexureCatId.set('');
+    this.annexureCustomName.set('');
   }
 
   /** Include/exclude a component. Excluded rows keep their amount for later. */
@@ -1188,8 +1243,78 @@ export class CandidatesComponent implements OnInit {
     this.annexureCatId.set('');
   }
 
+  /**
+   * Add a component the catalogue does not carry.
+   *
+   * The catalogue covers the usual two dozen, but a structure is a commercial
+   * document and companies keep inventing rows for it. The server already
+   * accepts any name (normalizeComponents caps it at 100 characters), so this
+   * only ever needed a way in from the screen.
+   */
+  addCustomAnnexureComponent() {
+    const name = this.annexureCustomName().trim();
+    if (!name) {
+      this.toast.error('Give the component a name');
+      return;
+    }
+
+    const taken = this.annexureComponents()
+      .some(c => String(c.name || '').trim().toLowerCase() === name.toLowerCase());
+    if (taken) {
+      this.toast.warning(`${name} is already part of the structure`);
+      return;
+    }
+
+    const next = [
+      ...this.annexureComponents(),
+      {
+        id: `custom_${Date.now()}`,
+        name: name.slice(0, 100),
+        group: this.annexureCustomGroup(),
+        kind: 'FIXED',
+        monthly: 0,
+        annual: 0,
+        included: true,
+        isCustom: true,
+      },
+    ];
+    this.annexureComponents.set(this.recalcAnnexure(next));
+    this.annexureCustomName.set('');
+  }
+
   removeAnnexureComponent(id: string) {
     this.annexureComponents.set(this.recalcAnnexure(this.annexureComponents().filter(c => c.id !== id)));
+  }
+
+  /**
+   * Put this candidate back on the company's standard structure.
+   *
+   * Confirmed first: it throws away every amount the recruiter has entered,
+   * and the components it restores are the company defaults, not what was
+   * there a moment ago.
+   */
+  resetAnnexureToCompany() {
+    const appId = this.annexureAppId();
+    if (!appId) return;
+    const ok = confirm(
+      'Rebuild this annexure from the company\'s standard salary structure?\n\n'
+      + 'Any amounts or components customised for this candidate will be discarded.');
+    if (!ok) return;
+
+    this.isSavingAnnexure.set(true);
+    this.candidatesService.resetAnnexure(appId).subscribe({
+      next: (data) => {
+        this.annexureData.set(data);
+        this.annexureComponents.set([]);
+        this.annexureEditing.set(false);
+        this.isSavingAnnexure.set(false);
+        this.toast.success('Reset to the company structure');
+      },
+      error: (err) => {
+        this.isSavingAnnexure.set(false);
+        this.toast.error(err.error?.message || 'Could not reset the CTC structure');
+      },
+    });
   }
 
   saveAnnexure() {
@@ -1210,6 +1335,127 @@ export class CandidatesComponent implements OnInit {
         this.isSavingAnnexure.set(false);
         this.toast.error(err.error?.message || 'Failed to save the CTC structure');
       }
+    });
+  }
+
+  /**
+   * Open this candidate's offer letter for editing.
+   *
+   * What loads is the finished letter, merge tags already resolved, not the
+   * template — the recruiter is changing wording for one person, and asking
+   * them to edit ##PLACEHOLDERS## would mean proof-reading a form rather than
+   * the document the candidate actually receives.
+   */
+  editOfferLetterText() {
+    const appId = this.selectedApp()?.id;
+    if (!appId) return;
+
+    this.isLoadingLetterDraft.set(true);
+    this.showLetterEditor.set(true);
+    this.candidatesService.getOfferLetterDraft(appId).subscribe({
+      next: (draft) => {
+        this.letterDraftBody = draft.body || '';
+        this.letterTemplateBody.set(draft.templateBody || '');
+        this.letterDraftCustomised.set(!!draft.isCustomised);
+        this.letterDraftLocked.set(!!draft.isLocked);
+        this.isLoadingLetterDraft.set(false);
+      },
+      error: (err) => {
+        this.isLoadingLetterDraft.set(false);
+        this.showLetterEditor.set(false);
+        this.toast.error(err.error?.message || 'Could not open the offer letter');
+      },
+    });
+  }
+
+  closeLetterEditor() {
+    this.showLetterEditor.set(false);
+    this.letterDraftBody = '';
+    this.letterTemplateBody.set('');
+    this.isLoadingLetterDraft.set(false);
+    this.isSavingLetterDraft.set(false);
+  }
+
+  saveOfferLetterText() {
+    const appId = this.selectedApp()?.id;
+    if (!appId) return;
+    if (!this.letterDraftBody || !this.letterDraftBody.trim()) {
+      this.toast.error('The offer letter cannot be saved empty');
+      return;
+    }
+
+    // Rebuilding the PDF is the point of saving — a saved body nobody
+    // regenerated is a letter that reads correctly on screen and wrong on
+    // file. The one case worth a question first is a letter the candidate can
+    // already open: the rebuild replaces what they were sent.
+    const letter = this.offerLetter();
+    if (letter && (letter.status === 'SENT' || letter.viewedAt)) {
+      const ok = confirm(
+        'Save this wording and rebuild the offer letter?\n\n' +
+        'The candidate keeps the same signing link, but any copy they have already ' +
+        'opened will be replaced by the revised text.');
+      if (!ok) return;
+    }
+
+    this.isSavingLetterDraft.set(true);
+    this.candidatesService.saveOfferLetterDraft(appId, this.letterDraftBody).subscribe({
+      next: () => {
+        this.letterDraftCustomised.set(true);
+        this.showLetterEditor.set(false);
+        this.regenerateAfterLetterEdit(appId);
+      },
+      error: (err) => {
+        this.isSavingLetterDraft.set(false);
+        this.toast.error(err.error?.message || 'Could not save the offer letter');
+      },
+    });
+  }
+
+  /**
+   * Rebuild the PDF from the text just saved.
+   *
+   * Separate from generateOfferLetter() because that one re-asks the
+   * already-sent question this flow has asked already, and because a failure
+   * here must not read as a failed save: the text is safely stored either way,
+   * and the recruiter only needs to know the document did not rebuild.
+   */
+  private regenerateAfterLetterEdit(appId: number) {
+    this.isGeneratingOfferLetter.set(true);
+    this.candidatesService.generateOfferLetter(appId).subscribe({
+      next: (letter) => {
+        this.offerLetter.set(letter);
+        this.isGeneratingOfferLetter.set(false);
+        this.isSavingLetterDraft.set(false);
+        this.toast.success('Letter saved and regenerated');
+      },
+      error: (err) => {
+        this.isGeneratingOfferLetter.set(false);
+        this.isSavingLetterDraft.set(false);
+        this.toast.error(
+          err?.error?.message
+            || 'Letter text saved, but the document could not be rebuilt — use Regenerate Letter.',
+        );
+      },
+    });
+  }
+
+  /** Discard this candidate's edits and go back to the shared template. */
+  revertOfferLetterText() {
+    const appId = this.selectedApp()?.id;
+    if (!appId) return;
+
+    this.isSavingLetterDraft.set(true);
+    this.candidatesService.resetOfferLetterDraft(appId).subscribe({
+      next: () => {
+        this.letterDraftBody = this.letterTemplateBody();
+        this.letterDraftCustomised.set(false);
+        this.isSavingLetterDraft.set(false);
+        this.toast.success('Reverted to the company template');
+      },
+      error: (err) => {
+        this.isSavingLetterDraft.set(false);
+        this.toast.error(err.error?.message || 'Could not revert the offer letter');
+      },
     });
   }
 

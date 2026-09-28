@@ -1,9 +1,34 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { PayrollSettingsService } from '../payroll/payroll-settings.service';
 import { LettersService } from '../letters/letters.service';
+import { OfferLettersService } from './offer-letters.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
+
+/**
+ * Where a salary component sits in the annexure.
+ *
+ * EARNINGS            — paid to the candidate; sums to gross.
+ * DEDUCTIONS          — employer contributions. Not paid out, but a cost to
+ *                       the company, so they count towards CTC.
+ * EMPLOYEE_DEDUCTIONS — withheld from the candidate's own gross (Employee PF,
+ *                       ESIC, professional tax). NOT part of CTC — the company
+ *                       has already been charged for this money as gross pay —
+ *                       so they only reduce net take-home.
+ */
+export type AnnexureGroup = 'EARNINGS' | 'DEDUCTIONS' | 'EMPLOYEE_DEDUCTIONS';
+
+export interface AnnexureComponent {
+  id: string;
+  name: string;
+  group: AnnexureGroup;
+  kind: 'FIXED' | 'BALANCER';
+  monthly: number;
+  annual: number;
+  included: boolean;
+}
 
 @Injectable()
 export class ApplicationsService {
@@ -14,6 +39,7 @@ export class ApplicationsService {
     private payrollSettingsService: PayrollSettingsService,
     private notificationsService: NotificationsService,
     private lettersService: LettersService,
+    private offerLettersService: OfferLettersService,
   ) {}
 
   /**
@@ -553,10 +579,13 @@ export class ApplicationsService {
   private normalizeComponents(
     raw: any[],
     targetMonthly: number,
-  ): { id: string; name: string; group: 'EARNINGS' | 'DEDUCTIONS'; kind: 'FIXED' | 'BALANCER'; monthly: number; annual: number; included: boolean }[] {
-    const items: { id: string; name: string; group: 'EARNINGS' | 'DEDUCTIONS'; kind: 'FIXED' | 'BALANCER'; monthly: number; included: boolean }[] =
+  ): AnnexureComponent[] {
+    const items: Omit<AnnexureComponent, 'annual'>[] =
       raw.map((c) => {
-        const group: 'EARNINGS' | 'DEDUCTIONS' = c?.group === 'DEDUCTIONS' ? 'DEDUCTIONS' : 'EARNINGS';
+        const group: AnnexureGroup =
+          c?.group === 'DEDUCTIONS' ? 'DEDUCTIONS'
+            : c?.group === 'EMPLOYEE_DEDUCTIONS' ? 'EMPLOYEE_DEDUCTIONS'
+              : 'EARNINGS';
         const kind: 'FIXED' | 'BALANCER' = c?.kind === 'BALANCER' ? 'BALANCER' : 'FIXED';
         const monthly = Math.max(0, Math.round(Number(c?.monthly) || 0));
         const included = c?.included !== false;
@@ -567,15 +596,20 @@ export class ApplicationsService {
 
     // The client never authors a BALANCER row; it is always derived here.
     const fixed = items.filter((c) => c.kind !== 'BALANCER');
+
+    // Employee deductions are withheld from pay the candidate has already been
+    // costed for — they are not a cost to the company and must not consume the
+    // CTC the balancer is filling, or adding "Employee PF" would silently
+    // shrink somebody's allowances by the same amount.
     const includedFixedSum = fixed
-      .filter((c) => c.included)
+      .filter((c) => c.included && c.group !== 'EMPLOYEE_DEDUCTIONS')
       .reduce((sum, c) => sum + c.monthly, 0);
 
     const balanceMonthly = Math.max(0, targetMonthly - includedFixedSum);
     let withBalance = [...fixed];
     if (balanceMonthly > 0) {
       withBalance.push({
-        id: 'balance', name: 'Balance / Flexible Allowance',
+        id: 'balance', name: 'Other Allowance (Balancing)',
         group: 'EARNINGS', kind: 'BALANCER', monthly: balanceMonthly, included: true,
       });
     }
@@ -583,6 +617,7 @@ export class ApplicationsService {
     const sorted = [
       ...withBalance.filter((c) => c.group === 'EARNINGS'),
       ...withBalance.filter((c) => c.group === 'DEDUCTIONS'),
+      ...withBalance.filter((c) => c.group === 'EMPLOYEE_DEDUCTIONS'),
     ];
 
     return sorted.map((c) => ({ ...c, annual: c.monthly * 12 }));
@@ -593,13 +628,20 @@ export class ApplicationsService {
     const visible = components.filter((c) => c.included !== false);
     const earnings = visible.filter((c) => c.group === 'EARNINGS');
     const deductions = visible.filter((c) => c.group === 'DEDUCTIONS');
+    const employeeDeductions = visible.filter((c) => c.group === 'EMPLOYEE_DEDUCTIONS');
 
     const grossMonthly = earnings.reduce((sum, c) => sum + c.monthly, 0);
     const dedMonthly = deductions.reduce((sum, c) => sum + c.monthly, 0);
+    const empDedMonthly = employeeDeductions.reduce((sum, c) => sum + c.monthly, 0);
     const grossAnnual = earnings.reduce((sum, c) => sum + c.annual, 0);
     const dedAnnual = deductions.reduce((sum, c) => sum + c.annual, 0);
+    const empDedAnnual = employeeDeductions.reduce((sum, c) => sum + c.annual, 0);
+
+    // CTC is gross plus what the employer contributes on top. What the
+    // candidate has withheld is already inside gross, so counting it again
+    // here would inflate the cost of hiring them.
     const totalMonthly = grossMonthly + dedMonthly;
-    const netMonthly = Math.max(0, grossMonthly - dedMonthly);
+    const netMonthly = Math.max(0, grossMonthly - empDedMonthly);
 
     return {
       candidateName: application.fullName,
@@ -617,6 +659,9 @@ export class ApplicationsService {
         },
         deductions: {
           totalDeductions: { annual: dedAnnual, monthly: dedMonthly },
+        },
+        employeeDeductions: {
+          totalDeductions: { annual: empDedAnnual, monthly: empDedMonthly },
         },
         netPay: {
           annual: netMonthly * 12,
@@ -639,20 +684,15 @@ export class ApplicationsService {
     if (Array.isArray((application as any).compensationStructure?.components)) {
       components = this.normalizeComponents((application as any).compensationStructure.components, targetMonthly);
     } else {
-      const settings = await this.payrollSettingsService.getSettings(companyId);
-      const basic = Math.round(targetMonthly * (settings.basicPercent / 100));
-      const hra = Math.round(targetMonthly * (settings.hraPercent / 100));
-      const pf = Math.round(basic * (settings.pfPercent / 100));
-      const gratuity = Math.round(basic * (settings.gratuityPercent / 100));
-      const special = Math.max(0, targetMonthly - (basic + hra + pf + gratuity));
+      // The company's standard structure, defined once alongside the offer
+      // letter's own table. These used to be derived here from payrollSettings
+      // while the letter derived its from offerLetterConfig, so the same
+      // candidate had two different Employer PF figures depending on which
+      // document you opened. "Other Allowance" is not in the list — it is the
+      // balancing row, derived below so the components always reconcile to the
+      // offered CTC.
       components = this.normalizeComponents(
-        [
-          { id: 'basic', name: 'Basic Salary', group: 'EARNINGS', kind: 'FIXED', monthly: basic },
-          { id: 'hra', name: 'House Rent Allowance (HRA)', group: 'EARNINGS', kind: 'FIXED', monthly: hra },
-          { id: 'special', name: 'Special Allowance / Bonus', group: 'EARNINGS', kind: 'FIXED', monthly: special },
-          { id: 'pf', name: 'Provident Fund (Employer PF)', group: 'DEDUCTIONS', kind: 'FIXED', monthly: pf },
-          { id: 'gratuity', name: 'Gratuity Allocation', group: 'DEDUCTIONS', kind: 'FIXED', monthly: gratuity },
-        ],
+        await this.offerLettersService.defaultAnnexureComponents(companyId, ctc),
         targetMonthly,
       );
     }
@@ -690,6 +730,29 @@ export class ApplicationsService {
 
     (application as any).compensationStructure = { version: 1, components: persisted };
     return this.renderAnnexure(application, components);
+  }
+
+  /**
+   * Drop a candidate's customised structure and go back to the company's.
+   *
+   * Without this a saved annexure is a one-way door: the standard structure is
+   * only ever used when none is stored, so a structure saved before the
+   * company's own changed could never be brought back into line except by
+   * editing every row by hand.
+   */
+  async resetAnnexure(id: number, companyId: number) {
+    const application = await this.findOne(id, companyId);
+    if (!application.offeredSalary) {
+      throw new BadRequestException('Cannot reset an annexure. Salary is not finalized for this application.');
+    }
+
+    await this.prisma.jobApplication.update({
+      where: { id },
+      data: { compensationStructure: Prisma.DbNull },
+    });
+
+    (application as any).compensationStructure = null;
+    return this.generateAnnexure(id, companyId);
   }
 
   // --- Interview Methods ---

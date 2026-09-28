@@ -702,6 +702,18 @@
             <span>Edit Offer Terms (CTC, joining date)</span>
           </button>
 
+          <!-- Reword the letter for this candidate alone -->
+          <button
+            type="button"
+            class="btn-edit-terms"
+            *ngIf="app.status === 'OFFERED' || app.status === 'HIRED' || app.status === 'ONBOARDED'"
+            (click)="editOfferLetterText()"
+            title="Change the wording of this candidate's offer letter"
+          >
+            <svg lucidePenLine size="15"></svg>
+            <span>Edit Offer Letter Text</span>
+          </button>
+
           <!-- Email the offer to the candidate, once a letter exists to send -->
           <button
             type="button"
@@ -1530,35 +1542,76 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Part A: EARNINGS & ALLOWANCES -->
-            <tr class="table-section-title">
-              <td colspan="3">
-                <span class="section-pill earnings">A. EARNINGS & ALLOWANCES</span>
-              </td>
+            <!--
+              Laid out as the company's own structure sheet reads, top to
+              bottom: the CTC it starts from, what the employer adds on top,
+              then the gross it resolves into, then what is withheld from the
+              candidate to reach take-home. Derived rows (CTC, Gross, Net) are
+              never editable — they are the sums the components have to satisfy.
+            -->
+
+            <!-- Cost to company -->
+            <tr class="annexure-derived-row ctc">
+              <td class="col-component"><strong>CTC</strong></td>
+              <td class="col-num"><strong>{{ (annexureEditing() ? annexureTotalMonthly() : d.monthlyCTC) | number }}</strong></td>
+              <td class="col-num"><strong>{{ (annexureEditing() ? annexureTotalAnnual() : d.totalCTC) | number }}</strong></td>
             </tr>
+
+            <!-- Employer contributions, paid on top of gross -->
+            <ng-container *ngIf="!annexureEditing(); else employerEditRows">
+              <tr *ngFor="let c of annexureDeductions(d)">
+                <td class="col-component">{{ c.name }}</td>
+                <td class="col-num">{{ c.monthly ? (c.monthly | number) : '–' }}</td>
+                <td class="col-num">{{ c.annual ? (c.annual | number) : '–' }}</td>
+              </tr>
+            </ng-container>
+            <ng-template #employerEditRows>
+              <tr *ngFor="let c of annexureDeductionsComps()" [class.annexure-excluded]="c.included === false">
+                <td class="col-component annexure-comp-name-cell">
+                  <input type="checkbox" class="annexure-comp-toggle"
+                         [checked]="c.included !== false" (change)="toggleAnnexureComponent(c.id)"
+                         title="Include {{ c.name }} in the CTC" />
+                  <span class="annexure-comp-label" [class.annexure-strike]="c.included === false">{{ c.name }}</span>
+                  <button type="button" class="annexure-remove-btn" (click)="removeAnnexureComponent(c.id)" title="Remove {{ c.name }}">
+                    <svg lucideX size="13"></svg>
+                  </button>
+                </td>
+                <td class="col-num">
+                  <input type="number" class="annexure-comp-input" min="0" step="1"
+                         [ngModel]="c.monthly" (ngModelChange)="updateAnnexureComponent(c.id, $event)"
+                         [hidden]="c.included === false"
+                         title="Monthly amount for {{ c.name }}" />
+                </td>
+                <td class="col-num font-semibold">{{ (c.monthly * 12) | number }}</td>
+              </tr>
+            </ng-template>
+
+            <tr class="annexure-spacer-row"><td colspan="3"></td></tr>
+
+            <!-- What the candidate is paid -->
             <ng-container *ngIf="!annexureEditing(); else earningsEditRows">
               <tr *ngFor="let c of annexureEarnings(d)">
-                <td class="col-component indent">{{ c.name }}</td>
-                <td class="col-num">{{ c.monthly | number }}</td>
-                <td class="col-num font-semibold">{{ c.annual | number }}</td>
+                <td class="col-component">{{ c.name }}</td>
+                <td class="col-num">{{ c.monthly ? (c.monthly | number) : '–' }}</td>
+                <td class="col-num">{{ c.annual ? (c.annual | number) : '–' }}</td>
               </tr>
             </ng-container>
             <ng-template #earningsEditRows>
               <tr *ngFor="let c of annexureEarningsComps()" [class.annexure-excluded]="c.included === false">
-                <td class="col-component indent annexure-comp-name-cell">
+                <td class="col-component annexure-comp-name-cell">
                   <input *ngIf="c.kind !== 'BALANCER'" type="checkbox" class="annexure-comp-toggle"
                          [checked]="c.included !== false" (change)="toggleAnnexureComponent(c.id)"
                          title="Include {{ c.name }} in the CTC" />
                   <span class="annexure-comp-label" [class.annexure-strike]="c.included === false">{{ c.name }}</span>
-                  <button *ngIf="c.isCustom" type="button" class="annexure-remove-btn" (click)="removeAnnexureComponent(c.id)" title="Remove {{ c.name }}">
+                  <button *ngIf="c.kind !== 'BALANCER'" type="button" class="annexure-remove-btn" (click)="removeAnnexureComponent(c.id)" title="Remove {{ c.name }}">
                     <svg lucideX size="13"></svg>
                   </button>
                 </td>
                 <td class="col-num">
-                  <ng-container *ngIf="c.kind === 'BALANCER'; else fixedMonthlyInput">
-                    <span class="annexure-auto-val"><strong>₹{{ c.monthly | number }}</strong><span class="annexure-auto-badge">Auto</span></span>
+                  <ng-container *ngIf="c.kind === 'BALANCER'; else earnFixedInput">
+                    <span class="annexure-auto-val"><strong>{{ c.monthly | number }}</strong><span class="annexure-auto-badge">Auto</span></span>
                   </ng-container>
-                  <ng-template #fixedMonthlyInput>
+                  <ng-template #earnFixedInput>
                     <input type="number" class="annexure-comp-input" min="0" step="1"
                            [ngModel]="c.monthly" (ngModelChange)="updateAnnexureComponent(c.id, $event)"
                            [hidden]="c.included === false"
@@ -1568,55 +1621,51 @@
                 <td class="col-num font-semibold">{{ (c.monthly * 12) | number }}</td>
               </tr>
             </ng-template>
-            <tr class="table-subtotal-row earnings-subtotal" [class.annexure-live]="annexureEditing()">
-              <td class="col-component"><strong>Total Gross Salary (A)</strong></td>
-              <td class="col-num"><strong>₹{{ annexureEditing() ? (annexureEarningsMonthly() | number) : d.breakdown.earnings.totalGross.monthly | number }}</strong></td>
-              <td class="col-num"><strong>₹{{ annexureEditing() ? (annexureEarningsMonthly() * 12 | number) : d.breakdown.earnings.totalGross.annual | number }}</strong></td>
+
+            <tr class="annexure-derived-row gross">
+              <td class="col-component"><strong>Gross Salary</strong></td>
+              <td class="col-num"><strong>{{ (annexureEditing() ? annexureEarningsMonthly() : d.breakdown.earnings.totalGross.monthly) | number }}</strong></td>
+              <td class="col-num"><strong>{{ (annexureEditing() ? (annexureEarningsMonthly() * 12) : d.breakdown.earnings.totalGross.annual) | number }}</strong></td>
             </tr>
-            
-            <!-- Part B: EMPLOYER CONTRIBUTIONS & STATUTORY -->
-            <tr class="table-section-title">
-              <td colspan="3">
-                <span class="section-pill deductions">B. EMPLOYER CONTRIBUTIONS & STATUTORY</span>
-              </td>
-            </tr>
-            <ng-container *ngIf="!annexureEditing(); else deductionsEditRows">
-              <tr *ngFor="let c of annexureDeductions(d)">
-                <td class="col-component indent">{{ c.name }}</td>
-                <td class="col-num">{{ c.monthly | number }}</td>
-                <td class="col-num font-semibold">{{ c.annual | number }}</td>
+
+            <!-- Withheld from gross -->
+            <ng-container *ngIf="annexureEditing() ? annexureEmployeeDedComps().length : annexureEmployeeDeductions(d).length">
+              <tr class="annexure-spacer-row"><td colspan="3"></td></tr>
+
+              <ng-container *ngIf="!annexureEditing(); else employeeDedEditRows">
+                <tr *ngFor="let c of annexureEmployeeDeductions(d)">
+                  <td class="col-component">{{ c.name }}</td>
+                  <td class="col-num">{{ c.monthly ? (c.monthly | number) : '–' }}</td>
+                  <td class="col-num">{{ c.annual ? (c.annual | number) : '–' }}</td>
+                </tr>
+              </ng-container>
+              <ng-template #employeeDedEditRows>
+                <tr *ngFor="let c of annexureEmployeeDedComps()" [class.annexure-excluded]="c.included === false">
+                  <td class="col-component annexure-comp-name-cell">
+                    <input type="checkbox" class="annexure-comp-toggle"
+                           [checked]="c.included !== false" (change)="toggleAnnexureComponent(c.id)"
+                           title="Withhold {{ c.name }} from gross pay" />
+                    <span class="annexure-comp-label" [class.annexure-strike]="c.included === false">{{ c.name }}</span>
+                    <button type="button" class="annexure-remove-btn" (click)="removeAnnexureComponent(c.id)" title="Remove {{ c.name }}">
+                      <svg lucideX size="13"></svg>
+                    </button>
+                  </td>
+                  <td class="col-num">
+                    <input type="number" class="annexure-comp-input" min="0" step="1"
+                           [ngModel]="c.monthly" (ngModelChange)="updateAnnexureComponent(c.id, $event)"
+                           [hidden]="c.included === false"
+                           title="Monthly amount withheld for {{ c.name }}" />
+                  </td>
+                  <td class="col-num font-semibold">{{ (c.monthly * 12) | number }}</td>
+                </tr>
+              </ng-template>
+
+              <tr class="annexure-derived-row net">
+                <td class="col-component"><strong>Net Take Home Salary</strong></td>
+                <td class="col-num"><strong>{{ (annexureEditing() ? annexureNetMonthly() : d.breakdown.netPay.monthly) | number }}</strong></td>
+                <td class="col-num"><strong>{{ (annexureEditing() ? (annexureNetMonthly() * 12) : d.breakdown.netPay.annual) | number }}</strong></td>
               </tr>
             </ng-container>
-            <ng-template #deductionsEditRows>
-              <tr *ngFor="let c of annexureDeductionsComps()" [class.annexure-excluded]="c.included === false">
-                <td class="col-component indent annexure-comp-name-cell">
-                  <input *ngIf="c.kind !== 'BALANCER'" type="checkbox" class="annexure-comp-toggle"
-                         [checked]="c.included !== false" (change)="toggleAnnexureComponent(c.id)"
-                         title="Include {{ c.name }} in the CTC" />
-                  <span class="annexure-comp-label" [class.annexure-strike]="c.included === false">{{ c.name }}</span>
-                  <button *ngIf="c.isCustom" type="button" class="annexure-remove-btn" (click)="removeAnnexureComponent(c.id)" title="Remove {{ c.name }}">
-                    <svg lucideX size="13"></svg>
-                  </button>
-                </td>
-                <td class="col-num">
-                  <ng-container *ngIf="c.kind === 'BALANCER'; else dedFixedMonthlyInput">
-                    <span class="annexure-auto-val"><strong>₹{{ c.monthly | number }}</strong><span class="annexure-auto-badge">Auto</span></span>
-                  </ng-container>
-                  <ng-template #dedFixedMonthlyInput>
-                    <input type="number" class="annexure-comp-input" min="0" step="1"
-                           [ngModel]="c.monthly" (ngModelChange)="updateAnnexureComponent(c.id, $event)"
-                           [hidden]="c.included === false"
-                           title="Monthly amount for {{ c.name }}" />
-                  </ng-template>
-                </td>
-                <td class="col-num font-semibold">{{ (c.monthly * 12) | number }}</td>
-              </tr>
-            </ng-template>
-            <tr class="table-subtotal-row deductions-subtotal" [class.annexure-live]="annexureEditing()">
-              <td class="col-component"><strong>Total Employer Deductions (B)</strong></td>
-              <td class="col-num"><strong>₹{{ annexureEditing() ? (annexureDeductionsMonthly() | number) : d.breakdown.deductions.totalDeductions.monthly | number }}</strong></td>
-              <td class="col-num"><strong>₹{{ annexureEditing() ? (annexureDeductionsMonthly() * 12 | number) : d.breakdown.deductions.totalDeductions.annual | number }}</strong></td>
-            </tr>
 
             <!-- Add Component (edit mode only) -->
             <tr class="annexure-add-row" *ngIf="annexureEditing()">
@@ -1628,7 +1677,7 @@
                   <select class="annexure-component-select" [(ngModel)]="annexureCatId" title="Add a salary component">
                     <option value="" disabled>Select component to add…</option>
                     <option *ngFor="let item of availableAnnexureCatalogue()" [value]="item.id">
-                      {{ item.name }} — {{ item.group === 'DEDUCTIONS' ? 'Employer Contribution' : 'Allowance' }}
+                      {{ item.name }} — {{ item.group === 'DEDUCTIONS' ? 'Employer Contribution' : item.group === 'EMPLOYEE_DEDUCTIONS' ? 'Employee Deduction' : 'Allowance' }}
                     </option>
                   </select>
                   <button type="button" class="annexure-add-btn" (click)="addAnnexureComponent()">
@@ -1636,17 +1685,28 @@
                     <span>Add Component</span>
                   </button>
                 </div>
+                <!-- Anything the catalogue does not carry, named by hand. -->
+                <div class="annexure-add-controls">
+                  <input
+                    type="text"
+                    class="annexure-custom-input"
+                    placeholder="Or type your own component name…"
+                    maxlength="100"
+                    [(ngModel)]="annexureCustomName"
+                    (keyup.enter)="addCustomAnnexureComponent()" />
+                  <select class="annexure-component-select annexure-custom-group" [(ngModel)]="annexureCustomGroup">
+                    <option value="EARNINGS">Allowance</option>
+                    <option value="DEDUCTIONS">Employer Contribution</option>
+                    <option value="EMPLOYEE_DEDUCTIONS">Employee Deduction</option>
+                  </select>
+                  <button type="button" class="annexure-add-btn" (click)="addCustomAnnexureComponent()">
+                    <svg lucideCirclePlus size="15"></svg>
+                    <span>Add Custom</span>
+                  </button>
+                </div>
               </td>
             </tr>
 
-            <!-- Grand Total -->
-            <tr class="table-grand-total-row" [class.annexure-live]="annexureEditing()">
-              <td class="col-component">
-                <span class="grand-total-label">Total Cost to Company (CTC = A + B)</span>
-              </td>
-              <td class="col-num grand-val">₹{{ annexureEditing() ? (annexureTotalMonthly() | number) : d.monthlyCTC | number }}</td>
-              <td class="col-num grand-val">₹{{ annexureEditing() ? (annexureTotalAnnual() | number) : d.totalCTC | number }}</td>
-            </tr>
           </tbody>
         </table>
       </div>
@@ -1673,6 +1733,13 @@
             <svg lucideRotateCcw size="15"></svg>
             <span>Cancel</span>
           </button>
+          <button type="button" class="btn-annexure-cancel-edit"
+                  *ngIf="annexureData()?.isCustomized"
+                  (click)="resetAnnexureToCompany()" [disabled]="isSavingAnnexure()"
+                  title="Discard this candidate's customisations and rebuild from the company structure">
+            <svg lucideRotateCcw size="15"></svg>
+            <span>Reset to company</span>
+          </button>
           <button type="button" class="btn-annexure-save" (click)="saveAnnexure()" [disabled]="isSavingAnnexure()">
             <svg lucideCheck size="15"></svg>
             <span>{{ isSavingAnnexure() ? 'Saving…' : 'Save Changes' }}</span>
@@ -1681,6 +1748,99 @@
         <button type="button" class="btn-annexure-print" (click)="printAnnexure()" [disabled]="isLoadingAnnexure()">
           <svg lucideDownload size="16"></svg>
           <span>Print / Save PDF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Offer Letter Text Editor ══════════════════════════════════════════════
+     The letter as this candidate will receive it, merge tags already resolved.
+     Editing here takes the candidate off the shared template: a later change to
+     that template deliberately will not reach them, which is the whole point of
+     tailoring one letter, so the banner says so plainly.                     -->
+<div class="modal-overlay" *ngIf="showLetterEditor()" (click)="closeLetterEditor()">
+  <div class="modal-content annexure-modal-card letter-editor-card" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="annexure-modal-header">
+      <div class="annexure-modal-header-icon">
+        <svg lucideFileText size="22"></svg>
+      </div>
+      <div class="annexure-modal-header-info">
+        <h3>Offer Letter Text</h3>
+        <p *ngIf="selectedApp() as app">
+          <strong>{{ app.fullName }}</strong> <span class="header-divider">·</span> {{ app.job?.title }}
+        </p>
+      </div>
+      <button type="button" class="modal-close-btn" (click)="closeLetterEditor()" title="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div class="annexure-loading" *ngIf="isLoadingLetterDraft()">
+      <div class="annexure-spinner"></div>
+      <p>Loading the letter…</p>
+    </div>
+
+    <!-- Body -->
+    <div class="annexure-modal-body letter-editor-body" *ngIf="!isLoadingLetterDraft()">
+      <div class="letter-editor-banner locked" *ngIf="letterDraftLocked()">
+        <svg lucideAlertCircle size="15"></svg>
+        <span>
+          This offer has already been signed. Withdraw the signed offer before
+          changing its wording — the signature applies to the text as issued.
+        </span>
+      </div>
+
+      <div class="letter-editor-banner tailored" *ngIf="!letterDraftLocked() && letterDraftCustomised()">
+        <svg lucideAlertCircle size="15"></svg>
+        <span>
+          This letter is tailored for this candidate. Changes to the company
+          template no longer reach it.
+        </span>
+        <button type="button" class="letter-revert-btn" (click)="revertOfferLetterText()"
+                [disabled]="isSavingLetterDraft()">
+          Revert to template
+        </button>
+      </div>
+
+      <div class="letter-editor-banner hint" *ngIf="!letterDraftLocked() && !letterDraftCustomised()">
+        <svg lucideAlertCircle size="15"></svg>
+        <span>
+          Showing the company template as it renders for this candidate. Saving
+          any change moves them onto their own copy of it.
+        </span>
+      </div>
+
+      <quill-editor
+        class="letter-quill"
+        [(ngModel)]="letterDraftBody"
+        [modules]="letterQuillModules"
+        [readOnly]="letterDraftLocked()"
+        placeholder="The offer letter body…">
+      </quill-editor>
+
+      <p class="letter-editor-note">
+        <code>##SALARY_TABLE##</code> marks where the compensation annexure is
+        printed — leave it in place and move it if you want the table elsewhere.
+        The letterhead and footer are not edited here; they repeat on every page
+        and come from your company settings.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="annexure-modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeLetterEditor()">Close</button>
+      <div class="annexure-footer-actions">
+        <button
+          type="button"
+          class="btn-annexure-save"
+          (click)="saveOfferLetterText()"
+          [disabled]="isSavingLetterDraft() || isLoadingLetterDraft() || letterDraftLocked()"
+        >
+          <svg lucideCheck size="15"></svg>
+          <span>{{ isSavingLetterDraft() ? 'Saving…' : 'Save Letter Text' }}</span>
         </button>
       </div>
     </div>

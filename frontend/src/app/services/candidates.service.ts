@@ -127,8 +127,29 @@ export class CandidatesService {
     return this.http.put<any>(`${this.apiUrl}/${applicationId}/annexure`, body);
   }
 
+  /** Discard the customised structure and rebuild from the company standard. */
+  resetAnnexure(applicationId: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/${applicationId}/annexure`);
+  }
+
   getOfferLetter(applicationId: number): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/${applicationId}/offer-letter`);
+  }
+
+  /** The letter body for the editor: this candidate's, or the template's. */
+  getOfferLetterDraft(applicationId: number): Observable<{
+    body: string; templateBody: string; isCustomised: boolean; isLocked: boolean;
+  }> {
+    return this.http.get<any>(`${this.apiUrl}/${applicationId}/offer-letter/draft`);
+  }
+
+  saveOfferLetterDraft(applicationId: number, body: string): Observable<{ isCustomised: boolean }> {
+    return this.http.put<any>(`${this.apiUrl}/${applicationId}/offer-letter/draft`, { body });
+  }
+
+  /** Discard this candidate's edits and go back to the shared template. */
+  resetOfferLetterDraft(applicationId: number): Observable<{ isCustomised: boolean }> {
+    return this.http.delete<any>(`${this.apiUrl}/${applicationId}/offer-letter/draft`);
   }
 
   generateOfferLetter(applicationId: number): Observable<any> {

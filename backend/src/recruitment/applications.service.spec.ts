@@ -8,7 +8,7 @@ import { ApplicationsService } from './applications.service';
  */
 describe('ApplicationsService — job offer rules', () => {
   const service = new ApplicationsService(
-    null as any, null as any, null as any, null as any,
+    null as any, null as any, null as any, null as any, null as any,
   );
 
   const assertStage = (app: any, target: string) =>
@@ -153,7 +153,7 @@ describe('ApplicationsService — job offer rules', () => {
       };
       const notifications = { notifyApprovers: jest.fn(async () => 1) };
       const svc = new ApplicationsService(
-        prisma as any, null as any, notifications as any, null as any,
+        prisma as any, null as any, notifications as any, null as any, null as any,
       );
       return { svc, update, notifications };
     };

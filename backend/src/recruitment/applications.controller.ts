@@ -111,6 +111,12 @@ export class ApplicationsController {
     return this.applicationsService.saveAnnexure(id, req.user.companyId, body);
   }
 
+  /** Discard a candidate's customised CTC structure. */
+  @Delete(':id/annexure')
+  resetAnnexure(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.applicationsService.resetAnnexure(id, req.user.companyId);
+  }
+
   @Get(':id/offer-letter')
   getOfferLetter(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.offerLettersService.getForApplication(id, req.user.companyId);
@@ -119,6 +125,27 @@ export class ApplicationsController {
   @Post(':id/offer-letter')
   generateOfferLetter(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.offerLettersService.generate(id, req.user.companyId);
+  }
+
+  /** The letter body for the editor — this candidate's, or the template's. */
+  @Get(':id/offer-letter/draft')
+  getOfferLetterDraft(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.offerLettersService.getDraft(id, req.user.companyId);
+  }
+
+  @Put(':id/offer-letter/draft')
+  saveOfferLetterDraft(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body('body') body: string,
+  ) {
+    return this.offerLettersService.saveDraft(id, req.user.companyId, body);
+  }
+
+  /** Discard this candidate's edits and go back to the shared template. */
+  @Delete(':id/offer-letter/draft')
+  resetOfferLetterDraft(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.offerLettersService.resetDraft(id, req.user.companyId);
   }
 
   @Post(':id/offer-letter/send')
