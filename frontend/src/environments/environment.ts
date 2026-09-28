@@ -6,8 +6,9 @@ export const environment = {
   mobileAppSectionEnabled: false,
   // Tawk.to live chat, careers page only. Both ids come from the Tawk
   // dashboard (Administration → Chat Widget); the embed URL is
-  // https://embed.tawk.to/<propertyId>/<widgetId>. Leave either empty and the
-  // widget stays off, which is what every non-production build wants.
+  // https://embed.tawk.to/<propertyId>/<widgetId>. Deliberately empty here and
+  // set only in environment.prod.ts: with them filled in, every developer's
+  // localhost would push test conversations into the live support inbox.
   tawkPropertyId: '',
   tawkWidgetId: '',
   production: false,
