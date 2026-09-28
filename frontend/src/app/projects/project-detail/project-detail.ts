@@ -37,6 +37,7 @@ import { MasterDataService } from '../../services/master-data.service';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, ModuleRegistry, AllCommunityModule, ValidationModule, CellClickedEvent } from 'ag-grid-community';
+import { RoleService } from '../../services/role.service';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 
@@ -72,6 +73,7 @@ declare var Quill: any;
 })
 export class ProjectDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
+  private roles = inject(RoleService);
   private router = inject(Router);
   private projectsService = inject(ProjectsService);
   private authService = inject(AuthService);
@@ -1815,6 +1817,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     // The money tabs are role-gated: a PM-less viewer who lands with one of
     // them restored from localStorage (or pasted via the URL) falls back to
     // the board rather than seeing an empty, privileged panel.
+    // Summary is gated on its own rule: a project manager sees their own
+    // project's summary without needing the financial tabs.
+    if (tab === 'summary' && !this.canSeeSummary) {
+      tab = 'board';
+    }
+
     const restrictedTabs = ['milestones', 'budget-requests', 'reports'];
     if (restrictedTabs.includes(tab) && !this.canSeeFinancialTabs) {
       tab = 'board';
@@ -3893,6 +3901,59 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     } else {
       this.filterSelectedLabels.set([...current, labelId]);
     }
+  }
+
+  /**
+   * Who may read the project Summary (§PB5).
+   *
+   * The summary is the commercial read of a project — budget consumed, spend
+   * against plan, delivery risk. That is a conversation between whoever runs
+   * the delivery and whoever carries the cost, not something an employee
+   * assigned to two tasks on the board should open by clicking a tab.
+   *
+   * Finance keeps it because they already see the financial tabs; hiding the
+   * summary from the people who approve the budget it reports on would be
+   * theatre.
+   */
+  get canSeeSummary(): boolean {
+    return this.roles.isSuperAdmin()
+      || this.roles.hasRole('FINANCE')
+      || this.isCurrentUserPM()
+      || this.isProjectOwner;
+  }
+
+  /**
+   * Delete the open task (§PB4).
+   *
+   * Named in the confirmation, because "are you sure?" over a board of forty
+   * cards is not a question anybody can answer. The server refuses a task with
+   * time logged against it and says why; that message is shown as-is rather
+   * than replaced with something vaguer.
+   */
+  deleteSelectedIssue() {
+    const issue = this.selectedIssue();
+    if (!issue || !this.canDeleteTasks) return;
+
+    const ok = confirm(
+      `Delete ${issue.key} — "${issue.title}"?\n\n`
+      + 'This cannot be undone. Comments, checklists and attachments go with it. '
+      + 'Sub-tasks are kept and become top-level tasks.\n\n'
+      + 'To take it off the board without destroying the record, archive it instead.');
+    if (!ok) return;
+
+    this.projectsService.deleteIssue(this.projectId, issue.id).subscribe({
+      next: () => {
+        this.allIssues.set(this.allIssues().filter(i => i.id !== issue.id));
+        this.closeDrawer();
+        this.toast.success(`${issue.key} deleted`);
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not delete the task'),
+    });
+  }
+
+  /** Deleting a task outright is the company owner's alone (§PB4). */
+  get canDeleteTasks(): boolean {
+    return this.roles.isSuperAdmin();
   }
 
   isCurrentUserPM(): boolean {

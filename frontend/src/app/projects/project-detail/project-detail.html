@@ -537,7 +537,7 @@
 
   <!-- Secondary Tab Bar -->
   <div class="project-tabs-bar">
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'summary'" (click)="setProjectTab('summary')"><svg lucideGlobe size="14"></svg> Summary</button>
+    <button class="project-tab-btn" *ngIf="canSeeSummary" [class.active]="activeProjectTab() === 'summary'" (click)="setProjectTab('summary')"><svg lucideGlobe size="14"></svg> Summary</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'board'" (click)="setProjectTab('board')"><svg lucideKanban size="14"></svg> Board</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'list'" (click)="setProjectTab('list')"><svg lucideList size="14"></svg> Tasks</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'milestones'" (click)="setProjectTab('milestones')" *ngIf="canSeeFinancialTabs"><svg lucideFlag size="14"></svg> Milestones<span class="tab-count" *ngIf="projectMilestones().length > 0">{{ projectMilestones().length }}</span></button>
@@ -2847,6 +2847,16 @@
             <span>Reject Task</span>
           </button>
         </ng-container>
+
+        <!-- Delete, Super Admin only (§PB4). The board archives otherwise. -->
+        <button class="modal-action-btn"
+                *ngIf="canDeleteTasks"
+                style="background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca;"
+                (click)="deleteSelectedIssue()"
+                title="Delete this task permanently">
+          <svg lucideTrash2 size="14" class="btn-icon-svg"></svg>
+          <span>Delete Task</span>
+        </button>
 
         <!-- Priority -->
         <div class="popover-container">

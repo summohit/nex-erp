@@ -47,6 +47,7 @@ function sameValue(next: unknown, current: unknown): boolean {
 }
 import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
 import { resolveProjectViewer, taskVisibilityFilter, mayChangeAnyTask, seesEveryTask, PROJECT_ROLE } from '../project-roles';
+import { isSuperAdmin } from '../../common/company-roles';
 
 @Injectable()
 export class IssuesService {
@@ -212,6 +213,50 @@ export class IssuesService {
     this.tasksGateway.emitActivityAdded(issue.id, activity);
 
     return issue;
+  }
+
+  /**
+   * Delete a task outright (§PB4). Super Admin only.
+   *
+   * The board archives rather than deletes, deliberately — work that happened
+   * is a record of what happened. This is the one way to actually remove a
+   * task, so it is the company owner's alone.
+   *
+   * Refused once time has been logged against it. IssueTimeLog cascades on
+   * delete and the timesheet service reads those rows directly, so deleting
+   * such a task does not merely lose the task: it silently rewrites weeks that
+   * people have already submitted, and were possibly paid or billed against.
+   * Archiving takes the task off the board and leaves the record intact, which
+   * is what somebody reaching for delete almost always actually wants.
+   *
+   * Sub-tasks are not deleted with it — Issue.parentId is SetNull, so they
+   * survive as top-level tasks rather than disappearing with their parent.
+   */
+  async deleteIssue(
+    companyId: number, projectId: number, issueId: number, role?: string,
+  ) {
+    if (!isSuperAdmin(role)) {
+      throw new ForbiddenException('Only a Super Admin can delete a task.');
+    }
+
+    const issue = await this.prisma.issue.findFirst({
+      where: { id: issueId, projectId, companyId },
+      select: { id: true, key: true, title: true, _count: { select: { timeLogs: true } } },
+    });
+    if (!issue) throw new NotFoundException('Task not found');
+
+    if (issue._count.timeLogs > 0) {
+      throw new BadRequestException(
+        `${issue.key} has ${issue._count.timeLogs} time log(s) against it. `
+        + 'Deleting it would remove those hours from timesheets that have already '
+        + 'been submitted. Archive the task instead.',
+      );
+    }
+
+    await this.prisma.issue.delete({ where: { id: issue.id } });
+    this.tasksGateway.emitIssueUpdated(issue.id, projectId, { id: issue.id, deleted: true });
+
+    return { deleted: true, key: issue.key, title: issue.title };
   }
 
   /**

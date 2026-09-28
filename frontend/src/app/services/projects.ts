@@ -179,6 +179,11 @@ export class ProjectsService {
     return this.http.put<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/archive`, {});
   }
 
+  /** Delete a task outright. Super Admin only; the server decides. */
+  deleteIssue(projectId: number, issueId: number) {
+    return this.http.delete<any>(`${this.apiUrl}/${projectId}/issues/${issueId}`);
+  }
+
   getChecklists(projectId: number, issueId: number) {
     return this.http.get<any[]>(`${this.apiUrl}/${projectId}/issues/${issueId}/checklists`);
   }

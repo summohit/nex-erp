@@ -71,6 +71,16 @@ export class IssuesController {
     return this.issuesService.toggleArchive(req.user.companyId, actorEmployeeId, projectId, id, req.user.role);
   }
 
+  /** Delete a task outright. Super Admin only — the board otherwise archives. */
+  @Delete(':id')
+  deleteIssue(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.issuesService.deleteIssue(req.user.companyId, projectId, id, req.user.role);
+  }
+
   @Post(':id/review')
   reviewIssue(
     @Req() req,
