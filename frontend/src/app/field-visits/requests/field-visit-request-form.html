@@ -173,15 +173,17 @@
         <div class="field-row">
           <div class="field">
             <label>Start Date</label>
-            <input type="date" [(ngModel)]="form.startDate" />
+            <input type="date" [(ngModel)]="form.startDate" (ngModelChange)="onScheduleDateChange()" />
           </div>
           <div class="field">
             <label>End Date</label>
-            <input type="date" [(ngModel)]="form.endDate" />
+            <input type="date" [(ngModel)]="form.endDate" [min]="form.startDate || null"
+                   (ngModelChange)="onScheduleDateChange()" />
           </div>
           <div class="field days-field">
             <label>Duration</label>
-            <div class="days-value-pill">
+            <div class="days-value-pill" [class.is-empty]="!visitDays()"
+                 title="Calculated from the start and end dates">
               <svg lucideCalendarDays [size]="15"></svg>
               <span>{{ visitDays() ? (visitDays() + (visitDays() === 1 ? ' Day' : ' Days')) : '—' }}</span>
             </div>

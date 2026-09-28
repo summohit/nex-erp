@@ -175,15 +175,50 @@ export class FieldVisitRequestFormComponent implements OnInit {
    * The server derives this the same way and refuses a request whose count
    * disagrees, so showing it here means nobody types "3 days" over a five-day
    * range and finds out at submit.
+   *
+   * A method rather than a computed(): `form` is a plain object driven by
+   * ngModel, not a signal, so a computed() over it took a dependency on
+   * nothing, ran once while both dates were still empty, and cached 0 — the
+   * field read "—" no matter what dates you picked.
    */
-  visitDays = computed(() => {
+  visitDays(): number {
     const { startDate, endDate } = this.form;
     if (!startDate || !endDate) return 0;
     const from = Date.parse(`${startDate}T00:00:00Z`);
     const to = Date.parse(`${endDate}T00:00:00Z`);
     if (Number.isNaN(from) || Number.isNaN(to) || to < from) return 0;
     return Math.round((to - from) / DAY_MS) + 1;
-  });
+  }
+
+  /** The last range complaint raised, so one bad range toasts once. */
+  private lastDateComplaint: string | null = null;
+
+  /**
+   * Duration is derived, so the only way a date range can fail is silently —
+   * the pill drops back to "—" and nothing says why. Say why instead.
+   */
+  onScheduleDateChange(): void {
+    const { startDate, endDate } = this.form;
+    if (!startDate || !endDate) {
+      this.lastDateComplaint = null;
+      return;
+    }
+
+    const from = Date.parse(`${startDate}T00:00:00Z`);
+    const to = Date.parse(`${endDate}T00:00:00Z`);
+
+    let complaint: string | null = null;
+    if (Number.isNaN(from) || Number.isNaN(to)) {
+      complaint = 'That date could not be read — pick the start and end from the calendar.';
+    } else if (to < from) {
+      complaint = 'The end date is before the start date, so the visit has no duration.';
+    }
+
+    if (complaint && complaint !== this.lastDateComplaint) {
+      this.toast.error(complaint);
+    }
+    this.lastDateComplaint = complaint;
+  }
 
   mapUrl(): SafeResourceUrl {
     const { latitude, longitude } = this.form;
@@ -452,6 +487,18 @@ export class FieldVisitRequestFormComponent implements OnInit {
   }
 
   save(submit: boolean): void {
+    // The server derives the day count itself and rejects a range it cannot
+    // make sense of. Catching it here costs a round trip less and says which
+    // field is wrong while the person is still looking at it.
+    if (!this.visitDays()) {
+      const message = !this.form.startDate || !this.form.endDate
+        ? 'Pick a start and end date for the visit.'
+        : 'The end date is before the start date, so the visit has no duration.';
+      this.toast.error(message);
+      this.error.set(message);
+      return;
+    }
+
     this.error.set(null);
     this.isSaving.set(true);
 

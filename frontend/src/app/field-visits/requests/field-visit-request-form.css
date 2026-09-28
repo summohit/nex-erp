@@ -1242,3 +1242,12 @@
   .task-inputs { flex-direction: column; }
   .member-picker-grid { grid-template-columns: 1fr; }
 }
+
+
+/* Duration is derived, never typed. Greyed while there is nothing to derive
+   it from, so an empty pill reads as "waiting on the dates" and not as a
+   field somebody forgot to enable. */
+.days-value-pill.is-empty {
+  color: #94a3b8;
+  background: #f8fafc;
+}
