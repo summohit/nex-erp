@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MasterDataService, Department, Designation, Branch, LeaveType, Holiday, TaskType, ProjectPhase, DefaultProjectTask, VisitLocation } from '../../services/master-data.service';
 import { ShiftsService } from '../../services/shifts.service';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -24,6 +25,21 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 declare const L: any;
 
 type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-types' | 'project-phases' | 'default-project-tasks' | 'visit-locations' | 'holidays' | 'blackout-dates' | 'shifts';
+
+/**
+ * The tabs a `?tab=` in the URL is allowed to name.
+ *
+ * The parameter exists so a deep link can land on one tab rather than on
+ * whichever happens to be first — the field visit form's "Manage Sites" sends
+ * people straight to `visit-locations`. Anything unrecognised is ignored rather
+ * than set, so a stale or hand-typed link cannot leave the page showing a tab
+ * that does not exist.
+ */
+const TABS: readonly Tab[] = [
+  'departments', 'designations', 'branches', 'leave-types', 'task-types',
+  'project-phases', 'default-project-tasks', 'visit-locations', 'holidays',
+  'blackout-dates', 'shifts',
+];
 
 export interface BlackoutDate {
   id: number;
@@ -53,6 +69,8 @@ export class MasterDataComponent implements OnInit {
   private shiftsService = inject(ShiftsService);
   private toast = inject(HotToastService);
   private sanitizer = inject(DomSanitizer);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   activeTab = signal<Tab>('departments');
   
@@ -1429,6 +1447,14 @@ export class MasterDataComponent implements OnInit {
 
   ngOnInit() {
     this.loadData();
+
+    // A `?tab=` beats the default. Read once, synchronously, because the template
+    // keys off activeTab() and painting Departments for a frame before swapping
+    // to the tab somebody asked for is exactly the flash this is here to avoid.
+    const requested = this.route.snapshot.queryParamMap.get('tab') as Tab | null;
+    if (requested && TABS.includes(requested)) {
+      this.activeTab.set(requested);
+    }
   }
 
   loadData() {
@@ -1453,6 +1479,14 @@ export class MasterDataComponent implements OnInit {
 
   switchTab(tab: Tab) {
     this.activeTab.set(tab);
+    // Keep the address bar in step, so a reload — or a copied link — comes back
+    // to the tab being looked at rather than to Departments.
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab },
+      queryParamsHandling: '',
+      replaceUrl: true,
+    });
   }
 
   openModal(mode: 'create' | 'edit', item?: any) {
